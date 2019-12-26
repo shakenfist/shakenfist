@@ -1,3 +1,5 @@
 pycdlib             # lgpl
 randmac             # mit
 oslo.concurrency    # apache2
+libvirt-python      # lgpl
+jinja2              # bsd

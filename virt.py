@@ -3,9 +3,11 @@
 import base64
 import email.utils
 import hashlib
+import jinja2
 import logging
 import io
 import json
+import libvirt
 import os
 import pycdlib
 import randmac
@@ -25,15 +27,19 @@ VALIDATED_IMAGE_FIELDS = ['Last-Modified', 'Content-Length']
 
 
 class Instance(object):
-    def __init__(self, uuid, name, tenant, image_url, root_size):
+    def __init__(self, uuid=None, name=None, tenant=None, image_url=None, root_size_gb=None, memory_kb=None, vcpus=None):
         self.uuid = uuid
         self.name = name
         self.tenant = tenant
         self.image_url = image_url
-        self.root_size = root_size
+        self.root_size = str(root_size_gb) + 'G'
+        self.memory = memory_kb
+        self.vcpus = vcpus
+
+        # TODO(mikal): sanity check instance specification
 
         self.sshkey = 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC2Pas6zLLgzXsUSZzt8E8fX7tzpwmNlrsbAeH9YoI2snfo+cKfO1BZVQgJnJVz+hGhnC1mzsMZMtdW2NRonRgeeQIPTUFXJI+3dyGzmiNrmtH8QQz++7zsmdwngeXKDrYhD6JGnPTkKcjShYcbvB/L3IDDJvepLxVOGRJBVHXJzqHgA62AtVsoiECKxFSn8MOuRfPHj5KInLxOEX9i/TfYKawSiId5xEkWWtcrp4QhjuoLv4UHL2aKs85ppVZFTmDHHcx3Au7pZ7/T9NOcUrvnwmQDVIBeU0LEELzuQZWLkFYvStAeCF7mYra+EJVXjiCQ9ZBw0vXGqJR1SU+W6dh9 mikal@kolla-m1'
-        self.mac_address = str(randmac.RandMac('00:00:00:00:00:00', True))
+        self.mac_address = str(randmac.RandMac('52:54:00:00:00:00', True))
 
         # Ensure we have state on disk
         self.instance_path = os.path.join(
@@ -56,6 +62,8 @@ class Instance(object):
         self._transcode_image()
         self._resize_image()
         self._create_root_disk()
+        self._create_domain_xml()
+        self._create_domain()
 
     def _make_config_drive(self):
         """Create a config drive"""
@@ -147,8 +155,9 @@ class Instance(object):
                    joliet_path='/openstack/2017-02-22/vendor_data2.json')
 
         # Dump to disk
+        self.config_disk_file = os.path.join(self.instance_path, 'config.disk')
         LOG.debug('%s: Writing config drive to %s' %(self.uuid, self.instance_path))
-        iso.write(os.path.join(self.instance_path, 'config.disk'))
+        iso.write(self.config_disk_file)
         iso.close()
 
     def _fetch_image(self):
@@ -212,27 +221,78 @@ class Instance(object):
     def _transcode_image(self):
         """Convert the image to qcow2."""
 
-        if not os.path.exists(self.hashed_image_path + '.qcow2'):
-            LOG.info('%s: Transcoding image to qcow2' % self.uuid)
-            processutils.execute(
-                'qemu-img', 'convert', '-t', 'none', '-O', 'qcow2',
-                self.hashed_image_path, self.hashed_image_path + '.qcow2')
-            LOG.info('%s: Transcoding image to qcow2 complete' % self.uuid)
+        if os.path.exists(self.hashed_image_path + '.qcow2'):
+            return
+
+        LOG.info('%s: Transcoding image to qcow2' % self.uuid)
+        processutils.execute(
+            'qemu-img', 'convert', '-t', 'none', '-O', 'qcow2',
+            self.hashed_image_path, self.hashed_image_path + '.qcow2')
+        LOG.info('%s: Transcoding image to qcow2 complete' % self.uuid)
 
     def _resize_image(self):
         """Resize the image to the specified size."""
 
         self.root_backing_file = self.hashed_image_path + '.qcow2'  + '.' + self.root_size
-        if not os.path.exists(self.root_backing_file):
-            LOG.info('%s: Resizing image to %s' %(self.uuid, self.root_size))
-            shutil.copyfile(self.hashed_image_path + '.qcow2', self.root_backing_file)
-            processutils.execute(
-                'qemu-img', 'resize', self.root_backing_file, self.root_size)
-            LOG.info('%s: Resizing image to %s complete' %(self.uuid, self.root_size))
+        if os.path.exists(self.root_backing_file):
+            return
+
+        LOG.info('%s: Resizing image to %s' %(self.uuid, self.root_size))
+        shutil.copyfile(self.hashed_image_path + '.qcow2', self.root_backing_file)
+        processutils.execute(
+            'qemu-img', 'resize', self.root_backing_file, self.root_size)
+        LOG.info('%s: Resizing image to %s complete' %(self.uuid, self.root_size))
 
     def _create_root_disk(self):
         """Create the root disk as a COW layer on top of the image cache."""
 
+        self.root_disk_file = os.path.join(self.instance_path, 'root.qcow2')
+        if os.path.exists(self.root_disk_file):
+            return
+
         processutils.execute(
             'qemu-img', 'create', '-b', self.root_backing_file,
-            '-f', 'qcow2', os.path.join(self.instance_path, 'root.qcow2'))
+            '-f', 'qcow2', self.root_disk_file)
+
+    def _create_domain_xml(self):
+        """Create the domain XML for the instance."""
+
+        self.xml_file = os.path.join(self.instance_path, 'libvirt.xml')
+        if os.path.exists(self.xml_file):
+            return
+
+        with open(os.path.join(config.parsed.get('STORAGE_PATH'), 'template.xml')) as f:
+            t = jinja2.Template(f.read())
+
+        xml = t.render(
+            uuid=self.uuid,
+            memory=self.memory,
+            vcpus=self.vcpus,
+            disk_root=self.root_disk_file,
+            disk_config=self.config_disk_file,
+            eth0_mac=self.mac_address
+        )
+
+        with open(self.xml_file, 'w') as f:
+            f.write(xml)
+
+        LOG.info('%s: Creating domain XML' % self.uuid)
+
+    def _create_domain(self):
+        with open(self.xml_file) as f:
+            xml = f.read()
+
+        conn = libvirt.open(None)
+        try:
+            instance = conn.lookupByName('sf:' + self.uuid)
+            LOG.info('%s: libvirt domain already exists' % self.uuid)
+            return
+
+        except libvirt.libvirtError:
+            instance = conn.createLinux(xml, 0)
+            if not instance:
+                LOG.error('%s: Failed to create libvirt domain' % self.uuid)
+                return
+
+            LOG.info('%s: Created libvirt domain' % self.uuid)
+

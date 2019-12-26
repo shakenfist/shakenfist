@@ -9,5 +9,11 @@ import virt
 logging.basicConfig(level=logging.DEBUG)
 
 
-uuid = str(uuid.uuid4())
-instance = virt.Instance(uuid, 'instance', 'tenant', 'https://cloud-images.ubuntu.com/disco/current/disco-server-cloudimg-amd64.img', '20G')
+instance = virt.Instance(
+    uuid=str(uuid.uuid4()),
+    name='foo',
+    tenant=None,
+    image_url='https://cloud-images.ubuntu.com/disco/current/disco-server-cloudimg-amd64.img',
+    root_size_gb=20,
+    memory_kb=4 * 1024 * 1024,
+    vcpus=1)
