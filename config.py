@@ -5,8 +5,8 @@ import os
 
 
 CONFIG_DEFAULTS = {
-    'INSTANCE_PATH': '/srv/shaken',     # Where on disk to store instance data
-    'ZONE': 'shaken',                   # What nova called an availability zone
+    'STORAGE_PATH': '/srv/shakenfist',      # Where on disk to store data
+    'ZONE': 'shaken',                       # What nova called an availability zone
 }
 
 
