@@ -15,5 +15,5 @@ instance = virt.Instance(
     tenant=None,
     image_url='https://cloud-images.ubuntu.com/disco/current/disco-server-cloudimg-amd64.img',
     root_size_gb=20,
-    memory_kb=4 * 1024 * 1024,
+    memory_kb=1 * 1024 * 1024,
     vcpus=1)
