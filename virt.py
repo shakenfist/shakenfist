@@ -45,7 +45,7 @@ class Instance(object):
     def create(self):
         # Ensure we have state on disk
         self.instance_path = os.path.join(
-            config.parsed.get('STORAGE_PATH'), 'instances', uuid)
+            config.parsed.get('STORAGE_PATH'), 'instances', self.uuid)
         if not os.path.exists(self.instance_path):
             LOG.debug('%s: Creating instance storage at %s' %
                       (self.uuid, self.instance_path))
