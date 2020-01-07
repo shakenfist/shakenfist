@@ -12,6 +12,7 @@ import os
 import pycdlib
 import randmac
 import shutil
+import time
 import urllib.request
 
 from oslo_concurrency import processutils
@@ -45,25 +46,34 @@ class Instance(object):
         self.instance_path = os.path.join(
             config.parsed.get('STORAGE_PATH'), 'instances', uuid)
         if not os.path.exists(self.instance_path):
-            LOG.debug('%s: Creating instance storage at %s' %(self.uuid, self.instance_path))
+            LOG.debug('%s: Creating instance storage at %s' %
+                      (self.uuid, self.instance_path))
             os.makedirs(self.instance_path)
 
         self.image_cache_path = os.path.join(
-           config.parsed.get('STORAGE_PATH'), 'image_cache')
+            config.parsed.get('STORAGE_PATH'), 'image_cache')
         if not os.path.exists(self.image_cache_path):
-            LOG.debug('%s: Creating image cache at %s' %(self.uuid, self.image_cache_path))
+            LOG.debug('%s: Creating image cache at %s' %
+                      (self.uuid, self.image_cache_path))
             os.makedirs(self.image_cache_path)
 
         # Generate a config drive
-        self._make_config_drive()
+        with RecordedOperation('make config drive', self) as ro:
+            self._make_config_drive()
 
         # Prepare the root disk image
-        self._fetch_image()
-        self._transcode_image()
-        self._resize_image()
-        self._create_root_disk()
-        self._create_domain_xml()
-        self._create_domain()
+        with RecordedOperation('fetch image', self) as ro:
+            self._fetch_image()
+        with RecordedOperation('transcode image', self) as ro:
+            self._transcode_image()
+        with RecordedOperation('resize image', self) as ro:
+            self._resize_image()
+        with RecordedOperation('create root disk', self) as ro:
+            self._create_root_disk()
+        with RecordedOperation('create domain XML', self) as ro:
+            self._create_domain_xml()
+        with RecordedOperation('create domain', self) as ro:
+            self._create_domain()
 
     def _make_config_drive(self):
         """Create a config drive"""
@@ -156,7 +166,6 @@ class Instance(object):
 
         # Dump to disk
         self.config_disk_file = os.path.join(self.instance_path, 'config.disk')
-        LOG.debug('%s: Writing config drive to %s' %(self.uuid, self.instance_path))
         iso.write(self.config_disk_file)
         iso.close()
 
@@ -167,12 +176,14 @@ class Instance(object):
         h = hashlib.sha256()
         h.update(self.image_url.encode('utf-8'))
         self.hashed_image_url = h.hexdigest()
-        LOG.debug('%s: Image %s hashes to %s' %(self.uuid, self.image_url, self.hashed_image_url))
+        LOG.debug('%s: Image %s hashes to %s' %
+                  (self.uuid, self.image_url, self.hashed_image_url))
 
         # Populate cache if its empty
-        self.hashed_image_path = os.path.join(self.image_cache_path, self.hashed_image_url)
+        self.hashed_image_path = os.path.join(
+            self.image_cache_path, self.hashed_image_url)
 
-        if not os.path.exists(self.hashed_image_path +  '.info'):
+        if not os.path.exists(self.hashed_image_path + '.info'):
             info = {
                 'url': self.image_url,
                 'hash': self.hashed_image_url,
@@ -216,7 +227,8 @@ class Instance(object):
             with open(self.hashed_image_path + '.info', 'w') as f:
                 f.write(json.dumps(info, indent=4, sort_keys=True))
 
-            LOG.info('%s: Fetching image complete (%d bytes)' %(self.uuid, fetched))
+            LOG.info('%s: Fetching image complete (%d bytes)' %
+                     (self.uuid, fetched))
 
     def _transcode_image(self):
         """Convert the image to qcow2."""
@@ -224,24 +236,21 @@ class Instance(object):
         if os.path.exists(self.hashed_image_path + '.qcow2'):
             return
 
-        LOG.info('%s: Transcoding image to qcow2' % self.uuid)
         processutils.execute(
             'qemu-img', 'convert', '-t', 'none', '-O', 'qcow2',
             self.hashed_image_path, self.hashed_image_path + '.qcow2')
-        LOG.info('%s: Transcoding image to qcow2 complete' % self.uuid)
 
     def _resize_image(self):
         """Resize the image to the specified size."""
 
-        self.root_backing_file = self.hashed_image_path + '.qcow2'  + '.' + self.root_size
+        self.root_backing_file = self.hashed_image_path + '.qcow2' + '.' + self.root_size
         if os.path.exists(self.root_backing_file):
             return
 
-        LOG.info('%s: Resizing image to %s' %(self.uuid, self.root_size))
-        shutil.copyfile(self.hashed_image_path + '.qcow2', self.root_backing_file)
+        shutil.copyfile(self.hashed_image_path +
+                        '.qcow2', self.root_backing_file)
         processutils.execute(
             'qemu-img', 'resize', self.root_backing_file, self.root_size)
-        LOG.info('%s: Resizing image to %s complete' %(self.uuid, self.root_size))
 
     def _create_root_disk(self):
         """Create the root disk as a COW layer on top of the image cache."""
@@ -276,8 +285,6 @@ class Instance(object):
         with open(self.xml_file, 'w') as f:
             f.write(xml)
 
-        LOG.info('%s: Creating domain XML' % self.uuid)
-
     def _create_domain(self):
         with open(self.xml_file) as f:
             xml = f.read()
@@ -285,7 +292,6 @@ class Instance(object):
         conn = libvirt.open(None)
         try:
             instance = conn.lookupByName('sf:' + self.uuid)
-            LOG.info('%s: libvirt domain already exists' % self.uuid)
             return
 
         except libvirt.libvirtError:
@@ -294,5 +300,18 @@ class Instance(object):
                 LOG.error('%s: Failed to create libvirt domain' % self.uuid)
                 return
 
-            LOG.info('%s: Created libvirt domain' % self.uuid)
 
+class RecordedOperation():
+    def __init__(self, operation, instance):
+        self.operation = operation
+        self.instance = instance
+
+    def __enter__(self):
+        self.start_time = time.time()
+        LOG.info('%s: Start %s' % (self.instance.uuid, self.operation))
+        return self
+
+    def __exit__(self, *args):
+        LOG.info('%s: Finish %s, duration %.02f seconds'
+                 % (self.instance.uuid, self.operation,
+                    time.time() - self.start_time))
