@@ -75,6 +75,9 @@ class Instance(object):
         with RecordedOperation('create domain', self) as ro:
             self._create_domain()
 
+    def __str__(self):
+        return 'instance(%s)' % self.uuid
+
     def _make_config_drive(self):
         """Create a config drive"""
 
@@ -308,10 +311,10 @@ class RecordedOperation():
 
     def __enter__(self):
         self.start_time = time.time()
-        LOG.info('%s: Start %s' % (self.instance.uuid, self.operation))
+        LOG.info('%s: Start %s' % (self.instance, self.operation))
         return self
 
     def __exit__(self, *args):
         LOG.info('%s: Finish %s, duration %.02f seconds'
-                 % (self.instance.uuid, self.operation,
+                 % (self.instance, self.operation,
                     time.time() - self.start_time))
