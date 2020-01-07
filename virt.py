@@ -12,12 +12,12 @@ import os
 import pycdlib
 import randmac
 import shutil
-import time
 import urllib.request
 
 from oslo_concurrency import processutils
 
 import config
+import util
 
 
 LOG = logging.getLogger(__file__)
@@ -42,6 +42,7 @@ class Instance(object):
         self.sshkey = 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC2Pas6zLLgzXsUSZzt8E8fX7tzpwmNlrsbAeH9YoI2snfo+cKfO1BZVQgJnJVz+hGhnC1mzsMZMtdW2NRonRgeeQIPTUFXJI+3dyGzmiNrmtH8QQz++7zsmdwngeXKDrYhD6JGnPTkKcjShYcbvB/L3IDDJvepLxVOGRJBVHXJzqHgA62AtVsoiECKxFSn8MOuRfPHj5KInLxOEX9i/TfYKawSiId5xEkWWtcrp4QhjuoLv4UHL2aKs85ppVZFTmDHHcx3Au7pZ7/T9NOcUrvnwmQDVIBeU0LEELzuQZWLkFYvStAeCF7mYra+EJVXjiCQ9ZBw0vXGqJR1SU+W6dh9 mikal@kolla-m1'
         self.mac_address = str(randmac.RandMac('52:54:00:00:00:00', True))
 
+    def create(self):
         # Ensure we have state on disk
         self.instance_path = os.path.join(
             config.parsed.get('STORAGE_PATH'), 'instances', uuid)
@@ -58,21 +59,21 @@ class Instance(object):
             os.makedirs(self.image_cache_path)
 
         # Generate a config drive
-        with RecordedOperation('make config drive', self) as ro:
+        with util.RecordedOperation('make config drive', self) as ro:
             self._make_config_drive()
 
         # Prepare the root disk image
-        with RecordedOperation('fetch image', self) as ro:
+        with util.RecordedOperation('fetch image', self) as ro:
             self._fetch_image()
-        with RecordedOperation('transcode image', self) as ro:
+        with util.RecordedOperation('transcode image', self) as ro:
             self._transcode_image()
-        with RecordedOperation('resize image', self) as ro:
+        with util.RecordedOperation('resize image', self) as ro:
             self._resize_image()
-        with RecordedOperation('create root disk', self) as ro:
+        with util.RecordedOperation('create root disk', self) as ro:
             self._create_root_disk()
-        with RecordedOperation('create domain XML', self) as ro:
+        with util.RecordedOperation('create domain XML', self) as ro:
             self._create_domain_xml()
-        with RecordedOperation('create domain', self) as ro:
+        with util.RecordedOperation('create domain', self) as ro:
             self._create_domain()
 
     def __str__(self):
@@ -302,19 +303,3 @@ class Instance(object):
             if not instance:
                 LOG.error('%s: Failed to create libvirt domain' % self.uuid)
                 return
-
-
-class RecordedOperation():
-    def __init__(self, operation, instance):
-        self.operation = operation
-        self.instance = instance
-
-    def __enter__(self):
-        self.start_time = time.time()
-        LOG.info('%s: Start %s' % (self.instance, self.operation))
-        return self
-
-    def __exit__(self, *args):
-        LOG.info('%s: Finish %s, duration %.02f seconds'
-                 % (self.instance, self.operation,
-                    time.time() - self.start_time))
