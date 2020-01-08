@@ -2,6 +2,7 @@
 
 import jinja2
 import logging
+import os
 
 from oslo_concurrency import processutils
 
