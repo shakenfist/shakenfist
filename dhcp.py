@@ -42,7 +42,7 @@ class DHCP(object):
         subst['config_dir'] = self.config_dir_path
 
         processutils.execute(
-            'docker rm -f %(dhcp_interface)s' % subst, shell=True)
+            'docker rm -f %(dhcp_interface)s' % subst, shell=True, check_exit_code=[0, 1])
 
         processutils.execute(
             'docker run -d --name %(dhcp_interface)s --restart=always '
