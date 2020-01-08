@@ -102,6 +102,7 @@ class Network(object):
                     'ip addr add 192.168.200.1/24 dev %(dhcp_interface)s' % subst,
                     shell=True)
 
+        if self.provide_dhcp:
             self.dhcp = dhcp.DHCP(self)
             self.update_dhcp()
 
