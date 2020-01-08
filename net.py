@@ -38,9 +38,11 @@ class Network(object):
             self.nodes = []
 
         if self.provide_dhcp:
-            self.dhcp_interface = 'dhcp-%s' % self.vx_interface
+            self.dhcp_interface = 'dhcpd-%s' % self.vxlan_id
+            self.dhcp_peer = 'dhcpp-%s' % self.vxlan_id
         else:
             self.dhcp_interface = None
+            self.dhcp_peer = None
 
     def __str__(self):
         return 'network(%s, vxid %s)' % (self.uuid, self.vxlan_id)
@@ -51,6 +53,7 @@ class Network(object):
             'vx_interface': self.vx_interface,
             'vx_bridge': self.vx_bridge,
             'dhcp_interface': self.dhcp_interface,
+            'dhcp_peer': self.dhcp_peer,
             'phy_interface': self.physical_nic,
 
             'ipblock': self.ipnetwork.network_address,
@@ -87,14 +90,14 @@ class Network(object):
             with util.RecordedOperation('create dhcp interface', self) as ro:
                 processutils.execute(
                     'ip link add %(dhcp_interface)s type veth peer name '
-                    '%(dhcp_interface)s-peer' % subst, shell=True)
+                    '%(dhcp_peer)s' % subst, shell=True)
                 processutils.execute(
-                    'ip link set %(dhcp_interface)s-peer master %(vx_bridge)s'
+                    'ip link set %(dhcp_peer)s master %(vx_bridge)s'
                     % subst, shell=True)
                 processutils.execute(
                     'ip link set %(dhcp_interface)s up' % subst, shell=True)
                 processutils.execute(
-                    'ip link set %(dhcp_interface)s-peer up' % subst, shell=True)
+                    'ip link set %(dhcp_peer)s up' % subst, shell=True)
                 processutils.execute(
                     'ip addr add 192.168.200.1/24 dev %(dhcp_interface)s' % subst,
                     shell=True)
