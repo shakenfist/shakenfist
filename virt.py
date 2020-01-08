@@ -42,13 +42,16 @@ class Instance(object):
         self.sshkey = 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC2Pas6zLLgzXsUSZzt8E8fX7tzpwmNlrsbAeH9YoI2snfo+cKfO1BZVQgJnJVz+hGhnC1mzsMZMtdW2NRonRgeeQIPTUFXJI+3dyGzmiNrmtH8QQz++7zsmdwngeXKDrYhD6JGnPTkKcjShYcbvB/L3IDDJvepLxVOGRJBVHXJzqHgA62AtVsoiECKxFSn8MOuRfPHj5KInLxOEX9i/TfYKawSiId5xEkWWtcrp4QhjuoLv4UHL2aKs85ppVZFTmDHHcx3Au7pZ7/T9NOcUrvnwmQDVIBeU0LEELzuQZWLkFYvStAeCF7mYra+EJVXjiCQ9ZBw0vXGqJR1SU+W6dh9 mikal@kolla-m1'
         self.mac_address = str(randmac.RandMac('52:54:00:00:00:00', True))
 
+    def __str__(self):
+        return 'instance(%s)' % self.uuid
+
     def create(self):
         # Ensure we have state on disk
         self.instance_path = os.path.join(
             config.parsed.get('STORAGE_PATH'), 'instances', self.uuid)
         if not os.path.exists(self.instance_path):
             LOG.debug('%s: Creating instance storage at %s' %
-                      (self.uuid, self.instance_path))
+                      (self, self.instance_path))
             os.makedirs(self.instance_path)
 
         self.image_cache_path = os.path.join(
@@ -75,9 +78,6 @@ class Instance(object):
             self._create_domain_xml()
         with util.RecordedOperation('create domain', self) as ro:
             self._create_domain()
-
-    def __str__(self):
-        return 'instance(%s)' % self.uuid
 
     def _make_config_drive(self):
         """Create a config drive"""
@@ -181,7 +181,7 @@ class Instance(object):
         h.update(self.image_url.encode('utf-8'))
         self.hashed_image_url = h.hexdigest()
         LOG.debug('%s: Image %s hashes to %s' %
-                  (self.uuid, self.image_url, self.hashed_image_url))
+                  (self, self.image_url, self.hashed_image_url))
 
         # Populate cache if its empty
         self.hashed_image_path = os.path.join(
@@ -210,7 +210,7 @@ class Instance(object):
 
         # If the image is missing, or has changed, fetch
         if image_dirty:
-            LOG.info('%s: Fetching image' % self.uuid)
+            LOG.info('%s: Fetching image' % self)
             info['version'] += 1
             info['fetched_at'] = email.utils.formatdate()
 
@@ -232,7 +232,7 @@ class Instance(object):
                 f.write(json.dumps(info, indent=4, sort_keys=True))
 
             LOG.info('%s: Fetching image complete (%d bytes)' %
-                     (self.uuid, fetched))
+                     (self, fetched))
 
     def _transcode_image(self):
         """Convert the image to qcow2."""
@@ -241,8 +241,9 @@ class Instance(object):
             return
 
         processutils.execute(
-            'qemu-img', 'convert', '-t', 'none', '-O', 'qcow2',
-            self.hashed_image_path, self.hashed_image_path + '.qcow2')
+            'qemu-img convert -t none -O qcow2 %s %s.qcow2'
+            % (self.hashed_image_path, self.hashed_image_path),
+            shell=True)
 
     def _resize_image(self):
         """Resize the image to the specified size."""
@@ -254,7 +255,8 @@ class Instance(object):
         shutil.copyfile(self.hashed_image_path +
                         '.qcow2', self.root_backing_file)
         processutils.execute(
-            'qemu-img', 'resize', self.root_backing_file, self.root_size)
+            'qemu-img resize %s %s' % (self.root_backing_file, self.root_size),
+            shell=True)
 
     def _create_root_disk(self):
         """Create the root disk as a COW layer on top of the image cache."""
@@ -264,8 +266,9 @@ class Instance(object):
             return
 
         processutils.execute(
-            'qemu-img', 'create', '-b', self.root_backing_file,
-            '-f', 'qcow2', self.root_disk_file)
+            'qemu-img create -b %s -f qcow2 %s'
+            % (self.root_backing_file, self.root_disk_file),
+            shell=True)
 
     def _create_domain_xml(self):
         """Create the domain XML for the instance."""
@@ -301,5 +304,5 @@ class Instance(object):
         except libvirt.libvirtError:
             instance = conn.createLinux(xml, 0)
             if not instance:
-                LOG.error('%s: Failed to create libvirt domain' % self.uuid)
+                LOG.error('%s: Failed to create libvirt domain' % self)
                 return

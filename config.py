@@ -2,11 +2,19 @@
 
 import copy
 import os
+import socket
 
 
 CONFIG_DEFAULTS = {
-    'STORAGE_PATH': '/srv/shakenfist',      # Where on disk to store data
-    'ZONE': 'shaken',                       # What nova called an availability zone
+    # Where on disk to store data
+    'STORAGE_PATH': '/srv/shakenfist',
+
+    # What nova called an availability zone
+    'ZONE': 'shaken',
+
+    ### NODE SPECIFIC ###
+    # The IP of this node
+    'NODE_IP': socket.gethostbyname(socket.getfqdn())
 }
 
 

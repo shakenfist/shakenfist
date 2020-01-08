@@ -3,12 +3,22 @@
 import logging
 import uuid
 
+import net
 import util
 import virt
 
 
 logging.basicConfig(level=logging.DEBUG)
 
+
+network = net.Network(
+    uuid=str(uuid.uuid4()),
+    vxlan_id=1,
+    provide_dhcp=False,
+    physical_nic='eth0',
+    nodes=['35.223.115.132', '34.70.161.180'])
+with util.RecordedOperation('network creation', network) as ro:
+    network.create()
 
 instance = virt.Instance(
     uuid=str(uuid.uuid4()),
