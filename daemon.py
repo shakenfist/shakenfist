@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 network = net.Network(
     uuid=str(uuid.uuid4()),
-    vxlan_id=2,
+    vxlan_id=3,
     provide_dhcp=True,
     physical_nic='eth0',
     nodes=['35.223.115.132', '34.70.161.180'],

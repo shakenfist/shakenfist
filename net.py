@@ -109,7 +109,7 @@ class Network(object):
 
     def update_dhcp(self):
         with util.RecordedOperation('update dhcp', self) as ro:
-            self.dhcp.create()
+            self.dhcp.make_config()
             self.dhcp.restart_dhcpd()
 
     def discover_mesh(self):
