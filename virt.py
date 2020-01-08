@@ -58,7 +58,7 @@ class Instance(object):
             config.parsed.get('STORAGE_PATH'), 'image_cache')
         if not os.path.exists(self.image_cache_path):
             LOG.debug('%s: Creating image cache at %s' %
-                      (self.uuid, self.image_cache_path))
+                      (self, self.image_cache_path))
             os.makedirs(self.image_cache_path)
 
         # Generate a config drive

@@ -1,11 +1,13 @@
 # Copyright 2020 Michael Still
 
+import ipaddress
 import logging
 import re
 
 from oslo_concurrency import processutils
 
 import config
+import dhcp
 import util
 
 
@@ -17,7 +19,7 @@ class Network(object):
     # NOTE(mikal): it should be noted that the maximum interface name length
     # on Linux is 15 user visible characters.
     def __init__(self, uuid=None, vxlan_id=1, provide_dhcp=False,
-                 physical_nic='eth0', nodes=None):
+                 physical_nic='eth0', nodes=None, ipblock=None):
         self.uuid = uuid
         self.vxlan_id = vxlan_id
         self.provide_dhcp = provide_dhcp
@@ -25,6 +27,8 @@ class Network(object):
 
         self.vx_interface = 'vxlan-%s' % self.vxlan_id
         self.vx_bridge = 'br-%s' % self.vx_interface
+
+        self.ipnetwork = ipaddress.ip_network(ipblock, strict=False)
 
         if nodes:
             self.nodes = nodes
@@ -41,17 +45,24 @@ class Network(object):
     def __str__(self):
         return 'network(%s, vxid %s)' % (self.uuid, self.vxlan_id)
 
-    def _subst_dict(self):
+    def subst_dict(self):
         return {
             'vx_id': self.vxlan_id,
             'vx_interface': self.vx_interface,
             'vx_bridge': self.vx_bridge,
             'dhcp_interface': self.dhcp_interface,
             'phy_interface': self.physical_nic,
+
+            'ipblock': self.ipnetwork.network_address,
+            'netmask': self.ipnetwork.netmask,
+            'router': list(self.ipnetwork.hosts())[0],
+            'broadcast': self.ipnetwork.broadcast_address,
+
+            'vms': [],
         }
 
     def create(self):
-        subst = self._subst_dict()
+        subst = self.subst_dict()
 
         if not util.check_for_interface(self.vx_interface):
             with util.RecordedOperation('create vxlan interface', self) as ro:
@@ -88,19 +99,22 @@ class Network(object):
                     'ip addr add 192.168.200.1/24 dev %(dhcp_interface)s' % subst,
                     shell=True)
 
-                # Create DHCP config file
-
-                #'docker run -it --rm --init --net host -v /srv/shakenfist/dhcp:/data networkboot/dhcpd %(dhcp_interface)s'
-            pass
+            self.dhcp = dhcp.DHCP(self)
+            self.update_dhcp()
 
         self.ensure_mesh(self.nodes)
+
+    def update_dhcp(self):
+        with util.RecordedOperation('update dhcp', self) as ro:
+            self.dhcp.create()
+            self.dhcp.restart_dhcpd()
 
     def discover_mesh(self):
         mesh_re = re.compile('00: 00: 00: 00: 00: 00 dst (.*) self permanent')
 
         with util.RecordedOperation('discover mesh', self) as ro:
             stdout, _ = processutils.execute(
-                'bridge fdb show brport %(vx_interface)s' % self._subst_dict(),
+                'bridge fdb show brport %(vx_interface)s' % self.subst_dict(),
                 shell=True)
 
             for line in stdout.split('\n'):
@@ -121,7 +135,7 @@ class Network(object):
 
     def _add_mesh_element(self, node):
         LOG.info('%s: Adding new mesh element %s' % (self, node))
-        subst = self._subst_dict()
+        subst = self.subst_dict()
         subst['node'] = node
         processutils.execute(
             'bridge fdb append to 00:00:00:00:00:00 dst %(node)s dev %(vx_interface)s'
@@ -130,7 +144,7 @@ class Network(object):
 
     def _remove_mesh_element(self, node):
         LOG.info('%s: Removing excess mesh element %s' % (self, node))
-        subst = self._subst_dict()
+        subst = self.subst_dict()
         subst['node'] = node
         processutils.execute(
             'bridge fdb del to 00:00:00:00:00:00 dst %(node)s dev %(vx_interface)s'

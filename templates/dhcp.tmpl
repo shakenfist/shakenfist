@@ -1,0 +1,17 @@
+default-lease-time 3600;
+max-lease-time 7200;
+option domain-name-servers 8.8.8.8;
+authoritative;
+
+subnet {{ipblock}} netmask {{netmask}} {
+  option routers {{router}};
+  option broadcast-address {{broadcast}};
+
+  {%- for vm in vms -%}
+  host {{uuid}} {
+    hardware ethernet {{eth0_mac}};
+    fixed-address {{eth0_ip}};
+    option host-name "{{name}}";
+  }
+  {%- endfor -%}
+}
