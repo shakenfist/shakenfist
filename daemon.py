@@ -30,5 +30,10 @@ instance = virt.Instance(
     root_size_gb=20,
     memory_kb=1 * 1024 * 1024,
     vcpus=1)
+
+with util.RecordedOperation('allocate ip address', instance) as ro:
+    network.allocate_ip_to_instance(instance)
+    network.update_dhcp()
+
 with util.RecordedOperation('instance creation', instance) as ro:
     instance.create()

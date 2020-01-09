@@ -7,11 +7,12 @@ subnet {{ipblock}} netmask {{netmask}} {
   option routers {{router}};
   option broadcast-address {{broadcast}};
 
-  {%- for vm in vms -%}
-  host {{uuid}} {
-    hardware ethernet {{eth0_mac}};
-    fixed-address {{eth0_ip}};
-    option host-name "{{name}}";
+  {% for vm in instances %}
+  host {{vm.uuid}} {
+    hardware ethernet {{vm.eth0_mac}};
+    fixed-address {{vm.eth0_ip}};
+    option host-name "{{vm.name}}";
   }
-  {%- endfor -%}
+
+  {% endfor %}
 }

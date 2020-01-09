@@ -2,6 +2,7 @@
 
 import ipaddress
 import logging
+import random
 import re
 
 from oslo_concurrency import processutils
@@ -44,11 +45,26 @@ class Network(object):
             self.dhcp_interface = None
             self.dhcp_peer = None
 
+        self.instances = []
+
     def __str__(self):
         return 'network(%s, vxid %s)' % (self.uuid, self.vxlan_id)
 
+    def allocate_ip_to_instance(self, instance):
+        addresses = list(self.ipnetwork.hosts())[1:]
+
+        for i in self.instances:
+            if i.eth0_ip in addresses:
+                addresses.remove(i.eth0_ip)
+
+        random.shuffle(addresses)
+        addr =  addresses[0]
+
+        instance.set_network_details(addr, self.subst_dict())
+        self.instances.append(instance)
+
     def subst_dict(self):
-        return {
+        retval = {
             'vx_id': self.vxlan_id,
             'vx_interface': self.vx_interface,
             'vx_bridge': self.vx_bridge,
@@ -61,8 +77,20 @@ class Network(object):
             'router': list(self.ipnetwork.hosts())[0],
             'broadcast': self.ipnetwork.broadcast_address,
 
-            'vms': [],
+            'instances': [],
         }
+
+        for i in self.instances:
+            retval['instances'].append(
+                {
+                    'uuid': i.uuid,
+                    'eth0_mac': i.eth0_mac,
+                    'eth0_ip': i.eth0_ip,
+                    'name': i.name,
+                }
+            )
+
+        return retval
 
     def create(self):
         subst = self.subst_dict()

@@ -32,7 +32,9 @@ class DHCP(object):
         with open(os.path.join(config.parsed.get('STORAGE_PATH'), 'dhcp.tmpl')) as f:
             t = jinja2.Template(f.read())
 
-        c = t.render(self.network.subst_dict())
+        subst = self.network.subst_dict()
+        print(subst)
+        c = t.render(subst)
 
         with open(os.path.join(self.config_dir_path, 'dhcpd.conf'), 'w') as f:
             f.write(c)

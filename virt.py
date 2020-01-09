@@ -40,10 +40,16 @@ class Instance(object):
         # TODO(mikal): sanity check instance specification
 
         self.sshkey = 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC2Pas6zLLgzXsUSZzt8E8fX7tzpwmNlrsbAeH9YoI2snfo+cKfO1BZVQgJnJVz+hGhnC1mzsMZMtdW2NRonRgeeQIPTUFXJI+3dyGzmiNrmtH8QQz++7zsmdwngeXKDrYhD6JGnPTkKcjShYcbvB/L3IDDJvepLxVOGRJBVHXJzqHgA62AtVsoiECKxFSn8MOuRfPHj5KInLxOEX9i/TfYKawSiId5xEkWWtcrp4QhjuoLv4UHL2aKs85ppVZFTmDHHcx3Au7pZ7/T9NOcUrvnwmQDVIBeU0LEELzuQZWLkFYvStAeCF7mYra+EJVXjiCQ9ZBw0vXGqJR1SU+W6dh9 mikal@kolla-m1'
-        self.mac_address = str(randmac.RandMac('52:54:00:00:00:00', True))
+        self.eth0_mac = str(randmac.RandMac('52:54:00:00:00:00', True)).lstrip('\'').rstrip('\'')
+        self.eth0_ip = None
 
     def __str__(self):
         return 'instance(%s)' % self.uuid
+
+    def set_network_details(self, ip, network_subst):
+        LOG.info('%s: Setting IP to %s' % (self, ip))
+        self.eth0_ip = ip
+        self.network_subst = network_subst
 
     def create(self):
         # Ensure we have state on disk
@@ -125,7 +131,7 @@ class Instance(object):
         nd = json.dumps({
             'links': [
                 {
-                    'ethernet_mac_address': self.mac_address,
+                    'ethernet_mac_address': self.eth0_mac,
                     'id': 'eth0',
                     'name': 'eth0',
                     'mtu': 1450,
@@ -277,7 +283,7 @@ class Instance(object):
         if os.path.exists(self.xml_file):
             return
 
-        with open(os.path.join(config.parsed.get('STORAGE_PATH'), 'template.xml')) as f:
+        with open(os.path.join(config.parsed.get('STORAGE_PATH'), 'libvirt.tmpl')) as f:
             t = jinja2.Template(f.read())
 
         xml = t.render(
@@ -286,7 +292,8 @@ class Instance(object):
             vcpus=self.vcpus,
             disk_root=self.root_disk_file,
             disk_config=self.config_disk_file,
-            eth0_mac=self.mac_address
+            eth0_mac=self.eth0_mac,
+            eth0_bridge=self.network_subst['vx_bridge'],
         )
 
         with open(self.xml_file, 'w') as f:
