@@ -101,6 +101,9 @@ class Network(object):
                     'ip link add %(vx_interface)s type vxlan id %(vx_id)s '
                     'dev %(phy_interface)s dstport 0'
                     % subst, shell=True)
+                processutils.execute(
+                    'sysctl -w net.ipv4.conf.%(vx_interface)s.arp_notify=1' % subst,
+                    shell=True)
 
         if not util.check_for_interface(self.vx_bridge):
             with util.RecordedOperation('create vxlan bridge', self) as ro:
@@ -113,6 +116,13 @@ class Network(object):
                     'ip link set %(vx_interface)s up' % subst, shell=True)
                 processutils.execute(
                     'ip link set %(vx_bridge)s up' % subst, shell=True)
+                processutils.execute(
+                    'sysctl -w net.ipv4.conf.%(vx_bridge)s.arp_notify=1' % subst,
+                    shell=True)
+                processutils.execute(
+                    'brctl setfd %(vx_bridge)s 0' % subst, shell=True)
+                processutils.execute(
+                    'brctl stp %(vx_bridge)s off' % subst, shell=True)
 
         if self.provide_dhcp and not util.check_for_interface(self.dhcp_interface):
             with util.RecordedOperation('create dhcp interface', self) as ro:
