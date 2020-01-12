@@ -7,9 +7,9 @@ import re
 
 from oslo_concurrency import processutils
 
-import config
-import dhcp
-import util
+from shakenfist import config
+from shakenfist import dhcp
+from shakenfist import util
 
 
 LOG = logging.getLogger(__file__)
@@ -58,7 +58,7 @@ class Network(object):
                 addresses.remove(i.eth0_ip)
 
         random.shuffle(addresses)
-        addr =  addresses[0]
+        addr = addresses[0]
 
         instance.set_network_details(addr, self.subst_dict())
         self.instances.append(instance)

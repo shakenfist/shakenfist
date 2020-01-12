@@ -1,5 +1,9 @@
 pycdlib             # lgpl
 randmac             # mit
 oslo.concurrency    # apache2
-libvirt-python      # lgpl
 jinja2              # bsd
+alembic             # mit
+mysqlclient         # gpl
+
+# Is difficult to get install working, use system packages
+#libvirt-python      # lgpl

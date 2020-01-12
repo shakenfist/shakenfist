@@ -16,8 +16,8 @@ import urllib.request
 
 from oslo_concurrency import processutils
 
-import config
-import util
+from shakenfist import config
+from shakenfist import util
 
 
 LOG = logging.getLogger(__file__)
@@ -40,7 +40,8 @@ class Instance(object):
         # TODO(mikal): sanity check instance specification
 
         self.sshkey = 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC2Pas6zLLgzXsUSZzt8E8fX7tzpwmNlrsbAeH9YoI2snfo+cKfO1BZVQgJnJVz+hGhnC1mzsMZMtdW2NRonRgeeQIPTUFXJI+3dyGzmiNrmtH8QQz++7zsmdwngeXKDrYhD6JGnPTkKcjShYcbvB/L3IDDJvepLxVOGRJBVHXJzqHgA62AtVsoiECKxFSn8MOuRfPHj5KInLxOEX9i/TfYKawSiId5xEkWWtcrp4QhjuoLv4UHL2aKs85ppVZFTmDHHcx3Au7pZ7/T9NOcUrvnwmQDVIBeU0LEELzuQZWLkFYvStAeCF7mYra+EJVXjiCQ9ZBw0vXGqJR1SU+W6dh9 mikal@kolla-m1'
-        self.eth0_mac = str(randmac.RandMac('52:54:00:00:00:00', True)).lstrip('\'').rstrip('\'')
+        self.eth0_mac = str(randmac.RandMac(
+            '52:54:00:00:00:00', True)).lstrip('\'').rstrip('\'')
         self.eth0_ip = None
 
     def __str__(self):

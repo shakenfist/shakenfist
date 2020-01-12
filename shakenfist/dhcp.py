@@ -6,8 +6,8 @@ import os
 
 from oslo_concurrency import processutils
 
-import config
-import util
+from shakenfist import config
+from shakenfist import util
 
 
 LOG = logging.getLogger(__file__)
