@@ -29,16 +29,87 @@ Virtual networks / micro segmentation is provided by VXLAN meshes betwen the ins
 Installation
 ============
 
-Do the following:
+Build an acceptable hypervisor node, noting that only Debian is supported. On Google Cloud, this looks like this:
 
-* Debian (production): sudo apt-get install python3-dev default-libmysqlclient-dev
+```bash
+# Create an image with nested virt enabled (only once)
+gcloud compute disks create disk1 --image-project debian-cloud \
+    --image-family debian-9 --zone us-central1-b
+gcloud compute images create nested-vm-image \
+  --source-disk disk1 --source-disk-zone us-central1-b \
+  --licenses "https://compute.googleapis.com/compute/v1/projects/vm-options/global/licenses/enable-vmx"
 
-* install docker on each hypervisor node.
+# Start our hypervisor node VM
+gcloud compute instances create sf-1 --zone us-central1-b \
+    --min-cpu-platform "Intel Haswell" --image nested-vm-image
+```
 
-* install mysql somewhere, and then provide that as a sqlalchemy connection URL in CONFIG.SQL_URL.
+Now on the hypervisor node:
 
-* python3 -m venv ~/virtualenvs/shakenfist
-* . ~/virtualenvs/shakenfist/bin/activate
-* python3 setup.py develop
+```bash
+sudo apt-get update
+sudo apt-get dist-upgrade -y
+sudo apt-get install -y python3-dev python3-pip default-libmysqlclient-dev \
+    qemu-kvm libvirt-daemon-system libvirt-dev git pwgen dnsutils \
+    mysql-client python3-libvirt
+```
 
-* update the database by running ```alembic upgrade head``` from the shakenfist directory.
+Install Docker (needed for MySQL and DHCP at the moment):
+
+```bash
+sudo apt-get install -y apt-transport-https ca-certificates curl gnupg2 \
+    software-properties-common
+curl -fsSL https://download.docker.com/linux/debian/gpg | sudo apt-key add -
+sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable"
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+```
+
+Fetch shakenfist:
+
+```bash
+git clone https://github.com/mikalstill/shakenfist
+cd shakenfist
+pip3 install -U setuptools
+sudo pip3 install -e .
+```
+
+Create the storage directory structure:
+
+```bash
+sudo mkdir -p /srv/shakenfist/mariadb
+sudo cp templates/libvirt.debian.tmpl /srv/shakenfist/libvirt.tmpl
+sudo cp templates/dhcp.tmpl /srv/shakenfist/
+```
+
+Run mysql in a docker container:
+
+```bash
+ROOT_PASSWORD=`pwgen -N 1`
+DB_PASSWORD=`pwgen -N 1`
+NODE_IP=`dig @resolver1.opendns.com ANY myip.opendns.com +short`
+
+echo "export SHAKENFIST_NODE_IP=$NODE_IP" >> ~/sf.sh
+echo "export SHAKENFIST_DB_ROOT_PASSWORD=$ROOT_PASSWORD" >> ~/sf.sh
+echo "export SHAKENFIST_DB_PASSWORD=$DB_PASSWORD" >> ~/sf.sh
+echo "export SHAKENFIST_SQL_URL=mysql://sf:$DB_PASSWORD@$NODE_IP/sf" >> ~/sf.sh
+. ~/sf.sh
+
+sudo docker run --name sfdb -d -e MYSQL_ROOT_PASSWORD="$ROOT_PASSWORD" \
+    -e MYSQL_DATABASE=sf -e MYSQL_USER=sf -e MYSQL_PASSWORD="$DB_PASSWORD" \
+    -v /srv/shakenfist/mysql:/var/lib/mysql -p 3306:3306 \
+    mariadb
+```
+
+It may take a couple of minutes for the database to be ready for queries. You can confirm with `docker logs sfdb`. Then confirm you can acccess the database:
+
+```bash
+mysql -h $SHAKENFIST_NODE_IP -u sf --password=$SHAKENFIST_DB_PASSWORD sf -e "show tables;"
+```
+
+You should get back no output (including no error messages). Now upgrade the MySQL database to the latest schema version:
+
+```bash
+cd shakenfist
+alembic upgrade head
+```

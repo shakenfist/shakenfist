@@ -29,6 +29,4 @@ class RecordedOperation():
 def check_for_interface(name):
     stdout, stderr = processutils.execute(
         'ip link show %s' % name, check_exit_code=[0, 1], shell=True)
-    print(stderr)
-    print(not stderr.endswith(' does not exist.'))
     return not stderr.rstrip('\n').endswith(' does not exist.')
