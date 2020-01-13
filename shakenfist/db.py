@@ -2,11 +2,13 @@
 
 import datetime
 import logging
+import uuid
 
 from sqlalchemy import create_engine
-from sqlalchemy import Column, String, DateTime
+from sqlalchemy import Boolean, Column, Integer, String, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import exc, sessionmaker
+from sqlalchemy.sql.expression import func
 
 
 from shakenfist import config
@@ -35,8 +37,9 @@ class Node(Base):
         self.lastseen = datetime.datetime.now()
 
 
-def see_this_node():
-    session = Session()
+def see_this_node(session=None):
+    if not session:
+        session = Session()
 
     try:
         node = session.query(Node).filter(
@@ -48,13 +51,10 @@ def see_this_node():
 
     node.lastseen = datetime.datetime.now()
 
-    session.commit()
-    session.close()
-
 
 def get_node_ips():
-    see_this_node()
     session = Session()
+    see_this_node(session=session)
 
     try:
         nodes = session.query(Node).all()
@@ -63,4 +63,60 @@ def get_node_ips():
     except exc.NoResultFound:
         pass
     finally:
+        session.commit()
+        session.close()
+
+
+class Network(Base):
+    __tablename__ = 'networks'
+
+    uuid = Column(String, primary_key=True)
+    vxid = Column(Integer)
+    netblock = Column(String)
+    provide_dhcp = Column(Boolean)
+    provide_nat = Column(Boolean)
+    owner = Column(String)
+
+    def __init__(self, uuid, vxid, netblock, provide_dhcp, provide_nat, owner):
+        self.uuid = uuid
+        self.vxid = vxid
+        self.netblock = netblock
+        self.provide_dhcp = provide_dhcp
+        self.provide_nat = provide_nat
+        self.owner = owner
+
+
+def get_networks():
+    session = Session()
+    see_this_node(session=session)
+
+    try:
+        networks = session.query(Network).all()
+        for n in networks:
+            yield n
+    except exc.NoResultFound:
+        pass
+    finally:
+        session.commit()
+        session.close()
+
+
+def allocate_network(netblock):
+    session = Session()
+    see_this_node(session=session)
+
+    try:
+        netid = str(uuid.uuid4())
+
+        for r in session.query(func.max(Network.vxid)).first():
+            if r:
+                vxid = r + 1
+            else:
+                vxid = 1
+
+        n = Network(netid, vxid, netblock, True, False, None)
+        session.add(n)
+        return n
+    finally:
+        session.commit()
         session.close()

@@ -1,4 +1,4 @@
-"""Create nodes table.
+"""Add nodes table.
 
 Revision ID: 51dc0aa2792b
 Revises: 

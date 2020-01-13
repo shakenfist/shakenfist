@@ -5,6 +5,7 @@ jinja2              # bsd
 sqlalchemy          # mit
 alembic             # mit
 mysqlclient         # gpl
+setproctitle        # bsd
 
 # Is difficult to get install working, use system packages
 #libvirt-python      # lgpl

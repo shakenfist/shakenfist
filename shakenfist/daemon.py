@@ -1,6 +1,10 @@
 # Copyright 2019 Michael Still
 
+import copy
 import logging
+import setproctitle
+import time
+import os
 import uuid
 
 from shakenfist import db
@@ -11,19 +15,48 @@ from shakenfist import virt
 
 logging.basicConfig(level=logging.DEBUG)
 
+LOG = logging.getLogger(__file__)
+LOG.setLevel(logging.DEBUG)
 
-db.see_this_node()
 
-node_ips = list(db.get_node_ips())
-network = net.Network(
-    uuid=str(uuid.uuid4()),
-    vxlan_id=3,
-    provide_dhcp=True,
-    physical_nic='eth0',
-    nodes=node_ips,
-    ipblock='192.168.200.0/24')
-with util.RecordedOperation('network creation', network) as ro:
-    network.create()
+# Network mesh maintenance
+netmon_pid = os.fork()
+if netmon_pid == 0:
+    setproctitle.setproctitle('sf netmon')
+    node_ips = list(db.get_node_ips())
+    for n in db.get_networks():
+        network = net.Network(
+            uuid=n.uuid,
+            vxlan_id=n.vxid,
+            provide_dhcp=n.provide_dhcp,
+            physical_nic='eth0',
+            nodes=node_ips,
+            ipblock=n.netblock)
+        with util.RecordedOperation('network creation', network) as ro:
+            network.create()
+
+    while True:
+        time.sleep(30)
+
+        node_ips = list(db.get_node_ips())
+        for n in db.get_networks():
+            network = net.Network(
+                uuid=n.uuid,
+                vxlan_id=n.vxid,
+                provide_dhcp=n.provide_dhcp,
+                physical_nic='eth0',
+                nodes=node_ips,
+                ipblock=n.netblock)
+            network.ensure_mesh(copy.deepcopy(node_ips))
+
+setproctitle.setproctitle('sf main')
+LOG.info('netmod pid is %d' % netmod_pid)
+
+while True:
+    time.sleep(10)
+    wpid, status = os.waitpid(-1, os.WNOHANG)
+    LOG.warning('Subprocess %d died' % wpid)
+
 
 # instance = virt.Instance(
 #     uuid=str(uuid.uuid4()),
