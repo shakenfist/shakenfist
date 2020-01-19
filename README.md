@@ -47,31 +47,10 @@ gcloud compute instances create sf-1 --zone us-central1-b \
 Now on the hypervisor node:
 
 ```bash
-sudo apt-get update
-sudo apt-get dist-upgrade -y
-sudo apt-get install -y python3-dev python3-pip default-libmysqlclient-dev \
-    qemu-kvm libvirt-daemon-system libvirt-dev git pwgen dnsutils \
-    mysql-client python3-libvirt
-```
-
-Install Docker (needed for MySQL and DHCP at the moment):
-
-```bash
-sudo apt-get install -y apt-transport-https ca-certificates curl gnupg2 \
-    software-properties-common
-curl -fsSL https://download.docker.com/linux/debian/gpg | sudo apt-key add -
-sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable"
-sudo apt-get update
-sudo apt-get install -y docker-ce docker-ce-cli containerd.io
-```
-
-Fetch shakenfist:
-
-```bash
+sudo apt-get install ansible
 git clone https://github.com/mikalstill/shakenfist
 cd shakenfist
-pip3 install -U setuptools
-sudo pip3 install -e .
+ansible-playbook -i ansible/hosts ansible/deploy.yml
 ```
 
 Create the storage directory structure:

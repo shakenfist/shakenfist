@@ -1,0 +1,16 @@
+--- # Install shakenfist on a series of debian machines
+- hosts: all
+  become: yes
+  become_method: sudo
+  gather_facts: yes
+  connection: ssh
+
+  tasks:
+    - include: includes/debian.yml
+    - include: includes/python3.yml
+    - include: includes/docker.yml
+
+    - name: install shakenfist
+      command: pip3 install -e .
+      args:
+        chdir: ..

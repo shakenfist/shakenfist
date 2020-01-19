@@ -1,0 +1,22 @@
+# Update a debian machine
+- name: apt-get dist-upgrade
+  apt:
+    update_cache: yes
+    upgrade: dist
+    autoremove: yes
+
+- name: install dependancies
+  apt:
+    name:
+      [
+        "default-libmysqlclient-dev",
+        "qemu-kvm",
+        "libvirt-daemon-system",
+        "libvirt-dev",
+        "git",
+        "pwgen",
+        "dnsutils",
+        "mysql-client",
+        "python3-libvirt",
+      ]
+    state: latest

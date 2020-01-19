@@ -1,0 +1,9 @@
+[master]
+  localhost ansible_connection=local
+
+[workers]
+  localhost
+
+[all:children]
+  master
+  workers

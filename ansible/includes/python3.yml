@@ -1,0 +1,25 @@
+# Setup python3
+- name: install python3-setuptools
+  apt:
+    name: ["python3-setuptools", "python3-dev"]
+    state: latest
+
+# Upgrade to a new pip3
+- name: test if we have any pip3
+  shell: pip3 help
+  ignore_errors: True
+  register: has_pip
+
+- name: install python3-pip
+  apt:
+    name: python3-pip
+    state: latest
+  when: has_pip is failed
+
+- name: pip3 self-upgrade
+  command: pip3 install -U pip
+
+- name: remove python3-pip
+  apt:
+    name: python3-pip
+    state: absent
