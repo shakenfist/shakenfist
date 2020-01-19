@@ -50,7 +50,7 @@ if netmon_pid == 0:
             network.ensure_mesh(copy.deepcopy(node_ips))
 
 setproctitle.setproctitle('sf main')
-LOG.info('netmod pid is %d' % netmod_pid)
+LOG.info('netmod pid is %d' % netmon_pid)
 
 while True:
     time.sleep(10)
