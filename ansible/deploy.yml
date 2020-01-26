@@ -97,3 +97,17 @@
         SHAKENFIST_DB_ROOT_PASSWORD: "{{db_root_password}}"
         SHAKENFIST_DB_PASSWORD: "{{db_user_password}}"
         SHAKENFIST_SQL_URL: "mysql://sf:{{db_user_password}}@{{node_ip}}/sf"
+
+    - name: Write systemd unit
+      template:
+        src: files/sf.service
+        dest: /lib/systemd/system
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
+
+    - name: Start the SF daemon
+      service:
+        name: sf
+        enabled: yes
+        state: restarted

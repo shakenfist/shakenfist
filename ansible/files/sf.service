@@ -1,0 +1,25 @@
+[Unit]
+Description=Shaken Fist minimal cloud
+After=network.target remote-fs.target nss-lookup.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+
+Environment=SHAKENFIST_NODE_IP="{{node_ip}}"
+Environment=SHAKENFIST_DB_ROOT_PASSWORD="{{db_root_password}}"
+Environment=SHAKENFIST_DB_PASSWORD="{{db_user_password}}"
+Environment=SHAKENFIST_SQL_URL="mysql://sf:{{db_user_password}}@{{node_ip}}/sf"
+
+ExecStart=/bin/sh -c 'sf-daemon'
+
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=sf
+
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
