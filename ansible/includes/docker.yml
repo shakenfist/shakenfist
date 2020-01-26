@@ -1,5 +1,5 @@
 --- # https://gist.github.com/rbq/886587980894e98b23d0eee2a1d84933
-- name: install docker prerequisites
+- name: Install docker prerequisites
   apt:
     name:
       [
@@ -8,6 +8,7 @@
         "curl",
         "gnupg2",
         "software-properties-common",
+        "python-docker",
       ]
     update_cache: yes
     state: latest

@@ -4,13 +4,96 @@
   become_method: sudo
   gather_facts: yes
   connection: ssh
+  vars_files:
+    - vars
 
   tasks:
     - include: includes/debian.yml
     - include: includes/python3.yml
     - include: includes/docker.yml
 
-    - name: install shakenfist
+    - name: Install shakenfist
       command: pip3 install -e .
       args:
         chdir: ..
+
+    - name: Create storage directory
+      file:
+        path: /srv/shakenfist/mariadb
+        state: directory
+        mode: "0755"
+
+    - name: Copy libvirt template
+      copy:
+        src: files/libvirt.debian.tmpl
+        dest: /srv/shakenfist/libvirt.tmpl
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Copy dhcp template
+      copy:
+        src: files/dhcp.tmpl
+        dest: /srv/shakenfist/dhcp.tmpl
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Determine node IP
+      shell: /usr/bin/dig @resolver1.opendns.com ANY myip.opendns.com +short
+      register: node_ip_complex
+      when: node_ip is not defined
+
+    - name: Extract node IP
+      set_fact:
+        node_ip: "{{node_ip_complex.stdout}}"
+      when: node_ip is not defined
+
+    - name: Create config directory
+      file:
+        path: /etc/sf
+        state: directory
+        mode: "0755"
+
+    - name: Write sfrc file
+      template:
+        src: files/sfrc
+        dest: /etc/sf/sfrc
+        owner: root
+        group: sudo
+        mode: u=rwx,g=rwx,o=
+
+    - name: Test if we have a database
+      shell: docker inspect sfdb
+      ignore_errors: True
+      register: has_sfdb
+
+    - name: Create mariadb docker container
+      docker_container:
+        name: sfdb
+        image: mariadb
+        env:
+          MYSQL_ROOT_PASSWORD: "{{db_root_password}}"
+          MYSQL_DATABASE: "sf"
+          MYSQL_USER: "sf"
+          MYSQL_PASSWORD: "{{db_user_password}}"
+        volumes:
+          - /srv/shakenfist/mysql:/var/lib/mysql
+        ports:
+          - 3306:3306
+      when: has_sfdb is failed
+
+    - name: Wait for mariabdb to be listening
+      wait_for:
+        port: 3306
+        delay: 0
+
+    - name: Upgrade database schema
+      command: alembic upgrade head
+      args:
+        chdir: ../shakenfist
+      environment:
+        SHAKENFIST_NODE_IP: "{{node_ip}}"
+        SHAKENFIST_DB_ROOT_PASSWORD: "{{db_root_password}}"
+        SHAKENFIST_DB_PASSWORD: "{{db_user_password}}"
+        SHAKENFIST_SQL_URL: "mysql://sf:{{db_user_password}}@{{node_ip}}/sf"

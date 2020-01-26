@@ -44,51 +44,13 @@ gcloud compute instances create sf-1 --zone us-central1-b \
     --min-cpu-platform "Intel Haswell" --image nested-vm-image
 ```
 
-Now on the hypervisor node:
+Update the contents of ansible/vars with locally valid values. Its a YAML file if that helps.
+
+Now on the hypervisor node (omit the --extra-vars for production environments, which are assumed to not be NAT'ed):
 
 ```bash
 sudo apt-get install ansible
 git clone https://github.com/mikalstill/shakenfist
 cd shakenfist
-ansible-playbook -i ansible/hosts ansible/deploy.yml
-```
-
-Create the storage directory structure:
-
-```bash
-sudo mkdir -p /srv/shakenfist/mariadb
-sudo cp templates/libvirt.debian.tmpl /srv/shakenfist/libvirt.tmpl
-sudo cp templates/dhcp.tmpl /srv/shakenfist/
-```
-
-Run mysql in a docker container:
-
-```bash
-ROOT_PASSWORD=`pwgen -N 1`
-DB_PASSWORD=`pwgen -N 1`
-NODE_IP=`dig @resolver1.opendns.com ANY myip.opendns.com +short`
-
-echo "export SHAKENFIST_NODE_IP=$NODE_IP" >> ~/sf.sh
-echo "export SHAKENFIST_DB_ROOT_PASSWORD=$ROOT_PASSWORD" >> ~/sf.sh
-echo "export SHAKENFIST_DB_PASSWORD=$DB_PASSWORD" >> ~/sf.sh
-echo "export SHAKENFIST_SQL_URL=mysql://sf:$DB_PASSWORD@$NODE_IP/sf" >> ~/sf.sh
-. ~/sf.sh
-
-sudo docker run --name sfdb -d -e MYSQL_ROOT_PASSWORD="$ROOT_PASSWORD" \
-    -e MYSQL_DATABASE=sf -e MYSQL_USER=sf -e MYSQL_PASSWORD="$DB_PASSWORD" \
-    -v /srv/shakenfist/mysql:/var/lib/mysql -p 3306:3306 \
-    mariadb
-```
-
-It may take a couple of minutes for the database to be ready for queries. You can confirm with `docker logs sfdb`. Then confirm you can acccess the database:
-
-```bash
-mysql -h $SHAKENFIST_NODE_IP -u sf --password=$SHAKENFIST_DB_PASSWORD sf -e "show tables;"
-```
-
-You should get back no output (including no error messages). Now upgrade the MySQL database to the latest schema version:
-
-```bash
-cd shakenfist
-alembic upgrade head
+ansible-playbook -i ansible/hosts ansible/deploy.yml --extra-vars "node_ip=127.0.0.1"
 ```

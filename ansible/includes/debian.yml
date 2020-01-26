@@ -18,5 +18,6 @@
         "dnsutils",
         "mysql-client",
         "python3-libvirt",
+        "libssl-dev",
       ]
     state: latest
