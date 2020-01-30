@@ -31,6 +31,7 @@ CONFIG_DEFAULTS = {
     # The IP of this node
     'NODE_IP': node_ip,
     'NODE_NAME': node_name,
+    'NODE_EGRESS_NIC': 'eth0',
 
     # Where on disk instances are stored
     'STORAGE_PATH': '/srv/shakenfist',

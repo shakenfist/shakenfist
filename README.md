@@ -8,6 +8,11 @@ Shaken Fist is a deliberately minimal cloud. Its also currently incomplete, so t
 
 One of the reasons OpenStack is so complicated and its behaviour varies is because it has many options to configure. The solution seemed obvious to me -- a cloud that is super opinionated. For each different functional requirement there is one option, and the simplest option is chosen where possible. Read on for some examples.
 
+Development choices
+-------------------
+
+If there is an existing library which does a thing, we use it. OpenStack suffered from being old (and having issues with re-writes being hard), as well as licensing. We just use the code that others have provided to the community. Always.
+
 Deployment choices
 ------------------
 

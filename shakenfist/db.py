@@ -86,6 +86,19 @@ class Network(Base):
         self.owner = owner
 
 
+def get_network(uuid):
+    session = Session()
+    see_this_node(session=session)
+
+    try:
+        return session.query(Network).filter(
+            Network.uuid == uuid).one()
+    except exc.NoResultFound:
+        return None
+    finally:
+        session.close()
+
+
 def get_networks():
     session = Session()
     see_this_node(session=session)
@@ -97,7 +110,6 @@ def get_networks():
     except exc.NoResultFound:
         pass
     finally:
-        session.commit()
         session.close()
 
 

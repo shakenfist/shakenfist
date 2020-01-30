@@ -68,6 +68,10 @@
       ignore_errors: True
       register: has_sfdb
 
+    - name: Ensure mariadb is started
+      shell: docker start sfdb
+      when: has_sfdb
+
     - name: Create mariadb docker container
       docker_container:
         name: sfdb

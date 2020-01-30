@@ -19,5 +19,6 @@
         "mysql-client",
         "python3-libvirt",
         "libssl-dev",
+        "net-tools",
       ]
     state: latest
