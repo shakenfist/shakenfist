@@ -1,6 +1,9 @@
 export SHAKENFIST_NODE_IP="{{node_ip}}"
+export SHAKENFIST_NODE_EGRESS_NIC="{{node_egress_nic}}"
+
 export SHAKENFIST_DB_ROOT_PASSWORD="{{db_root_password}}"
 export SHAKENFIST_DB_PASSWORD="{{db_user_password}}"
 export SHAKENFIST_SQL_URL="mysql://sf:{{db_user_password}}@{{node_ip}}/sf"
+
 
 eval "$(_SF_CLIENT_COMPLETE=source sf-client)"

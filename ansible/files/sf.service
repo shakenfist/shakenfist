@@ -8,6 +8,7 @@ User=root
 Group=root
 
 Environment=SHAKENFIST_NODE_IP="{{node_ip}}"
+Environment=SHAKENFIST_NODE_EGRESS_NIC="{{node_egress_nic}}"
 Environment=SHAKENFIST_DB_ROOT_PASSWORD="{{db_root_password}}"
 Environment=SHAKENFIST_DB_PASSWORD="{{db_user_password}}"
 Environment=SHAKENFIST_SQL_URL="mysql://sf:{{db_user_password}}@{{node_ip}}/sf"

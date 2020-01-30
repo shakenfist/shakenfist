@@ -7,6 +7,7 @@ import time
 import os
 import uuid
 
+from shakenfist import config
 from shakenfist import db
 from shakenfist import net
 from shakenfist import util
@@ -30,7 +31,7 @@ def main():
                 uuid=n.uuid,
                 vxlan_id=n.vxid,
                 provide_dhcp=n.provide_dhcp,
-                physical_nic='eth0',
+                physical_nic=config.parsed.get('NODE_EGRESS_NIC'),
                 nodes=node_ips,
                 ipblock=n.netblock)
             with util.RecordedOperation('network creation', network) as ro:
@@ -45,7 +46,7 @@ def main():
                     uuid=n.uuid,
                     vxlan_id=n.vxid,
                     provide_dhcp=n.provide_dhcp,
-                    physical_nic='eth0',
+                    physical_nic=config.parsed.get('NODE_EGRESS_NIC'),
                     nodes=node_ips,
                     ipblock=n.netblock)
                 network.ensure_mesh(copy.deepcopy(node_ips))

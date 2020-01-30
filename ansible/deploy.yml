@@ -55,6 +55,16 @@
         state: directory
         mode: "0755"
 
+    - name: Determine default interface
+      shell: ip route list default | head -1 | cut -f 5 -d " "
+      register: node_egress_nic_complex
+      when: node_egress_nic is not defined
+
+    - name: Extract node default interface
+      set_fact:
+        node_egress_nic: "{{node_egress_nic_complex.stdout}}"
+      when: node_egress_nic is not defined
+
     - name: Write sfrc file
       template:
         src: files/sfrc

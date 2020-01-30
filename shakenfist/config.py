@@ -41,9 +41,17 @@ CONFIG_DEFAULTS = {
 class Config(object):
     def __init__(self):
         self.config = copy.copy(CONFIG_DEFAULTS)
+        print('Scanning environment variables:')
         for var in os.environ:
+            print('%s: %s' % (var, os.environ.get(var)))
             if var.startswith('SHAKENFIST_'):
-                self.config[var.replace('SHAKENFIST_', '')] = os.environ[var]
+                flag = var.replace('SHAKENFIST_', '')
+                self.config[flag] = os.environ[var]
+                print('... set %s' % flag)
+
+        print('Dumping initial config:')
+        for var in self.config:
+            print('%s: %s' % (var, self.config.get(var)))
 
     def get(self, var):
         return self.config.get(var)
