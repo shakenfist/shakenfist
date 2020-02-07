@@ -16,9 +16,18 @@
 - name: Add Docker GPG key
   apt_key: url=https://download.docker.com/linux/ubuntu/gpg
 
+- name: Set release
+  set_fact:
+    docker_release: '{{ansible_distribution_release}}'
+
+- name: Override release for eoan to work around missing docker packages
+  set_fact:
+    docker_release: 'disco'
+  when: docker_release == 'eoan'
+
 - name: Add Docker APT repository
   apt_repository:
-    repo: deb [arch=amd64] https://download.docker.com/linux/{{ansible_distribution|lower}} {{ansible_distribution_release}} stable
+    repo: deb [arch=amd64] https://download.docker.com/linux/{{ansible_distribution|lower}} {{docker_release}} stable
 
 - name: Install Docker
   apt:
