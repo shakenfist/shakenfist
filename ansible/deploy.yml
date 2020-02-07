@@ -80,7 +80,7 @@
 
     - name: Ensure mariadb is started
       shell: docker start sfdb
-      when: has_sfdb
+      when: has_sfdb.rc == 0
 
     - name: Create mariadb docker container
       docker_container:
@@ -95,7 +95,7 @@
           - /srv/shakenfist/mysql:/var/lib/mysql
         ports:
           - 3306:3306
-      when: has_sfdb is failed
+      when: has_sfdb.rc == 1
 
     - name: Wait for mariabdb to be listening
       wait_for:
