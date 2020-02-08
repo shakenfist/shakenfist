@@ -13,11 +13,12 @@ LOG.setLevel(logging.DEBUG)
 node_name = socket.getfqdn()
 try:
     node_ip = socket.gethostbyname(node_name)
-except:
+except Exception:
     # Only for localhost development environments
     node_ip = '127.0.0.1'
     LOG.warning(
-        'Could not determine hostname. This is a failure for production deploys.')
+        'Could not determine hostname. This is a failure for production '
+        'deploys.')
 
 CONFIG_DEFAULTS = {
     # Deployment options
@@ -27,7 +28,9 @@ CONFIG_DEFAULTS = {
     # What nova called an availability zone
     'ZONE': 'shaken',
 
-    ### NODE SPECIFIC ###
+    # NODE SPECIFIC
+    # -------------
+    #
     # The IP of this node
     'NODE_IP': node_ip,
     'NODE_NAME': node_name,

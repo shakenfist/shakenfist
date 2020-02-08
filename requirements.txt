@@ -8,6 +8,9 @@ mysqlclient         # gpl
 setproctitle        # bsd
 click               # bsd
 prettytable         # bsd
+tox                 # mit
+flake8              # mit
+testtools           # mit
 
 # Is difficult to get install working, use system packages
-#libvirt-python      # lgpl
+# libvirt-python      # lgpl
