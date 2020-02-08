@@ -5,13 +5,11 @@ import logging
 import setproctitle
 import time
 import os
-import uuid
 
 from shakenfist import config
 from shakenfist import db
 from shakenfist import net
 from shakenfist import util
-from shakenfist import virt
 
 
 logging.basicConfig(level=logging.DEBUG)
@@ -34,7 +32,7 @@ def main():
                 physical_nic=config.parsed.get('NODE_EGRESS_NIC'),
                 nodes=node_ips,
                 ipblock=n.netblock)
-            with util.RecordedOperation('network creation', network) as ro:
+            with util.RecordedOperation('network creation', network) as _:
                 network.create()
 
         while True:

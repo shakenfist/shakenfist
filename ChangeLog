@@ -1,0 +1,33 @@
+CHANGES
+=======
+
+* Detect the NIC to configure meshes on
+* Early thoughts about a client
+* Run the daemon as a systemd unit
+* Fully automate node setup
+* Start automating deployment
+* Tweak process name
+* Add networks to database
+* Move node list to db
+* Working on adding MySQL
+* Tweak bridge setup
+* Allocate IP addresses to instances
+* Its ok for the DHCP container to not already exist
+* Don't clobber imports with variables
+* Always regenerate DHCP config, even if the interface exists
+* Add missing import
+* Get method name right
+* Make dhcp peer interface names shorter
+* Add dhcp support
+* Implement vxlan mesh creation
+* Use member variable
+* Refactor to record total start time as well
+* Slightly nicer instance name handling
+* A more organized logging framework
+* Use cirros
+* Tweaks for debian
+* Add a README
+* And now we can start instances
+* Initial commit
+* Create root disks including image caching and transcoding
+* Generating a reasonable looking config drive
