@@ -17,6 +17,7 @@ import urllib.request
 from oslo_concurrency import processutils
 
 from shakenfist import config
+from shakenfist import images
 from shakenfist import util
 
 
@@ -28,14 +29,30 @@ VALIDATED_IMAGE_FIELDS = ['Last-Modified', 'Content-Length']
 
 
 class Instance(object):
-    def __init__(self, uuid=None, name=None, tenant=None, image_url=None, root_size_gb=None, memory_kb=None, vcpus=None):
+    def __init__(self, uuid=None, name=None, tenant=None, image_url=None, disks=None, memory_kb=None, vcpus=None):
         self.uuid = uuid
         self.name = name
         self.tenant = tenant
-        self.image_url = image_url
-        self.root_size = str(root_size_gb) + 'G'
+        self.image_url = images.resolve_image(image_url)
+        self.root_size = str(disks[0]) + 'G'
         self.memory = memory_kb
         self.vcpus = vcpus
+
+        self.instance_path = os.path.join(
+            config.parsed.get('STORAGE_PATH'), 'instances', self.uuid)
+
+        # Convert extra disks into something we can use in a template
+        self.extra_disks = []
+        i = 0
+        for d in disks[1:]:
+            device = 'vd' + chr(ord('c') + i)
+            self.extra_disks.append({
+                'size': d,
+                'device': device,
+                'slot': hex(8 + i),
+                'path': os.path.join(self.instance_path, device + '.qcow2')
+            })
+            i += 1
 
         # TODO(mikal): sanity check instance specification
 
@@ -54,8 +71,6 @@ class Instance(object):
 
     def create(self):
         # Ensure we have state on disk
-        self.instance_path = os.path.join(
-            config.parsed.get('STORAGE_PATH'), 'instances', self.uuid)
         if not os.path.exists(self.instance_path):
             LOG.debug('%s: Creating instance storage at %s' %
                       (self, self.instance_path))
@@ -81,6 +96,16 @@ class Instance(object):
             self._resize_image()
         with util.RecordedOperation('create root disk', self) as ro:
             self._create_root_disk()
+
+        # Prepare extra disks
+        with util.RecordedOperation('create extra disks', self) as ro:
+            for disk in self.extra_disks:
+                print('Creating %s' % disk['path'])
+                processutils.execute('qemu-img create -f qcow2 %s %sG'
+                                     % (disk['path'], disk['size']),
+                                     shell=True)
+
+        # Create the actual instance
         with util.RecordedOperation('create domain XML', self) as ro:
             self._create_domain_xml()
         with util.RecordedOperation('create domain', self) as ro:
@@ -247,6 +272,14 @@ class Instance(object):
         if os.path.exists(self.hashed_image_path + '.qcow2'):
             return
 
+        if self.image_url.endswith('.gz'):
+            if not os.path.exists(self.hashed_image_path + '.orig'):
+                processutils.execute(
+                    'gunzip -k -q -c %(img)s > %(img)s.orig' % {
+                        'img': self.hashed_image_path},
+                    shell=True)
+            self.hashed_image_path += '.orig'
+
         processutils.execute(
             'qemu-img convert -t none -O qcow2 %s %s.qcow2'
             % (self.hashed_image_path, self.hashed_image_path),
@@ -295,6 +328,7 @@ class Instance(object):
             disk_config=self.config_disk_file,
             eth0_mac=self.eth0_mac,
             eth0_bridge=self.network_subst['vx_bridge'],
+            extra_disks=self.extra_disks
         )
 
         with open(self.xml_file, 'w') as f:
@@ -310,7 +344,10 @@ class Instance(object):
             return
 
         except libvirt.libvirtError:
-            instance = conn.createLinux(xml, 0)
+            instance = conn.defineXML(xml)
             if not instance:
                 LOG.error('%s: Failed to create libvirt domain' % self)
                 return
+
+        instance.create()
+        instance.setAutostart(1)

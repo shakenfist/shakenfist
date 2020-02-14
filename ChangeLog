@@ -1,6 +1,8 @@
 CHANGES
 =======
 
+* Add test infrastructure
+* Work around missing docker packages for eoan
 * Detect the NIC to configure meshes on
 * Early thoughts about a client
 * Run the daemon as a systemd unit

@@ -8,12 +8,24 @@ import re
 from oslo_concurrency import processutils
 
 from shakenfist import config
+from shakenfist.db import impl as db
 from shakenfist import dhcp
 from shakenfist import util
 
 
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
+
+
+def from_db(uuid):
+    dbnet = db.get_network(uuid)
+    if not dbnet:
+        return None
+
+    return Network(uuid=dbnet.uuid,
+                   vxlan_id=dbnet.vxid,
+                   provide_dhcp=dbnet.provide_dhcp,
+                   ipblock=dbnet.netblock)
 
 
 class Network(object):

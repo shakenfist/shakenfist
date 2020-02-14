@@ -41,6 +41,16 @@
       <target dev='vdb' bus='virtio'/>
       <address type='pci' domain='0x0000' bus='0x00' slot='0x07' function='0x0'/>
     </disk>
+
+    {% for disk in extra_disks %}
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2'/>
+      <source file='{{disk.path}}'/>
+      <target dev='{{disk.device}}' bus='virtio'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='{{disk.slot}}' function='0x0'/>
+    </disk>
+    {% endfor %}
+
     <controller type='usb' index='0' model='ich9-ehci1'>
       <address type='pci' domain='0x0000' bus='0x00' slot='0x04' function='0x7'/>
     </controller>
