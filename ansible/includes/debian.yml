@@ -20,5 +20,6 @@
         "python3-libvirt",
         "libssl-dev",
         "net-tools",
+        "bridge-utils"
       ]
     state: latest
