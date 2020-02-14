@@ -7,8 +7,8 @@ import time
 import os
 
 from shakenfist import config
-from shakenfist import db
-from shakenfist import net
+from shakenfist.db import impl as db
+from shakenfist.net import impl as net
 from shakenfist import util
 
 
@@ -57,20 +57,3 @@ def main():
         wpid, status = os.waitpid(-1, os.WNOHANG)
         if wpid != 0:
             LOG.warning('Subprocess %d died' % wpid)
-
-    # instance = virt.Instance(
-    #     uuid=str(uuid.uuid4()),
-    #     name='foo',
-    #     tenant=None,
-    #     # image_url='https://cloud-images.ubuntu.com/disco/current/disco-server-cloudimg-amd64.img',
-    #     image_url='http://download.cirros-cloud.net/0.4.0/cirros-0.4.0-x86_64-disk.img',
-    #     root_size_gb=20,
-    #     memory_kb=1 * 1024 * 1024,
-    #     vcpus=1)
-
-    # with util.RecordedOperation('allocate ip address', instance) as ro:
-    #     network.allocate_ip_to_instance(instance)
-    #     network.update_dhcp()
-
-    # with util.RecordedOperation('instance creation', instance) as ro:
-    #     instance.create()
