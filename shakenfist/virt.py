@@ -17,6 +17,7 @@ import urllib.request
 from oslo_concurrency import processutils
 
 from shakenfist import config
+from shakenfist import images
 from shakenfist import util
 
 
@@ -32,7 +33,7 @@ class Instance(object):
         self.uuid = uuid
         self.name = name
         self.tenant = tenant
-        self.image_url = image_url
+        self.image_url = images.resolve_image(image_url)
         self.root_size = str(root_size_gb) + 'G'
         self.memory = memory_kb
         self.vcpus = vcpus
@@ -247,6 +248,14 @@ class Instance(object):
         if os.path.exists(self.hashed_image_path + '.qcow2'):
             return
 
+        if self.image_url.endswith('.gz'):
+            if not os.path.exists(self.hashed_image_path + '.orig'):
+                processutils.execute(
+                    'gunzip -k -q -c %(img)s > %(img)s.orig' % {
+                        'img': self.hashed_image_path},
+                    shell=True)
+            self.hashed_image_path += '.orig'
+
         processutils.execute(
             'qemu-img convert -t none -O qcow2 %s %s.qcow2'
             % (self.hashed_image_path, self.hashed_image_path),
@@ -310,7 +319,10 @@ class Instance(object):
             return
 
         except libvirt.libvirtError:
-            instance = conn.createLinux(xml, 0)
+            instance = conn.defineXML(xml)
             if not instance:
                 LOG.error('%s: Failed to create libvirt domain' % self)
                 return
+
+        instance.create()
+        instance.setAutostart(1)
