@@ -86,6 +86,7 @@
       docker_container:
         name: sfdb
         image: mariadb
+        restart_policy: always
         env:
           MYSQL_ROOT_PASSWORD: "{{db_root_password}}"
           MYSQL_DATABASE: "sf"
