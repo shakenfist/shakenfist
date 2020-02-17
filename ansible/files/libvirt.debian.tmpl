@@ -31,22 +31,19 @@
     <disk type='file' device='disk'>
       <driver name='qemu' type='qcow2'/>
       <source file='{{disk_root}}'/>
-      <target dev='vda' bus='virtio'/>
-      <address type='pci' domain='0x0000' bus='0x00' slot='0x05' function='0x0'/>
+      <target dev='{{device_root}}' bus='{{disk_bus}}'/>
     </disk>
     <disk type='file' device='disk'>
       <driver name='qemu' type='raw'/>
       <source file='{{disk_config}}'/>
-      <target dev='vdb' bus='virtio'/>
-      <address type='pci' domain='0x0000' bus='0x00' slot='0x07' function='0x0'/>
+      <target dev='{{device_config}}' bus='{{disk_bus}}'/>
     </disk>
 
     {% for disk in extra_disks %}
     <disk type='file' device='disk'>
       <driver name='qemu' type='qcow2'/>
       <source file='{{disk.path}}'/>
-      <target dev='{{disk.device}}' bus='virtio'/>
-      <address type='pci' domain='0x0000' bus='0x00' slot='{{disk.slot}}' function='0x0'/>
+      <target dev='{{disk.device}}' bus='{{disk_bus}}'/>
     </disk>
     {% endfor %}
 

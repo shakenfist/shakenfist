@@ -41,11 +41,15 @@ class Instance(object):
         self.instance_path = os.path.join(
             config.parsed.get('STORAGE_PATH'), 'instances', self.uuid)
 
+        # Allocate devices to root and config disks depending on the bus in use
+        self.root_disk_device = self._get_disk_device_base() + 'a'
+        self.config_disk_device = self._get_disk_device_base() + 'b'
+
         # Convert extra disks into something we can use in a template
         self.extra_disks = []
         i = 0
         for d in disks[1:]:
-            device = 'vd' + chr(ord('c') + i)
+            device = self._get_disk_device_base() + chr(ord('c') + i)
             self.extra_disks.append({
                 'size': d,
                 'device': device,
@@ -63,6 +67,15 @@ class Instance(object):
 
     def __str__(self):
         return 'instance(%s)' % self.uuid
+
+    def _get_disk_device_base(self):
+        bases = {
+            'ide': 'hd',
+            'scsi': 'sd',
+            'usb': 'sd',
+            'virtio': 'vd',
+        }
+        return bases.get(config.parsed.get('DISK_BUS'), 'sd')
 
     def set_network_details(self, ip, network_subst):
         LOG.info('%s: Setting IP to %s' % (self, ip))
@@ -324,8 +337,11 @@ class Instance(object):
             uuid=self.uuid,
             memory=self.memory,
             vcpus=self.vcpus,
+            disk_bus=config.parsed.get('DISK_BUS'),
             disk_root=self.root_disk_file,
+            device_root=self.root_disk_device,
             disk_config=self.config_disk_file,
+            device_config=self.config_disk_device,
             eth0_mac=self.eth0_mac,
             eth0_bridge=self.network_subst['vx_bridge'],
             extra_disks=self.extra_disks

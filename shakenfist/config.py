@@ -30,7 +30,11 @@ CONFIG_DEFAULTS = {
 
     # NODE SPECIFIC
     # -------------
-    #
+
+    # The bus to use for disk devices. One of virtio, scsi, usb, ide, etc.
+    # See libvirt docs for full list of options.
+    'DISK_BUS': 'ide',
+
     # The IP of this node
     'NODE_IP': node_ip,
     'NODE_NAME': node_name,

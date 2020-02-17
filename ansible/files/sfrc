@@ -5,5 +5,7 @@ export SHAKENFIST_DB_ROOT_PASSWORD="{{db_root_password}}"
 export SHAKENFIST_DB_PASSWORD="{{db_user_password}}"
 export SHAKENFIST_SQL_URL="mysql://sf:{{db_user_password}}@{{node_ip}}/sf"
 
+export SHAKENFIST_DISK_BUS="virtio"
+
 
 eval "$(_SF_CLIENT_COMPLETE=source sf-client)"
