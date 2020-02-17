@@ -245,6 +245,7 @@ class Instance(object):
         # Fetch basic information about the image from the remote server
         # NOTE(mikal): if the head request results in a redirect, we end up
         # with a GET request instead. This is lame, but I am lazy right now.
+        print(self.image_url)
         req = urllib.request.Request(self.image_url, method='HEAD')
         resp = urllib.request.urlopen(req)
 
@@ -344,7 +345,8 @@ class Instance(object):
             device_config=self.config_disk_device,
             eth0_mac=self.eth0_mac,
             eth0_bridge=self.network_subst['vx_bridge'],
-            extra_disks=self.extra_disks
+            extra_disks=self.extra_disks,
+            network_model=config.parsed.get('NETWORK_MODEL'),
         )
 
         with open(self.xml_file, 'w') as f:

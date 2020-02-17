@@ -55,7 +55,8 @@ def _resolve_ubuntu(name):
     print(versions)
 
     if name == 'ubuntu':
-        ver = sorted(versions.keys())[-1]
+        verkey = sorted(versions.keys())[-1]
+        ver = versions[verkey]
     else:
         # Name is assumed to be in the form ubuntu-xenial or ubuntu-19.04
         _, req = name.split('-')
