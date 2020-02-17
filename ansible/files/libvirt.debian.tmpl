@@ -28,20 +28,10 @@
   </pm>
   <devices>
     <emulator>/usr/bin/kvm</emulator>
-    <disk type='file' device='disk'>
-      <driver name='qemu' type='qcow2'/>
-      <source file='{{disk_root}}'/>
-      <target dev='{{device_root}}' bus='{{disk_bus}}'/>
-    </disk>
-    <disk type='file' device='disk'>
-      <driver name='qemu' type='raw'/>
-      <source file='{{disk_config}}'/>
-      <target dev='{{device_config}}' bus='{{disk_bus}}'/>
-    </disk>
 
-    {% for disk in extra_disks %}
+    {% for disk in disks %}
     <disk type='file' device='disk'>
-      <driver name='qemu' type='qcow2'/>
+      <driver name='qemu' type='{{disk.type}}'/>
       <source file='{{disk.path}}'/>
       <target dev='{{disk.device}}' bus='{{disk_bus}}'/>
     </disk>
