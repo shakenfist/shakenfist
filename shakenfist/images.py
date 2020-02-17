@@ -1,12 +1,23 @@
 # Helpers to resolve images when we don't have an image service
 
+import email.utils
+import hashlib
+import json
 import logging
+import os
 import re
+import shutil
 import urllib.request
+
+from oslo_concurrency import processutils
+
+from shakenfist import config
 
 
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
+
+VALIDATED_IMAGE_FIELDS = ['Last-Modified', 'Content-Length']
 
 
 def resolve_image(name):
@@ -55,7 +66,8 @@ def _resolve_ubuntu(name):
     print(versions)
 
     if name == 'ubuntu':
-        ver = sorted(versions.keys())[-1]
+        verkey = sorted(versions.keys())[-1]
+        ver = versions[verkey]
     else:
         # Name is assumed to be in the form ubuntu-xenial or ubuntu-19.04
         _, req = name.split('-')
@@ -63,3 +75,123 @@ def _resolve_ubuntu(name):
 
     return ('https://cloud-images.ubuntu.com/%(ver)s/current/%(ver)s-server-cloudimg-amd64.img'
             % {'ver': ver})
+
+
+def _get_cache_path():
+    image_cache_path = os.path.join(
+        config.parsed.get('STORAGE_PATH'), 'image_cache')
+    if not os.path.exists(image_cache_path):
+        LOG.debug('Creating image cache at %s' % image_cache_path)
+        os.makedirs(image_cache_path)
+    return image_cache_path
+
+
+def fetch_image(image_url):
+    """Download the image if we don't already have the latest version in cache."""
+
+    image_url = resolve_image(image_url)
+
+    # Determine the hash for this image
+    h = hashlib.sha256()
+    h.update(image_url.encode('utf-8'))
+    hashed_image_url = h.hexdigest()
+    LOG.debug('Image %s hashes to %s' % (image_url, hashed_image_url))
+
+    # Populate cache if its empty
+    hashed_image_path = os.path.join(_get_cache_path(), hashed_image_url)
+
+    if not os.path.exists(hashed_image_path + '.info'):
+        info = {
+            'url': image_url,
+            'hash': hashed_image_url,
+            'version': 0
+        }
+    else:
+        with open(hashed_image_path + '.info') as f:
+            info = json.loads(f.read())
+
+    # Fetch basic information about the image from the remote server
+    # NOTE(mikal): if the head request results in a redirect, we end up
+    # with a GET request instead. This is lame, but I am lazy right now.
+    req = urllib.request.Request(image_url, method='HEAD')
+    resp = urllib.request.urlopen(req)
+
+    image_dirty = False
+    for field in VALIDATED_IMAGE_FIELDS:
+        if info.get(field) != resp.headers.get(field):
+            image_dirty = True
+
+    # If the image is missing, or has changed, fetch
+    if image_dirty:
+        LOG.info('Fetching image %s' % image_url)
+        info['version'] += 1
+        info['fetched_at'] = email.utils.formatdate()
+
+        req = urllib.request.Request(image_url, method='GET')
+        resp = urllib.request.urlopen(req)
+        fetched = 0
+
+        for field in VALIDATED_IMAGE_FIELDS:
+            info[field] = resp.headers.get(field)
+
+        with open(hashed_image_path, 'wb') as f:
+            chunk = resp.read(1024 * 1024)
+            while chunk:
+                fetched += len(chunk)
+                f.write(chunk)
+                chunk = resp.read(1024 * 1024)
+
+        with open(hashed_image_path + '.info', 'w') as f:
+            f.write(json.dumps(info, indent=4, sort_keys=True))
+
+        LOG.info('Fetching image %s complete (%d bytes)' %
+                 (image_url, fetched))
+
+    # Decompress if required
+    if image_url.endswith('.gz'):
+        if not os.path.exists(hashed_image_path + '.orig'):
+            processutils.execute(
+                'gunzip -k -q -c %(img)s > %(img)s.orig' % {
+                    'img': hashed_image_path},
+                shell=True)
+        hashed_image_path += '.orig'
+
+    return hashed_image_path
+
+
+def transcode_image(hashed_image_path):
+    """Convert the image to qcow2."""
+
+    if os.path.exists(hashed_image_path + '.qcow2'):
+        return
+
+    processutils.execute(
+        'qemu-img convert -t none -O qcow2 %s %s.qcow2'
+        % (hashed_image_path, hashed_image_path),
+        shell=True)
+
+
+def resize_image(hashed_image_path, size):
+    """Resize the image to the specified size."""
+
+    backing_file = hashed_image_path + '.qcow2' + '.' + size
+    if os.path.exists(backing_file):
+        return backing_file
+
+    shutil.copyfile(hashed_image_path + '.qcow2', backing_file)
+    processutils.execute(
+        'qemu-img resize %s %s' % (backing_file, size),
+        shell=True)
+
+    return backing_file
+
+
+def create_cow(cache_file, disk_file):
+    """Create a COW layer on top of the image cache."""
+
+    if os.path.exists(disk_file):
+        return
+
+    processutils.execute(
+        'qemu-img create -b %s -f qcow2 %s' % (cache_file, disk_file),
+        shell=True)

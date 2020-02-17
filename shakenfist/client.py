@@ -99,18 +99,18 @@ def instance_show(uuid=None):
 @instance.command(name='create',
                   help=('Create an instance.\n\n'
                         'NETWORK: The uuid of the network to attach the instance to.\n'
-                        'IMAGE: The URL to an image, or a common name (cirros, ubuntu, etc).\n'
                         'NAME: The name of the instance.\n'
                         'CPUS: The number of vCPUs for the instance.\n'
                         'MEMORY: The amount RAM for the instance in GB.\n'
-                        'DISK: The size of an attached disk in GB (you may have more than one disk).\n'))
+                        'DISK: The disks attached to the instance, in this format: \n'
+                        '          size@image_url where size is in GB and @image_url\n'
+                        '          is optional.\n'))
 @click.argument('network', type=click.STRING)
-@click.argument('image', type=click.STRING)
 @click.argument('name', type=click.STRING)
 @click.argument('cpus', type=click.INT)
 @click.argument('memory', type=click.INT)
-@click.argument('disk', type=click.INT, nargs=-1)
-def instance_create(network=None, image=None, name=None, cpus=None, memory=None, disk=None):
+@click.argument('disk', type=click.STRING, nargs=-1)
+def instance_create(network=None, name=None, cpus=None, memory=None, disk=None):
     n = net.from_db(network)
     if not n:
         print('Network %s not found' % uuid)
@@ -122,7 +122,6 @@ def instance_create(network=None, image=None, name=None, cpus=None, memory=None,
         uuid=newid,
         name=name,
         tenant=None,
-        image_url=image,
         disks=disk,
         memory_kb=memory * 1024 * 1024,
         vcpus=cpus)

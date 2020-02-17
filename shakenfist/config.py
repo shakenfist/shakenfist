@@ -30,7 +30,15 @@ CONFIG_DEFAULTS = {
 
     # NODE SPECIFIC
     # -------------
-    #
+
+    # The bus to use for disk devices. One of virtio, scsi, usb, ide, etc.
+    # See libvirt docs for full list of options.
+    'DISK_BUS': 'virtio',
+
+    # The network model to use for network devices. One of virtio, e1000,
+    # or another value supported by libvirt.
+    'NETWORK_MODEL': 'virtio',
+
     # The IP of this node
     'NODE_IP': node_ip,
     'NODE_NAME': node_name,
