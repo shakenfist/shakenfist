@@ -33,7 +33,6 @@ class DHCP(object):
             t = jinja2.Template(f.read())
 
         subst = self.network.subst_dict()
-        print(subst)
         c = t.render(subst)
 
         with open(os.path.join(self.config_dir_path, 'dhcpd.conf'), 'w') as f:

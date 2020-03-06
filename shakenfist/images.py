@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import shutil
+import time
 import urllib.request
 
 from oslo_concurrency import processutils
@@ -63,7 +64,6 @@ def _resolve_ubuntu(name):
         if m:
             versions[m.group(2)] = m.group(1)
     LOG.info('Found ubuntu versions: %s' % versions)
-    print(versions)
 
     if name == 'ubuntu':
         verkey = sorted(versions.keys())[-1]
@@ -86,7 +86,7 @@ def _get_cache_path():
     return image_cache_path
 
 
-def fetch_image(image_url):
+def fetch_image(image_url, recorded=None):
     """Download the image if we don't already have the latest version in cache."""
 
     image_url = resolve_image(image_url)
@@ -115,6 +115,7 @@ def fetch_image(image_url):
     # with a GET request instead. This is lame, but I am lazy right now.
     req = urllib.request.Request(image_url, method='HEAD')
     resp = urllib.request.urlopen(req)
+    length = int(resp.headers.get('Content-Length'))
 
     image_dirty = False
     for field in VALIDATED_IMAGE_FIELDS:
@@ -123,6 +124,9 @@ def fetch_image(image_url):
 
     # If the image is missing, or has changed, fetch
     if image_dirty:
+        received = 0
+        last_heartbeat = time.time()
+
         LOG.info('Fetching image %s' % image_url)
         info['version'] += 1
         info['fetched_at'] = email.utils.formatdate()
@@ -134,12 +138,21 @@ def fetch_image(image_url):
         for field in VALIDATED_IMAGE_FIELDS:
             info[field] = resp.headers.get(field)
 
-        with open(hashed_image_path, 'wb') as f:
+        with open(hashed_image_path + '.v%03d' % info['version'], 'wb') as f:
             chunk = resp.read(1024 * 1024)
+            received += len(chunk)
+
             while chunk:
                 fetched += len(chunk)
                 f.write(chunk)
+
                 chunk = resp.read(1024 * 1024)
+                received += len(chunk)
+
+                if time.time() - last_heartbeat > 5:
+                    if recorded:
+                        recorded.heartbeat('Recieved %d of %d bytes (%.01f%%)' %
+                                           (received, length, received / length * 100.0))
 
         with open(hashed_image_path + '.info', 'w') as f:
             f.write(json.dumps(info, indent=4, sort_keys=True))
@@ -149,14 +162,14 @@ def fetch_image(image_url):
 
     # Decompress if required
     if image_url.endswith('.gz'):
-        if not os.path.exists(hashed_image_path + '.orig'):
+        if not os.path.exists(hashed_image_path + '.v%03d.orig' % info['version']):
             processutils.execute(
                 'gunzip -k -q -c %(img)s > %(img)s.orig' % {
-                    'img': hashed_image_path},
+                    'img': hashed_image_path + '.v%03d' % info['version']},
                 shell=True)
-        hashed_image_path += '.orig'
+        return '%s.v%03d.orig' % (hashed_image_path, info['version'])
 
-    return hashed_image_path
+    return '%s.v%03d' % (hashed_image_path, info['version'])
 
 
 def transcode_image(hashed_image_path):

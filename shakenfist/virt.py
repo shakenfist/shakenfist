@@ -9,11 +9,11 @@ import libvirt
 import os
 import pycdlib
 import randmac
-import shutil
 
 from oslo_concurrency import processutils
 
 from shakenfist import config
+from shakenfist.db import impl as db
 from shakenfist import images
 from shakenfist import util
 
@@ -23,15 +23,14 @@ LOG.setLevel(logging.DEBUG)
 
 
 class Instance(object):
-    def __init__(self, uuid=None, name=None, tenant=None, disks=None, memory_kb=None, vcpus=None):
-        self.uuid = uuid
-        self.name = name
-        self.tenant = tenant
-        self.memory = memory_kb
-        self.vcpus = vcpus
+    def __init__(self, uuid=None, name=None, disks=None, memory_mb=None,
+                 vcpus=None, ssh_key=None):
+        self.db_entry = db.create_instance(uuid, None, name, vcpus, memory_mb, disks,
+                                           ssh_key)
+        self.tenant = None
 
         self.instance_path = os.path.join(
-            config.parsed.get('STORAGE_PATH'), 'instances', self.uuid)
+            config.parsed.get('STORAGE_PATH'), 'instances', self.db_entry['uuid'])
 
         size, base = self._parse_disk_spec(disks[0])
         root_device = self._get_disk_device_base() + 'a'
@@ -64,15 +63,12 @@ class Instance(object):
             })
             i += 1
 
-        # TODO(mikal): sanity check instance specification
-
-        self.sshkey = 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC2Pas6zLLgzXsUSZzt8E8fX7tzpwmNlrsbAeH9YoI2snfo+cKfO1BZVQgJnJVz+hGhnC1mzsMZMtdW2NRonRgeeQIPTUFXJI+3dyGzmiNrmtH8QQz++7zsmdwngeXKDrYhD6JGnPTkKcjShYcbvB/L3IDDJvepLxVOGRJBVHXJzqHgA62AtVsoiECKxFSn8MOuRfPHj5KInLxOEX9i/TfYKawSiId5xEkWWtcrp4QhjuoLv4UHL2aKs85ppVZFTmDHHcx3Au7pZ7/T9NOcUrvnwmQDVIBeU0LEELzuQZWLkFYvStAeCF7mYra+EJVXjiCQ9ZBw0vXGqJR1SU+W6dh9 mikal@kolla-m1'
         self.eth0_mac = str(randmac.RandMac(
             '52:54:00:00:00:00', True)).lstrip('\'').rstrip('\'')
         self.eth0_ip = None
 
     def __str__(self):
-        return 'instance(%s)' % self.uuid
+        return 'instance(%s)' % self.db_entry['uuid']
 
     def _parse_disk_spec(self, spec):
         if not '@' in spec:
@@ -94,7 +90,10 @@ class Instance(object):
         self.eth0_ip = ip
         self.network_subst = network_subst
 
-    def create(self):
+    def get_network_details(self):
+        return (self.eth0_mac, self.eth0_ip)
+
+    def create(self, status_callback):
         # Ensure we have state on disk
         if not os.path.exists(self.instance_path):
             LOG.debug('%s: Creating instance storage at %s' %
@@ -102,21 +101,23 @@ class Instance(object):
             os.makedirs(self.instance_path)
 
         # Generate a config drive
-        with util.RecordedOperation('make config drive', self) as ro:
+        with util.RecordedOperation('make config drive', self, status_callback) as ro:
             self._make_config_drive(os.path.join(
                 self.instance_path, self._get_disk_device_base() + 'b' + '.raw'))
 
         # Prepare disks
         for disk in self.disks:
             if disk.get('base'):
-                with util.RecordedOperation('fetch image', self) as ro:
-                    hashed_image_path = images.fetch_image(disk['base'])
-                with util.RecordedOperation('transcode image', self) as ro:
+                with util.RecordedOperation('fetch image', self, status_callback) as ro:
+                    hashed_image_path = images.fetch_image(
+                        disk['base'], recorded=ro)
+                with util.RecordedOperation('transcode image', self, status_callback) as ro:
                     images.transcode_image(hashed_image_path)
-                with util.RecordedOperation('resize image', self) as ro:
+                with util.RecordedOperation('resize image', self, status_callback) as ro:
                     resized_image_path = images.resize_image(
                         hashed_image_path, str(disk['size']) + 'G')
-                with util.RecordedOperation('create copy on write layer', self) as ro:
+                with util.RecordedOperation('create copy on write layer', self,
+                                            status_callback) as ro:
                     images.create_cow(resized_image_path, disk['path'])
             elif not os.path.exists(disk['path']):
                 processutils.execute('qemu-img create -f qcow2 %s %sG'
@@ -124,9 +125,9 @@ class Instance(object):
                                      shell=True)
 
         # Create the actual instance
-        with util.RecordedOperation('create domain XML', self) as ro:
+        with util.RecordedOperation('create domain XML', self, status_callback) as ro:
             self._create_domain_xml()
-        with util.RecordedOperation('create domain', self) as ro:
+        with util.RecordedOperation('create domain', self, status_callback) as ro:
             self._create_domain()
 
     def _make_config_drive(self, disk_path):
@@ -153,15 +154,15 @@ class Instance(object):
         # meta_data.json
         md = json.dumps({
             'random_seed': base64.b64encode(os.urandom(512)).decode('ascii'),
-            'uuid': self.uuid,
+            'uuid': self.db_entry['uuid'],
             'availability_zone': config.parsed.get('ZONE'),
-            'hostname': '%s.local' % self.name,
+            'hostname': '%s.local' % self.db_entry['name'],
             'launch_index': 0,
             'devices': [],
             'project_id': self.tenant,
-            'name': self.name,
+            'name': self.db_entry['name'],
             'public_keys': {
-                'mykey': self.sshkey
+                'mykey': self.db_entry['ssh_key']
             }
         }).encode('ascii')
         iso.add_fp(io.BytesIO(md), len(md), '/openstack/latest/meta_data.json;1',
@@ -233,9 +234,9 @@ class Instance(object):
             t = jinja2.Template(f.read())
 
         xml = t.render(
-            uuid=self.uuid,
-            memory=self.memory,
-            vcpus=self.vcpus,
+            uuid=self.db_entry['uuid'],
+            memory=self.db_entry['memory'] * 1024,
+            vcpus=self.db_entry['cpus'],
             disk_bus=config.parsed.get('DISK_BUS'),
             disks=self.disks,
             eth0_mac=self.eth0_mac,
@@ -252,7 +253,7 @@ class Instance(object):
 
         conn = libvirt.open(None)
         try:
-            instance = conn.lookupByName('sf:' + self.uuid)
+            instance = conn.lookupByName('sf:' + self.db_entry['uuid'])
             return
 
         except libvirt.libvirtError:
