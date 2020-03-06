@@ -4,6 +4,7 @@ import click
 import datetime
 from prettytable import PrettyTable
 import sys
+import time
 import uuid
 
 from shakenfist import config
@@ -13,8 +14,21 @@ from shakenfist import util
 from shakenfist import virt
 
 
-def _status_callback(json_status):
-    print('%s: Received status %s' % (datetime.datetime.now(), json_status))
+status = {}
+
+
+def _status_callback(d):
+    global status
+
+    event = d.get('event')
+    op = d.get('operation')
+
+    if event == 'start':
+        status[op] = time.time()
+    elif event == 'finish':
+        print('... %s took %0.2f seconds' % (op, time.time() - status[op]))
+    elif event == 'heartbeat':
+        print('    %s heartbeat "%s"' % (op, d.get('status')))
 
 
 @click.group()
