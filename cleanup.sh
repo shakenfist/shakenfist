@@ -1,17 +1,28 @@
 #!/bin/bash
 
-for c in `docker ps | grep dhcp | cut -f 1 -d " "`
+. /etc/sf/sfrc
+
+for c in `docker ps | grep dhcpd | cut -f 1 -d " "`
 do
     docker rm -f $c
 done
 
-for vm in `virsh list | tr -s " " | grep running | cut -f 3 -d " "`
+for vm in `virsh list --all | tr -s " " | grep "sf:" | cut -f 3 -d " "`
 do
     virsh destroy $vm
+    virsh undefine $vm
 done
 
 rm -rf /srv/shakenfist/instances
 rm -rf /srv/shakenfist/dhcp
+rm -rf /srv/shakenfist/image_cache/*.qcow2.*G
+
+for table in network_interfaces instances networks nodes
+do
+  echo "Clearing table $table"
+  docker exec -it sfdb mysql --user sf --password=$SHAKENFIST_DB_PASSWORD sf \
+      -e "delete from $table;"
+done
 
 ip link del dhcpd-$1
 ip link del br-vxlan-$1

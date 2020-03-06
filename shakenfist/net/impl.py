@@ -22,10 +22,11 @@ def from_db(uuid):
     if not dbnet:
         return None
 
-    return Network(uuid=dbnet.uuid,
-                   vxlan_id=dbnet.vxid,
-                   provide_dhcp=dbnet.provide_dhcp,
-                   ipblock=dbnet.netblock)
+    return Network(uuid=dbnet['uuid'],
+                   vxlan_id=dbnet['vxid'],
+                   provide_dhcp=dbnet['provide_dhcp'],
+                   ipblock=dbnet['netblock'],
+                   physical_nic=config.parsed.get('NODE_EGRESS_NIC'))
 
 
 class Network(object):
@@ -57,25 +58,38 @@ class Network(object):
             self.dhcp_interface = None
             self.dhcp_peer = None
 
-        self.instances = []
-
     def __str__(self):
         return 'network(%s, vxid %s)' % (self.uuid, self.vxlan_id)
 
     def allocate_ip_to_instance(self, instance):
+        addr = self.allocate_ip()
+        instance.set_network_details(addr, self.subst_dict())
+
+    def allocate_ip(self):
         addresses = list(self.ipnetwork.hosts())[1:]
 
-        for i in self.instances:
-            if i.eth0_ip in addresses:
-                addresses.remove(i.eth0_ip)
+        for interface in db.get_network_interfaces(self.uuid):
+            if interface['ipv4'] in addresses:
+                addresses.remove(interface['ipv4'])
 
         random.shuffle(addresses)
-        addr = addresses[0]
-
-        instance.set_network_details(addr, self.subst_dict())
-        self.instances.append(instance)
+        return addresses[0]
 
     def subst_dict(self):
+        instances = []
+
+        interfaces = list(db.get_network_interfaces(self.uuid))
+        for interface in interfaces:
+            hostname = db.get_instance(interface['instance_uuid'])
+            instances.append(
+                {
+                    'uuid': interface['instance_uuid'],
+                    'macaddr': interface['macaddr'],
+                    'ipv4': interface['ipv4'],
+                    'name': hostname['name']
+                }
+            )
+
         retval = {
             'vx_id': self.vxlan_id,
             'vx_interface': self.vx_interface,
@@ -89,18 +103,8 @@ class Network(object):
             'router': list(self.ipnetwork.hosts())[0],
             'broadcast': self.ipnetwork.broadcast_address,
 
-            'instances': [],
+            'instances': instances
         }
-
-        for i in self.instances:
-            retval['instances'].append(
-                {
-                    'uuid': i.uuid,
-                    'eth0_mac': i.eth0_mac,
-                    'eth0_ip': i.eth0_ip,
-                    'name': i.name,
-                }
-            )
 
         return retval
 

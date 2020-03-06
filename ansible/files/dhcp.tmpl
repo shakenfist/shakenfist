@@ -9,8 +9,8 @@ subnet {{ipblock}} netmask {{netmask}} {
 
   {% for vm in instances %}
   host {{vm.uuid}} {
-    hardware ethernet {{vm.eth0_mac}};
-    fixed-address {{vm.eth0_ip}};
+    hardware ethernet {{vm.macaddr}};
+    fixed-address {{vm.ipv4}};
     option host-name "{{vm.name}}";
   }
 
