@@ -2,6 +2,7 @@
 
 import click
 import datetime
+import logging
 from prettytable import PrettyTable
 import sys
 import time
@@ -12,6 +13,12 @@ from shakenfist.db import impl as db
 from shakenfist.net import impl as net
 from shakenfist import util
 from shakenfist import virt
+
+
+logging.basicConfig(level=logging.DEBUG)
+
+LOG = logging.getLogger(__file__)
+LOG.setLevel(logging.DEBUG)
 
 
 status = {}
@@ -78,11 +85,16 @@ def network_show(uuid=None):
 
 @network.command(name='create',
                  help=('Create a network.\n\n'
-                       'NETBLOCK: The IP address block to use, as a CIDR'
-                       ' range -- for example 192.168.200.1/24'))
+                       'NETBLOCK:     The IP address block to use, as a CIDR\n'
+                       '              range -- for example 192.168.200.1/24\n'
+                       'PROVIDE_DHCP: Should this network have DCHP?\n'
+                       'PROVIDE_NAT:  Should this network be able to access'
+                       '              the Internet via NAT?'))
 @click.argument('netblock', type=click.STRING)
-def network_create(netblock=None):
-    _show_network(db.allocate_network(netblock))
+@click.argument('provide_dhcp', type=click.BOOL)
+@click.argument('provide_nat', type=click.BOOL)
+def network_create(netblock=None, provide_dhcp=None, provide_nat=None):
+    _show_network(db.allocate_network(netblock, provide_dhcp, provide_nat))
 
 
 @network.command(name='delete', help='Delete a network')
@@ -101,7 +113,7 @@ def instance():
 
 def _get_instances(ctx, args, incomplete):
     for i in db.get_instances():
-        yield i.uuid
+        yield i['uuid']
 
 
 @instance.command(name='list', help='List instances')
@@ -152,7 +164,7 @@ def instance_show(uuid=None):
                         'DISK: The disks attached to the instance, in this format: \n'
                         '          size@image_url where size is in GB and @image_url\n'
                         '          is optional.\n'))
-@click.argument('network', type=click.STRING)
+@click.argument('network', type=click.STRING, autocompletion=_get_networks)
 @click.argument('name', type=click.STRING)
 @click.argument('cpus', type=click.INT)
 @click.argument('memory', type=click.INT)

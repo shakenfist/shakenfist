@@ -123,7 +123,7 @@ def get_networks():
         session.close()
 
 
-def allocate_network(netblock):
+def allocate_network(netblock, provide_dhcp=True, provide_nat=False):
     session = Session()
     see_this_node(session=session)
 
@@ -136,7 +136,7 @@ def allocate_network(netblock):
             else:
                 vxid = 1
 
-        n = Network(netid, vxid, netblock, True, False, None)
+        n = Network(netid, vxid, netblock, provide_dhcp, provide_nat, None)
         session.add(n)
         return n.export()
     finally:

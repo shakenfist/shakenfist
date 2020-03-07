@@ -25,6 +25,7 @@ def from_db(uuid):
     return Network(uuid=dbnet['uuid'],
                    vxlan_id=dbnet['vxid'],
                    provide_dhcp=dbnet['provide_dhcp'],
+                   provide_nat=dbnet['provide_nat'],
                    ipblock=dbnet['netblock'],
                    physical_nic=config.parsed.get('NODE_EGRESS_NIC'))
 
@@ -32,11 +33,12 @@ def from_db(uuid):
 class Network(object):
     # NOTE(mikal): it should be noted that the maximum interface name length
     # on Linux is 15 user visible characters.
-    def __init__(self, uuid=None, vxlan_id=1, provide_dhcp=False,
+    def __init__(self, uuid=None, vxlan_id=1, provide_dhcp=False, provide_nat=False,
                  physical_nic='eth0', nodes=None, ipblock=None):
         self.uuid = uuid
         self.vxlan_id = vxlan_id
         self.provide_dhcp = provide_dhcp
+        self.provide_nat = provide_nat
         self.physical_nic = physical_nic
 
         self.vx_interface = 'vxlan-%s' % self.vxlan_id
@@ -66,7 +68,7 @@ class Network(object):
         instance.set_network_details(addr, self.subst_dict())
 
     def allocate_ip(self):
-        addresses = list(self.ipnetwork.hosts())[1:]
+        addresses = list(self.ipnetwork.hosts())[2:]
 
         for interface in db.get_network_interfaces(self.uuid):
             if interface['ipv4'] in addresses:
@@ -101,9 +103,10 @@ class Network(object):
             'ipblock': self.ipnetwork.network_address,
             'netmask': self.ipnetwork.netmask,
             'router': list(self.ipnetwork.hosts())[0],
+            'dhcpserver': list(self.ipnetwork.hosts())[1],
             'broadcast': self.ipnetwork.broadcast_address,
 
-            'instances': instances
+            'instances': instances,
         }
 
         return retval
@@ -140,6 +143,27 @@ class Network(object):
                 processutils.execute(
                     'brctl stp %(vx_bridge)s off' % subst, shell=True)
 
+        if self.provide_nat:
+            with util.RecordedOperation('enable NAT', self) as ro:
+                processutils.execute(
+                    'ip addr add %(router)s/%(netmask)s dev %(vx_bridge)s' % subst,
+                    shell=True)
+                processutils.execute('echo 1 > /proc/sys/net/ipv4/ip_forward',
+                                     shell=True)
+                processutils.execute(
+                    'iptables -A FORWARD -o %(phy_interface)s '
+                    '-i %(vx_bridge)s -j ACCEPT' % subst,
+                    shell=True)
+                processutils.execute(
+                    'iptables -A FORWARD -i %(phy_interface)s '
+                    '-o %(vx_bridge)s -j ACCEPT' % subst,
+                    shell=True)
+                processutils.execute(
+                    'iptables -t nat -A POSTROUTING -s %(ipblock)s/%(netmask)s '
+                    '-o %(phy_interface)s -j MASQUERADE' % subst,
+                    shell=True
+                )
+
         if self.provide_dhcp and not util.check_for_interface(self.dhcp_interface):
             with util.RecordedOperation('create dhcp interface', self) as ro:
                 processutils.execute(
@@ -153,7 +177,7 @@ class Network(object):
                 processutils.execute(
                     'ip link set %(dhcp_peer)s up' % subst, shell=True)
                 processutils.execute(
-                    'ip addr add 192.168.200.1/24 dev %(dhcp_interface)s' % subst,
+                    'ip addr add %(dhcpserver)s/%(netmask)s dev %(dhcp_interface)s' % subst,
                     shell=True)
 
         if self.provide_dhcp:
