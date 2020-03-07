@@ -44,8 +44,8 @@ def _resolve_cirros(name):
         LOG.info('Found cirros versions: %s' % versions)
         ver = versions[-1]
     else:
-        # Name is assumed to be in the form cirros-0.4.0
-        _, ver = name.split('-')
+        # Name is assumed to be in the form cirros:0.4.0
+        _, ver = name.split(':')
 
     return ('http://download.cirros-cloud.net/%(ver)s/cirros-%(ver)s-x86_64-disk.img'
             % {'ver': ver})
@@ -69,8 +69,8 @@ def _resolve_ubuntu(name):
         verkey = sorted(versions.keys())[-1]
         ver = versions[verkey]
     else:
-        # Name is assumed to be in the form ubuntu-xenial or ubuntu-19.04
-        _, req = name.split('-')
+        # Name is assumed to be in the form ubuntu:xenial or ubuntu:19.04
+        _, req = name.split(':')
         ver = versions.get(req, req)
 
     return ('https://cloud-images.ubuntu.com/%(ver)s/current/%(ver)s-server-cloudimg-amd64.img'
@@ -151,7 +151,7 @@ def fetch_image(image_url, recorded=None):
 
                 if time.time() - last_heartbeat > 5:
                     if recorded:
-                        recorded.heartbeat('Recieved %d of %d bytes (%.01f%%)' %
+                        recorded.heartbeat('Received %d of %d bytes (%.01f%%)' %
                                            (received, length, received / length * 100.0))
 
         with open(hashed_image_path + '.info', 'w') as f:

@@ -24,6 +24,9 @@ do
       -e "delete from $table;"
 done
 
-ip link del dhcpd-$1
-ip link del br-vxlan-$1
-ip link del vxlan-$1
+for i in `seq 10`
+do
+  ip link del dhcpd-$i
+  ip link del br-vxlan-$i
+  ip link del vxlan-$i
+done
