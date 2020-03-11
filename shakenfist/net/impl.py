@@ -145,24 +145,28 @@ class Network(object):
 
         if self.provide_nat:
             with util.RecordedOperation('enable NAT', self) as ro:
-                processutils.execute(
-                    'ip addr add %(router)s/%(netmask)s dev %(vx_bridge)s' % subst,
+                out, err = processutils.execute(
+                    'ip addr show dev %(vx_bridge)s' % subst,
                     shell=True)
-                processutils.execute('echo 1 > /proc/sys/net/ipv4/ip_forward',
-                                     shell=True)
-                processutils.execute(
-                    'iptables -A FORWARD -o %(phy_interface)s '
-                    '-i %(vx_bridge)s -j ACCEPT' % subst,
-                    shell=True)
-                processutils.execute(
-                    'iptables -A FORWARD -i %(phy_interface)s '
-                    '-o %(vx_bridge)s -j ACCEPT' % subst,
-                    shell=True)
-                processutils.execute(
-                    'iptables -t nat -A POSTROUTING -s %(ipblock)s/%(netmask)s '
-                    '-o %(phy_interface)s -j MASQUERADE' % subst,
-                    shell=True
-                )
+                if out.find('inet %(router)s' % subst) == -1:
+                    processutils.execute(
+                        'ip addr add %(router)s/%(netmask)s dev %(vx_bridge)s' % subst,
+                        shell=True)
+                    processutils.execute('echo 1 > /proc/sys/net/ipv4/ip_forward',
+                                         shell=True)
+                    processutils.execute(
+                        'iptables -A FORWARD -o %(phy_interface)s '
+                        '-i %(vx_bridge)s -j ACCEPT' % subst,
+                        shell=True)
+                    processutils.execute(
+                        'iptables -A FORWARD -i %(phy_interface)s '
+                        '-o %(vx_bridge)s -j ACCEPT' % subst,
+                        shell=True)
+                    processutils.execute(
+                        'iptables -t nat -A POSTROUTING -s %(ipblock)s/%(netmask)s '
+                        '-o %(phy_interface)s -j MASQUERADE' % subst,
+                        shell=True
+                    )
 
         if self.provide_dhcp and not util.check_for_interface(self.dhcp_interface):
             with util.RecordedOperation('create dhcp interface', self) as ro:

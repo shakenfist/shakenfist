@@ -10,6 +10,7 @@ import uuid
 
 from shakenfist import config
 from shakenfist.db import impl as db
+from shakenfist import images
 from shakenfist.net import impl as net
 from shakenfist import util
 from shakenfist import virt
@@ -204,3 +205,20 @@ def instance_delete(uuid=None):
 
 
 cli.add_command(instance)
+
+
+@click.group(help='Image commands')
+def image():
+    pass
+
+
+@image.command(name='cache',
+               help=('Cache an image.\n\n'
+                     'IMAGE_URL: The URL of the image to cache'))
+@click.argument('image_url', type=click.STRING)
+def image_cache(image_url=None):
+    with util.RecordedOperation('cache image', image_url, _status_callback) as ro:
+        images.fetch_image(image_url, recorded=ro)
+
+
+cli.add_command(image)

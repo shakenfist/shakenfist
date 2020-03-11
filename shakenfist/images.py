@@ -208,3 +208,12 @@ def create_cow(cache_file, disk_file):
     processutils.execute(
         'qemu-img create -b %s -f qcow2 %s' % (cache_file, disk_file),
         shell=True)
+
+
+def snapshot(source, destination):
+    """Convert a possibly COW layered disk file into a snapshot."""
+
+    processutils.execute(
+        'qemu-img convert --force-share -O qcow2 %s %s'
+        % (source, destination),
+        shell=True)
