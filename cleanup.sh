@@ -14,6 +14,7 @@ do
 done
 
 rm -rf /srv/shakenfist/instances
+rm -rf /srv/shakenfist/snapshots
 rm -rf /srv/shakenfist/dhcp
 rm -rf /srv/shakenfist/image_cache/*.qcow2.*G
 

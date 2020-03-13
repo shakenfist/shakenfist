@@ -3,6 +3,7 @@
 import jinja2
 import logging
 import os
+import shutil
 
 from oslo_concurrency import processutils
 
@@ -38,13 +39,22 @@ class DHCP(object):
         with open(os.path.join(self.config_dir_path, 'dhcpd.conf'), 'w') as f:
             f.write(c)
 
-    def restart_dhcpd(self):
-        subst = self.network.subst_dict()
-        subst['config_dir'] = self.config_dir_path
+    def remove_config(self):
+        self.config_dir_path = os.path.join(
+            config.parsed.get('STORAGE_PATH'), 'dhcp', self.network.uuid)
+        if os.path.exists(self.config_dir_path):
+            shutil.rmtree(self.config_dir_path)
 
+    def remove_dhcpd(self):
+        subst = self.network.subst_dict()
         processutils.execute(
             'docker rm -f %(dhcp_interface)s' % subst, shell=True, check_exit_code=[0, 1])
 
+    def restart_dhcpd(self):
+        self.remove_dhcpd()
+
+        subst = self.network.subst_dict()
+        subst['config_dir'] = self.config_dir_path
         processutils.execute(
             'docker run -d --name %(dhcp_interface)s --restart=always '
             '--init --net host -v %(config_dir)s:/data networkboot/dhcpd '

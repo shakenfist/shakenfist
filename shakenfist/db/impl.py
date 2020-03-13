@@ -144,6 +144,21 @@ def allocate_network(netblock, provide_dhcp=True, provide_nat=False):
         session.close()
 
 
+def delete_network(uuid):
+    session = Session()
+    see_this_node(session=session)
+
+    try:
+        for n in session.query(Network).filter(
+                Network.uuid == uuid):
+            session.delete(n)
+    except exc.NoResultFound:
+        return None
+    finally:
+        session.commit()
+        session.close()
+
+
 class Instance(Base):
     __tablename__ = 'instances'
 
@@ -217,6 +232,24 @@ def create_instance(uuid, network_uuid, name, cpus, memory_mb, disk_spec, ssh_ke
         session.close()
 
 
+def delete_instance(uuid):
+    session = Session()
+    see_this_node(session=session)
+
+    try:
+        for ni in session.query(NetworkInterface).filter(
+                NetworkInterface.instance_uuid == uuid):
+            session.delete(ni)
+        i = session.query(Instance).filter(
+            Instance.uuid == uuid).one()
+        session.delete(i)
+    except exc.NoResultFound:
+        return None
+    finally:
+        session.commit()
+        session.close()
+
+
 class NetworkInterface(Base):
     __tablename__ = 'network_interfaces'
 
@@ -248,8 +281,8 @@ def create_network_interface(uuid, network_uuid, instance_uuid, macaddr, ipv4):
     see_this_node(session=session)
 
     try:
-        i = NetworkInterface(uuid, network_uuid, instance_uuid, macaddr, ipv4)
-        session.add(i)
+        session.add(NetworkInterface(
+            uuid, network_uuid, instance_uuid, macaddr, ipv4))
     finally:
         session.commit()
         session.close()
@@ -282,4 +315,38 @@ def get_network_interfaces(uuid):
     except exc.NoResultFound:
         pass
     finally:
+        session.close()
+
+
+class Snapshot(Base):
+    __tablename__ = 'snapshots'
+
+    uuid = Column(String, primary_key=True)
+    device = Column(String, primary_key=True)
+    instance_uuid = Column(String)
+    created = Column(DateTime)
+
+    def __init__(self, uuid, device, instance_uuid, created):
+        self.uuid = uuid
+        self.device = device
+        self.instance_uuid = instance_uuid
+        self.created = created
+
+    def export(self):
+        return {
+            'uuid': self.uuid,
+            'device': self.device,
+            'instance_uuid': self.instance_uuid,
+            'created': self.created
+        }
+
+
+def create_snapshot(uuid, device, instance_uuid, created):
+    session = Session()
+    see_this_node(session=session)
+
+    try:
+        session.add(Snapshot(uuid, device, instance_uuid, created))
+    finally:
+        session.commit()
         session.close()

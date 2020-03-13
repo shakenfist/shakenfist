@@ -10,6 +10,7 @@ import uuid
 
 from shakenfist import config
 from shakenfist.db import impl as db
+from shakenfist import images
 from shakenfist.net import impl as net
 from shakenfist import util
 from shakenfist import virt
@@ -100,7 +101,13 @@ def network_create(netblock=None, provide_dhcp=None, provide_nat=None):
 @network.command(name='delete', help='Delete a network')
 @click.argument('uuid', type=click.STRING, autocompletion=_get_networks)
 def network_delete(uuid=None):
-    click.echo('123')
+    n = net.from_db(uuid)
+    if not n:
+        print('Network not found')
+        sys.exit(1)
+
+    n.remove_dhcp()
+    db.delete_network(uuid)
 
 
 cli.add_command(network)
@@ -177,10 +184,10 @@ def instance_create(network=None, name=None, cpus=None, memory=None, disk=None):
     n.create()
 
     newid = str(uuid.uuid4())
-    instance = virt.Instance(
+    instance = virt.from_definition(
         uuid=newid,
         name=name,
-        disks=disk,
+        disks=' '.join(disk),
         memory_mb=memory * 1024,
         vcpus=cpus,
         ssh_key='ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC2Pas6zLLgzXsUSZzt8E8fX7tzpwmNlrsbAeH9YoI2snfo+cKfO1BZVQgJnJVz+hGhnC1mzsMZMtdW2NRonRgeeQIPTUFXJI+3dyGzmiNrmtH8QQz++7zsmdwngeXKDrYhD6JGnPTkKcjShYcbvB/L3IDDJvepLxVOGRJBVHXJzqHgA62AtVsoiECKxFSn8MOuRfPHj5KInLxOEX9i/TfYKawSiId5xEkWWtcrp4QhjuoLv4UHL2aKs85ppVZFTmDHHcx3Au7pZ7/T9NOcUrvnwmQDVIBeU0LEELzuQZWLkFYvStAeCF7mYra+EJVXjiCQ9ZBw0vXGqJR1SU+W6dh9 mikal@kolla-m1'
@@ -200,7 +207,37 @@ def instance_create(network=None, name=None, cpus=None, memory=None, disk=None):
 @instance.command(name='delete', help='Delete an instance')
 @click.argument('uuid', type=click.STRING, autocompletion=_get_networks)
 def instance_delete(uuid=None):
-    click.echo('123')
+    i = virt.from_db(uuid)
+    n = net.from_db(i.get_network_uuid())
+    i.delete(_status_callback)
+    if n:
+        with util.RecordedOperation('deallocate ip address', instance) as _:
+            n.update_dhcp()
+
+
+@instance.command(name='snapshot', help='Snapshot instance')
+@click.argument('uuid', type=click.STRING, autocompletion=_get_instances)
+@click.argument('all', type=click.BOOL, default=False)
+def instance_snapshot(uuid=None, all=False):
+    i = virt.from_db(uuid)
+    print('Created snapshot %s' % i.snapshot(all=all))
 
 
 cli.add_command(instance)
+
+
+@click.group(help='Image commands')
+def image():
+    pass
+
+
+@image.command(name='cache',
+               help=('Cache an image.\n\n'
+                     'IMAGE_URL: The URL of the image to cache'))
+@click.argument('image_url', type=click.STRING)
+def image_cache(image_url=None):
+    with util.RecordedOperation('cache image', image_url, _status_callback) as ro:
+        images.fetch_image(image_url, recorded=ro)
+
+
+cli.add_command(image)
