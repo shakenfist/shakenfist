@@ -192,8 +192,15 @@ class Network(object):
 
     def update_dhcp(self):
         with util.RecordedOperation('update dhcp', self) as ro:
+            self.dhcp = dhcp.DHCP(self)
             self.dhcp.make_config()
             self.dhcp.restart_dhcpd()
+
+    def remove_dhcp(self):
+        with util.RecordedOperation('update dhcp', self) as ro:
+            self.dhcp = dhcp.DHCP(self)
+            self.dhcp.remove_dhcpd()
+            self.dhcp.remove_config()
 
     def discover_mesh(self):
         mesh_re = re.compile('00: 00: 00: 00: 00: 00 dst (.*) self permanent')

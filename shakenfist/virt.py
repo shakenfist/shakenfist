@@ -1,6 +1,7 @@
 # Copyright 2019 Michael Still
 
 import base64
+import datetime
 import jinja2
 import logging
 import io
@@ -9,6 +10,8 @@ import libvirt
 import os
 import pycdlib
 import randmac
+import shutil
+import uuid
 
 from oslo_concurrency import processutils
 
@@ -22,16 +25,32 @@ LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
 
 
+def from_definition(uuid=None, name=None, disks=None, memory_mb=None,
+                    vcpus=None, ssh_key=None):
+    db_entry = db.create_instance(uuid, None, name, vcpus, memory_mb, disks,
+                                  ssh_key)
+    return Instance(db_entry)
+
+
+def from_db(uuid):
+    db_entry = db.get_instance(uuid)
+    if not db_entry:
+        return None
+    return Instance(db_entry)
+
+
 class Instance(object):
-    def __init__(self, uuid=None, name=None, disks=None, memory_mb=None,
-                 vcpus=None, ssh_key=None):
-        self.db_entry = db.create_instance(uuid, None, name, vcpus, memory_mb, disks,
-                                           ssh_key)
+    def __init__(self, db_entry):
+        self.db_entry = db_entry
         self.tenant = None
 
         self.instance_path = os.path.join(
             config.parsed.get('STORAGE_PATH'), 'instances', self.db_entry['uuid'])
+        self.snapshot_path = os.path.join(
+            config.parsed.get('STORAGE_PATH'), 'snapshots')
+        self.xml_file = os.path.join(self.instance_path, 'libvirt.xml')
 
+        disks = self.db_entry['disk_spec'].split(' ')
         size, base = self._parse_disk_spec(disks[0])
         root_device = self._get_disk_device_base() + 'a'
         config_device = self._get_disk_device_base() + 'b'
@@ -93,6 +112,9 @@ class Instance(object):
     def get_network_details(self):
         return (self.eth0_mac, self.eth0_ip)
 
+    def get_network_uuid(self):
+        return self.db_entry['network_uuid']
+
     def create(self, status_callback):
         # Ensure we have state on disk
         if not os.path.exists(self.instance_path):
@@ -129,6 +151,21 @@ class Instance(object):
             self._create_domain_xml()
         with util.RecordedOperation('create domain', self, status_callback) as ro:
             self._create_domain()
+
+    def delete(self, status_callback):
+        with util.RecordedOperation('delete domain', self, status_callback) as ro:
+            try:
+                self._delete_domain()
+            except:
+                pass
+
+        with util.RecordedOperation('delete disks', self, status_callback) as ro:
+            try:
+                shutil.rmtree(self.instance_path)
+            except:
+                pass
+
+        db.delete_instance(self.db_entry['uuid'])
 
     def _make_config_drive(self, disk_path):
         """Create a config drive"""
@@ -226,7 +263,6 @@ class Instance(object):
     def _create_domain_xml(self):
         """Create the domain XML for the instance."""
 
-        self.xml_file = os.path.join(self.instance_path, 'libvirt.xml')
         if os.path.exists(self.xml_file):
             return
 
@@ -247,16 +283,22 @@ class Instance(object):
         with open(self.xml_file, 'w') as f:
             f.write(xml)
 
+    def _get_domain(self):
+        conn = libvirt.open(None)
+        try:
+            return conn.lookupByName('sf:' + self.db_entry['uuid'])
+
+        except libvirt.libvirtError:
+            LOG.error('%s: Failed to lookup domain' % self)
+            return None
+
     def _create_domain(self):
         with open(self.xml_file) as f:
             xml = f.read()
 
-        conn = libvirt.open(None)
-        try:
-            instance = conn.lookupByName('sf:' + self.db_entry['uuid'])
-            return
-
-        except libvirt.libvirtError:
+        instance = self._get_domain()
+        if not instance:
+            conn = libvirt.open(None)
             instance = conn.defineXML(xml)
             if not instance:
                 LOG.error('%s: Failed to create libvirt domain' % self)
@@ -264,3 +306,50 @@ class Instance(object):
 
         instance.create()
         instance.setAutostart(1)
+
+    def _delete_domain(self):
+        with open(self.xml_file) as f:
+            xml = f.read()
+
+        instance = self._get_domain()
+        if not instance:
+            conn = libvirt.open(None)
+            instance = conn.defineXML(xml)
+            if not instance:
+                LOG.error('%s: Failed to create libvirt domain' % self)
+                return
+
+        try:
+            instance.destroy()
+        except libvirt.libvirtError as e:
+            LOG.error('%s: Failed to delete domain: %s' % (self, e))
+
+    def _snapshot_device(self, source, destination):
+        images.snapshot(source, destination)
+
+    def snapshot(self, all=False):
+        disks = self.disks
+        if not all:
+            disks = [disks[0]]
+
+        snapshot_uuid = str(uuid.uuid4())
+        snappath = os.path.join(self.snapshot_path, snapshot_uuid)
+        if not os.path.exists(snappath):
+            LOG.debug('%s: Creating snapshot storage at %s' %
+                      (self, snappath))
+            os.makedirs(snappath)
+            with open(os.path.join(self.snapshot_path, 'index.html'), 'w') as f:
+                f.write('<html></html>')
+
+        for d in disks:
+            print(d)
+            if d['type'] != 'qcow2':
+                continue
+
+            with util.RecordedOperation('snapshot %s' % d['device'], self) as ro:
+                self._snapshot_device(
+                    d['path'], os.path.join(snappath, d['device']))
+                db.create_snapshot(snapshot_uuid, d['device'], self.db_entry['uuid'],
+                                   datetime.datetime.now())
+
+        return snapshot_uuid
