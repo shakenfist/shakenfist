@@ -237,6 +237,9 @@ def delete_instance(uuid):
     see_this_node(session=session)
 
     try:
+        for s in session.query(Snapshot).filter(
+                Snapshot.instance_uuid == uuid):
+            session.delete(s)
         for ni in session.query(NetworkInterface).filter(
                 NetworkInterface.instance_uuid == uuid):
             session.delete(ni)
