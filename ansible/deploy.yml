@@ -1,4 +1,4 @@
---- # Install shakenfist on a series of debian machines
+--- # Install shakenfist on a series of Ubuntu or Debian machines
 - hosts: all
   become: yes
   become_method: sudo
@@ -12,42 +12,30 @@
     - include: includes/python3.yml
     - include: includes/docker.yml
 
+    - name: Copy shakenfist
+      synchronize:
+        src: ../../.
+        dest: /srv/shakenfist/src
+
     - name: Install shakenfist
       command: pip3 install -e .
       args:
-        chdir: ..
+        chdir: /srv/shakenfist/src/
 
-    - name: Create storage directory
-      file:
-        path: /srv/shakenfist/mariadb
-        state: directory
-        mode: "0755"
+- hosts: all
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
 
-    - name: Copy libvirt template
-      copy:
-        src: files/libvirt.debian.tmpl
-        dest: /srv/shakenfist/libvirt.tmpl
-        owner: root
-        group: root
-        mode: "0644"
-
-    - name: Copy dhcp template
-      copy:
-        src: files/dhcp.tmpl
-        dest: /srv/shakenfist/dhcp.tmpl
-        owner: root
-        group: root
-        mode: "0644"
-
-    - name: Determine node IP
-      shell: /usr/bin/dig @resolver1.opendns.com ANY myip.opendns.com +short
-      register: node_ip_complex
-      when: node_ip is not defined
-
-    - name: Extract node IP
+  tasks:
+    - name: Determine DB IP
       set_fact:
-        node_ip: "{{node_ip_complex.stdout}}"
-      when: node_ip is not defined
+        db_node_ip: "{{ node_ip }}"
+      delegate_to: group.db
+      run_once: true
 
     - name: Create config directory
       file:
@@ -73,6 +61,15 @@
         group: sudo
         mode: u=rwx,g=rwx,o=
 
+- hosts: db
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
     - name: Test if we have a database
       shell: docker inspect sfdb
       ignore_errors: True
@@ -106,12 +103,53 @@
     - name: Upgrade database schema
       command: alembic upgrade head
       args:
-        chdir: ../shakenfist
+        chdir: /srv/shakenfist/src/shakenfist
       environment:
         SHAKENFIST_NODE_IP: "{{node_ip}}"
         SHAKENFIST_DB_ROOT_PASSWORD: "{{db_root_password}}"
         SHAKENFIST_DB_PASSWORD: "{{db_user_password}}"
         SHAKENFIST_SQL_URL: "mysql://sf:{{db_user_password}}@{{node_ip}}/sf"
+
+- hosts: hypervisors
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - name: Create storage directory
+      file:
+        path: /srv/shakenfist/mariadb
+        state: directory
+        mode: "0755"
+
+    - name: Copy libvirt template
+      copy:
+        src: files/libvirt.debian.tmpl
+        dest: /srv/shakenfist/libvirt.tmpl
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Copy dhcp template
+      copy:
+        src: files/dhcp.tmpl
+        dest: /srv/shakenfist/dhcp.tmpl
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Determine node IP
+      shell: /usr/bin/dig @resolver1.opendns.com ANY myip.opendns.com +short
+      register: node_ip_complex
+      when: node_ip is not defined
+
+    - name: Extract node IP
+      set_fact:
+        node_ip: "{{node_ip_complex.stdout}}"
+      when: node_ip is not defined
 
     - name: Write systemd unit
       template:
