@@ -8,7 +8,6 @@
         "curl",
         "gnupg2",
         "software-properties-common",
-        "python-docker",
       ]
     update_cache: yes
     state: latest
@@ -18,11 +17,11 @@
 
 - name: Set release
   set_fact:
-    docker_release: '{{ansible_distribution_release}}'
+    docker_release: "{{ansible_distribution_release}}"
 
 - name: Override release for eoan to work around missing docker packages
   set_fact:
-    docker_release: 'disco'
+    docker_release: "disco"
   when: docker_release == 'eoan'
 
 - name: Add Docker APT repository
@@ -33,3 +32,9 @@
   apt:
     name: ["docker-ce", "docker-ce-cli", "containerd.io"]
     update_cache: yes
+
+- name: Install docker python libraries
+  apt:
+    name: ["python-docker"]
+    update_cache: yes
+    state: latest

@@ -37,15 +37,21 @@ Build an acceptable hypervisor node, noting that only Debian and Ubuntu are supp
 
 ```bash
 # Create an image with nested virt enabled (only once)
-gcloud compute disks create disk1 --image-project debian-cloud \
-    --image-family debian-9 --zone us-central1-b
-gcloud compute images create nested-vm-image \
-  --source-disk disk1 --source-disk-zone us-central1-b \
+gcloud compute disks create sf-source-disk --image-project ubuntu-os-cloud \
+    --image-family ubuntu-1804-lts --zone us-central1-b
+gcloud compute images create sf-image \
+  --source-disk sf-source-disk --source-disk-zone us-central1-b \
   --licenses "https://compute.googleapis.com/compute/v1/projects/vm-options/global/licenses/enable-vmx"
 
-# Start our hypervisor node VM
+# Start our hypervisor node VMs, we'll have two for now
 gcloud compute instances create sf-1 --zone us-central1-b \
-    --min-cpu-platform "Intel Haswell" --image nested-vm-image
+    --min-cpu-platform "Intel Haswell" --image sf-image
+gcloud compute instances create sf-2 --zone us-central1-b \
+    --min-cpu-platform "Intel Haswell" --image sf-image
+
+# And then we need a shared database backend
+gcloud compute instances create sf-db --zone us-central1-b \
+    --image-project ubuntu-os-cloud --image-family ubuntu-1804-lts
 ```
 
 Update the contents of ansible/vars with locally valid values. Its a YAML file if that helps.
@@ -56,7 +62,7 @@ Now on the hypervisor node (omit the --extra-vars for production environments, w
 sudo apt-get install ansible
 git clone https://github.com/mikalstill/shakenfist
 cd shakenfist
-ansible-playbook -i ansible/hosts ansible/deploy.yml --extra-vars "node_ip=127.0.0.1"
+ansible-playbook -i ansible/hosts-gcp ansible/deploy.yml
 ```
 
 At the moment you interact with Shaken Fist via a command line client as I haven't written an API layer yet. When I do, it will probably be graphql. For now, do something like this:

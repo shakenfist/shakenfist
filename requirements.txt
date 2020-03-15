@@ -6,7 +6,7 @@ sqlalchemy          # mit
 alembic             # mit
 mysqlclient         # gpl
 setproctitle        # bsd
-click               # bsd
+click>=7.1.1        # bsd
 prettytable         # bsd
 tox                 # mit
 flake8              # mit
