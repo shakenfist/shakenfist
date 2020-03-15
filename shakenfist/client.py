@@ -3,6 +3,7 @@
 import click
 import datetime
 import logging
+import os
 from prettytable import PrettyTable
 import sys
 import time
@@ -40,8 +41,12 @@ def _status_callback(d):
 
 
 @click.group()
-def cli():
-    pass
+@click.option('--pretty/--no-pretty', default=True)
+@click.pass_context
+def cli(ctx, pretty):
+    if not ctx.obj:
+        ctx.obj = {}
+    ctx.obj['PRETTY'] = pretty
 
 
 @click.group(help='Network commands')
@@ -55,14 +60,21 @@ def _get_networks(ctx, args, incomplete):
 
 
 @network.command(name='list', help='List networks')
-def network_list():
-    x = PrettyTable()
-    x.field_names = ['uuid', 'owner', 'netblock']
+@click.pass_context
+def network_list(ctx):
+    nets = db.get_networks()
 
-    for n in db.get_networks():
-        x.add_row([n['uuid'], n['owner'], n['netblock']])
+    if ctx.obj['PRETTY']:
+        x = PrettyTable()
+        x.field_names = ['uuid', 'owner', 'netblock']
+        for n in nets:
+            x.add_row([n['uuid'], n['owner'], n['netblock']])
+        print(x)
 
-    print(x)
+    else:
+        print('uuid,owner,netblock')
+        for n in nets:
+            print('%s,%s,%s' % (n['uuid'], n['owner'], n['netblock']))
 
 
 def _show_network(n):
@@ -80,27 +92,30 @@ def _show_network(n):
 
 @network.command(name='show', help='Show a network')
 @click.argument('uuid', type=click.STRING, autocompletion=_get_networks)
-def network_show(uuid=None):
+@click.pass_context
+def network_show(ctx, uuid=None):
     _show_network(db.get_network(uuid))
 
 
 @network.command(name='create',
                  help=('Create a network.\n\n'
-                       'NETBLOCK:     The IP address block to use, as a CIDR\n'
-                       '              range -- for example 192.168.200.1/24\n'
-                       'PROVIDE_DHCP: Should this network have DCHP?\n'
-                       'PROVIDE_NAT:  Should this network be able to access'
-                       '              the Internet via NAT?'))
+                       'NETBLOCK:         The IP address block to use, as a CIDR\n'
+                       '                  range -- for example 192.168.200.1/24\n'
+                       '--dhcp/--no-dhcp: Should this network have DCHP?\n'
+                       '--nat/--no-nat:   Should this network be able to access'
+                       '                  the Internet via NAT?'))
 @click.argument('netblock', type=click.STRING)
-@click.argument('provide_dhcp', type=click.BOOL)
-@click.argument('provide_nat', type=click.BOOL)
-def network_create(netblock=None, provide_dhcp=None, provide_nat=None):
-    _show_network(db.allocate_network(netblock, provide_dhcp, provide_nat))
+@click.option('--dhcp/--no-dhcp', default=True)
+@click.option('--nat/--no-nat', default=True)
+@click.pass_context
+def network_create(ctx, netblock=None, dhcp=None, nat=None):
+    _show_network(db.allocate_network(netblock, dhcp, nat))
 
 
 @network.command(name='delete', help='Delete a network')
 @click.argument('uuid', type=click.STRING, autocompletion=_get_networks)
-def network_delete(uuid=None):
+@click.pass_context
+def network_delete(ctx, uuid=None):
     n = net.from_db(uuid)
     if not n:
         print('Network not found')
@@ -124,14 +139,22 @@ def _get_instances(ctx, args, incomplete):
 
 
 @instance.command(name='list', help='List instances')
-def instance_list():
-    x = PrettyTable()
-    x.field_names = ['uuid', 'name', 'cpus', 'memory']
+@click.pass_context
+def instance_list(ctx):
+    insts = db.get_instances()
 
-    for i in db.get_instances():
-        x.add_row([i['uuid'], i['name'], i['cpus'], i['memory']])
+    if ctx.obj['PRETTY']:
+        x = PrettyTable()
+        x.field_names = ['uuid', 'name', 'cpus', 'memory']
+        for i in insts:
+            x.add_row([i['uuid'], i['name'], i['cpus'], i['memory']])
+        print(x)
 
-    print(x)
+    else:
+        print('uuid,name,cpus,memory')
+        for i in insts:
+            print('%s,%s,%s,%s' %
+                  (i['uuid'], i['name'], i['cpus'], i['memory']))
 
 
 def _show_instance(i):
@@ -158,7 +181,8 @@ def _show_instance(i):
 
 @instance.command(name='show', help='Show an instance')
 @click.argument('uuid', type=click.STRING, autocompletion=_get_instances)
-def instance_show(uuid=None):
+@click.pass_context
+def instance_show(ctx, uuid=None):
     _show_instance(db.get_instance(uuid))
 
 
@@ -176,7 +200,8 @@ def instance_show(uuid=None):
 @click.argument('cpus', type=click.INT)
 @click.argument('memory', type=click.INT)
 @click.argument('disk', type=click.STRING, nargs=-1)
-def instance_create(network=None, name=None, cpus=None, memory=None, disk=None):
+@click.pass_context
+def instance_create(ctx, network=None, name=None, cpus=None, memory=None, disk=None):
     n = net.from_db(network)
     if not n:
         print('Network not found')
@@ -206,7 +231,8 @@ def instance_create(network=None, name=None, cpus=None, memory=None, disk=None):
 
 @instance.command(name='delete', help='Delete an instance')
 @click.argument('uuid', type=click.STRING, autocompletion=_get_networks)
-def instance_delete(uuid=None):
+@click.pass_context
+def instance_delete(ctx, uuid=None):
     i = virt.from_db(uuid)
     n = net.from_db(i.get_network_uuid())
     i.delete(_status_callback)
@@ -218,7 +244,8 @@ def instance_delete(uuid=None):
 @instance.command(name='snapshot', help='Snapshot instance')
 @click.argument('uuid', type=click.STRING, autocompletion=_get_instances)
 @click.argument('all', type=click.BOOL, default=False)
-def instance_snapshot(uuid=None, all=False):
+@click.pass_context
+def instance_snapshot(ctx, uuid=None, all=False):
     i = virt.from_db(uuid)
     print('Created snapshot %s' % i.snapshot(all=all))
 
@@ -235,7 +262,8 @@ def image():
                help=('Cache an image.\n\n'
                      'IMAGE_URL: The URL of the image to cache'))
 @click.argument('image_url', type=click.STRING)
-def image_cache(image_url=None):
+@click.pass_context
+def image_cache(ctx, image_url=None):
     with util.RecordedOperation('cache image', image_url, _status_callback) as ro:
         images.fetch_image(image_url, recorded=ro)
 
