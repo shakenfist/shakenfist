@@ -1,0 +1,97 @@
+- hosts: all
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - name: Create helper wrapper
+      copy:
+        content: |
+          #/bin/bash -e
+          . /etc/sf/sfrc
+          sf-client --no-pretty $*
+        dest: /tmp/sf-client-wrapper
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx
+
+    - name: Clear out old instances and networks
+      shell: |
+        for inst in `/bin/bash /tmp/sf-client-wrapper instance list | grep -v uuid | cut -f 1 -d ","`
+        do
+          /bin/bash /tmp/sf-client-wrapper instance delete $inst
+        done
+
+        for net in `/bin/bash /tmp/sf-client-wrapper network list | grep -v uuid | cut -f 1 -d ","`
+        do
+          /bin/bash /tmp/sf-client-wrapper network delete $net
+        done
+      run_once: true
+
+    - name: We should have an empty list of networks
+      shell: |
+        [ `/bin/bash /tmp/sf-client-wrapper network list | wc -l` -eq 1 ]
+
+    - name: We should have an empty list of instances
+      shell: |
+        [ `/bin/bash /tmp/sf-client-wrapper instance list | wc -l` -eq 1 ]
+
+    - name: Create a network
+      shell: |
+        /bin/bash /tmp/sf-client-wrapper network create 192.168.242.0/24
+      run_once: true
+
+    - name: Determine network uuid
+      shell: |
+        /bin/bash /tmp/sf-client-wrapper network list | grep 192.168.242.0/24 | cut -f 1 -d ","
+      register: network_uuid_complex
+
+    - name: Extract network uuid
+      set_fact:
+        network_uuid: "{{network_uuid_complex.stdout}}"
+
+    - name: Log network uuid
+      debug:
+        msg: Network uuid is {{network_uuid}}.
+
+- hosts: sf-1
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - name: Start an instance on sf-1
+      shell: |
+        /bin/bash /tmp/sf-client-wrapper instance create "{{network_uuid}}" sf-1 1 1 8@cirros
+
+- hosts: sf-2
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - name: Start an instance on sf-2
+      shell: |
+        /bin/bash /tmp/sf-client-wrapper instance create "{{network_uuid}}" sf-2 1 1 8@cirros
+
+- hosts: all
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - name: We should have two instances
+      shell: |
+        [ `/bin/bash /tmp/sf-client-wrapper instance list | wc -l` -eq 3 ]
