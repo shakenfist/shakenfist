@@ -1,4 +1,4 @@
-- hosts: all
+- hosts: hypervisors
   become: yes
   become_method: sudo
   gather_facts: no
@@ -7,46 +7,35 @@
     - vars
 
   tasks:
-    - name: Create helper wrapper
-      copy:
-        content: |
-          #/bin/bash -e
-          . /etc/sf/sfrc
-          sf-client --no-pretty $*
-        dest: /tmp/sf-client-wrapper
-        owner: root
-        group: root
-        mode: u=rx,g=rx,o=rx
-
     - name: Clear out old instances and networks
       shell: |
-        for inst in `/bin/bash /tmp/sf-client-wrapper instance list | grep -v uuid | cut -f 1 -d ","`
+        for inst in `sf-client --no-pretty instance list | grep -v uuid | cut -f 1 -d ","`
         do
-          /bin/bash /tmp/sf-client-wrapper instance delete $inst
+          sf-client --no-pretty instance delete $inst
         done
 
-        for net in `/bin/bash /tmp/sf-client-wrapper network list | grep -v uuid | cut -f 1 -d ","`
+        for net in `sf-client --no-pretty network list | grep -v uuid | cut -f 1 -d ","`
         do
-          /bin/bash /tmp/sf-client-wrapper network delete $net
+          sf-client --no-pretty network delete $net
         done
       run_once: true
 
     - name: We should have an empty list of networks
       shell: |
-        [ `/bin/bash /tmp/sf-client-wrapper network list | wc -l` -eq 1 ]
+        [ `sf-client --no-pretty network list | wc -l` -eq 1 ]
 
     - name: We should have an empty list of instances
       shell: |
-        [ `/bin/bash /tmp/sf-client-wrapper instance list | wc -l` -eq 1 ]
+        [ `sf-client --no-pretty instance list | wc -l` -eq 1 ]
 
     - name: Create a network
       shell: |
-        /bin/bash /tmp/sf-client-wrapper network create 192.168.242.0/24
+        sf-client --no-pretty network create 192.168.242.0/24
       run_once: true
 
     - name: Determine network uuid
       shell: |
-        /bin/bash /tmp/sf-client-wrapper network list | grep 192.168.242.0/24 | cut -f 1 -d ","
+        sf-client --no-pretty network list | grep 192.168.242.0/24 | cut -f 1 -d ","
       register: network_uuid_complex
 
     - name: Extract network uuid
@@ -66,9 +55,17 @@
     - vars
 
   tasks:
+    - name: We shouldn't have any VMs running
+      shell: |
+        [ `virsh list | grep running | wc -l` -eq 0 ]
+
+    - name: And there should be no containers
+      shell: |
+        [ `docker ps | wc -l` -eq 1 ]
+
     - name: Start an instance on sf-1
       shell: |
-        /bin/bash /tmp/sf-client-wrapper instance create "{{network_uuid}}" sf-1 1 1 8@cirros
+        sf-client --no-pretty instance create "{{network_uuid}}" inst-1 1 1 8@cirros
 
 - hosts: sf-2
   become: yes
@@ -79,11 +76,19 @@
     - vars
 
   tasks:
+    - name: We shouldn't have any VMs running
+      shell: |
+        [ `virsh list | grep running | wc -l` -eq 0 ]
+
+    - name: And there should be no containers
+      shell: |
+        [ `docker ps | wc -l` -eq 1 ]
+
     - name: Start an instance on sf-2
       shell: |
-        /bin/bash /tmp/sf-client-wrapper instance create "{{network_uuid}}" sf-2 1 1 8@cirros
+        sf-client --no-pretty instance create "{{network_uuid}}" inst-2 1 1 8@cirros
 
-- hosts: all
+- hosts: hypervisors
   become: yes
   become_method: sudo
   gather_facts: no
@@ -94,4 +99,12 @@
   tasks:
     - name: We should have two instances
       shell: |
-        [ `/bin/bash /tmp/sf-client-wrapper instance list | wc -l` -eq 3 ]
+        [ `sf-client --no-pretty instance list | wc -l` -eq 3 ]
+
+    - name: With one recorded on sf-1
+      shell: |
+        [ `sf-client --no-pretty instance list | grep sf-1 | wc -l` -eq 1 ]
+
+    - name: And one recorded on sf-2
+      shell: |
+        [ `sf-client --no-pretty instance list | grep sf-2 | wc -l` -eq 1 ]

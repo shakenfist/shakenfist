@@ -9,35 +9,13 @@ import sys
 import time
 import uuid
 
-from shakenfist import config
-from shakenfist.db import impl as db
-from shakenfist import images
-from shakenfist.net import impl as net
-from shakenfist import util
-from shakenfist import virt
+from shakenfist.client import apiclient
 
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 LOG = logging.getLogger(__file__)
-LOG.setLevel(logging.DEBUG)
-
-
-status = {}
-
-
-def _status_callback(d):
-    global status
-
-    event = d.get('event')
-    op = d.get('operation')
-
-    if event == 'start':
-        status[op] = time.time()
-    elif event == 'finish':
-        print('... %s took %0.2f seconds' % (op, time.time() - status[op]))
-    elif event == 'heartbeat':
-        print('    %s heartbeat "%s"' % (op, d.get('status')))
+LOG.setLevel(logging.INFO)
 
 
 @click.group()
@@ -49,20 +27,51 @@ def cli(ctx, pretty):
     ctx.obj['PRETTY'] = pretty
 
 
+@click.group(help='Node commands')
+def node():
+    pass
+
+
+def _get_networks(ctx, args, incomplete):
+    for n in apiclient.get_networks():
+        yield n['uuid']
+
+
+@node.command(name='list', help='List nodes')
+@click.pass_context
+def node_list(ctx):
+    nodes = list(apiclient.get_nodes())
+
+    if ctx.obj['PRETTY']:
+        x = PrettyTable()
+        x.field_names = ['name', 'ip', 'lastseen']
+        for n in nodes:
+            x.add_row([n['name'], n['ip'], n['lastseen']])
+        print(x)
+
+    else:
+        print('name,ip,lastseen')
+        for n in nodes:
+            print('%s,%s,%s' % (n['name'], n['ip'], n['lastseen']))
+
+
+cli.add_command(node)
+
+
 @click.group(help='Network commands')
 def network():
     pass
 
 
 def _get_networks(ctx, args, incomplete):
-    for n in db.get_networks():
+    for n in list(apiclient.get_networks()):
         yield n['uuid']
 
 
 @network.command(name='list', help='List networks')
 @click.pass_context
 def network_list(ctx):
-    nets = db.get_networks()
+    nets = list(apiclient.get_networks())
 
     if ctx.obj['PRETTY']:
         x = PrettyTable()
@@ -94,7 +103,7 @@ def _show_network(n):
 @click.argument('uuid', type=click.STRING, autocompletion=_get_networks)
 @click.pass_context
 def network_show(ctx, uuid=None):
-    _show_network(db.get_network(uuid))
+    _show_network(apiclient.get_network(uuid))
 
 
 @network.command(name='create',
@@ -109,20 +118,14 @@ def network_show(ctx, uuid=None):
 @click.option('--nat/--no-nat', default=True)
 @click.pass_context
 def network_create(ctx, netblock=None, dhcp=None, nat=None):
-    _show_network(db.allocate_network(netblock, dhcp, nat))
+    _show_network(apiclient.allocate_network(netblock, dhcp, nat))
 
 
 @network.command(name='delete', help='Delete a network')
 @click.argument('uuid', type=click.STRING, autocompletion=_get_networks)
 @click.pass_context
 def network_delete(ctx, uuid=None):
-    n = net.from_db(uuid)
-    if not n:
-        print('Network not found')
-        sys.exit(1)
-
-    n.remove_dhcp()
-    db.delete_network(uuid)
+    apiclient.delete_network(uuid)
 
 
 cli.add_command(network)
@@ -134,27 +137,27 @@ def instance():
 
 
 def _get_instances(ctx, args, incomplete):
-    for i in db.get_instances():
+    for i in apiclient.get_instances():
         yield i['uuid']
 
 
 @instance.command(name='list', help='List instances')
 @click.pass_context
 def instance_list(ctx):
-    insts = db.get_instances()
+    insts = list(apiclient.get_instances())
 
     if ctx.obj['PRETTY']:
         x = PrettyTable()
-        x.field_names = ['uuid', 'name', 'cpus', 'memory']
+        x.field_names = ['uuid', 'name', 'cpus', 'memory', 'hypervisor']
         for i in insts:
-            x.add_row([i['uuid'], i['name'], i['cpus'], i['memory']])
+            x.add_row([i['uuid'], i['name'], i['cpus'], i['memory'], i['node']])
         print(x)
 
     else:
-        print('uuid,name,cpus,memory')
+        print('uuid,name,cpus,memory,hypervisor')
         for i in insts:
-            print('%s,%s,%s,%s' %
-                  (i['uuid'], i['name'], i['cpus'], i['memory']))
+            print('%s,%s,%s,%s,%s' %
+                  (i['uuid'], i['name'], i['cpus'], i['memory'], i['node']))
 
 
 def _show_instance(i):
@@ -169,10 +172,11 @@ def _show_instance(i):
     print('%-12s: %s' % ('memory', i['memory']))
     print('%-12s: %s' % ('disk spec', i['disk_spec']))
     print('%-12s: %s' % ('ssh key', i['ssh_key']))
+    print('%-12s: %s' % ('hypervisor', i['node']))
 
     print()
     print('Interfaces:')
-    for interface in db.get_instance_interfaces(i['uuid']):
+    for interface in apiclient.get_instance_interfaces(i['uuid']):
         print()
         print('    %-8s: %s' % ('uuid', interface['uuid']))
         print('    %-8s: %s' % ('macaddr', interface['macaddr']))
@@ -183,7 +187,7 @@ def _show_instance(i):
 @click.argument('uuid', type=click.STRING, autocompletion=_get_instances)
 @click.pass_context
 def instance_show(ctx, uuid=None):
-    _show_instance(db.get_instance(uuid))
+    _show_instance(apiclient.get_instance(uuid))
 
 
 @instance.command(name='create',
@@ -202,43 +206,21 @@ def instance_show(ctx, uuid=None):
 @click.argument('disk', type=click.STRING, nargs=-1)
 @click.pass_context
 def instance_create(ctx, network=None, name=None, cpus=None, memory=None, disk=None):
-    n = net.from_db(network)
-    if not n:
-        print('Network not found')
-        sys.exit(1)
-    n.create()
-
-    newid = str(uuid.uuid4())
-    instance = virt.from_definition(
-        uuid=newid,
-        name=name,
-        disks=' '.join(disk),
-        memory_mb=memory * 1024,
-        vcpus=cpus,
-        ssh_key='ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC2Pas6zLLgzXsUSZzt8E8fX7tzpwmNlrsbAeH9YoI2snfo+cKfO1BZVQgJnJVz+hGhnC1mzsMZMtdW2NRonRgeeQIPTUFXJI+3dyGzmiNrmtH8QQz++7zsmdwngeXKDrYhD6JGnPTkKcjShYcbvB/L3IDDJvepLxVOGRJBVHXJzqHgA62AtVsoiECKxFSn8MOuRfPHj5KInLxOEX9i/TfYKawSiId5xEkWWtcrp4QhjuoLv4UHL2aKs85ppVZFTmDHHcx3Au7pZ7/T9NOcUrvnwmQDVIBeU0LEELzuQZWLkFYvStAeCF7mYra+EJVXjiCQ9ZBw0vXGqJR1SU+W6dh9 mikal@kolla-m1'
-    )
-
-    with util.RecordedOperation('allocate ip address', instance) as _:
-        n.allocate_ip_to_instance(instance)
-        (mac, ip) = instance.get_network_details()
-        db.create_network_interface(str(uuid.uuid4()), n.uuid, newid,
-                                    mac, ip)
-        n.update_dhcp()
-
-    with util.RecordedOperation('instance creation', instance) as _:
-        instance.create(_status_callback)
+    _show_instance(
+        apiclient.create_instance(
+            network,
+            name,
+            cpus,
+            memory,
+            disk,
+            'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC2Pas6zLLgzXsUSZzt8E8fX7tzpwmNlrsbAeH9YoI2snfo+cKfO1BZVQgJnJVz+hGhnC1mzsMZMtdW2NRonRgeeQIPTUFXJI+3dyGzmiNrmtH8QQz++7zsmdwngeXKDrYhD6JGnPTkKcjShYcbvB/L3IDDJvepLxVOGRJBVHXJzqHgA62AtVsoiECKxFSn8MOuRfPHj5KInLxOEX9i/TfYKawSiId5xEkWWtcrp4QhjuoLv4UHL2aKs85ppVZFTmDHHcx3Au7pZ7/T9NOcUrvnwmQDVIBeU0LEELzuQZWLkFYvStAeCF7mYra+EJVXjiCQ9ZBw0vXGqJR1SU+W6dh9 mikal@kolla-m1'))
 
 
 @instance.command(name='delete', help='Delete an instance')
-@click.argument('uuid', type=click.STRING, autocompletion=_get_networks)
+@click.argument('uuid', type=click.STRING, autocompletion=_get_instances)
 @click.pass_context
 def instance_delete(ctx, uuid=None):
-    i = virt.from_db(uuid)
-    n = net.from_db(i.get_network_uuid())
-    i.delete(_status_callback)
-    if n:
-        with util.RecordedOperation('deallocate ip address', instance) as _:
-            n.update_dhcp()
+    apiclient.delete_instance(uuid)
 
 
 @instance.command(name='snapshot', help='Snapshot instance')
@@ -246,8 +228,8 @@ def instance_delete(ctx, uuid=None):
 @click.argument('all', type=click.BOOL, default=False)
 @click.pass_context
 def instance_snapshot(ctx, uuid=None, all=False):
-    i = virt.from_db(uuid)
-    print('Created snapshot %s' % i.snapshot(all=all))
+    print('Created snapshot %s'
+          % apiclient.snapshot_instance(uuid, all))
 
 
 cli.add_command(instance)
@@ -264,8 +246,7 @@ def image():
 @click.argument('image_url', type=click.STRING)
 @click.pass_context
 def image_cache(ctx, image_url=None):
-    with util.RecordedOperation('cache image', image_url, _status_callback) as ro:
-        images.fetch_image(image_url, recorded=ro)
+    apiclient.cache_image(image_url)
 
 
 cli.add_command(image)

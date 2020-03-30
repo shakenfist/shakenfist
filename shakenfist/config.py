@@ -22,6 +22,9 @@ except Exception:
 
 CONFIG_DEFAULTS = {
     # Deployment options
+    # The port for the REST API service
+    'API_PORT': 13000,
+
     # Where the MySQL database is
     'SQL_URL': 'mysql://root:foo@localhost/sf',
 

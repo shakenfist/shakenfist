@@ -36,6 +36,13 @@ class Node(Base):
         self.ip = ip
         self.lastseen = datetime.datetime.now()
 
+    def export(self):
+        return {
+            'fqdn': self.fqdn,
+            'ip': self.ip,
+            'lastseen': self.lastseen
+        }
+
 
 def see_this_node(session=None):
     if not session:
@@ -64,6 +71,20 @@ def get_node_ips():
         pass
     finally:
         session.commit()
+        session.close()
+
+
+def get_nodes():
+    session = Session()
+    see_this_node(session=session)
+
+    try:
+        nodes = session.query(Node).all()
+        for n in nodes:
+            yield n.export()
+    except exc.NoResultFound:
+        pass
+    finally:
         session.close()
 
 
@@ -169,8 +190,9 @@ class Instance(Base):
     memory = Column(Integer)
     disk_spec = Column(String)
     ssh_key = Column(String)
+    node = Column(String)
 
-    def __init__(self, uuid, network_uuid, name, cpus, memory_mb, disk_spec, ssh_key):
+    def __init__(self, uuid, network_uuid, name, cpus, memory_mb, disk_spec, ssh_key, node):
         self.uuid = uuid
         self.network_uuid = network_uuid
         self.name = name
@@ -178,6 +200,7 @@ class Instance(Base):
         self.memory = memory_mb
         self.disk_spec = disk_spec
         self.ssh_key = ssh_key
+        self.node = node
 
     def export(self):
         return {
@@ -187,7 +210,8 @@ class Instance(Base):
             'cpus': self.cpus,
             'memory': self.memory,
             'disk_spec': self.disk_spec,
-            'ssh_key': self.ssh_key
+            'ssh_key': self.ssh_key,
+            'node': self.node
         }
 
 
@@ -224,7 +248,8 @@ def create_instance(uuid, network_uuid, name, cpus, memory_mb, disk_spec, ssh_ke
 
     try:
         i = Instance(uuid, network_uuid, name, cpus,
-                     memory_mb, disk_spec, ssh_key)
+                     memory_mb, disk_spec, ssh_key,
+                     config.parsed.get('NODE_NAME'))
         session.add(i)
         return i.export()
     finally:
