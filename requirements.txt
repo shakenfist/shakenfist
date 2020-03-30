@@ -11,6 +11,8 @@ prettytable         # bsd
 tox                 # mit
 flake8              # mit
 testtools           # mit
+flask               # bsd
+flask_restful       # bsd
 
 # Is difficult to get install working, use system packages
 # libvirt-python      # lgpl

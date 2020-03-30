@@ -10,3 +10,5 @@ export SHAKENFIST_NETWORK_MODEL="virtio"
 
 
 eval "$(_SF_CLIENT_COMPLETE=source sf-client)"
+
+alias sfmysql="mysql -h {{db_node_ip}} -u sf --password={{db_user_password}} sf"

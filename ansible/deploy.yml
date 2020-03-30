@@ -12,30 +12,32 @@
     - include: includes/python3.yml
     - include: includes/docker.yml
 
+    - name: install mariadb client
+      apt:
+        name: ["mariadb-client"]
+        state: latest
+
+    - name: Make /srv/shakenfist/
+      file:
+        path: /srv/shakenfist
+        state: directory
+        mode: "0755"
+
     - name: Copy shakenfist
       synchronize:
         src: ../../.
-        dest: /srv/shakenfist/src
+        dest: /srv/shakenfist/src/
 
     - name: Install shakenfist
       command: pip3 install -e .
       args:
-        chdir: /srv/shakenfist/src/
+        chdir: /srv/shakenfist/src
 
-- hosts: all
-  become: yes
-  become_method: sudo
-  gather_facts: no
-  connection: ssh
-  vars_files:
-    - vars
-
-  tasks:
     - name: Determine DB IP
       set_fact:
         db_node_ip: "{{ node_ip }}"
       delegate_to: group.db
-      run_once: true
+      run_once: True
 
     - name: Create config directory
       file:
@@ -79,6 +81,11 @@
       shell: docker start sfdb
       when: has_sfdb.rc == 0
 
+    - name: Wait docker python package to be available
+      pause:
+        minutes: 1
+      when: has_sfdb.rc == 1
+
     - name: Create mariadb docker container
       docker_container:
         name: sfdb
@@ -96,9 +103,9 @@
       when: has_sfdb.rc == 1
 
     - name: Wait for mariabdb to be listening
-      wait_for:
-        port: 3306
-        delay: 0
+      pause:
+        minutes: 1
+      when: has_sfdb.rc == 1
 
     - name: Upgrade database schema
       command: alembic upgrade head

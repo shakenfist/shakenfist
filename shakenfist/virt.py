@@ -83,7 +83,7 @@ class Instance(object):
             i += 1
 
         self.eth0_mac = str(randmac.RandMac(
-            '52:54:00:00:00:00', True)).lstrip('\'').rstrip('\'')
+            '00:00:00:00:00:00', False)).lstrip('\'').rstrip('\'')
         self.eth0_ip = None
 
     def __str__(self):
