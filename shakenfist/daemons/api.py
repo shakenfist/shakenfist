@@ -100,15 +100,16 @@ class Instances(flask_restful.Resource):
             order = 0
             for network in args['network']:
                 n = net.from_db(network)
-                ip = n.allocate_ip()
-                macaddr = str(randmac.RandMac(
-                    '00:00:00:00:00:00', False)).lstrip('\'').rstrip('\'')
-                db.create_network_interface(
-                    str(uuid.uuid4()), network, new_instance_uuid, macaddr, ip, order)
-                order += 1
+                if n:
+                    ip = n.allocate_ip()
+                    macaddr = str(randmac.RandMac(
+                        '00:00:00:00:00:00', False)).lstrip('\'').rstrip('\'')
+                    db.create_network_interface(
+                        str(uuid.uuid4()), network, new_instance_uuid, macaddr, ip, order)
+                    order += 1
 
-                n.create()
-                n.update_dhcp()
+                    n.create()
+                    n.update_dhcp()
 
         with util.RecordedOperation('instance creation', instance) as _:
             instance.create(None)
