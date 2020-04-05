@@ -5,15 +5,14 @@
   <currentMemory unit='KiB'>{{memory}}</currentMemory>
   <vcpu placement='static'>{{vcpus}}</vcpu>
   <os>
-    <type arch='x86_64' machine='pc-i440fx-bionic'>hvm</type>
+    <type arch='x86_64' machine='pc-i440fx-2.8'>hvm</type>
     <boot dev='hd'/>
   </os>
   <features>
     <acpi/>
     <apic/>
   </features>
-  <cpu mode='custom' match='exact' check='partial'>
-    <model fallback='allow'>EPYC-IBPB</model>
+  <cpu mode='host-passthrough'>
   </cpu>
   <clock offset='utc'>
     <timer name='rtc' tickpolicy='catchup'/>
@@ -28,19 +27,16 @@
     <suspend-to-disk enabled='no'/>
   </pm>
   <devices>
-    <emulator>/usr/bin/kvm-spice</emulator>
+    <emulator>/usr/bin/kvm</emulator>
+
+    {% for disk in disks %}
     <disk type='file' device='disk'>
-      <driver name='qemu' type='qcow2'/>
-      <source file='{{disk_root}}'/>
-      <target dev='vda' bus='virtio'/>
-      <address type='pci' domain='0x0000' bus='0x00' slot='0x05' function='0x0'/>
+      <driver name='qemu' type='{{disk.type}}'/>
+      <source file='{{disk.path}}'/>
+      <target dev='{{disk.device}}' bus='{{disk_bus}}'/>
     </disk>
-    <disk type='file' device='disk'>
-      <driver name='qemu' type='raw'/>
-      <source file='{{disk_config}}'/>
-      <target dev='vdb' bus='virtio'/>
-      <address type='pci' domain='0x0000' bus='0x00' slot='0x07' function='0x0'/>
-    </disk>
+    {% endfor %}
+
     <controller type='usb' index='0' model='ich9-ehci1'>
       <address type='pci' domain='0x0000' bus='0x00' slot='0x04' function='0x7'/>
     </controller>
@@ -60,23 +56,23 @@
     <controller type='ide' index='0'>
       <address type='pci' domain='0x0000' bus='0x00' slot='0x01' function='0x1'/>
     </controller>
+
+    {% for net in networks %}
     <interface type='bridge'>
-      <mac address='{{eth0_mac}}'/>
-      <source bridge='br0'/>
-      <model type='virtio'/>
+      <mac address='{{net.macaddr}}'/>
+      <source bridge='{{net.bridge}}'/>
+      <model type='{{network_model}}'/>
       <address type='pci' domain='0x0000' bus='0x00' slot='0x03' function='0x0'/>
     </interface>
-    <serial type='pty'>
-      <target type='isa-serial' port='0'>
-        <model name='isa-serial'/>
-      </target>
+    {% endfor %}
+
+    <serial type="tcp">
+      <source mode="bind" host="127.0.0.1" service="{{console_port}}"/>
+      <log file="{{instance_path}}/console.log" append="on"/>
+      <protocol type="telnet"/>
+      <target port="1"/>
     </serial>
-    <console type='pty'>
-      <target type='serial' port='0'/>
-    </console>
-    <input type='tablet' bus='usb'>
-      <address type='usb' bus='0' port='1'/>
-    </input>
+
     <input type='mouse' bus='ps2'/>
     <input type='keyboard' bus='ps2'/>
     <graphics type='vnc' port='-1' autoport='yes' listen='127.0.0.1'>

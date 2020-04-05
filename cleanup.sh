@@ -31,3 +31,5 @@ do
   ip link del br-vxlan-$i
   ip link del vxlan-$i
 done
+
+exit 0

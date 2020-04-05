@@ -9,7 +9,6 @@ import json
 import libvirt
 import os
 import pycdlib
-import randmac
 import shutil
 import uuid
 
@@ -18,6 +17,7 @@ from oslo_concurrency import processutils
 from shakenfist import config
 from shakenfist.db import impl as db
 from shakenfist import images
+from shakenfist.net import impl as net
 from shakenfist import util
 
 
@@ -27,7 +27,7 @@ LOG.setLevel(logging.DEBUG)
 
 def from_definition(uuid=None, name=None, disks=None, memory_mb=None,
                     vcpus=None, ssh_key=None):
-    db_entry = db.create_instance(uuid, None, name, vcpus, memory_mb, disks,
+    db_entry = db.create_instance(uuid, name, vcpus, memory_mb, ' '.join(disks),
                                   ssh_key)
     return Instance(db_entry)
 
@@ -82,10 +82,6 @@ class Instance(object):
             })
             i += 1
 
-        self.eth0_mac = str(randmac.RandMac(
-            '00:00:00:00:00:00', False)).lstrip('\'').rstrip('\'')
-        self.eth0_ip = None
-
     def __str__(self):
         return 'instance(%s)' % self.db_entry['uuid']
 
@@ -103,17 +99,6 @@ class Instance(object):
             'virtio': 'vd',
         }
         return bases.get(config.parsed.get('DISK_BUS'), 'sd')
-
-    def set_network_details(self, ip, network_subst):
-        LOG.info('%s: Setting IP to %s' % (self, ip))
-        self.eth0_ip = ip
-        self.network_subst = network_subst
-
-    def get_network_details(self):
-        return (self.eth0_mac, self.eth0_ip)
-
-    def get_network_uuid(self):
-        return self.db_entry['network_uuid']
 
     def create(self, status_callback):
         # Ensure we have state on disk
@@ -210,38 +195,48 @@ class Instance(object):
                    joliet_path='/openstack/2017-02-22/meta_data.json')
 
         # network_data.json
-        nd = json.dumps({
-            'links': [
-                {
-                    'ethernet_mac_address': self.eth0_mac,
-                    'id': 'eth0',
-                    'name': 'eth0',
-                    'mtu': 1450,
-                    'type': 'physical',
-                }
-            ],
-            'networks': [
-                {
-                    'id': 'network0',
-                    'link': 'eth0',
-                    'type': 'ipv4_dhcp'
-                }
-            ],
+        nd = {
+            'links': [],
+            'networks': [],
             'services': [
                 {
                     'address': '8.8.8.8',
                     'type': 'dns'
                 }
             ]
-        }).encode('ascii')
-        iso.add_fp(io.BytesIO(nd), len(nd), '/openstack/latest/network_data.json;3',
+        }
+
+        seen_networks = []
+        for iface in db.get_instance_interfaces(self.db_entry['uuid']):
+            devname = 'eth%d' % iface['order']
+            nd['links'].append(
+                {
+                    'ethernet_mac_address': iface['macaddr'],
+                    'id': devname,
+                    'name': devname,
+                    'mtu': 1450,
+                    'type': 'physical',
+                }
+            )
+            if not iface['network_uuid'] in seen_networks:
+                nd['networks'].append(
+                    {
+                        'id': iface['network_uuid'],
+                        'link': devname,
+                        'type': 'ipv4_dhcp'
+                    }
+                )
+                seen_networks.append(iface['network_uuid'])
+
+        nd_encoded = json.dumps(nd).encode('ascii')
+        iso.add_fp(io.BytesIO(nd_encoded), len(nd_encoded), '/openstack/latest/network_data.json;3',
                    rr_name='network_data.json',
                    joliet_path='/openstack/latest/vendor_data.json')
-        iso.add_fp(io.BytesIO(nd), len(nd), '/openstack/2017-02-22/network_data.json;4',
+        iso.add_fp(io.BytesIO(nd_encoded), len(nd_encoded), '/openstack/2017-02-22/network_data.json;4',
                    rr_name='network_data.json',
                    joliet_path='/openstack/2017-02-22/vendor_data.json')
 
-        # emtpy vendor_data.json and vendor_data2.json
+        # empty vendor_data.json and vendor_data2.json
         vd = '{}'.encode('ascii')
         iso.add_fp(io.BytesIO(vd), len(vd), '/openstack/latest/vendor_data.json;5',
                    rr_name='vendor_data.json',
@@ -269,15 +264,26 @@ class Instance(object):
         with open(os.path.join(config.parsed.get('STORAGE_PATH'), 'libvirt.tmpl')) as f:
             t = jinja2.Template(f.read())
 
+        networks = []
+        for iface in list(db.get_instance_interfaces(self.db_entry['uuid'])):
+            n = net.from_db(iface['network_uuid'])
+            networks.append(
+                {
+                    'macaddr': iface['macaddr'],
+                    'bridge': n.vx_bridge
+                }
+            )
+
         xml = t.render(
             uuid=self.db_entry['uuid'],
             memory=self.db_entry['memory'] * 1024,
             vcpus=self.db_entry['cpus'],
             disk_bus=config.parsed.get('DISK_BUS'),
             disks=self.disks,
-            eth0_mac=self.eth0_mac,
-            eth0_bridge=self.network_subst['vx_bridge'],
+            networks=networks,
             network_model=config.parsed.get('NETWORK_MODEL'),
+            instance_path=self.instance_path,
+            console_port=self.db_entry['console_port']
         )
 
         with open(self.xml_file, 'w') as f:
@@ -304,7 +310,11 @@ class Instance(object):
                 LOG.error('%s: Failed to create libvirt domain' % self)
                 return
 
-        instance.create()
+        try:
+            instance.create()
+        except libvirt.libvirtError as e:
+            pass
+
         instance.setAutostart(1)
 
     def _delete_domain(self):

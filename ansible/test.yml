@@ -7,6 +7,17 @@
     - vars
 
   tasks:
+    - name: Create sfmysql helper wrapper
+      copy:
+        content: |
+          #/bin/bash -e
+          . /etc/sf/sfrc
+          mysql -h $_DB_NODE_IP -u sf --password=$_DB_PASSWORD sf -e "$1"
+        dest: /tmp/sfmysql
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx
+
     - name: Clear out old instances and networks
       shell: |
         for inst in `sf-client --no-pretty instance list | grep -v uuid | cut -f 1 -d ","`
@@ -20,6 +31,10 @@
         done
       run_once: true
 
+    - name: And then do a quick scrub as well
+      shell: |
+        /srv/shakenfist/src/cleanup.sh
+
     - name: We should have an empty list of networks
       shell: |
         [ `sf-client --no-pretty network list | wc -l` -eq 1 ]
@@ -27,6 +42,35 @@
     - name: We should have an empty list of instances
       shell: |
         [ `sf-client --no-pretty instance list | wc -l` -eq 1 ]
+
+    - name: We shouldn't have any VMs running
+      shell: |
+        [ `virsh list | grep running | wc -l` -eq 0 ]
+
+    - name: And there should be no containers
+      shell: |
+        [ `docker ps | wc -l` -eq 1 ]
+
+    - name: And there should be no mesh networks
+      shell: |
+        [ `ifconfig | grep -c br-vxlan` -eq 0 ]
+
+    # Needs to be wrapped in a helper...
+    - name: Clear out the instances table
+      shell: |
+        /bin/bash /tmp/sfmysql "delete from instances"
+
+    - name: Clear out the network_interfaces table
+      shell: |
+        /bin/bash /tmp/sfmysql "delete from network_interfaces"
+
+    - name: Clear out the  networks table
+      shell: |
+        /bin/bash /tmp/sfmysql "delete from networks"
+
+    - name: Clear out the snapshots table
+      shell: |
+        /bin/bash /tmp/sfmysql "delete from snapshots"
 
     - name: Create a network
       shell: |
@@ -55,17 +99,13 @@
     - vars
 
   tasks:
-    - name: We shouldn't have any VMs running
-      shell: |
-        [ `virsh list | grep running | wc -l` -eq 0 ]
-
-    - name: And there should be no containers
-      shell: |
-        [ `docker ps | wc -l` -eq 1 ]
-
     - name: Start an instance on sf-1
       shell: |
-        sf-client --no-pretty instance create "{{network_uuid}}" inst-1 1 1 8@cirros
+        sf-client --no-pretty instance create inst-1 1 1 -d 8@cirros -n "{{network_uuid}}"
+
+    - name: We should have one VM on sf-1
+      shell: |
+        [ `virsh list | grep running | wc -l` -eq 1 ]
 
 - hosts: sf-2
   become: yes
@@ -76,17 +116,13 @@
     - vars
 
   tasks:
-    - name: We shouldn't have any VMs running
-      shell: |
-        [ `virsh list | grep running | wc -l` -eq 0 ]
-
-    - name: And there should be no containers
-      shell: |
-        [ `docker ps | wc -l` -eq 1 ]
-
     - name: Start an instance on sf-2
       shell: |
-        sf-client --no-pretty instance create "{{network_uuid}}" inst-2 1 1 8@cirros
+        sf-client --no-pretty instance create inst-2 1 1 -d 8@cirros -n "{{network_uuid}}"
+
+    - name: We should have one VM on sf-2
+      shell: |
+        [ `virsh list | grep running | wc -l` -eq 1 ]
 
 - hosts: hypervisors
   become: yes
@@ -108,3 +144,95 @@
     - name: And one recorded on sf-2
       shell: |
         [ `sf-client --no-pretty instance list | grep sf-2 | wc -l` -eq 1 ]
+
+- hosts: sf-2
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - name: We should have one VM on sf-2
+      shell: |
+        [ `virsh list | grep running | wc -l` -eq 1 ]
+
+    - name: Rebooting a node should retain its instances
+      reboot:
+        reboot_timeout: 300
+
+    - name: We should have one VM on sf-2
+      shell: |
+        [ `virsh list | grep running | wc -l` -eq 1 ]
+
+- hosts: sf-1
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - name: Deleting an instance hosted remotely should work
+      shell: |
+        sf-client instance delete `sf-client --no-pretty instance list | grep sf-2 | cut -f 1 -d ","`
+
+    - name: Test database records the delete
+      shell: |
+        [ `sf-client --no-pretty instance list | grep sf-2 | wc -l` -eq 0 ]
+
+- hosts: sf-2
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - name: We shouldn't have any VMs running on sf-2
+      shell: |
+        [ `virsh list | grep running | wc -l` -eq 0 ]
+
+    - name: And we shouldn't have any mesh network on sf-2 any more
+      shell: |
+        [ `ifconfig | grep -c vxlan` -eq 0 ]
+
+- hosts: sf-1
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - name: Delete our last instance
+      shell: |
+        sf-client instance delete `sf-client --no-pretty instance list | grep sf-1 | cut -f 1 -d ","`
+
+    - name: Test database records the delete
+      shell: |
+        [ `sf-client --no-pretty instance list | grep sf-1 | wc -l` -eq 0 ]
+
+    - name: We shouldn't have any VMs running on sf-1
+      shell: |
+        [ `virsh list | grep running | wc -l` -eq 0 ]
+
+    - name: The instances table should be empty
+      shell: |
+        [ `/bin/bash /tmp/sfmysql "select * from instances" | wc -l` -eq 0 ]
+
+    - name: The network_interfaces table should be empty
+      shell: |
+        [ `/bin/bash /tmp/sfmysql "select * from network_interfaces" | wc -l` -eq 0 ]
+
+    - name: The networks table should still have an entry
+      shell: |
+        [ `/bin/bash /tmp/sfmysql "select * from networks \G" | grep -c uuid` -eq 1 ]
+
+    - name: The snapshots table should be empty
+      shell: |
+        [ `/bin/bash /tmp/sfmysql "select * from snapshots" | wc -l` -eq 0 ]

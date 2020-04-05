@@ -2,6 +2,7 @@
 
 import datetime
 import logging
+import random
 import uuid
 
 from sqlalchemy import create_engine
@@ -17,11 +18,12 @@ from shakenfist import config
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
 
-sql_url = config.parsed.get('SQL_URL')
-LOG.info('Connecting to database at %s' % sql_url)
-engine = create_engine(sql_url)
 Base = declarative_base()
-Session = sessionmaker(bind=engine)
+
+
+def _get_session():
+    engine = create_engine(config.parsed.get('SQL_URL'))
+    return sessionmaker(bind=engine)()
 
 
 class Node(Base):
@@ -46,7 +48,7 @@ class Node(Base):
 
 def see_this_node(session=None):
     if not session:
-        session = Session()
+        session = _get_session()
 
     try:
         node = session.query(Node).filter(
@@ -60,7 +62,7 @@ def see_this_node(session=None):
 
 
 def get_node_ips():
-    session = Session()
+    session = _get_session()
     see_this_node(session=session)
 
     try:
@@ -75,7 +77,7 @@ def get_node_ips():
 
 
 def get_nodes():
-    session = Session()
+    session = _get_session()
     see_this_node(session=session)
 
     try:
@@ -118,7 +120,7 @@ class Network(Base):
 
 
 def get_network(uuid):
-    session = Session()
+    session = _get_session()
     see_this_node(session=session)
 
     try:
@@ -131,7 +133,7 @@ def get_network(uuid):
 
 
 def get_networks():
-    session = Session()
+    session = _get_session()
     see_this_node(session=session)
 
     try:
@@ -145,7 +147,7 @@ def get_networks():
 
 
 def allocate_network(netblock, provide_dhcp=True, provide_nat=False):
-    session = Session()
+    session = _get_session()
     see_this_node(session=session)
 
     try:
@@ -166,7 +168,7 @@ def allocate_network(netblock, provide_dhcp=True, provide_nat=False):
 
 
 def delete_network(uuid):
-    session = Session()
+    session = _get_session()
     see_this_node(session=session)
 
     try:
@@ -184,39 +186,40 @@ class Instance(Base):
     __tablename__ = 'instances'
 
     uuid = Column(String, primary_key=True)
-    network_uuid = Column(String)
     name = Column(String)
     cpus = Column(Integer)
     memory = Column(Integer)
     disk_spec = Column(String)
     ssh_key = Column(String)
     node = Column(String)
+    console_port = Column(Integer)
 
-    def __init__(self, uuid, network_uuid, name, cpus, memory_mb, disk_spec, ssh_key, node):
+    def __init__(self, uuid, name, cpus, memory_mb, disk_spec,
+                 ssh_key, node, console_port):
         self.uuid = uuid
-        self.network_uuid = network_uuid
         self.name = name
         self.cpus = cpus
         self.memory = memory_mb
         self.disk_spec = disk_spec
         self.ssh_key = ssh_key
         self.node = node
+        self.console_port = console_port
 
     def export(self):
         return {
             'uuid': self.uuid,
-            'network_uuid': self.network_uuid,
             'name': self.name,
             'cpus': self.cpus,
             'memory': self.memory,
             'disk_spec': self.disk_spec,
             'ssh_key': self.ssh_key,
-            'node': self.node
+            'node': self.node,
+            'console_port': self.console_port
         }
 
 
 def get_instance(uuid):
-    session = Session()
+    session = _get_session()
     see_this_node(session=session)
 
     try:
@@ -228,13 +231,21 @@ def get_instance(uuid):
         session.close()
 
 
-def get_instances():
-    session = Session()
+def get_instances(local_only=False):
+    session = _get_session()
     see_this_node(session=session)
 
     try:
-        instances = session.query(Instance).all()
-        for i in instances:
+        if local_only:
+            LOG.info('Filtering instances to only %s' %
+                     config.parsed.get('NODE_NAME'))
+            query = session.query(Instance).filter(
+                Instance.node == config.parsed.get('NODE_NAME'))
+        else:
+            query = session.query(Instance)
+
+        for i in query.all():
+            LOG.info('Returning instance %s' % i.uuid)
             yield i.export()
     except exc.NoResultFound:
         pass
@@ -242,14 +253,16 @@ def get_instances():
         session.close()
 
 
-def create_instance(uuid, network_uuid, name, cpus, memory_mb, disk_spec, ssh_key):
-    session = Session()
+def create_instance(uuid, name, cpus, memory_mb, disk_spec, ssh_key):
+    session = _get_session()
     see_this_node(session=session)
 
     try:
-        i = Instance(uuid, network_uuid, name, cpus,
-                     memory_mb, disk_spec, ssh_key,
-                     config.parsed.get('NODE_NAME'))
+        # TODO(mikal): this is naive and we should at least check
+        # we haven't double allocated the port number on this node.
+        console_port = random.randrange(30000, 31000)
+        i = Instance(uuid, name, cpus, memory_mb, disk_spec, ssh_key,
+                     config.parsed.get('NODE_NAME'), console_port)
         session.add(i)
         return i.export()
     finally:
@@ -258,7 +271,7 @@ def create_instance(uuid, network_uuid, name, cpus, memory_mb, disk_spec, ssh_ke
 
 
 def delete_instance(uuid):
-    session = Session()
+    session = _get_session()
     see_this_node(session=session)
 
     try:
@@ -286,13 +299,15 @@ class NetworkInterface(Base):
     instance_uuid = Column(String)
     macaddr = Column(String)
     ipv4 = Column(String)
+    order = Column(Integer)
 
-    def __init__(self, uuid, network_uuid, instance_uuid, macaddr, ipv4):
+    def __init__(self, uuid, network_uuid, instance_uuid, macaddr, ipv4, order):
         self.uuid = uuid
         self.network_uuid = network_uuid
         self.instance_uuid = instance_uuid
         self.macaddr = macaddr
         self.ipv4 = ipv4
+        self.order = order
 
     def export(self):
         return {
@@ -300,24 +315,25 @@ class NetworkInterface(Base):
             'network_uuid': self.network_uuid,
             'instance_uuid': self.instance_uuid,
             'macaddr': self.macaddr,
-            'ipv4': self.ipv4
+            'ipv4': self.ipv4,
+            'order': self.order
         }
 
 
-def create_network_interface(uuid, network_uuid, instance_uuid, macaddr, ipv4):
-    session = Session()
+def create_network_interface(uuid, network_uuid, instance_uuid, macaddr, ipv4, order):
+    session = _get_session()
     see_this_node(session=session)
 
     try:
         session.add(NetworkInterface(
-            uuid, network_uuid, instance_uuid, macaddr, ipv4))
+            uuid, network_uuid, instance_uuid, macaddr, ipv4, order))
     finally:
         session.commit()
         session.close()
 
 
 def get_instance_interfaces(uuid):
-    session = Session()
+    session = _get_session()
     see_this_node(session=session)
 
     try:
@@ -332,7 +348,7 @@ def get_instance_interfaces(uuid):
 
 
 def get_network_interfaces(uuid):
-    session = Session()
+    session = _get_session()
     see_this_node(session=session)
 
     try:
@@ -370,7 +386,7 @@ class Snapshot(Base):
 
 
 def create_snapshot(uuid, device, instance_uuid, created):
-    session = Session()
+    session = _get_session()
     see_this_node(session=session)
 
     try:
