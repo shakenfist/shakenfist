@@ -1,5 +1,65 @@
---- # Install shakenfist on a series of Ubuntu or Debian machines
-- hosts: all
+--- # Install shakenfist on a series of Ubuntu machines
+- hosts: localhost
+  gather_facts: yes
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - name: Deploy infrastructure
+      terraform:
+        project_path: ./tf
+        state: present
+        force_init: true
+        variables:
+          project: "{{project}}"
+      register: terraform_out
+
+    - name: Add DB node to ansible
+      add_host:
+        hostname: sfdb
+        ansible_ssh_host: "{{terraform_out.outputs.sfdb_external.value[0]}}"
+        groups: db
+
+    - name: Add DB node_ip
+      set_fact:
+        node_ip: "{{terraform_out.outputs.sfdb_internal.value[0]}}"
+        db_node_ip: "{{terraform_out.outputs.sfdb_internal.value[0]}}"
+      delegate_to: sfdb
+      delegate_facts: true
+
+    - name: Add sf-1 to ansible
+      add_host:
+        hostname: sf-1
+        ansible_ssh_host: "{{terraform_out.outputs.sf_1_external.value[0]}}"
+        groups: hypervisors
+
+    - name: Add DB sf-1 node_ip
+      set_fact:
+        node_ip: "{{terraform_out.outputs.sf_1_internal.value[0]}}"
+      delegate_to: sf-1
+      delegate_facts: true
+
+    - name: Add sf-2 to ansible
+      add_host:
+        hostname: sf-2
+        ansible_ssh_host: "{{terraform_out.outputs.sf_2_external.value[0]}}"
+        groups: hypervisors
+
+    - name: Add DB sf-2 node_ip
+      set_fact:
+        node_ip: "{{terraform_out.outputs.sf_2_internal.value[0]}}"
+      delegate_to: sf-2
+      delegate_facts: true
+
+    - name: Log terraform hosts
+      debug:
+        msg:
+          - "db: {{hostvars['sfdb']['ansible_ssh_host']}}, {{hostvars['sfdb']['node_ip']}}"
+          - "sf-1: {{hostvars['sf-1']['ansible_ssh_host']}}, {{hostvars['sf-1']['node_ip']}}"
+          - "sf-2: {{hostvars['sf-2']['ansible_ssh_host']}}, {{hostvars['sf-2']['node_ip']}}"
+
+- hosts: allsf
   become: yes
   become_method: sudo
   gather_facts: yes
@@ -32,12 +92,6 @@
       command: pip3 install -e .
       args:
         chdir: /srv/shakenfist/src
-
-    - name: Determine DB IP
-      set_fact:
-        db_node_ip: "{{ node_ip }}"
-      delegate_to: group.db
-      run_once: True
 
     - name: Create config directory
       file:
