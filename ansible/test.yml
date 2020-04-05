@@ -18,6 +18,14 @@
         group: root
         mode: u=rx,g=rx,o=rx
 
+    - name: Create telnet console helper
+      copy:
+        src: files/telnet_client.py
+        dest: /tmp/telnet_client.py
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx
+
     - name: Clear out old instances and networks
       shell: |
         for inst in `sf-client --no-pretty instance list | grep -v uuid | cut -f 1 -d ","`
@@ -144,6 +152,68 @@
     - name: And one recorded on sf-2
       shell: |
         [ `sf-client --no-pretty instance list | grep sf-2 | wc -l` -eq 1 ]
+
+    - name: Determine instance uuid
+      shell: |
+        sf-client --no-pretty instance list | grep {{inventory_hostname}} | cut -f 1 -d ","
+      register: instance_uuid_complex
+
+    - name: Extract instance uuid
+      set_fact:
+        instance_uuid: "{{instance_uuid_complex.stdout}}"
+
+    - name: Log instance uuid
+      debug:
+        msg: Instance uuid is {{instance_uuid}}.
+
+    - name: Determine instance console port
+      shell: |
+        sf-client --no-pretty instance show {{instance_uuid}} | grep "console port" | cut -f 2 -d ":"
+      register: console_port_complex
+
+    - name: Extract console port
+      set_fact:
+        console_port: "{{console_port_complex.stdout}}"
+
+    - name: Log instance console port
+      debug:
+        msg: Instance console port is {{console_port}}.
+
+    - name: Wait for instances to boot
+      pause:
+        minutes: 1
+
+    - name: Wait for console port to answer
+      wait_for:
+        port: "{{ console_port }}"
+
+    - name: Instances should have an IP
+      shell: |
+        [ `/tmp/telnet_client.py {{console_port}} ping 192.168.242.1 | grep -c " 0% packet loss"` -eq 1 ]
+
+    - name: Instance should have a configured eth0
+      shell: |
+        [ `/tmp/telnet_client.py {{console_port}} ifconfig eth0 | grep -c "192.168.242"` -eq 1 ]
+
+    - name: Instance should have a configured DNS resolver
+      shell: |
+        [ `/tmp/telnet_client.py {{console_port}} cat /etc/resolv.conf | grep -c "8.8.8.8"` -eq 1 ]
+
+    - name: Instance should have a configured default route
+      shell: |
+        [ `/tmp/telnet_client.py {{console_port}} netstat -rn | grep -c "192.168.242.1"` -eq 1 ]
+
+    - name: Instances should be able to ping their gateway
+      shell: |
+        [ `/tmp/telnet_client.py {{console_port}} ping 192.168.242.1 | grep -c " 0% packet loss"` -eq 1 ]
+
+    - name: Instances should be able to ping their DHCP server
+      shell: |
+        [ `/tmp/telnet_client.py {{console_port}} ping 192.168.242.2 | grep -c " 0% packet loss"` -eq 1 ]
+
+    - name: Instances should be able to ping Google
+      shell: |
+        [ `/tmp/telnet_client.py {{console_port}} ping 8.8.8.8 | grep -c " 0% packet loss"` -eq 1 ]
 
 - hosts: sf-2
   become: yes

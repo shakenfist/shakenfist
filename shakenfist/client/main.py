@@ -96,24 +96,28 @@ def network_list(ctx):
             print('%s,%s,%s' % (n['uuid'], n['owner'], n['netblock']))
 
 
-def _show_network(n):
+def _show_network(ctx, n):
     if not n:
         print('Network not found')
         sys.exit(1)
 
-    print('%-12s: %s' % ('uuid', n['uuid']))
-    print('%-12s: %s' % ('vxlan id', n['vxid']))
-    print('%-12s: %s' % ('netblock', n['netblock']))
-    print('%-12s: %s' % ('provide dhcp', n['provide_dhcp']))
-    print('%-12s: %s' % ('provide nat', n['provide_nat']))
-    print('%-12s: %s' % ('owner', n['owner']))
+    format_string = '%-12s: %s'
+    if not ctx.obj['PRETTY']:
+        format_string = '%s:%s'
+
+    print(format_string % ('uuid', n['uuid']))
+    print(format_string % ('vxlan id', n['vxid']))
+    print(format_string % ('netblock', n['netblock']))
+    print(format_string % ('provide dhcp', n['provide_dhcp']))
+    print(format_string % ('provide nat', n['provide_nat']))
+    print(format_string % ('owner', n['owner']))
 
 
 @network.command(name='show', help='Show a network')
 @click.argument('uuid', type=click.STRING, autocompletion=_get_networks)
 @click.pass_context
 def network_show(ctx, uuid=None):
-    _show_network(CLIENT.get_network(uuid))
+    _show_network(ctx, CLIENT.get_network(uuid))
 
 
 @network.command(name='create',
@@ -128,7 +132,7 @@ def network_show(ctx, uuid=None):
 @click.option('--nat/--no-nat', default=True)
 @click.pass_context
 def network_create(ctx, netblock=None, dhcp=None, nat=None):
-    _show_network(CLIENT.allocate_network(netblock, dhcp, nat))
+    _show_network(ctx, CLIENT.allocate_network(netblock, dhcp, nat))
 
 
 @network.command(name='delete', help='Delete a network')
@@ -170,38 +174,46 @@ def instance_list(ctx):
                   (i['uuid'], i['name'], i['cpus'], i['memory'], i['node']))
 
 
-def _show_instance(i):
+def _show_instance(ctx, i):
     if not i:
         print('Instance not found')
         sys.exit(1)
 
-    print('%-12s: %s' % ('uuid', i['uuid']))
-    print('%-12s: %s' % ('name', i['name']))
-    print('%-12s: %s' % ('cpus', i['cpus']))
-    print('%-12s: %s' % ('memory', i['memory']))
-    print('%-12s: %s' % ('disk spec', i['disk_spec']))
-    print('%-12s: %s' % ('ssh key', i['ssh_key']))
-    print('%-12s: %s' % ('hypervisor', i['node']))
+    format_string = '%-12s: %s'
+    if not ctx.obj['PRETTY']:
+        format_string = '%s:%s'
+
+    print(format_string % ('uuid', i['uuid']))
+    print(format_string % ('name', i['name']))
+    print(format_string % ('cpus', i['cpus']))
+    print(format_string % ('memory', i['memory']))
+    print(format_string % ('disk spec', i['disk_spec']))
+    print(format_string % ('ssh key', i['ssh_key']))
+    print(format_string % ('hypervisor', i['node']))
 
     # NOTE(mikal): I am not sure we should expose this, but it will do
     # for now until a proxy is written.
-    print('%-12s: %s' % ('console port', i['console_port']))
+    print(format_string % ('console port', i['console_port']))
+
+    format_string = '    %-8s: %s'
+    if not ctx.obj['PRETTY']:
+        format_string = 'iface %s:%s'
 
     print()
     print('Interfaces:')
     for interface in CLIENT.get_instance_interfaces(i['uuid']):
         print()
-        print('    %-8s: %s' % ('uuid', interface['uuid']))
-        print('    %-8s: %s' % ('network', interface['network_uuid']))
-        print('    %-8s: %s' % ('macaddr', interface['macaddr']))
-        print('    %-8s: %s' % ('ipv4', interface['ipv4']))
+        print(format_string % ('uuid', interface['uuid']))
+        print(format_string % ('network', interface['network_uuid']))
+        print(format_string % ('macaddr', interface['macaddr']))
+        print(format_string % ('ipv4', interface['ipv4']))
 
 
 @instance.command(name='show', help='Show an instance')
 @click.argument('uuid', type=click.STRING, autocompletion=_get_instances)
 @click.pass_context
 def instance_show(ctx, uuid=None):
-    _show_instance(CLIENT.get_instance(uuid))
+    _show_instance(ctx, CLIENT.get_instance(uuid))
 
 
 @instance.command(name='create',
@@ -229,6 +241,7 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, disk=N
         print('You must specify at least one network')
 
     _show_instance(
+        ctx,
         CLIENT.create_instance(
             name,
             cpus,
