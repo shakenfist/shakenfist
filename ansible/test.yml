@@ -1,3 +1,63 @@
+- hosts: localhost
+  gather_facts: yes
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - name: Deploy infrastructure
+      terraform:
+        project_path: ./tf
+        state: present
+        force_init: true
+        variables:
+          project: "{{project}}"
+      register: terraform_out
+
+    - name: Add DB node to ansible
+      add_host:
+        hostname: sfdb
+        ansible_ssh_host: "{{terraform_out.outputs.sfdb_external.value[0]}}"
+        groups: db
+
+    - name: Add DB node_ip
+      set_fact:
+        node_ip: "{{terraform_out.outputs.sfdb_internal.value[0]}}"
+        db_node_ip: "{{terraform_out.outputs.sfdb_internal.value[0]}}"
+      delegate_to: sfdb
+      delegate_facts: true
+
+    - name: Add sf-1 to ansible
+      add_host:
+        hostname: sf-1
+        ansible_ssh_host: "{{terraform_out.outputs.sf_1_external.value[0]}}"
+        groups: hypervisors
+
+    - name: Add DB sf-1 node_ip
+      set_fact:
+        node_ip: "{{terraform_out.outputs.sf_1_internal.value[0]}}"
+      delegate_to: sf-1
+      delegate_facts: true
+
+    - name: Add sf-2 to ansible
+      add_host:
+        hostname: sf-2
+        ansible_ssh_host: "{{terraform_out.outputs.sf_2_external.value[0]}}"
+        groups: hypervisors
+
+    - name: Add DB sf-2 node_ip
+      set_fact:
+        node_ip: "{{terraform_out.outputs.sf_2_internal.value[0]}}"
+      delegate_to: sf-2
+      delegate_facts: true
+
+    - name: Log terraform hosts
+      debug:
+        msg:
+          - "db: {{hostvars['sfdb']['ansible_ssh_host']}}, {{hostvars['sfdb']['node_ip']}}"
+          - "sf-1: {{hostvars['sf-1']['ansible_ssh_host']}}, {{hostvars['sf-1']['node_ip']}}"
+          - "sf-2: {{hostvars['sf-2']['ansible_ssh_host']}}, {{hostvars['sf-2']['node_ip']}}"
+
 - hosts: hypervisors
   become: yes
   become_method: sudo
@@ -179,6 +239,19 @@
       debug:
         msg: Instance console port is {{console_port}}.
 
+    - name: Determine instance IP
+      shell: |
+        sf-client --no-pretty instance show {{instance_uuid}} | grep "ipv4" | cut -f 2 -d ":"
+      register: instance_ip_complex
+
+    - name: Extract instance IP
+      set_fact:
+        instance_ip: "{{instance_ip_complex.stdout}}"
+
+    - name: Log instance IP
+      debug:
+        msg: Instance IP is {{instance_ip}}.
+
     - name: Wait for instances to boot
       pause:
         minutes: 1
@@ -186,10 +259,6 @@
     - name: Wait for console port to answer
       wait_for:
         port: "{{ console_port }}"
-
-    - name: Instances should have an IP
-      shell: |
-        [ `/tmp/telnet_client.py {{console_port}} ping 192.168.242.1 | grep -c " 0% packet loss"` -eq 1 ]
 
     - name: Instance should have a configured eth0
       shell: |

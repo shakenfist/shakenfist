@@ -9,7 +9,7 @@ class LoggingSocket(object):
     ctrlc = '\x03'
 
     def __init__(self, port):
-        self.s = telnetlib.Telnet('127.0.0.1', port)
+        self.s = telnetlib.Telnet('127.0.0.1', port, 30)
         for d in [self.ctrlc, self.ctrlc, '\nexit\n', 'cirros\n', 'gocubsgo\n']:
             self.send(d)
             time.sleep(0.5)
