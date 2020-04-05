@@ -1,9 +1,9 @@
 [db]
-  sf-db ansible_host=104.154.139.100 node_ip=10.128.0.19
+  sf-db ansible_host=104.155.145.237 node_ip=10.128.0.21
 
 [hypervisors]
-  sf-1 ansible_host=104.155.145.237 node_ip=10.128.0.18
-  sf-2 ansible_host=35.188.169.162 node_ip=10.128.0.17
+  sf-1 ansible_host=104.154.139.100 node_ip=10.128.0.22
+  sf-2 ansible_host=35.188.169.162 node_ip=10.128.0.20
 
 [all:children]
   db

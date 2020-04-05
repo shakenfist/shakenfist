@@ -18,13 +18,23 @@ LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.INFO)
 
 
+CLIENT = apiclient.Client()
+
+
 @click.group()
 @click.option('--pretty/--no-pretty', default=True)
+@click.option('--verbose/--no-verbose', default=False)
 @click.pass_context
-def cli(ctx, pretty):
+def cli(ctx, pretty, verbose):
     if not ctx.obj:
         ctx.obj = {}
     ctx.obj['PRETTY'] = pretty
+
+    if verbose:
+        LOG.setLevel(logging.DEBUG)
+
+        global CLIENT
+        CLIENT = apiclient.Client(verbose=True)
 
 
 @click.group(help='Node commands')
@@ -33,14 +43,14 @@ def node():
 
 
 def _get_networks(ctx, args, incomplete):
-    for n in apiclient.get_networks():
+    for n in CLIENT.get_networks():
         yield n['uuid']
 
 
 @node.command(name='list', help='List nodes')
 @click.pass_context
 def node_list(ctx):
-    nodes = list(apiclient.get_nodes())
+    nodes = list(CLIENT.get_nodes())
 
     if ctx.obj['PRETTY']:
         x = PrettyTable()
@@ -64,14 +74,14 @@ def network():
 
 
 def _get_networks(ctx, args, incomplete):
-    for n in list(apiclient.get_networks()):
+    for n in list(CLIENT.get_networks()):
         yield n['uuid']
 
 
 @network.command(name='list', help='List networks')
 @click.pass_context
 def network_list(ctx):
-    nets = list(apiclient.get_networks())
+    nets = list(CLIENT.get_networks())
 
     if ctx.obj['PRETTY']:
         x = PrettyTable()
@@ -103,7 +113,7 @@ def _show_network(n):
 @click.argument('uuid', type=click.STRING, autocompletion=_get_networks)
 @click.pass_context
 def network_show(ctx, uuid=None):
-    _show_network(apiclient.get_network(uuid))
+    _show_network(CLIENT.get_network(uuid))
 
 
 @network.command(name='create',
@@ -118,14 +128,14 @@ def network_show(ctx, uuid=None):
 @click.option('--nat/--no-nat', default=True)
 @click.pass_context
 def network_create(ctx, netblock=None, dhcp=None, nat=None):
-    _show_network(apiclient.allocate_network(netblock, dhcp, nat))
+    _show_network(CLIENT.allocate_network(netblock, dhcp, nat))
 
 
 @network.command(name='delete', help='Delete a network')
 @click.argument('uuid', type=click.STRING, autocompletion=_get_networks)
 @click.pass_context
 def network_delete(ctx, uuid=None):
-    apiclient.delete_network(uuid)
+    CLIENT.delete_network(uuid)
 
 
 cli.add_command(network)
@@ -137,14 +147,14 @@ def instance():
 
 
 def _get_instances(ctx, args, incomplete):
-    for i in apiclient.get_instances():
+    for i in CLIENT.get_instances():
         yield i['uuid']
 
 
 @instance.command(name='list', help='List instances')
 @click.pass_context
 def instance_list(ctx):
-    insts = list(apiclient.get_instances())
+    insts = list(CLIENT.get_instances())
 
     if ctx.obj['PRETTY']:
         x = PrettyTable()
@@ -166,7 +176,6 @@ def _show_instance(i):
         sys.exit(1)
 
     print('%-12s: %s' % ('uuid', i['uuid']))
-    print('%-12s: %s' % ('net uuid', i['network_uuid']))
     print('%-12s: %s' % ('name', i['name']))
     print('%-12s: %s' % ('cpus', i['cpus']))
     print('%-12s: %s' % ('memory', i['memory']))
@@ -174,11 +183,16 @@ def _show_instance(i):
     print('%-12s: %s' % ('ssh key', i['ssh_key']))
     print('%-12s: %s' % ('hypervisor', i['node']))
 
+    # NOTE(mikal): I am not sure we should expose this, but it will do
+    # for now until a proxy is written.
+    print('%-12s: %s' % ('console port', i['console_port']))
+
     print()
     print('Interfaces:')
-    for interface in apiclient.get_instance_interfaces(i['uuid']):
+    for interface in CLIENT.get_instance_interfaces(i['uuid']):
         print()
         print('    %-8s: %s' % ('uuid', interface['uuid']))
+        print('    %-8s: %s' % ('network', interface['network_uuid']))
         print('    %-8s: %s' % ('macaddr', interface['macaddr']))
         print('    %-8s: %s' % ('ipv4', interface['ipv4']))
 
@@ -187,31 +201,39 @@ def _show_instance(i):
 @click.argument('uuid', type=click.STRING, autocompletion=_get_instances)
 @click.pass_context
 def instance_show(ctx, uuid=None):
-    _show_instance(apiclient.get_instance(uuid))
+    _show_instance(CLIENT.get_instance(uuid))
 
 
 @instance.command(name='create',
                   help=('Create an instance.\n\n'
-                        'NETWORK: The uuid of the network to attach the instance to.\n'
-                        'NAME: The name of the instance.\n'
-                        'CPUS: The number of vCPUs for the instance.\n'
-                        'MEMORY: The amount RAM for the instance in GB.\n'
-                        'DISK: The disks attached to the instance, in this format: \n'
-                        '          size@image_url where size is in GB and @image_url\n'
-                        '          is optional.\n'))
-@click.argument('network', type=click.STRING, autocompletion=_get_networks)
+                        'NAME:      The name of the instance.\n'
+                        'CPUS:      The number of vCPUs for the instance.\n'
+                        'MEMORY:    The amount RAM for the instance in GB.\n'
+                        '\n'
+                        'Options (may be repeated, must be specified at least once):\n'
+                        '--network: The uuid of the network to attach the instance to.\n'
+                        '--disk:    The disks attached to the instance, in this format: \n'
+                        '           size@image_url where size is in GB and @image_url\n'
+                        '           is optional.\n'))
 @click.argument('name', type=click.STRING)
 @click.argument('cpus', type=click.INT)
 @click.argument('memory', type=click.INT)
-@click.argument('disk', type=click.STRING, nargs=-1)
+@click.option('-n', '--network', type=click.STRING, multiple=True,
+              autocompletion=_get_networks)
+@click.option('-d', '--disk', type=click.STRING, multiple=True)
 @click.pass_context
-def instance_create(ctx, network=None, name=None, cpus=None, memory=None, disk=None):
+def instance_create(ctx, name=None, cpus=None, memory=None, network=None, disk=None):
+    if len(disk) < 1:
+        print('You must specify at least one disk')
+    if len(network) < 1:
+        print('You must specify at least one network')
+
     _show_instance(
-        apiclient.create_instance(
-            network,
+        CLIENT.create_instance(
             name,
             cpus,
             memory,
+            network,
             disk,
             'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC2Pas6zLLgzXsUSZzt8E8fX7tzpwmNlrsbAeH9YoI2snfo+cKfO1BZVQgJnJVz+hGhnC1mzsMZMtdW2NRonRgeeQIPTUFXJI+3dyGzmiNrmtH8QQz++7zsmdwngeXKDrYhD6JGnPTkKcjShYcbvB/L3IDDJvepLxVOGRJBVHXJzqHgA62AtVsoiECKxFSn8MOuRfPHj5KInLxOEX9i/TfYKawSiId5xEkWWtcrp4QhjuoLv4UHL2aKs85ppVZFTmDHHcx3Au7pZ7/T9NOcUrvnwmQDVIBeU0LEELzuQZWLkFYvStAeCF7mYra+EJVXjiCQ9ZBw0vXGqJR1SU+W6dh9 mikal@kolla-m1'))
 
@@ -220,7 +242,7 @@ def instance_create(ctx, network=None, name=None, cpus=None, memory=None, disk=N
 @click.argument('uuid', type=click.STRING, autocompletion=_get_instances)
 @click.pass_context
 def instance_delete(ctx, uuid=None):
-    apiclient.delete_instance(uuid)
+    CLIENT.delete_instance(uuid)
 
 
 @instance.command(name='snapshot', help='Snapshot instance')
@@ -229,7 +251,7 @@ def instance_delete(ctx, uuid=None):
 @click.pass_context
 def instance_snapshot(ctx, uuid=None, all=False):
     print('Created snapshot %s'
-          % apiclient.snapshot_instance(uuid, all))
+          % CLIENT.snapshot_instance(uuid, all))
 
 
 cli.add_command(instance)
@@ -246,7 +268,7 @@ def image():
 @click.argument('image_url', type=click.STRING)
 @click.pass_context
 def image_cache(ctx, image_url=None):
-    apiclient.cache_image(image_url)
+    CLIENT.cache_image(image_url)
 
 
 cli.add_command(image)

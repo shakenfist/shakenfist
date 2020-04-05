@@ -63,10 +63,6 @@ class Network(object):
     def __str__(self):
         return 'network(%s, vxid %s)' % (self.uuid, self.vxlan_id)
 
-    def allocate_ip_to_instance(self, instance):
-        addr = self.allocate_ip()
-        instance.set_network_details(addr, self.subst_dict())
-
     def allocate_ip(self):
         addresses = list(self.ipnetwork.hosts())[2:]
 
@@ -189,6 +185,25 @@ class Network(object):
             self.update_dhcp()
 
         self.ensure_mesh(self.nodes)
+
+    def delete(self):
+        subst = self.subst_dict()
+
+        if util.check_for_interface(self.dhcp_interface):
+            # This will delete the peer as well
+            with util.RecordedOperation('delete dhcp interface', self) as _:
+                processutils.execute('ip link delete %(dhcp_interface)s' % subst,
+                                     shell=True)
+
+        if util.check_for_interface(self.vx_bridge):
+            with util.RecordedOperation('delete vxlan bridge', self) as _:
+                processutils.execute('ip link delete %(vx_bridge)s' % subst,
+                                     shell=True)
+
+        if util.check_for_interface(self.vx_interface):
+            with util.RecordedOperation('delete vxlan interface', self) as _:
+                processutils.execute('ip link delete %(vx_interface)s' % subst,
+                                     shell=True)
 
     def update_dhcp(self):
         with util.RecordedOperation('update dhcp', self) as ro:

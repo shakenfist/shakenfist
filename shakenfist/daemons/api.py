@@ -2,10 +2,12 @@ import flask
 import flask_restful
 from flask_restful import fields, marshal_with, reqparse
 import logging
+import randmac
 import setproctitle
 import time
 import uuid
 
+from shakenfist.client import apiclient
 from shakenfist import config
 from shakenfist.db import impl as db
 from shakenfist import images
@@ -39,11 +41,34 @@ class Instance(flask_restful.Resource):
 
     def delete(self, uuid):
         i = virt.from_db(uuid)
-        n = net.from_db(i.get_network_uuid())
+        if i.db_entry['node'] != config.parsed.get('NODE_NAME'):
+            remote = apiclient.Client('http://%s:13000' % i.db_entry['node'])
+            return remote.delete_instance(uuid)
+
+        instance_networks = []
+        for iface in db.get_instance_interfaces(uuid):
+            if not iface['network_uuid'] in instance_networks:
+                instance_networks.append(iface['network_uuid'])
+
+        host_networks = []
+        for inst in list(db.get_instances(local_only=True)):
+            if not inst['uuid'] == uuid:
+                for iface in db.get_instance_interfaces(inst['uuid']):
+                    if not iface['network_uuid'] in host_networks:
+                        host_networks.append(iface['network_uuid'])
+
         i.delete(None)
-        if n:
-            with util.RecordedOperation('deallocate ip address', i) as _:
-                n.update_dhcp()
+
+        for network in instance_networks:
+            n = net.from_db(network)
+            if n:
+                if network in host_networks:
+                    with util.RecordedOperation('deallocate ip address', i) as _:
+                        n.update_dhcp()
+                else:
+                    with util.RecordedOperation('remove network', n) as _:
+                        n.delete()
+
         return True
 
 
@@ -53,22 +78,17 @@ class Instances(flask_restful.Resource):
 
     def post(self):
         parser = reqparse.RequestParser()
-        parser.add_argument('network', type=str)
         parser.add_argument('name', type=str)
         parser.add_argument('cpus', type=int)
         parser.add_argument('memory', type=int)
-        parser.add_argument('disk', type=str)
+        parser.add_argument('network', type=str, action='append')
+        parser.add_argument('disk', type=str, action='append')
         parser.add_argument('ssh_key', type=str)
         args = parser.parse_args()
 
-        n = net.from_db(args['network'])
-        if not n:
-            return False
-        n.create()
-
-        newid = str(uuid.uuid4())
+        new_instance_uuid = str(uuid.uuid4())
         instance = virt.from_definition(
-            uuid=newid,
+            uuid=new_instance_uuid,
             name=args['name'],
             disks=args['disk'],
             memory_mb=args['memory'] * 1024,
@@ -76,17 +96,24 @@ class Instances(flask_restful.Resource):
             ssh_key=args['ssh_key']
         )
 
-        with util.RecordedOperation('allocate ip address', instance) as _:
-            n.allocate_ip_to_instance(instance)
-            (mac, ip) = instance.get_network_details()
-            db.create_network_interface(str(uuid.uuid4()), n.uuid, newid,
-                                        mac, ip)
-            n.update_dhcp()
+        with util.RecordedOperation('allocate ip addresses', instance) as _:
+            order = 0
+            for network in args['network']:
+                n = net.from_db(network)
+                ip = n.allocate_ip()
+                macaddr = str(randmac.RandMac(
+                    '00:00:00:00:00:00', False)).lstrip('\'').rstrip('\'')
+                db.create_network_interface(
+                    str(uuid.uuid4()), network, new_instance_uuid, macaddr, ip, order)
+                order += 1
+
+                n.create()
+                n.update_dhcp()
 
         with util.RecordedOperation('instance creation', instance) as _:
             instance.create(None)
 
-        return db.get_instance(newid)
+        return db.get_instance(new_instance_uuid)
 
 
 class InstanceInterfaces(flask_restful.Resource):
@@ -101,6 +128,9 @@ class InstanceSnapshot(flask_restful.Resource):
         args = parser.parse_args()
 
         i = virt.from_db(uuid)
+        if i.db_entry['node'] != config.parsed.get('NODE_NAME'):
+            remote = apiclient.Client('http://%s:13000' % i.db_entry['node'])
+            return remote.snapshot_instance(uuid, all=args['all'])
         return i.snapshot(all=args['all'])
 
 
@@ -180,4 +210,5 @@ class monitor(object):
         setproctitle.setproctitle('sf api')
 
     def run(self):
-        app.run(host='0.0.0.0', port=config.parsed.get('API_PORT'), debug=True)
+        app.run(host='0.0.0.0', port=config.parsed.get(
+            'API_PORT'), debug=True)

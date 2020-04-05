@@ -134,7 +134,7 @@
 
     - name: Copy libvirt template
       copy:
-        src: files/libvirt.debian.tmpl
+        src: files/libvirt.tmpl
         dest: /srv/shakenfist/libvirt.tmpl
         owner: root
         group: root
