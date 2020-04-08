@@ -2,6 +2,7 @@
 
 import base64
 import datetime
+import ipaddress
 import jinja2
 import logging
 import io
@@ -219,11 +220,22 @@ class Instance(object):
                 }
             )
             if not iface['network_uuid'] in seen_networks:
+                n = net.from_db(iface['network_uuid'])
                 nd['networks'].append(
                     {
                         'id': iface['network_uuid'],
                         'link': devname,
-                        'type': 'ipv4_dhcp'
+                        'type': 'ipv4',
+                        'ip_address': iface['ipv4'],
+                        'netmask': str(n.ipnetwork.netmask),
+                        'routes': [
+                            {
+                                'network': '0.0.0.0',
+                                'netmask': '0.0.0.0',
+                                'gateway': str(list(n.ipnetwork.hosts())[0])
+                            }
+                        ],
+                        'network_id': iface['network_uuid']
                     }
                 )
                 seen_networks.append(iface['network_uuid'])

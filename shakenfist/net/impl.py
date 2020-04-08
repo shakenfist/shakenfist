@@ -4,6 +4,7 @@ import ipaddress
 import logging
 import random
 import re
+import requests
 
 from oslo_concurrency import processutils
 
@@ -46,13 +47,6 @@ class Network(object):
 
         self.ipnetwork = ipaddress.ip_network(ipblock, strict=False)
 
-        if nodes:
-            self.nodes = nodes
-            if config.parsed.get('NODE_IP') in nodes:
-                nodes.remove(config.parsed.get('NODE_IP'))
-        else:
-            self.nodes = []
-
         if self.provide_dhcp:
             self.dhcp_interface = 'dhcpd-%s' % self.vxlan_id
             self.dhcp_peer = 'dhcpp-%s' % self.vxlan_id
@@ -74,20 +68,6 @@ class Network(object):
         return addresses[0]
 
     def subst_dict(self):
-        instances = []
-
-        interfaces = list(db.get_network_interfaces(self.uuid))
-        for interface in interfaces:
-            hostname = db.get_instance(interface['instance_uuid'])
-            instances.append(
-                {
-                    'uuid': interface['instance_uuid'],
-                    'macaddr': interface['macaddr'],
-                    'ipv4': interface['ipv4'],
-                    'name': hostname['name']
-                }
-            )
-
         retval = {
             'vx_id': self.vxlan_id,
             'vx_interface': self.vx_interface,
@@ -101,10 +81,7 @@ class Network(object):
             'router': list(self.ipnetwork.hosts())[0],
             'dhcpserver': list(self.ipnetwork.hosts())[1],
             'broadcast': self.ipnetwork.broadcast_address,
-
-            'instances': instances,
         }
-
         return retval
 
     def create(self):
@@ -138,33 +115,59 @@ class Network(object):
                     'brctl setfd %(vx_bridge)s 0' % subst, shell=True)
                 processutils.execute(
                     'brctl stp %(vx_bridge)s off' % subst, shell=True)
+                processutils.execute(
+                    'brctl setageing %(vx_bridge)s 0' % subst, shell=True)
 
-        if self.provide_nat:
-            with util.RecordedOperation('enable NAT', self) as ro:
-                out, err = processutils.execute(
-                    'ip addr show dev %(vx_bridge)s' % subst,
+        if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
+            self.deploy_nat()
+            self.deploy_dhcp()
+        else:
+            requests.request(
+                'put',
+                ('http://%s:%d/deploy_network_node'
+                 % (config.parsed.get('NETWORK_NODE_IP'),
+                    config.parsed.get('API_PORT'))),
+                data={
+                    'uuid': self.uuid
+                })
+
+    def deploy_nat(self):
+        if not self.provide_nat:
+            return
+
+        subst = self.subst_dict()
+
+        with util.RecordedOperation('enable NAT', self) as ro:
+            out, _ = processutils.execute(
+                'ip addr show dev %(vx_bridge)s' % subst,
+                shell=True)
+            if out.find('inet %(router)s' % subst) == -1:
+                processutils.execute(
+                    'ip addr add %(router)s/%(netmask)s dev %(vx_bridge)s' % subst,
                     shell=True)
-                if out.find('inet %(router)s' % subst) == -1:
-                    processutils.execute(
-                        'ip addr add %(router)s/%(netmask)s dev %(vx_bridge)s' % subst,
-                        shell=True)
-                    processutils.execute('echo 1 > /proc/sys/net/ipv4/ip_forward',
-                                         shell=True)
-                    processutils.execute(
-                        'iptables -A FORWARD -o %(phy_interface)s '
-                        '-i %(vx_bridge)s -j ACCEPT' % subst,
-                        shell=True)
-                    processutils.execute(
-                        'iptables -A FORWARD -i %(phy_interface)s '
-                        '-o %(vx_bridge)s -j ACCEPT' % subst,
-                        shell=True)
-                    processutils.execute(
-                        'iptables -t nat -A POSTROUTING -s %(ipblock)s/%(netmask)s '
-                        '-o %(phy_interface)s -j MASQUERADE' % subst,
-                        shell=True
-                    )
+                processutils.execute('echo 1 > /proc/sys/net/ipv4/ip_forward',
+                                     shell=True)
+                processutils.execute(
+                    'iptables -A FORWARD -o %(phy_interface)s '
+                    '-i %(vx_bridge)s -j ACCEPT' % subst,
+                    shell=True)
+                processutils.execute(
+                    'iptables -A FORWARD -i %(phy_interface)s '
+                    '-o %(vx_bridge)s -j ACCEPT' % subst,
+                    shell=True)
+                processutils.execute(
+                    'iptables -t nat -A POSTROUTING -s %(ipblock)s/%(netmask)s '
+                    '-o %(phy_interface)s -j MASQUERADE' % subst,
+                    shell=True
+                )
 
-        if self.provide_dhcp and not util.check_for_interface(self.dhcp_interface):
+    def deploy_dhcp(self):
+        if not self.provide_dhcp:
+            return
+
+        subst = self.subst_dict()
+
+        if not util.check_for_interface(self.dhcp_interface):
             with util.RecordedOperation('create dhcp interface', self) as ro:
                 processutils.execute(
                     'ip link add %(dhcp_interface)s type veth peer name '
@@ -180,11 +183,7 @@ class Network(object):
                     'ip addr add %(dhcpserver)s/%(netmask)s dev %(dhcp_interface)s' % subst,
                     shell=True)
 
-        if self.provide_dhcp:
-            self.dhcp = dhcp.DHCP(self)
-            self.update_dhcp()
-
-        self.ensure_mesh(self.nodes)
+        self.update_dhcp()
 
     def delete(self):
         subst = self.subst_dict()
@@ -206,16 +205,36 @@ class Network(object):
                                      shell=True)
 
     def update_dhcp(self):
-        with util.RecordedOperation('update dhcp', self) as ro:
-            self.dhcp = dhcp.DHCP(self)
-            self.dhcp.make_config()
-            self.dhcp.restart_dhcpd()
+        if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
+            with util.RecordedOperation('update dhcp', self) as _:
+                d = dhcp.DHCP(self.uuid)
+                d.make_config()
+                d.restart_dhcpd()
+        else:
+            requests.request(
+                'put',
+                ('http://%s:%d/update_dhcp'
+                 % (config.parsed.get('NETWORK_NODE_IP'),
+                    config.parsed.get('API_PORT'))),
+                data={
+                    'uuid': self.uuid
+                })
 
     def remove_dhcp(self):
-        with util.RecordedOperation('update dhcp', self) as ro:
-            self.dhcp = dhcp.DHCP(self)
-            self.dhcp.remove_dhcpd()
-            self.dhcp.remove_config()
+        if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
+            with util.RecordedOperation('remove dhcp', self) as _:
+                d = dhcp.DHCP(self.uuid)
+                d.remove_dhcpd()
+                d.remove_config()
+        else:
+            requests.request(
+                'put',
+                ('http://%s:%d/remove_dhcp'
+                 % (config.parsed.get('NETWORK_NODE_IP'),
+                    config.parsed.get('API_PORT'))),
+                data={
+                    'uuid': self.uuid
+                })
 
     def discover_mesh(self):
         mesh_re = re.compile('00: 00: 00: 00: 00: 00 dst (.*) self permanent')
@@ -230,15 +249,33 @@ class Network(object):
                 if m:
                     yield m.group(1)
 
-    def ensure_mesh(self, all_nodes):
+    def ensure_mesh(self):
         with util.RecordedOperation('ensure mesh', self) as ro:
+            instances = []
+            for iface in db.get_network_interfaces(self.uuid):
+                if not iface['instance_uuid'] in instances:
+                    instances.append(iface['instance_uuid'])
+
+            node_fqdns = []
+            for inst in instances:
+                i = db.get_instance(inst)
+                if not i['node'] in node_fqdns:
+                    node_fqdns.append(i['node'])
+
+            # NOTE(mikal): why not use DNS here? Well, DNS might be outside
+            # the control of the deployer if we're running in a public cloud
+            # as an overlay cloud...
+            node_ips = [config.parsed.get('NETWORK_NODE_IP')]
+            for fqdn in node_fqdns:
+                node_ips.append(db.get_node(fqdn)['ip'])
+
             for node in self.discover_mesh():
-                if node in all_nodes:
-                    all_nodes.remove(node)
+                if node in node_ips:
+                    node_ips.remove(node)
                 else:
                     self._remove_mesh_element(node)
 
-            for node in all_nodes:
+            for node in node_ips:
                 self._add_mesh_element(node)
 
     def _add_mesh_element(self, node):

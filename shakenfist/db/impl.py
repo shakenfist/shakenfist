@@ -19,11 +19,21 @@ LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
 
 Base = declarative_base()
+ENGINE = create_engine(config.parsed.get('SQL_URL'))
+SESSIONMAKER = sessionmaker(bind=ENGINE)
+SESSION = SESSIONMAKER()
 
 
-def _get_session():
-    engine = create_engine(config.parsed.get('SQL_URL'))
-    return sessionmaker(bind=engine)()
+def ensure_valid_session():
+    global SESSION
+    global SESSIONMAKER
+
+    try:
+        see_this_node()
+        return
+    except:
+        SESSION = SESSIONMAKER()
+        see_this_node()
 
 
 class Node(Base):
@@ -46,48 +56,50 @@ class Node(Base):
         }
 
 
-def see_this_node(session=None):
-    if not session:
-        session = _get_session()
-
+def see_this_node():
     try:
-        node = session.query(Node).filter(
+        node = SESSION.query(Node).filter(
             Node.fqdn == config.parsed.get('NODE_NAME')).one()
     except exc.NoResultFound:
         node = Node(config.parsed.get('NODE_NAME'),
                     config.parsed.get('NODE_IP'))
-        session.add(node)
+        SESSION.add(node)
 
     node.lastseen = datetime.datetime.now()
+    SESSION.commit()
 
 
 def get_node_ips():
-    session = _get_session()
-    see_this_node(session=session)
+    ensure_valid_session()
 
     try:
-        nodes = session.query(Node).all()
+        nodes = SESSION.query(Node).all()
         for node in nodes:
             yield node.ip
     except exc.NoResultFound:
         pass
-    finally:
-        session.commit()
-        session.close()
+
+
+def get_node(fqdn):
+    ensure_valid_session()
+
+    try:
+        node = SESSION.query(Node).filter(
+            Node.fqdn == fqdn).one()
+        return node.export()
+    except exc.NoResultFound:
+        pass
 
 
 def get_nodes():
-    session = _get_session()
-    see_this_node(session=session)
+    ensure_valid_session()
 
     try:
-        nodes = session.query(Node).all()
+        nodes = SESSION.query(Node).all()
         for n in nodes:
             yield n.export()
     except exc.NoResultFound:
         pass
-    finally:
-        session.close()
 
 
 class Network(Base):
@@ -120,66 +132,56 @@ class Network(Base):
 
 
 def get_network(uuid):
-    session = _get_session()
-    see_this_node(session=session)
+    ensure_valid_session()
 
     try:
-        return session.query(Network).filter(
+        return SESSION.query(Network).filter(
             Network.uuid == uuid).one().export()
     except exc.NoResultFound:
         return None
-    finally:
-        session.close()
 
 
 def get_networks():
-    session = _get_session()
-    see_this_node(session=session)
+    ensure_valid_session()
 
     try:
-        networks = session.query(Network).all()
+        networks = SESSION.query(Network).all()
         for n in networks:
             yield n.export()
     except exc.NoResultFound:
         pass
-    finally:
-        session.close()
 
 
 def allocate_network(netblock, provide_dhcp=True, provide_nat=False):
-    session = _get_session()
-    see_this_node(session=session)
+    ensure_valid_session()
 
     try:
         netid = str(uuid.uuid4())
 
-        for r in session.query(func.max(Network.vxid)).first():
+        for r in SESSION.query(func.max(Network.vxid)).first():
             if r:
                 vxid = r + 1
             else:
                 vxid = 1
 
         n = Network(netid, vxid, netblock, provide_dhcp, provide_nat, None)
-        session.add(n)
+        SESSION.add(n)
         return n.export()
     finally:
-        session.commit()
-        session.close()
+        SESSION.commit()
 
 
 def delete_network(uuid):
-    session = _get_session()
-    see_this_node(session=session)
+    ensure_valid_session()
 
     try:
-        for n in session.query(Network).filter(
-                Network.uuid == uuid):
-            session.delete(n)
+        for n in SESSION.query(Network).filter(
+                Network.uuid == uuid).all():
+            SESSION.delete(n)
     except exc.NoResultFound:
         return None
     finally:
-        session.commit()
-        session.close()
+        SESSION.commit()
 
 
 class Instance(Base):
@@ -219,43 +221,35 @@ class Instance(Base):
 
 
 def get_instance(uuid):
-    session = _get_session()
-    see_this_node(session=session)
+    ensure_valid_session()
 
     try:
-        return session.query(Instance).filter(
+        return SESSION.query(Instance).filter(
             Instance.uuid == uuid).one().export()
     except exc.NoResultFound:
         return None
     finally:
-        session.close()
+        SESSION.commit()
 
 
 def get_instances(local_only=False):
-    session = _get_session()
-    see_this_node(session=session)
+    ensure_valid_session()
 
     try:
         if local_only:
-            LOG.info('Filtering instances to only %s' %
-                     config.parsed.get('NODE_NAME'))
-            query = session.query(Instance).filter(
+            query = SESSION.query(Instance).filter(
                 Instance.node == config.parsed.get('NODE_NAME'))
         else:
-            query = session.query(Instance)
+            query = SESSION.query(Instance)
 
         for i in query.all():
-            LOG.info('Returning instance %s' % i.uuid)
             yield i.export()
     except exc.NoResultFound:
         pass
-    finally:
-        session.close()
 
 
 def create_instance(uuid, name, cpus, memory_mb, disk_spec, ssh_key):
-    session = _get_session()
-    see_this_node(session=session)
+    ensure_valid_session()
 
     try:
         # TODO(mikal): this is naive and we should at least check
@@ -263,32 +257,29 @@ def create_instance(uuid, name, cpus, memory_mb, disk_spec, ssh_key):
         console_port = random.randrange(30000, 31000)
         i = Instance(uuid, name, cpus, memory_mb, disk_spec, ssh_key,
                      config.parsed.get('NODE_NAME'), console_port)
-        session.add(i)
+        SESSION.add(i)
         return i.export()
     finally:
-        session.commit()
-        session.close()
+        SESSION.commit()
 
 
 def delete_instance(uuid):
-    session = _get_session()
-    see_this_node(session=session)
+    ensure_valid_session()
 
     try:
-        for s in session.query(Snapshot).filter(
+        for s in SESSION.query(Snapshot).filter(
                 Snapshot.instance_uuid == uuid):
-            session.delete(s)
-        for ni in session.query(NetworkInterface).filter(
-                NetworkInterface.instance_uuid == uuid):
-            session.delete(ni)
-        i = session.query(Instance).filter(
+            SESSION.delete(s)
+        for ni in SESSION.query(NetworkInterface).filter(
+                NetworkInterface.instance_uuid == uuid).all():
+            SESSION.delete(ni)
+        i = SESSION.query(Instance).filter(
             Instance.uuid == uuid).one()
-        session.delete(i)
+        SESSION.delete(i)
     except exc.NoResultFound:
         return None
     finally:
-        session.commit()
-        session.close()
+        SESSION.commit()
 
 
 class NetworkInterface(Base):
@@ -321,45 +312,50 @@ class NetworkInterface(Base):
 
 
 def create_network_interface(uuid, network_uuid, instance_uuid, macaddr, ipv4, order):
-    session = _get_session()
-    see_this_node(session=session)
+    ensure_valid_session()
 
     try:
-        session.add(NetworkInterface(
+        SESSION.add(NetworkInterface(
             uuid, network_uuid, instance_uuid, macaddr, ipv4, order))
     finally:
-        session.commit()
-        session.close()
+        SESSION.commit()
+
+
+def delete_network_interface(uuid):
+    ensure_valid_session()
+
+    try:
+        for i in SESSION.query(NetworkInterface).filter(
+                NetworkInterface.instance_uuid == uuid).all():
+            SESSION.delete(i)
+    except exc.NoResultFound:
+        return None
+    finally:
+        SESSION.commit()
 
 
 def get_instance_interfaces(uuid):
-    session = _get_session()
-    see_this_node(session=session)
+    ensure_valid_session()
 
     try:
-        interfaces = session.query(NetworkInterface).filter(
+        interfaces = SESSION.query(NetworkInterface).filter(
             NetworkInterface.instance_uuid == uuid).all()
         for i in interfaces:
             yield i.export()
     except exc.NoResultFound:
         pass
-    finally:
-        session.close()
 
 
 def get_network_interfaces(uuid):
-    session = _get_session()
-    see_this_node(session=session)
+    ensure_valid_session()
 
     try:
-        interfaces = session.query(NetworkInterface).filter(
+        interfaces = SESSION.query(NetworkInterface).filter(
             NetworkInterface.network_uuid == uuid).all()
         for i in interfaces:
             yield i.export()
     except exc.NoResultFound:
         pass
-    finally:
-        session.close()
 
 
 class Snapshot(Base):
@@ -386,11 +382,9 @@ class Snapshot(Base):
 
 
 def create_snapshot(uuid, device, instance_uuid, created):
-    session = _get_session()
-    see_this_node(session=session)
+    ensure_valid_session()
 
     try:
-        session.add(Snapshot(uuid, device, instance_uuid, created))
+        SESSION.add(Snapshot(uuid, device, instance_uuid, created))
     finally:
-        session.commit()
-        session.close()
+        SESSION.commit()
