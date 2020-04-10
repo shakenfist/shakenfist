@@ -34,6 +34,7 @@ def restore_instances():
             LOG.info('Restoring network %s' % network)
             n = net.from_db(network)
             n.create()
+            n.ensure_mesh()
             n.update_dhcp()
 
     with util.RecordedOperation('restore instances', None) as _:

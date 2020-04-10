@@ -22,7 +22,7 @@
           #/bin/bash -e
           . /etc/sf/sfrc
           mysql -h $_DB_NODE_IP -u sf --password=$_DB_PASSWORD sf -e "$1"
-        dest: /tmp/sfmysql
+        dest: /opt/sfmysql
         owner: root
         group: root
         mode: u=rx,g=rx,o=rx
@@ -30,7 +30,7 @@
     - name: Create telnet console helper
       copy:
         src: files/telnet_client.py
-        dest: /tmp/telnet_client.py
+        dest: /opt/telnet_client.py
         owner: root
         group: root
         mode: u=rx,g=rx,o=rx
@@ -75,19 +75,19 @@
     # Needs to be wrapped in a helper...
     - name: Clear out the instances table
       shell: |
-        /bin/bash /tmp/sfmysql "delete from instances"
+        /bin/bash /opt/sfmysql "delete from instances"
 
     - name: Clear out the network_interfaces table
       shell: |
-        /bin/bash /tmp/sfmysql "delete from network_interfaces"
+        /bin/bash /opt/sfmysql "delete from network_interfaces"
 
     - name: Clear out the networks table
       shell: |
-        /bin/bash /tmp/sfmysql "delete from networks"
+        /bin/bash /opt/sfmysql "delete from networks"
 
     - name: Clear out the snapshots table
       shell: |
-        /bin/bash /tmp/sfmysql "delete from snapshots"
+        /bin/bash /opt/sfmysql "delete from snapshots"
 
     - name: Create a network
       shell: |
@@ -259,27 +259,27 @@
 
     - name: Instance should have a configured eth0
       shell: |
-        [ `/tmp/telnet_client.py {{centos_console_port}} ifconfig eth0 | grep -c "192.168.242"` -eq 1 ]
+        [ `/opt/telnet_client.py {{centos_console_port}} ifconfig eth0 | grep -c "192.168.242"` -eq 1 ]
 
     - name: Instance should have a configured DNS resolver
       shell: |
-        [ `/tmp/telnet_client.py {{centos_console_port}} cat /etc/resolv.conf | grep -c "8.8.8.8"` -eq 1 ]
+        [ `/opt/telnet_client.py {{centos_console_port}} cat /etc/resolv.conf | grep -c "8.8.8.8"` -eq 1 ]
 
     - name: Instance should have a configured default route
       shell: |
-        [ `/tmp/telnet_client.py {{centos_console_port}} netstat -rn | grep -c "192.168.242.1"` -eq 1 ]
+        [ `/opt/telnet_client.py {{centos_console_port}} netstat -rn | grep -c "192.168.242.1"` -eq 1 ]
 
     - name: Instances should be able to ping their gateway
       shell: |
-        [ `/tmp/telnet_client.py {{centos_console_port}} ping 192.168.242.1 | grep -c " 0% packet loss"` -eq 1 ]
+        [ `/opt/telnet_client.py {{centos_console_port}} ping 192.168.242.1 | grep -c " 0% packet loss"` -eq 1 ]
 
     - name: Instances should be able to ping their DHCP server
       shell: |
-        [ `/tmp/telnet_client.py {{centos_console_port}} ping 192.168.242.2 | grep -c " 0% packet loss"` -eq 1 ]
+        [ `/opt/telnet_client.py {{centos_console_port}} ping 192.168.242.2 | grep -c " 0% packet loss"` -eq 1 ]
 
     - name: Instances should be able to ping Google
       shell: |
-        [ `/tmp/telnet_client.py {{centos_console_port}} ping 8.8.8.8 | grep -c " 0% packet loss"` -eq 1 ]
+        [ `/opt/telnet_client.py {{centos_console_port}} ping 8.8.8.8 | grep -c " 0% packet loss"` -eq 1 ]
 
 - hosts: sf-1
   become: yes
@@ -292,7 +292,7 @@
   tasks:
     - name: The instance on sf-1 should be able to ping the instance on sf-2
       shell: |
-        [ `/tmp/telnet_client.py {{centos_console_port}} ping {{hostvars['sf-2']['centos_instance_ip']}} | grep -c " 0% packet loss"` -eq 1 ]
+        [ `/opt/telnet_client.py {{centos_console_port}} ping {{hostvars['sf-2']['centos_instance_ip']}} | grep -c " 0% packet loss"` -eq 1 ]
 
 - hosts: sf-2
   become: yes
@@ -361,7 +361,7 @@
 
     - name: Instance is pingable
       shell: |
-        [ `ping -c 1 {{ubuntu_instance_ip}} | grep -c " 0% packet loss"` -eq 1 ]
+        [ `ping -c 1 {{hostvars['sf-2']['ubuntu_instance_ip']}} | grep -c " 0% packet loss"` -eq 1 ]
 
 - hosts: sf-2
   become: yes
@@ -378,23 +378,81 @@
 
     - name: Post delete of an unrelated instance, an instance should still be able to ping Google
       shell: |
-        [ `/tmp/telnet_client.py {{centos_console_port}} ping 8.8.8.8 | grep -c " 0% packet loss"` -eq 1 ]
+        [ `/opt/telnet_client.py {{centos_console_port}} ping 8.8.8.8 | grep -c " 0% packet loss"` -eq 1 ]
 
     - name: We should have one VM on sf-2
       shell: |
         [ `virsh list | grep running | wc -l` -eq 1 ]
 
+- hosts: hypervisors
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - name: Record the state of the mesh before reboot
+      shell: |
+        bridge fdb show brport vxlan-1
+      register: mesh_state
+
+    - name: Log the mesh before
+      debug:
+        msg: "Mesh state: {{mesh_state}}"
+
+- hosts: sf-2
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
     - name: Rebooting a node should retain its instances
       reboot:
         reboot_timeout: 300
 
+    - name: Give the node a minute to settle
+      pause:
+        minutes: 1
+
     - name: We should have one VM on sf-2
       shell: |
         [ `virsh list | grep running | wc -l` -eq 1 ]
 
+- hosts: hypervisors
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - name: Record the state of the mesh after reboot
+      shell: |
+        bridge fdb show brport vxlan-1
+      register: mesh_state
+
+    - name: Log the mesh after
+      debug:
+        msg: "Mesh state: {{mesh_state}}"
+
+- hosts: sf-2
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
     - name: Post reboot an instance should still be able to ping Google
       shell: |
-        [ `/tmp/telnet_client.py {{centos_console_port}} ping 8.8.8.8 | grep -c " 0% packet loss"` -eq 1 ]
+        [ `/opt/telnet_client.py {{centos_console_port}} ping 8.8.8.8 | grep -c " 0% packet loss"` -eq 1 ]
 
 - hosts: sf-1
   become: yes
@@ -453,16 +511,16 @@
 
     - name: The instances table should be empty
       shell: |
-        [ `/bin/bash /tmp/sfmysql "select * from instances" | wc -l` -eq 0 ]
+        [ `/bin/bash /opt/sfmysql "select * from instances" | wc -l` -eq 0 ]
 
     - name: The network_interfaces table should be empty
       shell: |
-        [ `/bin/bash /tmp/sfmysql "select * from network_interfaces" | wc -l` -eq 0 ]
+        [ `/bin/bash /opt/sfmysql "select * from network_interfaces" | wc -l` -eq 0 ]
 
     - name: The networks table should still have an entry
       shell: |
-        [ `/bin/bash /tmp/sfmysql "select * from networks \G" | grep -c uuid` -eq 1 ]
+        [ `/bin/bash /opt/sfmysql "select * from networks \G" | grep -c uuid` -eq 1 ]
 
     - name: The snapshots table should be empty
       shell: |
-        [ `/bin/bash /tmp/sfmysql "select * from snapshots" | wc -l` -eq 0 ]
+        [ `/bin/bash /opt/sfmysql "select * from snapshots" | wc -l` -eq 0 ]
