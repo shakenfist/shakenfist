@@ -6,6 +6,7 @@ import time
 
 from oslo_concurrency import processutils
 
+from shakenfist import config
 from shakenfist.db import impl as db
 from shakenfist.net import impl as net
 from shakenfist import util
@@ -36,10 +37,17 @@ class monitor(object):
         while True:
             time.sleep(30)
 
-            # And then maintain the mesh with new nodes / networks
-            #node_ips = list(db.get_node_ips())
-            # for n in _get_list_of_network_uuids():
-            #    network = net.from_db(n)
-            #    network.ensure_mesh(copy.deepcopy(node_ips))
+            # We do not reap unused networks from the network node, as they might be
+            # in use for instances on other hypervisor nodes.
+            if config.parsed.get('NODE_IP') != config.parsed.get('NETWORK_NODE_IP'):
+                host_networks = []
+                for inst in list(db.get_instances(local_only=True)):
+                    for iface in db.get_instance_interfaces(inst['uuid']):
+                        if not iface['network_uuid'] in host_networks:
+                            host_networks.append(iface['network_uuid'])
 
-            # And remove any stray networks
+                for network in host_networks:
+                    n = net.from_db(network)
+                    n.ensure_mesh()
+
+                # TODO(mikal): remove stray networks

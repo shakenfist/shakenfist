@@ -5,58 +5,7 @@
     - vars
 
   tasks:
-    - name: Deploy infrastructure
-      terraform:
-        project_path: ./tf
-        state: present
-        force_init: true
-        variables:
-          project: "{{project}}"
-      register: terraform_out
-
-    - name: Add DB node to ansible
-      add_host:
-        hostname: sfdb
-        ansible_ssh_host: "{{terraform_out.outputs.sfdb_external.value[0]}}"
-        groups: db
-
-    - name: Add DB node_ip
-      set_fact:
-        node_ip: "{{terraform_out.outputs.sfdb_internal.value[0]}}"
-        db_node_ip: "{{terraform_out.outputs.sfdb_internal.value[0]}}"
-      delegate_to: sfdb
-      delegate_facts: true
-
-    - name: Add sf-1 to ansible
-      add_host:
-        hostname: sf-1
-        ansible_ssh_host: "{{terraform_out.outputs.sf_1_external.value[0]}}"
-        groups: hypervisors
-
-    - name: Add DB sf-1 node_ip
-      set_fact:
-        node_ip: "{{terraform_out.outputs.sf_1_internal.value[0]}}"
-      delegate_to: sf-1
-      delegate_facts: true
-
-    - name: Add sf-2 to ansible
-      add_host:
-        hostname: sf-2
-        ansible_ssh_host: "{{terraform_out.outputs.sf_2_external.value[0]}}"
-        groups: hypervisors
-
-    - name: Add DB sf-2 node_ip
-      set_fact:
-        node_ip: "{{terraform_out.outputs.sf_2_internal.value[0]}}"
-      delegate_to: sf-2
-      delegate_facts: true
-
-    - name: Log terraform hosts
-      debug:
-        msg:
-          - "db: {{hostvars['sfdb']['ansible_ssh_host']}}, {{hostvars['sfdb']['node_ip']}}"
-          - "sf-1: {{hostvars['sf-1']['ansible_ssh_host']}}, {{hostvars['sf-1']['node_ip']}}"
-          - "sf-2: {{hostvars['sf-2']['ansible_ssh_host']}}, {{hostvars['sf-2']['node_ip']}}"
+    - include: includes/terraform.yml
 
 - hosts: hypervisors
   become: yes
@@ -67,130 +16,8 @@
     - vars
 
   tasks:
-    - name: Create sfmysql helper wrapper
-      copy:
-        content: |
-          #/bin/bash -e
-          . /etc/sf/sfrc
-          mysql -h $_DB_NODE_IP -u sf --password=$_DB_PASSWORD sf -e "$1"
-        dest: /tmp/sfmysql
-        owner: root
-        group: root
-        mode: u=rx,g=rx,o=rx
-
-    - name: Create telnet console helper
-      copy:
-        src: files/telnet_client.py
-        dest: /tmp/telnet_client.py
-        owner: root
-        group: root
-        mode: u=rx,g=rx,o=rx
-
-    - name: Clear out old instances and networks
-      shell: |
-        for inst in `sf-client --no-pretty instance list | grep -v uuid | cut -f 1 -d ","`
-        do
-          sf-client --no-pretty instance delete $inst
-        done
-
-        for net in `sf-client --no-pretty network list | grep -v uuid | cut -f 1 -d ","`
-        do
-          sf-client --no-pretty network delete $net
-        done
-      run_once: true
-
-    - name: And then do a quick scrub as well
-      shell: |
-        /srv/shakenfist/src/cleanup.sh
-
-    - name: We should have an empty list of networks
-      shell: |
-        [ `sf-client --no-pretty network list | wc -l` -eq 1 ]
-
-    - name: We should have an empty list of instances
-      shell: |
-        [ `sf-client --no-pretty instance list | wc -l` -eq 1 ]
-
-    - name: We shouldn't have any VMs running
-      shell: |
-        [ `virsh list | grep running | wc -l` -eq 0 ]
-
-    - name: And there should be no containers
-      shell: |
-        [ `docker ps | wc -l` -eq 1 ]
-
-    - name: And there should be no mesh networks
-      shell: |
-        [ `ifconfig | grep -c br-vxlan` -eq 0 ]
-
-    # Needs to be wrapped in a helper...
-    - name: Clear out the instances table
-      shell: |
-        /bin/bash /tmp/sfmysql "delete from instances"
-
-    - name: Clear out the network_interfaces table
-      shell: |
-        /bin/bash /tmp/sfmysql "delete from network_interfaces"
-
-    - name: Clear out the  networks table
-      shell: |
-        /bin/bash /tmp/sfmysql "delete from networks"
-
-    - name: Clear out the snapshots table
-      shell: |
-        /bin/bash /tmp/sfmysql "delete from snapshots"
-
-    - name: Create a network
-      shell: |
-        sf-client --no-pretty network create 192.168.242.0/24
-      run_once: true
-
-    - name: Determine network uuid
-      shell: |
-        sf-client --no-pretty network list | grep 192.168.242.0/24 | cut -f 1 -d ","
-      register: network_uuid_complex
-
-    - name: Extract network uuid
-      set_fact:
-        network_uuid: "{{network_uuid_complex.stdout}}"
-
-    - name: Log network uuid
-      debug:
-        msg: Network uuid is {{network_uuid}}.
-
-- hosts: sf-1
-  become: yes
-  become_method: sudo
-  gather_facts: no
-  connection: ssh
-  vars_files:
-    - vars
-
-  tasks:
-    - name: Start an instance on sf-1
-      shell: |
-        sf-client --no-pretty instance create inst-1 1 1 -d 8@cirros -n "{{network_uuid}}"
-
-    - name: We should have one VM on sf-1
-      shell: |
-        [ `virsh list | grep running | wc -l` -eq 1 ]
-
-- hosts: sf-2
-  become: yes
-  become_method: sudo
-  gather_facts: no
-  connection: ssh
-  vars_files:
-    - vars
-
-  tasks:
-    - name: Start an instance on sf-2
-      shell: |
-        sf-client --no-pretty instance create inst-2 1 1 -d 8@cirros -n "{{network_uuid}}"
-
-    - name: We should have one VM on sf-2
-      shell: |
-        [ `virsh list | grep running | wc -l` -eq 1 ]
+    - include: tests/_setup.yml
+    - include: tests/start_cirros_instance.yml
 
 - hosts: hypervisors
   become: yes
@@ -213,76 +40,22 @@
       shell: |
         [ `sf-client --no-pretty instance list | grep sf-2 | wc -l` -eq 1 ]
 
-    - name: Determine instance uuid
+- hosts: sf-1
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - name: Ensure that inst-{{inventory_hostname}} appears in the dhcp config on the network node
       shell: |
-        sf-client --no-pretty instance list | grep {{inventory_hostname}} | cut -f 1 -d ","
-      register: instance_uuid_complex
+        [ `grep -c "fixed-address {{hostvars['sf-1']['centos_instance_ip']}}" /srv/shakenfist/dhcp/{{network_uuid}}/dhcpd.conf` -eq 1 ]
 
-    - name: Extract instance uuid
-      set_fact:
-        instance_uuid: "{{instance_uuid_complex.stdout}}"
-
-    - name: Log instance uuid
-      debug:
-        msg: Instance uuid is {{instance_uuid}}.
-
-    - name: Determine instance console port
+    - name: Ensure that inst-{{inventory_hostname}} appears in the dhcp config on the network node
       shell: |
-        sf-client --no-pretty instance show {{instance_uuid}} | grep "console port" | cut -f 2 -d ":"
-      register: console_port_complex
-
-    - name: Extract console port
-      set_fact:
-        console_port: "{{console_port_complex.stdout}}"
-
-    - name: Log instance console port
-      debug:
-        msg: Instance console port is {{console_port}}.
-
-    - name: Determine instance IP
-      shell: |
-        sf-client --no-pretty instance show {{instance_uuid}} | grep "ipv4" | cut -f 2 -d ":"
-      register: instance_ip_complex
-
-    - name: Extract instance IP
-      set_fact:
-        instance_ip: "{{instance_ip_complex.stdout}}"
-
-    - name: Log instance IP
-      debug:
-        msg: Instance IP is {{instance_ip}}.
-
-    - name: Wait for instances to boot
-      pause:
-        minutes: 1
-
-    - name: Wait for console port to answer
-      wait_for:
-        port: "{{ console_port }}"
-
-    - name: Instance should have a configured eth0
-      shell: |
-        [ `/tmp/telnet_client.py {{console_port}} ifconfig eth0 | grep -c "192.168.242"` -eq 1 ]
-
-    - name: Instance should have a configured DNS resolver
-      shell: |
-        [ `/tmp/telnet_client.py {{console_port}} cat /etc/resolv.conf | grep -c "8.8.8.8"` -eq 1 ]
-
-    - name: Instance should have a configured default route
-      shell: |
-        [ `/tmp/telnet_client.py {{console_port}} netstat -rn | grep -c "192.168.242.1"` -eq 1 ]
-
-    - name: Instances should be able to ping their gateway
-      shell: |
-        [ `/tmp/telnet_client.py {{console_port}} ping 192.168.242.1 | grep -c " 0% packet loss"` -eq 1 ]
-
-    - name: Instances should be able to ping their DHCP server
-      shell: |
-        [ `/tmp/telnet_client.py {{console_port}} ping 192.168.242.2 | grep -c " 0% packet loss"` -eq 1 ]
-
-    - name: Instances should be able to ping Google
-      shell: |
-        [ `/tmp/telnet_client.py {{console_port}} ping 8.8.8.8 | grep -c " 0% packet loss"` -eq 1 ]
+        [ `grep -c "fixed-address {{hostvars['sf-2']['centos_instance_ip']}}" /srv/shakenfist/dhcp/{{network_uuid}}/dhcpd.conf` -eq 1 ]
 
 - hosts: sf-2
   become: yes
@@ -293,17 +66,181 @@
     - vars
 
   tasks:
+    - name: Ensure that dhcp is not configured on a non-network-node
+      shell: |
+        [ ! -e /srv/shakenfist/dhcp/{{network_uuid}}/dhcpd.conf ]
+
+- hosts: hypervisors
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - include: tests/cirros_networking_tests.yml
+
+- hosts: sf-1
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - name: The instance on sf-1 should be able to ping the instance on sf-2
+      shell: |
+        [ `/opt/telnet_client.py {{centos_console_port}} ping {{hostvars['sf-2']['centos_instance_ip']}} | grep -c " 0% packet loss"` -eq 1 ]
+
+- hosts: sf-2
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - include: tests/start_ubuntu_instance.yml
+
+- hosts: sf-1
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    # NOTE(mikal): Ubuntu 18.04 has a bug where DHCP doesn't always work in the
+    # cloud image. This is ok though, because we should be using the config drive
+    # style interface information anyway.
+
+    - name: Instance is pingable
+      shell: |
+        [ `ping -c 1 {{hostvars['sf-2']['ubuntu_instance_ip']}} | grep -c " 0% packet loss"` -eq 1 ]
+
+- hosts: sf-2
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - name: Deleting an instance hosted locally should work
+      shell: |
+        sf-client instance delete {{ubuntu_instance_uuid}}
+
+    - include: tests/cirros_networking_tests.yml
+
     - name: We should have one VM on sf-2
       shell: |
         [ `virsh list | grep running | wc -l` -eq 1 ]
 
-    - name: Rebooting a node should retain its instances
-      reboot:
-        reboot_timeout: 300
-
-    - name: We should have one VM on sf-2
+    - name: Count how many times the instance has booted
       shell: |
-        [ `virsh list | grep running | wc -l` -eq 1 ]
+        grep -c "\[    0.000000\] Linux version" /srv/shakenfist/instances/{{centos_instance_uuid}}/console.log
+      register: centos_instance_boots_before_complex
+
+    - name: Extract boot count
+      set_fact:
+        centos_instance_boots_before: "{{centos_instance_boots_before_complex.stdout}}"
+
+    - name: Soft reboot the instance
+      shell: |
+        sf-client instance reboot {{centos_instance_uuid}}
+
+    - name: Wait
+      pause:
+        minutes: 2
+
+    - name: Count how many times the instance has booted
+      shell: |
+        grep -c "\[    0.000000\] Linux version" /srv/shakenfist/instances/{{centos_instance_uuid}}/console.log
+      register: centos_instance_boots_after_soft_complex
+
+    - name: Extract boot count
+      set_fact:
+        centos_instance_boots_after_soft: "{{centos_instance_boots_after_soft_complex.stdout}}"
+
+    - name: Make sure we rebooted
+      fail:
+        msg: Instance did not reboot.
+      when: centos_instance_boots_before == centos_instance_boots_after_soft
+
+    - name: Count how many times the instance has booted
+      shell: |
+        grep -c "\[    0.000000\] Linux version" /srv/shakenfist/instances/{{centos_instance_uuid}}/console.log
+      register: centos_instance_boots_before_complex
+
+    - name: Extract boot count
+      set_fact:
+        centos_instance_boots_before: "{{centos_instance_boots_before_complex.stdout}}"
+
+    - name: Hard reboot the instance
+      shell: |
+        sf-client instance reboot --hard {{centos_instance_uuid}}
+
+    - name: Wait
+      pause:
+        minutes: 2
+
+    - name: Count how many times the instance has booted
+      shell: |
+        grep -c "\[    0.000000\] Linux version" /srv/shakenfist/instances/{{centos_instance_uuid}}/console.log
+      register: centos_instance_boots_after_hard_complex
+
+    - name: Extract boot count
+      set_fact:
+        centos_instance_boots_after_hard: "{{centos_instance_boots_after_hard_complex.stdout}}"
+
+    - name: Make sure we rebooted
+      fail:
+        msg: Instance did not reboot.
+      when: centos_instance_boots_before == centos_instance_boots_after_hard
+
+    - include: tests/cirros_networking_tests.yml
+
+    - name: Count how many times the instance has booted
+      shell: |
+        grep -c "\[    0.000000\] Linux version" /srv/shakenfist/instances/{{centos_instance_uuid}}/console.log
+      register: centos_instance_boots_before_complex
+
+    - name: Extract boot count
+      set_fact:
+        centos_instance_boots_before: "{{centos_instance_boots_before_complex.stdout}}"
+
+    - name: Power off an instance
+      shell: |
+        sf-client instance poweroff {{centos_instance_uuid}}
+
+    - name: We should have no VMs on sf-2
+      shell: |
+        [ `virsh list | grep running | wc -l` -eq 0 ]
+
+    - name: Power on an instance
+      shell: |
+        sf-client instance poweron {{centos_instance_uuid}}
+
+    - name: Count how many times the instance has booted
+      shell: |
+        grep -c "\[    0.000000\] Linux version" /srv/shakenfist/instances/{{centos_instance_uuid}}/console.log
+      register: centos_instance_boots_after_powercycle_complex
+
+    - name: Extract boot count
+      set_fact:
+        centos_instance_boots_after_powercycle: "{{centos_instance_boots_after_powercycle_complex.stdout}}"
+
+    - name: Make sure we rebooted
+      fail:
+        msg: Instance did not reboot.
+      when: centos_instance_boots_before == centos_instance_boots_after_powercycle
+
+    - include: tests/cirros_networking_tests.yml
 
 - hosts: sf-1
   become: yes
@@ -316,7 +253,7 @@
   tasks:
     - name: Deleting an instance hosted remotely should work
       shell: |
-        sf-client instance delete `sf-client --no-pretty instance list | grep sf-2 | cut -f 1 -d ","`
+        sf-client instance delete {{hostvars['sf-2']['centos_instance_uuid']}}
 
     - name: Test database records the delete
       shell: |
@@ -362,16 +299,16 @@
 
     - name: The instances table should be empty
       shell: |
-        [ `/bin/bash /tmp/sfmysql "select * from instances" | wc -l` -eq 0 ]
+        [ `/bin/bash /opt/sfmysql "select * from instances" | wc -l` -eq 0 ]
 
     - name: The network_interfaces table should be empty
       shell: |
-        [ `/bin/bash /tmp/sfmysql "select * from network_interfaces" | wc -l` -eq 0 ]
+        [ `/bin/bash /opt/sfmysql "select * from network_interfaces" | wc -l` -eq 0 ]
 
     - name: The networks table should still have an entry
       shell: |
-        [ `/bin/bash /tmp/sfmysql "select * from networks \G" | grep -c uuid` -eq 1 ]
+        [ `/bin/bash /opt/sfmysql "select * from networks \G" | grep -c uuid` -eq 1 ]
 
     - name: The snapshots table should be empty
       shell: |
-        [ `/bin/bash /tmp/sfmysql "select * from snapshots" | wc -l` -eq 0 ]
+        [ `/bin/bash /opt/sfmysql "select * from snapshots" | wc -l` -eq 0 ]

@@ -39,9 +39,19 @@ if __name__ == '__main__':
 
     if sys.argv[2] == 'cat':
         print(console.execute('cat %s' % sys.argv[3]))
+    if sys.argv[2] == 'exists':
+        print(console.execute(
+            'if [ -e %s ]\n'
+            'then\n'
+            '  echo "File exists"\n'
+            'else\n'
+            '  echo "File missing"\n'
+            'fi' % sys.argv[3]))
     if sys.argv[2] == 'ifconfig':
         print(console.execute('ifconfig %s' % sys.argv[3]))
     if sys.argv[2] == 'netstat':
         print(console.execute('netstat %s' % sys.argv[3]))
     if sys.argv[2] == 'ping':
         print(console.execute('ping -c 3 -w 4 %s' % sys.argv[3]))
+    if sys.argv[2] == 'touch':
+        print(console.execute('touch %s' % sys.argv[3]))

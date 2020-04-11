@@ -35,6 +35,6 @@
 
 - name: Install docker python libraries
   apt:
-    name: ["python-docker"]
+    name: ["python-docker", "python3-docker"]
     update_cache: yes
     state: latest

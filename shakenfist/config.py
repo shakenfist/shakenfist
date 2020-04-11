@@ -22,11 +22,14 @@ except Exception:
 
 CONFIG_DEFAULTS = {
     # Deployment options
-    # The port for the REST API service
+    # The ports for the internal REST API service
     'API_PORT': 13000,
 
     # Where the MySQL database is
     'SQL_URL': 'mysql://root:foo@localhost/sf',
+
+    # Which node provides DHCP and NAT
+    'NETWORK_NODE_IP': node_ip,
 
     # What nova called an availability zone
     'ZONE': 'shaken',

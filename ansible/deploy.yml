@@ -6,58 +6,11 @@
     - vars
 
   tasks:
-    - name: Deploy infrastructure
-      terraform:
-        project_path: ./tf
-        state: present
-        force_init: true
-        variables:
-          project: "{{project}}"
-      register: terraform_out
+    - include: includes/terraform.yml
 
-    - name: Add DB node to ansible
-      add_host:
-        hostname: sfdb
-        ansible_ssh_host: "{{terraform_out.outputs.sfdb_external.value[0]}}"
-        groups: db
-
-    - name: Add DB node_ip
-      set_fact:
-        node_ip: "{{terraform_out.outputs.sfdb_internal.value[0]}}"
-        db_node_ip: "{{terraform_out.outputs.sfdb_internal.value[0]}}"
-      delegate_to: sfdb
-      delegate_facts: true
-
-    - name: Add sf-1 to ansible
-      add_host:
-        hostname: sf-1
-        ansible_ssh_host: "{{terraform_out.outputs.sf_1_external.value[0]}}"
-        groups: hypervisors
-
-    - name: Add DB sf-1 node_ip
-      set_fact:
-        node_ip: "{{terraform_out.outputs.sf_1_internal.value[0]}}"
-      delegate_to: sf-1
-      delegate_facts: true
-
-    - name: Add sf-2 to ansible
-      add_host:
-        hostname: sf-2
-        ansible_ssh_host: "{{terraform_out.outputs.sf_2_external.value[0]}}"
-        groups: hypervisors
-
-    - name: Add DB sf-2 node_ip
-      set_fact:
-        node_ip: "{{terraform_out.outputs.sf_2_internal.value[0]}}"
-      delegate_to: sf-2
-      delegate_facts: true
-
-    - name: Log terraform hosts
-      debug:
-        msg:
-          - "db: {{hostvars['sfdb']['ansible_ssh_host']}}, {{hostvars['sfdb']['node_ip']}}"
-          - "sf-1: {{hostvars['sf-1']['ansible_ssh_host']}}, {{hostvars['sf-1']['node_ip']}}"
-          - "sf-2: {{hostvars['sf-2']['ansible_ssh_host']}}, {{hostvars['sf-2']['node_ip']}}"
+    - name: Wait for instances to boot
+      pause:
+        minutes: 2
 
 - hosts: allsf
   become: yes
@@ -122,6 +75,7 @@
   become_method: sudo
   gather_facts: no
   connection: ssh
+
   vars_files:
     - vars
 
@@ -135,7 +89,7 @@
       shell: docker start sfdb
       when: has_sfdb.rc == 0
 
-    - name: Wait docker python package to be available
+    - name: Wait for docker python package to be available
       pause:
         minutes: 1
       when: has_sfdb.rc == 1

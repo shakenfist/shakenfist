@@ -16,7 +16,8 @@ If there is an existing library which does a thing, we use it. OpenStack suffere
 Deployment choices
 ------------------
 
-libvirt is the only supported hypervisor. Instances are specified to libvirt with simple templated XML. If your local requirements are different to what's in the template, you're welcome to change the template to meet your needs.
+libvirt is the only supported hypervisor. Instances are specified to libvirt with simple templated XML. If your local requirements are different to what's in the template, you're welcome to change the template to meet your needs. If you're template changes break things, you're also welcome to
+debug what went wrong for yourself.
 
 Instances
 ---------
@@ -33,7 +34,7 @@ Virtual networks / micro segmentation is provided by VXLAN meshes betwen the ins
 Installation
 ============
 
-Build an acceptable hypervisor node, noting that only Debian and Ubuntu are supported. On Google Cloud, this looks like this:
+Build an acceptable hypervisor node, noting that only Ubuntu is supported. On Google Cloud, this looks like this:
 
 ```bash
 # Create an image with nested virt enabled (only once)
@@ -56,18 +57,62 @@ gcloud compute instances create sf-db --zone us-central1-b \
 
 Update the contents of ansible/vars with locally valid values. Its a YAML file if that helps.
 
-Now on the hypervisor node (omit the --extra-vars for production environments, which are assumed to not be NAT'ed):
+Now create your database and hypervisor nodes (where foo-1234 is my Google Compute project):
 
 ```bash
 sudo apt-get install ansible
 git clone https://github.com/mikalstill/shakenfist
-cd shakenfist
-ansible-playbook -i ansible/hosts-gcp ansible/deploy.yml
+cd ansible
+ansible-playbook -i ansible/hosts-gcp -var project=foo-1234 ansible/deploy.yml
 ```
 
-At the moment you interact with Shaken Fist via a command line client as I haven't written an API layer yet. When I do, it will probably be graphql. For now, do something like this:
+There are automated tests, which you can run like this:
 
 ```bash
-. /etc/sf/sfrc
+ansible-playbook -i ansible/hosts-gcp -var project=foo-1234 ansible/test.yml
+```
+
+At the moment you interact with Shaken Fist via a command line client or the REST API. For now, do something like this to get some help:
+
+```bash
 sf-client --help
 ```
+
+Features
+========
+
+Here's a simple feature matrix:
+
+| Feature                                           | Implemented | Planned | Not Planned |
+|---------------------------------------------------|-------------|---------|-------------|
+| Servers / instances                               | Yes         |         |             |
+| Networks                                          | Yes         |         |             |
+| Multiple NICs for a given server                  | Yes         |         |             |
+| Pre-cache a server image                          | Yes         |         |             |
+| Floating IPs                                      |             | Yes     |             |
+| Pause                                             |             | Yes     |             |
+| Reboot (hard and soft)                            | Yes         |         |             |
+| Security groups                                   |             | Yes     |             |
+| Text console                                      | Yes         |         |             |
+| VDI                                               | Yes         |         |             |
+| User data                                         |             | Yes     |             |
+| Keypairs                                          |             | Yes     |             |
+| Virtual networks allow overlapping IP allocations |             | Yes     |             |
+| REST API authentication and object ownership      |             | Yes     |             |
+| Snapshots (of all disks)                          | Yes         |         |             |
+| Volumes                                           |             |         | No plans    |
+| Quotas                                            |             |         | No plans    |
+| API versioning                                    |             |         | No plans    |
+| Keystone style service lookup and URLs            |             |         | No plans    |
+| Create multiple servers in a single request       |             |         | No plans    |
+| Resize a server                                   |             |         | No plans    |
+| Server groups                                     |             |         | No plans    |
+| Change admin password                             |             |         | No plans    |
+| Rebuild a server                                  |             |         | No plans    |
+| Shelve / unshelve                                 |             |         | No plans    |
+| Trigger crash dump                                |             |         | No plans    |
+| Live migration                                    |             |         | No plans    |
+| Flavors                                           |             |         | No plans    |
+| Guest agents                                      |             |         | No plans    |
+| Host aggregates                                   |             |         | No plans    |
+| Server tags                                       |             |         | No plans    |
