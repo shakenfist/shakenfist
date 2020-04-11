@@ -5,7 +5,7 @@
     upgrade: dist
     autoremove: yes
 
-- name: install dependancies
+- name: Install dependancies
   apt:
     name:
       [
@@ -17,9 +17,10 @@
         "pwgen",
         "dnsutils",
         "mysql-client",
+        "python-libvirt",
         "python3-libvirt",
         "libssl-dev",
         "net-tools",
-        "bridge-utils"
+        "bridge-utils",
       ]
     state: latest

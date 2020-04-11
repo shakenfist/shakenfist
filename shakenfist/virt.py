@@ -136,12 +136,12 @@ class Instance(object):
         with util.RecordedOperation('create domain XML', self, status_callback) as ro:
             self._create_domain_xml()
         with util.RecordedOperation('create domain', self, status_callback) as ro:
-            self._create_domain()
+            self.power_on()
 
     def delete(self, status_callback):
         with util.RecordedOperation('delete domain', self, status_callback) as ro:
             try:
-                self._delete_domain()
+                self.power_off()
             except:
                 pass
 
@@ -295,7 +295,8 @@ class Instance(object):
             networks=networks,
             network_model=config.parsed.get('NETWORK_MODEL'),
             instance_path=self.instance_path,
-            console_port=self.db_entry['console_port']
+            console_port=self.db_entry['console_port'],
+            vdi_port=self.db_entry['vdi_port']
         )
 
         with open(self.xml_file, 'w') as f:
@@ -310,7 +311,7 @@ class Instance(object):
             LOG.error('%s: Failed to lookup domain' % self)
             return None
 
-    def _create_domain(self):
+    def power_on(self):
         with open(self.xml_file) as f:
             xml = f.read()
 
@@ -324,12 +325,12 @@ class Instance(object):
 
         try:
             instance.create()
-        except libvirt.libvirtError as e:
+        except libvirt.libvirtError:
             pass
 
         instance.setAutostart(1)
 
-    def _delete_domain(self):
+    def power_off(self):
         with open(self.xml_file) as f:
             xml = f.read()
 
@@ -375,3 +376,10 @@ class Instance(object):
                                    datetime.datetime.now())
 
         return snapshot_uuid
+
+    def reboot(self, hard=False):
+        instance = self._get_domain()
+        if not hard:
+            instance.reboot(flags=libvirt.VIR_DOMAIN_REBOOT_ACPI_POWER_BTN)
+        else:
+            instance.reset()

@@ -194,6 +194,7 @@ def _show_instance(ctx, i):
     # NOTE(mikal): I am not sure we should expose this, but it will do
     # for now until a proxy is written.
     print(format_string % ('console port', i['console_port']))
+    print(format_string % ('vdi port', i['vdi_port']))
 
     format_string = '    %-8s: %s'
     if not ctx.obj['PRETTY']:
@@ -256,6 +257,28 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, disk=N
 @click.pass_context
 def instance_delete(ctx, uuid=None):
     CLIENT.delete_instance(uuid)
+
+
+@instance.command(name='reboot', help='Reboot instance')
+@click.argument('uuid', type=click.STRING, autocompletion=_get_instances)
+@click.option('--hard/--soft', default=False)
+@click.pass_context
+def instance_reboot(ctx, uuid=None, hard=False):
+    CLIENT.reboot_instance(uuid, hard=hard)
+
+
+@instance.command(name='poweron', help='Power on an instance')
+@click.argument('uuid', type=click.STRING, autocompletion=_get_instances)
+@click.pass_context
+def instance_power_on(ctx, uuid=None):
+    CLIENT.power_on_instance(uuid)
+
+
+@instance.command(name='poweroff', help='Power off an instance')
+@click.argument('uuid', type=click.STRING, autocompletion=_get_instances)
+@click.pass_context
+def instance_power_off(ctx, uuid=None):
+    CLIENT.power_off_instance(uuid)
 
 
 @instance.command(name='snapshot', help='Snapshot instance')

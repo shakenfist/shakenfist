@@ -6,6 +6,7 @@ import random
 import re
 import requests
 
+from oslo_concurrency import lockutils
 from oslo_concurrency import processutils
 
 from shakenfist import config
@@ -58,14 +59,15 @@ class Network(object):
         return 'network(%s, vxid %s)' % (self.uuid, self.vxlan_id)
 
     def allocate_ip(self):
-        addresses = list(self.ipnetwork.hosts())[2:]
+        with lockutils.lock('sf_net_%s' % self.uuid, external=True, lock_path='/tmp/'):
+            addresses = list(self.ipnetwork.hosts())[2:]
 
-        for interface in db.get_network_interfaces(self.uuid):
-            if interface['ipv4'] in addresses:
-                addresses.remove(interface['ipv4'])
+            for interface in db.get_network_interfaces(self.uuid):
+                if interface['ipv4'] in addresses:
+                    addresses.remove(interface['ipv4'])
 
-        random.shuffle(addresses)
-        return addresses[0]
+            random.shuffle(addresses)
+            return addresses[0]
 
     def subst_dict(self):
         retval = {
@@ -87,36 +89,37 @@ class Network(object):
     def create(self):
         subst = self.subst_dict()
 
-        if not util.check_for_interface(self.vx_interface):
-            with util.RecordedOperation('create vxlan interface', self) as ro:
-                processutils.execute(
-                    'ip link add %(vx_interface)s type vxlan id %(vx_id)s '
-                    'dev %(phy_interface)s dstport 0'
-                    % subst, shell=True)
-                processutils.execute(
-                    'sysctl -w net.ipv4.conf.%(vx_interface)s.arp_notify=1' % subst,
-                    shell=True)
+        with lockutils.lock('sf_net_%s' % self.uuid, external=True, lock_path='/tmp/'):
+            if not util.check_for_interface(self.vx_interface):
+                with util.RecordedOperation('create vxlan interface', self) as ro:
+                    processutils.execute(
+                        'ip link add %(vx_interface)s type vxlan id %(vx_id)s '
+                        'dev %(phy_interface)s dstport 0'
+                        % subst, shell=True)
+                    processutils.execute(
+                        'sysctl -w net.ipv4.conf.%(vx_interface)s.arp_notify=1' % subst,
+                        shell=True)
 
-        if not util.check_for_interface(self.vx_bridge):
-            with util.RecordedOperation('create vxlan bridge', self) as ro:
-                processutils.execute(
-                    'ip link add %(vx_bridge)s type bridge' % subst, shell=True)
-                processutils.execute(
-                    'ip link set %(vx_interface)s master %(vx_bridge)s' % subst,
-                    shell=True)
-                processutils.execute(
-                    'ip link set %(vx_interface)s up' % subst, shell=True)
-                processutils.execute(
-                    'ip link set %(vx_bridge)s up' % subst, shell=True)
-                processutils.execute(
-                    'sysctl -w net.ipv4.conf.%(vx_bridge)s.arp_notify=1' % subst,
-                    shell=True)
-                processutils.execute(
-                    'brctl setfd %(vx_bridge)s 0' % subst, shell=True)
-                processutils.execute(
-                    'brctl stp %(vx_bridge)s off' % subst, shell=True)
-                processutils.execute(
-                    'brctl setageing %(vx_bridge)s 0' % subst, shell=True)
+            if not util.check_for_interface(self.vx_bridge):
+                with util.RecordedOperation('create vxlan bridge', self) as ro:
+                    processutils.execute(
+                        'ip link add %(vx_bridge)s type bridge' % subst, shell=True)
+                    processutils.execute(
+                        'ip link set %(vx_interface)s master %(vx_bridge)s' % subst,
+                        shell=True)
+                    processutils.execute(
+                        'ip link set %(vx_interface)s up' % subst, shell=True)
+                    processutils.execute(
+                        'ip link set %(vx_bridge)s up' % subst, shell=True)
+                    processutils.execute(
+                        'sysctl -w net.ipv4.conf.%(vx_bridge)s.arp_notify=1' % subst,
+                        shell=True)
+                    processutils.execute(
+                        'brctl setfd %(vx_bridge)s 0' % subst, shell=True)
+                    processutils.execute(
+                        'brctl stp %(vx_bridge)s off' % subst, shell=True)
+                    processutils.execute(
+                        'brctl setageing %(vx_bridge)s 0' % subst, shell=True)
 
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
             self.deploy_nat()
@@ -138,28 +141,29 @@ class Network(object):
         subst = self.subst_dict()
 
         with util.RecordedOperation('enable NAT', self) as ro:
-            out, _ = processutils.execute(
-                'ip addr show dev %(vx_bridge)s' % subst,
-                shell=True)
-            if out.find('inet %(router)s' % subst) == -1:
-                processutils.execute(
-                    'ip addr add %(router)s/%(netmask)s dev %(vx_bridge)s' % subst,
+            with lockutils.lock('sf_net_%s' % self.uuid, external=True, lock_path='/tmp/'):
+                out, _ = processutils.execute(
+                    'ip addr show dev %(vx_bridge)s' % subst,
                     shell=True)
-                processutils.execute('echo 1 > /proc/sys/net/ipv4/ip_forward',
-                                     shell=True)
-                processutils.execute(
-                    'iptables -A FORWARD -o %(phy_interface)s '
-                    '-i %(vx_bridge)s -j ACCEPT' % subst,
-                    shell=True)
-                processutils.execute(
-                    'iptables -A FORWARD -i %(phy_interface)s '
-                    '-o %(vx_bridge)s -j ACCEPT' % subst,
-                    shell=True)
-                processutils.execute(
-                    'iptables -t nat -A POSTROUTING -s %(ipblock)s/%(netmask)s '
-                    '-o %(phy_interface)s -j MASQUERADE' % subst,
-                    shell=True
-                )
+                if out.find('inet %(router)s' % subst) == -1:
+                    processutils.execute(
+                        'ip addr add %(router)s/%(netmask)s dev %(vx_bridge)s' % subst,
+                        shell=True)
+                    processutils.execute('echo 1 > /proc/sys/net/ipv4/ip_forward',
+                                         shell=True)
+                    processutils.execute(
+                        'iptables -A FORWARD -o %(phy_interface)s '
+                        '-i %(vx_bridge)s -j ACCEPT' % subst,
+                        shell=True)
+                    processutils.execute(
+                        'iptables -A FORWARD -i %(phy_interface)s '
+                        '-o %(vx_bridge)s -j ACCEPT' % subst,
+                        shell=True)
+                    processutils.execute(
+                        'iptables -t nat -A POSTROUTING -s %(ipblock)s/%(netmask)s '
+                        '-o %(phy_interface)s -j MASQUERADE' % subst,
+                        shell=True
+                    )
 
     def deploy_dhcp(self):
         if not self.provide_dhcp:
@@ -168,48 +172,51 @@ class Network(object):
         subst = self.subst_dict()
 
         if not util.check_for_interface(self.dhcp_interface):
-            with util.RecordedOperation('create dhcp interface', self) as ro:
-                processutils.execute(
-                    'ip link add %(dhcp_interface)s type veth peer name '
-                    '%(dhcp_peer)s' % subst, shell=True)
-                processutils.execute(
-                    'ip link set %(dhcp_peer)s master %(vx_bridge)s'
-                    % subst, shell=True)
-                processutils.execute(
-                    'ip link set %(dhcp_interface)s up' % subst, shell=True)
-                processutils.execute(
-                    'ip link set %(dhcp_peer)s up' % subst, shell=True)
-                processutils.execute(
-                    'ip addr add %(dhcpserver)s/%(netmask)s dev %(dhcp_interface)s' % subst,
-                    shell=True)
+            with lockutils.lock('sf_net_%s' % self.uuid, external=True, lock_path='/tmp/'):
+                with util.RecordedOperation('create dhcp interface', self) as ro:
+                    processutils.execute(
+                        'ip link add %(dhcp_interface)s type veth peer name '
+                        '%(dhcp_peer)s' % subst, shell=True)
+                    processutils.execute(
+                        'ip link set %(dhcp_peer)s master %(vx_bridge)s'
+                        % subst, shell=True)
+                    processutils.execute(
+                        'ip link set %(dhcp_interface)s up' % subst, shell=True)
+                    processutils.execute(
+                        'ip link set %(dhcp_peer)s up' % subst, shell=True)
+                    processutils.execute(
+                        'ip addr add %(dhcpserver)s/%(netmask)s dev %(dhcp_interface)s' % subst,
+                        shell=True)
 
         self.update_dhcp()
 
     def delete(self):
         subst = self.subst_dict()
 
-        if util.check_for_interface(self.dhcp_interface):
-            # This will delete the peer as well
-            with util.RecordedOperation('delete dhcp interface', self) as _:
-                processutils.execute('ip link delete %(dhcp_interface)s' % subst,
-                                     shell=True)
+        with lockutils.lock('sf_net_%s' % self.uuid, external=True, lock_path='/tmp/'):
+            if util.check_for_interface(self.dhcp_interface):
+                # This will delete the peer as well
+                with util.RecordedOperation('delete dhcp interface', self) as _:
+                    processutils.execute('ip link delete %(dhcp_interface)s' % subst,
+                                         shell=True)
 
-        if util.check_for_interface(self.vx_bridge):
-            with util.RecordedOperation('delete vxlan bridge', self) as _:
-                processutils.execute('ip link delete %(vx_bridge)s' % subst,
-                                     shell=True)
+            if util.check_for_interface(self.vx_bridge):
+                with util.RecordedOperation('delete vxlan bridge', self) as _:
+                    processutils.execute('ip link delete %(vx_bridge)s' % subst,
+                                         shell=True)
 
-        if util.check_for_interface(self.vx_interface):
-            with util.RecordedOperation('delete vxlan interface', self) as _:
-                processutils.execute('ip link delete %(vx_interface)s' % subst,
-                                     shell=True)
+            if util.check_for_interface(self.vx_interface):
+                with util.RecordedOperation('delete vxlan interface', self) as _:
+                    processutils.execute('ip link delete %(vx_interface)s' % subst,
+                                         shell=True)
 
     def update_dhcp(self):
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
             with util.RecordedOperation('update dhcp', self) as _:
-                d = dhcp.DHCP(self.uuid)
-                d.make_config()
-                d.restart_dhcpd()
+                with lockutils.lock('sf_net_%s' % self.uuid, external=True, lock_path='/tmp/'):
+                    d = dhcp.DHCP(self.uuid)
+                    d.make_config()
+                    d.restart_dhcpd()
         else:
             requests.request(
                 'put',
@@ -223,9 +230,10 @@ class Network(object):
     def remove_dhcp(self):
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
             with util.RecordedOperation('remove dhcp', self) as _:
-                d = dhcp.DHCP(self.uuid)
-                d.remove_dhcpd()
-                d.remove_config()
+                with lockutils.lock('sf_net_%s' % self.uuid, external=True, lock_path='/tmp/'):
+                    d = dhcp.DHCP(self.uuid)
+                    d.remove_dhcpd()
+                    d.remove_config()
         else:
             requests.request(
                 'put',

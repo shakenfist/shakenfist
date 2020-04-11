@@ -77,6 +77,24 @@ class Client(object):
                          '/snapshot', data={'all': all})
         return r.json()
 
+    def reboot_instance(self, uuid, hard=False):
+        style = 'soft'
+        if hard:
+            style = 'hard'
+        r = _request_url('POST', self.base_url + '/instances/' + uuid +
+                         '/reboot' + style, data={})
+        return r.json()
+
+    def power_off_instance(self, uuid):
+        r = _request_url('POST', self.base_url + '/instances/' + uuid +
+                         '/poweroff', data={})
+        return r.json()
+
+    def power_on_instance(self, uuid):
+        r = _request_url('POST', self.base_url + '/instances/' + uuid +
+                         '/poweron', data={})
+        return r.json()
+
     def delete_instance(self, uuid):
         r = _request_url('DELETE', self.base_url + '/instances/' + uuid)
         return r.json()

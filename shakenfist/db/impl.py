@@ -8,7 +8,7 @@ import uuid
 from sqlalchemy import create_engine
 from sqlalchemy import Boolean, Column, Integer, String, DateTime
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import exc, sessionmaker
+from sqlalchemy.orm import exc, scoped_session, sessionmaker
 from sqlalchemy.sql.expression import func
 
 
@@ -21,7 +21,7 @@ LOG.setLevel(logging.DEBUG)
 Base = declarative_base()
 ENGINE = create_engine(config.parsed.get('SQL_URL'))
 SESSIONMAKER = sessionmaker(bind=ENGINE)
-SESSION = SESSIONMAKER()
+SESSION = scoped_session(SESSIONMAKER)
 
 
 def ensure_valid_session():
@@ -32,7 +32,7 @@ def ensure_valid_session():
         see_this_node()
         return
     except:
-        SESSION = SESSIONMAKER()
+        SESSION = scoped_session(SESSIONMAKER)
         see_this_node()
 
 
@@ -195,9 +195,10 @@ class Instance(Base):
     ssh_key = Column(String)
     node = Column(String)
     console_port = Column(Integer)
+    vdi_port = Column(Integer)
 
     def __init__(self, uuid, name, cpus, memory_mb, disk_spec,
-                 ssh_key, node, console_port):
+                 ssh_key, node, console_port, vdi_port):
         self.uuid = uuid
         self.name = name
         self.cpus = cpus
@@ -206,6 +207,7 @@ class Instance(Base):
         self.ssh_key = ssh_key
         self.node = node
         self.console_port = console_port
+        self.vdi_port = vdi_port
 
     def export(self):
         return {
@@ -216,7 +218,8 @@ class Instance(Base):
             'disk_spec': self.disk_spec,
             'ssh_key': self.ssh_key,
             'node': self.node,
-            'console_port': self.console_port
+            'console_port': self.console_port,
+            'vdi_port': self.vdi_port
         }
 
 
@@ -255,8 +258,10 @@ def create_instance(uuid, name, cpus, memory_mb, disk_spec, ssh_key):
         # TODO(mikal): this is naive and we should at least check
         # we haven't double allocated the port number on this node.
         console_port = random.randrange(30000, 31000)
+        vdi_port = random.randrange(30000, 31000)
         i = Instance(uuid, name, cpus, memory_mb, disk_spec, ssh_key,
-                     config.parsed.get('NODE_NAME'), console_port)
+                     config.parsed.get('NODE_NAME'), console_port,
+                     vdi_port)
         SESSION.add(i)
         return i.export()
     finally:

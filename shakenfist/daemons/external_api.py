@@ -143,6 +143,54 @@ class InstanceSnapshot(flask_restful.Resource):
         return i.snapshot(all=args['all'])
 
 
+class InstanceRebootSoft(flask_restful.Resource):
+    def post(self, uuid):
+        i = virt.from_db(uuid)
+        if i.db_entry['node'] != config.parsed.get('NODE_NAME'):
+            remote = apiclient.Client(
+                'http://%s:%d'
+                % (i.db_entry['node'],
+                   config.parsed.get('API_PORT')))
+            return remote.reboot_instance(uuid, hard=False)
+        return i.reboot(hard=False)
+
+
+class InstanceRebootHard(flask_restful.Resource):
+    def post(self, uuid):
+        i = virt.from_db(uuid)
+        if i.db_entry['node'] != config.parsed.get('NODE_NAME'):
+            remote = apiclient.Client(
+                'http://%s:%d'
+                % (i.db_entry['node'],
+                   config.parsed.get('API_PORT')))
+            return remote.reboot_instance(uuid, hard=True)
+        return i.reboot(hard=True)
+
+
+class InstancePowerOff(flask_restful.Resource):
+    def post(self, uuid):
+        i = virt.from_db(uuid)
+        if i.db_entry['node'] != config.parsed.get('NODE_NAME'):
+            remote = apiclient.Client(
+                'http://%s:%d'
+                % (i.db_entry['node'],
+                   config.parsed.get('API_PORT')))
+            return remote.power_off_instance(uuid)
+        return i.power_off()
+
+
+class InstancePowerOn(flask_restful.Resource):
+    def post(self, uuid):
+        i = virt.from_db(uuid)
+        if i.db_entry['node'] != config.parsed.get('NODE_NAME'):
+            remote = apiclient.Client(
+                'http://%s:%d'
+                % (i.db_entry['node'],
+                   config.parsed.get('API_PORT')))
+            return remote.power_on_instance(uuid)
+        return i.power_on()
+
+
 class Image(flask_restful.Resource):
     def post(self):
         parser = reqparse.RequestParser()
@@ -270,10 +318,14 @@ class RemoveDHCP(flask_restful.Resource):
 
 
 api.add_resource(Root, '/')
-api.add_resource(Instance, '/instances/<uuid>')
 api.add_resource(Instances, '/instances')
+api.add_resource(Instance, '/instances/<uuid>')
 api.add_resource(InstanceInterfaces, '/instances/<uuid>/interfaces')
 api.add_resource(InstanceSnapshot, '/instances/<uuid>/snapshot')
+api.add_resource(InstanceRebootSoft, '/instances/<uuid>/rebootsoft')
+api.add_resource(InstanceRebootHard, '/instances/<uuid>/reboothard')
+api.add_resource(InstancePowerOff, '/instances/<uuid>/poweroff')
+api.add_resource(InstancePowerOn, '/instances/<uuid>/poweron')
 api.add_resource(Image, '/images')
 api.add_resource(Network, '/networks/<uuid>')
 api.add_resource(Networks, '/networks')
