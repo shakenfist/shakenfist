@@ -242,6 +242,46 @@
 
     - include: tests/cirros_networking_tests.yml
 
+    - name: Pause an instance
+      shell: |
+        sf-client instance pause {{centos_instance_uuid}}
+
+    - name: We should still have a VM on sf-2
+      shell: |
+        [ `virsh list | grep -c paused` -eq 1 ]
+
+    - name: Paused instance should not respond
+      shell: |
+        [ `ping -c 3 "{{centos_instance_ip}}" | grep -c " 100% packet loss"` -eq 1 ]
+
+    - name: Unpause an instance
+      shell: |
+        sf-client instance unpause {{centos_instance_uuid}}
+
+    - name: We should have no paused instances on sf-2
+      shell: |
+        [ `virsh list | grep -c paused` -eq 0 ]
+
+    - name: We should still have a VM on sf-2 running
+      shell: |
+        [ `virsh list | grep -c running` -eq 1 ]
+
+    - name: Count how many times the instance has booted
+      shell: |
+        grep -c "\[    0.000000\] Linux version" /srv/shakenfist/instances/{{centos_instance_uuid}}/console.log
+      register: centos_instance_boots_after_pause_complex
+
+    - name: Extract boot count
+      set_fact:
+        centos_instance_boots_after_pause: "{{centos_instance_boots_after_pause_complex.stdout}}"
+
+    - name: Make sure we haven't rebooted
+      fail:
+        msg: Instance rebooted
+      when: centos_instance_boots_after_powercycle < centos_instance_boots_after_pause
+
+    - include: tests/cirros_networking_tests.yml
+
 - hosts: sf-1
   become: yes
   become_method: sudo

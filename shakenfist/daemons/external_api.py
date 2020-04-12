@@ -191,6 +191,30 @@ class InstancePowerOn(flask_restful.Resource):
         return i.power_on()
 
 
+class InstancePause(flask_restful.Resource):
+    def post(self, uuid):
+        i = virt.from_db(uuid)
+        if i.db_entry['node'] != config.parsed.get('NODE_NAME'):
+            remote = apiclient.Client(
+                'http://%s:%d'
+                % (i.db_entry['node'],
+                   config.parsed.get('API_PORT')))
+            return remote.pause_instance(uuid)
+        return i.pause()
+
+
+class InstanceUnpause(flask_restful.Resource):
+    def post(self, uuid):
+        i = virt.from_db(uuid)
+        if i.db_entry['node'] != config.parsed.get('NODE_NAME'):
+            remote = apiclient.Client(
+                'http://%s:%d'
+                % (i.db_entry['node'],
+                   config.parsed.get('API_PORT')))
+            return remote.unpause_instance(uuid)
+        return i.unpause()
+
+
 class Image(flask_restful.Resource):
     def post(self):
         parser = reqparse.RequestParser()
@@ -326,6 +350,8 @@ api.add_resource(InstanceRebootSoft, '/instances/<uuid>/rebootsoft')
 api.add_resource(InstanceRebootHard, '/instances/<uuid>/reboothard')
 api.add_resource(InstancePowerOff, '/instances/<uuid>/poweroff')
 api.add_resource(InstancePowerOn, '/instances/<uuid>/poweron')
+api.add_resource(InstancePause, '/instances/<uuid>/pause')
+api.add_resource(InstanceUnpause, '/instances/<uuid>/unpause')
 api.add_resource(Image, '/images')
 api.add_resource(Network, '/networks/<uuid>')
 api.add_resource(Networks, '/networks')

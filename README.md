@@ -90,7 +90,7 @@ Here's a simple feature matrix:
 | Multiple NICs for a given server                  | Yes         |         |             |
 | Pre-cache a server image                          | Yes         |         |             |
 | Floating IPs                                      |             | Yes     |             |
-| Pause                                             |             | Yes     |             |
+| Pause                                             | Yes         |         |             |
 | Reboot (hard and soft)                            | Yes         |         |             |
 | Security groups                                   |             | Yes     |             |
 | Text console                                      | Yes         |         |             |
@@ -100,6 +100,8 @@ Here's a simple feature matrix:
 | Virtual networks allow overlapping IP allocations |             | Yes     |             |
 | REST API authentication and object ownership      |             | Yes     |             |
 | Snapshots (of all disks)                          | Yes         |         |             |
+| Central API service                               |             | Yes     |             |
+| Scheduling                                        |             | Yes     |             |
 | Volumes                                           |             |         | No plans    |
 | Quotas                                            |             |         | No plans    |
 | API versioning                                    |             |         | No plans    |
