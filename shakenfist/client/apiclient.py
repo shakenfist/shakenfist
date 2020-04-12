@@ -95,6 +95,16 @@ class Client(object):
                          '/poweron', data={})
         return r.json()
 
+    def pause_instance(self, uuid):
+        r = _request_url('POST', self.base_url + '/instances/' + uuid +
+                         '/pause', data={})
+        return r.json()
+
+    def unpause_instance(self, uuid):
+        r = _request_url('POST', self.base_url + '/instances/' + uuid +
+                         '/unpause', data={})
+        return r.json()
+
     def delete_instance(self, uuid):
         r = _request_url('DELETE', self.base_url + '/instances/' + uuid)
         return r.json()

@@ -281,6 +281,20 @@ def instance_power_off(ctx, uuid=None):
     CLIENT.power_off_instance(uuid)
 
 
+@instance.command(name='pause', help='Pause an instance')
+@click.argument('uuid', type=click.STRING, autocompletion=_get_instances)
+@click.pass_context
+def instance_power_on(ctx, uuid=None):
+    CLIENT.pause_instance(uuid)
+
+
+@instance.command(name='unpause', help='Unpause an instance')
+@click.argument('uuid', type=click.STRING, autocompletion=_get_instances)
+@click.pass_context
+def instance_power_off(ctx, uuid=None):
+    CLIENT.unpause_instance(uuid)
+
+
 @instance.command(name='snapshot', help='Snapshot instance')
 @click.argument('uuid', type=click.STRING, autocompletion=_get_instances)
 @click.argument('all', type=click.BOOL, default=False)

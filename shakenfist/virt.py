@@ -383,3 +383,11 @@ class Instance(object):
             instance.reboot(flags=libvirt.VIR_DOMAIN_REBOOT_ACPI_POWER_BTN)
         else:
             instance.reset()
+
+    def pause(self):
+        instance = self._get_domain()
+        instance.suspend()
+
+    def unpause(self):
+        instance = self._get_domain()
+        instance.resume()
