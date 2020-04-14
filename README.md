@@ -95,8 +95,8 @@ Here's a simple feature matrix:
 | Security groups                                   |             | Yes     |             |
 | Text console                                      | Yes         |         |             |
 | VDI                                               | Yes         |         |             |
-| User data                                         |             | Yes     |             |
-| Keypairs                                          |             | Yes     |             |
+| User data                                         | Yes         |         |             |
+| Keypairs                                          | Yes         |         |             |
 | Virtual networks allow overlapping IP allocations |             | Yes     |             |
 | REST API authentication and object ownership      |             | Yes     |             |
 | Snapshots (of all disks)                          | Yes         |         |             |

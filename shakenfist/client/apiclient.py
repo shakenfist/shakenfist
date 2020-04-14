@@ -1,3 +1,4 @@
+import base64
 from email.utils import parsedate_to_datetime
 import json
 import logging
@@ -48,8 +49,7 @@ class Client(object):
 
     def get_instances(self):
         r = _request_url('GET', self.base_url + '/instances')
-        for n in r.json():
-            yield n
+        return r.json()
 
     def get_instance(self, uuid):
         r = _request_url('GET', self.base_url + '/instances/' + uuid)
@@ -60,7 +60,12 @@ class Client(object):
                          '/interfaces')
         return r.json()
 
-    def create_instance(self, name, cpus, memory, network, disk, ssh_key):
+    def create_instance(self, name, cpus, memory, network, disk, sshkey, userdata):
+        encoded_userdata = None
+        if userdata:
+            encoded_userdata = str(base64.b64encode(
+                userdata.encode('utf-8')), 'utf-8')
+
         r = _request_url('POST', self.base_url + '/instances',
                          data={
                              'name': name,
@@ -68,7 +73,8 @@ class Client(object):
                              'memory': memory,
                              'network': network,
                              'disk': disk,
-                             'ssh_key': ssh_key
+                             'ssh_key': sshkey,
+                             'user_data': encoded_userdata
                          })
         return r.json()
 
@@ -82,27 +88,27 @@ class Client(object):
         if hard:
             style = 'hard'
         r = _request_url('POST', self.base_url + '/instances/' + uuid +
-                         '/reboot' + style, data={})
+                         '/reboot' + style)
         return r.json()
 
     def power_off_instance(self, uuid):
         r = _request_url('POST', self.base_url + '/instances/' + uuid +
-                         '/poweroff', data={})
+                         '/poweroff')
         return r.json()
 
     def power_on_instance(self, uuid):
         r = _request_url('POST', self.base_url + '/instances/' + uuid +
-                         '/poweron', data={})
+                         '/poweron')
         return r.json()
 
     def pause_instance(self, uuid):
         r = _request_url('POST', self.base_url + '/instances/' + uuid +
-                         '/pause', data={})
+                         '/pause')
         return r.json()
 
     def unpause_instance(self, uuid):
         r = _request_url('POST', self.base_url + '/instances/' + uuid +
-                         '/unpause', data={})
+                         '/unpause')
         return r.json()
 
     def delete_instance(self, uuid):
@@ -116,8 +122,7 @@ class Client(object):
 
     def get_networks(self):
         r = _request_url('GET', self.base_url + '/networks')
-        for n in r.json():
-            yield n
+        return r.json()
 
     def get_network(self, uuid):
         r = _request_url('GET', self.base_url + '/networks/' + uuid)

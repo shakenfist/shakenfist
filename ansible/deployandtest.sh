@@ -1,5 +1,7 @@
 #!/bin/bash -ex
 
+tox -epy37
+
 cd tf
 terraform destroy -auto-approve -var project=mikal-269605
 cd ..

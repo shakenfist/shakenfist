@@ -27,9 +27,9 @@ LOG.setLevel(logging.DEBUG)
 
 
 def from_definition(uuid=None, name=None, disks=None, memory_mb=None,
-                    vcpus=None, ssh_key=None):
+                    vcpus=None, ssh_key=None, user_data=None):
     db_entry = db.create_instance(uuid, name, vcpus, memory_mb, ' '.join(disks),
-                                  ssh_key)
+                                  ssh_key, user_data)
     return Instance(db_entry)
 
 
@@ -139,13 +139,13 @@ class Instance(object):
             self.power_on()
 
     def delete(self, status_callback):
-        with util.RecordedOperation('delete domain', self, status_callback) as ro:
+        with util.RecordedOperation('delete domain', self, status_callback) as _:
             try:
                 self.power_off()
             except:
                 pass
 
-        with util.RecordedOperation('delete disks', self, status_callback) as ro:
+        with util.RecordedOperation('delete disks', self, status_callback) as _:
             try:
                 shutil.rmtree(self.instance_path)
             except:
@@ -194,6 +194,16 @@ class Instance(object):
         iso.add_fp(io.BytesIO(md), len(md), '/openstack/2017-02-22/meta_data.json;2',
                    rr_name='meta_data.json',
                    joliet_path='/openstack/2017-02-22/meta_data.json')
+
+        # user_data
+        if self.db_entry['user_data']:
+            user_data = base64.b64decode(self.db_entry['user_data'])
+            iso.add_fp(io.BytesIO(user_data), len(user_data), '/openstack/latest/user_data',
+                       rr_name='user_data',
+                       joliet_path='/openstack/latest/user_data.json')
+            iso.add_fp(io.BytesIO(user_data), len(user_data), '/openstack/2017-02-22/user_data',
+                       rr_name='user_data',
+                       joliet_path='/openstack/2017-02-22/user_data.json')
 
         # network_data.json
         nd = {
@@ -369,7 +379,7 @@ class Instance(object):
             if d['type'] != 'qcow2':
                 continue
 
-            with util.RecordedOperation('snapshot %s' % d['device'], self) as ro:
+            with util.RecordedOperation('snapshot %s' % d['device'], self) as _:
                 self._snapshot_device(
                     d['path'], os.path.join(snappath, d['device']))
                 db.create_snapshot(snapshot_uuid, d['device'], self.db_entry['uuid'],

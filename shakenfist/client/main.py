@@ -158,7 +158,7 @@ def _get_instances(ctx, args, incomplete):
 @instance.command(name='list', help='List instances')
 @click.pass_context
 def instance_list(ctx):
-    insts = list(CLIENT.get_instances())
+    insts = CLIENT.get_instances()
 
     if ctx.obj['PRETTY']:
         x = PrettyTable()
@@ -188,13 +188,16 @@ def _show_instance(ctx, i):
     print(format_string % ('cpus', i['cpus']))
     print(format_string % ('memory', i['memory']))
     print(format_string % ('disk spec', i['disk_spec']))
-    print(format_string % ('ssh key', i['ssh_key']))
     print(format_string % ('hypervisor', i['node']))
 
     # NOTE(mikal): I am not sure we should expose this, but it will do
     # for now until a proxy is written.
     print(format_string % ('console port', i['console_port']))
     print(format_string % ('vdi port', i['vdi_port']))
+
+    print()
+    print(format_string % ('ssh key', i['ssh_key']))
+    print(format_string % ('user data', i['user_data']))
 
     format_string = '    %-8s: %s'
     if not ctx.obj['PRETTY']:
@@ -224,32 +227,42 @@ def instance_show(ctx, uuid=None):
                         'MEMORY:    The amount RAM for the instance in GB.\n'
                         '\n'
                         'Options (may be repeated, must be specified at least once):\n'
-                        '--network: The uuid of the network to attach the instance to.\n'
-                        '--disk:    The disks attached to the instance, in this format: \n'
-                        '           size@image_url where size is in GB and @image_url\n'
-                        '           is optional.\n'))
+                        '--network/-n:  The uuid of the network to attach the instance to.\n'
+                        '--disk/-d:     The disks attached to the instance, in this format: \n'
+                        '               size@image_url where size is in GB and @image_url\n'
+                        '               is optional.\n'
+                        '--sshkey/-i:   The path to a ssh public key to configure on the\n'
+                        '               instance via config drive / cloud-init.\n'
+                        '--userdata/-u: The path to a file containing user data to provided\n'
+                        '               to the instance via config drive / cloud-init.'))
 @click.argument('name', type=click.STRING)
 @click.argument('cpus', type=click.INT)
 @click.argument('memory', type=click.INT)
 @click.option('-n', '--network', type=click.STRING, multiple=True,
               autocompletion=_get_networks)
 @click.option('-d', '--disk', type=click.STRING, multiple=True)
+@click.option('-i', '--sshkey', type=click.STRING)
+@click.option('-u', '--userdata', type=click.STRING)
 @click.pass_context
-def instance_create(ctx, name=None, cpus=None, memory=None, network=None, disk=None):
+def instance_create(ctx, name=None, cpus=None, memory=None, network=None, disk=None,
+                    sshkey=None, userdata=None):
     if len(disk) < 1:
         print('You must specify at least one disk')
-    if len(network) < 1:
-        print('You must specify at least one network')
+
+    sshkey_content = None
+    if sshkey:
+        with open(sshkey) as f:
+            sshkey_content = f.read()
+
+    userdata_content = None
+    if userdata:
+        with open(userdata) as f:
+            userdata_content = f.read()
 
     _show_instance(
         ctx,
-        CLIENT.create_instance(
-            name,
-            cpus,
-            memory,
-            network,
-            disk,
-            'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC2Pas6zLLgzXsUSZzt8E8fX7tzpwmNlrsbAeH9YoI2snfo+cKfO1BZVQgJnJVz+hGhnC1mzsMZMtdW2NRonRgeeQIPTUFXJI+3dyGzmiNrmtH8QQz++7zsmdwngeXKDrYhD6JGnPTkKcjShYcbvB/L3IDDJvepLxVOGRJBVHXJzqHgA62AtVsoiECKxFSn8MOuRfPHj5KInLxOEX9i/TfYKawSiId5xEkWWtcrp4QhjuoLv4UHL2aKs85ppVZFTmDHHcx3Au7pZ7/T9NOcUrvnwmQDVIBeU0LEELzuQZWLkFYvStAeCF7mYra+EJVXjiCQ9ZBw0vXGqJR1SU+W6dh9 mikal@kolla-m1'))
+        CLIENT.create_instance(name, cpus, memory,
+                               network, disk, sshkey_content, userdata_content))
 
 
 @instance.command(name='delete', help='Delete an instance')
@@ -284,14 +297,14 @@ def instance_power_off(ctx, uuid=None):
 @instance.command(name='pause', help='Pause an instance')
 @click.argument('uuid', type=click.STRING, autocompletion=_get_instances)
 @click.pass_context
-def instance_power_on(ctx, uuid=None):
+def instance_pause(ctx, uuid=None):
     CLIENT.pause_instance(uuid)
 
 
 @instance.command(name='unpause', help='Unpause an instance')
 @click.argument('uuid', type=click.STRING, autocompletion=_get_instances)
 @click.pass_context
-def instance_power_off(ctx, uuid=None):
+def instance_unpause(ctx, uuid=None):
     CLIENT.unpause_instance(uuid)
 
 

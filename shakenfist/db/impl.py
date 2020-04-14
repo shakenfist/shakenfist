@@ -196,9 +196,10 @@ class Instance(Base):
     node = Column(String)
     console_port = Column(Integer)
     vdi_port = Column(Integer)
+    user_data = Column(String)
 
     def __init__(self, uuid, name, cpus, memory_mb, disk_spec,
-                 ssh_key, node, console_port, vdi_port):
+                 ssh_key, node, console_port, vdi_port, user_data):
         self.uuid = uuid
         self.name = name
         self.cpus = cpus
@@ -208,6 +209,7 @@ class Instance(Base):
         self.node = node
         self.console_port = console_port
         self.vdi_port = vdi_port
+        self.user_data = user_data
 
     def export(self):
         return {
@@ -219,7 +221,8 @@ class Instance(Base):
             'ssh_key': self.ssh_key,
             'node': self.node,
             'console_port': self.console_port,
-            'vdi_port': self.vdi_port
+            'vdi_port': self.vdi_port,
+            'user_data': self.user_data
         }
 
 
@@ -251,7 +254,7 @@ def get_instances(local_only=False):
         pass
 
 
-def create_instance(uuid, name, cpus, memory_mb, disk_spec, ssh_key):
+def create_instance(uuid, name, cpus, memory_mb, disk_spec, ssh_key, user_data):
     ensure_valid_session()
 
     try:
@@ -261,7 +264,7 @@ def create_instance(uuid, name, cpus, memory_mb, disk_spec, ssh_key):
         vdi_port = random.randrange(30000, 31000)
         i = Instance(uuid, name, cpus, memory_mb, disk_spec, ssh_key,
                      config.parsed.get('NODE_NAME'), console_port,
-                     vdi_port)
+                     vdi_port, user_data)
         SESSION.add(i)
         return i.export()
     finally:
