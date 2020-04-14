@@ -88,6 +88,7 @@ class Instances(flask_restful.Resource):
         parser.add_argument('network', type=str, action='append')
         parser.add_argument('disk', type=str, action='append')
         parser.add_argument('ssh_key', type=str)
+        parser.add_argument('user_data', type=str)
         args = parser.parse_args()
 
         new_instance_uuid = str(uuid.uuid4())
@@ -97,7 +98,8 @@ class Instances(flask_restful.Resource):
             disks=args['disk'],
             memory_mb=args['memory'] * 1024,
             vcpus=args['cpus'],
-            ssh_key=args['ssh_key']
+            ssh_key=args['ssh_key'],
+            user_data=args['user_data']
         )
 
         with util.RecordedOperation('allocate ip addresses', instance) as _:

@@ -1,6 +1,36 @@
 CHANGES
 =======
 
+* Implement pause and unpause
+* Various changes:
+* Chasing why meshes don't work after hypervisor reboot
+* Networking changes:  - have a single network node per virtual network  - better mesh reliability  - provide more networking information in config drive, avoiding the use of DHCP in many cases
+* Rejig how terraform is run
+* Verify that internet connectivity works
+* Rewrites:
+* Convert sf-client to using a REST API
+* Start implementing simple functional tests in ansible
+* Usability tweaks to the client
+* Multinode deployment tooling
+* Remove snapshot records (but not data) when deleting an instance
+* Further snapshot work
+* Working towards snapshots
+* Support NAT for virtual networks
+* Client prints status messages
+* Track instances and their IP allocations in the database
+* Rearrange how disks are specified
+* Make network model configurable and fix ubuntu download bug
+* Make disk bus configurable
+* Pass through CPU features to instances
+* Starting to think about network controllers
+* Hacking on the client
+* Remove historic block comment
+* Remove regrettable debugging output
+* Include bridge utils in install
+* Always restart the DB container
+* Update template to include extra disks
+* Support more than one disk on an instance
+* Resolve short names for images, and decompress when required
 * Add test infrastructure
 * Work around missing docker packages for eoan
 * Detect the NIC to configure meshes on

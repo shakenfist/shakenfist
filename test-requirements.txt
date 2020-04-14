@@ -1,0 +1,4 @@
+coverage            # apache2
+testtools           # mit
+mock                # bsd
+stestr              # apache2
