@@ -36,7 +36,7 @@ class Network(object):
     # NOTE(mikal): it should be noted that the maximum interface name length
     # on Linux is 15 user visible characters.
     def __init__(self, uuid=None, vxlan_id=1, provide_dhcp=False, provide_nat=False,
-                 physical_nic='eth0', nodes=None, ipblock=None):
+                 physical_nic='eth0', ipblock=None):
         self.uuid = uuid
         self.vxlan_id = vxlan_id
         self.provide_dhcp = provide_dhcp
@@ -47,6 +47,8 @@ class Network(object):
         self.vx_bridge = 'br-%s' % self.vx_interface
 
         self.ipnetwork = ipaddress.ip_network(ipblock, strict=False)
+        self.router, self.dhcp_server, _ = util.get_network_fundamentals(
+            self.ipnetwork)
 
         if self.provide_dhcp:
             self.dhcp_interface = 'dhcpd-%s' % self.vxlan_id
@@ -59,15 +61,22 @@ class Network(object):
         return 'network(%s, vxid %s)' % (self.uuid, self.vxlan_id)
 
     def allocate_ip(self):
-        with lockutils.lock('sf_net_%s' % self.uuid, external=True, lock_path='/tmp/'):
-            addresses = list(self.ipnetwork.hosts())[2:]
+        attempts = 0
+        while True:
+            address = util.get_random_ip(self.ipnetwork)
+            if address == str(self.ipnetwork.network_address):
+                continue
+            if address == str(self.router):
+                continue
+            if address == str(self.dhcp_server):
+                continue
 
-            for interface in db.get_network_interfaces(self.uuid):
-                if interface['ipv4'] in addresses:
-                    addresses.remove(interface['ipv4'])
+            if db.is_address_free(self.uuid, address):
+                return address
 
-            random.shuffle(addresses)
-            return addresses[0]
+            attempts += 1
+            if attempts > 10000:
+                return None
 
     def subst_dict(self):
         retval = {
@@ -80,8 +89,8 @@ class Network(object):
 
             'ipblock': self.ipnetwork.network_address,
             'netmask': self.ipnetwork.netmask,
-            'router': list(self.ipnetwork.hosts())[0],
-            'dhcpserver': list(self.ipnetwork.hosts())[1],
+            'router': self.router,
+            'dhcpserver': self.dhcp_server,
             'broadcast': self.ipnetwork.broadcast_address,
         }
         return retval
@@ -214,8 +223,7 @@ class Network(object):
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
             with util.RecordedOperation('update dhcp', self) as _:
                 with lockutils.lock('sf_net_%s' % self.uuid, external=True, lock_path='/tmp/'):
-                    d = dhcp.DHCP(self.uuid)
-                    d.make_config()
+                    d = dhcp.DHCP(self.uuid, self.dhcp_interface)
                     d.restart_dhcpd()
         else:
             requests.request(
@@ -231,9 +239,8 @@ class Network(object):
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
             with util.RecordedOperation('remove dhcp', self) as _:
                 with lockutils.lock('sf_net_%s' % self.uuid, external=True, lock_path='/tmp/'):
-                    d = dhcp.DHCP(self.uuid)
+                    d = dhcp.DHCP(self.uuid, self.dhcp_interface)
                     d.remove_dhcpd()
-                    d.remove_config()
         else:
             requests.request(
                 'put',

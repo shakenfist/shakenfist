@@ -319,6 +319,20 @@ class NetworkInterface(Base):
         }
 
 
+def is_address_free(network_uuid, address):
+    ensure_valid_session()
+
+    try:
+        found = SESSION.query(NetworkInterface).filter(
+            NetworkInterface.network_uuid == network_uuid).filter(
+                NetworkInterface.ipv4 == address).count()
+        if found > 0:
+            return False
+        return True
+    except exc.NoResultFound:
+        return True
+
+
 def create_network_interface(uuid, network_uuid, instance_uuid, macaddr, ipv4, order):
     ensure_valid_session()
 

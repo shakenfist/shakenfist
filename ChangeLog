@@ -1,6 +1,7 @@
 CHANGES
 =======
 
+* Add support for userdata and sshkeys
 * Implement pause and unpause
 * Various changes:
 * Chasing why meshes don't work after hypervisor reboot

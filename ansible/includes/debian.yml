@@ -22,5 +22,12 @@
         "libssl-dev",
         "net-tools",
         "bridge-utils",
+        "dnsmasq",
       ]
     state: latest
+
+- name: Disable dnsmasq
+  service:
+    name: dnsmasq
+    enabled: no
+    state: stopped

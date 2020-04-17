@@ -1,6 +1,8 @@
 # Copyright 2020 Michael Still
 
+import ipaddress
 import logging
+import random
 import time
 
 from oslo_concurrency import processutils
@@ -51,6 +53,26 @@ class RecordedOperation():
 
 
 def check_for_interface(name):
-    stdout, stderr = processutils.execute(
+    _, stderr = processutils.execute(
         'ip link show %s' % name, check_exit_code=[0, 1], shell=True)
     return not stderr.rstrip('\n').endswith(' does not exist.')
+
+
+def get_network_fundamentals(netblock):
+    ipblock = ipaddress.ip_network(netblock)
+
+    hosts = []
+    for host in ipblock.hosts():
+        hosts.append(host)
+        if len(hosts) == 3:
+            break
+
+    # NOTE(mikal): these are the router, dhcp server, and start of dhcp range
+    return hosts[0], hosts[1], hosts[2]
+
+
+def get_random_ip(netblock):
+    ipblock = ipaddress.ip_network(netblock)
+    bits = random.getrandbits(
+        ipblock.max_prefixlen - ipblock.prefixlen)
+    return str(ipaddress.IPv4Address(ipblock.network_address + bits))

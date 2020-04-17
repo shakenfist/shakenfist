@@ -23,7 +23,6 @@
   tasks:
     - include: includes/debian.yml
     - include: includes/python3.yml
-    - include: includes/docker.yml
 
     - name: install mariadb client
       apt:
@@ -80,6 +79,8 @@
     - vars
 
   tasks:
+    - include: includes/docker.yml
+
     - name: Test if we have a database
       shell: docker inspect sfdb
       ignore_errors: True
@@ -148,10 +149,23 @@
         group: root
         mode: "0644"
 
-    - name: Copy dhcp template
+    - name: Turn off default libvirt networking
+      shell: |
+        virsh net-destroy default
+      ignore_errors: True
+
+    - name: Copy dhcp config template
       copy:
         src: files/dhcp.tmpl
         dest: /srv/shakenfist/dhcp.tmpl
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Copy dhcp hosts template
+      copy:
+        src: files/dhcphosts.tmpl
+        dest: /srv/shakenfist/dhcphosts.tmpl
         owner: root
         group: root
         mode: "0644"

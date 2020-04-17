@@ -51,11 +51,11 @@
   tasks:
     - name: Ensure that inst-{{inventory_hostname}} appears in the dhcp config on the network node
       shell: |
-        [ `grep -c "fixed-address {{hostvars['sf-1']['centos_instance_ip']}}" /srv/shakenfist/dhcp/{{network_uuid}}/dhcpd.conf` -eq 1 ]
+        [ `grep -c "{{hostvars['sf-1']['centos_instance_ip']}}" /srv/shakenfist/dhcp/{{network_uuid}}/hosts` -eq 1 ]
 
     - name: Ensure that inst-{{inventory_hostname}} appears in the dhcp config on the network node
       shell: |
-        [ `grep -c "fixed-address {{hostvars['sf-2']['centos_instance_ip']}}" /srv/shakenfist/dhcp/{{network_uuid}}/dhcpd.conf` -eq 1 ]
+        [ `grep -c "{{hostvars['sf-2']['centos_instance_ip']}}" /srv/shakenfist/dhcp/{{network_uuid}}/hosts` -eq 1 ]
 
 - hosts: sf-2
   become: yes
@@ -68,7 +68,7 @@
   tasks:
     - name: Ensure that dhcp is not configured on a non-network-node
       shell: |
-        [ ! -e /srv/shakenfist/dhcp/{{network_uuid}}/dhcpd.conf ]
+        [ ! -e /srv/shakenfist/dhcp/{{network_uuid}}/config ]
 
 - hosts: hypervisors
   become: yes

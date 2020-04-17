@@ -8,37 +8,40 @@ from shakenfist.client import apiclient
 
 
 class ApiClientTestCase(testtools.TestCase):
-    @mock.patch('shakenfist.client.apiclient._request_url')
-    def test_get_instances(self, mock_request):
+    def setUp(self):
+        super(ApiClientTestCase, self).setUp()
+
+        self.request_url = mock.patch(
+            'shakenfist.client.apiclient._request_url')
+        self.mock_request = self.request_url.start()
+
+    def test_get_instances(self):
         client = apiclient.Client()
         list(client.get_instances())
 
-        mock_request.assert_called_with(
+        self.mock_request.assert_called_with(
             'GET', 'http://localhost:13000/instances')
 
-    @mock.patch('shakenfist.client.apiclient._request_url')
-    def test_get_instance(self, mock_request):
+    def test_get_instance(self):
         client = apiclient.Client()
         client.get_instance('notreallyauuid')
 
-        mock_request.assert_called_with(
+        self.mock_request.assert_called_with(
             'GET', 'http://localhost:13000/instances/notreallyauuid')
 
-    @mock.patch('shakenfist.client.apiclient._request_url')
-    def test_get_instance_interfaces(self, mock_request):
+    def test_get_instance_interfaces(self):
         client = apiclient.Client()
         client.get_instance_interfaces('notreallyauuid')
 
-        mock_request.assert_called_with(
+        self.mock_request.assert_called_with(
             'GET', 'http://localhost:13000/instances/notreallyauuid/interfaces')
 
-    @mock.patch('shakenfist.client.apiclient._request_url')
-    def test_create_instance(self, mock_request):
+    def test_create_instance(self):
         client = apiclient.Client()
         client.create_instance('foo', 1, 2, ['netuuid1'], ['8@cirros'],
                                'sshkey', None)
 
-        mock_request.assert_called_with(
+        self.mock_request.assert_called_with(
             'POST', 'http://localhost:13000/instances',
             data={
                 'name': 'foo',
@@ -50,13 +53,12 @@ class ApiClientTestCase(testtools.TestCase):
                 'user_data': None
             })
 
-    @mock.patch('shakenfist.client.apiclient._request_url')
-    def test_create_instance_user_data(self, mock_request):
+    def test_create_instance_user_data(self):
         client = apiclient.Client()
         client.create_instance('foo', 1, 2, ['netuuid1'], ['8@cirros'],
                                'sshkey', 'userdatabeforebase64')
 
-        mock_request.assert_called_with(
+        self.mock_request.assert_called_with(
             'POST', 'http://localhost:13000/instances',
             data={
                 'name': 'foo',
@@ -68,110 +70,97 @@ class ApiClientTestCase(testtools.TestCase):
                 'user_data': "dXNlcmRhdGFiZWZvcmViYXNlNjQ="
             })
 
-    @mock.patch('shakenfist.client.apiclient._request_url')
-    def test_snapshot_instance(self, mock_request):
+    def test_snapshot_instance(self):
         client = apiclient.Client()
         client.snapshot_instance('notreallyauuid', all=True)
 
-        mock_request.assert_called_with(
+        self.mock_request.assert_called_with(
             'POST', 'http://localhost:13000/instances/notreallyauuid/snapshot',
             data={'all': True})
 
-    @mock.patch('shakenfist.client.apiclient._request_url')
-    def test_soft_reboot_instance(self, mock_request):
+    def test_soft_reboot_instance(self):
         client = apiclient.Client()
         client.reboot_instance('notreallyauuid')
 
-        mock_request.assert_called_with(
+        self.mock_request.assert_called_with(
             'POST', 'http://localhost:13000/instances/notreallyauuid/rebootsoft')
 
-    @mock.patch('shakenfist.client.apiclient._request_url')
-    def test_hard_reboot_instance(self, mock_request):
+    def test_hard_reboot_instance(self):
         client = apiclient.Client()
         client.reboot_instance('notreallyauuid', hard=True)
 
-        mock_request.assert_called_with(
+        self.mock_request.assert_called_with(
             'POST', 'http://localhost:13000/instances/notreallyauuid/reboothard')
 
-    @mock.patch('shakenfist.client.apiclient._request_url')
-    def test_power_off_instance(self, mock_request):
+    def test_power_off_instance(self):
         client = apiclient.Client()
         client.power_off_instance('notreallyauuid')
 
-        mock_request.assert_called_with(
+        self.mock_request.assert_called_with(
             'POST', 'http://localhost:13000/instances/notreallyauuid/poweroff')
 
-    @mock.patch('shakenfist.client.apiclient._request_url')
-    def test_power_on_instance(self, mock_request):
+    def test_power_on_instance(self):
         client = apiclient.Client()
         client.power_on_instance('notreallyauuid')
 
-        mock_request.assert_called_with(
+        self.mock_request.assert_called_with(
             'POST', 'http://localhost:13000/instances/notreallyauuid/poweron')
 
-    @mock.patch('shakenfist.client.apiclient._request_url')
-    def test_pause_instance(self, mock_request):
+    def test_pause_instance(self):
         client = apiclient.Client()
         client.pause_instance('notreallyauuid')
 
-        mock_request.assert_called_with(
+        self.mock_request.assert_called_with(
             'POST', 'http://localhost:13000/instances/notreallyauuid/pause')
 
-    @mock.patch('shakenfist.client.apiclient._request_url')
-    def test_unpause_instance(self, mock_request):
+    def test_unpause_instance(self):
         client = apiclient.Client()
         client.unpause_instance('notreallyauuid')
 
-        mock_request.assert_called_with(
+        self.mock_request.assert_called_with(
             'POST', 'http://localhost:13000/instances/notreallyauuid/unpause')
 
-    @mock.patch('shakenfist.client.apiclient._request_url')
-    def test_delete_instance(self, mock_request):
+    def test_delete_instance(self):
         client = apiclient.Client()
         client.delete_instance('notreallyauuid')
 
-        mock_request.assert_called_with(
+        self.mock_request.assert_called_with(
             'DELETE', 'http://localhost:13000/instances/notreallyauuid')
 
-    @mock.patch('shakenfist.client.apiclient._request_url')
-    def test_cache_image(self, mock_request):
+    def test_cache_image(self):
         client = apiclient.Client()
         client.cache_image('imageurl')
 
-        mock_request.assert_called_with(
+        self.mock_request.assert_called_with(
             'POST', 'http://localhost:13000/images',
             data={'url': 'imageurl'})
 
-    @mock.patch('shakenfist.client.apiclient._request_url')
-    def test_get_networks(self, mock_request):
+    def test_get_networks(self):
         client = apiclient.Client()
         client.get_networks()
 
-        mock_request.assert_called_with(
+        self.mock_request.assert_called_with(
             'GET', 'http://localhost:13000/networks')
 
-    @mock.patch('shakenfist.client.apiclient._request_url')
-    def test_get_network(self, mock_request):
+    def test_get_network(self):
         client = apiclient.Client()
         client.get_network('notreallyauuid')
 
-        mock_request.assert_called_with(
+        self.mock_request.assert_called_with(
             'GET', 'http://localhost:13000/networks/notreallyauuid')
 
-    @mock.patch('shakenfist.client.apiclient._request_url')
-    def test_delete_network(self, mock_request):
+    def test_delete_network(self):
         client = apiclient.Client()
         client.delete_network('notreallyauuid')
 
-        mock_request.assert_called_with(
+        self.mock_request.assert_called_with(
             'DELETE', 'http://localhost:13000/networks/notreallyauuid')
 
-    @mock.patch('shakenfist.client.apiclient._request_url')
-    def test_allocate_network(self, mock_request):
+    def test_allocate_network(self):
         client = apiclient.Client()
         client.allocate_network('192.168.1.0/24', True, True)
 
-        mock_request.assert_called_with(
+        self.mock_request.assert_called_with(
             'POST', 'http://localhost:13000/networks',
             data={
                 'netblock': '192.168.1.0/24',
