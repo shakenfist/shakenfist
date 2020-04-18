@@ -70,6 +70,10 @@
       shell: |
         [ ! -e /srv/shakenfist/dhcp/{{network_uuid}}/config ]
 
+    - name: Ensure that the router IP is not configured on a non-network-node
+      shell: |
+        [ `ifconfig | grep -c 192.168.242.1` -eq 0 ]
+
 - hosts: hypervisors
   become: yes
   become_method: sudo

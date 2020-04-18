@@ -31,10 +31,8 @@ class DHCP(object):
         self.subst['zone'] = config.parsed.get('ZONE')
         self.subst['interface'] = interface
 
-        router, dhcp_server, dhcp_start = util.get_network_fundamentals(
-            netblock)
+        router, dhcp_start = util.get_network_fundamentals(netblock)
         self.subst['router'] = router
-        self.subst['dhcp_server'] = dhcp_server
         self.subst['dhcp_start'] = dhcp_start
         self.subst['netmask'] = netblock.netmask
         self.subst['broadcast'] = netblock.broadcast_address

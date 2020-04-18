@@ -3,6 +3,7 @@
 import ipaddress
 import logging
 import random
+import re
 import time
 
 from oslo_concurrency import processutils
@@ -58,6 +59,21 @@ def check_for_interface(name):
     return not stderr.rstrip('\n').endswith(' does not exist.')
 
 
+def nat_rules_for_ipblock(ipblock):
+    out, _ = processutils.execute(
+        'iptables -t nat -L POSTROUTING -n -v', shell=True)
+    # Output looks like this:
+    # Chain POSTROUTING (policy ACCEPT 199 packets, 18189 bytes)
+    # pkts bytes target     prot opt in     out     source               destination
+    #   23  1736 MASQUERADE  all  --  *      ens4    192.168.242.0/24     0.0.0.0/0
+
+    for line in out.split('\n'):
+        if line.find(str(ipblock)) != -1:
+            return True
+
+    return False
+
+
 def get_network_fundamentals(netblock):
     ipblock = ipaddress.ip_network(netblock)
 
@@ -67,8 +83,8 @@ def get_network_fundamentals(netblock):
         if len(hosts) == 3:
             break
 
-    # NOTE(mikal): these are the router, dhcp server, and start of dhcp range
-    return hosts[0], hosts[1], hosts[2]
+    # NOTE(mikal): these are the router, and start of dhcp range
+    return hosts[0], hosts[1]
 
 
 def get_random_ip(netblock):

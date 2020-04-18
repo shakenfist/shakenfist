@@ -231,7 +231,7 @@ class Instance(object):
 
             if not iface['network_uuid'] in seen_networks:
                 n = net.from_db(iface['network_uuid'])
-                router, _, _ = util.get_network_fundamentals(n.ipnetwork)
+                router, _ = util.get_network_fundamentals(n.ipnetwork)
 
                 nd['networks'].append(
                     {

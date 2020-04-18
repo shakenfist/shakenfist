@@ -19,7 +19,7 @@ class NetTestCase(testtools.TestCase):
         self.assertEqual('network(notauuid, vxid 42)', str(n))
 
     @mock.patch('shakenfist.util.get_random_ip',
-                side_effect=['192.168.1.0', '192.168.1.1', '192.168.1.2',
+                side_effect=['192.168.1.0', '192.168.1.1',
                              '192.168.1.30', '192.168.1.42'])
     @mock.patch('shakenfist.db.impl.is_address_free',
                 side_effect=[False, True])
@@ -29,5 +29,4 @@ class NetTestCase(testtools.TestCase):
                         ipblock='192.168.1.0/24')
         addr = n.allocate_ip()
         self.assertEqual('192.168.1.1', str(n.router))
-        self.assertEqual('192.168.1.2', str(n.dhcp_server))
         self.assertEqual('192.168.1.42', addr)

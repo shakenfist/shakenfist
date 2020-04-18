@@ -47,15 +47,8 @@ class Network(object):
         self.vx_bridge = 'br-%s' % self.vx_interface
 
         self.ipnetwork = ipaddress.ip_network(ipblock, strict=False)
-        self.router, self.dhcp_server, _ = util.get_network_fundamentals(
+        self.router, _ = util.get_network_fundamentals(
             self.ipnetwork)
-
-        if self.provide_dhcp:
-            self.dhcp_interface = 'dhcpd-%s' % self.vxlan_id
-            self.dhcp_peer = 'dhcpp-%s' % self.vxlan_id
-        else:
-            self.dhcp_interface = None
-            self.dhcp_peer = None
 
     def __str__(self):
         return 'network(%s, vxid %s)' % (self.uuid, self.vxlan_id)
@@ -67,8 +60,6 @@ class Network(object):
             if address == str(self.ipnetwork.network_address):
                 continue
             if address == str(self.router):
-                continue
-            if address == str(self.dhcp_server):
                 continue
 
             if db.is_address_free(self.uuid, address):
@@ -83,14 +74,11 @@ class Network(object):
             'vx_id': self.vxlan_id,
             'vx_interface': self.vx_interface,
             'vx_bridge': self.vx_bridge,
-            'dhcp_interface': self.dhcp_interface,
-            'dhcp_peer': self.dhcp_peer,
             'phy_interface': self.physical_nic,
 
             'ipblock': self.ipnetwork.network_address,
             'netmask': self.ipnetwork.netmask,
             'router': self.router,
-            'dhcpserver': self.dhcp_server,
             'broadcast': self.ipnetwork.broadcast_address,
         }
         return retval
@@ -132,7 +120,7 @@ class Network(object):
 
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
             self.deploy_nat()
-            self.deploy_dhcp()
+            self.update_dhcp()
         else:
             requests.request(
                 'put',
@@ -144,20 +132,23 @@ class Network(object):
                 })
 
     def deploy_nat(self):
+        subst = self.subst_dict()
+
+        # We always put the router IP on the bridge because its used for DHCP as well
+        out, _ = processutils.execute(
+            'ip addr show dev %(vx_bridge)s' % subst,
+            shell=True)
+        if out.find('inet %(router)s' % subst) == -1:
+            processutils.execute(
+                'ip addr add %(router)s/%(netmask)s dev %(vx_bridge)s' % subst,
+                shell=True)
+
         if not self.provide_nat:
             return
 
-        subst = self.subst_dict()
-
         with util.RecordedOperation('enable NAT', self) as ro:
             with lockutils.lock('sf_net_%s' % self.uuid, external=True, lock_path='/tmp/'):
-                out, _ = processutils.execute(
-                    'ip addr show dev %(vx_bridge)s' % subst,
-                    shell=True)
-                if out.find('inet %(router)s' % subst) == -1:
-                    processutils.execute(
-                        'ip addr add %(router)s/%(netmask)s dev %(vx_bridge)s' % subst,
-                        shell=True)
+                if not util.nat_rules_for_ipblock(self.ipnetwork):
                     processutils.execute('echo 1 > /proc/sys/net/ipv4/ip_forward',
                                          shell=True)
                     processutils.execute(
@@ -174,41 +165,10 @@ class Network(object):
                         shell=True
                     )
 
-    def deploy_dhcp(self):
-        if not self.provide_dhcp:
-            return
-
-        subst = self.subst_dict()
-
-        if not util.check_for_interface(self.dhcp_interface):
-            with lockutils.lock('sf_net_%s' % self.uuid, external=True, lock_path='/tmp/'):
-                with util.RecordedOperation('create dhcp interface', self) as ro:
-                    processutils.execute(
-                        'ip link add %(dhcp_interface)s type veth peer name '
-                        '%(dhcp_peer)s' % subst, shell=True)
-                    processutils.execute(
-                        'ip link set %(dhcp_peer)s master %(vx_bridge)s'
-                        % subst, shell=True)
-                    processutils.execute(
-                        'ip link set %(dhcp_interface)s up' % subst, shell=True)
-                    processutils.execute(
-                        'ip link set %(dhcp_peer)s up' % subst, shell=True)
-                    processutils.execute(
-                        'ip addr add %(dhcpserver)s/%(netmask)s dev %(dhcp_interface)s' % subst,
-                        shell=True)
-
-        self.update_dhcp()
-
     def delete(self):
         subst = self.subst_dict()
 
         with lockutils.lock('sf_net_%s' % self.uuid, external=True, lock_path='/tmp/'):
-            if util.check_for_interface(self.dhcp_interface):
-                # This will delete the peer as well
-                with util.RecordedOperation('delete dhcp interface', self) as _:
-                    processutils.execute('ip link delete %(dhcp_interface)s' % subst,
-                                         shell=True)
-
             if util.check_for_interface(self.vx_bridge):
                 with util.RecordedOperation('delete vxlan bridge', self) as _:
                     processutils.execute('ip link delete %(vx_bridge)s' % subst,
@@ -223,7 +183,7 @@ class Network(object):
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
             with util.RecordedOperation('update dhcp', self) as _:
                 with lockutils.lock('sf_net_%s' % self.uuid, external=True, lock_path='/tmp/'):
-                    d = dhcp.DHCP(self.uuid, self.dhcp_interface)
+                    d = dhcp.DHCP(self.uuid, self.vx_bridge)
                     d.restart_dhcpd()
         else:
             requests.request(
@@ -239,7 +199,7 @@ class Network(object):
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
             with util.RecordedOperation('remove dhcp', self) as _:
                 with lockutils.lock('sf_net_%s' % self.uuid, external=True, lock_path='/tmp/'):
-                    d = dhcp.DHCP(self.uuid, self.dhcp_interface)
+                    d = dhcp.DHCP(self.uuid, self.vx_bridge)
                     d.remove_dhcpd()
         else:
             requests.request(
