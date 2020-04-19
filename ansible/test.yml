@@ -422,3 +422,20 @@
     - name: The snapshots table should be empty
       shell: |
         [ `/bin/bash /opt/sfmysql "select * from snapshots" | wc -l` -eq 0 ]
+
+    - name: Delete the network
+      shell: |
+        sf-client network delete {{network_uuid}}
+
+- hosts: hypervisors
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - name: We should not have any VXLAN interfaces left
+      shell: |
+        [ `ifconfig | grep -c vxlan` -eq 0 ]

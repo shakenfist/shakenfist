@@ -239,6 +239,7 @@ class Network(flask_restful.Resource):
             return False
 
         n.remove_dhcp()
+        n.delete()
         db.delete_network(uuid)
         return True
 
