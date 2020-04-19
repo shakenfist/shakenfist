@@ -50,6 +50,8 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+cover/
+.stestr/
 
 # Translations
 *.mo
@@ -127,3 +129,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Terraform
+.terraform/
+*.tfstate*

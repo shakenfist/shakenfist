@@ -70,10 +70,6 @@
   shell: |
     [ `virsh list | grep running | wc -l` -eq 0 ]
 
-- name: And there should be no containers
-  shell: |
-    [ `docker ps | wc -l` -eq 1 ]
-
 - name: And there should be no mesh networks
   shell: |
     [ `ifconfig | grep -c br-vxlan` -eq 0 ]

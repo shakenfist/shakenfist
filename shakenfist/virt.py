@@ -2,7 +2,6 @@
 
 import base64
 import datetime
-import ipaddress
 import jinja2
 import logging
 import io
@@ -229,8 +228,11 @@ class Instance(object):
                     'type': 'physical',
                 }
             )
+
             if not iface['network_uuid'] in seen_networks:
                 n = net.from_db(iface['network_uuid'])
+                router, _ = util.get_network_fundamentals(n.ipnetwork)
+
                 nd['networks'].append(
                     {
                         'id': iface['network_uuid'],
@@ -242,7 +244,7 @@ class Instance(object):
                             {
                                 'network': '0.0.0.0',
                                 'netmask': '0.0.0.0',
-                                'gateway': str(list(n.ipnetwork.hosts())[0])
+                                'gateway': str(router)
                             }
                         ],
                         'network_id': iface['network_uuid']
