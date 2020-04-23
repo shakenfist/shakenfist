@@ -10,7 +10,7 @@ from oslo_concurrency import lockutils
 from oslo_concurrency import processutils
 
 from shakenfist import config
-from shakenfist.db import impl as db
+from shakenfist import db
 from shakenfist import dhcp
 from shakenfist import ipmanager
 from shakenfist import util

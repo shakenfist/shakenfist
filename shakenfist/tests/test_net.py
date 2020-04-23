@@ -2,7 +2,7 @@ import mock
 import testtools
 
 
-from shakenfist.net import impl as net
+from shakenfist import net
 
 
 class NetTestCase(testtools.TestCase):

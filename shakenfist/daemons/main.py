@@ -10,9 +10,9 @@ from oslo_concurrency import processutils
 from shakenfist import config
 from shakenfist.daemons import external_api as external_api_daemon
 from shakenfist.daemons import net as net_daemon
-from shakenfist.db import impl as db
+from shakenfist import db
 from shakenfist import ipmanager
-from shakenfist.net import impl as net
+from shakenfist import net
 from shakenfist import util
 from shakenfist import virt
 
