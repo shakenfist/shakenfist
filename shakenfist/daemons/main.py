@@ -5,9 +5,13 @@ import setproctitle
 import time
 import os
 
+from oslo_concurrency import processutils
+
+from shakenfist import config
 from shakenfist.daemons import external_api as external_api_daemon
 from shakenfist.daemons import net as net_daemon
 from shakenfist.db import impl as db
+from shakenfist import ipmanager
 from shakenfist.net import impl as net
 from shakenfist import util
 from shakenfist import virt
@@ -45,6 +49,43 @@ def restore_instances():
 
 
 def main():
+    # If I am the network node, I need some setup
+    if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
+        subst = {
+            'physical_bridge': 'phy-br-%s' % config.parsed.get('NODE_EGRESS_NIC'),
+            'physical_nic': config.parsed.get('NODE_EGRESS_NIC')
+        }
+
+        if not util.check_for_interface(subst['physical_bridge']):
+            # NOTE(mikal): Adding the physical interface to the physical bridge
+            # is considered outside the scope of the orchestration software as it
+            # will cause the node to lose network connectivity. So instead all we
+            # do is create a bridge if it doesn't exist and the wire everything up
+            # to it. We can do egress NAT in that state, even if floating IPs
+            # don't work.
+            with util.RecordedOperation('create physical bridge', 'startup') as _:
+                ipm = ipmanager.NetBlock(config.parsed.get('FLOATING_NETWORK'))
+                subst['master_float'] = ipm.get_address_at_index(1)
+                subst['netmask'] = ipm.netmask
+
+                processutils.execute(
+                    'ip link add %(physical_bridge)s type bridge' % subst, shell=True)
+                processutils.execute(
+                    'ip link set %(physical_bridge)s up' % subst, shell=True)
+                processutils.execute(
+                    'ip addr add %(master_float)s/%(netmask)s dev %(physical_bridge)s' % subst,
+                    shell=True)
+
+                processutils.execute(
+                    'iptables -A FORWARD -o %(physical_nic)s -i %(physical_bridge)s -j ACCEPT' % subst,
+                    shell=True)
+                processutils.execute(
+                    'iptables -A FORWARD -i %(physical_nic)s -o %(physical_bridge)s -j ACCEPT' % subst,
+                    shell=True)
+                processutils.execute(
+                    'iptables -t nat -A POSTROUTING -o %(physical_nic)s -j MASQUERADE' % subst,
+                    shell=True)
+
     # Network mesh maintenance
     net_pid = os.fork()
     if net_pid == 0:

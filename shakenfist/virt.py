@@ -231,20 +231,18 @@ class Instance(object):
 
             if not iface['network_uuid'] in seen_networks:
                 n = net.from_db(iface['network_uuid'])
-                router, _ = util.get_network_fundamentals(n.ipnetwork)
-
                 nd['networks'].append(
                     {
                         'id': iface['network_uuid'],
                         'link': devname,
                         'type': 'ipv4',
                         'ip_address': iface['ipv4'],
-                        'netmask': str(n.ipnetwork.netmask),
+                        'netmask': str(n.ipmanager.netmask),
                         'routes': [
                             {
                                 'network': '0.0.0.0',
                                 'netmask': '0.0.0.0',
-                                'gateway': str(router)
+                                'gateway': str(n.router)
                             }
                         ],
                         'network_id': iface['network_uuid']
@@ -294,7 +292,7 @@ class Instance(object):
             networks.append(
                 {
                     'macaddr': iface['macaddr'],
-                    'bridge': n.vx_bridge
+                    'bridge': n.subst_dict()['vx_bridge']
                 }
             )
 

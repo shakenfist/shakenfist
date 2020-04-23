@@ -7,9 +7,16 @@ import testtools
 
 
 from shakenfist import dhcp
+from shakenfist import ipmanager
 
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+class FakeNetwork(object):
+    def __init__(self):
+        self.ipmanager = ipmanager.NetBlock('10.0.0.0/8')
+        self.router = self.ipmanager.get_address_at_index(1)
 
 
 class DHCPTestCase(testtools.TestCase):
@@ -27,8 +34,8 @@ class DHCPTestCase(testtools.TestCase):
                                  fake_config)
         self.mock_config = self.config.start()
 
-        self.network = mock.patch('shakenfist.db.impl.get_network',
-                                  return_value={'netblock': '10.0.0.0/8'})
+        self.network = mock.patch('shakenfist.net.impl.from_db',
+                                  return_value=FakeNetwork())
         self.mock_network = self.network.start()
 
         with open('%s/../../ansible/files/dhcp.tmpl' % TEST_DIR) as f:
@@ -185,5 +192,5 @@ class DHCPTestCase(testtools.TestCase):
         d.restart_dhcpd()
         mock_signal.assert_called_with(signal.SIGHUP)
         mock_execute.assert_called_with(
-            'dnsmasq --conf-file=/a/b/c/dhcp/notauuid/config',
+            'ip netns exec notauuid dnsmasq --conf-file=/a/b/c/dhcp/notauuid/config',
             shell=True)

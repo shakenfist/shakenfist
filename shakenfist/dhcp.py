@@ -1,6 +1,5 @@
 # Copyright 2020 Michael Still
 
-import ipaddress
 import jinja2
 import logging
 import os
@@ -12,6 +11,7 @@ from oslo_concurrency import processutils
 
 from shakenfist import config
 from shakenfist.db import impl as db
+from shakenfist.net import impl as net
 from shakenfist import util
 
 LOG = logging.getLogger(__file__)
@@ -22,20 +22,20 @@ class DHCP(object):
     def __init__(self, network_uuid, interface):
         self.network_uuid = network_uuid
 
-        n = db.get_network(self.network_uuid)
-        netblock = ipaddress.ip_network(n['netblock'], strict=False)
+        n = net.from_db(self.network_uuid)
+        self.subst = {
+            'config_dir': os.path.join(
+                config.parsed.get('STORAGE_PATH'), 'dhcp', self.network_uuid),
+            'zone': config.parsed.get('ZONE'),
 
-        self.subst = {}
-        self.subst['config_dir'] = os.path.join(
-            config.parsed.get('STORAGE_PATH'), 'dhcp', self.network_uuid)
-        self.subst['zone'] = config.parsed.get('ZONE')
-        self.subst['interface'] = interface
+            'router': n.router,
+            'dhcp_start': n.ipmanager.get_address_at_index(2),
+            'netmask': n.ipmanager.netmask,
+            'broadcast': n.ipmanager.broadcast_address,
 
-        router, dhcp_start = util.get_network_fundamentals(netblock)
-        self.subst['router'] = router
-        self.subst['dhcp_start'] = dhcp_start
-        self.subst['netmask'] = netblock.netmask
-        self.subst['broadcast'] = netblock.broadcast_address
+            'in_namespace': 'ip netns exec %s' % self.network_uuid,
+            'interface': interface
+        }
 
     def __str__(self):
         return 'dhcp(%s)' % self.network_uuid
@@ -63,14 +63,13 @@ class DHCP(object):
         t = self._read_template('dhcphosts.tmpl')
 
         instances = []
-        interfaces = list(db.get_network_interfaces(self.network_uuid))
-        for interface in interfaces:
-            hostname = db.get_instance(interface['instance_uuid'])
+        for ni in list(db.get_network_interfaces(self.network_uuid)):
+            hostname = db.get_instance(ni['instance_uuid'])
             instances.append(
                 {
-                    'uuid': interface['instance_uuid'],
-                    'macaddr': interface['macaddr'],
-                    'ipv4': interface['ipv4'],
+                    'uuid': ni['instance_uuid'],
+                    'macaddr': ni['macaddr'],
+                    'ipv4': ni['ipv4'],
                     'name': hostname['name'].replace(',', '')
                 }
             )
@@ -108,5 +107,5 @@ class DHCP(object):
         self._make_hosts()
         if not self._send_signal(signal.SIGHUP):
             processutils.execute(
-                'dnsmasq --conf-file=%s/config' % self.subst['config_dir'],
+                '%(in_namespace)s dnsmasq --conf-file=%(config_dir)s/config' % self.subst,
                 shell=True)

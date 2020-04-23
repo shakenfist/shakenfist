@@ -1,0 +1,56 @@
+- name: Count the number of VMs before
+  virt:
+    command: list_vms
+    state: running
+  register: instance_start_count_before
+
+- name: Start a {{distro}} instance on {{inventory_hostname}}
+  shell: |
+    sf-client --no-pretty instance create {{name}} 1 1 -d 8@{{distro}} -n "{{network_uuid}}" {{extra}}
+
+- name: Count the number of VMs after
+  virt:
+    command: list_vms
+    state: running
+  register: instance_start_count_after
+
+- name: Make sure we have one more VM
+  fail:
+    msg: We failed to start a VM on {{inventory_hostname}}.
+  when: instance_start_count_before == instance_start_count_after
+
+- name: Determine instance uuid
+  shell: |
+    sf-client --no-pretty instance list | grep {{name}} | grep {{inventory_hostname}} | cut -f 1 -d ","
+  register: instance_uuid_complex
+
+- name: Extract instance uuid
+  set_fact:
+    "{{name}}_uuid": "{{instance_uuid_complex.stdout}}"
+
+- name: Determine instance console port
+  shell: |
+    sf-client --no-pretty instance show {{vars[name + '_uuid']}} | grep "console port" | cut -f 2 -d ":"
+  register: instance_console_port_complex
+
+- name: Extract console port
+  set_fact:
+    "{{name}}_console_port": "{{instance_console_port_complex.stdout}}"
+
+- name: Determine instance IP
+  shell: |
+    sf-client --no-pretty instance show {{vars[name + '_uuid']}} | grep "ipv4" | cut -f 2 -d ":"
+  register: instance_ip_complex
+
+- name: Extract instance IP
+  set_fact:
+    "{{name}}_ip": "{{instance_ip_complex.stdout}}"
+
+- name: Log instance details
+  debug:
+    msg: Instance {{name}} has uuid {{vars[name + '_uuid']}}, console port {{vars[name + '_console_port']}}, and IPv4 {{vars[name + '_ip']}}.
+
+# This needs to be so long because DHCP failures take a fair while to happen
+- name: Wait for instance to boot
+  pause:
+    minutes: 2

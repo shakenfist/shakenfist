@@ -1,6 +1,7 @@
 CHANGES
 =======
 
+* Correctly delete networks
 * Move the DHCP server onto the router IP
 * Move to dnsmasq for DHCP services
 * Add support for userdata and sshkeys

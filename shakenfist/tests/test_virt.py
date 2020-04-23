@@ -1,5 +1,4 @@
 import base64
-import ipaddress
 import json
 import mock
 import os
@@ -8,12 +7,14 @@ import tempfile
 import testtools
 
 
+from shakenfist import ipmanager
 from shakenfist import virt
 
 
 class FakeNetwork(object):
     def __init__(self):
-        self.ipnetwork = ipaddress.ip_network('127.0.0.0/8')
+        self.ipmanager = ipmanager.NetBlock('127.0.0.0/8')
+        self.router = self.ipmanager.get_address_at_index(1)
 
 
 class VirtTestCase(testtools.TestCase):

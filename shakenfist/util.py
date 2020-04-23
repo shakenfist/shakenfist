@@ -59,6 +59,30 @@ def check_for_interface(name):
     return not stderr.rstrip('\n').endswith(' does not exist.')
 
 
+def get_interface_addresses(namespace, name):
+    in_namespace = ''
+    if namespace:
+        in_namespace = 'ip netns exec %s ' % namespace
+
+    stdout, _ = processutils.execute(
+        '%(in_namespace)sip addr show %(name)s'
+        % {
+            'in_namespace': in_namespace,
+            'name': name
+        },
+        check_exit_code=[0, 1], shell=True)
+    if not stdout:
+        return
+
+    inet_re = re.compile(' +inet (.*)/[0-9]+.*')
+    for line in stdout.split('\n'):
+        m = inet_re.match(line)
+        if m:
+            yield m.group(1)
+
+    return
+
+
 def nat_rules_for_ipblock(ipblock):
     out, _ = processutils.execute(
         'iptables -t nat -L POSTROUTING -n -v', shell=True)
@@ -72,23 +96,3 @@ def nat_rules_for_ipblock(ipblock):
             return True
 
     return False
-
-
-def get_network_fundamentals(netblock):
-    ipblock = ipaddress.ip_network(netblock)
-
-    hosts = []
-    for host in ipblock.hosts():
-        hosts.append(host)
-        if len(hosts) == 3:
-            break
-
-    # NOTE(mikal): these are the router, and start of dhcp range
-    return hosts[0], hosts[1]
-
-
-def get_random_ip(netblock):
-    ipblock = ipaddress.ip_network(netblock)
-    bits = random.getrandbits(
-        ipblock.max_prefixlen - ipblock.prefixlen)
-    return str(ipaddress.IPv4Address(ipblock.network_address + bits))

@@ -1,7 +1,7 @@
 - name: Create sfmysql helper wrapper
   copy:
     content: |
-      #/bin/bash -e
+      #!/bin/bash -e
       . /etc/sf/sfrc
       mysql -h $_DB_NODE_IP -u sf --password=$_DB_PASSWORD sf -e "$1"
     dest: /opt/sfmysql
@@ -39,7 +39,7 @@
     dest: /opt/id_rsa
     owner: root
     group: root
-    mode: u=r
+    mode: u=rx
 
 - name: Clear out old instances and networks
   shell: |
@@ -54,57 +54,29 @@
     done
   run_once: true
 
-- name: And then do a quick scrub as well
-  shell: |
-    /srv/shakenfist/src/cleanup.sh
+- name: Quick scrub and sanity checks
+  copy:
+    content: |
+      #!/bin/bash -e
 
-- name: We should have an empty list of networks
-  shell: |
-    [ `sf-client --no-pretty network list | wc -l` -eq 1 ]
+      /srv/shakenfist/src/cleanup.sh
+      [ `sf-client --no-pretty instance list | wc -l` -eq 1 ]
+      [ `virsh list | grep running | wc -l` -eq 0 ]
+      [ `ifconfig | grep -c br-vxlan` -eq 0 ]
+      /opt/sfmysql "delete from instances"
+      /opt/sfmysql "delete from network_interfaces"
+      /opt/sfmysql "delete from networks"
+      /opt/sfmysql "delete from snapshots"
 
-- name: We should have an empty list of instances
-  shell: |
-    [ `sf-client --no-pretty instance list | wc -l` -eq 1 ]
+      systemctl restart sf
+    dest: /tmp/shell_script
+    owner: root
+    group: root
+    mode: u=rx,g=rx,o=rx
 
-- name: We shouldn't have any VMs running
-  shell: |
-    [ `virsh list | grep running | wc -l` -eq 0 ]
+- name: Execute
+  shell: /tmp/shell_script
 
-- name: And there should be no mesh networks
-  shell: |
-    [ `ifconfig | grep -c br-vxlan` -eq 0 ]
-
-# Needs to be wrapped in a helper...
-- name: Clear out the instances table
-  shell: |
-    /bin/bash /opt/sfmysql "delete from instances"
-
-- name: Clear out the network_interfaces table
-  shell: |
-    /bin/bash /opt/sfmysql "delete from network_interfaces"
-
-- name: Clear out the networks table
-  shell: |
-    /bin/bash /opt/sfmysql "delete from networks"
-
-- name: Clear out the snapshots table
-  shell: |
-    /bin/bash /opt/sfmysql "delete from snapshots"
-
-- name: Create a network
-  shell: |
-    sf-client --no-pretty network create 192.168.242.0/24
-  run_once: true
-
-- name: Determine network uuid
-  shell: |
-    sf-client --no-pretty network list | grep 192.168.242.0/24 | cut -f 1 -d ","
-  register: network_uuid_complex
-
-- name: Extract network uuid
-  set_fact:
-    network_uuid: "{{network_uuid_complex.stdout}}"
-
-- name: Log network uuid
-  debug:
-    msg: Network uuid is {{network_uuid}}.
+- include: _util_network_create.yml
+    netblock="192.168.242.0/24"
+    name="network"
