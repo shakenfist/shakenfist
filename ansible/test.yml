@@ -1,3 +1,7 @@
+#########################################
+# Import inventory from terraform
+#########################################
+
 - hosts: localhost
   gather_facts: yes
   connection: ssh
@@ -6,6 +10,10 @@
 
   tasks:
     - include: includes/terraform.yml
+
+#########################################
+# Scenario: we can start cirros VMs
+#########################################
 
 - hosts: hypervisors
   become: yes
@@ -17,28 +25,30 @@
 
   tasks:
     - include: tests/_setup.yml
-    - include: tests/start_cirros_instance.yml
+    - include: tests/_util_instance_start.yml
+        name="cirros"
+        distro=cirros
+        extra=""
 
-- hosts: hypervisors
-  become: yes
-  become_method: sudo
-  gather_facts: no
-  connection: ssh
-  vars_files:
-    - vars
+    - name: Validate
+      copy:
+        content: |
+          #!/bin/bash -e
 
-  tasks:
-    - name: We should have two instances
-      shell: |
-        [ `sf-client --no-pretty instance list | wc -l` -eq 3 ]
+          [ `sf-client --no-pretty instance list | wc -l` -eq 3 ]
+          [ `sf-client --no-pretty instance list | grep sf-1 | wc -l` -eq 1 ]
+          [ `sf-client --no-pretty instance list | grep sf-2 | wc -l` -eq 1 ]
+        dest: /tmp/shell_script
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx
 
-    - name: With one recorded on sf-1
-      shell: |
-        [ `sf-client --no-pretty instance list | grep sf-1 | wc -l` -eq 1 ]
+    - name: Execute
+      shell: /tmp/shell_script
 
-    - name: And one recorded on sf-2
-      shell: |
-        [ `sf-client --no-pretty instance list | grep sf-2 | wc -l` -eq 1 ]
+#########################################
+# Scenario: the network node DHCP is correct
+#########################################
 
 - hosts: sf-1
   become: yes
@@ -49,13 +59,20 @@
     - vars
 
   tasks:
-    - name: Ensure that inst-{{inventory_hostname}} appears in the dhcp config on the network node
-      shell: |
-        [ `grep -c "{{hostvars['sf-1']['centos_instance_ip']}}" /srv/shakenfist/dhcp/{{network_uuid}}/hosts` -eq 1 ]
+    - name: Ensure that the instances appear in the dhcp config on the network node
+      copy:
+        content: |
+          #!/bin/bash -e
 
-    - name: Ensure that inst-{{inventory_hostname}} appears in the dhcp config on the network node
-      shell: |
-        [ `grep -c "{{hostvars['sf-2']['centos_instance_ip']}}" /srv/shakenfist/dhcp/{{network_uuid}}/hosts` -eq 1 ]
+          [ `grep -c "{{hostvars['sf-1']['cirros_ip']}}" /srv/shakenfist/dhcp/{{network_uuid}}/hosts` -eq 1 ]
+          [ `grep -c "{{hostvars['sf-2']['cirros_ip']}}" /srv/shakenfist/dhcp/{{network_uuid}}/hosts` -eq 1 ]
+        dest: /tmp/shell_script
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx
+
+    - name: Execute
+      shell: /tmp/shell_script
 
 - hosts: sf-2
   become: yes
@@ -67,12 +84,23 @@
 
   tasks:
     - name: Ensure that dhcp is not configured on a non-network-node
-      shell: |
-        [ ! -e /srv/shakenfist/dhcp/{{network_uuid}}/config ]
+      copy:
+        content: |
+          #!/bin/bash -e
 
-    - name: Ensure that the router IP is not configured on a non-network-node
-      shell: |
-        [ `ifconfig | grep -c 192.168.242.1` -eq 0 ]
+          [ ! -e /srv/shakenfist/dhcp/{{network_uuid}}/config ]
+          [ `ifconfig | grep -c 192.168.242.1` -eq 0 ]
+        dest: /tmp/shell_script
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx
+
+    - name: Execute
+      shell: /tmp/shell_script
+
+#########################################
+# Scenario: verify networking on our cirros instances
+#########################################
 
 - hosts: hypervisors
   become: yes
@@ -83,7 +111,8 @@
     - vars
 
   tasks:
-    - include: tests/cirros_networking_tests.yml
+    - include: tests/_util_network_cirros_validate.yml
+        console_port="{{cirros_console_port}}"
 
 - hosts: sf-1
   become: yes
@@ -96,7 +125,11 @@
   tasks:
     - name: The instance on sf-1 should be able to ping the instance on sf-2
       shell: |
-        [ `/opt/telnet_client.py {{centos_console_port}} ping {{hostvars['sf-2']['centos_instance_ip']}} | grep -c " 0% packet loss"` -eq 1 ]
+        [ `/opt/telnet_client.py {{cirros_console_port}} ping {{hostvars['sf-2']['cirros_ip']}} | grep -c " 0% packet loss"` -eq 1 ]
+
+#########################################
+# Scenario: we can start an Ubuntu instance too
+#########################################
 
 - hosts: sf-2
   become: yes
@@ -107,7 +140,10 @@
     - vars
 
   tasks:
-    - include: tests/start_ubuntu_instance.yml
+    - include: tests/_util_instance_start.yml
+        name="ubuntu"
+        distro=ubuntu:18.04
+        extra=""
 
 - hosts: sf-1
   become: yes
@@ -122,9 +158,13 @@
     # cloud image. This is ok though, because we should be using the config drive
     # style interface information anyway.
 
-    - name: Instance is pingable
+    - name: Instance is pingable from inside the network namespace
       shell: |
-        [ `ping -c 1 {{hostvars['sf-2']['ubuntu_instance_ip']}} | grep -c " 0% packet loss"` -eq 1 ]
+        [ `ip netns exec {{network_uuid}} ping -c 1 {{hostvars['sf-2']['ubuntu_ip']}} | grep -c " 0% packet loss"` -eq 1 ]
+
+#########################################
+# Scenario: deleting instances works
+#########################################
 
 - hosts: sf-2
   become: yes
@@ -137,154 +177,62 @@
   tasks:
     - name: Deleting an instance hosted locally should work
       shell: |
-        sf-client instance delete {{ubuntu_instance_uuid}}
+        sf-client instance delete {{ubuntu_uuid}}
 
-    - include: tests/cirros_networking_tests.yml
+    - include: tests/_util_network_cirros_validate.yml
+        console_port="{{cirros_console_port}}"
 
     - name: We should have one VM on sf-2
       shell: |
         [ `virsh list | grep running | wc -l` -eq 1 ]
 
-    - name: Count how many times the instance has booted
-      shell: |
-        grep -c "\[    0.000000\] Linux version" /srv/shakenfist/instances/{{centos_instance_uuid}}/console.log
-      register: centos_instance_boots_before_complex
+#########################################
+# Scenario: reboots, pauses, and power offs
+#########################################
 
-    - name: Extract boot count
-      set_fact:
-        centos_instance_boots_before: "{{centos_instance_boots_before_complex.stdout}}"
+- hosts: sf-2
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
 
-    - name: Soft reboot the instance
-      shell: |
-        sf-client instance reboot {{centos_instance_uuid}}
+  tasks:
+    - include: tests/_util_instance_reboot.yml
+        uuid={{cirros_uuid}}
+        type=soft
 
-    - name: Wait
-      pause:
-        minutes: 2
+    - include: tests/_util_network_cirros_validate.yml
+        console_port="{{cirros_console_port}}"
 
-    - name: Count how many times the instance has booted
-      shell: |
-        grep -c "\[    0.000000\] Linux version" /srv/shakenfist/instances/{{centos_instance_uuid}}/console.log
-      register: centos_instance_boots_after_soft_complex
+    - include: tests/_util_instance_reboot.yml
+        uuid={{cirros_uuid}}
+        type=hard
 
-    - name: Extract boot count
-      set_fact:
-        centos_instance_boots_after_soft: "{{centos_instance_boots_after_soft_complex.stdout}}"
+    - include: tests/_util_network_cirros_validate.yml
+        console_port="{{cirros_console_port}}"
 
-    - name: Make sure we rebooted
-      fail:
-        msg: Instance did not reboot.
-      when: centos_instance_boots_before == centos_instance_boots_after_soft
+    - include: tests/_util_instance_halt.yml
+        uuid={{cirros_uuid}}
+        action_one=poweroff
+        action_two=poweron
 
-    - name: Count how many times the instance has booted
-      shell: |
-        grep -c "\[    0.000000\] Linux version" /srv/shakenfist/instances/{{centos_instance_uuid}}/console.log
-      register: centos_instance_boots_before_complex
+    - include: tests/_util_network_cirros_validate.yml
+        console_port="{{cirros_console_port}}"
 
-    - name: Extract boot count
-      set_fact:
-        centos_instance_boots_before: "{{centos_instance_boots_before_complex.stdout}}"
+    - include: tests/_util_instance_halt.yml
+        uuid={{cirros_uuid}}
+        ip={{cirros_uuid}}
+        action_one=pause
+        action_two=unpause
 
-    - name: Hard reboot the instance
-      shell: |
-        sf-client instance reboot --hard {{centos_instance_uuid}}
+    - include: tests/_util_network_cirros_validate.yml
+        console_port="{{cirros_console_port}}"
 
-    - name: Wait
-      pause:
-        minutes: 2
-
-    - name: Count how many times the instance has booted
-      shell: |
-        grep -c "\[    0.000000\] Linux version" /srv/shakenfist/instances/{{centos_instance_uuid}}/console.log
-      register: centos_instance_boots_after_hard_complex
-
-    - name: Extract boot count
-      set_fact:
-        centos_instance_boots_after_hard: "{{centos_instance_boots_after_hard_complex.stdout}}"
-
-    - name: Make sure we rebooted
-      fail:
-        msg: Instance did not reboot.
-      when: centos_instance_boots_before == centos_instance_boots_after_hard
-
-    - include: tests/cirros_networking_tests.yml
-
-    - name: Count how many times the instance has booted
-      shell: |
-        grep -c "\[    0.000000\] Linux version" /srv/shakenfist/instances/{{centos_instance_uuid}}/console.log
-      register: centos_instance_boots_before_complex
-
-    - name: Extract boot count
-      set_fact:
-        centos_instance_boots_before: "{{centos_instance_boots_before_complex.stdout}}"
-
-    - name: Power off an instance
-      shell: |
-        sf-client instance poweroff {{centos_instance_uuid}}
-
-    - name: We should have no VMs on sf-2
-      shell: |
-        [ `virsh list | grep running | wc -l` -eq 0 ]
-
-    - name: Power on an instance
-      shell: |
-        sf-client instance poweron {{centos_instance_uuid}}
-
-    - name: Count how many times the instance has booted
-      shell: |
-        grep -c "\[    0.000000\] Linux version" /srv/shakenfist/instances/{{centos_instance_uuid}}/console.log
-      register: centos_instance_boots_after_powercycle_complex
-
-    - name: Extract boot count
-      set_fact:
-        centos_instance_boots_after_powercycle: "{{centos_instance_boots_after_powercycle_complex.stdout}}"
-
-    - name: Make sure we rebooted
-      fail:
-        msg: Instance did not reboot.
-      when: centos_instance_boots_before == centos_instance_boots_after_powercycle
-
-    - include: tests/cirros_networking_tests.yml
-
-    - name: Pause an instance
-      shell: |
-        sf-client instance pause {{centos_instance_uuid}}
-
-    - name: We should still have a VM on sf-2
-      shell: |
-        [ `virsh list | grep -c paused` -eq 1 ]
-
-    - name: Paused instance should not respond
-      shell: |
-        [ `ping -c 3 "{{centos_instance_ip}}" | grep -c " 100% packet loss"` -eq 1 ]
-
-    - name: Unpause an instance
-      shell: |
-        sf-client instance unpause {{centos_instance_uuid}}
-
-    - name: We should have no paused instances on sf-2
-      shell: |
-        [ `virsh list | grep -c paused` -eq 0 ]
-
-    - name: We should still have a VM on sf-2 running
-      shell: |
-        [ `virsh list | grep -c running` -eq 1 ]
-
-    - name: Count how many times the instance has booted
-      shell: |
-        grep -c "\[    0.000000\] Linux version" /srv/shakenfist/instances/{{centos_instance_uuid}}/console.log
-      register: centos_instance_boots_after_pause_complex
-
-    - name: Extract boot count
-      set_fact:
-        centos_instance_boots_after_pause: "{{centos_instance_boots_after_pause_complex.stdout}}"
-
-    - name: Make sure we haven't rebooted
-      fail:
-        msg: Instance rebooted
-      when: centos_instance_boots_after_powercycle < centos_instance_boots_after_pause
-
-    - include: tests/cirros_networking_tests.yml
+#########################################
+# Scenario: delete a remote instance
+#########################################
 
 - hosts: sf-1
   become: yes
@@ -296,12 +244,19 @@
 
   tasks:
     - name: Deleting an instance hosted remotely should work
-      shell: |
-        sf-client instance delete {{hostvars['sf-2']['centos_instance_uuid']}}
+      copy:
+        content: |
+          #!/bin/bash -e
 
-    - name: Test database records the delete
-      shell: |
-        [ `sf-client --no-pretty instance list | grep sf-2 | wc -l` -eq 0 ]
+          sf-client instance delete {{hostvars['sf-2']['cirros_uuid']}}
+          [ `sf-client --no-pretty instance list | grep sf-2 | wc -l` -eq 0 ]
+        dest: /tmp/shell_script
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx
+
+    - name: Execute
+      shell: /tmp/shell_script
 
 - hosts: sf-2
   become: yes
@@ -312,79 +267,60 @@
     - vars
 
   tasks:
-    - name: We shouldn't have any VMs running on sf-2
-      shell: |
-        [ `virsh list | grep running | wc -l` -eq 0 ]
+    - name: We shouldn't have any VMs or mesh networks running on sf-2
+      copy:
+        content: |
+          #!/bin/bash -e
 
-    - name: And we shouldn't have any mesh network on sf-2 any more
-      shell: |
-        [ `ifconfig | grep -c vxlan` -eq 0 ]
+          [ `virsh list | grep running | wc -l` -eq 0 ]
+          [ `ifconfig | grep -c vxlan` -eq 0 ]
+        dest: /tmp/shell_script
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx
 
-    - name: Count the number of VMs before
-      virt:
-        command: list_vms
-        state: running
-      register: start_cirros_vm_count_before
+    - name: Execute
+      shell: /tmp/shell_script
 
-    - name: Start a cirros instance with user data and a ssh key
-      shell: |
-        sf-client --no-pretty instance create inst-{{inventory_hostname}} 1 1 -d 8@cirros \
-            -n "{{network_uuid}}" -i /opt/id_rsa.pub -u /opt/userdata
+#########################################
+# Scenario: user data and ssh keys
+#########################################
 
-    - name: Wait for boot
-      pause:
-        minutes: 1
+- hosts: sf-2
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
 
-    - name: Count the number of VMs after
-      virt:
-        command: list_vms
-        state: running
-      register: start_cirros_vm_count_after
-
-    - name: Make sure we have one more VM
-      fail:
-        msg: We failed to start a VM on {{inventory_hostname}}.
-      when: start_cirros_vm_count_before == start_cirros_vm_count_after
-
-    - name: Determine instance uuid
-      shell: |
-        sf-client --no-pretty instance list | grep {{inventory_hostname}} | cut -f 1 -d ","
-      register: centos_instance_uuid_complex
-
-    - name: Extract instance uuid
-      set_fact:
-        centos_instance_uuid: "{{centos_instance_uuid_complex.stdout}}"
-
-    - name: Log instance uuid
-      debug:
-        msg: Instance uuid is {{centos_instance_uuid}}.
-
-    - name: Determine instance console port
-      shell: |
-        sf-client --no-pretty instance show {{centos_instance_uuid}} | grep "console port" | cut -f 2 -d ":"
-      register: centos_console_port_complex
-
-    - name: Extract console port
-      set_fact:
-        centos_console_port: "{{centos_console_port_complex.stdout}}"
-
-    - name: Log instance console port
-      debug:
-        msg: Instance console port is {{centos_console_port}}.
+  tasks:
+    - include: tests/_util_instance_start.yml
+        name="cirros_with_extras"
+        distro=cirros
+        extra="-i /opt/id_rsa.pub -u /opt/userdata"
 
     # The test value is two here because we also get a copy of the shell script that the
     # helper runs
-    - name: Ensure user data ran
-      shell: |
-        [ `/opt/telnet_client.py {{centos_console_port}} exists /home/cirros/output.txt | grep -c "File exists"` -eq 2 ]
+    - name: Ensure user data ran and ssh keys were setup, then cleanup
+      copy:
+        content: |
+          #!/bin/bash -e
 
-    - name: Ensure the key is in authorized_keys for the cirros user
-      shell: |
-        [ `/opt/telnet_client.py {{centos_console_port}} exists /home/cirros/.ssh/authorized_keys | grep -c "File exists"` -eq 2 ]
+          [ `/opt/telnet_client.py {{cirros_with_extras_console_port}} exists /home/cirros/output.txt | grep -c "File exists"` -eq 2 ]
+          [ `/opt/telnet_client.py {{cirros_with_extras_console_port}} exists /home/cirros/.ssh/authorized_keys | grep -c "File exists"` -eq 2 ]
+          sf-client instance delete {{cirros_with_extras_uuid}}
+        dest: /tmp/shell_script
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx
 
-    - name: Delete the instance
-      shell: |
-        sf-client instance delete {{centos_instance_uuid}}
+    - name: Execute
+      shell: /tmp/shell_script
+
+#########################################
+# Scenario: an empty cloud should be empty
+#########################################
 
 - hosts: sf-1
   become: yes
@@ -395,37 +331,26 @@
     - vars
 
   tasks:
-    - name: Delete our last instance
-      shell: |
-        sf-client instance delete {{centos_instance_uuid}}
+    - name: Delete our last instance and validate
+      copy:
+        content: |
+          #!/bin/bash -e
 
-    - name: Test database records the delete
-      shell: |
-        [ `sf-client --no-pretty instance list | grep sf-1 | wc -l` -eq 0 ]
+          sf-client instance delete {{cirros_uuid}}
+          sf-client network delete {{network_uuid}}
+          [ `sf-client --no-pretty instance list | grep sf-1 | wc -l` -eq 0 ]
+          [ `virsh list | grep running | wc -l` -eq 0 ]
+          [ `/bin/bash /opt/sfmysql "select * from instances" | wc -l` -eq 0 ]
+          [ `/bin/bash /opt/sfmysql "select * from network_interfaces" | wc -l` -eq 0 ]
+          [ `/bin/bash /opt/sfmysql "select * from networks \G" | grep -c uuid` -eq 0 ]
+          [ `/bin/bash /opt/sfmysql "select * from snapshots" | wc -l` -eq 0 ]
+        dest: /tmp/shell_script
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx
 
-    - name: We shouldn't have any VMs running on sf-1
-      shell: |
-        [ `virsh list | grep running | wc -l` -eq 0 ]
-
-    - name: The instances table should be empty
-      shell: |
-        [ `/bin/bash /opt/sfmysql "select * from instances" | wc -l` -eq 0 ]
-
-    - name: The network_interfaces table should be empty
-      shell: |
-        [ `/bin/bash /opt/sfmysql "select * from network_interfaces" | wc -l` -eq 0 ]
-
-    - name: The networks table should still have an entry
-      shell: |
-        [ `/bin/bash /opt/sfmysql "select * from networks \G" | grep -c uuid` -eq 1 ]
-
-    - name: The snapshots table should be empty
-      shell: |
-        [ `/bin/bash /opt/sfmysql "select * from snapshots" | wc -l` -eq 0 ]
-
-    - name: Delete the network
-      shell: |
-        sf-client network delete {{network_uuid}}
+    - name: Execute
+      shell: /tmp/shell_script
 
 - hosts: hypervisors
   become: yes

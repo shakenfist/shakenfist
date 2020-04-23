@@ -1,0 +1,41 @@
+import mock
+import testtools
+import time
+
+
+from shakenfist import ipmanager
+
+
+class IPManagerTestCase(testtools.TestCase):
+    def test_init(self):
+        ipm = ipmanager.NetBlock('192.168.1.0/24')
+        self.assertEqual({}, ipm.in_use)
+
+    def test_get_address_at_index(self):
+        ipm = ipmanager.NetBlock('192.168.1.0/24')
+        self.assertEqual('192.168.1.1', str(ipm.get_address_at_index(1)))
+        self.assertEqual('192.168.1.254', str(ipm.get_address_at_index(-2)))
+
+    def test_is_free_and_reserve(self):
+        ipm = ipmanager.NetBlock('192.168.1.0/24')
+        self.assertEqual(True, ipm.is_free('192.168.1.24'))
+        ipm.reserve('192.168.1.24')
+        self.assertEqual(False, ipm.is_free('192.168.1.24'))
+        self.assertEqual(False, ipm.reserve_if_free('192.168.1.24'))
+
+        self.assertEqual(True, ipm.is_free('192.168.1.42'))
+        self.assertEqual(True, ipm.reserve_if_free('192.168.1.42'))
+        self.assertEqual(False, ipm.is_free('192.168.1.42'))
+        ipm.release('192.168.1.42')
+        self.assertEqual(True, ipm.is_free('192.168.1.42'))
+
+    def test_get_free_random_ip(self):
+        ipm = ipmanager.NetBlock('10.0.0.0/8')
+
+        start_time = time.time()
+        for i in range(65025):
+            ipm.get_random_free_address()
+        end_time = time.time()
+
+        self.assertEqual(65025, len(ipm.in_use))
+        self.assertTrue(end_time - start_time < 3.0)

@@ -25,11 +25,14 @@ CONFIG_DEFAULTS = {
     # The ports for the internal REST API service
     'API_PORT': 13000,
 
-    # Where the MySQL database is
-    'SQL_URL': 'mysql://root:foo@localhost/sf',
+    # A network block used for NAT egress from VMs and floating IPs
+    'FLOATING_NETWORK': '192.168.20.0/24',
 
     # Which node provides DHCP and NAT
     'NETWORK_NODE_IP': node_ip,
+
+    # Where the MySQL database is
+    'SQL_URL': 'mysql://root:foo@localhost/sf',
 
     # What nova called an availability zone
     'ZONE': 'shaken',

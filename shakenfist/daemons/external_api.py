@@ -107,7 +107,7 @@ class Instances(flask_restful.Resource):
             for network in args['network']:
                 n = net.from_db(network)
                 if n:
-                    ip = n.allocate_ip()
+                    ip = n.ipmanager.get_random_free_address()
                     macaddr = str(randmac.RandMac(
                         '00:00:00:00:00:00', False)).lstrip('\'').rstrip('\'')
                     db.create_network_interface(
