@@ -97,7 +97,7 @@ Here's a simple feature matrix:
 | VDI                                               | Yes         |         |             |
 | User data                                         | Yes         |         |             |
 | Keypairs                                          | Yes         |         |             |
-| Virtual networks allow overlapping IP allocations |             | Yes     |             |
+| Virtual networks allow overlapping IP allocations | Yes         |         |             |
 | REST API authentication and object ownership      |             | Yes     |             |
 | Snapshots (of all disks)                          | Yes         |         |             |
 | Central API service                               |             | Yes     |             |
