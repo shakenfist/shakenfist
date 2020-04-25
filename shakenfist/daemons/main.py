@@ -51,6 +51,12 @@ def restore_instances():
 def main():
     # If I am the network node, I need some setup
     if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
+        # Bootstrap the floating network in the Networks table
+        floating_network = db.get_network('floating')
+        if not floating_network:
+            db.create_floating_network(config.parsed.get('FLOATING_NETWORK'))
+            floating_network = net.from_db('floating')
+
         subst = {
             'physical_bridge': 'phy-br-%s' % config.parsed.get('NODE_EGRESS_NIC'),
             'physical_nic': config.parsed.get('NODE_EGRESS_NIC')
@@ -64,9 +70,9 @@ def main():
             # to it. We can do egress NAT in that state, even if floating IPs
             # don't work.
             with util.RecordedOperation('create physical bridge', 'startup') as _:
-                ipm = ipmanager.NetBlock(config.parsed.get('FLOATING_NETWORK'))
-                subst['master_float'] = ipm.get_address_at_index(1)
-                subst['netmask'] = ipm.netmask
+                subst['master_float'] = floating_network.ipmanager.get_address_at_index(
+                    1)
+                subst['netmask'] = floating_network.ipmanager.netmask
 
                 processutils.execute(
                     'ip link add %(physical_bridge)s type bridge' % subst, shell=True)

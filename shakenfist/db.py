@@ -6,7 +6,7 @@ import random
 import uuid
 
 from sqlalchemy import create_engine
-from sqlalchemy import Boolean, Column, Integer, String, DateTime
+from sqlalchemy import BLOB, Boolean, Column, Integer, String, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import exc, scoped_session, sessionmaker
 from sqlalchemy.sql.expression import func
@@ -111,6 +111,8 @@ class Network(Base):
     provide_dhcp = Column(Boolean)
     provide_nat = Column(Boolean)
     owner = Column(String)
+    ipmanager = Column(BLOB)
+    floating_gateway = Column(String)
 
     def __init__(self, uuid, vxid, netblock, provide_dhcp, provide_nat, owner):
         self.uuid = uuid
@@ -119,6 +121,8 @@ class Network(Base):
         self.provide_dhcp = provide_dhcp
         self.provide_nat = provide_nat
         self.owner = owner
+        self.ipmanager = None
+        self.floating_gateway = None
 
     def export(self):
         return {
@@ -127,7 +131,9 @@ class Network(Base):
             'netblock': self.netblock,
             'provide_dhcp': self.provide_dhcp,
             'provide_nat': self.provide_nat,
-            'owner': self.owner
+            'owner': self.owner,
+            'ipmanager': self.ipmanager,
+            'floating_gateway': self.floating_gateway
         }
 
 
@@ -147,7 +153,8 @@ def get_networks():
     try:
         networks = SESSION.query(Network).all()
         for n in networks:
-            yield n.export()
+            if n.uuid != 'floating':
+                yield n.export()
     except exc.NoResultFound:
         pass
 
@@ -180,6 +187,36 @@ def delete_network(uuid):
             SESSION.delete(n)
     except exc.NoResultFound:
         return None
+    finally:
+        SESSION.commit()
+
+
+def create_floating_network(netblock):
+    ensure_valid_session()
+
+    try:
+        n = Network('floating', 0, netblock, False, False, None)
+        SESSION.add(n)
+    finally:
+        SESSION.commit()
+
+
+def persist_ipmanager(uuid, data):
+    ensure_valid_session()
+
+    try:
+        n = SESSION.query(Network).filter(Network.uuid == uuid).one()
+        n.ipmanager = data.encode('utf-8')
+    finally:
+        SESSION.commit()
+
+
+def persist_floating_gateway(uuid, gateway):
+    ensure_valid_session()
+
+    try:
+        n = SESSION.query(Network).filter(Network.uuid == uuid).one()
+        n.floating_gateway = gateway
     finally:
         SESSION.commit()
 

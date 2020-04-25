@@ -1,6 +1,7 @@
 CHANGES
 =======
 
+* Get rid of that annoying impl thing
 * Enable overlapping virtual networks
 * Correctly delete networks
 * Move the DHCP server onto the router IP

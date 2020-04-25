@@ -24,6 +24,8 @@ class DHCPTestCase(testtools.TestCase):
         super(DHCPTestCase, self).setUp()
 
         def fake_config(key):
+            if key == 'NODE_NAME':
+                return 'foo'
             if key == 'STORAGE_PATH':
                 return '/a/b/c'
             if key == 'ZONE':

@@ -28,6 +28,7 @@
     - include: tests/_util_instance_start.yml
         name="cirros"
         distro=cirros
+        network="{{network_uuid}}"
         extra=""
 
     - name: Validate
@@ -113,6 +114,7 @@
   tasks:
     - include: tests/_util_network_cirros_validate.yml
         console_port="{{cirros_console_port}}"
+        netblock_octets="192.168.242"
 
 - hosts: sf-1
   become: yes
@@ -143,6 +145,7 @@
     - include: tests/_util_instance_start.yml
         name="ubuntu"
         distro=ubuntu:18.04
+        network="{{network_uuid}}"
         extra=""
 
 - hosts: sf-1
@@ -181,6 +184,7 @@
 
     - include: tests/_util_network_cirros_validate.yml
         console_port="{{cirros_console_port}}"
+        netblock_octets="192.168.242"
 
     - name: We should have one VM on sf-2
       shell: |
@@ -205,6 +209,7 @@
 
     - include: tests/_util_network_cirros_validate.yml
         console_port="{{cirros_console_port}}"
+        netblock_octets="192.168.242"
 
     - include: tests/_util_instance_reboot.yml
         uuid={{cirros_uuid}}
@@ -212,6 +217,7 @@
 
     - include: tests/_util_network_cirros_validate.yml
         console_port="{{cirros_console_port}}"
+        netblock_octets="192.168.242"
 
     - include: tests/_util_instance_halt.yml
         uuid={{cirros_uuid}}
@@ -220,6 +226,7 @@
 
     - include: tests/_util_network_cirros_validate.yml
         console_port="{{cirros_console_port}}"
+        netblock_octets="192.168.242"
 
     - include: tests/_util_instance_halt.yml
         uuid={{cirros_uuid}}
@@ -229,6 +236,7 @@
 
     - include: tests/_util_network_cirros_validate.yml
         console_port="{{cirros_console_port}}"
+        netblock_octets="192.168.242"
 
 #########################################
 # Scenario: delete a remote instance
@@ -298,6 +306,7 @@
     - include: tests/_util_instance_start.yml
         name="cirros_with_extras"
         distro=cirros
+        network="{{network_uuid}}"
         extra="-i /opt/id_rsa.pub -u /opt/userdata"
 
     # The test value is two here because we also get a copy of the shell script that the
@@ -310,6 +319,98 @@
           [ `/opt/telnet_client.py {{cirros_with_extras_console_port}} exists /home/cirros/output.txt | grep -c "File exists"` -eq 2 ]
           [ `/opt/telnet_client.py {{cirros_with_extras_console_port}} exists /home/cirros/.ssh/authorized_keys | grep -c "File exists"` -eq 2 ]
           sf-client instance delete {{cirros_with_extras_uuid}}
+        dest: /tmp/shell_script
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx
+
+    - name: Execute
+      shell: /tmp/shell_script
+
+#########################################
+# Scenario: a second network shouldn't be able to see the first network
+#########################################
+
+- hosts: sf-1
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - include: tests/_util_network_create.yml
+        netblock="192.168.240.0/24"
+        name="net_two"
+
+    - include: tests/_util_instance_start.yml
+        name="cirros_net_two"
+        distro=cirros
+        network="{{net_two_uuid}}"
+        extra=""
+
+    - include: tests/_util_network_cirros_validate.yml
+        console_port="{{cirros_net_two_console_port}}"
+        netblock_octets="192.168.240"
+
+    - name: Check we can't talk to the other virtual network
+      shell: |
+        [ `/opt/telnet_client.py {{cirros_net_two_console_port}} ping {{cirros_ip}} | grep -c " 100% packet loss"` -eq 1 ]
+
+    - name: Delete our instance and network
+      copy:
+        content: |
+          #!/bin/bash -e
+
+          sf-client instance delete {{cirros_net_two_uuid}}
+          sf-client network delete {{net_two_uuid}}
+        dest: /tmp/shell_script
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx
+
+    - name: Execute
+      shell: /tmp/shell_script
+
+#########################################
+# Scenario: a network with an overlapping IP range should not be able to see the other virtual network
+#########################################
+
+- hosts: sf-1
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - include: tests/_util_network_create.yml
+        netblock="192.168.242.0/24"
+        name="net_three"
+
+    - include: tests/_util_instance_start.yml
+        name="cirros_net_three"
+        distro=cirros
+        network="{{net_three_uuid}}"
+        extra=""
+
+    - include: tests/_util_network_cirros_validate.yml
+        console_port="{{cirros_net_three_console_port}}"
+        netblock_octets="192.168.242"
+
+    - name: Check we can't talk to the other virtual network
+      shell: |
+        [ `/opt/telnet_client.py {{cirros_net_three_console_port}} ping {{cirros_ip}} | grep -c " 100% packet loss"` -eq 1 ]
+
+    - name: Delete our instance and network
+      copy:
+        content: |
+          #!/bin/bash -e
+
+          sf-client instance delete {{cirros_net_three_uuid}}
+          sf-client network delete {{net_three_uuid}}
         dest: /tmp/shell_script
         owner: root
         group: root
@@ -342,7 +443,7 @@
           [ `virsh list | grep running | wc -l` -eq 0 ]
           [ `/bin/bash /opt/sfmysql "select * from instances" | wc -l` -eq 0 ]
           [ `/bin/bash /opt/sfmysql "select * from network_interfaces" | wc -l` -eq 0 ]
-          [ `/bin/bash /opt/sfmysql "select * from networks \G" | grep -c uuid` -eq 0 ]
+          [ `/bin/bash /opt/sfmysql "select * from networks \G" | grep -c uuid` -eq 1 ]
           [ `/bin/bash /opt/sfmysql "select * from snapshots" | wc -l` -eq 0 ]
         dest: /tmp/shell_script
         owner: root

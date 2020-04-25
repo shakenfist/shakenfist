@@ -150,6 +150,12 @@ class Instance(object):
             except:
                 pass
 
+        with util.RecordedOperation('release network addreses', self, status_callback) as _:
+            for ni in db.get_instance_interfaces(self.db_entry['uuid']):
+                n = net.from_db(ni['network_uuid'])
+                n.ipmanager.release(ni['ipv4'])
+                n.persist_ipmanager()
+
         db.delete_instance(self.db_entry['uuid'])
 
     def _make_config_drive(self, disk_path):

@@ -108,6 +108,8 @@ class Instances(flask_restful.Resource):
                 n = net.from_db(network)
                 if n:
                     ip = n.ipmanager.get_random_free_address()
+                    n.persist_ipmanager()
+
                     macaddr = str(randmac.RandMac(
                         '00:00:00:00:00:00', False)).lstrip('\'').rstrip('\'')
                     db.create_network_interface(
@@ -234,12 +236,25 @@ class Network(flask_restful.Resource):
         return db.get_network(uuid)
 
     def delete(self, uuid):
+        if uuid == 'floating':
+            return
+
+        # We only delete unused networks
+        if len(list(db.get_network_interfaces(uuid))) > 0:
+            return
+
         n = net.from_db(uuid)
         if not n:
             return False
 
         n.remove_dhcp()
         n.delete()
+
+        if n.floating_gateway:
+            floating_network = net.from_db('floating')
+            floating_network.ipmanager.release(n.floating_gateway)
+            floating_network.persist_ipmanager()
+
         db.delete_network(uuid)
         return True
 

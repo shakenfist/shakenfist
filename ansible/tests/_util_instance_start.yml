@@ -6,7 +6,7 @@
 
 - name: Start a {{distro}} instance on {{inventory_hostname}}
   shell: |
-    sf-client --no-pretty instance create {{name}} 1 1 -d 8@{{distro}} -n "{{network_uuid}}" {{extra}}
+    sf-client --no-pretty instance create {{name}} 1 1 -d 8@{{distro}} -n "{{network}}" {{extra}}
 
 - name: Count the number of VMs after
   virt:
@@ -53,4 +53,4 @@
 # This needs to be so long because DHCP failures take a fair while to happen
 - name: Wait for instance to boot
   pause:
-    minutes: 2
+    minutes: 1
