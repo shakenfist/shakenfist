@@ -116,12 +116,12 @@ class VirtTestCase(testtools.TestCase):
 
     # create, delete
 
-    @mock.patch('shakenfist.db.impl.get_network',
+    @mock.patch('shakenfist.db.get_network',
                 return_value={
                     'uuid': 'netuuid',
                     'netblock': '127.0.0.0/8'
                 })
-    @mock.patch('shakenfist.db.impl.get_instance_interfaces',
+    @mock.patch('shakenfist.db.get_instance_interfaces',
                 return_value=[
                     {
                         'instance_uuid': 'fakeuuid',
@@ -138,7 +138,7 @@ class VirtTestCase(testtools.TestCase):
                         'order': 1
                     }
                 ])
-    @mock.patch('shakenfist.net.impl.from_db',
+    @mock.patch('shakenfist.net.from_db',
                 return_value=FakeNetwork())
     def test_make_config_drive(self, mock_net_from_db, mock_interfaces,
                                mock_network):

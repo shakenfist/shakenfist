@@ -10,9 +10,9 @@ import uuid
 
 from shakenfist.client import apiclient
 from shakenfist import config
-from shakenfist.db import impl as db
+from shakenfist import db
 from shakenfist import images
-from shakenfist.net import impl as net
+from shakenfist import net
 from shakenfist import util
 from shakenfist import virt
 
@@ -108,6 +108,8 @@ class Instances(flask_restful.Resource):
                 n = net.from_db(network)
                 if n:
                     ip = n.ipmanager.get_random_free_address()
+                    n.persist_ipmanager()
+
                     macaddr = str(randmac.RandMac(
                         '00:00:00:00:00:00', False)).lstrip('\'').rstrip('\'')
                     db.create_network_interface(
@@ -234,12 +236,25 @@ class Network(flask_restful.Resource):
         return db.get_network(uuid)
 
     def delete(self, uuid):
+        if uuid == 'floating':
+            return
+
+        # We only delete unused networks
+        if len(list(db.get_network_interfaces(uuid))) > 0:
+            return
+
         n = net.from_db(uuid)
         if not n:
             return False
 
         n.remove_dhcp()
         n.delete()
+
+        if n.floating_gateway:
+            floating_network = net.from_db('floating')
+            floating_network.ipmanager.release(n.floating_gateway)
+            floating_network.persist_ipmanager()
+
         db.delete_network(uuid)
         return True
 
@@ -252,6 +267,7 @@ class Networks(flask_restful.Resource):
         'provide_dhcp': fields.Boolean,
         'provide_nat': fields.Boolean,
         'owner': fields.String,
+        'name': fields.String,
     })
     def get(self):
         return list(db.get_networks())
@@ -261,11 +277,13 @@ class Networks(flask_restful.Resource):
         parser.add_argument('netblock', type=str)
         parser.add_argument('provide_dhcp', type=bool)
         parser.add_argument('provide_nat', type=bool)
+        parser.add_argument('name', type=str)
         args = parser.parse_args()
 
         network = db.allocate_network(args['netblock'],
                                       args['provide_dhcp'],
-                                      args['provide_nat'])
+                                      args['provide_nat'],
+                                      args['name'])
 
         # Networks should immediately appear on the network node
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):

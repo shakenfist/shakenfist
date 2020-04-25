@@ -13,7 +13,7 @@
 
 - name: Wait
   pause:
-    minutes: 2
+    minutes: 1
 
 - name: Count how many times the instance has booted
   shell: |

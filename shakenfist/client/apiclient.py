@@ -132,12 +132,13 @@ class Client(object):
         r = _request_url('DELETE', self.base_url + '/networks/' + uuid)
         return r.json()
 
-    def allocate_network(self, netblock, provide_dhcp, provide_nat):
+    def allocate_network(self, netblock, provide_dhcp, provide_nat, name):
         r = _request_url('POST', self.base_url + '/networks',
                          data={
                              'netblock': netblock,
                              'provide_dhcp': provide_dhcp,
-                             'provide_nat': provide_nat
+                             'provide_nat': provide_nat,
+                             'name': name
                          })
         return r.json()
 

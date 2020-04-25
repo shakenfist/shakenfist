@@ -158,14 +158,15 @@ class ApiClientTestCase(testtools.TestCase):
 
     def test_allocate_network(self):
         client = apiclient.Client()
-        client.allocate_network('192.168.1.0/24', True, True)
+        client.allocate_network('192.168.1.0/24', True, True, 'gerkin')
 
         self.mock_request.assert_called_with(
             'POST', 'http://localhost:13000/networks',
             data={
                 'netblock': '192.168.1.0/24',
                 'provide_dhcp': True,
-                'provide_nat': True
+                'provide_nat': True,
+                'name': 'gerkin'
             })
 
 

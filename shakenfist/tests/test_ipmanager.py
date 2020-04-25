@@ -1,6 +1,6 @@
+import ipaddress
 import mock
 import testtools
-import time
 
 
 from shakenfist import ipmanager
@@ -9,7 +9,10 @@ from shakenfist import ipmanager
 class IPManagerTestCase(testtools.TestCase):
     def test_init(self):
         ipm = ipmanager.NetBlock('192.168.1.0/24')
-        self.assertEqual({}, ipm.in_use)
+        self.assertEqual({
+            ipaddress.IPv4Address('192.168.1.0'): True,
+            ipaddress.IPv4Address('192.168.1.255'): True
+        }, ipm.in_use)
 
     def test_get_address_at_index(self):
         ipm = ipmanager.NetBlock('192.168.1.0/24')
@@ -32,10 +35,9 @@ class IPManagerTestCase(testtools.TestCase):
     def test_get_free_random_ip(self):
         ipm = ipmanager.NetBlock('10.0.0.0/8')
 
-        start_time = time.time()
         for i in range(65025):
             ipm.get_random_free_address()
-        end_time = time.time()
 
-        self.assertEqual(65025, len(ipm.in_use))
-        self.assertTrue(end_time - start_time < 3.0)
+        # The extra two are the reserved network and broadcast
+        # addresses
+        self.assertEqual(65025 + 2, len(ipm.in_use))

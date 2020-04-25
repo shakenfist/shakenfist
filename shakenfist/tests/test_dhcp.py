@@ -24,6 +24,8 @@ class DHCPTestCase(testtools.TestCase):
         super(DHCPTestCase, self).setUp()
 
         def fake_config(key):
+            if key == 'NODE_NAME':
+                return 'foo'
             if key == 'STORAGE_PATH':
                 return '/a/b/c'
             if key == 'ZONE':
@@ -34,7 +36,7 @@ class DHCPTestCase(testtools.TestCase):
                                  fake_config)
         self.mock_config = self.config.start()
 
-        self.network = mock.patch('shakenfist.net.impl.from_db',
+        self.network = mock.patch('shakenfist.net.from_db',
                                   return_value=FakeNetwork())
         self.mock_network = self.network.start()
 
@@ -102,7 +104,7 @@ class DHCPTestCase(testtools.TestCase):
         )
 
     @mock.patch('os.path.exists', return_value=True)
-    @mock.patch('shakenfist.db.impl.get_network_interfaces',
+    @mock.patch('shakenfist.db.get_network_interfaces',
                 return_value=[
                     {'instance_uuid': 'instuuid1',
                      'macaddr': '1a:91:64:d2:15:39',
@@ -111,7 +113,7 @@ class DHCPTestCase(testtools.TestCase):
                      'macaddr': '1a:91:64:d2:15:40',
                      'ipv4': '127.0.0.6'}
                 ])
-    @mock.patch('shakenfist.db.impl.get_instance',
+    @mock.patch('shakenfist.db.get_instance',
                 side_effect=[
                     {'uuid': 'instuuid1',
                      'name': 'inst1'},

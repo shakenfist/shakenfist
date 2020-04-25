@@ -15,9 +15,9 @@ import uuid
 from oslo_concurrency import processutils
 
 from shakenfist import config
-from shakenfist.db import impl as db
+from shakenfist import db
 from shakenfist import images
-from shakenfist.net import impl as net
+from shakenfist import net
 from shakenfist import util
 
 
@@ -149,6 +149,12 @@ class Instance(object):
                 shutil.rmtree(self.instance_path)
             except:
                 pass
+
+        with util.RecordedOperation('release network addreses', self, status_callback) as _:
+            for ni in db.get_instance_interfaces(self.db_entry['uuid']):
+                n = net.from_db(ni['network_uuid'])
+                n.ipmanager.release(ni['ipv4'])
+                n.persist_ipmanager()
 
         db.delete_instance(self.db_entry['uuid'])
 

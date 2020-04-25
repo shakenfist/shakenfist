@@ -10,8 +10,8 @@ import signal
 from oslo_concurrency import processutils
 
 from shakenfist import config
-from shakenfist.db import impl as db
-from shakenfist.net import impl as net
+from shakenfist import db
+from shakenfist import net
 from shakenfist import util
 
 LOG = logging.getLogger(__file__)

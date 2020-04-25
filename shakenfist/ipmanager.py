@@ -21,7 +21,10 @@ class NetBlock(object):
         self.network_address = self.ipblock_obj.network_address
 
         self.num_addresses = self.ipblock_obj.num_addresses
-        self.in_use = {}
+        self.in_use = {
+            self.network_address: True,
+            self.broadcast_address: True
+        }
         self.in_use_counter = 0
 
     def get_address_at_index(self, idx):
@@ -74,9 +77,15 @@ class NetBlock(object):
                 idx += 1
 
     def save(self):
+        in_use = []
+        for ip in self.in_use:
+            ip_str = str(ip)
+            if not ip_str in in_use:
+                in_use.append(ip_str)
+
         return json.dumps({
             'ipmanager.v1': {
                 'ipblock': self.ipblock,
-                'in_use': sorted(self.in_use.keys())
+                'in_use': in_use
             }
         })

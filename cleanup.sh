@@ -19,7 +19,7 @@ do
   ip link del br-vxlan-$i
   ip link del vxlan-$i
   ip link del phy-$i-o
-  ip link del veth-$1-o
+  ip link del veth-$i-o
 done
 
 for ns in `ls /var/run/netns`

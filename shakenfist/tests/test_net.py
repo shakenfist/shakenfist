@@ -2,10 +2,17 @@ import mock
 import testtools
 
 
-from shakenfist.net import impl as net
+from shakenfist import net
 
 
 class NetTestCase(testtools.TestCase):
+    def setUp(self):
+        super(NetTestCase, self).setUp()
+
+        self.ipmanager_persist = mock.patch(
+            'shakenfist.db.persist_ipmanager')
+        self.mock_ipmanager_persist = self.ipmanager_persist.start()
+
     def test_init(self):
         net.Network(uuid='notauuid', vxlan_id=42, provide_dhcp=True,
                     provide_nat=True, physical_nic='eth0',
