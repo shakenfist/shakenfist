@@ -113,8 +113,9 @@ class Network(Base):
     owner = Column(String)
     ipmanager = Column(BLOB)
     floating_gateway = Column(String)
+    name = Column(String)
 
-    def __init__(self, uuid, vxid, netblock, provide_dhcp, provide_nat, owner):
+    def __init__(self, uuid, vxid, netblock, provide_dhcp, provide_nat, owner, name):
         self.uuid = uuid
         self.vxid = vxid
         self.netblock = netblock
@@ -123,6 +124,7 @@ class Network(Base):
         self.owner = owner
         self.ipmanager = None
         self.floating_gateway = None
+        self.name = name
 
     def export(self):
         return {
@@ -133,7 +135,8 @@ class Network(Base):
             'provide_nat': self.provide_nat,
             'owner': self.owner,
             'ipmanager': self.ipmanager,
-            'floating_gateway': self.floating_gateway
+            'floating_gateway': self.floating_gateway,
+            'name': self.name
         }
 
 
@@ -159,7 +162,7 @@ def get_networks():
         pass
 
 
-def allocate_network(netblock, provide_dhcp=True, provide_nat=False):
+def allocate_network(netblock, provide_dhcp=True, provide_nat=False, name=None):
     ensure_valid_session()
 
     try:
@@ -171,7 +174,8 @@ def allocate_network(netblock, provide_dhcp=True, provide_nat=False):
             else:
                 vxid = 1
 
-        n = Network(netid, vxid, netblock, provide_dhcp, provide_nat, None)
+        n = Network(netid, vxid, netblock, provide_dhcp,
+                    provide_nat, None, name)
         SESSION.add(n)
         return n.export()
     finally:
@@ -195,7 +199,7 @@ def create_floating_network(netblock):
     ensure_valid_session()
 
     try:
-        n = Network('floating', 0, netblock, False, False, None)
+        n = Network('floating', 0, netblock, False, False, None, 'floating')
         SESSION.add(n)
     finally:
         SESSION.commit()

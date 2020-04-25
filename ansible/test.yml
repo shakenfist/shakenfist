@@ -28,7 +28,7 @@
     - include: tests/_util_instance_start.yml
         name="cirros"
         distro=cirros
-        network="{{network_uuid}}"
+        network="{{net_one_uuid}}"
         extra=""
 
     - name: Validate
@@ -65,8 +65,8 @@
         content: |
           #!/bin/bash -e
 
-          [ `grep -c "{{hostvars['sf-1']['cirros_ip']}}" /srv/shakenfist/dhcp/{{network_uuid}}/hosts` -eq 1 ]
-          [ `grep -c "{{hostvars['sf-2']['cirros_ip']}}" /srv/shakenfist/dhcp/{{network_uuid}}/hosts` -eq 1 ]
+          [ `grep -c "{{hostvars['sf-1']['cirros_ip']}}" /srv/shakenfist/dhcp/{{net_one_uuid}}/hosts` -eq 1 ]
+          [ `grep -c "{{hostvars['sf-2']['cirros_ip']}}" /srv/shakenfist/dhcp/{{net_one_uuid}}/hosts` -eq 1 ]
         dest: /tmp/shell_script
         owner: root
         group: root
@@ -89,7 +89,7 @@
         content: |
           #!/bin/bash -e
 
-          [ ! -e /srv/shakenfist/dhcp/{{network_uuid}}/config ]
+          [ ! -e /srv/shakenfist/dhcp/{{net_one_uuid}}/config ]
           [ `ifconfig | grep -c 192.168.242.1` -eq 0 ]
         dest: /tmp/shell_script
         owner: root
@@ -145,7 +145,7 @@
     - include: tests/_util_instance_start.yml
         name="ubuntu"
         distro=ubuntu:18.04
-        network="{{network_uuid}}"
+        network="{{net_one_uuid}}"
         extra=""
 
 - hosts: sf-1
@@ -163,7 +163,7 @@
 
     - name: Instance is pingable from inside the network namespace
       shell: |
-        [ `ip netns exec {{network_uuid}} ping -c 1 {{hostvars['sf-2']['ubuntu_ip']}} | grep -c " 0% packet loss"` -eq 1 ]
+        [ `ip netns exec {{net_one_uuid}} ping -c 1 {{hostvars['sf-2']['ubuntu_ip']}} | grep -c " 0% packet loss"` -eq 1 ]
 
 #########################################
 # Scenario: deleting instances works
@@ -306,7 +306,7 @@
     - include: tests/_util_instance_start.yml
         name="cirros_with_extras"
         distro=cirros
-        network="{{network_uuid}}"
+        network="{{net_one_uuid}}"
         extra="-i /opt/id_rsa.pub -u /opt/userdata"
 
     # The test value is two here because we also get a copy of the shell script that the
@@ -438,7 +438,7 @@
           #!/bin/bash -e
 
           sf-client instance delete {{cirros_uuid}}
-          sf-client network delete {{network_uuid}}
+          sf-client network delete {{net_one_uuid}}
           [ `sf-client --no-pretty instance list | grep sf-1 | wc -l` -eq 0 ]
           [ `virsh list | grep running | wc -l` -eq 0 ]
           [ `/bin/bash /opt/sfmysql "select * from instances" | wc -l` -eq 0 ]

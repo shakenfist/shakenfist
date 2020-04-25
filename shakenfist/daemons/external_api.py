@@ -267,6 +267,7 @@ class Networks(flask_restful.Resource):
         'provide_dhcp': fields.Boolean,
         'provide_nat': fields.Boolean,
         'owner': fields.String,
+        'name': fields.String,
     })
     def get(self):
         return list(db.get_networks())
@@ -276,11 +277,13 @@ class Networks(flask_restful.Resource):
         parser.add_argument('netblock', type=str)
         parser.add_argument('provide_dhcp', type=bool)
         parser.add_argument('provide_nat', type=bool)
+        parser.add_argument('name', type=str)
         args = parser.parse_args()
 
         network = db.allocate_network(args['netblock'],
                                       args['provide_dhcp'],
-                                      args['provide_nat'])
+                                      args['provide_nat'],
+                                      args['name'])
 
         # Networks should immediately appear on the network node
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):

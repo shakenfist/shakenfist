@@ -1,6 +1,7 @@
 CHANGES
 =======
 
+* More network tests and associated fixes
 * Get rid of that annoying impl thing
 * Enable overlapping virtual networks
 * Correctly delete networks

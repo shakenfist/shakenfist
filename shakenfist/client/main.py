@@ -85,15 +85,16 @@ def network_list(ctx):
 
     if ctx.obj['PRETTY']:
         x = PrettyTable()
-        x.field_names = ['uuid', 'owner', 'netblock']
+        x.field_names = ['uuid', 'name', 'owner', 'netblock']
         for n in nets:
-            x.add_row([n['uuid'], n['owner'], n['netblock']])
+            x.add_row([n['uuid'], n['name'], n['owner'], n['netblock']])
         print(x)
 
     else:
-        print('uuid,owner,netblock')
+        print('uuid,name,owner,netblock')
         for n in nets:
-            print('%s,%s,%s' % (n['uuid'], n['owner'], n['netblock']))
+            print('%s,%s,%s,%s' %
+                  (n['uuid'], n['name'], n['owner'], n['netblock']))
 
 
 def _show_network(ctx, n):
@@ -106,6 +107,7 @@ def _show_network(ctx, n):
         format_string = '%s:%s'
 
     print(format_string % ('uuid', n['uuid']))
+    print(format_string % ('name', n['name']))
     print(format_string % ('vxlan id', n['vxid']))
     print(format_string % ('netblock', n['netblock']))
     print(format_string % ('provide dhcp', n['provide_dhcp']))
@@ -124,15 +126,17 @@ def network_show(ctx, uuid=None):
                  help=('Create a network.\n\n'
                        'NETBLOCK:         The IP address block to use, as a CIDR\n'
                        '                  range -- for example 192.168.200.1/24\n'
+                       'NAME:             The name of the network\n'
                        '--dhcp/--no-dhcp: Should this network have DCHP?\n'
                        '--nat/--no-nat:   Should this network be able to access'
                        '                  the Internet via NAT?'))
 @click.argument('netblock', type=click.STRING)
+@click.argument('name', type=click.STRING)
 @click.option('--dhcp/--no-dhcp', default=True)
 @click.option('--nat/--no-nat', default=True)
 @click.pass_context
-def network_create(ctx, netblock=None, dhcp=None, nat=None):
-    _show_network(ctx, CLIENT.allocate_network(netblock, dhcp, nat))
+def network_create(ctx, netblock=None, name=None, dhcp=None, nat=None):
+    _show_network(ctx, CLIENT.allocate_network(netblock, dhcp, nat, name))
 
 
 @network.command(name='delete', help='Delete a network')
