@@ -129,8 +129,8 @@ def _show_network(ctx, n):
 
     if ctx.obj['OUTPUT'] == 'json':
         print(json.dumps(filter_dict(n, ['uuid', 'name', 'vxid', 'netblock', 'provide_dhcp',
-                                         'provide_nat', 'owner'])),
-              indent=4, sort_keys=True)
+                                         'provide_nat', 'owner']),
+                         indent=4, sort_keys=True))
 
     format_string = '%-12s: %s'
     if ctx.obj['OUTPUT'] == 'simple':
@@ -231,7 +231,7 @@ def _show_instance(ctx, i):
                 filter_dict(
                     interface, ['uuid', 'network_uuid', 'macaddr', 'ipv4']))
 
-        print(json.dumps(out), indent=4, sort_keys=True)
+        print(json.dumps(out, indent=4, sort_keys=True))
 
     format_string = '%-12s: %s'
     if ctx.obj['OUTPUT'] == 'simple':
