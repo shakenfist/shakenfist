@@ -6,7 +6,7 @@
 
 - name: Start a {{distro}} instance on {{inventory_hostname}}
   shell: |
-    sf-client --no-pretty instance create {{name}} 1 1 -d 8@{{distro}} -n "{{network}}" {{extra}}
+    sf-client --simple instance create {{name}} 1 1 -d 8@{{distro}} -n "{{network}}" {{extra}}
 
 - name: Count the number of VMs after
   virt:
@@ -21,7 +21,7 @@
 
 - name: Determine instance uuid
   shell: |
-    sf-client --no-pretty instance list | grep {{name}} | grep {{inventory_hostname}} | cut -f 1 -d ","
+    sf-client --simple instance list | grep {{name}} | grep {{inventory_hostname}} | cut -f 1 -d ","
   register: instance_uuid_complex
 
 - name: Extract instance uuid
@@ -30,7 +30,7 @@
 
 - name: Determine instance console port
   shell: |
-    sf-client --no-pretty instance show {{vars[name + '_uuid']}} | grep "console port" | cut -f 2 -d ":"
+    sf-client --simple instance show {{vars[name + '_uuid']}} | grep "console port" | cut -f 2 -d ":"
   register: instance_console_port_complex
 
 - name: Extract console port
@@ -39,7 +39,7 @@
 
 - name: Determine instance IP
   shell: |
-    sf-client --no-pretty instance show {{vars[name + '_uuid']}} | grep "ipv4" | cut -f 2 -d ":"
+    sf-client --simple instance show {{vars[name + '_uuid']}} | grep "ipv4" | cut -f 2 -d ":"
   register: instance_ip_complex
 
 - name: Extract instance IP

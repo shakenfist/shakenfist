@@ -10,7 +10,12 @@ LOG.setLevel(logging.INFO)
 
 
 class APIException(Exception):
-    pass
+    def __init__(self, message, method, url, status_code, text):
+        self.message = message
+        self.method = method
+        self.url = url
+        self.status_code = status_code
+        self.text = text
 
 
 def _request_url(method, url, data=None):
@@ -36,8 +41,8 @@ def _request_url(method, url, data=None):
     LOG.debug('-------------------------------------------------------')
 
     if r.status_code != 200:
-        raise APIException('Failed to get %s (status %s): %s'
-                           % (url, r.status_code, r.text))
+        raise APIException(
+            'API request failed', method, url, r.status_code, r.text)
     return r
 
 

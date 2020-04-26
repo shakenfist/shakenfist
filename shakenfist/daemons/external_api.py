@@ -1,11 +1,14 @@
 import flask
 import flask_restful
 from flask_restful import fields, marshal_with, reqparse
+import json
 import logging
 import randmac
 import requests
 import setproctitle
+import sys
 import time
+import traceback
 import uuid
 
 from shakenfist.client import apiclient
@@ -23,11 +26,111 @@ LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
 
 
+TESTING = False
+
+
+def error(status_code, message):
+    global TESTING
+
+    body = {
+        'error': message,
+        'status': status_code
+    }
+
+    if TESTING or config.parsed.get('INCLUDE_TRACEBACKS') == '1':
+        _, _, tb = sys.exc_info()
+        if tb:
+            body['traceback'] = traceback.format_exc()
+
+    resp = flask.Response(json.dumps(body),
+                          mimetype='application/json')
+    resp.status_code = status_code
+    LOG.info('Returning API error: %d, %s' % (status_code, message))
+    return resp
+
+
+def generic_catch_exception(func):
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except:
+            return error(500, 'server error')
+    return wrapper
+
+
+class Resource(flask_restful.Resource):
+    method_decorators = [generic_catch_exception]
+
+
+def arg_is_instance_uuid(func):
+    # Method uses the instance from the db
+    def wrapper(*args, **kwargs):
+        if 'instance_uuid' in kwargs:
+            kwargs['instance_from_db'] = db.get_instance(
+                kwargs['instance_uuid'])
+        if not kwargs.get('instance_from_db'):
+            return error(404, 'instance not found')
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
+def arg_is_instance_uuid_as_virt(func):
+    # Method uses the rehydrated instance
+    def wrapper(*args, **kwargs):
+        if 'instance_uuid' in kwargs:
+            kwargs['instance_from_db_virt'] = virt.from_db(
+                kwargs['instance_uuid']
+            )
+        if not kwargs.get('instance_from_db_virt'):
+            return error(404, 'instance not found')
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
+def redirect_instance_request(func):
+    # Redirect method to the hypervisor hosting the instance
+    def wrapper(*args, **kwargs):
+        i = kwargs.get('instance_from_db_virt')
+        if i and i.db_entry['node'] != config.parsed.get('NODE_NAME'):
+            r = requests.request(
+                flask.request.environ['REQUEST_METHOD'],
+                'http://%s:%d%s'
+                % (i.db_entry['node'],
+                   config.parsed.get('API_PORT'),
+                   flask.request.environ['PATH_INFO']),
+                data=flask.request.get_json())
+
+            LOG.info('Returning proxied request: %d, %s'
+                     % (r.status_code, r.text))
+            resp = flask.Response(r.text,
+                                  mimetype='application/json')
+            resp.status_code = r.status_code
+            return resp
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
+def arg_is_network_uuid(func):
+    # Method uses the network from the db
+    def wrapper(*args, **kwargs):
+        if 'network_uuid' in kwargs:
+            kwargs['network_from_db'] = db.get_network(
+                kwargs['network_uuid'])
+        if not kwargs.get('network_from_db'):
+            return error(404, 'network not found')
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
 app = flask.Flask(__name__)
-api = flask_restful.Api(app)
+api = flask_restful.Api(app, catch_all_404s=False)
 
 
-class Root(flask_restful.Resource):
+class Root(Resource):
     def get(self):
         resp = flask.Response(
             'Shaken Fist REST API service',
@@ -36,47 +139,40 @@ class Root(flask_restful.Resource):
         return resp
 
 
-class Instance(flask_restful.Resource):
-    def get(self, uuid):
-        return db.get_instance(uuid)
+class Instance(Resource):
+    @arg_is_instance_uuid
+    def get(self, instance_uuid=None, instance_from_db=None):
+        return instance_from_db
 
-    def delete(self, uuid):
-        i = virt.from_db(uuid)
-        if i.db_entry['node'] != config.parsed.get('NODE_NAME'):
-            remote = apiclient.Client(
-                'http://%s:%d'
-                % (i.db_entry['node'],
-                   config.parsed.get('API_PORT')))
-            return remote.delete_instance(uuid)
-
+    @arg_is_instance_uuid_as_virt
+    @redirect_instance_request
+    def delete(self, instance_uuid=None, instance_from_db_virt=None):
         instance_networks = []
-        for iface in list(db.get_instance_interfaces(uuid)):
+        for iface in list(db.get_instance_interfaces(instance_uuid)):
             if not iface['network_uuid'] in instance_networks:
                 instance_networks.append(iface['network_uuid'])
 
         host_networks = []
         for inst in list(db.get_instances(local_only=True)):
-            if not inst['uuid'] == uuid:
+            if not inst['uuid'] == instance_uuid:
                 for iface in db.get_instance_interfaces(inst['uuid']):
                     if not iface['network_uuid'] in host_networks:
                         host_networks.append(iface['network_uuid'])
 
-        i.delete(None)
+        instance_from_db_virt.delete(None)
 
         for network in instance_networks:
             n = net.from_db(network)
             if n:
                 if network in host_networks:
-                    with util.RecordedOperation('deallocate ip address', i) as _:
+                    with util.RecordedOperation('deallocate ip address', instance_from_db_virt) as _:
                         n.update_dhcp()
                 else:
                     with util.RecordedOperation('remove network', n) as _:
                         n.delete()
 
-        return True
 
-
-class Instances(flask_restful.Resource):
+class Instances(Resource):
     def get(self):
         return list(db.get_instances())
 
@@ -126,100 +222,66 @@ class Instances(flask_restful.Resource):
         return db.get_instance(new_instance_uuid)
 
 
-class InstanceInterfaces(flask_restful.Resource):
-    def get(self, uuid):
-        return list(db.get_instance_interfaces(uuid))
+class InstanceInterfaces(Resource):
+    @arg_is_instance_uuid
+    def get(self, instance_uuid=None, instance_from_db=None):
+        return list(db.get_instance_interfaces(instance_uuid))
 
 
-class InstanceSnapshot(flask_restful.Resource):
-    def post(self, uuid):
+class InstanceSnapshot(Resource):
+    @arg_is_instance_uuid_as_virt
+    @redirect_instance_request
+    def post(self, instance_uuid=None, instance_from_db_virt=None):
         parser = reqparse.RequestParser()
         parser.add_argument('all', type=bool)
         args = parser.parse_args()
 
-        i = virt.from_db(uuid)
-        if i.db_entry['node'] != config.parsed.get('NODE_NAME'):
-            remote = apiclient.Client(
-                'http://%s:%d'
-                % (i.db_entry['node'],
-                   config.parsed.get('API_PORT')))
-            return remote.snapshot_instance(uuid, all=args['all'])
-        return i.snapshot(all=args['all'])
+        return instance_from_db_virt.snapshot(all=args['all'])
 
 
-class InstanceRebootSoft(flask_restful.Resource):
-    def post(self, uuid):
-        i = virt.from_db(uuid)
-        if i.db_entry['node'] != config.parsed.get('NODE_NAME'):
-            remote = apiclient.Client(
-                'http://%s:%d'
-                % (i.db_entry['node'],
-                   config.parsed.get('API_PORT')))
-            return remote.reboot_instance(uuid, hard=False)
-        return i.reboot(hard=False)
+class InstanceRebootSoft(Resource):
+    @arg_is_instance_uuid_as_virt
+    @redirect_instance_request
+    def post(self, instance_uuid=None, instance_from_db_virt=None):
+        return instance_from_db_virt.reboot(hard=False)
 
 
-class InstanceRebootHard(flask_restful.Resource):
-    def post(self, uuid):
-        i = virt.from_db(uuid)
-        if i.db_entry['node'] != config.parsed.get('NODE_NAME'):
-            remote = apiclient.Client(
-                'http://%s:%d'
-                % (i.db_entry['node'],
-                   config.parsed.get('API_PORT')))
-            return remote.reboot_instance(uuid, hard=True)
-        return i.reboot(hard=True)
+class InstanceRebootHard(Resource):
+    @arg_is_instance_uuid_as_virt
+    @redirect_instance_request
+    def post(self, instance_uuid=None, instance_from_db_virt=None):
+        return instance_from_db_virt.reboot(hard=True)
 
 
-class InstancePowerOff(flask_restful.Resource):
-    def post(self, uuid):
-        i = virt.from_db(uuid)
-        if i.db_entry['node'] != config.parsed.get('NODE_NAME'):
-            remote = apiclient.Client(
-                'http://%s:%d'
-                % (i.db_entry['node'],
-                   config.parsed.get('API_PORT')))
-            return remote.power_off_instance(uuid)
-        return i.power_off()
+class InstancePowerOff(Resource):
+    @arg_is_instance_uuid_as_virt
+    @redirect_instance_request
+    def post(self, instance_uuid=None, instance_from_db_virt=None):
+        return instance_from_db_virt.power_off()
 
 
-class InstancePowerOn(flask_restful.Resource):
-    def post(self, uuid):
-        i = virt.from_db(uuid)
-        if i.db_entry['node'] != config.parsed.get('NODE_NAME'):
-            remote = apiclient.Client(
-                'http://%s:%d'
-                % (i.db_entry['node'],
-                   config.parsed.get('API_PORT')))
-            return remote.power_on_instance(uuid)
-        return i.power_on()
+class InstancePowerOn(Resource):
+    @arg_is_instance_uuid_as_virt
+    @redirect_instance_request
+    def post(self, instance_uuid=None, instance_from_db_virt=None):
+        return instance_from_db_virt.power_on()
 
 
-class InstancePause(flask_restful.Resource):
-    def post(self, uuid):
-        i = virt.from_db(uuid)
-        if i.db_entry['node'] != config.parsed.get('NODE_NAME'):
-            remote = apiclient.Client(
-                'http://%s:%d'
-                % (i.db_entry['node'],
-                   config.parsed.get('API_PORT')))
-            return remote.pause_instance(uuid)
-        return i.pause()
+class InstancePause(Resource):
+    @arg_is_instance_uuid_as_virt
+    @redirect_instance_request
+    def post(self, instance_uuid=None, instance_from_db_virt=None):
+        return instance_from_db_virt.pause()
 
 
-class InstanceUnpause(flask_restful.Resource):
-    def post(self, uuid):
-        i = virt.from_db(uuid)
-        if i.db_entry['node'] != config.parsed.get('NODE_NAME'):
-            remote = apiclient.Client(
-                'http://%s:%d'
-                % (i.db_entry['node'],
-                   config.parsed.get('API_PORT')))
-            return remote.unpause_instance(uuid)
-        return i.unpause()
+class InstanceUnpause(Resource):
+    @arg_is_instance_uuid_as_virt
+    @redirect_instance_request
+    def post(self, instance_uuid=None, instance_from_db_virt=None):
+        return instance_from_db_virt.unpause()
 
 
-class Image(flask_restful.Resource):
+class Image(Resource):
     def post(self):
         parser = reqparse.RequestParser()
         parser.add_argument('url', type=str)
@@ -228,24 +290,22 @@ class Image(flask_restful.Resource):
         with util.RecordedOperation('cache image', args['url']) as ro:
             images.fetch_image(args['url'], recorded=ro)
 
-        return True
 
+class Network(Resource):
+    @arg_is_network_uuid
+    def get(self, network_uuid=None, network_from_db=None):
+        return network_from_db
 
-class Network(flask_restful.Resource):
-    def get(self, uuid):
-        return db.get_network(uuid)
+    @arg_is_network_uuid
+    def delete(self, network_uuid=None, network_from_db=None):
+        if network_uuid == 'floating':
+            return error(403, 'you cannot delete the floating network')
 
-    def delete(self, uuid):
-        if uuid == 'floating':
-            return
+        n = net.from_db(network_uuid)
 
         # We only delete unused networks
-        if len(list(db.get_network_interfaces(uuid))) > 0:
-            return
-
-        n = net.from_db(uuid)
-        if not n:
-            return False
+        if len(list(db.get_network_interfaces(network_uuid))) > 0:
+            return error(403, 'you cannot delete an in use network')
 
         n.remove_dhcp()
         n.delete()
@@ -255,11 +315,10 @@ class Network(flask_restful.Resource):
             floating_network.ipmanager.release(n.floating_gateway)
             floating_network.persist_ipmanager()
 
-        db.delete_network(uuid)
-        return True
+        db.delete_network(network_uuid)
 
 
-class Networks(flask_restful.Resource):
+class Networks(Resource):
     @marshal_with({
         'uuid': fields.String,
         'vxlan_id': fields.Integer,
@@ -289,7 +348,7 @@ class Networks(flask_restful.Resource):
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
             n = net.from_db(network['uuid'])
             if not n:
-                return False
+                return error(404, 'network not found')
 
             n.create()
             n.ensure_mesh()
@@ -306,7 +365,7 @@ class Networks(flask_restful.Resource):
         return network
 
 
-class Nodes(flask_restful.Resource):
+class Nodes(Resource):
     @marshal_with({
         'name': fields.String(attribute='fqdn'),
         'ip': fields.String,
@@ -319,7 +378,7 @@ class Nodes(flask_restful.Resource):
 # Internal APIs
 
 
-class DeployNetworkNode(flask_restful.Resource):
+class DeployNetworkNode(Resource):
     def put(self):
         parser = reqparse.RequestParser()
         parser.add_argument('uuid', type=str)
@@ -327,14 +386,13 @@ class DeployNetworkNode(flask_restful.Resource):
 
         n = net.from_db(args['uuid'])
         if not n:
-            return False
+            return error(404, 'network not found')
 
         n.create()
         n.ensure_mesh()
-        return True
 
 
-class UpdateDHCP(flask_restful.Resource):
+class UpdateDHCP(Resource):
     def put(self):
         parser = reqparse.RequestParser()
         parser.add_argument('uuid', type=str)
@@ -342,13 +400,12 @@ class UpdateDHCP(flask_restful.Resource):
 
         n = net.from_db(args['uuid'])
         if not n:
-            return False
+            return error(404, 'network not found')
 
         n.update_dhcp()
-        return True
 
 
-class RemoveDHCP(flask_restful.Resource):
+class RemoveDHCP(Resource):
     def put(self):
         parser = reqparse.RequestParser()
         parser.add_argument('uuid', type=str)
@@ -356,25 +413,24 @@ class RemoveDHCP(flask_restful.Resource):
 
         n = net.from_db(args['uuid'])
         if not n:
-            return False
+            return error(404, 'network not found')
 
         n.remove_dhcp()
-        return True
 
 
 api.add_resource(Root, '/')
 api.add_resource(Instances, '/instances')
-api.add_resource(Instance, '/instances/<uuid>')
-api.add_resource(InstanceInterfaces, '/instances/<uuid>/interfaces')
-api.add_resource(InstanceSnapshot, '/instances/<uuid>/snapshot')
-api.add_resource(InstanceRebootSoft, '/instances/<uuid>/rebootsoft')
-api.add_resource(InstanceRebootHard, '/instances/<uuid>/reboothard')
-api.add_resource(InstancePowerOff, '/instances/<uuid>/poweroff')
-api.add_resource(InstancePowerOn, '/instances/<uuid>/poweron')
-api.add_resource(InstancePause, '/instances/<uuid>/pause')
-api.add_resource(InstanceUnpause, '/instances/<uuid>/unpause')
+api.add_resource(Instance, '/instances/<instance_uuid>')
+api.add_resource(InstanceInterfaces, '/instances/<instance_uuid>/interfaces')
+api.add_resource(InstanceSnapshot, '/instances/<instance_uuid>/snapshot')
+api.add_resource(InstanceRebootSoft, '/instances/<instance_uuid>/rebootsoft')
+api.add_resource(InstanceRebootHard, '/instances/<instance_uuid>/reboothard')
+api.add_resource(InstancePowerOff, '/instances/<instance_uuid>/poweroff')
+api.add_resource(InstancePowerOn, '/instances/<instance_uuid>/poweron')
+api.add_resource(InstancePause, '/instances/<instance_uuid>/pause')
+api.add_resource(InstanceUnpause, '/instances/<instance_uuid>/unpause')
 api.add_resource(Image, '/images')
-api.add_resource(Network, '/networks/<uuid>')
+api.add_resource(Network, '/networks/<network_uuid>')
 api.add_resource(Networks, '/networks')
 api.add_resource(Nodes, '/nodes')
 
@@ -390,5 +446,4 @@ class monitor(object):
     def run(self):
         app.run(
             host='0.0.0.0',
-            port=config.parsed.get('API_PORT'),
-            debug=True)
+            port=config.parsed.get('API_PORT'))

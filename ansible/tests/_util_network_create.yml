@@ -1,11 +1,11 @@
 - name: Create a network
   shell: |
-    sf-client --no-pretty network create {{netblock}} {{name}}
+    sf-client --simple network create {{netblock}} {{name}}
   run_once: true
 
 - name: Determine network uuid
   shell: |
-    sf-client --no-pretty network list | grep {{name}} | cut -f 1 -d ","
+    sf-client --simple network list | grep {{name}} | cut -f 1 -d ","
   register: network_uuid_complex
 
 - name: Extract network uuid

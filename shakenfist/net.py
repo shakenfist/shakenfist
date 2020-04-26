@@ -263,10 +263,14 @@ class Network(object):
 
         # Otherwise ask the network node to do additional cleanup. Other nodes
         # will catch up later if needed.
-        else:
-            c = apiclient.Client('http://%s:%s' % (config.parsed.get('NETWORK_NODE_IP'),
-                                                   config.parsed.get('API_PORT')))
-            c.delete_network(self.uuid)
+        elif len(list(db.get_network_interfaces(self.uuid))) == 0:
+            try:
+                c = apiclient.Client('http://%s:%s' % (config.parsed.get('NETWORK_NODE_IP'),
+                                                       config.parsed.get('API_PORT')))
+                c.delete_network(self.uuid)
+            except apiclient.APIException:
+                # The network might still be in use on other nodes (race condition)
+                pass
 
     def update_dhcp(self):
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):

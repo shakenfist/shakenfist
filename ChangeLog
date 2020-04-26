@@ -1,6 +1,9 @@
 CHANGES
 =======
 
+* Add JSON as a client output format
+* Add missing file
+* Allow networks to have names
 * More network tests and associated fixes
 * Get rid of that annoying impl thing
 * Enable overlapping virtual networks
