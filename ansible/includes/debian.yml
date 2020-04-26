@@ -23,6 +23,7 @@
         "net-tools",
         "bridge-utils",
         "dnsmasq",
+        "arping",
       ]
     state: latest
 

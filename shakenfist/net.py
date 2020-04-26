@@ -274,6 +274,7 @@ class Network(object):
 
     def update_dhcp(self):
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
+            self.ensure_mesh()
             subst = self.subst_dict()
             with util.RecordedOperation('update dhcp', self) as _:
                 with lockutils.lock('sf_net_%s' % self.uuid, external=True, lock_path='/tmp/'):

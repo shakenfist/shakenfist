@@ -1,6 +1,7 @@
 CHANGES
 =======
 
+* Better REST API error checking, and JSON mode in client
 * Add JSON as a client output format
 * Add missing file
 * Allow networks to have names

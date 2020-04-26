@@ -187,6 +187,7 @@ class Instances(Resource):
         parser.add_argument('user_data', type=str)
         args = parser.parse_args()
 
+        # The instance needs to exist in the DB before network interfaces are created
         new_instance_uuid = str(uuid.uuid4())
         instance = virt.from_definition(
             uuid=new_instance_uuid,
@@ -198,23 +199,56 @@ class Instances(Resource):
             user_data=args['user_data']
         )
 
-        with util.RecordedOperation('allocate ip addresses', instance) as _:
-            order = 0
-            for network in args['network']:
-                n = net.from_db(network)
-                if n:
-                    ip = n.ipmanager.get_random_free_address()
-                    n.persist_ipmanager()
+        # Check we can get the required IPs
+        nets = {}
+        allocations = {}
 
-                    macaddr = str(randmac.RandMac(
-                        '00:00:00:00:00:00', False)).lstrip('\'').rstrip('\'')
-                    db.create_network_interface(
-                        str(uuid.uuid4()), network, new_instance_uuid, macaddr, ip, order)
-                    order += 1
+        def error_with_cleanup(status_code, message):
+            for network_uuid in allocations:
+                for addr, _ in allocations[network_uuid]:
+                    nets[network_uuid].ipmanager.release(addr)
+                nets[network_uuid].persist_ipmanager()
+            return error(status_code, message)
 
-                    n.create()
-                    n.ensure_mesh()
-                    n.update_dhcp()
+        order = 0
+        for network in args['network']:
+            if not '@' in network:
+                network_uuid = network
+                addr = None
+            else:
+                network_uuid, addr = network.split('@')
+
+            if not network_uuid in nets:
+                n = net.from_db(network_uuid)
+                if not n:
+                    error_with_cleanup(
+                        404, 'network %s not found' % network_uuid)
+                nets[network_uuid] = n
+                n.create()
+
+            allocations.setdefault(network_uuid, [])
+            if not addr:
+                addr = nets[network_uuid].ipmanager.get_random_free_address()
+            else:
+                if not nets[network_uuid].ipmanager.reserve(addr):
+                    error_with_cleanup(409, 'address %s in use' % addr)
+            nets[network_uuid].persist_ipmanager()
+            allocations[network_uuid].append((addr, order))
+
+            macaddr = str(randmac.RandMac(
+                '00:00:00:00:00:00', True)).lstrip('\'').rstrip('\'')
+            db.create_network_interface(
+                str(uuid.uuid4()), network_uuid, new_instance_uuid,
+                macaddr, addr, order)
+
+            order += 1
+
+        # Now we can start the instance
+        with util.RecordedOperation('ensure networks exist', instance) as _:
+            for network_uuid in nets:
+                n = nets[network_uuid]
+                n.ensure_mesh()
+                n.update_dhcp()
 
         with util.RecordedOperation('instance creation', instance) as _:
             instance.create(None)
