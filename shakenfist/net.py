@@ -366,3 +366,35 @@ class Network(object):
             'bridge fdb del to 00:00:00:00:00:00 dst %(node)s dev %(vx_interface)s'
             % subst,
             shell=True)
+
+    def add_floating_ip(self, floating_address, inner_address):
+        LOG.info('%s: Adding floating ip %s -> %s'
+                 % (self, floating_address, inner_address))
+        subst = self.subst_dict()
+        subst['floating_address'] = floating_address
+        subst['innner_address'] = inner_address
+
+        processutils.execute(
+            '%(in_namespace)s ip addr add %(floating_address)s/%(netmask)s '
+            'dev %(physical_veth_inner)s' % subst,
+            shell=True)
+        processutils.execute(
+            '%(in_namespace)s iptables -t nat -A PREROUTING '
+            '-d %(floating_address)s -j DNAT --to-destination %(inner_address)s' % subst,
+            shell=True)
+
+    def remove_floating_ip(self, floating_address, inner_address):
+        LOG.info('%s: Removing floating ip %s -> %s'
+                 % (self, floating_address, inner_address))
+        subst = self.subst_dict()
+        subst['floating_address'] = floating_address
+        subst['innner_address'] = inner_address
+
+        processutils.execute(
+            '%(in_namespace)s ip addr del %(floating_address)s/%(netmask)s '
+            'dev %(physical_veth_inner)s' % subst,
+            shell=True)
+        processutils.execute(
+            '%(in_namespace)s iptables -t nat -D PREROUTING '
+            '-d %(floating_address)s -j DNAT --to-destination %(inner_address)s' % subst,
+            shell=True)

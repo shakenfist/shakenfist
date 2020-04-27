@@ -131,6 +131,7 @@ def _show_network(ctx, n):
         print(json.dumps(filter_dict(n, ['uuid', 'name', 'vxid', 'netblock', 'provide_dhcp',
                                          'provide_nat', 'owner']),
                          indent=4, sort_keys=True))
+        return
 
     format_string = '%-12s: %s'
     if ctx.obj['OUTPUT'] == 'simple':
@@ -229,9 +230,11 @@ def _show_instance(ctx, i):
         for interface in CLIENT.get_instance_interfaces(i['uuid']):
             out['network_interfaces'].append(
                 filter_dict(
-                    interface, ['uuid', 'network_uuid', 'macaddr', 'ipv4']))
+                    interface, ['uuid', 'network_uuid', 'macaddr', 'order',
+                                'ipv4', 'floating']))
 
         print(json.dumps(out, indent=4, sort_keys=True))
+        return
 
     format_string = '%-12s: %s'
     if ctx.obj['OUTPUT'] == 'simple':
@@ -253,18 +256,25 @@ def _show_instance(ctx, i):
     print(format_string % ('ssh key', i['ssh_key']))
     print(format_string % ('user data', i['user_data']))
 
-    format_string = '    %-8s: %s'
-    if ctx.obj['OUTPUT'] == 'simple':
-        format_string = 'iface %s:%s'
-
     print()
-    print('Interfaces:')
-    for interface in CLIENT.get_instance_interfaces(i['uuid']):
-        print()
-        print(format_string % ('uuid', interface['uuid']))
-        print(format_string % ('network', interface['network_uuid']))
-        print(format_string % ('macaddr', interface['macaddr']))
-        print(format_string % ('ipv4', interface['ipv4']))
+    if ctx.obj['OUTPUT'] == 'pretty':
+        format_string = '    %-8s: %s'
+        print('Interfaces:')
+        for interface in CLIENT.get_instance_interfaces(i['uuid']):
+            print()
+            print(format_string % ('uuid', interface['uuid']))
+            print(format_string % ('network', interface['network_uuid']))
+            print(format_string % ('macaddr', interface['macaddr']))
+            print(format_string % ('order', interface['order']))
+            print(format_string % ('ipv4', interface['ipv4']))
+            print(format_string % ('floating', interface['floating']))
+    else:
+        print('iface,interface uuid,network uuid,macaddr,order,ipv4,floating')
+        for interface in CLIENT.get_instance_interfaces(i['uuid']):
+            print('iface,%s,%s,%s,%s,%s,%s'
+                  % (interface['uuid'], interface['network_uuid'],
+                     interface['macaddr'], interface['order'], interface['ipv4'],
+                     interface['floating']))
 
 
 @instance.command(name='show', help='Show an instance')
@@ -372,6 +382,30 @@ def instance_snapshot(ctx, instance_uuid=None, all=False):
 
 
 cli.add_command(instance)
+
+
+@click.group(help='Interface commands')
+def interface():
+    pass
+
+
+@interface.command(name='float',
+                   help='Add a floating IP to an interface')
+@click.argument('interface_uuid', type=click.STRING)
+@click.pass_context
+def interface_float(ctx, interface_uuid=None):
+    CLIENT.float_interface(interface_uuid)
+
+
+@interface.command(name='defloat',
+                   help='Remove a floating IP to an interface')
+@click.argument('interface_uuid', type=click.STRING)
+@click.pass_context
+def interface_deloat(ctx, interface_uuid=None):
+    CLIENT.defloat_interface(interface_uuid)
+
+
+cli.add_command(interface)
 
 
 @click.group(help='Image commands')

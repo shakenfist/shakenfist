@@ -39,7 +39,7 @@
 
 - name: Determine instance IP
   shell: |
-    sf-client --simple instance show {{vars[name + '_uuid']}} | grep "ipv4" | cut -f 2 -d ":"
+    sf-client --simple instance show {{vars[name + '_uuid']}} | grep iface | grep -v "interface uuid" | cut -f 6 -d ","
   register: instance_ip_complex
 
 - name: Extract instance IP

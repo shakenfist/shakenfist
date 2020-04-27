@@ -1,6 +1,9 @@
 CHANGES
 =======
 
+* First baby steps towards having an ansible module
+* Users can request specific IP addresses for interfaces
+* Fix small bugs in JSON output
 * Better REST API error checking, and JSON mode in client
 * Add JSON as a client output format
 * Add missing file

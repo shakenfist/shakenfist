@@ -115,8 +115,9 @@ class Network(Base):
     floating_gateway = Column(String)
     name = Column(String)
 
-    def __init__(self, uuid, vxid, netblock, provide_dhcp, provide_nat, owner, name):
-        self.uuid = uuid
+    def __init__(self, network_uuid, vxid, netblock, provide_dhcp, provide_nat,
+                 owner, name):
+        self.uuid = network_uuid
         self.vxid = vxid
         self.netblock = netblock
         self.provide_dhcp = provide_dhcp
@@ -140,12 +141,12 @@ class Network(Base):
         }
 
 
-def get_network(uuid):
+def get_network(network_uuid):
     ensure_valid_session()
 
     try:
         return SESSION.query(Network).filter(
-            Network.uuid == uuid).one().export()
+            Network.uuid == network_uuid).one().export()
     except exc.NoResultFound:
         return None
 
@@ -182,12 +183,12 @@ def allocate_network(netblock, provide_dhcp=True, provide_nat=False, name=None):
         SESSION.commit()
 
 
-def delete_network(uuid):
+def delete_network(network_uuid):
     ensure_valid_session()
 
     try:
         for n in SESSION.query(Network).filter(
-                Network.uuid == uuid).all():
+                Network.uuid == network_uuid).all():
             SESSION.delete(n)
     except exc.NoResultFound:
         return None
@@ -205,21 +206,21 @@ def create_floating_network(netblock):
         SESSION.commit()
 
 
-def persist_ipmanager(uuid, data):
+def persist_ipmanager(network_uuid, data):
     ensure_valid_session()
 
     try:
-        n = SESSION.query(Network).filter(Network.uuid == uuid).one()
+        n = SESSION.query(Network).filter(Network.uuid == network_uuid).one()
         n.ipmanager = data.encode('utf-8')
     finally:
         SESSION.commit()
 
 
-def persist_floating_gateway(uuid, gateway):
+def persist_floating_gateway(network_uuid, gateway):
     ensure_valid_session()
 
     try:
-        n = SESSION.query(Network).filter(Network.uuid == uuid).one()
+        n = SESSION.query(Network).filter(Network.uuid == network_uuid).one()
         n.floating_gateway = gateway
     finally:
         SESSION.commit()
@@ -239,9 +240,9 @@ class Instance(Base):
     vdi_port = Column(Integer)
     user_data = Column(String)
 
-    def __init__(self, uuid, name, cpus, memory_mb, disk_spec,
+    def __init__(self, instance_uuid, name, cpus, memory_mb, disk_spec,
                  ssh_key, node, console_port, vdi_port, user_data):
-        self.uuid = uuid
+        self.uuid = instance_uuid
         self.name = name
         self.cpus = cpus
         self.memory = memory_mb
@@ -267,12 +268,12 @@ class Instance(Base):
         }
 
 
-def get_instance(uuid):
+def get_instance(instance_uuid):
     ensure_valid_session()
 
     try:
         return SESSION.query(Instance).filter(
-            Instance.uuid == uuid).one().export()
+            Instance.uuid == instance_uuid).one().export()
     except exc.NoResultFound:
         return None
     finally:
@@ -295,7 +296,7 @@ def get_instances(local_only=False):
         pass
 
 
-def create_instance(uuid, name, cpus, memory_mb, disk_spec, ssh_key, user_data):
+def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key, user_data):
     ensure_valid_session()
 
     try:
@@ -303,7 +304,7 @@ def create_instance(uuid, name, cpus, memory_mb, disk_spec, ssh_key, user_data):
         # we haven't double allocated the port number on this node.
         console_port = random.randrange(30000, 31000)
         vdi_port = random.randrange(30000, 31000)
-        i = Instance(uuid, name, cpus, memory_mb, disk_spec, ssh_key,
+        i = Instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key,
                      config.parsed.get('NODE_NAME'), console_port,
                      vdi_port, user_data)
         SESSION.add(i)
@@ -312,18 +313,18 @@ def create_instance(uuid, name, cpus, memory_mb, disk_spec, ssh_key, user_data):
         SESSION.commit()
 
 
-def delete_instance(uuid):
+def delete_instance(instance_uuid):
     ensure_valid_session()
 
     try:
         for s in SESSION.query(Snapshot).filter(
-                Snapshot.instance_uuid == uuid):
+                Snapshot.instance_uuid == instance_uuid):
             SESSION.delete(s)
         for ni in SESSION.query(NetworkInterface).filter(
-                NetworkInterface.instance_uuid == uuid).all():
+                NetworkInterface.instance_uuid == instance_uuid).all():
             SESSION.delete(ni)
         i = SESSION.query(Instance).filter(
-            Instance.uuid == uuid).one()
+            Instance.uuid == instance_uuid).one()
         SESSION.delete(i)
     except exc.NoResultFound:
         return None
@@ -340,14 +341,17 @@ class NetworkInterface(Base):
     macaddr = Column(String)
     ipv4 = Column(String)
     order = Column(Integer)
+    floating = Column(String)
 
-    def __init__(self, uuid, network_uuid, instance_uuid, macaddr, ipv4, order):
-        self.uuid = uuid
+    def __init__(self, interface_uuid, network_uuid, instance_uuid, macaddr, ipv4, order,
+                 floating):
+        self.uuid = interface_uuid
         self.network_uuid = network_uuid
         self.instance_uuid = instance_uuid
         self.macaddr = macaddr
         self.ipv4 = ipv4
         self.order = order
+        self.floating = floating
 
     def export(self):
         return {
@@ -356,7 +360,8 @@ class NetworkInterface(Base):
             'instance_uuid': self.instance_uuid,
             'macaddr': self.macaddr,
             'ipv4': self.ipv4,
-            'order': self.order
+            'order': self.order,
+            'floating': self.floating
         }
 
 
@@ -374,22 +379,23 @@ def is_address_free(network_uuid, address):
         return True
 
 
-def create_network_interface(uuid, network_uuid, instance_uuid, macaddr, ipv4, order):
+def create_network_interface(interface_uuid, network_uuid, instance_uuid, macaddr, ipv4,
+                             order):
     ensure_valid_session()
 
     try:
         SESSION.add(NetworkInterface(
-            uuid, network_uuid, instance_uuid, macaddr, ipv4, order))
+            interface_uuid, network_uuid, instance_uuid, macaddr, ipv4, order, None))
     finally:
         SESSION.commit()
 
 
-def delete_network_interface(uuid):
+def delete_network_interface(interface_uuid):
     ensure_valid_session()
 
     try:
         for i in SESSION.query(NetworkInterface).filter(
-                NetworkInterface.instance_uuid == uuid).all():
+                NetworkInterface.instance_uuid == interface_uuid).all():
             SESSION.delete(i)
     except exc.NoResultFound:
         return None
@@ -397,28 +403,60 @@ def delete_network_interface(uuid):
         SESSION.commit()
 
 
-def get_instance_interfaces(uuid):
+def get_instance_interfaces(instance_uuid):
     ensure_valid_session()
 
     try:
         interfaces = SESSION.query(NetworkInterface).filter(
-            NetworkInterface.instance_uuid == uuid).all()
+            NetworkInterface.instance_uuid == instance_uuid).all()
         for i in interfaces:
             yield i.export()
     except exc.NoResultFound:
         pass
 
 
-def get_network_interfaces(uuid):
+def get_network_interfaces(network_uuid):
     ensure_valid_session()
 
     try:
         interfaces = SESSION.query(NetworkInterface).filter(
-            NetworkInterface.network_uuid == uuid).all()
+            NetworkInterface.network_uuid == network_uuid).all()
         for i in interfaces:
             yield i.export()
     except exc.NoResultFound:
         pass
+
+
+def get_interface(interface_uuid):
+    ensure_valid_session()
+
+    try:
+        return SESSION.query(NetworkInterface).filter(
+            NetworkInterface.uuid == interface_uuid).one()
+    except exc.NoResultFound:
+        pass
+
+
+def add_floating_to_interface(interface_uuid, addr):
+    ensure_valid_session()
+
+    try:
+        ni = SESSION.query(NetworkInterface).filter(
+            NetworkInterface.uuid == interface_uuid).one()
+        ni.floating = addr
+    finally:
+        SESSION.commit()
+
+
+def remove_floating_from_interface(interface_uuid):
+    ensure_valid_session()
+
+    try:
+        ni = SESSION.query(NetworkInterface).filter(
+            NetworkInterface.uuid == interface_uuid).one()
+        ni.floating = None
+    finally:
+        SESSION.commit()
 
 
 class Snapshot(Base):
@@ -429,8 +467,8 @@ class Snapshot(Base):
     instance_uuid = Column(String)
     created = Column(DateTime)
 
-    def __init__(self, uuid, device, instance_uuid, created):
-        self.uuid = uuid
+    def __init__(self, snapshot_uuid, device, instance_uuid, created):
+        self.uuid = snapshot_uuid
         self.device = device
         self.instance_uuid = instance_uuid
         self.created = created
@@ -449,5 +487,7 @@ def create_snapshot(uuid, device, instance_uuid, created):
 
     try:
         SESSION.add(Snapshot(uuid, device, instance_uuid, created))
+
+        SESSION.add(Snapshot(snapshot_uuid, device, instance_uuid, created))
     finally:
         SESSION.commit()

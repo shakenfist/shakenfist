@@ -126,6 +126,29 @@ def arg_is_network_uuid(func):
     return wrapper
 
 
+def redirect_to_network_node(func):
+    # Redirect method to the network node
+    def wrapper(*args, **kwargs):
+        if config.parsed.get('NODE_IP') != config.parsed.get('NETWORK_NODE_IP'):
+            r = requests.request(
+                flask.request.environ['REQUEST_METHOD'],
+                'http://%s:%d%s'
+                % (config.parsed.get('NETWORK_NODE_IP'),
+                   config.parsed.get('API_PORT'),
+                   flask.request.environ['PATH_INFO']),
+                data=flask.request.get_json())
+
+            LOG.info('Returning proxied request: %d, %s'
+                     % (r.status_code, r.text))
+            resp = flask.Response(r.text,
+                                  mimetype='application/json')
+            resp.status_code = r.status_code
+            return resp
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
 app = flask.Flask(__name__)
 api = flask_restful.Api(app, catch_all_404s=False)
 
@@ -315,6 +338,54 @@ class InstanceUnpause(Resource):
         return instance_from_db_virt.unpause()
 
 
+class InterfaceFloat(Resource):
+    @redirect_to_network_node
+    def post(self, interface_uuid=None):
+        ni = db.get_interface(interface_uuid)
+        if not ni:
+            return error(404, 'network interface not found')
+
+        if ni['floating']:
+            return error(409, 'this interface already has a floating ip')
+
+        n = net.from_db(ni['network_uuid'])
+        if not n:
+            return error(404, 'network not found')
+
+        float_net = net.from_db('floating')
+        if not float_net:
+            return error(404, 'floating network not found')
+
+        addr = float_net.ipmanager.get_random_free_address()
+        float_net.persist_ipmanager()
+        db.add_floating_to_interface(ni['uuid'], addr)
+        n.add_floating_ip(addr, ni['ipv4'])
+
+
+class InterfaceDefloat(Resource):
+    @redirect_to_network_node
+    def post(self, interface_uuid=None):
+        ni = db.get_interface(interface_uuid)
+        if not ni:
+            return error(404, 'network interface not found')
+
+        if not ni['floating']:
+            return error(409, 'this interface does not have a floating ip')
+
+        n = net.from_db(ni['network_uuid'])
+        if not n:
+            return error(404, 'network not found')
+
+        float_net = net.from_db('floating')
+        if not float_net:
+            return error(404, 'floating network not found')
+
+        float_net.ipmanager.release(ni['floating'])
+        float_net.persist_ipmanager()
+        db.remove_floating_from_interface(ni['uuid'])
+        n.remove_floating_ip(ni['floating'], ni['ipv4'])
+
+
 class Image(Resource):
     def post(self):
         parser = reqparse.RequestParser()
@@ -413,6 +484,7 @@ class Nodes(Resource):
 
 
 class DeployNetworkNode(Resource):
+    @redirect_to_network_node
     def put(self):
         parser = reqparse.RequestParser()
         parser.add_argument('uuid', type=str)
@@ -427,6 +499,7 @@ class DeployNetworkNode(Resource):
 
 
 class UpdateDHCP(Resource):
+    @redirect_to_network_node
     def put(self):
         parser = reqparse.RequestParser()
         parser.add_argument('uuid', type=str)
@@ -440,6 +513,7 @@ class UpdateDHCP(Resource):
 
 
 class RemoveDHCP(Resource):
+    @redirect_to_network_node
     def put(self):
         parser = reqparse.RequestParser()
         parser.add_argument('uuid', type=str)
@@ -463,6 +537,8 @@ api.add_resource(InstancePowerOff, '/instances/<instance_uuid>/poweroff')
 api.add_resource(InstancePowerOn, '/instances/<instance_uuid>/poweron')
 api.add_resource(InstancePause, '/instances/<instance_uuid>/pause')
 api.add_resource(InstanceUnpause, '/instances/<instance_uuid>/unpause')
+api.add_resource(InterfaceFloat, '/interfaces/<interface_uuid>/float')
+api.add_resource(InterfaceDefloat, '/interfaces/<interface_uuid>/defloat')
 api.add_resource(Image, '/images')
 api.add_resource(Network, '/networks/<network_uuid>')
 api.add_resource(Networks, '/networks')
