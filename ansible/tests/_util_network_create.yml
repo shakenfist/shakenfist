@@ -1,7 +1,14 @@
 - name: Create a network
-  shell: |
-    sf-client --simple network create {{netblock}} {{name}}
+  sf_network:
+    netblock: "{{netblock}}"
+    name: "{{name}}"
+    state: present
+  register: network_create_out
   run_once: true
+
+- name: Log result
+  debug:
+    msg: "{{network_create_out}}"
 
 - name: Determine network uuid
   shell: |
