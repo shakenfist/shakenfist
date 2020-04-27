@@ -10,7 +10,12 @@ LOG.setLevel(logging.INFO)
 
 
 class APIException(Exception):
-    pass
+    def __init__(self, message, method, url, status_code, text):
+        self.message = message
+        self.method = method
+        self.url = url
+        self.status_code = status_code
+        self.text = text
 
 
 def _request_url(method, url, data=None):
@@ -36,8 +41,8 @@ def _request_url(method, url, data=None):
     LOG.debug('-------------------------------------------------------')
 
     if r.status_code != 200:
-        raise APIException('Failed to get %s (status %s): %s'
-                           % (url, r.status_code, r.text))
+        raise APIException(
+            'API request failed', method, url, r.status_code, r.text)
     return r
 
 
@@ -51,12 +56,12 @@ class Client(object):
         r = _request_url('GET', self.base_url + '/instances')
         return r.json()
 
-    def get_instance(self, uuid):
-        r = _request_url('GET', self.base_url + '/instances/' + uuid)
+    def get_instance(self, instance_uuid):
+        r = _request_url('GET', self.base_url + '/instances/' + instance_uuid)
         return r.json()
 
-    def get_instance_interfaces(self, uuid):
-        r = _request_url('GET', self.base_url + '/instances/' + uuid +
+    def get_instance_interfaces(self, instance_uuid):
+        r = _request_url('GET', self.base_url + '/instances/' + instance_uuid +
                          '/interfaces')
         return r.json()
 
@@ -78,41 +83,42 @@ class Client(object):
                          })
         return r.json()
 
-    def snapshot_instance(self, uuid, all=False):
-        r = _request_url('POST', self.base_url + '/instances/' + uuid +
+    def snapshot_instance(self, instance_uuid, all=False):
+        r = _request_url('POST', self.base_url + '/instances/' + instance_uuid +
                          '/snapshot', data={'all': all})
         return r.json()
 
-    def reboot_instance(self, uuid, hard=False):
+    def reboot_instance(self, instance_uuid, hard=False):
         style = 'soft'
         if hard:
             style = 'hard'
-        r = _request_url('POST', self.base_url + '/instances/' + uuid +
+        r = _request_url('POST', self.base_url + '/instances/' + instance_uuid +
                          '/reboot' + style)
         return r.json()
 
-    def power_off_instance(self, uuid):
-        r = _request_url('POST', self.base_url + '/instances/' + uuid +
+    def power_off_instance(self, instance_uuid):
+        r = _request_url('POST', self.base_url + '/instances/' + instance_uuid +
                          '/poweroff')
         return r.json()
 
-    def power_on_instance(self, uuid):
-        r = _request_url('POST', self.base_url + '/instances/' + uuid +
+    def power_on_instance(self, instance_uuid):
+        r = _request_url('POST', self.base_url + '/instances/' + instance_uuid +
                          '/poweron')
         return r.json()
 
-    def pause_instance(self, uuid):
-        r = _request_url('POST', self.base_url + '/instances/' + uuid +
+    def pause_instance(self, instance_uuid):
+        r = _request_url('POST', self.base_url + '/instances/' + instance_uuid +
                          '/pause')
         return r.json()
 
-    def unpause_instance(self, uuid):
-        r = _request_url('POST', self.base_url + '/instances/' + uuid +
+    def unpause_instance(self, instance_uuid):
+        r = _request_url('POST', self.base_url + '/instances/' + instance_uuid +
                          '/unpause')
         return r.json()
 
-    def delete_instance(self, uuid):
-        r = _request_url('DELETE', self.base_url + '/instances/' + uuid)
+    def delete_instance(self, instance_uuid):
+        r = _request_url('DELETE', self.base_url +
+                         '/instances/' + instance_uuid)
         return r.json()
 
     def cache_image(self, image_url):
@@ -124,12 +130,12 @@ class Client(object):
         r = _request_url('GET', self.base_url + '/networks')
         return r.json()
 
-    def get_network(self, uuid):
-        r = _request_url('GET', self.base_url + '/networks/' + uuid)
+    def get_network(self, network_uuid):
+        r = _request_url('GET', self.base_url + '/networks/' + network_uuid)
         return r.json()
 
-    def delete_network(self, uuid):
-        r = _request_url('DELETE', self.base_url + '/networks/' + uuid)
+    def delete_network(self, network_uuid):
+        r = _request_url('DELETE', self.base_url + '/networks/' + network_uuid)
         return r.json()
 
     def allocate_network(self, netblock, provide_dhcp, provide_nat, name):
@@ -147,3 +153,13 @@ class Client(object):
         for n in r.json():
             n['lastseen'] = parsedate_to_datetime(n['lastseen'])
             yield n
+
+    def float_interface(self, interface_uuid):
+        r = _request_url('POST', self.base_url + '/interface/' + interface_uuid +
+                         '/float')
+        return r.json()
+
+    def defloat_interface(self, interface_uuid):
+        r = _request_url('POST', self.base_url + '/interface/' + interface_uuid +
+                         '/defloat')
+        return r.json()

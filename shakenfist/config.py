@@ -21,9 +21,15 @@ except Exception:
         'deploys.')
 
 CONFIG_DEFAULTS = {
-    # Deployment options
+    # Deployment wide options
+    # -----------------------
+
     # The ports for the internal REST API service
     'API_PORT': 13000,
+
+    # If tracebacks should be included where relevant in API responses.
+    # Do not enable for untrusted clients!
+    'INCLUDE_TRACEBACKS': '1',
 
     # A network block used for NAT egress from VMs and floating IPs
     'FLOATING_NETWORK': '192.168.20.0/24',

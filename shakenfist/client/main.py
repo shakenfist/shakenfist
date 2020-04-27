@@ -2,6 +2,7 @@
 
 import click
 import datetime
+import json
 import logging
 import os
 from prettytable import PrettyTable
@@ -21,14 +22,24 @@ LOG.setLevel(logging.INFO)
 CLIENT = apiclient.Client()
 
 
+def filter_dict(d, allowed_keys):
+    out = {}
+    for key in allowed_keys:
+        if key in d:
+            out[key] = d[key]
+    return out
+
+
 @click.group()
-@click.option('--pretty/--no-pretty', default=True)
+@click.option('--pretty', 'output', flag_value='pretty', default=True)
+@click.option('--simple', 'output', flag_value='simple')
+@click.option('--json', 'output', flag_value='json')
 @click.option('--verbose/--no-verbose', default=False)
 @click.pass_context
-def cli(ctx, pretty, verbose):
+def cli(ctx, output, verbose):
     if not ctx.obj:
         ctx.obj = {}
-    ctx.obj['PRETTY'] = pretty
+    ctx.obj['OUTPUT'] = output
 
     if verbose:
         LOG.setLevel(logging.DEBUG)
@@ -52,17 +63,23 @@ def _get_networks(ctx, args, incomplete):
 def node_list(ctx):
     nodes = list(CLIENT.get_nodes())
 
-    if ctx.obj['PRETTY']:
+    if ctx.obj['OUTPUT'] == 'pretty':
         x = PrettyTable()
         x.field_names = ['name', 'ip', 'lastseen']
         for n in nodes:
             x.add_row([n['name'], n['ip'], n['lastseen']])
         print(x)
 
-    else:
+    elif ctx.obj['OUTPUT'] == 'simple':
         print('name,ip,lastseen')
         for n in nodes:
             print('%s,%s,%s' % (n['name'], n['ip'], n['lastseen']))
+
+    elif ctx.obj['OUTPUT'] == 'json':
+        filtered_nodes = []
+        for n in nodes:
+            filtered_nodes.append(filter_dict(n, ['name', 'ip', 'lastseen']))
+        print(json.dumps({'nodes': filtered_nodes}, indent=4, sort_keys=True))
 
 
 cli.add_command(node)
@@ -83,18 +100,26 @@ def _get_networks(ctx, args, incomplete):
 def network_list(ctx):
     nets = list(CLIENT.get_networks())
 
-    if ctx.obj['PRETTY']:
+    if ctx.obj['OUTPUT'] == 'pretty':
         x = PrettyTable()
         x.field_names = ['uuid', 'name', 'owner', 'netblock']
         for n in nets:
             x.add_row([n['uuid'], n['name'], n['owner'], n['netblock']])
         print(x)
 
-    else:
+    elif ctx.obj['OUTPUT'] == 'simple':
         print('uuid,name,owner,netblock')
         for n in nets:
             print('%s,%s,%s,%s' %
                   (n['uuid'], n['name'], n['owner'], n['netblock']))
+
+    elif ctx.obj['OUTPUT'] == 'json':
+        filtered_nets = []
+        for n in nets:
+            filtered_nets.append(filter_dict(
+                n, ['uuid', 'name', 'owner', 'netblock']))
+        print(json.dumps({'networks': filtered_nets},
+                         indent=4, sort_keys=True))
 
 
 def _show_network(ctx, n):
@@ -102,8 +127,14 @@ def _show_network(ctx, n):
         print('Network not found')
         sys.exit(1)
 
+    if ctx.obj['OUTPUT'] == 'json':
+        print(json.dumps(filter_dict(n, ['uuid', 'name', 'vxid', 'netblock', 'provide_dhcp',
+                                         'provide_nat', 'owner']),
+                         indent=4, sort_keys=True))
+        return
+
     format_string = '%-12s: %s'
-    if not ctx.obj['PRETTY']:
+    if ctx.obj['OUTPUT'] == 'simple':
         format_string = '%s:%s'
 
     print(format_string % ('uuid', n['uuid']))
@@ -116,10 +147,10 @@ def _show_network(ctx, n):
 
 
 @network.command(name='show', help='Show a network')
-@click.argument('uuid', type=click.STRING, autocompletion=_get_networks)
+@click.argument('network_uuid', type=click.STRING, autocompletion=_get_networks)
 @click.pass_context
-def network_show(ctx, uuid=None):
-    _show_network(ctx, CLIENT.get_network(uuid))
+def network_show(ctx, network_uuid=None):
+    _show_network(ctx, CLIENT.get_network(network_uuid))
 
 
 @network.command(name='create',
@@ -140,10 +171,10 @@ def network_create(ctx, netblock=None, name=None, dhcp=None, nat=None):
 
 
 @network.command(name='delete', help='Delete a network')
-@click.argument('uuid', type=click.STRING, autocompletion=_get_networks)
+@click.argument('network_uuid', type=click.STRING, autocompletion=_get_networks)
 @click.pass_context
-def network_delete(ctx, uuid=None):
-    CLIENT.delete_network(uuid)
+def network_delete(ctx, network_uuid=None):
+    CLIENT.delete_network(network_uuid)
 
 
 cli.add_command(network)
@@ -164,18 +195,26 @@ def _get_instances(ctx, args, incomplete):
 def instance_list(ctx):
     insts = CLIENT.get_instances()
 
-    if ctx.obj['PRETTY']:
+    if ctx.obj['OUTPUT'] == 'pretty':
         x = PrettyTable()
         x.field_names = ['uuid', 'name', 'cpus', 'memory', 'hypervisor']
         for i in insts:
             x.add_row([i['uuid'], i['name'], i['cpus'], i['memory'], i['node']])
         print(x)
 
-    else:
+    elif ctx.obj['OUTPUT'] == 'simple':
         print('uuid,name,cpus,memory,hypervisor')
         for i in insts:
             print('%s,%s,%s,%s,%s' %
                   (i['uuid'], i['name'], i['cpus'], i['memory'], i['node']))
+
+    elif ctx.obj['OUTPUT'] == 'json':
+        filtered_insts = []
+        for i in insts:
+            filtered_insts.append(filter_dict(
+                i, ['uuid', 'name', 'cpus', 'memory', 'node']))
+        print(json.dumps({'instances': filtered_insts},
+                         indent=4, sort_keys=True))
 
 
 def _show_instance(ctx, i):
@@ -183,8 +222,22 @@ def _show_instance(ctx, i):
         print('Instance not found')
         sys.exit(1)
 
+    if ctx.obj['OUTPUT'] == 'json':
+        out = filter_dict(i, ['uuid', 'name', 'cpus', 'memory', 'disk_spec',
+                              'node', 'console_port', 'vdi_port', 'ssh_key',
+                              'user_data'])
+        out['network_interfaces'] = []
+        for interface in CLIENT.get_instance_interfaces(i['uuid']):
+            out['network_interfaces'].append(
+                filter_dict(
+                    interface, ['uuid', 'network_uuid', 'macaddr', 'order',
+                                'ipv4', 'floating']))
+
+        print(json.dumps(out, indent=4, sort_keys=True))
+        return
+
     format_string = '%-12s: %s'
-    if not ctx.obj['PRETTY']:
+    if ctx.obj['OUTPUT'] == 'simple':
         format_string = '%s:%s'
 
     print(format_string % ('uuid', i['uuid']))
@@ -192,7 +245,7 @@ def _show_instance(ctx, i):
     print(format_string % ('cpus', i['cpus']))
     print(format_string % ('memory', i['memory']))
     print(format_string % ('disk spec', i['disk_spec']))
-    print(format_string % ('hypervisor', i['node']))
+    print(format_string % ('node', i['node']))
 
     # NOTE(mikal): I am not sure we should expose this, but it will do
     # for now until a proxy is written.
@@ -203,25 +256,32 @@ def _show_instance(ctx, i):
     print(format_string % ('ssh key', i['ssh_key']))
     print(format_string % ('user data', i['user_data']))
 
-    format_string = '    %-8s: %s'
-    if not ctx.obj['PRETTY']:
-        format_string = 'iface %s:%s'
-
     print()
-    print('Interfaces:')
-    for interface in CLIENT.get_instance_interfaces(i['uuid']):
-        print()
-        print(format_string % ('uuid', interface['uuid']))
-        print(format_string % ('network', interface['network_uuid']))
-        print(format_string % ('macaddr', interface['macaddr']))
-        print(format_string % ('ipv4', interface['ipv4']))
+    if ctx.obj['OUTPUT'] == 'pretty':
+        format_string = '    %-8s: %s'
+        print('Interfaces:')
+        for interface in CLIENT.get_instance_interfaces(i['uuid']):
+            print()
+            print(format_string % ('uuid', interface['uuid']))
+            print(format_string % ('network', interface['network_uuid']))
+            print(format_string % ('macaddr', interface['macaddr']))
+            print(format_string % ('order', interface['order']))
+            print(format_string % ('ipv4', interface['ipv4']))
+            print(format_string % ('floating', interface['floating']))
+    else:
+        print('iface,interface uuid,network uuid,macaddr,order,ipv4,floating')
+        for interface in CLIENT.get_instance_interfaces(i['uuid']):
+            print('iface,%s,%s,%s,%s,%s,%s'
+                  % (interface['uuid'], interface['network_uuid'],
+                     interface['macaddr'], interface['order'], interface['ipv4'],
+                     interface['floating']))
 
 
 @instance.command(name='show', help='Show an instance')
-@click.argument('uuid', type=click.STRING, autocompletion=_get_instances)
+@click.argument('instance_uuid', type=click.STRING, autocompletion=_get_instances)
 @click.pass_context
-def instance_show(ctx, uuid=None):
-    _show_instance(ctx, CLIENT.get_instance(uuid))
+def instance_show(ctx, instance_uuid=None):
+    _show_instance(ctx, CLIENT.get_instance(instance_uuid))
 
 
 @instance.command(name='create',
@@ -270,58 +330,82 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, disk=N
 
 
 @instance.command(name='delete', help='Delete an instance')
-@click.argument('uuid', type=click.STRING, autocompletion=_get_instances)
+@click.argument('instance_uuid', type=click.STRING, autocompletion=_get_instances)
 @click.pass_context
-def instance_delete(ctx, uuid=None):
-    CLIENT.delete_instance(uuid)
+def instance_delete(ctx, instance_uuid=None):
+    CLIENT.delete_instance(instance_uuid)
 
 
 @instance.command(name='reboot', help='Reboot instance')
-@click.argument('uuid', type=click.STRING, autocompletion=_get_instances)
+@click.argument('instance_uuid', type=click.STRING, autocompletion=_get_instances)
 @click.option('--hard/--soft', default=False)
 @click.pass_context
-def instance_reboot(ctx, uuid=None, hard=False):
-    CLIENT.reboot_instance(uuid, hard=hard)
+def instance_reboot(ctx, instance_uuid=None, hard=False):
+    CLIENT.reboot_instance(instance_uuid, hard=hard)
 
 
 @instance.command(name='poweron', help='Power on an instance')
-@click.argument('uuid', type=click.STRING, autocompletion=_get_instances)
+@click.argument('instance_uuid', type=click.STRING, autocompletion=_get_instances)
 @click.pass_context
-def instance_power_on(ctx, uuid=None):
-    CLIENT.power_on_instance(uuid)
+def instance_power_on(ctx, instance_uuid=None):
+    CLIENT.power_on_instance(instance_uuid)
 
 
 @instance.command(name='poweroff', help='Power off an instance')
-@click.argument('uuid', type=click.STRING, autocompletion=_get_instances)
+@click.argument('instance_uuid', type=click.STRING, autocompletion=_get_instances)
 @click.pass_context
-def instance_power_off(ctx, uuid=None):
-    CLIENT.power_off_instance(uuid)
+def instance_power_off(ctx, instance_uuid=None):
+    CLIENT.power_off_instance(instance_uuid)
 
 
 @instance.command(name='pause', help='Pause an instance')
-@click.argument('uuid', type=click.STRING, autocompletion=_get_instances)
+@click.argument('instance_uuid', type=click.STRING, autocompletion=_get_instances)
 @click.pass_context
-def instance_pause(ctx, uuid=None):
-    CLIENT.pause_instance(uuid)
+def instance_pause(ctx, instance_uuid=None):
+    CLIENT.pause_instance(instance_uuid)
 
 
 @instance.command(name='unpause', help='Unpause an instance')
-@click.argument('uuid', type=click.STRING, autocompletion=_get_instances)
+@click.argument('instance_uuid', type=click.STRING, autocompletion=_get_instances)
 @click.pass_context
-def instance_unpause(ctx, uuid=None):
-    CLIENT.unpause_instance(uuid)
+def instance_unpause(ctx, instance_uuid=None):
+    CLIENT.unpause_instance(instance_uuid)
 
 
 @instance.command(name='snapshot', help='Snapshot instance')
-@click.argument('uuid', type=click.STRING, autocompletion=_get_instances)
+@click.argument('instance_uuid', type=click.STRING, autocompletion=_get_instances)
 @click.argument('all', type=click.BOOL, default=False)
 @click.pass_context
-def instance_snapshot(ctx, uuid=None, all=False):
+def instance_snapshot(ctx, instance_uuid=None, all=False):
     print('Created snapshot %s'
-          % CLIENT.snapshot_instance(uuid, all))
+          % CLIENT.snapshot_instance(instance_uuid, all))
 
 
 cli.add_command(instance)
+
+
+@click.group(help='Interface commands')
+def interface():
+    pass
+
+
+@interface.command(name='float',
+                   help='Add a floating IP to an interface')
+@click.argument('interface_uuid', type=click.STRING)
+@click.pass_context
+def interface_float(ctx, interface_uuid=None):
+    CLIENT.float_interface(interface_uuid)
+
+
+@interface.command(name='defloat',
+                   help='Remove a floating IP to an interface')
+@click.argument('interface_uuid', type=click.STRING)
+@click.pass_context
+def interface_deloat(ctx, interface_uuid=None):
+    CLIENT.defloat_interface(interface_uuid)
+
+
+cli.add_command(interface)
 
 
 @click.group(help='Image commands')

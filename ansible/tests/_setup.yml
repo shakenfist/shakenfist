@@ -43,14 +43,14 @@
 
 - name: Clear out old instances and networks
   shell: |
-    for inst in `sf-client --no-pretty instance list | grep -v uuid | cut -f 1 -d ","`
+    for inst in `sf-client --simple instance list | grep -v uuid | cut -f 1 -d ","`
     do
-      sf-client --no-pretty instance delete $inst
+      sf-client --simple instance delete $inst
     done
 
-    for net in `sf-client --no-pretty network list | grep -v uuid | cut -f 1 -d ","`
+    for net in `sf-client --simple network list | grep -v uuid | cut -f 1 -d ","`
     do
-      sf-client --no-pretty network delete $net
+      sf-client --simple network delete $net
     done
   run_once: true
 
@@ -60,7 +60,7 @@
       #!/bin/bash -e
 
       /srv/shakenfist/src/cleanup.sh
-      [ `sf-client --no-pretty instance list | wc -l` -eq 1 ]
+      [ `sf-client --simple instance list | wc -l` -eq 1 ]
       [ `virsh list | grep running | wc -l` -eq 0 ]
       [ `ifconfig | grep -c br-vxlan` -eq 0 ]
       /opt/sfmysql "delete from instances"

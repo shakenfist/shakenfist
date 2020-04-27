@@ -1,16 +1,18 @@
 - name: Create a network
-  shell: |
-    sf-client --no-pretty network create {{netblock}} {{name}}
+  sf_network:
+    netblock: "{{netblock}}"
+    name: "{{name}}"
+    state: present
+  register: network_create_out
   run_once: true
 
-- name: Determine network uuid
-  shell: |
-    sf-client --no-pretty network list | grep {{name}} | cut -f 1 -d ","
-  register: network_uuid_complex
+- name: Log result
+  debug:
+    msg: "{{network_create_out}}"
 
-- name: Extract network uuid
+- name: Determine network uuid
   set_fact:
-    "{{name}}_uuid": "{{network_uuid_complex.stdout}}"
+    "{{name}}_uuid": "{{network_create_out.meta.uuid}}"
 
 - name: Log instance details
   debug:

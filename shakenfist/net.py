@@ -263,13 +263,18 @@ class Network(object):
 
         # Otherwise ask the network node to do additional cleanup. Other nodes
         # will catch up later if needed.
-        else:
-            c = apiclient.Client('http://%s:%s' % (config.parsed.get('NETWORK_NODE_IP'),
-                                                   config.parsed.get('API_PORT')))
-            c.delete_network(self.uuid)
+        elif len(list(db.get_network_interfaces(self.uuid))) == 0:
+            try:
+                c = apiclient.Client('http://%s:%s' % (config.parsed.get('NETWORK_NODE_IP'),
+                                                       config.parsed.get('API_PORT')))
+                c.delete_network(self.uuid)
+            except apiclient.APIException:
+                # The network might still be in use on other nodes (race condition)
+                pass
 
     def update_dhcp(self):
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
+            self.ensure_mesh()
             subst = self.subst_dict()
             with util.RecordedOperation('update dhcp', self) as _:
                 with lockutils.lock('sf_net_%s' % self.uuid, external=True, lock_path='/tmp/'):
@@ -360,4 +365,36 @@ class Network(object):
         processutils.execute(
             'bridge fdb del to 00:00:00:00:00:00 dst %(node)s dev %(vx_interface)s'
             % subst,
+            shell=True)
+
+    def add_floating_ip(self, floating_address, inner_address):
+        LOG.info('%s: Adding floating ip %s -> %s'
+                 % (self, floating_address, inner_address))
+        subst = self.subst_dict()
+        subst['floating_address'] = floating_address
+        subst['innner_address'] = inner_address
+
+        processutils.execute(
+            '%(in_namespace)s ip addr add %(floating_address)s/%(netmask)s '
+            'dev %(physical_veth_inner)s' % subst,
+            shell=True)
+        processutils.execute(
+            '%(in_namespace)s iptables -t nat -A PREROUTING '
+            '-d %(floating_address)s -j DNAT --to-destination %(inner_address)s' % subst,
+            shell=True)
+
+    def remove_floating_ip(self, floating_address, inner_address):
+        LOG.info('%s: Removing floating ip %s -> %s'
+                 % (self, floating_address, inner_address))
+        subst = self.subst_dict()
+        subst['floating_address'] = floating_address
+        subst['innner_address'] = inner_address
+
+        processutils.execute(
+            '%(in_namespace)s ip addr del %(floating_address)s/%(netmask)s '
+            'dev %(physical_veth_inner)s' % subst,
+            shell=True)
+        processutils.execute(
+            '%(in_namespace)s iptables -t nat -D PREROUTING '
+            '-d %(floating_address)s -j DNAT --to-destination %(inner_address)s' % subst,
             shell=True)
