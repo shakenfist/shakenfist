@@ -1,6 +1,7 @@
 import flask
 import flask_restful
 from flask_restful import fields, marshal_with, reqparse
+import ipaddress
 import json
 import logging
 import randmac
@@ -443,6 +444,11 @@ class Networks(Resource):
         parser.add_argument('provide_nat', type=bool)
         parser.add_argument('name', type=str)
         args = parser.parse_args()
+
+        try:
+            ipblock = ipaddress.ip_network(args['netblock'])
+        except ValueError as e:
+            return error(400, 'cannot parse netblock: %s' % e)
 
         network = db.allocate_network(args['netblock'],
                                       args['provide_dhcp'],
