@@ -29,7 +29,8 @@
         name="cirros"
         distro=cirros
         network="{{net_one_uuid}}"
-        extra=""
+        sshkey=""
+        userdata=""
 
     - name: Validate
       copy:
@@ -146,7 +147,8 @@
         name="ubuntu"
         distro=ubuntu:18.04
         network="{{net_one_uuid}}"
-        extra=""
+        sshkey=""
+        userdata=""
 
 - hosts: sf-1
   become: yes
@@ -179,8 +181,9 @@
 
   tasks:
     - name: Deleting an instance hosted locally should work
-      shell: |
-        sf-client instance delete {{ubuntu_uuid}}
+      sf_instance:
+        uuid: "{{ubuntu_uuid}}"
+        state: absent
 
     - include: tests/_util_network_cirros_validate.yml
         console_port="{{cirros_console_port}}"
@@ -252,19 +255,13 @@
 
   tasks:
     - name: Deleting an instance hosted remotely should work
-      copy:
-        content: |
-          #!/bin/bash -e
+      sf_instance:
+        uuid: "{{hostvars['sf-2']['cirros_uuid']}}"
+        state: absent
 
-          sf-client instance delete {{hostvars['sf-2']['cirros_uuid']}}
-          [ `sf-client --simple instance list | grep sf-2 | wc -l` -eq 0 ]
-        dest: /tmp/shell_script
-        owner: root
-        group: root
-        mode: u=rx,g=rx,o=rx
-
-    - name: Execute
-      shell: /tmp/shell_script
+    - name: Ensure delete worked
+      shell: |
+        [ `sf-client --simple instance list | grep sf-2 | wc -l` -eq 0 ]
 
 - hosts: sf-2
   become: yes
@@ -307,7 +304,8 @@
         name="cirros_with_extras"
         distro=cirros
         network="{{net_one_uuid}}"
-        extra="-i /opt/id_rsa.pub -u /opt/userdata"
+        sshkey="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCuGJ47be0/3EH/q1b/2AYdhvTG/5L84QnKm3MhTO+cQGYfxw2AhPk6AOdHYPIp+t2wV/noc1eKCHN8n//T424usEIQ/ODg9o2BeAhUU8S4qd6XSW5ihOknBZRnoQrYmAM6gUUvF4hLJ62Tzf/h2Hi9Wl774DRDs/Il5pBJnt+AdAgLcnVgJJG8KtX3JnynwnBOTlbKnyIWmEnHZL+RH2+lIftsVXelLwq/bpzBWsg0JjjGvtuuKMMge0y3ZfsBA8/vLytaEV/vQk/osilJeAbYa7Ul1K65S5eC2G2Yx4rNKdx0nn4lK2o/2keN52pDhrJbmK4907B50mWqtCFjsNULnfT5paInHRPgasKl007E0ZNNxhfXWieiVCUu/5zFiMPcWyB9YN60gp4lZSKB19GaURxtbKWlajfEakn3mTm9JQH5eU48XIaCh+LcptKYd6lDBWeoicQzECQLMfnKuGpfoZsKbOTTeCzS0/q6guKLNgfXijpRf5uaZaTqQa18t8s= mikal@marvin"
+        userdata="IyEvYmluL3NoCgplY2hvICJIZWxsbyBXb3JsZC4gIFRoZSB0aW1lIGlzIG5vdyAkKGRhdGUgLVIpISIgPiAvaG9tZS9jaXJyb3Mvb3V0cHV0LnR4dApjaG93biBjaXJyb3MuY2lycm9zIC9ob21lL2NpcnJvcy9vdXRwdXQudHh0"
 
     # The test value is two here because we also get a copy of the shell script that the
     # helper runs
@@ -318,7 +316,6 @@
 
           [ `/opt/telnet_client.py {{cirros_with_extras_console_port}} exists /home/cirros/output.txt | grep -c "File exists"` -eq 2 ]
           [ `/opt/telnet_client.py {{cirros_with_extras_console_port}} exists /home/cirros/.ssh/authorized_keys | grep -c "File exists"` -eq 2 ]
-          sf-client instance delete {{cirros_with_extras_uuid}}
         dest: /tmp/shell_script
         owner: root
         group: root
@@ -326,6 +323,11 @@
 
     - name: Execute
       shell: /tmp/shell_script
+
+    - name: Delete instance
+      sf_instance:
+        uuid: "{{cirros_with_extras_uuid}}"
+        state: absent
 
 #########################################
 # Scenario: a second network shouldn't be able to see the first network
@@ -348,7 +350,8 @@
         name="cirros_net_two"
         distro=cirros
         network="{{net_two_uuid}}"
-        extra=""
+        sshkey=""
+        userdata=""
 
     - include: tests/_util_network_cirros_validate.yml
         console_port="{{cirros_net_two_console_port}}"
@@ -358,20 +361,15 @@
       shell: |
         [ `/opt/telnet_client.py {{cirros_net_two_console_port}} ping {{cirros_ip}} | grep -c " 100% packet loss"` -eq 1 ]
 
-    - name: Delete our instance and network
-      copy:
-        content: |
-          #!/bin/bash -e
+    - name: Delete instance
+      sf_instance:
+        uuid: "{{cirros_net_two_uuid}}"
+        state: absent
 
-          sf-client instance delete {{cirros_net_two_uuid}}
-          sf-client network delete {{net_two_uuid}}
-        dest: /tmp/shell_script
-        owner: root
-        group: root
-        mode: u=rx,g=rx,o=rx
-
-    - name: Execute
-      shell: /tmp/shell_script
+    - name: Delete network
+      sf_network:
+        uuid: "{{net_two_uuid}}"
+        state: absent
 
 #########################################
 # Scenario: a network with an overlapping IP range should not be able to see the other virtual network
@@ -394,7 +392,8 @@
         name="cirros_net_three"
         distro=cirros
         network="{{net_three_uuid}}"
-        extra=""
+        sshkey=""
+        userdata=""
 
     - include: tests/_util_network_cirros_validate.yml
         console_port="{{cirros_net_three_console_port}}"
@@ -404,20 +403,15 @@
       shell: |
         [ `/opt/telnet_client.py {{cirros_net_three_console_port}} ping {{cirros_ip}} | grep -c " 100% packet loss"` -eq 1 ]
 
-    - name: Delete our instance and network
-      copy:
-        content: |
-          #!/bin/bash -e
+    - name: Delete instance
+      sf_instance:
+        uuid: "{{cirros_net_three_uuid}}"
+        state: absent
 
-          sf-client instance delete {{cirros_net_three_uuid}}
-          sf-client network delete {{net_three_uuid}}
-        dest: /tmp/shell_script
-        owner: root
-        group: root
-        mode: u=rx,g=rx,o=rx
-
-    - name: Execute
-      shell: /tmp/shell_script
+    - name: Delete network
+      sf_network:
+        uuid: "{{net_three_uuid}}"
+        state: absent
 
 #########################################
 # Scenario: requesting a specific IP address should work
@@ -440,27 +434,23 @@
         name="cirros_net_four"
         distro=cirros
         network="{{net_four_uuid}}@192.168.242.42"
-        extra=""
+        sshkey=""
+        userdata=""
 
     - name: Make sure we get the IP we requested
       fail:
         msg: "We did not get the IP we requested: {{cirros_net_four_ip}} != 192.168.242.42"
       when: cirros_net_four_ip != "192.168.242.42"
 
-    - name: Delete our instance and network
-      copy:
-        content: |
-          #!/bin/bash -e
+    - name: Delete instance
+      sf_instance:
+        uuid: "{{cirros_net_four_uuid}}"
+        state: absent
 
-          sf-client instance delete {{cirros_net_four_uuid}}
-          sf-client network delete {{net_four_uuid}}
-        dest: /tmp/shell_script
-        owner: root
-        group: root
-        mode: u=rx,g=rx,o=rx
-
-    - name: Execute
-      shell: /tmp/shell_script
+    - name: Delete network
+      sf_network:
+        uuid: "{{net_four_uuid}}"
+        state: absent
 
 #########################################
 # Scenario: an empty cloud should be empty
@@ -475,13 +465,21 @@
     - vars
 
   tasks:
+    - name: Delete our last instance
+      sf_instance:
+        uuid: "{{cirros_uuid}}"
+        state: absent
+
+    - name: Delete our last network
+      sf_network:
+        uuid: "{{net_one_uuid}}"
+        state: absent
+
     - name: Delete our last instance and validate
       copy:
         content: |
           #!/bin/bash -e
 
-          sf-client instance delete {{cirros_uuid}}
-          sf-client network delete {{net_one_uuid}}
           [ `sf-client --simple instance list | grep sf-1 | wc -l` -eq 0 ]
           [ `virsh list | grep running | wc -l` -eq 0 ]
           [ `/bin/bash /opt/sfmysql "select * from instances" | wc -l` -eq 0 ]

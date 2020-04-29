@@ -10,20 +10,31 @@ from ansible.module_utils.basic import AnsibleModule
 
 DOCUMENTATION = """
 ---
-module: sf_network
-short_description: Create and delete Shaken Fist networks.
+module: sf_instance
+short_description: Create and delete Shaken Fist instances.
 """
 
 EXAMPLES = """
-- name: Create Shaken Fist network
-  sf_network:
-    netblock: '192.168.242.0/24'
-    name: 'mynet'
+- name: Create Shaken Fist instance
+  sf_instance:
+    name: 'myinstance'
+    cpu: 1
+    ram: 1
+    disks:
+      - 8@cirros
+    networks:
+      - 1ebc5020-6cfd-4641-8f3b-175596a19de0
+    ssh_key: ssh-rsa AAAAB3NzaC1yc2EAA...f5uaZaTqQa18t8s= mikal@marvin
+    user_data: |
+      IyEvYmluL3NoCgplY2hvICJIZWxsbyBXb3JsZC4gIFRoZSB0aW1lIGlzIG5vdyAkKGRhdGUgLVIp
+      ISIgPiAvaG9tZS9jaXJyb3Mvb3V0cHV0LnR4dApjaG93biBjaXJyb3MuY2lycm9zIC9ob21lL2Np
+      cnJvcy9vdXRwdXQudHh0
+    state: present
   register: result
 
-- name: Delete that network
-  sf_network:
-    uuid: '1ebc5020-6cfd-4641-8f3b-175596a19de0'
+- name: Delete that intance
+  sf_instance:
+    uuid: 'afb68328-6ff0-498f-bdaa-27d3fcc97f31'
     state: absent
   register: result
 """
@@ -34,12 +45,33 @@ def error(message):
 
 
 def present(module):
-    for required in ['name', 'netblock']:
+    for required in ['name', 'cpu', 'ram']:
         if not module.params.get(required):
             return error('You must specify a %s when creating an instance' % required)
 
-    cmd = ('sf-client --json network create %(netblock)s %(name)s'
-           % module.params)
+    params = {}
+    for key in ['name', 'cpu', 'ram']:
+        params[key] = module.params.get(key)
+
+    if not module.params.get('disks'):
+        params['disks'] = ''
+    else:
+        params['disks'] = '-d %s' % (' -d '.join(module.params['disks']))
+
+    if not module.params.get('networks'):
+        params['networks'] = ''
+    else:
+        params['networks'] = '-n %s' % (' -n '.join(module.params['networks']))
+
+    extra = ''
+    if module.params.get('ssh_key'):
+        extra += ' -I "%s"' % module.params['ssh_key']
+    if module.params.get('user_data'):
+        extra += ' -U "%s"' % module.params['user_data']
+    params['extra'] = extra
+
+    cmd = ('sf-client --json instance create %(name)s %(cpu)s %(ram)s '
+           '%(disks)s %(networks)s %(extra)s' % params)
     rc, stdout, stderr = module.run_command(
         cmd, check_rc=False, use_unsafe_shell=True)
 
@@ -63,7 +95,7 @@ def absent(module):
     if not module.params.get('uuid'):
         return error('You must specify a uuid when deleting a network')
 
-    cmd = ('sf-client --json network delete %(uuid)s' % module.params)
+    cmd = ('sf-client --json instance delete %(uuid)s' % module.params)
     rc, stdout, stderr = module.run_command(
         cmd, check_rc=False, use_unsafe_shell=True)
 
@@ -87,8 +119,13 @@ def main():
 
     fields = {
         'uuid': {'required': False, 'type': 'str'},
-        'netblock': {'required': False, 'type': 'str'},
         'name': {'required': False, 'type': 'str'},
+        'cpu': {'required': False, 'type': 'str'},
+        'ram': {'required': False, 'type': 'str'},
+        'disks': {'required': False, 'type': 'list', 'elements': 'str'},
+        'networks': {'required': False, 'type': 'list', 'elements': 'str'},
+        'ssh_key': {'required': False, 'type': 'str'},
+        'user_data': {'required': False, 'type': 'str'},
         'state': {
             'default': 'present',
             'choices': ['present', 'absent'],
@@ -108,7 +145,9 @@ def main():
     if not is_error:
         module.exit_json(changed=has_changed, meta=result)
     else:
-        module.fail_json(msg='Error manipulating network', meta=result)
+        module.fail_json(msg='Error manipulating instance',
+                         params=module.params,
+                         meta=result)
 
 
 if __name__ == '__main__':

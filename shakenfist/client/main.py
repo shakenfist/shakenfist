@@ -1,5 +1,6 @@
 # Copyright 2020 Michael Still
 
+import base64
 import click
 import datetime
 import json
@@ -175,6 +176,8 @@ def network_create(ctx, netblock=None, name=None, dhcp=None, nat=None):
 @click.pass_context
 def network_delete(ctx, network_uuid=None):
     CLIENT.delete_network(network_uuid)
+    if ctx.obj['OUTPUT'] == 'json':
+        print('{}')
 
 
 cli.add_command(network)
@@ -297,8 +300,14 @@ def instance_show(ctx, instance_uuid=None):
                         '               is optional.\n'
                         '--sshkey/-i:   The path to a ssh public key to configure on the\n'
                         '               instance via config drive / cloud-init.\n'
+                        '--sshkeydata/-I:\n'
+                        '               A ssh public key as a string to configure on the\n'
+                        '               instance via config drive / cloud-init.\n'
                         '--userdata/-u: The path to a file containing user data to provided\n'
-                        '               to the instance via config drive / cloud-init.'))
+                        '               to the instance via config drive / cloud-init.'
+                        '--encodeduserdata/-U:\n'
+                        '               Base64 encoded user data to provide to the instance\n'
+                        '               via config drive / cloud-init.'))
 @click.argument('name', type=click.STRING)
 @click.argument('cpus', type=click.INT)
 @click.argument('memory', type=click.INT)
@@ -306,10 +315,12 @@ def instance_show(ctx, instance_uuid=None):
               autocompletion=_get_networks)
 @click.option('-d', '--disk', type=click.STRING, multiple=True)
 @click.option('-i', '--sshkey', type=click.STRING)
+@click.option('-I', '--sshkeydata', type=click.STRING)
 @click.option('-u', '--userdata', type=click.STRING)
+@click.option('-U', '--encodeduserdata', type=click.STRING)
 @click.pass_context
 def instance_create(ctx, name=None, cpus=None, memory=None, network=None, disk=None,
-                    sshkey=None, userdata=None):
+                    sshkey=None, sshkeydata=None, userdata=None, encodeduserdata=None):
     if len(disk) < 1:
         print('You must specify at least one disk')
 
@@ -317,11 +328,17 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, disk=N
     if sshkey:
         with open(sshkey) as f:
             sshkey_content = f.read()
+    if sshkeydata:
+        sshkey_content = sshkeydata
 
     userdata_content = None
     if userdata:
         with open(userdata) as f:
             userdata_content = f.read()
+        userdata_content = str(base64.b64encode(
+            userdata_content.encode('utf-8')), 'utf-8')
+    if encodeduserdata:
+        userdata_content = encodeduserdata
 
     _show_instance(
         ctx,
@@ -334,6 +351,8 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, disk=N
 @click.pass_context
 def instance_delete(ctx, instance_uuid=None):
     CLIENT.delete_instance(instance_uuid)
+    if ctx.obj['OUTPUT'] == 'json':
+        print('{}')
 
 
 @instance.command(name='reboot', help='Reboot instance')
@@ -342,6 +361,8 @@ def instance_delete(ctx, instance_uuid=None):
 @click.pass_context
 def instance_reboot(ctx, instance_uuid=None, hard=False):
     CLIENT.reboot_instance(instance_uuid, hard=hard)
+    if ctx.obj['OUTPUT'] == 'json':
+        print('{}')
 
 
 @instance.command(name='poweron', help='Power on an instance')
@@ -349,6 +370,8 @@ def instance_reboot(ctx, instance_uuid=None, hard=False):
 @click.pass_context
 def instance_power_on(ctx, instance_uuid=None):
     CLIENT.power_on_instance(instance_uuid)
+    if ctx.obj['OUTPUT'] == 'json':
+        print('{}')
 
 
 @instance.command(name='poweroff', help='Power off an instance')
@@ -356,6 +379,8 @@ def instance_power_on(ctx, instance_uuid=None):
 @click.pass_context
 def instance_power_off(ctx, instance_uuid=None):
     CLIENT.power_off_instance(instance_uuid)
+    if ctx.obj['OUTPUT'] == 'json':
+        print('{}')
 
 
 @instance.command(name='pause', help='Pause an instance')
@@ -363,6 +388,8 @@ def instance_power_off(ctx, instance_uuid=None):
 @click.pass_context
 def instance_pause(ctx, instance_uuid=None):
     CLIENT.pause_instance(instance_uuid)
+    if ctx.obj['OUTPUT'] == 'json':
+        print('{}')
 
 
 @instance.command(name='unpause', help='Unpause an instance')
@@ -370,6 +397,8 @@ def instance_pause(ctx, instance_uuid=None):
 @click.pass_context
 def instance_unpause(ctx, instance_uuid=None):
     CLIENT.unpause_instance(instance_uuid)
+    if ctx.obj['OUTPUT'] == 'json':
+        print('{}')
 
 
 @instance.command(name='snapshot', help='Snapshot instance')
@@ -377,8 +406,11 @@ def instance_unpause(ctx, instance_uuid=None):
 @click.argument('all', type=click.BOOL, default=False)
 @click.pass_context
 def instance_snapshot(ctx, instance_uuid=None, all=False):
-    print('Created snapshot %s'
-          % CLIENT.snapshot_instance(instance_uuid, all))
+    uuid = CLIENT.snapshot_instance(instance_uuid, all)
+    if ctx.obj['OUTPUT'] == 'json':
+        print(json.dumps({'uuid': uuid}, indent=4, sort_keys=True))
+    else:
+        print('Created snapshot %s' % uuid)
 
 
 cli.add_command(instance)
@@ -395,6 +427,8 @@ def interface():
 @click.pass_context
 def interface_float(ctx, interface_uuid=None):
     CLIENT.float_interface(interface_uuid)
+    if ctx.obj['OUTPUT'] == 'json':
+        print('{}')
 
 
 @interface.command(name='defloat',
@@ -403,6 +437,8 @@ def interface_float(ctx, interface_uuid=None):
 @click.pass_context
 def interface_deloat(ctx, interface_uuid=None):
     CLIENT.defloat_interface(interface_uuid)
+    if ctx.obj['OUTPUT'] == 'json':
+        print('{}')
 
 
 cli.add_command(interface)
@@ -420,6 +456,8 @@ def image():
 @click.pass_context
 def image_cache(ctx, image_url=None):
     CLIENT.cache_image(image_url)
+    if ctx.obj['OUTPUT'] == 'json':
+        print('{}')
 
 
 cli.add_command(image)
