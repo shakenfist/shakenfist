@@ -5,8 +5,21 @@
   register: instance_start_count_before
 
 - name: Start a {{distro}} instance on {{inventory_hostname}}
-  shell: |
-    sf-client --simple instance create {{name}} 1 1 -d 8@{{distro}} -n "{{network}}" {{extra}}
+  sf_instance:
+    name: "{{name}}"
+    cpu: 1
+    ram: 1
+    disks:
+      - "8@{{distro}}"
+    networks:
+      - "{{network}}"
+    ssh_key: "{{sshkey}}"
+    user_data: "{{userdata}}"
+  register: instance_create_out
+
+- name: Log instance details
+  debug:
+    msg: "{{instance_create_out}}"
 
 - name: Count the number of VMs after
   virt:
@@ -19,32 +32,17 @@
     msg: We failed to start a VM on {{inventory_hostname}}.
   when: instance_start_count_before == instance_start_count_after
 
-- name: Determine instance uuid
-  shell: |
-    sf-client --simple instance list | grep {{name}} | grep {{inventory_hostname}} | cut -f 1 -d ","
-  register: instance_uuid_complex
-
 - name: Extract instance uuid
   set_fact:
-    "{{name}}_uuid": "{{instance_uuid_complex.stdout}}"
-
-- name: Determine instance console port
-  shell: |
-    sf-client --simple instance show {{vars[name + '_uuid']}} | grep "console port" | cut -f 2 -d ":"
-  register: instance_console_port_complex
+    "{{name}}_uuid": "{{instance_create_out.meta.uuid}}"
 
 - name: Extract console port
   set_fact:
-    "{{name}}_console_port": "{{instance_console_port_complex.stdout}}"
-
-- name: Determine instance IP
-  shell: |
-    sf-client --simple instance show {{vars[name + '_uuid']}} | grep iface | grep -v "interface uuid" | cut -f 6 -d ","
-  register: instance_ip_complex
+    "{{name}}_console_port": "{{instance_create_out.meta.console_port}}"
 
 - name: Extract instance IP
   set_fact:
-    "{{name}}_ip": "{{instance_ip_complex.stdout}}"
+    "{{name}}_ip": "{{instance_create_out.meta.network_interfaces[0].ipv4}}"
 
 - name: Log instance details
   debug:
@@ -53,4 +51,4 @@
 # This needs to be so long because DHCP failures take a fair while to happen
 - name: Wait for instance to boot
   pause:
-    minutes: 1
+    seconds: 20

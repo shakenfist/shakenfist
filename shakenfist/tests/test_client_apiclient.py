@@ -67,7 +67,7 @@ class ApiClientTestCase(testtools.TestCase):
                 'network': ['netuuid1'],
                 'disk': ['8@cirros'],
                 'ssh_key': 'sshkey',
-                'user_data': "dXNlcmRhdGFiZWZvcmViYXNlNjQ="
+                'user_data': "userdatabeforebase64"
             })
 
     def test_snapshot_instance(self):

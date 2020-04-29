@@ -66,11 +66,6 @@ class Client(object):
         return r.json()
 
     def create_instance(self, name, cpus, memory, network, disk, sshkey, userdata):
-        encoded_userdata = None
-        if userdata:
-            encoded_userdata = str(base64.b64encode(
-                userdata.encode('utf-8')), 'utf-8')
-
         r = _request_url('POST', self.base_url + '/instances',
                          data={
                              'name': name,
@@ -79,7 +74,7 @@ class Client(object):
                              'network': network,
                              'disk': disk,
                              'ssh_key': sshkey,
-                             'user_data': encoded_userdata
+                             'user_data': userdata
                          })
         return r.json()
 
