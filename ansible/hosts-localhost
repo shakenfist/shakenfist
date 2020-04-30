@@ -1,9 +1,0 @@
-[db]
-  localhost ansible_connection=local node_ip=127.0.0.1
-
-[hypervisors]
-  localhost
-
-[all:children]
-  db
-  hypervisors
