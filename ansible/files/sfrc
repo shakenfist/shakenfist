@@ -1,5 +1,6 @@
 export SHAKENFIST_NODE_IP="{{node_ip}}"
 export SHAKENFIST_NODE_EGRESS_NIC="{{node_egress_nic}}"
+export SHAKENFIST_FLOATING_NETWORK="{{floating_network_ipblock}}"
 export SHAKENFIST_NETWORK_NODE_IP="{{hostvars['sf-1']['node_ip']}}"
 
 export _DB_NODE_IP="{{hostvars['sfdb']['node_ip']}}"
