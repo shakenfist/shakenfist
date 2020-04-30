@@ -375,8 +375,8 @@ class Network(object):
         subst['inner_address'] = inner_address
 
         processutils.execute(
-            '%(in_namespace)s ip addr add %(floating_address)s/%(netmask)s '
-            'dev %(physical_veth_inner)s' % subst,
+            'ip addr add %(floating_address)s/%(netmask)s '
+            'dev %(physical_veth_outer)s' % subst,
             shell=True)
         processutils.execute(
             '%(in_namespace)s iptables -t nat -A PREROUTING '
@@ -391,8 +391,8 @@ class Network(object):
         subst['inner_address'] = inner_address
 
         processutils.execute(
-            '%(in_namespace)s ip addr del %(floating_address)s/%(netmask)s '
-            'dev %(physical_veth_inner)s' % subst,
+            'ip addr del %(floating_address)s/%(netmask)s '
+            'dev %(physical_veth_outer)s' % subst,
             shell=True)
         processutils.execute(
             '%(in_namespace)s iptables -t nat -D PREROUTING '

@@ -1,6 +1,10 @@
 CHANGES
 =======
 
+* Refactor deployment to support clouds other than GCP
+* Fix missing export for network interface
+* Add floating config IP to deployment
+* Add tests for floating IP, fix bugs found by tests
 * Check for valid netblocks when creating networks
 * Add an ansible module for creating and deleting instances
 * Implement floating IPs

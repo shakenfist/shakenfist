@@ -407,21 +407,22 @@ class Network(Resource):
         if network_uuid == 'floating':
             return error(403, 'you cannot delete the floating network')
 
-        n = net.from_db(network_uuid)
-
         # We only delete unused networks
         if len(list(db.get_network_interfaces(network_uuid))) > 0:
             return error(403, 'you cannot delete an in use network')
 
-        n.remove_dhcp()
-        n.delete()
+        network_from_db.remove_dhcp()
+        network_from_db.delete()
 
-        if n.floating_gateway:
+        if network_from_db.floating_gateway:
             floating_network = net.from_db('floating')
             floating_network.ipmanager.release(n.floating_gateway)
             floating_network.persist_ipmanager()
 
-        db.delete_network(network_uuid)
+        # Only the network node removes the network from the database
+        # (otherwise the network node doesn't get cleaned up).
+        if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
+            db.delete_network(network_uuid)
 
 
 class Networks(Resource):

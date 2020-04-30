@@ -515,11 +515,11 @@
   tasks:
     - name: Network node outer namespace can ping floating IP
       shell: |
-        [ `ping -c 3 -w 4 {{cirros_floating_external_ip}} | grep -c " 0% packet loss"` -eq 1 ]
+        [ `ping -c 3 -w 4 {{hostvars['sf-2']['cirros_floating_external_ip']}} | grep -c " 0% packet loss"` -eq 1 ]
 
     - name: Delete instance
       sf_instance:
-        uuid: "{{cirros_floating_uuid}}"
+        uuid: "{{hostvars['sf-2']['cirros_floating_uuid']}}"
         state: absent
 
     - name: Delete network
