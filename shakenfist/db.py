@@ -432,7 +432,7 @@ def get_interface(interface_uuid):
 
     try:
         return SESSION.query(NetworkInterface).filter(
-            NetworkInterface.uuid == interface_uuid).one()
+            NetworkInterface.uuid == interface_uuid).one().export()
     except exc.NoResultFound:
         pass
 
