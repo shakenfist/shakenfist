@@ -150,11 +150,11 @@ class Client(object):
             yield n
 
     def float_interface(self, interface_uuid):
-        r = _request_url('POST', self.base_url + '/interface/' + interface_uuid +
+        r = _request_url('POST', self.base_url + '/interfaces/' + interface_uuid +
                          '/float')
         return r.json()
 
     def defloat_interface(self, interface_uuid):
-        r = _request_url('POST', self.base_url + '/interface/' + interface_uuid +
+        r = _request_url('POST', self.base_url + '/interfaces/' + interface_uuid +
                          '/defloat')
         return r.json()

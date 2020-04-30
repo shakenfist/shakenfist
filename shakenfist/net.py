@@ -372,7 +372,7 @@ class Network(object):
                  % (self, floating_address, inner_address))
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
-        subst['innner_address'] = inner_address
+        subst['inner_address'] = inner_address
 
         processutils.execute(
             '%(in_namespace)s ip addr add %(floating_address)s/%(netmask)s '
@@ -388,7 +388,7 @@ class Network(object):
                  % (self, floating_address, inner_address))
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
-        subst['innner_address'] = inner_address
+        subst['inner_address'] = inner_address
 
         processutils.execute(
             '%(in_namespace)s ip addr del %(floating_address)s/%(netmask)s '

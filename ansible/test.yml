@@ -9,13 +9,14 @@
     - vars
 
   tasks:
-    - include: includes/terraform.yml
+    - include: terraform/{{cloud}}/terraform.yml
 
 #########################################
 # Scenario: we can start cirros VMs
 #########################################
 
 - hosts: hypervisors
+  any_errors_fatal: true
   become: yes
   become_method: sudo
   gather_facts: no
@@ -53,6 +54,7 @@
 #########################################
 
 - hosts: sf-1
+  any_errors_fatal: true
   become: yes
   become_method: sudo
   gather_facts: no
@@ -77,6 +79,7 @@
       shell: /tmp/shell_script
 
 - hosts: sf-2
+  any_errors_fatal: true
   become: yes
   become_method: sudo
   gather_facts: no
@@ -105,6 +108,7 @@
 #########################################
 
 - hosts: hypervisors
+  any_errors_fatal: true
   become: yes
   become_method: sudo
   gather_facts: no
@@ -118,6 +122,7 @@
         netblock_octets="192.168.242"
 
 - hosts: sf-1
+  any_errors_fatal: true
   become: yes
   become_method: sudo
   gather_facts: no
@@ -135,6 +140,7 @@
 #########################################
 
 - hosts: sf-2
+  any_errors_fatal: true
   become: yes
   become_method: sudo
   gather_facts: no
@@ -151,6 +157,7 @@
         userdata=""
 
 - hosts: sf-1
+  any_errors_fatal: true
   become: yes
   become_method: sudo
   gather_facts: no
@@ -172,6 +179,7 @@
 #########################################
 
 - hosts: sf-2
+  any_errors_fatal: true
   become: yes
   become_method: sudo
   gather_facts: no
@@ -198,6 +206,7 @@
 #########################################
 
 - hosts: sf-2
+  any_errors_fatal: true
   become: yes
   become_method: sudo
   gather_facts: no
@@ -246,6 +255,7 @@
 #########################################
 
 - hosts: sf-1
+  any_errors_fatal: true
   become: yes
   become_method: sudo
   gather_facts: no
@@ -264,6 +274,7 @@
         [ `sf-client --simple instance list | grep sf-2 | wc -l` -eq 0 ]
 
 - hosts: sf-2
+  any_errors_fatal: true
   become: yes
   become_method: sudo
   gather_facts: no
@@ -292,6 +303,7 @@
 #########################################
 
 - hosts: sf-2
+  any_errors_fatal: true
   become: yes
   become_method: sudo
   gather_facts: no
@@ -334,6 +346,7 @@
 #########################################
 
 - hosts: sf-1
+  any_errors_fatal: true
   become: yes
   become_method: sudo
   gather_facts: no
@@ -376,6 +389,7 @@
 #########################################
 
 - hosts: sf-1
+  any_errors_fatal: true
   become: yes
   become_method: sudo
   gather_facts: no
@@ -418,6 +432,7 @@
 #########################################
 
 - hosts: sf-1
+  any_errors_fatal: true
   become: yes
   become_method: sudo
   gather_facts: no
@@ -447,6 +462,66 @@
         uuid: "{{cirros_net_four_uuid}}"
         state: absent
 
+#########################################
+# Scenario: a floating IP on the non-network node should work
+#########################################
+
+- hosts: sf-2
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - include: tests/_util_instance_start.yml
+        name="cirros_floating"
+        distro=cirros
+        network="{{hostvars['sf-1']['net_four_uuid']}}"
+        sshkey=""
+        userdata=""
+
+    - name: Determine network interface uuid
+      shell: sf-client --simple instance show {{cirros_floating_uuid}} | grep iface | grep -v "interface uuid" | cut -f 2 -d ","
+      register: cirros_floating_interface_uuid_complex
+
+    - name: Extract network interface uuid
+      set_fact:
+        cirros_floating_interface_uuid: "{{cirros_floating_interface_uuid_complex.stdout}}"
+
+    - name: Assign a floating IP
+      shell: |
+        sf-client --simple interface float {{cirros_floating_interface_uuid}}
+
+    - name: Determine floating IP
+      shell: sf-client --simple instance show {{cirros_floating_uuid}} | grep iface | grep -v "interface uuid" | cut -f 7 -d ","
+      register: cirros_floating_external_ip_complex
+
+    - name: Extract the floating IP
+      set_fact:
+        cirros_floating_external_ip: "{{cirros_floating_external_ip_complex.stdout}}"
+
+- hosts: sf-1
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - name: Network node outer namespace can ping floating IP
+      shell: |
+        [ `ping -c 3 -w 4 {{cirros_floating_external_ip}} | grep -c " 0% packet loss"` -eq 1 ]
+
+    - name: Delete instance
+      sf_instance:
+        uuid: "{{cirros_floating_uuid}}"
+        state: absent
+
     - name: Delete network
       sf_network:
         uuid: "{{net_four_uuid}}"
@@ -457,6 +532,7 @@
 #########################################
 
 - hosts: sf-1
+  any_errors_fatal: true
   become: yes
   become_method: sudo
   gather_facts: no
@@ -493,6 +569,10 @@
 
     - name: Execute
       shell: /tmp/shell_script
+
+#########################################
+# Scenario: the final checkening
+#########################################
 
 - hosts: hypervisors
   become: yes
