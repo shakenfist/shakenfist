@@ -447,6 +447,7 @@ class Network(Resource):
         return network_from_db
 
     @arg_is_network_uuid
+    @redirect_to_network_node
     def delete(self, network_uuid=None, network_from_db=None):
         db.add_event('network', network_uuid, 'API DELETE', None, None, None)
         if network_uuid == 'floating':
@@ -465,10 +466,7 @@ class Network(Resource):
             floating_network.ipmanager.release(n.floating_gateway)
             floating_network.persist_ipmanager()
 
-        # Only the network node removes the network from the database
-        # (otherwise the network node doesn't get cleaned up).
-        if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
-            db.delete_network(network_uuid)
+        db.delete_network(network_uuid)
 
 
 class Networks(Resource):
