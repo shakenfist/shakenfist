@@ -6,11 +6,11 @@
     - vars
 
   tasks:
-    - include: includes/terraform.yml
+    - include: terraform/{{cloud}}/terraform.yml
 
     - name: Wait for instances to boot
       pause:
-        minutes: 2
+        minutes: "{{bootdelay}}"
 
 - hosts: allsf
   become: yes

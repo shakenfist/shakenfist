@@ -60,13 +60,13 @@
       #!/bin/bash -e
 
       /srv/shakenfist/src/cleanup.sh
-      [ `sf-client --simple instance list | wc -l` -eq 1 ]
       [ `virsh list | grep running | wc -l` -eq 0 ]
       [ `ifconfig | grep -c br-vxlan` -eq 0 ]
-      /opt/sfmysql "delete from instances"
       /opt/sfmysql "delete from network_interfaces"
+      /opt/sfmysql "delete from instances"
       /opt/sfmysql "delete from networks"
       /opt/sfmysql "delete from snapshots"
+      /opt/sfmysql "delete from events"
 
       systemctl restart sf
     dest: /tmp/shell_script

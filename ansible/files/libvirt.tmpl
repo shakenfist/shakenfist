@@ -7,6 +7,8 @@
   <os>
     <type arch='x86_64' machine='pc-i440fx-2.8'>hvm</type>
     <boot dev='hd'/>
+    <boot dev='cdrom'/>
+    <bootmenu enable='yes' timeout='3000'/>
   </os>
   <features>
     <acpi/>
@@ -30,7 +32,7 @@
     <emulator>/usr/bin/kvm</emulator>
 
     {% for disk in disks %}
-    <disk type='file' device='disk'>
+    <disk type='file' device='{{disk.present_as}}'>
       <driver name='qemu' type='{{disk.type}}'/>
       <source file='{{disk.path}}'/>
       <target dev='{{disk.device}}' bus='{{disk_bus}}'/>

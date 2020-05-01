@@ -8,7 +8,9 @@ User=root
 Group=root
 
 Environment=SHAKENFIST_NODE_IP="{{node_ip}}"
+Environment=SHAKENFIST_NODE_NAME="{{inventory_hostname}}"
 Environment=SHAKENFIST_NODE_EGRESS_NIC="{{node_egress_nic}}"
+Environment=SHAKENFIST_FLOATING_NETWORK="{{floating_network_ipblock}}"
 Environment=SHAKENFIST_NETWORK_NODE_IP="{{hostvars['sf-1']['node_ip']}}"
 
 Environment=SHAKENFIST_DB_ROOT_PASSWORD="{{db_root_password}}"

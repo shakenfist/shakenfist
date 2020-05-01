@@ -3,10 +3,11 @@
 import datetime
 import logging
 import random
+import time
 import uuid
 
 from sqlalchemy import create_engine
-from sqlalchemy import BLOB, Boolean, Column, Integer, String, DateTime
+from sqlalchemy import BLOB, Boolean, Column, Float, Integer, String, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import exc, scoped_session, sessionmaker
 from sqlalchemy.sql.expression import func
@@ -432,7 +433,7 @@ def get_interface(interface_uuid):
 
     try:
         return SESSION.query(NetworkInterface).filter(
-            NetworkInterface.uuid == interface_uuid).one()
+            NetworkInterface.uuid == interface_uuid).one().export()
     except exc.NoResultFound:
         pass
 
@@ -482,12 +483,68 @@ class Snapshot(Base):
         }
 
 
-def create_snapshot(uuid, device, instance_uuid, created):
+def create_snapshot(snapshot_uuid, device, instance_uuid, created):
     ensure_valid_session()
 
     try:
-        SESSION.add(Snapshot(uuid, device, instance_uuid, created))
-
         SESSION.add(Snapshot(snapshot_uuid, device, instance_uuid, created))
     finally:
         SESSION.commit()
+
+
+class Event(Base):
+    __tablename__ = 'events'
+
+    timestamp = Column(DateTime)
+    object_type = Column(String, primary_key=True)
+    object_uuid = Column(String, primary_key=True)
+    fqdn = Column(String, primary_key=True)
+    operation = Column(String, primary_key=True)
+    phase = Column(String, primary_key=True)
+    duration = Column(Float)
+    message = Column(String)
+
+    def __init__(self, object_type, object_uuid, operation, phase, duration, message):
+        self.timestamp = datetime.datetime.now()
+        self.object_type = object_type
+        self.object_uuid = object_uuid
+        self.fqdn = config.parsed.get('NODE_NAME')
+        self.operation = operation
+        self.phase = phase
+        self.duration = duration
+        self.message = message
+
+    def export(self):
+        return {
+            'timestamp': self.timestamp,
+            'object_type': self.object_type,
+            'object_uuid': self.object_uuid,
+            'fqdn': self.fqdn,
+            'operation': self.operation,
+            'phase': self.phase,
+            'duration': self.duration,
+            'message': self.message
+        }
+
+
+def add_event(object_type, object_uuid, operation, phase, duration, message):
+    ensure_valid_session()
+
+    try:
+        SESSION.add(Event(object_type, object_uuid, operation, phase,
+                          duration, message))
+    finally:
+        SESSION.commit()
+
+
+def get_events(object_type, object_uuid):
+    ensure_valid_session()
+
+    try:
+        events = SESSION.query(Event).filter(
+            Event.object_type == object_type).filter(
+                Event.object_uuid == object_uuid).all()
+        for e in events:
+            yield e.export()
+    except exc.NoResultFound:
+        pass

@@ -62,10 +62,14 @@ class VirtTestCase(testtools.TestCase):
                     'device': 'vda',
                     'path': '/a/b/c/instances/fakeuuid/vda.qcow2',
                     'size': 8,
-                    'type': 'qcow2'
+                    'type': 'qcow2',
+                    'present_as': 'disk'
                 },
                 {
-                    'device': 'vdb', 'path': '/a/b/c/instances/fakeuuid/vdb.raw', 'type': 'raw'
+                    'device': 'vdb',
+                    'path': '/a/b/c/instances/fakeuuid/vdb.raw',
+                    'type': 'raw',
+                    'present_as': 'disk'
                 }
             ], i.disks)
 
@@ -86,26 +90,30 @@ class VirtTestCase(testtools.TestCase):
                     'device': 'vda',
                     'path': '/a/b/c/instances/fakeuuid/vda.qcow2',
                     'size': 8,
-                    'type': 'qcow2'
+                    'type': 'qcow2',
+                    'present_as': 'disk'
                 },
                 {
                     'device': 'vdb',
                     'path': '/a/b/c/instances/fakeuuid/vdb.raw',
-                    'type': 'raw'
+                    'type': 'raw',
+                    'present_as': 'disk'
                 },
                 {
                     'base': None,
                     'device': 'vdc',
                     'path': '/a/b/c/instances/fakeuuid/vdc.qcow2',
                     'size': 16,
-                    'type': 'qcow2'
+                    'type': 'qcow2',
+                    'present_as': 'disk'
                 },
                 {
                     'base': None,
                     'device': 'vdd',
                     'path': '/a/b/c/instances/fakeuuid/vdd.qcow2',
                     'size': 24,
-                    'type': 'qcow2'
+                    'type': 'qcow2',
+                    'present_as': 'disk'
                 }
             ], i.disks)
 
@@ -151,7 +159,6 @@ class VirtTestCase(testtools.TestCase):
             i._make_config_drive(cd_file)
             cd = pycdlib.PyCdlib()
             cd.open(cd_file)
-            print(cd_file)
 
             entries = {}
             for dirname, _, filelist in cd.walk(rr_path='/'):

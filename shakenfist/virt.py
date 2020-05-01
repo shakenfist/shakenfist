@@ -60,12 +60,14 @@ class Instance(object):
                 'size': size,
                 'device': root_device,
                 'path': os.path.join(self.instance_path, root_device + '.qcow2'),
-                'base': base
+                'base': base,
+                'present_as': 'disk'
             },
             {
                 'type': 'raw',
                 'device': config_device,
-                'path': os.path.join(self.instance_path, config_device + '.raw')
+                'path': os.path.join(self.instance_path, config_device + '.raw'),
+                'present_as': 'disk'
             }
         ]
 
@@ -78,12 +80,16 @@ class Instance(object):
                 'size': size,
                 'device': device,
                 'path': os.path.join(self.instance_path, device + '.qcow2'),
-                'base': base
+                'base': base,
+                'present_as': 'disk'
             })
             i += 1
 
     def __str__(self):
         return 'instance(%s)' % self.db_entry['uuid']
+
+    def get_describing_tuple(self):
+        return ('instance', self.db_entry['uuid'])
 
     def _parse_disk_spec(self, spec):
         if not '@' in spec:
@@ -100,7 +106,7 @@ class Instance(object):
         }
         return bases.get(config.parsed.get('DISK_BUS'), 'sd')
 
-    def create(self, status_callback):
+    def create(self):
         # Ensure we have state on disk
         if not os.path.exists(self.instance_path):
             LOG.debug('%s: Creating instance storage at %s' %
@@ -108,49 +114,68 @@ class Instance(object):
             os.makedirs(self.instance_path)
 
         # Generate a config drive
-        with util.RecordedOperation('make config drive', self, status_callback) as ro:
+        with util.RecordedOperation('make config drive', self) as ro:
             self._make_config_drive(os.path.join(
                 self.instance_path, self._get_disk_device_base() + 'b' + '.raw'))
 
         # Prepare disks
+        modified_disks = []
         for disk in self.disks:
             if disk.get('base'):
-                with util.RecordedOperation('fetch image', self, status_callback) as ro:
-                    hashed_image_path = images.fetch_image(
-                        disk['base'], recorded=ro)
-                with util.RecordedOperation('transcode image', self, status_callback) as ro:
-                    images.transcode_image(hashed_image_path)
-                with util.RecordedOperation('resize image', self, status_callback) as ro:
-                    resized_image_path = images.resize_image(
-                        hashed_image_path, str(disk['size']) + 'G')
-                with util.RecordedOperation('create copy on write layer', self,
-                                            status_callback) as ro:
-                    images.create_cow(resized_image_path, disk['path'])
+                with util.RecordedOperation('fetch image', self) as ro:
+                    hashed_image_path = images.fetch_image(disk['base'])
+
+                try:
+                    cd = pycdlib.PyCdlib()
+                    cd.open(hashed_image_path)
+                    disk['present_as'] = 'cdrom'
+                except:
+                    pass
+
+                if disk.get('present_as', 'cdrom') == 'cdrom':
+                    # There is no point in resizing or COW'ing a cdrom. We do
+                    # assume the image cache and instances are on the same filesystem.
+                    disk['path'] = disk['path'].replace('.qcow2', '.raw')
+                    disk['type'] = 'raw'
+                    os.link(hashed_image_path, disk['path'])
+                else:
+                    with util.RecordedOperation('transcode image', self) as ro:
+                        images.transcode_image(hashed_image_path)
+                    with util.RecordedOperation('resize image', self) as ro:
+                        resized_image_path = images.resize_image(
+                            hashed_image_path, str(disk['size']) + 'G')
+                    with util.RecordedOperation('create copy on write layer', self) as ro:
+                        images.create_cow(resized_image_path, disk['path'])
+
             elif not os.path.exists(disk['path']):
                 processutils.execute('qemu-img create -f qcow2 %s %sG'
                                      % (disk['path'], disk['size']),
                                      shell=True)
 
+            modified_disks.append(disk)
+
+        self.disks = modified_disks
+
         # Create the actual instance
-        with util.RecordedOperation('create domain XML', self, status_callback) as ro:
+        with util.RecordedOperation('create domain XML', self) as ro:
             self._create_domain_xml()
-        with util.RecordedOperation('create domain', self, status_callback) as ro:
+        with util.RecordedOperation('create domain', self) as ro:
             self.power_on()
 
-    def delete(self, status_callback):
-        with util.RecordedOperation('delete domain', self, status_callback) as _:
+    def delete(self):
+        with util.RecordedOperation('delete domain', self) as _:
             try:
                 self.power_off()
             except:
                 pass
 
-        with util.RecordedOperation('delete disks', self, status_callback) as _:
+        with util.RecordedOperation('delete disks', self) as _:
             try:
                 shutil.rmtree(self.instance_path)
             except:
                 pass
 
-        with util.RecordedOperation('release network addreses', self, status_callback) as _:
+        with util.RecordedOperation('release network addreses', self) as _:
             for ni in db.get_instance_interfaces(self.db_entry['uuid']):
                 n = net.from_db(ni['network_uuid'])
                 n.ipmanager.release(ni['ipv4'])

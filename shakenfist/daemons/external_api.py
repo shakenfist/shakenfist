@@ -1,6 +1,7 @@
 import flask
 import flask_restful
 from flask_restful import fields, marshal_with, reqparse
+import ipaddress
 import json
 import logging
 import randmac
@@ -165,11 +166,14 @@ class Root(Resource):
 class Instance(Resource):
     @arg_is_instance_uuid
     def get(self, instance_uuid=None, instance_from_db=None):
+        db.add_event('instance', instance_uuid, 'API GET', None, None, None)
         return instance_from_db
 
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def delete(self, instance_uuid=None, instance_from_db_virt=None):
+        db.add_event('instance', instance_uuid, 'API DELETE', None, None, None)
+
         instance_networks = []
         for iface in list(db.get_instance_interfaces(instance_uuid)):
             if not iface['network_uuid'] in instance_networks:
@@ -182,13 +186,14 @@ class Instance(Resource):
                     if not iface['network_uuid'] in host_networks:
                         host_networks.append(iface['network_uuid'])
 
-        instance_from_db_virt.delete(None)
+        instance_from_db_virt.delete()
 
         for network in instance_networks:
             n = net.from_db(network)
             if n:
                 if network in host_networks:
-                    with util.RecordedOperation('deallocate ip address', instance_from_db_virt) as _:
+                    with util.RecordedOperation('deallocate ip address',
+                                                instance_from_db_virt) as _:
                         n.update_dhcp()
                 else:
                     with util.RecordedOperation('remove network', n) as _:
@@ -212,6 +217,9 @@ class Instances(Resource):
 
         # The instance needs to exist in the DB before network interfaces are created
         new_instance_uuid = str(uuid.uuid4())
+        db.add_event('instance', new_instance_uuid,
+                     'API CREATE', None, None, None)
+
         instance = virt.from_definition(
             uuid=new_instance_uuid,
             name=args['name'],
@@ -274,7 +282,7 @@ class Instances(Resource):
                 n.update_dhcp()
 
         with util.RecordedOperation('instance creation', instance) as _:
-            instance.create(None)
+            instance.create()
 
         return db.get_instance(new_instance_uuid)
 
@@ -282,7 +290,22 @@ class Instances(Resource):
 class InstanceInterfaces(Resource):
     @arg_is_instance_uuid
     def get(self, instance_uuid=None, instance_from_db=None):
+        db.add_event('instance', instance_uuid,
+                     'API GET Interfaces', None, None, None)
         return list(db.get_instance_interfaces(instance_uuid))
+
+
+class InstanceEvents(Resource):
+    @arg_is_instance_uuid
+    def get(self, instance_uuid=None, instance_from_db=None):
+        db.add_event('instance', instance_uuid,
+                     'API GET Events', None, None, None)
+
+        out = []
+        for event in db.get_events('instance', instance_uuid):
+            event['timestamp'] = event['timestamp'].timestamp()
+            out.append(event)
+        return out
 
 
 class InstanceSnapshot(Resource):
@@ -293,13 +316,20 @@ class InstanceSnapshot(Resource):
         parser.add_argument('all', type=bool)
         args = parser.parse_args()
 
-        return instance_from_db_virt.snapshot(all=args['all'])
+        snap_uuid = instance_from_db_virt.snapshot(all=args['all'])
+        db.add_event('instance', instance_uuid, 'API CREATE Snapshot', None, None,
+                     snap_uuid)
+        db.add_event('instance', snap_uuid,
+                     'API CREATE Snapshot', None, None, None)
+        return snap
 
 
 class InstanceRebootSoft(Resource):
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db_virt=None):
+        db.add_event('instance', instance_uuid,
+                     'API SOFT REBOOT', None, None, None)
         return instance_from_db_virt.reboot(hard=False)
 
 
@@ -307,6 +337,8 @@ class InstanceRebootHard(Resource):
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db_virt=None):
+        db.add_event('instance', instance_uuid,
+                     'API HARD REBOOT', None, None, None)
         return instance_from_db_virt.reboot(hard=True)
 
 
@@ -314,6 +346,8 @@ class InstancePowerOff(Resource):
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db_virt=None):
+        db.add_event('instance', instance_uuid,
+                     'API POWEROFF', None, None, None)
         return instance_from_db_virt.power_off()
 
 
@@ -321,6 +355,8 @@ class InstancePowerOn(Resource):
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db_virt=None):
+        db.add_event('instance', instance_uuid,
+                     'API POWERON', None, None, None)
         return instance_from_db_virt.power_on()
 
 
@@ -328,6 +364,7 @@ class InstancePause(Resource):
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db_virt=None):
+        db.add_event('instance', instance_uuid, 'API PAUSE', None, None, None)
         return instance_from_db_virt.pause()
 
 
@@ -335,12 +372,16 @@ class InstanceUnpause(Resource):
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db_virt=None):
+        db.add_event('instance', instance_uuid,
+                     'API UNPAUSE', None, None, None)
         return instance_from_db_virt.unpause()
 
 
 class InterfaceFloat(Resource):
     @redirect_to_network_node
     def post(self, interface_uuid=None):
+        db.add_event('interface', interface_uuid,
+                     'API FLOAT', None, None, None)
         ni = db.get_interface(interface_uuid)
         if not ni:
             return error(404, 'network interface not found')
@@ -365,6 +406,8 @@ class InterfaceFloat(Resource):
 class InterfaceDefloat(Resource):
     @redirect_to_network_node
     def post(self, interface_uuid=None):
+        db.add_event('interface', interface_uuid,
+                     'API DEFLOAT', None, None, None)
         ni = db.get_interface(interface_uuid)
         if not ni:
             return error(404, 'network interface not found')
@@ -391,27 +434,30 @@ class Image(Resource):
         parser = reqparse.RequestParser()
         parser.add_argument('url', type=str)
         args = parser.parse_args()
+        db.add_event('image', url, 'API CACHE', None, None, None)
 
         with util.RecordedOperation('cache image', args['url']) as ro:
-            images.fetch_image(args['url'], recorded=ro)
+            images.fetch_image(args['url'])
 
 
 class Network(Resource):
     @arg_is_network_uuid
     def get(self, network_uuid=None, network_from_db=None):
+        db.add_event('network', network_uuid, 'API GET', None, None, None)
         return network_from_db
 
     @arg_is_network_uuid
+    @redirect_to_network_node
     def delete(self, network_uuid=None, network_from_db=None):
+        db.add_event('network', network_uuid, 'API DELETE', None, None, None)
         if network_uuid == 'floating':
             return error(403, 'you cannot delete the floating network')
-
-        n = net.from_db(network_uuid)
 
         # We only delete unused networks
         if len(list(db.get_network_interfaces(network_uuid))) > 0:
             return error(403, 'you cannot delete an in use network')
 
+        n = net.from_db(network_uuid)
         n.remove_dhcp()
         n.delete()
 
@@ -444,10 +490,17 @@ class Networks(Resource):
         parser.add_argument('name', type=str)
         args = parser.parse_args()
 
+        try:
+            ipblock = ipaddress.ip_network(args['netblock'])
+        except ValueError as e:
+            return error(400, 'cannot parse netblock: %s' % e)
+
         network = db.allocate_network(args['netblock'],
                                       args['provide_dhcp'],
                                       args['provide_nat'],
                                       args['name'])
+        db.add_event('network', network['uuid'],
+                     'API CREATE', None, None, None)
 
         # Networks should immediately appear on the network node
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
@@ -468,6 +521,19 @@ class Networks(Resource):
                 })
 
         return network
+
+
+class NetworkEvents(Resource):
+    @arg_is_network_uuid
+    def get(self, network_uuid=None, network_from_db=None):
+        db.add_event('network', network_uuid,
+                     'API GET Events', None, None, None)
+
+        out = []
+        for event in db.get_events('network', network_uuid):
+            event['timestamp'] = event['timestamp'].timestamp()
+            out.append(event)
+        return out
 
 
 class Nodes(Resource):
@@ -529,6 +595,7 @@ class RemoveDHCP(Resource):
 api.add_resource(Root, '/')
 api.add_resource(Instances, '/instances')
 api.add_resource(Instance, '/instances/<instance_uuid>')
+api.add_resource(InstanceEvents, '/instances/<instance_uuid>/events')
 api.add_resource(InstanceInterfaces, '/instances/<instance_uuid>/interfaces')
 api.add_resource(InstanceSnapshot, '/instances/<instance_uuid>/snapshot')
 api.add_resource(InstanceRebootSoft, '/instances/<instance_uuid>/rebootsoft')
@@ -540,8 +607,9 @@ api.add_resource(InstanceUnpause, '/instances/<instance_uuid>/unpause')
 api.add_resource(InterfaceFloat, '/interfaces/<interface_uuid>/float')
 api.add_resource(InterfaceDefloat, '/interfaces/<interface_uuid>/defloat')
 api.add_resource(Image, '/images')
-api.add_resource(Network, '/networks/<network_uuid>')
 api.add_resource(Networks, '/networks')
+api.add_resource(Network, '/networks/<network_uuid>')
+api.add_resource(NetworkEvents, '/networks/<network_uuid>/events')
 api.add_resource(Nodes, '/nodes')
 
 api.add_resource(DeployNetworkNode, '/deploy_network_node')

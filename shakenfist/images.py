@@ -7,7 +7,6 @@ import logging
 import os
 import re
 import shutil
-import time
 import urllib.request
 
 from oslo_concurrency import processutils
@@ -86,7 +85,7 @@ def _get_cache_path():
     return image_cache_path
 
 
-def fetch_image(image_url, recorded=None):
+def fetch_image(image_url):
     """Download the image if we don't already have the latest version in cache."""
 
     image_url = resolve_image(image_url)
@@ -125,7 +124,6 @@ def fetch_image(image_url, recorded=None):
     # If the image is missing, or has changed, fetch
     if image_dirty:
         received = 0
-        last_heartbeat = time.time()
 
         LOG.info('Fetching image %s' % image_url)
         info['version'] += 1
@@ -148,11 +146,6 @@ def fetch_image(image_url, recorded=None):
 
                 chunk = resp.read(1024 * 1024)
                 received += len(chunk)
-
-                if time.time() - last_heartbeat > 5:
-                    if recorded:
-                        recorded.heartbeat('Received %d of %d bytes (%.01f%%)' %
-                                           (received, length, received / length * 100.0))
 
         with open(hashed_image_path + '.info', 'w') as f:
             f.write(json.dumps(info, indent=4, sort_keys=True))

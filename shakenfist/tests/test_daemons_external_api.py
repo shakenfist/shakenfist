@@ -20,6 +20,10 @@ class ExternalApiTestCase(testtools.TestCase):
     def setUp(self):
         super(ExternalApiTestCase, self).setUp()
 
+        self.add_event = mock.patch(
+            'shakenfist.db.add_event')
+        self.mock_add_event = self.add_event.start()
+
         external_api.TESTING = True
         external_api.app.testing = True
         external_api.app.debug = False

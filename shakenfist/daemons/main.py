@@ -45,10 +45,14 @@ def restore_instances():
         for instance in instances:
             LOG.info('Restoring instance %s' % instance)
             i = virt.from_db(instance)
-            i.create(None)
+            i.create()
 
 
 def main():
+    # Log configuration on startup
+    for key in config.parsed.config:
+        LOG.info('Configuration item %s = %s' % (key, config.parsed.get(key)))
+
     # If I am the network node, I need some setup
     if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
         # Bootstrap the floating network in the Networks table

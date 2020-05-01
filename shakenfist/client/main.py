@@ -171,6 +171,38 @@ def network_create(ctx, netblock=None, name=None, dhcp=None, nat=None):
     _show_network(ctx, CLIENT.allocate_network(netblock, dhcp, nat, name))
 
 
+@network.command(name='events', help='Display events for a network')
+@click.argument('network_uuid', type=click.STRING, autocompletion=_get_networks)
+@click.pass_context
+def network_events(ctx, network_uuid=None):
+    events = CLIENT.get_network_events(network_uuid)
+    if ctx.obj['OUTPUT'] == 'pretty':
+        x = PrettyTable()
+        x.field_names = ['timestamp', 'node',
+                         'operation', 'phase', 'duration', 'message']
+        for e in events:
+            e['timestamp'] = datetime.datetime.fromtimestamp(e['timestamp'])
+            x.add_row([e['timestamp'], e['fqdn'], e['operation'], e['phase'],
+                       e['duration'], e['message']])
+        print(x)
+
+    elif ctx.obj['OUTPUT'] == 'simple':
+        print('timestamp,node,operation,phase,duration,message')
+        for e in events:
+            e['timestamp'] = datetime.datetime.fromtimestamp(e['timestamp'])
+            x.add_row('%s,%s,%s,%s,%s,%s'
+                      % (e['timestamp'], e['fqdn'], e['operation'], e['phase'],
+                         e['duration'], e['message']))
+
+    elif ctx.obj['OUTPUT'] == 'json':
+        filtered_events = []
+        for e in events:
+            filtered_events.append(filter_dict(
+                n, ['timestamp', 'fqdn', 'operation', 'phase', 'duration', 'message']))
+        print(json.dumps({'networks': filtered_events},
+                         indent=4, sort_keys=True))
+
+
 @network.command(name='delete', help='Delete a network')
 @click.argument('network_uuid', type=click.STRING, autocompletion=_get_networks)
 @click.pass_context
@@ -353,6 +385,38 @@ def instance_delete(ctx, instance_uuid=None):
     CLIENT.delete_instance(instance_uuid)
     if ctx.obj['OUTPUT'] == 'json':
         print('{}')
+
+
+@instance.command(name='events', help='Display events for an instance')
+@click.argument('instance_uuid', type=click.STRING, autocompletion=_get_instances)
+@click.pass_context
+def network_events(ctx, instance_uuid=None):
+    events = CLIENT.get_instance_events(instance_uuid)
+    if ctx.obj['OUTPUT'] == 'pretty':
+        x = PrettyTable()
+        x.field_names = ['timestamp', 'node',
+                         'operation', 'phase', 'duration', 'message']
+        for e in events:
+            e['timestamp'] = datetime.datetime.fromtimestamp(e['timestamp'])
+            x.add_row([e['timestamp'], e['fqdn'], e['operation'], e['phase'],
+                       e['duration'], e['message']])
+        print(x)
+
+    elif ctx.obj['OUTPUT'] == 'simple':
+        print('timestamp,node,operation,phase,duration,message')
+        for e in events:
+            e['timestamp'] = datetime.datetime.fromtimestamp(e['timestamp'])
+            x.add_row('%s,%s,%s,%s,%s,%s'
+                      % (e['timestamp'], e['fqdn'], e['operation'], e['phase'],
+                         e['duration'], e['message']))
+
+    elif ctx.obj['OUTPUT'] == 'json':
+        filtered_events = []
+        for e in events:
+            filtered_events.append(filter_dict(
+                n, ['timestamp', 'fqdn', 'operation', 'phase', 'duration', 'message']))
+        print(json.dumps({'networks': filtered_events},
+                         indent=4, sort_keys=True))
 
 
 @instance.command(name='reboot', help='Reboot instance')

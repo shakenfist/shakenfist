@@ -1,45 +1,38 @@
-- name: Deploy infrastructure
-  terraform:
-    project_path: ./tf
-    state: present
-    force_init: true
-    variables:
-      project: "{{project}}"
-  register: terraform_out
+# Fake terraform for hard coded metal
 
 - name: Add DB node to ansible
   add_host:
     hostname: sfdb
-    ansible_ssh_host: "{{terraform_out.outputs.sfdb_external.value[0]}}"
+    ansible_ssh_host: "192.168.10.40"
     groups: db
 
 - name: Add DB node_ip
   set_fact:
-    node_ip: "{{terraform_out.outputs.sfdb_internal.value[0]}}"
+    node_ip: "192.168.10.40"
   delegate_to: sfdb
   delegate_facts: true
 
 - name: Add sf-1 to ansible
   add_host:
     hostname: sf-1
-    ansible_ssh_host: "{{terraform_out.outputs.sf_1_external.value[0]}}"
+    ansible_ssh_host: "192.168.10.41"
     groups: hypervisors
 
 - name: Add sf-1 node_ip
   set_fact:
-    node_ip: "{{terraform_out.outputs.sf_1_internal.value[0]}}"
+    node_ip: "192.168.10.41"
   delegate_to: sf-1
   delegate_facts: true
 
 - name: Add sf-2 to ansible
   add_host:
     hostname: sf-2
-    ansible_ssh_host: "{{terraform_out.outputs.sf_2_external.value[0]}}"
+    ansible_ssh_host: "192.168.10.42"
     groups: hypervisors
 
 - name: Add sf-2 node_ip
   set_fact:
-    node_ip: "{{terraform_out.outputs.sf_2_internal.value[0]}}"
+    node_ip: "192.168.10.42"
   delegate_to: sf-2
   delegate_facts: true
 

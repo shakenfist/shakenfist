@@ -63,6 +63,9 @@ class Network(object):
     def __str__(self):
         return 'network(%s, vxid %s)' % (self.uuid, self.vxlan_id)
 
+    def get_describing_tuple(self):
+        return ('network', self.uuid)
+
     def subst_dict(self):
         retval = {
             'vx_id': self.vxlan_id,
@@ -261,17 +264,6 @@ class Network(object):
                 floatnet.ipmanager.release(self.floating_gateway)
                 floatnet.persist_ipmanager()
 
-        # Otherwise ask the network node to do additional cleanup. Other nodes
-        # will catch up later if needed.
-        elif len(list(db.get_network_interfaces(self.uuid))) == 0:
-            try:
-                c = apiclient.Client('http://%s:%s' % (config.parsed.get('NETWORK_NODE_IP'),
-                                                       config.parsed.get('API_PORT')))
-                c.delete_network(self.uuid)
-            except apiclient.APIException:
-                # The network might still be in use on other nodes (race condition)
-                pass
-
     def update_dhcp(self):
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
             self.ensure_mesh()
@@ -372,11 +364,11 @@ class Network(object):
                  % (self, floating_address, inner_address))
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
-        subst['innner_address'] = inner_address
+        subst['inner_address'] = inner_address
 
         processutils.execute(
-            '%(in_namespace)s ip addr add %(floating_address)s/%(netmask)s '
-            'dev %(physical_veth_inner)s' % subst,
+            'ip addr add %(floating_address)s/%(netmask)s '
+            'dev %(physical_veth_outer)s' % subst,
             shell=True)
         processutils.execute(
             '%(in_namespace)s iptables -t nat -A PREROUTING '
@@ -388,11 +380,11 @@ class Network(object):
                  % (self, floating_address, inner_address))
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
-        subst['innner_address'] = inner_address
+        subst['inner_address'] = inner_address
 
         processutils.execute(
-            '%(in_namespace)s ip addr del %(floating_address)s/%(netmask)s '
-            'dev %(physical_veth_inner)s' % subst,
+            'ip addr del %(floating_address)s/%(netmask)s '
+            'dev %(physical_veth_outer)s' % subst,
             shell=True)
         processutils.execute(
             '%(in_namespace)s iptables -t nat -D PREROUTING '
