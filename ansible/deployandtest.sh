@@ -4,7 +4,7 @@ tox -epy37
 
 
 TERRAFORM_VARS=""
-ANSIBLE_VARS="cloud=$CLOUD"
+ANSIBLE_VARS="cloud=$CLOUD bootdelay=$BOOTDELAY"
 for var in $VARIABLES
 do
   TERRAFORM_VARS="$TERRAFORM_VARS -var=$var"

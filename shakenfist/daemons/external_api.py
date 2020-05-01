@@ -437,7 +437,7 @@ class Image(Resource):
         db.add_event('image', url, 'API CACHE', None, None, None)
 
         with util.RecordedOperation('cache image', args['url']) as ro:
-            images.fetch_image(args['url'], recorded=ro)
+            images.fetch_image(args['url'])
 
 
 class Network(Resource):

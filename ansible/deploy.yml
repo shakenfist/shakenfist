@@ -10,7 +10,7 @@
 
     - name: Wait for instances to boot
       pause:
-        minutes: 2
+        minutes: "{{bootdelay}}"
 
 - hosts: allsf
   become: yes

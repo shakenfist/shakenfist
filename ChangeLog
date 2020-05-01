@@ -1,6 +1,7 @@
 CHANGES
 =======
 
+* Fix a bug with network deletes
 * Record events to the database
 * More floating IP bug fixes
 * Refactor deployment to support clouds other than GCP

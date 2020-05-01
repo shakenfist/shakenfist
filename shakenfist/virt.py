@@ -60,12 +60,14 @@ class Instance(object):
                 'size': size,
                 'device': root_device,
                 'path': os.path.join(self.instance_path, root_device + '.qcow2'),
-                'base': base
+                'base': base,
+                'present_as': 'disk'
             },
             {
                 'type': 'raw',
                 'device': config_device,
-                'path': os.path.join(self.instance_path, config_device + '.raw')
+                'path': os.path.join(self.instance_path, config_device + '.raw'),
+                'present_as': 'disk'
             }
         ]
 
@@ -78,7 +80,8 @@ class Instance(object):
                 'size': size,
                 'device': device,
                 'path': os.path.join(self.instance_path, device + '.qcow2'),
-                'base': base
+                'base': base,
+                'present_as': 'disk'
             })
             i += 1
 
@@ -116,22 +119,42 @@ class Instance(object):
                 self.instance_path, self._get_disk_device_base() + 'b' + '.raw'))
 
         # Prepare disks
+        modified_disks = []
         for disk in self.disks:
             if disk.get('base'):
                 with util.RecordedOperation('fetch image', self) as ro:
-                    hashed_image_path = images.fetch_image(
-                        disk['base'], recorded=ro)
-                with util.RecordedOperation('transcode image', self) as ro:
-                    images.transcode_image(hashed_image_path)
-                with util.RecordedOperation('resize image', self) as ro:
-                    resized_image_path = images.resize_image(
-                        hashed_image_path, str(disk['size']) + 'G')
-                with util.RecordedOperation('create copy on write layer', self) as ro:
-                    images.create_cow(resized_image_path, disk['path'])
+                    hashed_image_path = images.fetch_image(disk['base'])
+
+                try:
+                    cd = pycdlib.PyCdlib()
+                    cd.open(hashed_image_path)
+                    disk['present_as'] = 'cdrom'
+                except:
+                    pass
+
+                if disk.get('present_as', 'cdrom') == 'cdrom':
+                    # There is no point in resizing or COW'ing a cdrom. We do
+                    # assume the image cache and instances are on the same filesystem.
+                    disk['path'] = disk['path'].replace('.qcow2', '.raw')
+                    disk['type'] = 'raw'
+                    os.link(hashed_image_path, disk['path'])
+                else:
+                    with util.RecordedOperation('transcode image', self) as ro:
+                        images.transcode_image(hashed_image_path)
+                    with util.RecordedOperation('resize image', self) as ro:
+                        resized_image_path = images.resize_image(
+                            hashed_image_path, str(disk['size']) + 'G')
+                    with util.RecordedOperation('create copy on write layer', self) as ro:
+                        images.create_cow(resized_image_path, disk['path'])
+
             elif not os.path.exists(disk['path']):
                 processutils.execute('qemu-img create -f qcow2 %s %sG'
                                      % (disk['path'], disk['size']),
                                      shell=True)
+
+            modified_disks.append(disk)
+
+        self.disks = modified_disks
 
         # Create the actual instance
         with util.RecordedOperation('create domain XML', self) as ro:

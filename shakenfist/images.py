@@ -85,7 +85,7 @@ def _get_cache_path():
     return image_cache_path
 
 
-def fetch_image(image_url, recorded=None):
+def fetch_image(image_url):
     """Download the image if we don't already have the latest version in cache."""
 
     image_url = resolve_image(image_url)

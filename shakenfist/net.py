@@ -264,17 +264,6 @@ class Network(object):
                 floatnet.ipmanager.release(self.floating_gateway)
                 floatnet.persist_ipmanager()
 
-        # Otherwise ask the network node to do additional cleanup. Other nodes
-        # will catch up later if needed.
-        elif len(list(db.get_network_interfaces(self.uuid))) == 0:
-            try:
-                c = apiclient.Client('http://%s:%s' % (config.parsed.get('NETWORK_NODE_IP'),
-                                                       config.parsed.get('API_PORT')))
-                c.delete_network(self.uuid)
-            except apiclient.APIException:
-                # The network might still be in use on other nodes (race condition)
-                pass
-
     def update_dhcp(self):
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
             self.ensure_mesh()
