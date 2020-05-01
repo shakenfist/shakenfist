@@ -8,49 +8,49 @@ import time
 
 from oslo_concurrency import processutils
 
+from shakenfist import db
+
 
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
 
 
 class RecordedOperation():
-    def __init__(self, operation, object, callback=None):
+    def __init__(self, operation, object):
         self.operation = operation
         self.object = object
-        self.callback = callback
 
     def __enter__(self):
         self.start_time = time.time()
         LOG.info('%s: Start %s' % (self.object, self.operation))
-        if self.callback:
-            self.callback({
-                'event': 'start',
-                'operation': self.operation,
-                'object': str(self.object)
-            })
+
+        object_type, object_uuid = self.get_describing_tuple()
+        db.add_event(object_type, object_uuid,
+                     self.operation, 'start', None, None)
         return self
 
     def __exit__(self, *args):
+        duration = time.time() - self.start_time
         LOG.info('%s: Finish %s, duration %.02f seconds'
                  % (self.object, self.operation,
-                    time.time() - self.start_time))
-        if self.callback:
-            self.callback({
-                'event': 'finish',
-                'operation': self.operation,
-                'object': str(self.object)
-            })
+                    duration))
 
-    def heartbeat(self, status=None):
-        LOG.info('%s: Heartbeat %s, status %s'
-                 % (self.object, self.operation, status))
-        if self.callback:
-            self.callback({
-                'event': 'heartbeat',
-                'operation': self.operation,
-                'object': str(self.object),
-                'status': status
-            })
+        object_type, object_uuid = self.get_describing_tuple()
+        db.add_event(object_type, object_uuid,
+                     self.operation, 'finish', duration, None)
+
+    def get_describing_tuple(self):
+        if self.object:
+            if isinstance(self.object, str):
+                object_type = 'null'
+                object_uuid = self.object
+            else:
+                object_type, object_uuid = self.object.get_describing_tuple()
+        else:
+            object_type = 'null'
+            object_uuid = 'null'
+
+        return object_type, object_uuid
 
 
 def check_for_interface(name):

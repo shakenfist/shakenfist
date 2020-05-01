@@ -116,6 +116,11 @@ class Client(object):
                          '/instances/' + instance_uuid)
         return r.json()
 
+    def get_instance_events(self, instance_uuid):
+        r = _request_url('GET', self.base_url +
+                         '/instances/' + instance_uuid + '/events')
+        return r.json()
+
     def cache_image(self, image_url):
         r = _request_url('POST', self.base_url + '/images',
                          data={'url': image_url})
@@ -131,6 +136,11 @@ class Client(object):
 
     def delete_network(self, network_uuid):
         r = _request_url('DELETE', self.base_url + '/networks/' + network_uuid)
+        return r.json()
+
+    def get_network_events(self, instance_uuid):
+        r = _request_url('GET', self.base_url +
+                         '/networks/' + instance_uuid + '/events')
         return r.json()
 
     def allocate_network(self, netblock, provide_dhcp, provide_nat, name):

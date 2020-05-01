@@ -51,4 +51,4 @@
 # This needs to be so long because DHCP failures take a fair while to happen
 - name: Wait for instance to boot
   pause:
-    seconds: 30
+    minutes: 1

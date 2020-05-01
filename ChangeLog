@@ -1,6 +1,8 @@
 CHANGES
 =======
 
+* Record events to the database
+* More floating IP bug fixes
 * Refactor deployment to support clouds other than GCP
 * Fix missing export for network interface
 * Add floating config IP to deployment
