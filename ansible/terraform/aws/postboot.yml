@@ -1,5 +1,16 @@
 - name: Setup /srv as a raid device on NVME disks
   shell: |
-    mdadm --create /dev/md0 --level=0 --raid-devices=2 /dev/nvme1n1 /dev/nvme2n1
+    available_nvme=""
+    for nvme in /dev/nvme[0-9]
+    do
+      if [ `ls ${nvme}n1p[0-9] | wc -l` -eq 0 ]
+      then
+        echo "$nvme is free"
+        available_nvme="$nvme,$available_nvme"
+      fi
+    done
+    echo "Available NVME devices: $available_nvme"
+
+    mdadm --create /dev/md0 --level=0 --raid-devices=2 `echo $available_nvme | cut -f 1 -d ","`n1 `echo $available_nvme | cut -f 2 -d ","`n1
     mkfs.ext4 /dev/md0
     mount /dev/md0 /srv
