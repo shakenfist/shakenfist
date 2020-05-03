@@ -1,6 +1,11 @@
 CHANGES
 =======
 
+* AWS needs some additional security groups
+* AWS metal NVME disks are a bit more complicated, as root moves around
+* Support for AWS metal as a platform
+* More CDROM support
+* Better support attaching ISOs to instances
 * Fix a bug with network deletes
 * Record events to the database
 * More floating IP bug fixes

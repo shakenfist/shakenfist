@@ -59,6 +59,7 @@ class Instance(object):
                 'type': 'qcow2',
                 'size': size,
                 'device': root_device,
+                'bus': config.parsed.get('DISK_BUS'),
                 'path': os.path.join(self.instance_path, root_device + '.qcow2'),
                 'base': base,
                 'present_as': 'disk'
@@ -66,6 +67,7 @@ class Instance(object):
             {
                 'type': 'raw',
                 'device': config_device,
+                'bus': config.parsed.get('DISK_BUS'),
                 'path': os.path.join(self.instance_path, config_device + '.raw'),
                 'present_as': 'disk'
             }
@@ -79,6 +81,7 @@ class Instance(object):
                 'type': 'qcow2',
                 'size': size,
                 'device': device,
+                'bus': config.parsed.get('DISK_BUS'),
                 'path': os.path.join(self.instance_path, device + '.qcow2'),
                 'base': base,
                 'present_as': 'disk'
@@ -133,11 +136,19 @@ class Instance(object):
                     pass
 
                 if disk.get('present_as', 'cdrom') == 'cdrom':
-                    # There is no point in resizing or COW'ing a cdrom. We do
-                    # assume the image cache and instances are on the same filesystem.
+                    # There is no point in resizing or COW'ing a cdrom
                     disk['path'] = disk['path'].replace('.qcow2', '.raw')
                     disk['type'] = 'raw'
-                    os.link(hashed_image_path, disk['path'])
+
+                    try:
+                        os.link(hashed_image_path, disk['path'])
+                    except OSError:
+                        # Different filesystems
+                        shutil.copyfile(hashed_image_path, disk['path'])
+
+                    # Due to limitations in some installers, cdroms are always on IDE
+                    disk['device'] = 'hd%s' % disk['device'][-1]
+                    disk['bus'] = 'ide'
                 else:
                     with util.RecordedOperation('transcode image', self) as ro:
                         images.transcode_image(hashed_image_path)
@@ -331,7 +342,6 @@ class Instance(object):
             uuid=self.db_entry['uuid'],
             memory=self.db_entry['memory'] * 1024,
             vcpus=self.db_entry['cpus'],
-            disk_bus=config.parsed.get('DISK_BUS'),
             disks=self.disks,
             networks=networks,
             network_model=config.parsed.get('NETWORK_MODEL'),

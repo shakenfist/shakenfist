@@ -444,6 +444,7 @@ class Network(Resource):
     @arg_is_network_uuid
     def get(self, network_uuid=None, network_from_db=None):
         db.add_event('network', network_uuid, 'API GET', None, None, None)
+        del network_from_db['ipmanager']
         return network_from_db
 
     @arg_is_network_uuid

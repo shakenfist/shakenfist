@@ -24,6 +24,7 @@
         "bridge-utils",
         "dnsmasq",
         "arping",
+        "cpu-checker",
       ]
     state: latest
 

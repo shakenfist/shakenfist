@@ -13,6 +13,7 @@
         minutes: "{{bootdelay}}"
 
 - hosts: allsf
+  any_errors_fatal: true
   become: yes
   become_method: sudo
   gather_facts: yes
@@ -22,6 +23,32 @@
 
   tasks:
     - include: includes/debian.yml
+
+- hosts: hypervisors
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - name: Check that we can run KVM
+      shell: kvm-ok
+
+    - include: terraform/{{cloud}}/postboot.yml
+
+- hosts: allsf
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: yes
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
     - include: includes/python3.yml
 
     - name: install mariadb client
@@ -70,6 +97,7 @@
         mode: u=rwx,g=rwx,o=
 
 - hosts: db
+  any_errors_fatal: true
   become: yes
   become_method: sudo
   gather_facts: no
@@ -127,6 +155,7 @@
         SHAKENFIST_SQL_URL: "mysql://sf:{{db_user_password}}@{{node_ip}}/sf"
 
 - hosts: hypervisors
+  any_errors_fatal: true
   become: yes
   become_method: sudo
   gather_facts: no
