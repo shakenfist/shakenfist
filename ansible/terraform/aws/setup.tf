@@ -36,7 +36,7 @@ resource "aws_instance" "sfdb" {
   tags = {
     Name = "sfdb"
   }
-  vpc_security_group_ids = ["sg-0ff088c6b3e980ffd"]
+  vpc_security_group_ids = ["sg-0ff088c6b3e980ffd", "sg-0008a21805a524651"]
 }
 
 resource "aws_instance" "sf_1" {
@@ -50,7 +50,7 @@ resource "aws_instance" "sf_1" {
   tags = {
     Name = "sf-1"
   }
-  vpc_security_group_ids = ["sg-0ff088c6b3e980ffd"]
+  vpc_security_group_ids = ["sg-0ff088c6b3e980ffd", "sg-0ae4a0742f580e222", "sg-0f4481fe67c40d267"]
 }
 
 resource "aws_instance" "sf_2" {
@@ -64,7 +64,7 @@ resource "aws_instance" "sf_2" {
   tags = {
     Name = "sf-2"
   }
-  vpc_security_group_ids = ["sg-0ff088c6b3e980ffd"]
+  vpc_security_group_ids = ["sg-0ff088c6b3e980ffd", "sg-0ae4a0742f580e222", "sg-0f4481fe67c40d267"]
 }
 
 output "sf_1_external" {
