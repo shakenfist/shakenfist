@@ -1,6 +1,7 @@
 CHANGES
 =======
 
+* Better support attaching ISOs to instances
 * Fix a bug with network deletes
 * Record events to the database
 * More floating IP bug fixes

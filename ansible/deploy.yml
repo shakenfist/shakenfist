@@ -22,6 +22,30 @@
 
   tasks:
     - include: includes/debian.yml
+
+- hosts: hypervisors
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - name: Check that we can run KVM
+      shell: kvm-ok
+
+    - include: terraform/{{cloud}}/postboot.yml
+
+- hosts: allsf
+  become: yes
+  become_method: sudo
+  gather_facts: yes
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
     - include: includes/python3.yml
 
     - name: install mariadb client

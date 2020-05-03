@@ -14,6 +14,7 @@ resource "google_compute_instance" "sf_1" {
   boot_disk {
     initialize_params {
       image = "sf-image"
+      size  = 40
     }
   }
   network_interface {
@@ -30,6 +31,7 @@ resource "google_compute_instance" "sf_2" {
   boot_disk {
     initialize_params {
       image = "sf-image"
+      size  = 40
     }
   }
   network_interface {
