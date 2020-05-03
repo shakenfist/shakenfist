@@ -60,6 +60,7 @@ class VirtTestCase(testtools.TestCase):
                 {
                     'base': 'cirros',
                     'device': 'vda',
+                    'bus': 'virtio',
                     'path': '/a/b/c/instances/fakeuuid/vda.qcow2',
                     'size': 8,
                     'type': 'qcow2',
@@ -67,6 +68,7 @@ class VirtTestCase(testtools.TestCase):
                 },
                 {
                     'device': 'vdb',
+                    'bus': 'virtio',
                     'path': '/a/b/c/instances/fakeuuid/vdb.raw',
                     'type': 'raw',
                     'present_as': 'disk'
@@ -88,6 +90,7 @@ class VirtTestCase(testtools.TestCase):
                 {
                     'base': 'cirros',
                     'device': 'vda',
+                    'bus': 'virtio',
                     'path': '/a/b/c/instances/fakeuuid/vda.qcow2',
                     'size': 8,
                     'type': 'qcow2',
@@ -95,6 +98,7 @@ class VirtTestCase(testtools.TestCase):
                 },
                 {
                     'device': 'vdb',
+                    'bus': 'virtio',
                     'path': '/a/b/c/instances/fakeuuid/vdb.raw',
                     'type': 'raw',
                     'present_as': 'disk'
@@ -102,6 +106,7 @@ class VirtTestCase(testtools.TestCase):
                 {
                     'base': None,
                     'device': 'vdc',
+                    'bus': 'virtio',
                     'path': '/a/b/c/instances/fakeuuid/vdc.qcow2',
                     'size': 16,
                     'type': 'qcow2',
@@ -110,6 +115,7 @@ class VirtTestCase(testtools.TestCase):
                 {
                     'base': None,
                     'device': 'vdd',
+                    'bus': 'virtio',
                     'path': '/a/b/c/instances/fakeuuid/vdd.qcow2',
                     'size': 24,
                     'type': 'qcow2',
