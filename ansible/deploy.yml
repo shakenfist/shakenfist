@@ -13,6 +13,7 @@
         minutes: "{{bootdelay}}"
 
 - hosts: allsf
+  any_errors_fatal: true
   become: yes
   become_method: sudo
   gather_facts: yes
@@ -24,6 +25,7 @@
     - include: includes/debian.yml
 
 - hosts: hypervisors
+  any_errors_fatal: true
   become: yes
   become_method: sudo
   gather_facts: no
@@ -38,6 +40,7 @@
     - include: terraform/{{cloud}}/postboot.yml
 
 - hosts: allsf
+  any_errors_fatal: true
   become: yes
   become_method: sudo
   gather_facts: yes
@@ -94,6 +97,7 @@
         mode: u=rwx,g=rwx,o=
 
 - hosts: db
+  any_errors_fatal: true
   become: yes
   become_method: sudo
   gather_facts: no
@@ -151,6 +155,7 @@
         SHAKENFIST_SQL_URL: "mysql://sf:{{db_user_password}}@{{node_ip}}/sf"
 
 - hosts: hypervisors
+  any_errors_fatal: true
   become: yes
   become_method: sudo
   gather_facts: no
