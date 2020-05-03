@@ -164,7 +164,7 @@ Here's a simple feature matrix:
 | Networks                                          | Yes         |         |             |
 | Multiple NICs for a given server                  | Yes         |         |             |
 | Pre-cache a server image                          | Yes         |         |             |
-| Floating IPs                                      |             | Yes     |             |
+| Floating IPs                                      | Yes         |         |             |
 | Pause                                             | Yes         |         |             |
 | Reboot (hard and soft)                            | Yes         |         |             |
 | Security groups                                   |             | Yes     |             |
