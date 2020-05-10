@@ -114,14 +114,17 @@
       ignore_errors: True
       register: has_sfdb
 
-    - name: Ensure mariadb is started
-      shell: docker start sfdb
+    - name: Stop MySQL if running
+      shell: docker stop sfdb
       when: has_sfdb.rc == 0
 
-    - name: Wait for docker python package to be available
-      pause:
-        minutes: 1
-      when: has_sfdb.rc == 1
+    - name: Copy MySQL configuration file
+      copy:
+        src: files/my.cnf
+        dest: /srv/shakenfist/mysql.cnf
+        owner: root
+        group: root
+        mode: "0644"
 
     - name: Create mariadb docker container
       docker_container:
@@ -135,14 +138,13 @@
           MYSQL_PASSWORD: "{{db_user_password}}"
         volumes:
           - /srv/shakenfist/mysql:/var/lib/mysql
+          - /srv/shakenfist/mysql.cnf:/etc/mysql/my.cnf
         ports:
           - 3306:3306
-      when: has_sfdb.rc == 1
 
-    - name: Wait for mariabdb to be listening
+    - name: Wait for mariadb to be listening
       pause:
         minutes: 1
-      when: has_sfdb.rc == 1
 
     - name: Upgrade database schema
       command: alembic upgrade head
@@ -166,7 +168,7 @@
   tasks:
     - name: Create storage directory
       file:
-        path: /srv/shakenfist/mariadb
+        path: /srv/shakenfist
         state: directory
         mode: "0755"
 
