@@ -47,6 +47,7 @@ class VirtTestCase(testtools.TestCase):
             'ssh_key': 'thisisasshkey',
             'user_data': str(base64.b64encode(
                 'thisisuserdata'.encode('utf-8')), 'utf-8'),
+            'block_devices': None
         })
 
     def test_init(self):
@@ -64,22 +65,25 @@ class VirtTestCase(testtools.TestCase):
                     'path': '/a/b/c/instances/fakeuuid/vda.qcow2',
                     'size': 8,
                     'type': 'qcow2',
-                    'present_as': 'disk'
+                    'present_as': 'disk',
+                    'snapshot_ignores': False
                 },
                 {
                     'device': 'vdb',
                     'bus': 'virtio',
                     'path': '/a/b/c/instances/fakeuuid/vdb.raw',
                     'type': 'raw',
-                    'present_as': 'disk'
+                    'present_as': 'disk',
+                    'snapshot_ignores': True
                 }
-            ], i.disks)
+            ], i.db_entry['block_devices']['devices'])
 
     def test_init_muliple_disks(self):
         i = virt.Instance({
             'uuid': 'fakeuuid',
             'name': 'cirros',
-            'disk_spec': '8@cirros 16 24'
+            'disk_spec': '8@cirros 16 24',
+            'block_devices': None
         })
 
         self.assertEqual('/a/b/c/instances/fakeuuid', i.instance_path)
@@ -94,14 +98,16 @@ class VirtTestCase(testtools.TestCase):
                     'path': '/a/b/c/instances/fakeuuid/vda.qcow2',
                     'size': 8,
                     'type': 'qcow2',
-                    'present_as': 'disk'
+                    'present_as': 'disk',
+                    'snapshot_ignores': False
                 },
                 {
                     'device': 'vdb',
                     'bus': 'virtio',
                     'path': '/a/b/c/instances/fakeuuid/vdb.raw',
                     'type': 'raw',
-                    'present_as': 'disk'
+                    'present_as': 'disk',
+                    'snapshot_ignores': True
                 },
                 {
                     'base': None,
@@ -110,7 +116,8 @@ class VirtTestCase(testtools.TestCase):
                     'path': '/a/b/c/instances/fakeuuid/vdc.qcow2',
                     'size': 16,
                     'type': 'qcow2',
-                    'present_as': 'disk'
+                    'present_as': 'disk',
+                    'snapshot_ignores': False
                 },
                 {
                     'base': None,
@@ -119,9 +126,10 @@ class VirtTestCase(testtools.TestCase):
                     'path': '/a/b/c/instances/fakeuuid/vdd.qcow2',
                     'size': 24,
                     'type': 'qcow2',
-                    'present_as': 'disk'
+                    'present_as': 'disk',
+                    'snapshot_ignores': False
                 }
-            ], i.disks)
+            ], i.db_entry['block_devices']['devices'])
 
     def test_str(self):
         i = self._make_instance()

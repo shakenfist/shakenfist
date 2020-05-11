@@ -50,49 +50,61 @@ class Instance(object):
             config.parsed.get('STORAGE_PATH'), 'snapshots')
         self.xml_file = os.path.join(self.instance_path, 'libvirt.xml')
 
-        disks = self.db_entry['disk_spec'].split(' ')
-        size, base = self._parse_disk_spec(disks[0])
-        root_device = self._get_disk_device_base() + 'a'
-        config_device = self._get_disk_device_base() + 'b'
-        self.disks = [
-            {
-                'type': 'qcow2',
-                'size': size,
-                'device': root_device,
-                'bus': config.parsed.get('DISK_BUS'),
-                'path': os.path.join(self.instance_path, root_device + '.qcow2'),
-                'base': base,
-                'present_as': 'disk'
-            },
-            {
-                'type': 'raw',
-                'device': config_device,
-                'bus': config.parsed.get('DISK_BUS'),
-                'path': os.path.join(self.instance_path, config_device + '.raw'),
-                'present_as': 'disk'
-            }
-        ]
-
-        i = 0
-        for d in disks[1:]:
-            size, base = self._parse_disk_spec(d)
-            device = self._get_disk_device_base() + chr(ord('c') + i)
-            self.disks.append({
-                'type': 'qcow2',
-                'size': size,
-                'device': device,
-                'bus': config.parsed.get('DISK_BUS'),
-                'path': os.path.join(self.instance_path, device + '.qcow2'),
-                'base': base,
-                'present_as': 'disk'
-            })
-            i += 1
+        if not self.db_entry['block_devices']:
+            self._populate_block_devices()
 
     def __str__(self):
         return 'instance(%s)' % self.db_entry['uuid']
 
     def get_describing_tuple(self):
         return ('instance', self.db_entry['uuid'])
+
+    def _populate_block_devices(self):
+        disks = self.db_entry['disk_spec'].split(' ')
+        size, base = self._parse_disk_spec(disks[0])
+        root_device = self._get_disk_device_base() + 'a'
+        config_device = self._get_disk_device_base() + 'b'
+
+        self.db_entry['block_devices'] = {
+            'devices': [
+                {
+                    'type': 'qcow2',
+                    'size': size,
+                    'device': root_device,
+                    'bus': config.parsed.get('DISK_BUS'),
+                    'path': os.path.join(self.instance_path, root_device + '.qcow2'),
+                    'base': base,
+                    'present_as': 'disk',
+                    'snapshot_ignores': False
+                },
+                {
+                    'type': 'raw',
+                    'device': config_device,
+                    'bus': config.parsed.get('DISK_BUS'),
+                    'path': os.path.join(self.instance_path, config_device + '.raw'),
+                    'present_as': 'disk',
+                    'snapshot_ignores': True
+                }
+            ]
+        }
+
+        i = 0
+        for d in disks[1:]:
+            size, base = self._parse_disk_spec(d)
+            device = self._get_disk_device_base() + chr(ord('c') + i)
+            self.db_entry['block_devices']['devices'].append({
+                'type': 'qcow2',
+                'size': size,
+                'device': device,
+                'bus': config.parsed.get('DISK_BUS'),
+                'path': os.path.join(self.instance_path, device + '.qcow2'),
+                'base': base,
+                'present_as': 'disk',
+                'snapshot_ignores': False
+            })
+            i += 1
+
+        self.db_entry['block_devices']['finalized'] = False
 
     def _parse_disk_spec(self, spec):
         if not '@' in spec:
@@ -122,50 +134,55 @@ class Instance(object):
                 self.instance_path, self._get_disk_device_base() + 'b' + '.raw'))
 
         # Prepare disks
-        modified_disks = []
-        for disk in self.disks:
-            if disk.get('base'):
-                with util.RecordedOperation('fetch image', self) as ro:
-                    hashed_image_path = images.fetch_image(disk['base'])
-
-                try:
-                    cd = pycdlib.PyCdlib()
-                    cd.open(hashed_image_path)
-                    disk['present_as'] = 'cdrom'
-                except:
-                    pass
-
-                if disk.get('present_as', 'cdrom') == 'cdrom':
-                    # There is no point in resizing or COW'ing a cdrom
-                    disk['path'] = disk['path'].replace('.qcow2', '.raw')
-                    disk['type'] = 'raw'
+        if not self.db_entry['block_devices']['finalized']:
+            modified_disks = []
+            for disk in self.db_entry['block_devices']['devices']:
+                if disk.get('base'):
+                    with util.RecordedOperation('fetch image', self) as ro:
+                        hashed_image_path = images.fetch_image(disk['base'])
 
                     try:
-                        os.link(hashed_image_path, disk['path'])
-                    except OSError:
-                        # Different filesystems
-                        shutil.copyfile(hashed_image_path, disk['path'])
+                        cd = pycdlib.PyCdlib()
+                        cd.open(hashed_image_path)
+                        disk['present_as'] = 'cdrom'
+                    except:
+                        pass
 
-                    # Due to limitations in some installers, cdroms are always on IDE
-                    disk['device'] = 'hd%s' % disk['device'][-1]
-                    disk['bus'] = 'ide'
-                else:
-                    with util.RecordedOperation('transcode image', self) as ro:
-                        images.transcode_image(hashed_image_path)
-                    with util.RecordedOperation('resize image', self) as ro:
-                        resized_image_path = images.resize_image(
-                            hashed_image_path, str(disk['size']) + 'G')
-                    with util.RecordedOperation('create copy on write layer', self) as ro:
-                        images.create_cow(resized_image_path, disk['path'])
+                    if disk.get('present_as', 'cdrom') == 'cdrom':
+                        # There is no point in resizing or COW'ing a cdrom
+                        disk['path'] = disk['path'].replace('.qcow2', '.raw')
+                        disk['type'] = 'raw'
+                        disk['snapshot_ignores'] = True
 
-            elif not os.path.exists(disk['path']):
-                processutils.execute('qemu-img create -f qcow2 %s %sG'
-                                     % (disk['path'], disk['size']),
-                                     shell=True)
+                        try:
+                            os.link(hashed_image_path, disk['path'])
+                        except OSError:
+                            # Different filesystems
+                            shutil.copyfile(hashed_image_path, disk['path'])
 
-            modified_disks.append(disk)
+                        # Due to limitations in some installers, cdroms are always on IDE
+                        disk['device'] = 'hd%s' % disk['device'][-1]
+                        disk['bus'] = 'ide'
+                    else:
+                        with util.RecordedOperation('transcode image', self) as ro:
+                            images.transcode_image(hashed_image_path)
+                        with util.RecordedOperation('resize image', self) as ro:
+                            resized_image_path = images.resize_image(
+                                hashed_image_path, str(disk['size']) + 'G')
+                        with util.RecordedOperation('create copy on write layer', self) as ro:
+                            images.create_cow(resized_image_path, disk['path'])
 
-        self.disks = modified_disks
+                elif not os.path.exists(disk['path']):
+                    processutils.execute('qemu-img create -f qcow2 %s %sG'
+                                         % (disk['path'], disk['size']),
+                                         shell=True)
+
+                modified_disks.append(disk)
+            self.db_entry['block_devices']['devices'] = modified_disks
+            self.db_entry['block_devices']['finalized'] = True
+
+        db.persist_block_devices(
+            self.db_entry['uuid'], self.db_entry['block_devices'])
 
         # Create the actual instance
         with util.RecordedOperation('create domain XML', self) as ro:
@@ -342,7 +359,7 @@ class Instance(object):
             uuid=self.db_entry['uuid'],
             memory=self.db_entry['memory'] * 1024,
             vcpus=self.db_entry['cpus'],
-            disks=self.disks,
+            disks=self.db_entry['block_devices']['devices'],
             networks=networks,
             network_model=config.parsed.get('NETWORK_MODEL'),
             instance_path=self.instance_path,
@@ -402,7 +419,7 @@ class Instance(object):
         images.snapshot(source, destination)
 
     def snapshot(self, all=False):
-        disks = self.disks
+        disks = self.db_entry['block_devices']['devices']
         if not all:
             disks = [disks[0]]
 
@@ -416,7 +433,12 @@ class Instance(object):
                 f.write('<html></html>')
 
         for d in disks:
-            print(d)
+            if not os.path.exists(d['path']):
+                continue
+
+            if d['snapshot_ignores']:
+                continue
+
             if d['type'] != 'qcow2':
                 continue
 

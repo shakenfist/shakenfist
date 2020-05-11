@@ -19,7 +19,10 @@ class APIException(Exception):
 
 
 def _request_url(method, url, data=None):
-    r = requests.request(method, url, data=data)
+    h = {}
+    if data:
+        h['Content-Type'] = 'application/json'
+    r = requests.request(method, url, data=json.dumps(data), headers=h)
 
     LOG.debug('-------------------------------------------------------')
     LOG.debug('API client requested: %s %s' % (method, url))
@@ -81,6 +84,11 @@ class Client(object):
     def snapshot_instance(self, instance_uuid, all=False):
         r = _request_url('POST', self.base_url + '/instances/' + instance_uuid +
                          '/snapshot', data={'all': all})
+        return r.json()
+
+    def get_instance_snapshots(self, instance_uuid):
+        r = _request_url('GET', self.base_url + '/instances/' + instance_uuid +
+                         '/snapshot')
         return r.json()
 
     def reboot_instance(self, instance_uuid, hard=False):

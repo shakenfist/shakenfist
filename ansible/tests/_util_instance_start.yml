@@ -11,6 +11,7 @@
     ram: 1
     disks:
       - "8@{{distro}}"
+      - "8"
     networks:
       - "{{network}}"
     ssh_key: "{{sshkey}}"

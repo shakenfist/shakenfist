@@ -114,14 +114,17 @@
       ignore_errors: True
       register: has_sfdb
 
-    - name: Ensure mariadb is started
-      shell: docker start sfdb
+    - name: Stop MySQL if running
+      shell: docker stop sfdb
       when: has_sfdb.rc == 0
 
-    - name: Wait for docker python package to be available
-      pause:
-        minutes: 1
-      when: has_sfdb.rc == 1
+    - name: Copy MySQL configuration file
+      copy:
+        src: files/my.cnf
+        dest: /srv/shakenfist/mysql.cnf
+        owner: root
+        group: root
+        mode: "0644"
 
     - name: Create mariadb docker container
       docker_container:
@@ -135,14 +138,13 @@
           MYSQL_PASSWORD: "{{db_user_password}}"
         volumes:
           - /srv/shakenfist/mysql:/var/lib/mysql
+          - /srv/shakenfist/mysql.cnf:/etc/mysql/my.cnf
         ports:
           - 3306:3306
-      when: has_sfdb.rc == 1
 
-    - name: Wait for mariabdb to be listening
+    - name: Wait for mariadb to be listening
       pause:
         minutes: 1
-      when: has_sfdb.rc == 1
 
     - name: Upgrade database schema
       command: alembic upgrade head
@@ -154,6 +156,20 @@
         SHAKENFIST_DB_PASSWORD: "{{db_user_password}}"
         SHAKENFIST_SQL_URL: "mysql://sf:{{db_user_password}}@{{node_ip}}/sf"
 
+    - name: Write syslog file
+      template:
+        src: files/rsyslog-server-01-sf.conf
+        dest: /etc/rsyslog.d/01-sf.conf
+        owner: root
+        group: sudo
+        mode: u=r,g=r,o=
+
+    - name: Restart syslog
+      service:
+        name: rsyslog
+        enabled: yes
+        state: restarted
+
 - hosts: hypervisors
   any_errors_fatal: true
   become: yes
@@ -164,9 +180,27 @@
     - vars
 
   tasks:
+    - name: Syslog server is DB server
+      set_fact:
+        syslog: "{{hostvars['localhost']['database_node_ip']}}"
+
+    - name: Write syslog file
+      template:
+        src: files/rsyslog-client-01-sf.conf
+        dest: /etc/rsyslog.d/01-sf.conf
+        owner: root
+        group: sudo
+        mode: u=r,g=r,o=
+
+    - name: Restart syslog
+      service:
+        name: rsyslog
+        enabled: yes
+        state: restarted
+
     - name: Create storage directory
       file:
-        path: /srv/shakenfist/mariadb
+        path: /srv/shakenfist
         state: directory
         mode: "0755"
 

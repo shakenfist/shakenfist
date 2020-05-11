@@ -1,12 +1,12 @@
 export SHAKENFIST_NODE_IP="{{node_ip}}"
 export SHAKENFIST_NODE_EGRESS_NIC="{{node_egress_nic}}"
 export SHAKENFIST_FLOATING_NETWORK="{{floating_network_ipblock}}"
-export SHAKENFIST_NETWORK_NODE_IP="{{hostvars['sf-1']['node_ip']}}"
+export SHAKENFIST_NETWORK_NODE_IP="{{hostvars['localhost']['network_node_ip']}}"
 
-export _DB_NODE_IP="{{hostvars['sfdb']['node_ip']}}"
+export _DB_NODE_IP="{{hostvars['localhost']['database_node_ip']}}"
 export _DB_ROOT_PASSWORD="{{db_root_password}}"
 export _DB_PASSWORD="{{db_user_password}}"
-export SHAKENFIST_SQL_URL="mysql://sf:{{db_user_password}}@{{hostvars['sfdb']['node_ip']}}/sf"
+export SHAKENFIST_SQL_URL="mysql://sf:{{db_user_password}}@{{hostvars['localhost']['database_node_ip']}}/sf"
 
 export SHAKENFIST_DISK_BUS="virtio"
 export SHAKENFIST_NETWORK_MODEL="virtio"
@@ -14,5 +14,5 @@ export SHAKENFIST_NETWORK_MODEL="virtio"
 
 eval "$(_SF_CLIENT_COMPLETE=source sf-client)"
 
-alias sfmysql="mysql -h {{hostvars['sfdb']['node_ip']}} -u sf --password={{db_user_password}} sf"
+alias sfmysql="mysql -h {{hostvars['localhost']['database_node_ip']}} -u sf --password={{db_user_password}} sf"
 alias sfmesh="bridge fdb show brport vxlan-1"
