@@ -252,10 +252,13 @@ def instance_list(ctx):
                          indent=4, sort_keys=True))
 
 
-def _show_instance(ctx, i):
+def _show_instance(ctx, i, include_snapshots=False):
     if not i:
         print('Instance not found')
         sys.exit(1)
+
+    if include_snapshots:
+        snapshots = CLIENT.get_instance_snapshots(i['uuid'])
 
     if ctx.obj['OUTPUT'] == 'json':
         out = filter_dict(i, ['uuid', 'name', 'cpus', 'memory', 'disk_spec',
@@ -267,6 +270,11 @@ def _show_instance(ctx, i):
                 filter_dict(
                     interface, ['uuid', 'network_uuid', 'macaddr', 'order',
                                 'ipv4', 'floating']))
+        if include_snapshots:
+            out['snapshots'] = []
+            for snap in snapshots:
+                out['snapshots'].append(filter_dict(
+                    snap, ['uuid', 'device', 'created']))
 
         print(json.dumps(out, indent=4, sort_keys=True))
         return
@@ -311,12 +319,31 @@ def _show_instance(ctx, i):
                      interface['macaddr'], interface['order'], interface['ipv4'],
                      interface['floating']))
 
+    if include_snapshots:
+        print()
+        if ctx.obj['OUTPUT'] == 'pretty':
+            format_string = '    %-8s: %s'
+            print('Snapshots:')
+            for snap in snapshots:
+                print()
+                print(format_string % ('uuid', snap['uuid']))
+                print(format_string % ('device', snap['device']))
+                print(format_string % (
+                    'created', datetime.datetime.fromtimestamp(snap['created'])))
+        else:
+            print('snapshot,uuid,device,created')
+            for snap in snapshots:
+                print('snapshot,%s,%s,%s'
+                      % (snap['uuid'], snap['device'],
+                         datetime.datetime.fromtimestamp(snap['created'])))
+
 
 @instance.command(name='show', help='Show an instance')
 @click.argument('instance_uuid', type=click.STRING, autocompletion=_get_instances)
+@click.argument('snapshots', type=click.BOOL, default=False)
 @click.pass_context
-def instance_show(ctx, instance_uuid=None):
-    _show_instance(ctx, CLIENT.get_instance(instance_uuid))
+def instance_show(ctx, instance_uuid=None, snapshots=False):
+    _show_instance(ctx, CLIENT.get_instance(instance_uuid), snapshots)
 
 
 @instance.command(name='create',
@@ -390,7 +417,7 @@ def instance_delete(ctx, instance_uuid=None):
 @instance.command(name='events', help='Display events for an instance')
 @click.argument('instance_uuid', type=click.STRING, autocompletion=_get_instances)
 @click.pass_context
-def network_events(ctx, instance_uuid=None):
+def instance_events(ctx, instance_uuid=None):
     events = CLIENT.get_instance_events(instance_uuid)
     if ctx.obj['OUTPUT'] == 'pretty':
         x = PrettyTable()
@@ -406,15 +433,15 @@ def network_events(ctx, instance_uuid=None):
         print('timestamp,node,operation,phase,duration,message')
         for e in events:
             e['timestamp'] = datetime.datetime.fromtimestamp(e['timestamp'])
-            x.add_row('%s,%s,%s,%s,%s,%s'
-                      % (e['timestamp'], e['fqdn'], e['operation'], e['phase'],
-                         e['duration'], e['message']))
+            print('%s,%s,%s,%s,%s,%s'
+                  % (e['timestamp'], e['fqdn'], e['operation'], e['phase'],
+                     e['duration'], e['message']))
 
     elif ctx.obj['OUTPUT'] == 'json':
         filtered_events = []
         for e in events:
             filtered_events.append(filter_dict(
-                n, ['timestamp', 'fqdn', 'operation', 'phase', 'duration', 'message']))
+                e, ['timestamp', 'fqdn', 'operation', 'phase', 'duration', 'message']))
         print(json.dumps({'networks': filtered_events},
                          indent=4, sort_keys=True))
 

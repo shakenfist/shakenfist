@@ -136,6 +136,36 @@
         [ `/opt/telnet_client.py {{cirros_console_port}} ping {{hostvars['sf-2']['cirros_ip']}} | grep -c " 0% packet loss"` -eq 1 ]
 
 #########################################
+# Scenario: snapshots work
+#########################################
+
+- hosts: sf-1
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - name: Snapshot sf-1 cirros
+      shell: |
+        sf-client instance snapshot {{hostvars['sf-1']['cirros_uuid']}}
+
+    - name: Validate
+      shell: |
+        [ `sf-client --simple instance show {{hostvars['sf-1']['cirros_uuid']}} True | grep -v "snapshot,uuid" | grep -c "snapshot,"` -eq 1 ]
+
+    - name: Snapshot sf-2
+      shell: |
+        sf-client instance snapshot {{hostvars['sf-2']['cirros_uuid']}} True
+
+    - name: Validate
+      shell: |
+        [ `sf-client --simple instance show {{hostvars['sf-2']['cirros_uuid']}} True | grep -v "snapshot,uuid" | grep -c "snapshot,"` -eq 2 ]
+
+#########################################
 # Scenario: we can start an Ubuntu instance too
 #########################################
 

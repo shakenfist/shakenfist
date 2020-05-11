@@ -58,7 +58,8 @@ class ExternalApiTestCase(testtools.TestCase):
                 return_value={'uuid': '123',
                               'name': 'banana',
                               'node': 'notthisone',
-                              'disk_spec': '8@cirros'})
+                              'disk_spec': '8@cirros',
+                              'block_devices': None})
     @mock.patch('shakenfist.config.parsed',
                 return_value={'INCLUDE_TRACEBACKS': '1',
                               'NODE_NAME': 'thisone',
@@ -69,6 +70,6 @@ class ExternalApiTestCase(testtools.TestCase):
                              mock_get_instance):
         resp = self.client.delete('/instances/foo')
         mock_request.assert_called_with(
-            'DELETE', 'http://notthisone:1/instances/foo', data=None)
+            'DELETE', 'http://notthisone:1/instances/foo', data='{}')
         self.assertEqual({'fakestuff': 'here'}, resp.get_json())
         self.assertEqual(200, resp.status_code)

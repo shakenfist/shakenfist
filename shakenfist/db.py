@@ -1,6 +1,7 @@
 # Copyright 2020 Michael Still
 
 import datetime
+import json
 import logging
 import random
 import time
@@ -18,6 +19,7 @@ from shakenfist import config
 
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
+
 
 Base = declarative_base()
 ENGINE = create_engine(config.parsed.get('SQL_URL'))
@@ -240,6 +242,7 @@ class Instance(Base):
     console_port = Column(Integer)
     vdi_port = Column(Integer)
     user_data = Column(String)
+    block_devices = Column(BLOB)
 
     def __init__(self, instance_uuid, name, cpus, memory_mb, disk_spec,
                  ssh_key, node, console_port, vdi_port, user_data):
@@ -253,8 +256,14 @@ class Instance(Base):
         self.console_port = console_port
         self.vdi_port = vdi_port
         self.user_data = user_data
+        self.block_devices = None
 
     def export(self):
+        if self.block_devices:
+            block_devices = json.loads(self.block_devices)
+        else:
+            block_devices = None
+
         return {
             'uuid': self.uuid,
             'name': self.name,
@@ -265,7 +274,8 @@ class Instance(Base):
             'node': self.node,
             'console_port': self.console_port,
             'vdi_port': self.vdi_port,
-            'user_data': self.user_data
+            'user_data': self.user_data,
+            'block_devices': block_devices
         }
 
 
@@ -295,6 +305,17 @@ def get_instances(local_only=False):
             yield i.export()
     except exc.NoResultFound:
         pass
+
+
+def persist_block_devices(instance_uuid, block_devices):
+    ensure_valid_session()
+
+    try:
+        i = SESSION.query(Instance).filter(
+            Instance.uuid == instance_uuid).one()
+        i.block_devices = json.dumps(block_devices).encode('utf-8')
+    finally:
+        SESSION.commit()
 
 
 def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key, user_data):
@@ -490,6 +511,18 @@ def create_snapshot(snapshot_uuid, device, instance_uuid, created):
         SESSION.add(Snapshot(snapshot_uuid, device, instance_uuid, created))
     finally:
         SESSION.commit()
+
+
+def get_instance_snapshots(instance_uuid):
+    ensure_valid_session()
+
+    try:
+        snapshots = SESSION.query(Snapshot).filter(
+            Snapshot.instance_uuid == instance_uuid).all()
+        for s in snapshots:
+            yield s.export()
+    except exc.NoResultFound:
+        pass
 
 
 class Event(Base):

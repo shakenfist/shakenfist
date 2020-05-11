@@ -1,5 +1,6 @@
 # Copyright 2020 Michael Still
 
+import json
 import logging
 import os
 import random
@@ -176,9 +177,9 @@ class Network(object):
                 ('http://%s:%d/deploy_network_node'
                  % (config.parsed.get('NETWORK_NODE_IP'),
                     config.parsed.get('API_PORT'))),
-                data={
+                data=json.dumps({
                     'uuid': self.uuid
-                })
+                }))
 
     def deploy_nat(self):
         if not self.provide_nat:
@@ -278,9 +279,9 @@ class Network(object):
                 ('http://%s:%d/update_dhcp'
                  % (config.parsed.get('NETWORK_NODE_IP'),
                     config.parsed.get('API_PORT'))),
-                data={
+                data=json.dumps({
                     'uuid': self.uuid
-                })
+                }))
 
     def remove_dhcp(self):
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
@@ -295,9 +296,9 @@ class Network(object):
                 ('http://%s:%d/remove_dhcp'
                  % (config.parsed.get('NETWORK_NODE_IP'),
                     config.parsed.get('API_PORT'))),
-                data={
+                data=json.dumps({
                     'uuid': self.uuid
-                })
+                }))
 
     def discover_mesh(self):
         mesh_re = re.compile('00: 00: 00: 00: 00: 00 dst (.*) self permanent')

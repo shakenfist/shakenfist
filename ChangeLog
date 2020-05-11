@@ -1,6 +1,10 @@
 CHANGES
 =======
 
+* Turn off MySQL query caching
+* Support smaller AWS metal deployments
+* Floating IPs work!
+* GCP gives us DNS, AWS doesn't
 * AWS needs some additional security groups
 * AWS metal NVME disks are a bit more complicated, as root moves around
 * Support for AWS metal as a platform

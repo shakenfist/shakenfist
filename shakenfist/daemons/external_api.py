@@ -1,6 +1,6 @@
 import flask
 import flask_restful
-from flask_restful import fields, marshal_with, reqparse
+from flask_restful import fields, marshal_with
 import ipaddress
 import json
 import logging
@@ -50,9 +50,34 @@ def error(status_code, message):
     return resp
 
 
-def generic_catch_exception(func):
+def flask_get_post_body():
+    j = {}
+    try:
+        j = flask.request.get_json(force=True)
+    except:
+        if flask.request.data:
+            try:
+                j = json.loads(flask.request.data)
+            except:
+                pass
+    return j
+
+
+def generic_wrapper(func):
     def wrapper(*args, **kwargs):
         try:
+            LOG.info('External API request: %s' % flask.request)
+            j = flask_get_post_body()
+
+            if j:
+                for key in j:
+                    if key == 'uuid':
+                        destkey = 'passed_uuid'
+                    else:
+                        destkey = key
+                    kwargs[destkey] = j[key]
+
+            LOG.info('External API request: %s %s %s' % (func, args, kwargs))
             return func(*args, **kwargs)
         except:
             return error(500, 'server error')
@@ -60,7 +85,7 @@ def generic_catch_exception(func):
 
 
 class Resource(flask_restful.Resource):
-    method_decorators = [generic_catch_exception]
+    method_decorators = [generic_wrapper]
 
 
 def arg_is_instance_uuid(func):
@@ -101,7 +126,7 @@ def redirect_instance_request(func):
                 % (i.db_entry['node'],
                    config.parsed.get('API_PORT'),
                    flask.request.environ['PATH_INFO']),
-                data=flask.request.get_json())
+                data=json.dumps(flask_get_post_body()))
 
             LOG.info('Returning proxied request: %d, %s'
                      % (r.status_code, r.text))
@@ -137,7 +162,7 @@ def redirect_to_network_node(func):
                 % (config.parsed.get('NETWORK_NODE_IP'),
                    config.parsed.get('API_PORT'),
                    flask.request.environ['PATH_INFO']),
-                data=flask.request.get_json())
+                data=json.dumps(flask.request.get_json()))
 
             LOG.info('Returning proxied request: %d, %s'
                      % (r.status_code, r.text))
@@ -152,6 +177,16 @@ def redirect_to_network_node(func):
 
 app = flask.Flask(__name__)
 api = flask_restful.Api(app, catch_all_404s=False)
+
+
+@app.before_request
+def log_request_info():
+    output = 'API request headers:\n'
+    for header, value in flask.request.headers:
+        output += '    %s: %s\n' % (header, value)
+    output += 'API request body: %s' % flask.request.get_data()
+
+    app.logger.info(output)
 
 
 class Root(Resource):
@@ -204,17 +239,8 @@ class Instances(Resource):
     def get(self):
         return list(db.get_instances())
 
-    def post(self):
-        parser = reqparse.RequestParser()
-        parser.add_argument('name', type=str)
-        parser.add_argument('cpus', type=int)
-        parser.add_argument('memory', type=int)
-        parser.add_argument('network', type=str, action='append')
-        parser.add_argument('disk', type=str, action='append')
-        parser.add_argument('ssh_key', type=str)
-        parser.add_argument('user_data', type=str)
-        args = parser.parse_args()
-
+    def post(self, name=None, cpus=None, memory=None, network=None,
+             disk=None, ssh_key=None, user_data=None):
         # The instance needs to exist in the DB before network interfaces are created
         new_instance_uuid = str(uuid.uuid4())
         db.add_event('instance', new_instance_uuid,
@@ -222,12 +248,12 @@ class Instances(Resource):
 
         instance = virt.from_definition(
             uuid=new_instance_uuid,
-            name=args['name'],
-            disks=args['disk'],
-            memory_mb=args['memory'] * 1024,
-            vcpus=args['cpus'],
-            ssh_key=args['ssh_key'],
-            user_data=args['user_data']
+            name=name,
+            disks=disk,
+            memory_mb=memory * 1024,
+            vcpus=cpus,
+            ssh_key=ssh_key,
+            user_data=user_data
         )
 
         # Check we can get the required IPs
@@ -242,12 +268,12 @@ class Instances(Resource):
             return error(status_code, message)
 
         order = 0
-        for network in args['network']:
-            if not '@' in network:
-                network_uuid = network
+        for netdesc in network:
+            if not '@' in netdesc:
+                network_uuid = netdesc
                 addr = None
             else:
-                network_uuid, addr = network.split('@')
+                network_uuid, addr = netdesc.split('@')
 
             if not network_uuid in nets:
                 n = net.from_db(network_uuid)
@@ -311,17 +337,24 @@ class InstanceEvents(Resource):
 class InstanceSnapshot(Resource):
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None, instance_from_db_virt=None):
-        parser = reqparse.RequestParser()
-        parser.add_argument('all', type=bool)
-        args = parser.parse_args()
-
-        snap_uuid = instance_from_db_virt.snapshot(all=args['all'])
-        db.add_event('instance', instance_uuid, 'API CREATE Snapshot', None, None,
-                     snap_uuid)
-        db.add_event('instance', snap_uuid,
+    def post(self, instance_uuid=None, instance_from_db_virt=None, all=None):
+        snap_uuid = instance_from_db_virt.snapshot(all=all)
+        db.add_event('instance', instance_uuid,
+                     'API CREATE Snapshot (all=%s)' % all,
+                     None, None, snap_uuid)
+        db.add_event('snapshot', snap_uuid,
                      'API CREATE Snapshot', None, None, None)
-        return snap
+        return snap_uuid
+
+    @arg_is_instance_uuid
+    def get(self, instance_uuid=None, instance_from_db=None):
+        db.add_event('instance', instance_uuid,
+                     'API GET Snapshots', None, None, None)
+        out = []
+        for snap in db.get_instance_snapshots(instance_uuid):
+            snap['created'] = snap['created'].timestamp()
+            out.append(snap)
+        return out
 
 
 class InstanceRebootSoft(Resource):
@@ -430,10 +463,7 @@ class InterfaceDefloat(Resource):
 
 
 class Image(Resource):
-    def post(self):
-        parser = reqparse.RequestParser()
-        parser.add_argument('url', type=str)
-        args = parser.parse_args()
+    def post(self, url=None):
         db.add_event('image', url, 'API CACHE', None, None, None)
 
         with util.RecordedOperation('cache image', args['url']) as ro:
@@ -483,23 +513,14 @@ class Networks(Resource):
     def get(self):
         return list(db.get_networks())
 
-    def post(self):
-        parser = reqparse.RequestParser()
-        parser.add_argument('netblock', type=str)
-        parser.add_argument('provide_dhcp', type=bool)
-        parser.add_argument('provide_nat', type=bool)
-        parser.add_argument('name', type=str)
-        args = parser.parse_args()
-
+    def post(self, netblock=None, provide_dhcp=None, provide_nat=None, name=None):
         try:
-            ipblock = ipaddress.ip_network(args['netblock'])
+            ipaddress.ip_network(netblock)
         except ValueError as e:
             return error(400, 'cannot parse netblock: %s' % e)
 
-        network = db.allocate_network(args['netblock'],
-                                      args['provide_dhcp'],
-                                      args['provide_nat'],
-                                      args['name'])
+        network = db.allocate_network(netblock, provide_dhcp,
+                                      provide_nat, name)
         db.add_event('network', network['uuid'],
                      'API CREATE', None, None, None)
 
@@ -517,9 +538,9 @@ class Networks(Resource):
                 ('http://%s:%d/deploy_network_node'
                  % (config.parsed.get('NETWORK_NODE_IP'),
                     config.parsed.get('API_PORT'))),
-                data={
+                data=json.dumps({
                     'uuid': network['uuid']
-                })
+                }))
 
         return network
 
@@ -552,12 +573,8 @@ class Nodes(Resource):
 
 class DeployNetworkNode(Resource):
     @redirect_to_network_node
-    def put(self):
-        parser = reqparse.RequestParser()
-        parser.add_argument('uuid', type=str)
-        args = parser.parse_args()
-
-        n = net.from_db(args['uuid'])
+    def put(self, passed_uuid=None):
+        n = net.from_db(passed_uuid)
         if not n:
             return error(404, 'network not found')
 
@@ -567,12 +584,8 @@ class DeployNetworkNode(Resource):
 
 class UpdateDHCP(Resource):
     @redirect_to_network_node
-    def put(self):
-        parser = reqparse.RequestParser()
-        parser.add_argument('uuid', type=str)
-        args = parser.parse_args()
-
-        n = net.from_db(args['uuid'])
+    def put(self, passed_uuid=None):
+        n = net.from_db(passed_uuid)
         if not n:
             return error(404, 'network not found')
 
@@ -581,12 +594,8 @@ class UpdateDHCP(Resource):
 
 class RemoveDHCP(Resource):
     @redirect_to_network_node
-    def put(self):
-        parser = reqparse.RequestParser()
-        parser.add_argument('uuid', type=str)
-        args = parser.parse_args()
-
-        n = net.from_db(args['uuid'])
+    def put(self, passed_uuid=None):
+        n = net.from_db(passed_uuid)
         if not n:
             return error(404, 'network not found')
 
