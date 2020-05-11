@@ -214,6 +214,44 @@
         sf-client instance delete {{cirros_cdrom_uuid}}
 
 #########################################
+# Scenario: we can create an instance with no networking configured
+#########################################
+
+- hosts: sf-1
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - vars
+
+  tasks:
+    - name: Start a cirros instance on sf-1
+      sf_instance:
+        name: "cirros_no_network"
+        cpu: 1
+        ram: 1
+        disks:
+          - "8@cirros"
+        networks:
+        ssh_key: ""
+        user_data: ""
+      register: instance_create_out
+
+    - name: Log instance details
+      debug:
+        msg: "{{instance_create_out}}"
+
+    - name: Extract instance uuid
+      set_fact:
+        "cirros_no_network_uuid": "{{instance_create_out.meta.uuid}}"
+
+    - name: Delete instance
+      shell: |
+        sf-client instance delete {{cirros_no_network_uuid}}
+
+#########################################
 # Scenario: we can start an Ubuntu instance too
 #########################################
 
