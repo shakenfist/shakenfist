@@ -1,6 +1,8 @@
 CHANGES
 =======
 
+* Add test for snapshots of CDROMs
+* Add additional tests for snapshots, fix API bugs found along the way
 * Turn off MySQL query caching
 * Support smaller AWS metal deployments
 * Floating IPs work!

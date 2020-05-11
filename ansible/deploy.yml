@@ -156,6 +156,20 @@
         SHAKENFIST_DB_PASSWORD: "{{db_user_password}}"
         SHAKENFIST_SQL_URL: "mysql://sf:{{db_user_password}}@{{node_ip}}/sf"
 
+    - name: Write syslog file
+      template:
+        src: files/rsyslog-server-01-sf.conf
+        dest: /etc/rsyslog.d/01-sf.conf
+        owner: root
+        group: sudo
+        mode: u=r,g=r,o=
+
+    - name: Restart syslog
+      service:
+        name: rsyslog
+        enabled: yes
+        state: restarted
+
 - hosts: hypervisors
   any_errors_fatal: true
   become: yes
@@ -166,6 +180,24 @@
     - vars
 
   tasks:
+    - name: Syslog server is DB server
+      set_fact:
+        syslog: "{{hostvars['localhost']['database_node_ip']}}"
+
+    - name: Write syslog file
+      template:
+        src: files/rsyslog-client-01-sf.conf
+        dest: /etc/rsyslog.d/01-sf.conf
+        owner: root
+        group: sudo
+        mode: u=r,g=r,o=
+
+    - name: Restart syslog
+      service:
+        name: rsyslog
+        enabled: yes
+        state: restarted
+
     - name: Create storage directory
       file:
         path: /srv/shakenfist
