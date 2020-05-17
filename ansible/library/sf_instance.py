@@ -32,7 +32,26 @@ EXAMPLES = """
     state: present
   register: result
 
-- name: Delete that intance
+- name: Create Shaken Fist instance with fancy disks
+  sf_instance:
+    name: 'myinstance'
+    cpu: 1
+    ram: 1
+    diskspecs:
+      - size=8,base=cirros,bus=ide,type=disk
+      - size=16,type=disk
+      - base=http://archive.ubuntu.com/ubuntu/dists/focal/main/installer-amd64/current/legacy-images/netboot/mini.iso,type=cdrom
+    networks:
+      - 1ebc5020-6cfd-4641-8f3b-175596a19de0
+    ssh_key: ssh-rsa AAAAB3NzaC1yc2EAA...f5uaZaTqQa18t8s= mikal@marvin
+    user_data: |
+      IyEvYmluL3NoCgplY2hvICJIZWxsbyBXb3JsZC4gIFRoZSB0aW1lIGlzIG5vdyAkKGRhdGUgLVIp
+      ISIgPiAvaG9tZS9jaXJyb3Mvb3V0cHV0LnR4dApjaG93biBjaXJyb3MuY2lycm9zIC9ob21lL2Np
+      cnJvcy9vdXRwdXQudHh0
+    state: present
+  register: result
+
+- name: Delete an intance
   sf_instance:
     uuid: 'afb68328-6ff0-498f-bdaa-27d3fcc97f31'
     state: absent
@@ -58,10 +77,22 @@ def present(module):
     else:
         params['disks'] = '-d %s' % (' -d '.join(module.params['disks']))
 
+    if not module.params.get('diskspecs'):
+        params['diskspecs'] = ''
+    else:
+        params['diskspecs'] = '-D %s' % (
+            ' -D '.join(module.params['diskspecs']))
+
     if not module.params.get('networks'):
         params['networks'] = ''
     else:
         params['networks'] = '-n %s' % (' -n '.join(module.params['networks']))
+
+    if not module.params.get('networkspecs'):
+        params['networkspecs'] = ''
+    else:
+        params['networkspecs'] = '-N %s' % (
+            ' -N '.join(module.params['networkspecs']))
 
     extra = ''
     if module.params.get('ssh_key'):
@@ -71,7 +102,7 @@ def present(module):
     params['extra'] = extra
 
     cmd = ('sf-client --json instance create %(name)s %(cpu)s %(ram)s '
-           '%(disks)s %(networks)s %(extra)s' % params)
+           '%(disks)s %(diskspecs)s %(networks)s %(networkspecs)s %(extra)s' % params)
     rc, stdout, stderr = module.run_command(
         cmd, check_rc=False, use_unsafe_shell=True)
 
@@ -93,7 +124,7 @@ def present(module):
 
 def absent(module):
     if not module.params.get('uuid'):
-        return error('You must specify a uuid when deleting a network')
+        return error('You must specify a uuid when deleting an instance')
 
     cmd = ('sf-client --json instance delete %(uuid)s' % module.params)
     rc, stdout, stderr = module.run_command(
@@ -123,7 +154,9 @@ def main():
         'cpu': {'required': False, 'type': 'str'},
         'ram': {'required': False, 'type': 'str'},
         'disks': {'required': False, 'type': 'list', 'elements': 'str'},
+        'diskspecs': {'required': False, 'type': 'list', 'elements': 'str'},
         'networks': {'required': False, 'type': 'list', 'elements': 'str'},
+        'networkspecs': {'required': False, 'type': 'list', 'elements': 'str'},
         'ssh_key': {'required': False, 'type': 'str'},
         'user_data': {'required': False, 'type': 'str'},
         'state': {

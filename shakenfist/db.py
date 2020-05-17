@@ -264,12 +264,17 @@ class Instance(Base):
         else:
             block_devices = None
 
+        if self.disk_spec:
+            disk_spec = json.loads(self.disk_spec)
+        else:
+            disk_spec = None
+
         return {
             'uuid': self.uuid,
             'name': self.name,
             'cpus': self.cpus,
             'memory': self.memory,
-            'disk_spec': self.disk_spec,
+            'disk_spec': disk_spec,
             'ssh_key': self.ssh_key,
             'node': self.node,
             'console_port': self.console_port,

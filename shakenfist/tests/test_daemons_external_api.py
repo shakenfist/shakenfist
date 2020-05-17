@@ -1,4 +1,5 @@
 import flask
+import json
 import logging
 import mock
 import testtools
@@ -58,7 +59,10 @@ class ExternalApiTestCase(testtools.TestCase):
                 return_value={'uuid': '123',
                               'name': 'banana',
                               'node': 'notthisone',
-                              'disk_spec': '8@cirros',
+                              'disk_spec': [{
+                                  'base': 'cirros',
+                                  'size': 8
+                              }],
                               'block_devices': None})
     @mock.patch('shakenfist.config.parsed',
                 return_value={'INCLUDE_TRACEBACKS': '1',

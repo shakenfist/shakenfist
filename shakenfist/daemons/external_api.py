@@ -262,41 +262,44 @@ class Instances(Resource):
 
         def error_with_cleanup(status_code, message):
             for network_uuid in allocations:
+                n = net.from_db(network_uuid)
                 for addr, _ in allocations[network_uuid]:
-                    nets[network_uuid].ipmanager.release(addr)
-                nets[network_uuid].persist_ipmanager()
+                    n.ipmanager.release(addr)
+                n.persist_ipmanager()
             return error(status_code, message)
 
         order = 0
         for netdesc in network:
-            if not '@' in netdesc:
-                network_uuid = netdesc
-                addr = None
-            else:
-                network_uuid, addr = netdesc.split('@')
+            if not 'network_uuid' in netdesc or not netdesc['network_uuid']:
+                error_with_cleanup(404, 'network not specified')
 
-            if not network_uuid in nets:
-                n = net.from_db(network_uuid)
+            if not netdesc['network_uuid'] in nets:
+                n = net.from_db(netdesc['network_uuid'])
                 if not n:
                     error_with_cleanup(
-                        404, 'network %s not found' % network_uuid)
-                nets[network_uuid] = n
+                        404, 'network %s not found' % netdesc['network_uuid'])
+                nets[netdesc['network_uuid']] = n
                 n.create()
 
-            allocations.setdefault(network_uuid, [])
-            if not addr:
-                addr = nets[network_uuid].ipmanager.get_random_free_address()
+            allocations.setdefault(netdesc['network_uuid'], [])
+            if not 'address' in netdesc or not netdesc['address']:
+                netdesc['address'] = nets[netdesc['network_uuid']
+                                          ].ipmanager.get_random_free_address()
             else:
-                if not nets[network_uuid].ipmanager.reserve(addr):
-                    error_with_cleanup(409, 'address %s in use' % addr)
-            nets[network_uuid].persist_ipmanager()
-            allocations[network_uuid].append((addr, order))
+                if not nets[netdesc['network_uuid']].ipmanager.reserve(netdesc['address']):
+                    error_with_cleanup(409, 'address %s in use' %
+                                       netdesc['address'])
+            nets[netdesc['network_uuid']].persist_ipmanager()
+            allocations[netdesc['network_uuid']].append(
+                (netdesc['address'], order))
 
-            macaddr = str(randmac.RandMac(
-                '00:00:00:00:00:00', True)).lstrip('\'').rstrip('\'')
+            if not 'macaddress' in netdesc or not netdesc['macaddress']:
+                netdesc['macaddress'] = str(randmac.RandMac(
+                    '00:00:00:00:00:00', True)).lstrip('\'').rstrip('\'')
+
             db.create_network_interface(
-                str(uuid.uuid4()), network_uuid, new_instance_uuid,
-                macaddr, addr, order)
+                str(uuid.uuid4()), netdesc['network_uuid'], new_instance_uuid,
+                netdesc['macaddress'], netdesc['address'], order)
 
             order += 1
 
