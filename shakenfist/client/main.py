@@ -346,6 +346,12 @@ def instance_show(ctx, instance_uuid=None, snapshots=False):
     _show_instance(ctx, CLIENT.get_instance(instance_uuid), snapshots)
 
 
+def _parse_spec(spec):
+    if not '@' in spec:
+        return spec, None
+    return spec.split('@')
+
+
 @instance.command(name='create',
                   help=('Create an instance.\n\n'
                         'NAME:      The name of the instance.\n'
@@ -372,15 +378,18 @@ def instance_show(ctx, instance_uuid=None, snapshots=False):
 @click.argument('memory', type=click.INT)
 @click.option('-n', '--network', type=click.STRING, multiple=True,
               autocompletion=_get_networks)
+@click.option('-N', '--networkspec', type=click.STRING, multiple=True)
 @click.option('-d', '--disk', type=click.STRING, multiple=True)
+@click.option('-D', '--diskspec', type=click.STRING, multiple=True)
 @click.option('-i', '--sshkey', type=click.STRING)
 @click.option('-I', '--sshkeydata', type=click.STRING)
 @click.option('-u', '--userdata', type=click.STRING)
 @click.option('-U', '--encodeduserdata', type=click.STRING)
 @click.pass_context
-def instance_create(ctx, name=None, cpus=None, memory=None, network=None, disk=None,
-                    sshkey=None, sshkeydata=None, userdata=None, encodeduserdata=None):
-    if len(disk) < 1:
+def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networkspec=None,
+                    disk=None, diskspec=None, sshkey=None, sshkeydata=None, userdata=None,
+                    encodeduserdata=None):
+    if len(disk) < 1 and len(diskspec) < 1:
         print('You must specify at least one disk')
 
     sshkey_content = None
@@ -399,10 +408,41 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, disk=N
     if encodeduserdata:
         userdata_content = encodeduserdata
 
+    diskdefs = []
+    for d in disk:
+        size, base = _parse_spec(d)
+        diskdefs.append({
+            'size': int(size),
+            'base': base,
+            'bus': None,
+            'type': 'disk',
+        })
+    for d in diskspec:
+        defn = {}
+        for elem in d.split(','):
+            key, value = elem.split('=')
+            defn[key] = value
+        diskdefs.append(defn)
+
+    netdefs = []
+    for n in network:
+        network_uuid, address = _parse_spec(n)
+        netdefs.append({
+            'network_uuid': network_uuid,
+            'address': address,
+            'macaddress': None
+        })
+    for n in networkspec:
+        defn = {}
+        for elem in n.split(','):
+            key, value = elem.split('=')
+            defn[key] = value
+        netdefs.append(defn)
+
     _show_instance(
         ctx,
-        CLIENT.create_instance(name, cpus, memory,
-                               network, disk, sshkey_content, userdata_content))
+        CLIENT.create_instance(name, cpus, memory, netdefs, diskdefs, sshkey_content,
+                               userdata_content))
 
 
 @instance.command(name='delete', help='Delete an instance')

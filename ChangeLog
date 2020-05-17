@@ -1,6 +1,7 @@
 CHANGES
 =======
 
+* Add test for instances with no networking
 * Setup rsyslog to aid debugging
 * Add test for snapshots of CDROMs
 * Add additional tests for snapshots, fix API bugs found along the way

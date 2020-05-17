@@ -69,7 +69,7 @@ sf-client instance create "myinstance" 1 2 -d 8@cirros -n netuuid
 
 Where "myinstance" is the name of the instance, it has 1 vCPU, 2gb of RAM, a single 8gb disk (more on this in a second) and a single network interface on the network with the UUID "netuuid".
 
-"8@cirros" is a "disk specification". These are in the form size@image, where the @image is optional. You can specify more than one disk, so this is valid:
+"8@cirros" is a "short disk specification". These are in the form size@image, where the @image is optional. You can specify more than one disk, so this is valid:
 
 ```bash
 sf-client instance create "myinstance" 1 2 -d 8@cirros -d 8 -d 8 -n netuuid
@@ -81,14 +81,31 @@ In this case we have three disks, all of 8gb. The boot disk is imaged with cirro
 sf-client instance create "myinstance" 1 2 -d 8@cirros:0.5.1 -d 8 -d 8 -n netuuid
 ```
 
-"Common cloud images" is currently defined as cirros and Ubuntu.
+"Common cloud images" is currently defined as cirros and Ubuntu. You can also use a "detailed disk specification", which is what fancy people use. It's syntax is similar:
 
-Similarly, networks are a "network specification", where you can specify the UUID of a network, but also optionally the IP address to use for the interface. You can also have more than one network interface, so this is valid:
+```bash
+sf-client instance create "myinstance" 1 2 -D size=8,base=cirros,bus=ide,type=cdrom -d 8 -d 8 -n netuuid
+```
+
+The specification is composed of a series of key-value pairs. Valid keys are: size; base; bus; and type. If you don't specify a key, you'll get a reasonable default. Here's how the keys work:
+
+* _size_ as per the shorthand notation.
+* _base_ as per the shorthand notation, including version specification.
+* _bus_ is any valid disk bus for libvirt, which is virtio, ide, scsi, usb. Use virtio unless you have a really good reason other wise -- the performance of the other are terrible. An example of a good reason is to install virtio drivers into legacy operating systems that lack them natively.
+* _type_ can be one of disk or cdrom. Note that cdroms are excluded from snapshots.
+
+Similarly, networks have a "short network specification", where you can specify the UUID of a network, but also optionally the IP address to use for the interface. You can also have more than one network interface, so this is valid:
 
 ```bash
 sf-client instance create "myinstance" 1 2 -d 8@cirros -n netuuid1@192.168.1.2 \
     -n netuuid2@10.0.0.4
 ```
+
+There is a "detailed network specification" as well, which is composed of the following keys:
+
+* _network_uuid_ is the UUID of the network to use.
+* _address_ is the IPv4 network address to use, if free. If its not free the instance will fail to start.
+* _macaddress_ the mac address to use for the interface.
 
 Missing documentation
 ---------------------

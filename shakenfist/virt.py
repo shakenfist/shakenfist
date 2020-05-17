@@ -27,7 +27,7 @@ LOG.setLevel(logging.DEBUG)
 
 def from_definition(uuid=None, name=None, disks=None, memory_mb=None,
                     vcpus=None, ssh_key=None, user_data=None):
-    db_entry = db.create_instance(uuid, name, vcpus, memory_mb, ' '.join(disks),
+    db_entry = db.create_instance(uuid, name, vcpus, memory_mb, json.dumps(disks),
                                   ssh_key, user_data)
     return Instance(db_entry)
 
@@ -37,6 +37,23 @@ def from_db(uuid):
     if not db_entry:
         return None
     return Instance(db_entry)
+
+
+def _get_defaulted_disk_bus(disk):
+    bus = disk.get('bus')
+    if bus:
+        return bus
+    return config.parsed.get('DISK_BUS')
+
+
+def _get_disk_device_base(bus):
+    bases = {
+        'ide': 'hd',
+        'scsi': 'sd',
+        'usb': 'sd',
+        'virtio': 'vd'
+    }
+    return bases.get(bus, 'sd')
 
 
 class Instance(object):
@@ -60,27 +77,26 @@ class Instance(object):
         return ('instance', self.db_entry['uuid'])
 
     def _populate_block_devices(self):
-        disks = self.db_entry['disk_spec'].split(' ')
-        size, base = self._parse_disk_spec(disks[0])
-        root_device = self._get_disk_device_base() + 'a'
-        config_device = self._get_disk_device_base() + 'b'
+        bus = _get_defaulted_disk_bus(self.db_entry['disk_spec'][0])
+        root_device = _get_disk_device_base(bus) + 'a'
+        config_device = _get_disk_device_base(bus) + 'b'
 
         self.db_entry['block_devices'] = {
             'devices': [
                 {
                     'type': 'qcow2',
-                    'size': size,
+                    'size': self.db_entry['disk_spec'][0].get('size'),
                     'device': root_device,
-                    'bus': config.parsed.get('DISK_BUS'),
+                    'bus': bus,
                     'path': os.path.join(self.instance_path, root_device + '.qcow2'),
-                    'base': base,
-                    'present_as': 'disk',
+                    'base': self.db_entry['disk_spec'][0].get('base'),
+                    'present_as': self.db_entry['disk_spec'][0].get('type', 'disk'),
                     'snapshot_ignores': False
                 },
                 {
                     'type': 'raw',
                     'device': config_device,
-                    'bus': config.parsed.get('DISK_BUS'),
+                    'bus': bus,
                     'path': os.path.join(self.instance_path, config_device + '.raw'),
                     'present_as': 'disk',
                     'snapshot_ignores': True
@@ -89,37 +105,22 @@ class Instance(object):
         }
 
         i = 0
-        for d in disks[1:]:
-            size, base = self._parse_disk_spec(d)
-            device = self._get_disk_device_base() + chr(ord('c') + i)
+        for d in self.db_entry['disk_spec'][1:]:
+            bus = _get_defaulted_disk_bus(d)
+            device = _get_disk_device_base(bus) + chr(ord('c') + i)
             self.db_entry['block_devices']['devices'].append({
                 'type': 'qcow2',
-                'size': size,
+                'size': d.get('size'),
                 'device': device,
-                'bus': config.parsed.get('DISK_BUS'),
+                'bus': bus,
                 'path': os.path.join(self.instance_path, device + '.qcow2'),
-                'base': base,
-                'present_as': 'disk',
+                'base': d.get('base'),
+                'present_as': d.get('type', 'disk'),
                 'snapshot_ignores': False
             })
             i += 1
 
         self.db_entry['block_devices']['finalized'] = False
-
-    def _parse_disk_spec(self, spec):
-        if not '@' in spec:
-            return int(spec), None
-        size, base = spec.split('@')
-        return int(size), base
-
-    def _get_disk_device_base(self):
-        bases = {
-            'ide': 'hd',
-            'scsi': 'sd',
-            'usb': 'sd',
-            'virtio': 'vd',
-        }
-        return bases.get(config.parsed.get('DISK_BUS'), 'sd')
 
     def create(self):
         # Ensure we have state on disk
@@ -131,7 +132,7 @@ class Instance(object):
         # Generate a config drive
         with util.RecordedOperation('make config drive', self) as ro:
             self._make_config_drive(os.path.join(
-                self.instance_path, self._get_disk_device_base() + 'b' + '.raw'))
+                self.instance_path, self.db_entry['block_devices']['devices'][1]['path']))
 
         # Prepare disks
         if not self.db_entry['block_devices']['finalized']:

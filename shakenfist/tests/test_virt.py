@@ -43,7 +43,10 @@ class VirtTestCase(testtools.TestCase):
         return virt.Instance({
             'uuid': 'fakeuuid',
             'name': 'cirros',
-            'disk_spec': '8@cirros',
+            'disk_spec': [{
+                'base': 'cirros',
+                'size': 8
+            }],
             'ssh_key': 'thisisasshkey',
             'user_data': str(base64.b64encode(
                 'thisisuserdata'.encode('utf-8')), 'utf-8'),
@@ -82,7 +85,19 @@ class VirtTestCase(testtools.TestCase):
         i = virt.Instance({
             'uuid': 'fakeuuid',
             'name': 'cirros',
-            'disk_spec': '8@cirros 16 24',
+            'disk_spec':
+            [
+                {
+                    'base': 'cirros',
+                    'size': 8
+                },
+                {
+                    'size': 16
+                },
+                {
+                    'size': 24
+                }
+            ],
             'block_devices': None
         })
 
