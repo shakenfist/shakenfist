@@ -159,7 +159,7 @@ def network_show(ctx, network_uuid=None):
                        'NETBLOCK:         The IP address block to use, as a CIDR\n'
                        '                  range -- for example 192.168.200.1/24\n'
                        'NAME:             The name of the network\n'
-                       '--dhcp/--no-dhcp: Should this network have DCHP?\n'
+                       '--dhcp/--no-dhcp: Should this network have DHCP?\n'
                        '--nat/--no-nat:   Should this network be able to access'
                        '                  the Internet via NAT?'))
 @click.argument('netblock', type=click.STRING)
@@ -356,7 +356,7 @@ def _parse_spec(spec):
                   help=('Create an instance.\n\n'
                         'NAME:      The name of the instance.\n'
                         'CPUS:      The number of vCPUs for the instance.\n'
-                        'MEMORY:    The amount RAM for the instance in GB.\n'
+                        'MEMORY:    The amount of RAM for the instance in GB.\n'
                         '\n'
                         'Options (may be repeated, must be specified at least once):\n'
                         '--network/-n:  The uuid of the network to attach the instance to.\n'
