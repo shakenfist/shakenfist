@@ -156,6 +156,168 @@
         SHAKENFIST_DB_PASSWORD: "{{db_user_password}}"
         SHAKENFIST_SQL_URL: "mysql://sf:{{db_user_password}}@{{node_ip}}/sf"
 
+    - name: Create a prometheus user
+      user:
+        name: sfprometheus
+        comment: shakenfist prometheus
+        group: daemon
+      register: sfprometheus_user_complex
+
+    - name: Test if we have a prometheus
+      shell: docker inspect sfprom
+      ignore_errors: True
+      register: has_sfprom
+
+    - name: Stop prometheus if running
+      shell: docker stop sfprom
+      when: has_sfprom.rc == 0
+
+    - name: Make /srv/shakenfist/prometheus
+      file:
+        path: /srv/shakenfist/prometheus
+        state: directory
+        owner: sfprometheus
+        mode: u=rwx,g=,o=
+
+    - name: Fix prometheus permissions
+      file:
+        path: /srv/shakenfist/prometheus
+        recurse: true
+        owner: sfprometheus
+        mode: u=rwx,g=,o=
+
+    - name: Write prometheus configuration file
+      copy:
+        content: |
+          global:
+            external_labels:
+              monitor: 'shakenfist'
+
+          scrape_configs:
+            - job_name: 'node'
+              static_configs:
+                - targets: ['{{hostvars['sf-1']['node_ip']}}:9100',
+                            '{{hostvars['sf-2']['node_ip']}}:9100',
+                            '{{hostvars['sfdb']['node_ip']}}:9100']
+            - job_name: 'shakenfist'
+              static_configs:
+                - targets: ['{{hostvars['sf-1']['node_ip']}}:13001',
+                            '{{hostvars['sf-2']['node_ip']}}:13001']
+        dest: /srv/shakenfist/prometheus/prometheus.yml
+        owner: sfprometheus
+        mode: u=rwx,g=,o=
+
+    - name: Create prometheus docker container
+      docker_container:
+        name: sfprom
+        image: prom/prometheus
+        restart_policy: always
+        volumes:
+          - /srv/shakenfist/prometheus:/prometheus
+          - /srv/shakenfist/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+        ports:
+          - 0.0.0.0:9090:9090
+        user: "{{sfprometheus_user_complex.uid}}"
+
+    - name: Create a grafana user
+      user:
+        name: sfgrafana
+        comment: shakenfist grafana
+        group: daemon
+      register: sfgrafana_user_complex
+
+    - name: Test if we have a grafana
+      shell: docker inspect sfgrafana
+      ignore_errors: True
+      register: has_sfgrafana
+
+    - name: Stop grafana if running
+      shell: docker stop sfgrafana
+      when: has_sfgrafana.rc == 0
+
+    - name: Make /srv/shakenfist/grafana
+      file:
+        path: /srv/shakenfist/grafana
+        state: directory
+        owner: sfgrafana
+        mode: u=rwx,g=,o=
+
+    - name: Make /srv/shakenfist/grafana/data
+      file:
+        path: /srv/shakenfist/grafana/data
+        state: directory
+        owner: sfgrafana
+        mode: u=rwx,g=,o=
+
+    - name: Make /srv/shakenfist/grafana/logs
+      file:
+        path: /srv/shakenfist/grafana/logs
+        state: directory
+        owner: sfgrafana
+        mode: u=rwx,g=,o=
+
+    - name: Make /srv/shakenfist/grafana/dashboards
+      file:
+        path: /srv/shakenfist/grafana/dashboards
+        state: directory
+        owner: sfgrafana
+        mode: u=rwx,g=,o=
+
+    - name: Write grafana dashboard
+      copy:
+        src: files/grafana.json
+        dest: /srv/shakenfist/grafana/dashboards/shakenfist.json
+        owner: sfgrafana
+        mode: u=rwx,g=,o=
+
+    - name: Copy grafana config
+      synchronize:
+        src: files/grafana/
+        dest: /srv/shakenfist/grafana/config
+
+    - name: Fix grafana permissions
+      file:
+        path: /srv/shakenfist/grafana
+        recurse: true
+        owner: sfgrafana
+        mode: u=rwx,g=,o=
+
+    - name: Write prometheus grafana configuration file
+      copy:
+        content: |
+          apiVersion: 1
+
+          datasources:
+          - name: Prometheus
+            type: prometheus
+            orgId: 1
+            url: http://{{hostvars['sfdb']['node_ip']}}:9090
+            isDefault: true
+            version: 1
+            editable: false
+            access: proxy
+            jsonData:
+              tlsSkipVerify: true
+        dest: /srv/shakenfist/grafana/config/provisioning/datasources/prometheus.yml
+        owner: sfgrafana
+        mode: u=rwx,g=,o=
+
+    - name: Create grafana docker container
+      docker_container:
+        name: sfgrafana
+        image: grafana/grafana
+        restart_policy: always
+        volumes:
+          - /srv/shakenfist/grafana/data:/var/lib/grafana
+          - /srv/shakenfist/grafana/logs:/var/log/grafana
+          - /srv/shakenfist/grafana/dashboards:/var/lib/grafana/dashboards
+          - /srv/shakenfist/grafana/config:/etc/grafana
+        env:
+          GF_SECURITY_ADMIN_PASSWORD: "{{db_user_password}}"
+        ports:
+          - 3000:3000
+        user: "{{sfgrafana_user_complex.uid}}"
+
     - name: Write syslog file
       template:
         src: files/rsyslog-server-01-sf.conf

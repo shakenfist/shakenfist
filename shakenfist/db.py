@@ -296,13 +296,13 @@ def get_instance(instance_uuid):
         SESSION.commit()
 
 
-def get_instances(local_only=False):
+def get_instances(only_node=None):
     ensure_valid_session()
 
     try:
-        if local_only:
+        if only_node:
             query = SESSION.query(Instance).filter(
-                Instance.node == config.parsed.get('NODE_NAME'))
+                Instance.node == only_node)
         else:
             query = SESSION.query(Instance)
 
@@ -336,6 +336,17 @@ def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key, us
                      vdi_port, user_data)
         SESSION.add(i)
         return i.export()
+    finally:
+        SESSION.commit()
+
+
+def place_instance(instance_uuid, node):
+    ensure_valid_session()
+
+    try:
+        i = SESSION.query(Instance).filter(
+            Instance.uuid == instance_uuid).one()
+        i.node = node
     finally:
         SESSION.commit()
 
@@ -584,5 +595,69 @@ def get_events(object_type, object_uuid):
                 Event.object_uuid == object_uuid).all()
         for e in events:
             yield e.export()
+    except exc.NoResultFound:
+        pass
+
+
+class NodeMetric(Base):
+    __tablename__ = 'node_metrics'
+
+    fqdn = Column(String, primary_key=True)
+    metric = Column(String, primary_key=True)
+    value = Column(String)
+    timestamp = Column(DateTime)
+
+    def __init__(self, metric, value):
+        self.fqdn = config.parsed.get('NODE_NAME')
+        self.metric = metric
+        self.value = value
+        self.timestamp = datetime.datetime.now()
+
+    def export(self):
+        return {
+            'fqdn': self.fqdn,
+            'metric': self.metric,
+            'value': self.value,
+            'timestamp': self.timestamp
+        }
+
+
+def update_metric(metric, value):
+    ensure_valid_session()
+
+    try:
+        try:
+            metric = SESSION.query(NodeMetric).filter(
+                NodeMetric.fqdn == config.parsed.get('NODE_NAME')).filter(
+                    NodeMetric.metric == metric).one()
+            metric.value = value
+        except exc.NoResultFound:
+            metric = NodeMetric(metric, value)
+
+        SESSION.add(metric)
+    finally:
+        SESSION.commit()
+
+
+def get_metric(fqdn, metric):
+    ensure_valid_session()
+
+    try:
+        m = SESSION.query(NodeMetric).filter(
+            NodeMetric.fqdn == fqdn).filter(
+                NodeMetric.metric == metric).one()
+        return m.export()
+    except exc.NoResultFound:
+        pass
+
+
+def get_metrics(fqdn):
+    ensure_valid_session()
+
+    try:
+        metrics = SESSION.query(NodeMetric).filter(
+            NodeMetric.fqdn == fqdn).all()
+        for m in metrics:
+            yield m.export()
     except exc.NoResultFound:
         pass

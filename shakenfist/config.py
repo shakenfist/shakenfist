@@ -24,17 +24,29 @@ CONFIG_DEFAULTS = {
     # Deployment wide options
     # -----------------------
 
-    # The ports for the internal REST API service
+    # API options
+    #  - api_port: the port for the REST API
+    #  - include_tracebacks: if tracebacks should be included where relevant
+    #    in API responses. Do not enable for untrusted clients!
+    #  - prometheus_metrics_port: where to expose internal metrics. Do not
+    #    allow access from untrusted clients!
     'API_PORT': 13000,
-
-    # If tracebacks should be included where relevant in API responses.
-    # Do not enable for untrusted clients!
     'INCLUDE_TRACEBACKS': '1',
+    'PROMETHEUS_METRICS_PORT': 13001,
 
-    # A network block used for NAT egress from VMs and floating IPs
+    # Scheduler options:
+    #  - scheduler_cache_timeout: how long the scheduler should cache things for
+    #  - cpu_overcommit_ratio: how many vCPUS per real CPU
+    #  - ram_overcommit_ratio: how much vRAM per real unit of RAM
+    'SCHEDULER_CACHE_TIMEOUT': 30,
+    'CPU_OVERCOMMIT_RATIO': 16,
+    'RAM_OVERCOMMIT_RATIO': 1.5,
+
+    # Network options:
+    #  - floating_network: a network block used for NAT egress from VMs and
+    #    floating IPs
+    #  - network_node_ip: the IP of a node which will egress all traffic
     'FLOATING_NETWORK': '192.168.20.0/24',
-
-    # Which node provides DHCP and NAT
     'NETWORK_NODE_IP': node_ip,
 
     # Where the MySQL database is

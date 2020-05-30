@@ -70,6 +70,7 @@
       /opt/sfmysql "delete from nodes"
 
       systemctl restart sf
+      sleep 30
     dest: /tmp/shell_script
     owner: root
     group: root

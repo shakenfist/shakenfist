@@ -359,20 +359,22 @@ def _parse_spec(spec):
                         'MEMORY:    The amount RAM for the instance in GB.\n'
                         '\n'
                         'Options (may be repeated, must be specified at least once):\n'
-                        '--network/-n:  The uuid of the network to attach the instance to.\n'
-                        '--disk/-d:     The disks attached to the instance, in this format: \n'
-                        '               size@image_url where size is in GB and @image_url\n'
-                        '               is optional.\n'
-                        '--sshkey/-i:   The path to a ssh public key to configure on the\n'
-                        '               instance via config drive / cloud-init.\n'
+                        '--network/-n:   The uuid of the network to attach the instance to.\n'
+                        '--disk/-d:      The disks attached to the instance, in this format: \n'
+                        '                size@image_url where size is in GB and @image_url\n'
+                        '                is optional.\n'
+                        '--sshkey/-i:    The path to a ssh public key to configure on the\n'
+                        '                instance via config drive / cloud-init.\n'
                         '--sshkeydata/-I:\n'
                         '               A ssh public key as a string to configure on the\n'
-                        '               instance via config drive / cloud-init.\n'
-                        '--userdata/-u: The path to a file containing user data to provided\n'
-                        '               to the instance via config drive / cloud-init.'
+                        '                 instance via config drive / cloud-init.\n'
+                        '--userdata/-u:  The path to a file containing user data to provided\n'
+                        '                to the instance via config drive / cloud-init.'
                         '--encodeduserdata/-U:\n'
-                        '               Base64 encoded user data to provide to the instance\n'
-                        '               via config drive / cloud-init.'))
+                        '                Base64 encoded user data to provide to the instance\n'
+                        '                via config drive / cloud-init.\n'
+                        '\n'
+                        '--placement/-p: Force placement of instance on specified node'))
 @click.argument('name', type=click.STRING)
 @click.argument('cpus', type=click.INT)
 @click.argument('memory', type=click.INT)
@@ -385,10 +387,11 @@ def _parse_spec(spec):
 @click.option('-I', '--sshkeydata', type=click.STRING)
 @click.option('-u', '--userdata', type=click.STRING)
 @click.option('-U', '--encodeduserdata', type=click.STRING)
+@click.option('-p', '--placement', type=click.STRING)
 @click.pass_context
 def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networkspec=None,
                     disk=None, diskspec=None, sshkey=None, sshkeydata=None, userdata=None,
-                    encodeduserdata=None):
+                    encodeduserdata=None, placement=None):
     if len(disk) < 1 and len(diskspec) < 1:
         print('You must specify at least one disk')
 
@@ -442,7 +445,7 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networ
     _show_instance(
         ctx,
         CLIENT.create_instance(name, cpus, memory, netdefs, diskdefs, sshkey_content,
-                               userdata_content))
+                               userdata_content, force_placement=placement))
 
 
 @instance.command(name='delete', help='Delete an instance')

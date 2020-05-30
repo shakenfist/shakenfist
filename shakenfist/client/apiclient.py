@@ -68,17 +68,23 @@ class Client(object):
                          '/interfaces')
         return r.json()
 
-    def create_instance(self, name, cpus, memory, network, disk, sshkey, userdata):
+    def create_instance(self, name, cpus, memory, network, disk, sshkey, userdata,
+                        force_placement=None):
+        body = {
+            'name': name,
+            'cpus': cpus,
+            'memory': memory,
+            'network': network,
+            'disk': disk,
+            'ssh_key': sshkey,
+            'user_data': userdata
+        }
+
+        if force_placement:
+            body['placed_on'] = force_placement
+
         r = _request_url('POST', self.base_url + '/instances',
-                         data={
-                             'name': name,
-                             'cpus': cpus,
-                             'memory': memory,
-                             'network': network,
-                             'disk': disk,
-                             'ssh_key': sshkey,
-                             'user_data': userdata
-                         })
+                         data=body)
         return r.json()
 
     def snapshot_instance(self, instance_uuid, all=False):

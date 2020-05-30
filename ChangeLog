@@ -1,6 +1,7 @@
 CHANGES
 =======
 
+* Example OpenStack terraform
 * Add more detailed specification options for disks and networks
 * Add test for instances with no networking
 * Setup rsyslog to aid debugging

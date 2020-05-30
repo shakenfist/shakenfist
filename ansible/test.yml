@@ -191,6 +191,7 @@
           - "{{net_one_uuid}}"
         ssh_key: ""
         user_data: ""
+        placement: "{{inventory_hostname}}"
       register: instance_create_out
 
     - name: Log instance details
@@ -237,6 +238,7 @@
         networks:
         ssh_key: ""
         user_data: ""
+        placement: "{{inventory_hostname}}"
       register: instance_create_out
 
     - name: Log instance details
@@ -670,6 +672,7 @@
         networks:
         ssh_key: ""
         user_data: ""
+        placement: "{{inventory_hostname}}"
       register: instance_create_out
 
     - name: Log instance details
@@ -733,6 +736,7 @@
           - network_uuid={{net_one_uuid}},address=192.168.242.66,macaddress=02:42:4d:0a:86:fe
         ssh_key: ""
         user_data: ""
+        placement: "{{inventory_hostname}}"
       register: instance_create_out
 
     - name: Log instance details

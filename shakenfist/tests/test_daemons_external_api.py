@@ -17,6 +17,11 @@ class FakeResponse(object):
         self.text = text
 
 
+class FakeScheduler(object):
+    def place_instance(self, *args, **kwargs):
+        return config.parsed.get('NODE_NAME')
+
+
 class ExternalApiTestCase(testtools.TestCase):
     def setUp(self):
         super(ExternalApiTestCase, self).setUp()
@@ -24,6 +29,10 @@ class ExternalApiTestCase(testtools.TestCase):
         self.add_event = mock.patch(
             'shakenfist.db.add_event')
         self.mock_add_event = self.add_event.start()
+
+        self.scheduler = mock.patch(
+            'shakenfist.scheduler.Scheduler', FakeScheduler)
+        self.mock_scheduler = self.scheduler.start()
 
         external_api.TESTING = True
         external_api.app.testing = True

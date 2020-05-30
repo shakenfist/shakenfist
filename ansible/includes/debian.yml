@@ -25,6 +25,7 @@
         "dnsmasq",
         "arping",
         "cpu-checker",
+        "prometheus-node-exporter",
       ]
     state: latest
 

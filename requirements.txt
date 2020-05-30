@@ -14,6 +14,7 @@ testtools           # mit
 flask               # bsd
 flask_restful       # bsd
 psutil              # bsd
+prometheus_client   # apache2
 
 # Is difficult to get install working, use system packages
 libvirt-python      # lgpl

@@ -17,6 +17,7 @@ from shakenfist import config
 from shakenfist import db
 from shakenfist import images
 from shakenfist import net
+from shakenfist import scheduler
 from shakenfist import util
 from shakenfist import virt
 
@@ -28,6 +29,7 @@ LOG.setLevel(logging.DEBUG)
 
 
 TESTING = False
+SCHEDULER = None
 
 
 def error(status_code, message):
@@ -201,13 +203,13 @@ class Root(Resource):
 class Instance(Resource):
     @arg_is_instance_uuid
     def get(self, instance_uuid=None, instance_from_db=None):
-        db.add_event('instance', instance_uuid, 'API GET', None, None, None)
+        db.add_event('instance', instance_uuid, 'api', 'get', None, None)
         return instance_from_db
 
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def delete(self, instance_uuid=None, instance_from_db_virt=None):
-        db.add_event('instance', instance_uuid, 'API DELETE', None, None, None)
+        db.add_event('instance', instance_uuid, 'api', 'delete', None, None)
 
         instance_networks = []
         for iface in list(db.get_instance_interfaces(instance_uuid)):
@@ -215,7 +217,7 @@ class Instance(Resource):
                 instance_networks.append(iface['network_uuid'])
 
         host_networks = []
-        for inst in list(db.get_instances(local_only=True)):
+        for inst in list(db.get_instances(only_node=config.parsed.get('NODE_NAME'))):
             if not inst['uuid'] == instance_uuid:
                 for iface in db.get_instance_interfaces(inst['uuid']):
                     if not iface['network_uuid'] in host_networks:
@@ -240,21 +242,57 @@ class Instances(Resource):
         return list(db.get_instances())
 
     def post(self, name=None, cpus=None, memory=None, network=None,
-             disk=None, ssh_key=None, user_data=None):
-        # The instance needs to exist in the DB before network interfaces are created
-        new_instance_uuid = str(uuid.uuid4())
-        db.add_event('instance', new_instance_uuid,
-                     'API CREATE', None, None, None)
+             disk=None, ssh_key=None, user_data=None, placed_on=None, instance_uuid=None):
+        global SCHEDULER
 
-        instance = virt.from_definition(
-            uuid=new_instance_uuid,
-            name=name,
-            disks=disk,
-            memory_mb=memory * 1024,
-            vcpus=cpus,
-            ssh_key=ssh_key,
-            user_data=user_data
-        )
+        # The instance needs to exist in the DB before network interfaces are created
+        if not instance_uuid:
+            instance_uuid = str(uuid.uuid4())
+            db.add_event('instance', instance_uuid,
+                         'uuid allocated', None, None, None)
+
+        # Create instance object
+        instance = virt.from_db(instance_uuid)
+        if not instance:
+            instance = virt.from_definition(
+                uuid=instance_uuid,
+                name=name,
+                disks=disk,
+                memory_mb=memory * 1024,
+                vcpus=cpus,
+                ssh_key=ssh_key,
+                user_data=user_data
+            )
+
+        # Have we been placed?
+        if not placed_on:
+            if not SCHEDULER:
+                SCHEDULER = scheduler.Scheduler()
+
+            candidates = SCHEDULER.place_instance(instance, network)
+            placed_on = candidates[0]
+            db.place_instance(instance_uuid, placed_on)
+            db.add_event('instance', instance_uuid,
+                         'placement', None, None, placed_on)
+
+        # Have we been placed on a different node?
+        if not placed_on == config.parsed.get('NODE_NAME'):
+            body = flask_get_post_body()
+            body['placed_on'] = placed_on
+            body['instance_uuid'] = instance_uuid
+
+            r = requests.request('POST',
+                                 'http://%s:%d/instances'
+                                 % (placed_on,
+                                    config.parsed.get('API_PORT')),
+                                 data=json.dumps(body))
+
+            LOG.info('Returning proxied request: %d, %s'
+                     % (r.status_code, r.text))
+            resp = flask.Response(r.text,
+                                  mimetype='application/json')
+            resp.status_code = r.status_code
+            return resp
 
         # Check we can get the required IPs
         nets = {}
@@ -298,7 +336,7 @@ class Instances(Resource):
                     '00:00:00:00:00:00', True)).lstrip('\'').rstrip('\'')
 
             db.create_network_interface(
-                str(uuid.uuid4()), netdesc['network_uuid'], new_instance_uuid,
+                str(uuid.uuid4()), netdesc['network_uuid'], instance_uuid,
                 netdesc['macaddress'], netdesc['address'], order)
 
             order += 1
@@ -313,14 +351,14 @@ class Instances(Resource):
         with util.RecordedOperation('instance creation', instance) as _:
             instance.create()
 
-        return db.get_instance(new_instance_uuid)
+        return db.get_instance(instance_uuid)
 
 
 class InstanceInterfaces(Resource):
     @arg_is_instance_uuid
     def get(self, instance_uuid=None, instance_from_db=None):
         db.add_event('instance', instance_uuid,
-                     'API GET Interfaces', None, None, None)
+                     'api', 'get interfaces', None, None)
         return list(db.get_instance_interfaces(instance_uuid))
 
 
@@ -328,7 +366,7 @@ class InstanceEvents(Resource):
     @arg_is_instance_uuid
     def get(self, instance_uuid=None, instance_from_db=None):
         db.add_event('instance', instance_uuid,
-                     'API GET Events', None, None, None)
+                     'api', 'get events', None, None)
 
         out = []
         for event in db.get_events('instance', instance_uuid):
@@ -343,16 +381,16 @@ class InstanceSnapshot(Resource):
     def post(self, instance_uuid=None, instance_from_db_virt=None, all=None):
         snap_uuid = instance_from_db_virt.snapshot(all=all)
         db.add_event('instance', instance_uuid,
-                     'API CREATE Snapshot (all=%s)' % all,
-                     None, None, snap_uuid)
+                     'api', 'snapshot (all=%s)' % all,
+                     None, snap_uuid)
         db.add_event('snapshot', snap_uuid,
-                     'API CREATE Snapshot', None, None, None)
+                     'api', 'create', None, None)
         return snap_uuid
 
     @arg_is_instance_uuid
     def get(self, instance_uuid=None, instance_from_db=None):
         db.add_event('instance', instance_uuid,
-                     'API GET Snapshots', None, None, None)
+                     'api', 'get', None, None)
         out = []
         for snap in db.get_instance_snapshots(instance_uuid):
             snap['created'] = snap['created'].timestamp()
@@ -365,7 +403,7 @@ class InstanceRebootSoft(Resource):
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid,
-                     'API SOFT REBOOT', None, None, None)
+                     'api', 'soft reboot', None, None)
         return instance_from_db_virt.reboot(hard=False)
 
 
@@ -374,7 +412,7 @@ class InstanceRebootHard(Resource):
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid,
-                     'API HARD REBOOT', None, None, None)
+                     'api', 'hard reboot', None, None)
         return instance_from_db_virt.reboot(hard=True)
 
 
@@ -383,7 +421,7 @@ class InstancePowerOff(Resource):
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid,
-                     'API POWEROFF', None, None, None)
+                     'api', 'poweroff', None, None)
         return instance_from_db_virt.power_off()
 
 
@@ -392,7 +430,7 @@ class InstancePowerOn(Resource):
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid,
-                     'API POWERON', None, None, None)
+                     'api', 'poweron', None, None)
         return instance_from_db_virt.power_on()
 
 
@@ -400,7 +438,7 @@ class InstancePause(Resource):
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db_virt=None):
-        db.add_event('instance', instance_uuid, 'API PAUSE', None, None, None)
+        db.add_event('instance', instance_uuid, 'api', 'pause', None, None)
         return instance_from_db_virt.pause()
 
 
@@ -409,7 +447,7 @@ class InstanceUnpause(Resource):
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid,
-                     'API UNPAUSE', None, None, None)
+                     'api', 'unpause', None, None)
         return instance_from_db_virt.unpause()
 
 
@@ -417,7 +455,7 @@ class InterfaceFloat(Resource):
     @redirect_to_network_node
     def post(self, interface_uuid=None):
         db.add_event('interface', interface_uuid,
-                     'API FLOAT', None, None, None)
+                     'api', 'float', None, None)
         ni = db.get_interface(interface_uuid)
         if not ni:
             return error(404, 'network interface not found')
@@ -443,7 +481,7 @@ class InterfaceDefloat(Resource):
     @redirect_to_network_node
     def post(self, interface_uuid=None):
         db.add_event('interface', interface_uuid,
-                     'API DEFLOAT', None, None, None)
+                     'api', 'defloat', None, None)
         ni = db.get_interface(interface_uuid)
         if not ni:
             return error(404, 'network interface not found')
@@ -467,7 +505,7 @@ class InterfaceDefloat(Resource):
 
 class Image(Resource):
     def post(self, url=None):
-        db.add_event('image', url, 'API CACHE', None, None, None)
+        db.add_event('image', url, 'api', 'cache', None, None)
 
         with util.RecordedOperation('cache image', args['url']) as ro:
             images.fetch_image(args['url'])
@@ -476,14 +514,14 @@ class Image(Resource):
 class Network(Resource):
     @arg_is_network_uuid
     def get(self, network_uuid=None, network_from_db=None):
-        db.add_event('network', network_uuid, 'API GET', None, None, None)
+        db.add_event('network', network_uuid, 'api', 'get', None, None)
         del network_from_db['ipmanager']
         return network_from_db
 
     @arg_is_network_uuid
     @redirect_to_network_node
     def delete(self, network_uuid=None, network_from_db=None):
-        db.add_event('network', network_uuid, 'API DELETE', None, None, None)
+        db.add_event('network', network_uuid, 'api', 'delete', None, None)
         if network_uuid == 'floating':
             return error(403, 'you cannot delete the floating network')
 
@@ -525,7 +563,7 @@ class Networks(Resource):
         network = db.allocate_network(netblock, provide_dhcp,
                                       provide_nat, name)
         db.add_event('network', network['uuid'],
-                     'API CREATE', None, None, None)
+                     'api', 'create', None, None)
 
         # Networks should immediately appear on the network node
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
@@ -552,7 +590,7 @@ class NetworkEvents(Resource):
     @arg_is_network_uuid
     def get(self, network_uuid=None, network_from_db=None):
         db.add_event('network', network_uuid,
-                     'API GET Events', None, None, None)
+                     'api', 'get events', None, None)
 
         out = []
         for event in db.get_events('network', network_uuid):

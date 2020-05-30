@@ -10,6 +10,7 @@ from oslo_concurrency import processutils
 from shakenfist import config
 from shakenfist.daemons import external_api as external_api_daemon
 from shakenfist.daemons import net as net_daemon
+from shakenfist.daemons import resources as resource_daemon
 from shakenfist import db
 from shakenfist import ipmanager
 from shakenfist import net
@@ -27,7 +28,7 @@ def restore_instances():
     # Ensure all instances for this node are defined
     networks = []
     instances = []
-    for inst in list(db.get_instances(local_only=True)):
+    for inst in list(db.get_instances(only_node=config.parsed.get('NODE_NAME'))):
         for iface in db.get_instance_interfaces(inst['uuid']):
             if not iface['network_uuid'] in networks:
                 networks.append(iface['network_uuid'])
@@ -100,6 +101,11 @@ def main():
     net_pid = os.fork()
     if net_pid == 0:
         net_daemon.monitor().run()
+
+    # Resource usage publisher
+    resource_pid = os.fork()
+    if resource_pid == 0:
+        resource_daemon.monitor().run()
 
     # REST API
     external_api_pid = os.fork()
