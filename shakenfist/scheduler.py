@@ -106,6 +106,10 @@ class Scheduler(object):
                 self.refresh_metrics()
 
             if candidates:
+                LOG.info('Scheduling %s, %s forced as candidates' %
+                         (instance, candidates))
+                db.add_event('instance', instance.db_entry['uuid'],
+                             'schedule', 'Forced candidates', None, str(candidates))
                 for node in candidates:
                     if not node in self.metrics:
                         raise CandidateNodeNotFoundException(node)

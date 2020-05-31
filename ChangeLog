@@ -1,6 +1,8 @@
 CHANGES
 =======
 
+* Safety checks
+* Track metrics for each hypervisor, use them to schedule
 * Example OpenStack terraform
 * Add more detailed specification options for disks and networks
 * Add test for instances with no networking

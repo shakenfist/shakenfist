@@ -281,7 +281,7 @@ class Instances(Resource):
         else:
             try:
                 candidates = SCHEDULER.place_instance(
-                    instance, network, candidates=placed_on)
+                    instance, network, candidates=[placed_on])
                 if len(candidates) == 0:
                     return error(507, 'Insufficient capacity')
             except scheduler.CandidateNodeNotFoundException as e:

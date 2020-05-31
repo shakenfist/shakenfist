@@ -65,22 +65,10 @@
             "steppedLine": false,
             "targets": [
                 {
-                    "expr": "cpu_load_1",
-                    "interval": "",
-                    "legendFormat": "{{instance}} loadavg 1",
-                    "refId": "A"
-                },
-                {
                     "expr": "cpu_load_5",
                     "interval": "",
                     "legendFormat": "{{instance}} loadavg 5",
                     "refId": "B"
-                },
-                {
-                    "expr": "cpu_load_15",
-                    "interval": "",
-                    "legendFormat": "{{instance}} loadavg 15",
-                    "refId": "C"
                 }
             ],
             "thresholds": [],
