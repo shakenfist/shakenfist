@@ -13,6 +13,10 @@ LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
 
 
+class CandidateNodeNotFoundException(Exception):
+    pass
+
+
 class Scheduler(object):
     def __init__(self):
         self.refresh_metrics()
@@ -96,14 +100,19 @@ class Scheduler(object):
         max_matches = max(candidates_by_image_matches.keys())
         return candidates_by_image_matches[max_matches]
 
-    def place_instance(self, instance, network):
-        with util.RecordedOperation('schedule', instance) as ro:
+    def place_instance(self, instance, network, candidates=None):
+        with util.RecordedOperation('schedule', instance) as _:
             if time.time() - self.metrics_updated > config.parsed.get('SCHEDULER_CACHE_TIMEOUT'):
                 self.refresh_metrics()
 
-            candidates = []
-            for node in self.metrics.keys():
-                candidates.append(node)
+            if candidates:
+                for node in candidates:
+                    if not node in self.metrics:
+                        raise CandidateNodeNotFoundException(node)
+            else:
+                candidates = []
+                for node in self.metrics.keys():
+                    candidates.append(node)
             LOG.info('Scheduling %s, %s start as candidates' %
                      (instance, candidates))
             db.add_event('instance', instance.db_entry['uuid'],

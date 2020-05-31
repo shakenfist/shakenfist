@@ -264,16 +264,28 @@ class Instances(Resource):
                 user_data=user_data
             )
 
+        if not SCHEDULER:
+            SCHEDULER = scheduler.Scheduler()
+
         # Have we been placed?
         if not placed_on:
-            if not SCHEDULER:
-                SCHEDULER = scheduler.Scheduler()
-
             candidates = SCHEDULER.place_instance(instance, network)
+            if len(candidates) == 0:
+                return error(507, 'Insufficient capacity')
+
             placed_on = candidates[0]
             db.place_instance(instance_uuid, placed_on)
             db.add_event('instance', instance_uuid,
                          'placement', None, None, placed_on)
+
+        else:
+            try:
+                candidates = SCHEDULER.place_instance(
+                    instance, network, candidates=placed_on)
+                if len(candidates) == 0:
+                    return error(507, 'Insufficient capacity')
+            except scheduler.CandidateNodeNotFoundException as e:
+                return error(404, 'Node not found: %s' % e)
 
         # Have we been placed on a different node?
         if not placed_on == config.parsed.get('NODE_NAME'):
@@ -507,8 +519,8 @@ class Image(Resource):
     def post(self, url=None):
         db.add_event('image', url, 'api', 'cache', None, None)
 
-        with util.RecordedOperation('cache image', args['url']) as ro:
-            images.fetch_image(args['url'])
+        with util.RecordedOperation('cache image', url) as _:
+            images.fetch_image(url)
 
 
 class Network(Resource):

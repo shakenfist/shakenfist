@@ -18,6 +18,35 @@ class APIException(Exception):
         self.text = text
 
 
+class RequestMalformedException(APIException):
+    pass
+
+
+class ResourceCannotBeDeletedException(APIException):
+    pass
+
+
+class ResourceNotFoundException(APIException):
+    pass
+
+
+class ResourceInUseException(APIException):
+    pass
+
+
+class InsufficientResourcesException(APIException):
+    pass
+
+
+STATUS_CODES_TO_ERRORS = {
+    400: RequestMalformedException,
+    403: ResourceCannotBeDeletedException,
+    404: ResourceNotFoundException,
+    409: ResourceInUseException,
+    507: InsufficientResourcesException,
+}
+
+
 def _request_url(method, url, data=None):
     h = {}
     if data:
@@ -42,6 +71,10 @@ def _request_url(method, url, data=None):
             LOG.debug('Text:\n    %s'
                       % ('\n    '.join(r.text.split('\n'))))
     LOG.debug('-------------------------------------------------------')
+
+    if r.status_code in STATUS_CODES_TO_ERRORS:
+        raise STATUS_CODES_TO_ERRORS[r.status_code](
+            'API request failed', method, url, r.status_code, r.text)
 
     if r.status_code != 200:
         raise APIException(
