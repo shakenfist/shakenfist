@@ -30,4 +30,4 @@ do
   done
 done
 
-ansible-playbook -i hosts --extra-vars "$ANSIBLE_VARS" tests/tests_final.yml
+ansible-playbook -i hosts --extra-vars "$ANSIBLE_VARS" tests/test_final.yml
