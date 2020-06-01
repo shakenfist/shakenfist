@@ -1,6 +1,7 @@
 CHANGES
 =======
 
+* Fix playbook name
 * Further state management
 * Correctly undefine domains upon delete
 * Add instance states

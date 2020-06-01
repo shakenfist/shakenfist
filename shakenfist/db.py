@@ -150,30 +150,30 @@ class Network(Base):
         }
 
 
-def get_network(network_uuid, all=False):
+def get_network(network_uuid):
     ensure_valid_session()
 
     try:
         query = SESSION.query(Network).filter(
             Network.uuid == network_uuid)
 
-        if not all:
-            query = query.filter(Network.state != 'deleted')
-            query = query.filter(Network.state != 'error')
+        query = query.filter(Network.state != 'deleted')
+        query = query.filter(Network.state != 'error')
 
         return query.one().export()
     except exc.NoResultFound:
         return None
 
 
-def get_networks():
+def get_networks(all=False):
     ensure_valid_session()
 
     try:
         query = SESSION.query(Network)
 
-        query = query.filter(Network.state != 'deleted')
-        query = query.filter(Network.state != 'error')
+        if not all:
+            query = query.filter(Network.state != 'deleted')
+            query = query.filter(Network.state != 'error')
 
         for n in query.all():
             if n.uuid != 'floating':
