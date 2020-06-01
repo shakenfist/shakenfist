@@ -117,6 +117,8 @@ class Network(Base):
     ipmanager = Column(BLOB)
     floating_gateway = Column(String)
     name = Column(String)
+    state = Column(String)
+    state_updated = Column(DateTime)
 
     def __init__(self, network_uuid, vxid, netblock, provide_dhcp, provide_nat,
                  owner, name):
@@ -129,6 +131,8 @@ class Network(Base):
         self.ipmanager = None
         self.floating_gateway = None
         self.name = name
+        self.state = 'initial'
+        self.state_updated = datetime.datetime.now()
 
     def export(self):
         return {
@@ -140,16 +144,24 @@ class Network(Base):
             'owner': self.owner,
             'ipmanager': self.ipmanager,
             'floating_gateway': self.floating_gateway,
-            'name': self.name
+            'name': self.name,
+            'state': self.state,
+            'state_updated': self.state_updated.timestamp()
         }
 
 
-def get_network(network_uuid):
+def get_network(network_uuid, all=False):
     ensure_valid_session()
 
     try:
-        return SESSION.query(Network).filter(
-            Network.uuid == network_uuid).one().export()
+        query = SESSION.query(Network).filter(
+            Network.uuid == network_uuid)
+
+        if not all:
+            query = query.filter(Network.state != 'deleted')
+            query = query.filter(Network.state != 'error')
+
+        return query.one().export()
     except exc.NoResultFound:
         return None
 
@@ -158,8 +170,12 @@ def get_networks():
     ensure_valid_session()
 
     try:
-        networks = SESSION.query(Network).all()
-        for n in networks:
+        query = SESSION.query(Network)
+
+        query = query.filter(Network.state != 'deleted')
+        query = query.filter(Network.state != 'error')
+
+        for n in query.all():
             if n.uuid != 'floating':
                 yield n.export()
     except exc.NoResultFound:
@@ -186,7 +202,35 @@ def allocate_network(netblock, provide_dhcp=True, provide_nat=False, name=None):
         SESSION.commit()
 
 
-def delete_network(network_uuid):
+def update_network_state(network_uuid, state):
+    ensure_valid_session()
+
+    try:
+        i = SESSION.query(Network).filter(
+            Network.uuid == network_uuid).one()
+        i.state = state
+        i.state_updated = datetime.datetime.now()
+    finally:
+        SESSION.commit()
+
+
+def get_stale_networks(delay):
+    ensure_valid_session()
+
+    horizon = datetime.datetime.now() - datetime.timedelta(seconds=delay)
+
+    for state in ['deleted', 'error']:
+        try:
+            query = SESSION.query(Network).filter(
+                Network.state_updated < horizon).filter(
+                    Network.state == state)
+            for n in query.all():
+                yield n.export()
+        except exc.NoResultFound:
+            pass
+
+
+def hard_delete_network(network_uuid):
     ensure_valid_session()
 
     try:
@@ -285,7 +329,8 @@ class Instance(Base):
             'vdi_port': self.vdi_port,
             'user_data': self.user_data,
             'block_devices': block_devices,
-            'state': self.state
+            'state': self.state,
+            'state_updated': self.state_updated.timestamp()
         }
 
 
@@ -301,7 +346,7 @@ def get_instance(instance_uuid):
         SESSION.commit()
 
 
-def get_instances(only_node=None):
+def get_instances(only_node=None, all=False):
     ensure_valid_session()
 
     try:
@@ -311,8 +356,9 @@ def get_instances(only_node=None):
         else:
             query = SESSION.query(Instance)
 
-        query = query.filter(Instance.state != 'deleted')
-        query = query.filter(Instance.state != 'error')
+        if not all:
+            query = query.filter(Instance.state != 'deleted')
+            query = query.filter(Instance.state != 'error')
 
         for i in query.all():
             yield i.export()
@@ -390,6 +436,22 @@ def hard_delete_instance(instance_uuid):
         SESSION.commit()
 
 
+def get_stale_instances(delay):
+    ensure_valid_session()
+
+    horizon = datetime.datetime.now() - datetime.timedelta(seconds=delay)
+
+    for state in ['deleted', 'error']:
+        try:
+            query = SESSION.query(Instance).filter(
+                Instance.state_updated < horizon).filter(
+                    Instance.state == state)
+            for i in query.all():
+                yield i.export()
+        except exc.NoResultFound:
+            pass
+
+
 class NetworkInterface(Base):
     __tablename__ = 'network_interfaces'
 
@@ -400,6 +462,8 @@ class NetworkInterface(Base):
     ipv4 = Column(String)
     order = Column(Integer)
     floating = Column(String)
+    state = Column(String)
+    state_updated = Column(DateTime)
 
     def __init__(self, interface_uuid, network_uuid, instance_uuid, macaddr, ipv4, order,
                  floating):
@@ -410,6 +474,8 @@ class NetworkInterface(Base):
         self.ipv4 = ipv4
         self.order = order
         self.floating = floating
+        self.state = 'initial'
+        self.state_updated = datetime.datetime.now()
 
     def export(self):
         return {
@@ -419,7 +485,9 @@ class NetworkInterface(Base):
             'macaddr': self.macaddr,
             'ipv4': self.ipv4,
             'order': self.order,
-            'floating': self.floating
+            'floating': self.floating,
+            'state': self.state,
+            'state_updated': self.state_updated.timestamp()
         }
 
 
@@ -427,10 +495,14 @@ def is_address_free(network_uuid, address):
     ensure_valid_session()
 
     try:
-        found = SESSION.query(NetworkInterface).filter(
+        query = SESSION.query(NetworkInterface).filter(
             NetworkInterface.network_uuid == network_uuid).filter(
-                NetworkInterface.ipv4 == address).count()
-        if found > 0:
+                NetworkInterface.ipv4 == address)
+
+        query = query.filter(NetworkInterface.state != 'deleted')
+        query = query.filter(NetworkInterface.state != 'error')
+
+        if query.count() > 0:
             return False
         return True
     except exc.NoResultFound:
@@ -448,7 +520,7 @@ def create_network_interface(interface_uuid, network_uuid, instance_uuid, macadd
         SESSION.commit()
 
 
-def delete_network_interface(interface_uuid):
+def hard_delete_network_interface(interface_uuid):
     ensure_valid_session()
 
     try:
@@ -465,9 +537,13 @@ def get_instance_interfaces(instance_uuid):
     ensure_valid_session()
 
     try:
-        interfaces = SESSION.query(NetworkInterface).filter(
-            NetworkInterface.instance_uuid == instance_uuid).all()
-        for i in interfaces:
+        query = SESSION.query(NetworkInterface).filter(
+            NetworkInterface.instance_uuid == instance_uuid)
+
+        query = query.filter(NetworkInterface.state != 'deleted')
+        query = query.filter(NetworkInterface.state != 'error')
+
+        for i in query.all():
             yield i.export()
     except exc.NoResultFound:
         pass
@@ -477,9 +553,13 @@ def get_network_interfaces(network_uuid):
     ensure_valid_session()
 
     try:
-        interfaces = SESSION.query(NetworkInterface).filter(
-            NetworkInterface.network_uuid == network_uuid).all()
-        for i in interfaces:
+        query = SESSION.query(NetworkInterface).filter(
+            NetworkInterface.network_uuid == network_uuid)
+
+        query = query.filter(NetworkInterface.state != 'deleted')
+        query = query.filter(NetworkInterface.state != 'error')
+
+        for i in query.all():
             yield i.export()
     except exc.NoResultFound:
         pass
@@ -489,10 +569,27 @@ def get_interface(interface_uuid):
     ensure_valid_session()
 
     try:
-        return SESSION.query(NetworkInterface).filter(
-            NetworkInterface.uuid == interface_uuid).one().export()
+        query = SESSION.query(NetworkInterface).filter(
+            NetworkInterface.uuid == interface_uuid)
+
+        query = query.filter(NetworkInterface.state != 'deleted')
+        query = query.filter(NetworkInterface.state != 'error')
+
+        return query.one().export()
     except exc.NoResultFound:
         pass
+
+
+def update_network_interface_state(interface_uuid, state):
+    ensure_valid_session()
+
+    try:
+        i = SESSION.query(NetworkInterface).filter(
+            NetworkInterface.uuid == interface_uuid).one()
+        i.state = state
+        i.state_updated = datetime.datetime.now()
+    finally:
+        SESSION.commit()
 
 
 def add_floating_to_interface(interface_uuid, addr):

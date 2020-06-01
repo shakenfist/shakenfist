@@ -8,6 +8,7 @@ import os
 from oslo_concurrency import processutils
 
 from shakenfist import config
+from shakenfist.daemons import cleaner as cleaner_daemon
 from shakenfist.daemons import external_api as external_api_daemon
 from shakenfist.daemons import net as net_daemon
 from shakenfist.daemons import resources as resource_daemon
@@ -106,6 +107,11 @@ def main():
     resource_pid = os.fork()
     if resource_pid == 0:
         resource_daemon.monitor().run()
+
+    # Old object deleter
+    cleaner_pid = os.fork()
+    if cleaner_pid == 0:
+        cleaner_daemon.monitor().run()
 
     # REST API
     external_api_pid = os.fork()

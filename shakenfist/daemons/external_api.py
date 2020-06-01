@@ -215,6 +215,7 @@ class Instance(Resource):
         for iface in list(db.get_instance_interfaces(instance_uuid)):
             if not iface['network_uuid'] in instance_networks:
                 instance_networks.append(iface['network_uuid'])
+                db.update_network_interface_state(iface['uuid'], 'deleted')
 
         host_networks = []
         for inst in list(db.get_instances(only_node=config.parsed.get('NODE_NAME'))):
@@ -238,8 +239,8 @@ class Instance(Resource):
 
 
 class Instances(Resource):
-    def get(self):
-        return list(db.get_instances())
+    def get(self, all=False):
+        return list(db.get_instances(all=all))
 
     def post(self, name=None, cpus=None, memory=None, network=None,
              disk=None, ssh_key=None, user_data=None, placed_on=None, instance_uuid=None):
@@ -368,6 +369,9 @@ class Instances(Resource):
 
         with util.RecordedOperation('instance creation', instance) as _:
             instance.create()
+
+        for iface in db.get_instance_interfaces(instance.db_entry['uuid']):
+            db.update_network_interface_state(iface['uuid'], 'created')
 
         return db.get_instance(instance_uuid)
 
@@ -556,7 +560,7 @@ class Network(Resource):
             floating_network.ipmanager.release(n.floating_gateway)
             floating_network.persist_ipmanager()
 
-        db.delete_network(network_uuid)
+        db.update_network_state(network_uuid, 'deleted')
 
 
 class Networks(Resource):
@@ -569,8 +573,8 @@ class Networks(Resource):
         'owner': fields.String,
         'name': fields.String,
     })
-    def get(self):
-        return list(db.get_networks())
+    def get(self, all=False):
+        return list(db.get_networks(all=all))
 
     def post(self, netblock=None, provide_dhcp=None, provide_nat=None, name=None):
         try:

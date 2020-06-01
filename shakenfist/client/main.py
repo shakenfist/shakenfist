@@ -97,9 +97,10 @@ def _get_networks(ctx, args, incomplete):
 
 
 @network.command(name='list', help='List networks')
+@click.argument('all', type=click.BOOL, default=False)
 @click.pass_context
-def network_list(ctx):
-    nets = list(CLIENT.get_networks())
+def network_list(ctx, all=False):
+    nets = list(CLIENT.get_networks(all=all))
 
     if ctx.obj['OUTPUT'] == 'pretty':
         x = PrettyTable()
@@ -226,9 +227,10 @@ def _get_instances(ctx, args, incomplete):
 
 
 @instance.command(name='list', help='List instances')
+@click.argument('all', type=click.BOOL, default=False)
 @click.pass_context
-def instance_list(ctx):
-    insts = CLIENT.get_instances()
+def instance_list(ctx, all=False):
+    insts = CLIENT.get_instances(all=all)
 
     if ctx.obj['OUTPUT'] == 'pretty':
         x = PrettyTable()

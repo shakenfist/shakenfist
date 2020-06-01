@@ -20,7 +20,7 @@ class ApiClientTestCase(testtools.TestCase):
         list(client.get_instances())
 
         self.mock_request.assert_called_with(
-            'GET', 'http://localhost:13000/instances')
+            'GET', 'http://localhost:13000/instances', data={'all': False})
 
     def test_get_instance(self):
         client = apiclient.Client()
@@ -140,7 +140,7 @@ class ApiClientTestCase(testtools.TestCase):
         client.get_networks()
 
         self.mock_request.assert_called_with(
-            'GET', 'http://localhost:13000/networks')
+            'GET', 'http://localhost:13000/networks', data={'all': False})
 
     def test_get_network(self):
         client = apiclient.Client()

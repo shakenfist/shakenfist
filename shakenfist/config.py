@@ -49,8 +49,12 @@ CONFIG_DEFAULTS = {
     'FLOATING_NETWORK': '192.168.20.0/24',
     'NETWORK_NODE_IP': node_ip,
 
-    # Where the MySQL database is
+    # Database options:
+    #  - sql_url: where the MySQL server is
+    #  - cleaner_delay: how long to wait before removing old data from the
+    #    database.
     'SQL_URL': 'mysql://root:foo@localhost/sf',
+    'CLEANER_DELAY': 3600,
 
     # What nova called an availability zone
     'ZONE': 'shaken',

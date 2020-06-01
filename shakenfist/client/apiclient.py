@@ -88,8 +88,9 @@ class Client(object):
         if verbose:
             LOG.setLevel(logging.DEBUG)
 
-    def get_instances(self):
-        r = _request_url('GET', self.base_url + '/instances')
+    def get_instances(self, all=False):
+        r = _request_url('GET', self.base_url +
+                         '/instances', data={'all': all})
         return r.json()
 
     def get_instance(self, instance_uuid):
@@ -173,8 +174,8 @@ class Client(object):
                          data={'url': image_url})
         return r.json()
 
-    def get_networks(self):
-        r = _request_url('GET', self.base_url + '/networks')
+    def get_networks(self, all=False):
+        r = _request_url('GET', self.base_url + '/networks', data={'all': all})
         return r.json()
 
     def get_network(self, network_uuid):

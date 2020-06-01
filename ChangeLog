@@ -1,6 +1,9 @@
 CHANGES
 =======
 
+* Further state management
+* Correctly undefine domains upon delete
+* Add instance states
 * A simple scheduler test script
 * Fix path to test
 * Split out tests into logical groupings
