@@ -50,6 +50,19 @@ class Scheduler(object):
             return False
         return True
 
+    def _has_sufficient_disk(self, instance, node):
+        requested_disk = 0
+        for disk in instance.db_entry.get('block_devices', {}).get('devices', []):
+            # TODO(mikal): this ignores "sizeless disks", that is ones that
+            # are exactly the size of their base image, for example CD ROMs.
+            if 'size' in disk:
+                if not disk['size'] is None:
+                    requested_disk += int(disk['size'])
+
+        if requested_disk > (int(self.metrics[node].get('disk_free', '0')) / 1024 / 1024 / 1024):
+            return False
+        return True
+
     def _find_most_matching_networks(self, requested_networks, candidates):
         candidates_network_matches = {}
         for node in candidates:
@@ -70,6 +83,9 @@ class Scheduler(object):
             matches = candidates_network_matches[node]
             candidates_by_network_matches.setdefault(matches, [])
             candidates_by_network_matches[matches].append(node)
+
+        if len(candidates_by_network_matches) == 0:
+            return candidates
 
         max_matches = max(candidates_by_network_matches.keys())
         return candidates_by_network_matches[max_matches]
@@ -96,6 +112,9 @@ class Scheduler(object):
             matches = candidates_image_matches[node]
             candidates_by_image_matches.setdefault(matches, [])
             candidates_by_image_matches[matches].append(node)
+
+        if len(candidates_by_image_matches) == 0:
+            return candidates
 
         max_matches = max(candidates_by_image_matches.keys())
         return candidates_by_image_matches[max_matches]
@@ -125,7 +144,7 @@ class Scheduler(object):
             # Can we host that many vCPUs?
             for node in copy.copy(candidates):
                 if instance.db_entry['cpus'] > self.metrics[node].get('cpu_max_per_instance', 0):
-                    del candidates[node]
+                    candidates.remove(node)
             LOG.info('Scheduling %s, %s have enough actual CPU' %
                      (instance, candidates))
             db.add_event('instance', instance.db_entry['uuid'],
@@ -134,7 +153,7 @@ class Scheduler(object):
             # Do we have enough idle CPU?
             for node in copy.copy(candidates):
                 if not self._has_sufficient_cpu(instance.db_entry['cpus'], node):
-                    del candidates[node]
+                    candidates.remove(node)
             LOG.info('Scheduling %s, %s have enough idle CPU' %
                      (instance, candidates))
             db.add_event('instance', instance.db_entry['uuid'],
@@ -143,11 +162,20 @@ class Scheduler(object):
             # Do we have enough idle RAM?
             for node in copy.copy(candidates):
                 if not self._has_sufficient_ram(instance.db_entry['memory'], node):
-                    del candidates[node]
+                    candidates.remove(node)
             LOG.info('Scheduling %s, %s have enough idle RAM' %
                      (instance, candidates))
             db.add_event('instance', instance.db_entry['uuid'],
                          'schedule', 'Have enough idle RAM', None, str(candidates))
+
+            # Do we have enough idle disk?
+            for node in copy.copy(candidates):
+                if not self._has_sufficient_disk(instance, node):
+                    candidates.remove(node)
+            LOG.info('Scheduling %s, %s have enough idle disk' %
+                     (instance, candidates))
+            db.add_event('instance', instance.db_entry['uuid'],
+                         'schedule', 'Have enough idle disk', None, str(candidates))
 
             # What nodes have the highest number of networks already present?
             requested_networks = []

@@ -1,6 +1,8 @@
 CHANGES
 =======
 
+* Fix path to test
+* Split out tests into logical groupings
 * Safety checks
 * Track metrics for each hypervisor, use them to schedule
 * Example OpenStack terraform
