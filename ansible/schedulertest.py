@@ -70,16 +70,20 @@ def main():
                 print('Deleted instance %s' % i)
 
         else:
-            i = c.create_instance(
-                randomName(),
-                random.randint(1, 4),
-                random.randint(1, 4),
-                [random.choice(networks)],
-                [random.choice(disks)],
-                None,
-                None)
-            instances.append(i['uuid'])
-            print('Created instance %s' % i['uuid'])
+            try:
+                i = c.create_instance(
+                    randomName(),
+                    random.randint(1, 4),
+                    random.randint(1, 4),
+                    [random.choice(networks)],
+                    [random.choice(disks)],
+                    None,
+                    None)
+                instances.append(i['uuid'])
+                print('Created instance %s' % i['uuid'])
+
+            except apiclient.InsufficientResourcesException:
+                print('Failed to start an instance due to insufficient resources')
 
 
 if __name__ == '__main__':

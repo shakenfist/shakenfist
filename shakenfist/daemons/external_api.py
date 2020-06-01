@@ -271,6 +271,9 @@ class Instances(Resource):
         if not placed_on:
             candidates = SCHEDULER.place_instance(instance, network)
             if len(candidates) == 0:
+                db.add_event('instance', instance_uuid,
+                             'schedule', 'failed', None, 'insufficient resources')
+                db.update_instance_state(instance_uuid, 'error')
                 return error(507, 'Insufficient capacity')
 
             placed_on = candidates[0]
@@ -283,6 +286,9 @@ class Instances(Resource):
                 candidates = SCHEDULER.place_instance(
                     instance, network, candidates=[placed_on])
                 if len(candidates) == 0:
+                    db.add_event('instance', instance_uuid,
+                                 'schedule', 'failed', None, 'insufficient resources')
+                    db.update_instance_state(instance_uuid, 'error')
                     return error(507, 'Insufficient capacity')
             except scheduler.CandidateNodeNotFoundException as e:
                 return error(404, 'Node not found: %s' % e)

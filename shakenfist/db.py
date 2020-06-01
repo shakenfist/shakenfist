@@ -243,6 +243,8 @@ class Instance(Base):
     vdi_port = Column(Integer)
     user_data = Column(String)
     block_devices = Column(BLOB)
+    state = Column(String)
+    state_updated = Column(DateTime)
 
     def __init__(self, instance_uuid, name, cpus, memory_mb, disk_spec,
                  ssh_key, node, console_port, vdi_port, user_data):
@@ -257,6 +259,8 @@ class Instance(Base):
         self.vdi_port = vdi_port
         self.user_data = user_data
         self.block_devices = None
+        self.state = 'initial'
+        self.state_updated = datetime.datetime.now()
 
     def export(self):
         if self.block_devices:
@@ -280,7 +284,8 @@ class Instance(Base):
             'console_port': self.console_port,
             'vdi_port': self.vdi_port,
             'user_data': self.user_data,
-            'block_devices': block_devices
+            'block_devices': block_devices,
+            'state': self.state
         }
 
 
@@ -305,6 +310,9 @@ def get_instances(only_node=None):
                 Instance.node == only_node)
         else:
             query = SESSION.query(Instance)
+
+        query = query.filter(Instance.state != 'deleted')
+        query = query.filter(Instance.state != 'error')
 
         for i in query.all():
             yield i.export()
@@ -351,7 +359,19 @@ def place_instance(instance_uuid, node):
         SESSION.commit()
 
 
-def delete_instance(instance_uuid):
+def update_instance_state(instance_uuid, state):
+    ensure_valid_session()
+
+    try:
+        i = SESSION.query(Instance).filter(
+            Instance.uuid == instance_uuid).one()
+        i.state = state
+        i.state_updated = datetime.datetime.now()
+    finally:
+        SESSION.commit()
+
+
+def hard_delete_instance(instance_uuid):
     ensure_valid_session()
 
     try:

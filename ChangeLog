@@ -1,6 +1,7 @@
 CHANGES
 =======
 
+* A simple scheduler test script
 * Fix path to test
 * Split out tests into logical groupings
 * Safety checks
