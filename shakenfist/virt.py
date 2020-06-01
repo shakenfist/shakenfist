@@ -197,6 +197,9 @@ class Instance(object):
         with util.RecordedOperation('delete domain', self) as _:
             try:
                 self.power_off()
+
+                instance = self._get_domain()
+                instance.undefine()
             except:
                 pass
 
