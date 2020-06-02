@@ -192,8 +192,8 @@ Here's a simple feature matrix:
 | Virtual networks allow overlapping IP allocations | Yes         |         |             |
 | REST API authentication and object ownership      |             | Yes     |             |
 | Snapshots (of all disks)                          | Yes         |         |             |
-| Central API service                               |             | Yes     |             |
-| Scheduling                                        |             | Yes     |             |
+| Central API service                               | Yes, in a meshy sort of way |         |             |
+| Scheduling                                        | Yes         |         |             |
 | Volumes                                           |             |         | No plans    |
 | Quotas                                            |             |         | No plans    |
 | API versioning                                    |             |         | No plans    |
