@@ -121,12 +121,16 @@ def main():
     setproctitle.setproctitle('sf main')
     LOG.info('network monitor pid is %d' % net_pid)
     LOG.info('external api pid is %d' % external_api_pid)
+    LOG.info('resources monitor pid is %d' % resource_pid)
+    LOG.info('cleaner pid is %d' % cleaner_pid)
 
     restore_instances()
 
     procnames = {
         external_api_pid: 'external api',
-        net_pid: 'network monitor'
+        net_pid: 'network monitor',
+        resource_pid: 'resource monitor',
+        cleaner_pid: 'cleaner'
     }
 
     while True:

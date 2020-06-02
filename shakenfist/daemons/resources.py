@@ -112,13 +112,17 @@ class monitor(object):
             'updated_at', 'The last time metrics were updated')}
 
         while True:
-            stats = _get_stats()
-            for metric in stats:
-                if not metric in gauges:
-                    gauges[metric] = Gauge(metric, '')
-                gauges[metric].set(stats[metric])
-                db.update_metric(metric, stats[metric])
+            try:
+                stats = _get_stats()
+                for metric in stats:
+                    if not metric in gauges:
+                        gauges[metric] = Gauge(metric, '')
+                    gauges[metric].set(stats[metric])
+                    db.update_metric(metric, stats[metric])
 
-            gauges['updated_at'].set_to_current_time()
+                gauges['updated_at'].set_to_current_time()
+
+            except Exception as e:
+                LOG.error('Failed to collect resource statistics: %s' % e)
 
             time.sleep(config.parsed.get('SCHEDULER_CACHE_TIMEOUT'))
