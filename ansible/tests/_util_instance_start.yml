@@ -16,6 +16,7 @@
       - "{{network}}"
     ssh_key: "{{sshkey}}"
     user_data: "{{userdata}}"
+    placement: "{{inventory_hostname}}"
   register: instance_create_out
 
 - name: Log instance details

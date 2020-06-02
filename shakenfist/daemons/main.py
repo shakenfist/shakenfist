@@ -8,8 +8,10 @@ import os
 from oslo_concurrency import processutils
 
 from shakenfist import config
+from shakenfist.daemons import cleaner as cleaner_daemon
 from shakenfist.daemons import external_api as external_api_daemon
 from shakenfist.daemons import net as net_daemon
+from shakenfist.daemons import resources as resource_daemon
 from shakenfist import db
 from shakenfist import ipmanager
 from shakenfist import net
@@ -27,7 +29,7 @@ def restore_instances():
     # Ensure all instances for this node are defined
     networks = []
     instances = []
-    for inst in list(db.get_instances(local_only=True)):
+    for inst in list(db.get_instances(only_node=config.parsed.get('NODE_NAME'))):
         for iface in db.get_instance_interfaces(inst['uuid']):
             if not iface['network_uuid'] in networks:
                 networks.append(iface['network_uuid'])
@@ -101,6 +103,16 @@ def main():
     if net_pid == 0:
         net_daemon.monitor().run()
 
+    # Resource usage publisher
+    resource_pid = os.fork()
+    if resource_pid == 0:
+        resource_daemon.monitor().run()
+
+    # Old object deleter
+    cleaner_pid = os.fork()
+    if cleaner_pid == 0:
+        cleaner_daemon.monitor().run()
+
     # REST API
     external_api_pid = os.fork()
     if external_api_pid == 0:
@@ -109,12 +121,16 @@ def main():
     setproctitle.setproctitle('sf main')
     LOG.info('network monitor pid is %d' % net_pid)
     LOG.info('external api pid is %d' % external_api_pid)
+    LOG.info('resources monitor pid is %d' % resource_pid)
+    LOG.info('cleaner pid is %d' % cleaner_pid)
 
     restore_instances()
 
     procnames = {
         external_api_pid: 'external api',
-        net_pid: 'network monitor'
+        net_pid: 'network monitor',
+        resource_pid: 'resource monitor',
+        cleaner_pid: 'cleaner'
     }
 
     while True:

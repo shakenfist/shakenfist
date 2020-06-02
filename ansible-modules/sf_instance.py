@@ -94,6 +94,11 @@ def present(module):
         params['networkspecs'] = '-N %s' % (
             ' -N '.join(module.params['networkspecs']))
 
+    if not module.params.get('placement'):
+        params['placement'] = ''
+    else:
+        params['placement'] = '-p  %s' % module.params['placement']
+
     extra = ''
     if module.params.get('ssh_key'):
         extra += ' -I "%s"' % module.params['ssh_key']
@@ -102,7 +107,8 @@ def present(module):
     params['extra'] = extra
 
     cmd = ('sf-client --json instance create %(name)s %(cpu)s %(ram)s '
-           '%(disks)s %(diskspecs)s %(networks)s %(networkspecs)s %(extra)s' % params)
+           '%(disks)s %(diskspecs)s %(networks)s %(networkspecs)s %(placement)s '
+           '%(extra)s' % params)
     rc, stdout, stderr = module.run_command(
         cmd, check_rc=False, use_unsafe_shell=True)
 
@@ -159,6 +165,7 @@ def main():
         'networkspecs': {'required': False, 'type': 'list', 'elements': 'str'},
         'ssh_key': {'required': False, 'type': 'str'},
         'user_data': {'required': False, 'type': 'str'},
+        'placement': {'required': False, 'type': 'str'},
         'state': {
             'default': 'present',
             'choices': ['present', 'absent'],

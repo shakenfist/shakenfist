@@ -41,7 +41,7 @@ class monitor(object):
             # in use for instances on other hypervisor nodes.
             if config.parsed.get('NODE_IP') != config.parsed.get('NETWORK_NODE_IP'):
                 host_networks = []
-                for inst in list(db.get_instances(local_only=True)):
+                for inst in list(db.get_instances(only_node=config.parsed.get('NODE_NAME'))):
                     for iface in db.get_instance_interfaces(inst['uuid']):
                         if not iface['network_uuid'] in host_networks:
                             host_networks.append(iface['network_uuid'])

@@ -1,6 +1,18 @@
 CHANGES
 =======
 
+* Tweaks to test\_final to catch up with states
+* Put the all argument on the right method
+* Fix playbook name
+* Further state management
+* Correctly undefine domains upon delete
+* Add instance states
+* A simple scheduler test script
+* Fix path to test
+* Split out tests into logical groupings
+* Safety checks
+* Track metrics for each hypervisor, use them to schedule
+* Example OpenStack terraform
 * Add more detailed specification options for disks and networks
 * Add test for instances with no networking
 * Setup rsyslog to aid debugging

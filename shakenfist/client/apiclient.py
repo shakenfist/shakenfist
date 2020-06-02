@@ -18,6 +18,35 @@ class APIException(Exception):
         self.text = text
 
 
+class RequestMalformedException(APIException):
+    pass
+
+
+class ResourceCannotBeDeletedException(APIException):
+    pass
+
+
+class ResourceNotFoundException(APIException):
+    pass
+
+
+class ResourceInUseException(APIException):
+    pass
+
+
+class InsufficientResourcesException(APIException):
+    pass
+
+
+STATUS_CODES_TO_ERRORS = {
+    400: RequestMalformedException,
+    403: ResourceCannotBeDeletedException,
+    404: ResourceNotFoundException,
+    409: ResourceInUseException,
+    507: InsufficientResourcesException,
+}
+
+
 def _request_url(method, url, data=None):
     h = {}
     if data:
@@ -43,6 +72,10 @@ def _request_url(method, url, data=None):
                       % ('\n    '.join(r.text.split('\n'))))
     LOG.debug('-------------------------------------------------------')
 
+    if r.status_code in STATUS_CODES_TO_ERRORS:
+        raise STATUS_CODES_TO_ERRORS[r.status_code](
+            'API request failed', method, url, r.status_code, r.text)
+
     if r.status_code != 200:
         raise APIException(
             'API request failed', method, url, r.status_code, r.text)
@@ -55,8 +88,9 @@ class Client(object):
         if verbose:
             LOG.setLevel(logging.DEBUG)
 
-    def get_instances(self):
-        r = _request_url('GET', self.base_url + '/instances')
+    def get_instances(self, all=False):
+        r = _request_url('GET', self.base_url +
+                         '/instances', data={'all': all})
         return r.json()
 
     def get_instance(self, instance_uuid):
@@ -68,17 +102,23 @@ class Client(object):
                          '/interfaces')
         return r.json()
 
-    def create_instance(self, name, cpus, memory, network, disk, sshkey, userdata):
+    def create_instance(self, name, cpus, memory, network, disk, sshkey, userdata,
+                        force_placement=None):
+        body = {
+            'name': name,
+            'cpus': cpus,
+            'memory': memory,
+            'network': network,
+            'disk': disk,
+            'ssh_key': sshkey,
+            'user_data': userdata
+        }
+
+        if force_placement:
+            body['placed_on'] = force_placement
+
         r = _request_url('POST', self.base_url + '/instances',
-                         data={
-                             'name': name,
-                             'cpus': cpus,
-                             'memory': memory,
-                             'network': network,
-                             'disk': disk,
-                             'ssh_key': sshkey,
-                             'user_data': userdata
-                         })
+                         data=body)
         return r.json()
 
     def snapshot_instance(self, instance_uuid, all=False):
@@ -134,8 +174,8 @@ class Client(object):
                          data={'url': image_url})
         return r.json()
 
-    def get_networks(self):
-        r = _request_url('GET', self.base_url + '/networks')
+    def get_networks(self, all=False):
+        r = _request_url('GET', self.base_url + '/networks', data={'all': all})
         return r.json()
 
     def get_network(self, network_uuid):

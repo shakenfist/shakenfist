@@ -191,10 +191,15 @@ class Instance(object):
         with util.RecordedOperation('create domain', self) as ro:
             self.power_on()
 
+        db.update_instance_state(self.db_entry['uuid'], 'created')
+
     def delete(self):
         with util.RecordedOperation('delete domain', self) as _:
             try:
                 self.power_off()
+
+                instance = self._get_domain()
+                instance.undefine()
             except:
                 pass
 
@@ -210,7 +215,7 @@ class Instance(object):
                 n.ipmanager.release(ni['ipv4'])
                 n.persist_ipmanager()
 
-        db.delete_instance(self.db_entry['uuid'])
+        db.update_instance_state(self.db_entry['uuid'], 'deleted')
 
     def _make_config_drive(self, disk_path):
         """Create a config drive"""
