@@ -62,7 +62,7 @@ def main():
             })
             print('Created network %s' % n['uuid'])
 
-        elif choice < 10:
+        elif choice < 30:
             if len(instances) > 0:
                 i = random.choice(instances)
                 c.delete_instance(i)
