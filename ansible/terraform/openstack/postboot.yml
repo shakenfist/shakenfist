@@ -11,9 +11,9 @@
       ff02::2 ip6-allrouters
       ff02::3 ip6-allhosts
 
-      {{hostvars['sf-1']['node_ip']}}   sf-1
-      {{hostvars['sf-2']['node_ip']}}   sf-2
-      {{hostvars['sfdb']['node_ip']}}   sfdb
+      {% for svr in groups.allsf %}
+      {{hostvars[svr]['node_ip']}}  {{svr}}
+      {% endfor %}
     dest: /etc/hosts
     owner: root
     group: root
