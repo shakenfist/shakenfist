@@ -1,6 +1,7 @@
 CHANGES
 =======
 
+* Use system packages for mariadb, and handle the DB being on a hypervisor node
 * Update README
 * Make deletes a little more likely while testing
 * Catch resource monitor errors instead of crashing

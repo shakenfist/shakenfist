@@ -99,7 +99,9 @@ class DHCPTestCase(testtools.TestCase):
                 'dhcp-option=eth0,3,10.0.0.1',
                 'dhcp-option=eth0,6,8.8.8.8',
                 'dhcp-option=eth0,15,shakenfist',
-                'dhcp-hostsfile=/a/b/c/dhcp/notauuid/hosts'
+                'dhcp-hostsfile=/a/b/c/dhcp/notauuid/hosts',
+                'dhcp-broadcast',
+                'dhcp-authoritative'
             ])
         )
 

@@ -63,7 +63,7 @@
     <interface type='bridge'>
       <mac address='{{net.macaddr}}'/>
       <source bridge='{{net.bridge}}'/>
-      <model type='{{network_model}}'/>
+      <model type='{{net.model}}'/>
       <address type='pci' domain='0x0000' bus='0x00' slot='0x03' function='0x0'/>
     </interface>
     {% endfor %}

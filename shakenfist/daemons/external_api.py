@@ -354,9 +354,11 @@ class Instances(Resource):
                 netdesc['macaddress'] = str(randmac.RandMac(
                     '00:00:00:00:00:00', True)).lstrip('\'').rstrip('\'')
 
+            if not 'model' in netdesc or not netdesc['model']:
+                netdesc['model'] = 'virtio'
+
             db.create_network_interface(
-                str(uuid.uuid4()), netdesc['network_uuid'], instance_uuid,
-                netdesc['macaddress'], netdesc['address'], order)
+                str(uuid.uuid4()), netdesc, instance_uuid, order)
 
             order += 1
 

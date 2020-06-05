@@ -435,7 +435,8 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networ
         netdefs.append({
             'network_uuid': network_uuid,
             'address': address,
-            'macaddress': None
+            'macaddress': None,
+            'model': 'virtio'
         })
     for n in networkspec:
         defn = {}

@@ -464,9 +464,10 @@ class NetworkInterface(Base):
     floating = Column(String)
     state = Column(String)
     state_updated = Column(DateTime)
+    model = Column(String)
 
     def __init__(self, interface_uuid, network_uuid, instance_uuid, macaddr, ipv4, order,
-                 floating):
+                 floating, model):
         self.uuid = interface_uuid
         self.network_uuid = network_uuid
         self.instance_uuid = instance_uuid
@@ -476,6 +477,7 @@ class NetworkInterface(Base):
         self.floating = floating
         self.state = 'initial'
         self.state_updated = datetime.datetime.now()
+        self.model = model
 
     def export(self):
         return {
@@ -487,7 +489,8 @@ class NetworkInterface(Base):
             'order': self.order,
             'floating': self.floating,
             'state': self.state,
-            'state_updated': self.state_updated.timestamp()
+            'state_updated': self.state_updated.timestamp(),
+            'model': self.model
         }
 
 
@@ -509,13 +512,12 @@ def is_address_free(network_uuid, address):
         return True
 
 
-def create_network_interface(interface_uuid, network_uuid, instance_uuid, macaddr, ipv4,
-                             order):
+def create_network_interface(interface_uuid, netdesc, instance_uuid, order):
     ensure_valid_session()
 
     try:
         SESSION.add(NetworkInterface(
-            interface_uuid, network_uuid, instance_uuid, macaddr, ipv4, order, None))
+            interface_uuid, netdesc['network_uuid'], instance_uuid, netdesc['macaddress'], netdesc['address'], order, None, netdesc['model']))
     finally:
         SESSION.commit()
 
