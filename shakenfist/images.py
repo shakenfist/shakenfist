@@ -170,6 +170,11 @@ def transcode_image(hashed_image_path):
     if os.path.exists(hashed_image_path + '.qcow2'):
         return
 
+    current_format = identify_image(hashed_image_path).get('file format')
+    if current_format == 'qcow2':
+        os.link(hashed_image_path, hashed_image_path + '.qcow2')
+        return
+
     processutils.execute(
         'qemu-img convert -t none -O qcow2 %s %s.qcow2'
         % (hashed_image_path, hashed_image_path),
@@ -179,16 +184,62 @@ def transcode_image(hashed_image_path):
 def resize_image(hashed_image_path, size):
     """Resize the image to the specified size."""
 
-    backing_file = hashed_image_path + '.qcow2' + '.' + size
+    backing_file = hashed_image_path + '.qcow2' + '.' + str(size) + 'G'
+    current_size = identify_image(hashed_image_path).get('virtual size')
+    if current_size == size * 1024 * 1024 * 1024:
+        os.link(hashed_image_path, backing_file)
+        return backing_file
+
     if os.path.exists(backing_file):
         return backing_file
 
     shutil.copyfile(hashed_image_path + '.qcow2', backing_file)
     processutils.execute(
-        'qemu-img resize %s %s' % (backing_file, size),
+        'qemu-img resize %s %sG' % (backing_file, size),
         shell=True)
 
     return backing_file
+
+
+VALUE_WITH_BRACKETS_RE = re.compile('.* \(([0-9]+) bytes\)')
+
+
+def identify_image(path):
+    """Work out what an image is."""
+
+    if not os.path.exists(path):
+        return {}
+
+    out, _ = processutils.execute(
+        'qemu-img info %s' % path, shell=True)
+
+    data = {}
+    for line in out.split('\n'):
+        line = line.lstrip().rstrip()
+        elems = line.split(': ')
+        if len(elems) > 1:
+            key = elems[0]
+            value = ': '.join(elems[1:])
+
+            m = VALUE_WITH_BRACKETS_RE.match(value)
+            if m:
+                value = float(m.group(1))
+
+            elif value.endswith('K'):
+                value = float(value[:-1]) * 1024
+            elif value.endswith('M'):
+                value = float(value[:-1]) * 1024 * 1024
+            elif value.endswith('G'):
+                value = float(value[:-1]) * 1024 * 1024 * 1024
+            elif value.endswith('T'):
+                value = float(value[:-1]) * 1024 * 1024 * 1024 * 1024
+
+            try:
+                data[key] = float(value)
+            except:
+                data[key] = value
+
+    return data
 
 
 def create_cow(cache_file, disk_file):

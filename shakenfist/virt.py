@@ -169,7 +169,7 @@ class Instance(object):
                             images.transcode_image(hashed_image_path)
                         with util.RecordedOperation('resize image', self) as ro:
                             resized_image_path = images.resize_image(
-                                hashed_image_path, str(disk['size']) + 'G')
+                                hashed_image_path, disk['size'])
                         with util.RecordedOperation('create copy on write layer', self) as ro:
                             images.create_cow(resized_image_path, disk['path'])
 

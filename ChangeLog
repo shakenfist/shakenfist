@@ -1,6 +1,9 @@
 CHANGES
 =======
 
+* Identify images and only transcode and resize as required
+* Remove unused variable
+* Make ansible paths a little more clear
 * Expose network card model as part of the netspec
 * Use system packages for mariadb, and handle the DB being on a hypervisor node
 * Update README
@@ -17,6 +20,7 @@ CHANGES
 * Split out tests into logical groupings
 * Safety checks
 * Track metrics for each hypervisor, use them to schedule
+* Update main.py
 * Example OpenStack terraform
 * Add more detailed specification options for disks and networks
 * Add test for instances with no networking
