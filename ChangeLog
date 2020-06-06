@@ -1,6 +1,7 @@
 CHANGES
 =======
 
+* Add unit tests for images
 * Identify images and only transcode and resize as required
 * Remove unused variable
 * Make ansible paths a little more clear
