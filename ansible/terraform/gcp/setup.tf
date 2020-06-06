@@ -7,14 +7,14 @@ provider "google" {
 }
 
 resource "google_compute_instance" "sf_1" {
-  machine_type     = "n1-standard-2"
+  machine_type     = "n1-standard-4"
   name             = "sf-1"
   zone             = "us-central1-b"
   min_cpu_platform = "Intel Haswell"
   boot_disk {
     initialize_params {
       image = "sf-image"
-      size  = 40
+      size  = 50
     }
   }
   network_interface {
@@ -24,14 +24,14 @@ resource "google_compute_instance" "sf_1" {
 }
 
 resource "google_compute_instance" "sf_2" {
-  machine_type     = "n1-standard-2"
+  machine_type     = "n1-standard-4"
   name             = "sf-2"
   zone             = "us-central1-b"
   min_cpu_platform = "Intel Haswell"
   boot_disk {
     initialize_params {
       image = "sf-image"
-      size  = 40
+      size  = 50
     }
   }
   network_interface {
