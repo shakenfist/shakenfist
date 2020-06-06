@@ -1,6 +1,7 @@
 CHANGES
 =======
 
+* Expose network card model as part of the netspec
 * Use system packages for mariadb, and handle the DB being on a hypervisor node
 * Update README
 * Make deletes a little more likely while testing

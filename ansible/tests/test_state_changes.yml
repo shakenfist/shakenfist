@@ -9,7 +9,7 @@
     - ../vars
 
   tasks:
-    - include: ../terraform/{{cloud}}/terraform.yml
+    - include: "{{ansible_root}}/terraform/{{cloud}}/terraform.yml"
 
 - hosts: hypervisors
   any_errors_fatal: true

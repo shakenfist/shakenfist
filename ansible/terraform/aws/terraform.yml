@@ -1,6 +1,6 @@
 - name: Deploy infrastructure
   terraform:
-    project_path: ./terraform/aws
+    project_path: "{{ansible_root}}/terraform/aws"
     state: present
     force_init: true
     variables:
