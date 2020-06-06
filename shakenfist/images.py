@@ -114,7 +114,6 @@ def fetch_image(image_url):
     # with a GET request instead. This is lame, but I am lazy right now.
     req = urllib.request.Request(image_url, method='HEAD')
     resp = urllib.request.urlopen(req)
-    length = int(resp.headers.get('Content-Length'))
 
     image_dirty = False
     for field in VALIDATED_IMAGE_FIELDS:
