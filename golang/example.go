@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
-	"shakenfist"
 	"time"
+
+	"github.com/mikalstill/shakenfist_go"
 )
 
-func printNetwork(network shakenfist.Network) {
+func printNetwork(network shakenfist_go.Network) {
 	fmt.Printf("UUID: %s\n", network.UUID)
 	fmt.Printf("Name: %s\n", network.Name)
 	fmt.Printf("Net Block: %s\n", network.NetBlock)
@@ -19,7 +20,7 @@ func printNetwork(network shakenfist.Network) {
 	fmt.Println("")
 }
 
-func printInstance(instance shakenfist.Instance) {
+func printInstance(instance shakenfist_go.Instance) {
 	fmt.Printf("UUID: %s\n", instance.UUID)
 	fmt.Printf("Name: %s\n", instance.Name)
 	fmt.Printf("CPUs: %d\n", instance.CPUs)
@@ -41,7 +42,7 @@ func printInstance(instance shakenfist.Instance) {
 	fmt.Println("")
 }
 
-func printInterfaces(interfaces []shakenfist.NetworkInterface) {
+func printInterfaces(interfaces []shakenfist_go.NetworkInterface) {
 	for _, iface := range interfaces {
 		fmt.Printf("  - UUID: %s\n", iface.UUID)
 		fmt.Printf("    Network UUID: %s\n", iface.NetworkUUID)
@@ -59,7 +60,7 @@ func printInterfaces(interfaces []shakenfist.NetworkInterface) {
 }
 
 func main() {
-	c := shakenfist.NewClient("http://localhost", 13000)
+	c := shakenfist_go.NewClient("http://localhost", 13000)
 
 	// --------------------------------------------------------------------------
 	fmt.Println("**********************")
@@ -161,8 +162,8 @@ func main() {
 	fmt.Println("*** Create an instance ***")
 	fmt.Println("**************************")
 	instance, err = c.CreateInstance("golang", 1, 1,
-		[]shakenfist.NetworkSpec{{NetworkUUID: networkUuid}},
-		[]shakenfist.DiskSpec{{Base: "cirros", Size: 8, Type: "disk", Bus: ""}},
+		[]shakenfist_go.NetworkSpec{{NetworkUUID: networkUuid}},
+		[]shakenfist_go.DiskSpec{{Base: "cirros", Size: 8, Type: "disk", Bus: ""}},
 		"", "")
 	if err != nil {
 		fmt.Println("CreateInstance request error: ", err)
