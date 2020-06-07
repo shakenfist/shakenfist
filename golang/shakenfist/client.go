@@ -86,6 +86,50 @@ func (c *Client) GetNetwork(networkUUID string) (Network, error) {
 	return network, nil
 }
 
+type createNetworkRequest struct {
+	Name        string `json:"name"`
+	Netblock    string `json:"netblock"`
+	ProvideDHCP bool   `json:"provide_dhcp"`
+	ProvideNAT  bool   `json:"provide_nat"`
+}
+
+// CreateNetwork creates a new network
+func (c *Client) CreateNetwork(netblock string, provideDHCP bool, provideNAT bool,
+	name string) (Network, error) {
+	request := &createNetworkRequest{
+		Netblock:    netblock,
+		ProvideDHCP: provideDHCP,
+		ProvideNAT:  provideNAT,
+		Name:        name,
+	}
+	post, err := json.Marshal(request)
+	if err != nil {
+		return Network{}, err
+	}
+
+	body, err := c.httpRequest("networks", "POST", *bytes.NewBuffer(post))
+	if err != nil {
+		return Network{}, err
+	}
+
+	network := Network{}
+	err = json.NewDecoder(body).Decode(&network)
+	if err != nil {
+		return Network{}, err
+	}
+	return network, nil
+}
+
+// DeleteNetwork removes a network with a specified UUID
+func (c *Client) DeleteNetwork(networkUUID string) error {
+	path := fmt.Sprintf("networks/%s", networkUUID)
+	_, err := c.httpRequest(path, "DELETE", bytes.Buffer{})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // DiskSpec is a definition of an instance disk
 type DiskSpec struct {
 	Base string `json:"base"`
@@ -180,7 +224,7 @@ func (c *Client) GetInstanceInterfaces(instanceUUID string) ([]NetworkInterface,
 	return interfaces, nil
 }
 
-type createRequest struct {
+type createInstanceRequest struct {
 	Name     string        `json:"name"`
 	CPUs     int           `json:"cpus"`
 	Memory   int           `json:"memory"`
@@ -194,7 +238,7 @@ type createRequest struct {
 func (c *Client) CreateInstance(Name string, CPUs int, Memory int,
 	Networks []NetworkSpec, Disks []DiskSpec, SSHKey string,
 	UserData string) (Instance, error) {
-	request := &createRequest{
+	request := &createInstanceRequest{
 		Name:     Name,
 		CPUs:     CPUs,
 		Memory:   Memory,

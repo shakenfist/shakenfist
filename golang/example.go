@@ -62,10 +62,45 @@ func main() {
 	c := shakenfist.NewClient("http://localhost", 13000)
 
 	// --------------------------------------------------------------------------
+	fmt.Println("**********************")
+	fmt.Println("*** Make a network ***")
+	fmt.Println("**********************")
+	createdNetwork, err := c.CreateNetwork("192.168.50.0/24", true, true, "golang")
+	if err != nil {
+		fmt.Println("CreateNetwork request error: ", err)
+		return
+	}
+	printNetwork(createdNetwork)
+
+	// --------------------------------------------------------------------------
 	fmt.Println("******************************")
 	fmt.Println("*** Get a list of networks ***")
 	fmt.Println("******************************")
 	networks, err := c.GetNetworks()
+	if err != nil {
+		fmt.Println("GetNetworks request error: ", err)
+		return
+	}
+
+	for _, network := range networks {
+		printNetwork(network)
+	}
+
+	// --------------------------------------------------------------------------
+	fmt.Println("************************")
+	fmt.Println("*** Delete a network ***")
+	fmt.Println("************************")
+	err = c.DeleteNetwork(createdNetwork.UUID)
+	if err != nil {
+		fmt.Println("DeleteNetwork request error: ", err)
+		return
+	}
+
+	// --------------------------------------------------------------------------
+	fmt.Println("******************************")
+	fmt.Println("*** Get a list of networks ***")
+	fmt.Println("******************************")
+	networks, err = c.GetNetworks()
 	if err != nil {
 		fmt.Println("GetNetworks request error: ", err)
 		return
