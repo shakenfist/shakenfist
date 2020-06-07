@@ -24,7 +24,7 @@ func Provider() terraform.ResourceProvider {
 			},
 		},
 		ResourcesMap: map[string]*schema.Resource{
-			"network": resourceNetwork(),
+			"shakenfist_network": resourceNetwork(),
 		},
 		ConfigureFunc: providerConfigure,
 	}

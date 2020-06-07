@@ -32,8 +32,8 @@ func validateNetblock(v interface{}, k string) (ws []string, es []error) {
 		return warns, errs
 	}
 
-	netblock := regexp.MustCompile(`[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+`)
-	if netblock.Match([]byte(value)) {
+	netblock := regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$`)
+	if !netblock.Match([]byte(value)) {
 		errs = append(errs, fmt.Errorf("Netblock must be IPv4 CIDR. Got %s", value))
 		return warns, errs
 	}
