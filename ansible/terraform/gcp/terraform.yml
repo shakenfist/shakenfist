@@ -1,6 +1,6 @@
 - name: Deploy infrastructure
   terraform:
-    project_path: ./terraform/gcp
+    project_path: "{{ansible_root}}/terraform/gcp"
     state: present
     force_init: true
     variables:

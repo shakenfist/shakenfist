@@ -27,6 +27,6 @@
 
 - name: Determine database node
   set_fact:
-    database_node_ip: "{{hostvars['sfdb']['node_ip']}}"
+    database_node_ip: "{{hostvars['sf-1']['node_ip']}}"
   delegate_to: localhost
   delegate_facts: true

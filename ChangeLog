@@ -1,6 +1,15 @@
 CHANGES
 =======
 
+* Add unit tests for images
+* Identify images and only transcode and resize as required
+* Remove unused variable
+* Make ansible paths a little more clear
+* Expose network card model as part of the netspec
+* Use system packages for mariadb, and handle the DB being on a hypervisor node
+* Update README
+* Make deletes a little more likely while testing
+* Catch resource monitor errors instead of crashing
 * Tweaks to test\_final to catch up with states
 * Put the all argument on the right method
 * Fix playbook name
@@ -12,6 +21,7 @@ CHANGES
 * Split out tests into logical groupings
 * Safety checks
 * Track metrics for each hypervisor, use them to schedule
+* Update main.py
 * Example OpenStack terraform
 * Add more detailed specification options for disks and networks
 * Add test for instances with no networking

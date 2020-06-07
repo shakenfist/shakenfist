@@ -3,8 +3,9 @@
 tox -epy37
 
 
+cwd=`pwd`
 TERRAFORM_VARS=""
-ANSIBLE_VARS="cloud=$CLOUD bootdelay=$BOOTDELAY"
+ANSIBLE_VARS="cloud=$CLOUD bootdelay=$BOOTDELAY ansible_root=$cwd"
 for var in $VARIABLES
 do
   TERRAFORM_VARS="$TERRAFORM_VARS -var=$var"

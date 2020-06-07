@@ -66,10 +66,6 @@ CONFIG_DEFAULTS = {
     # See libvirt docs for full list of options.
     'DISK_BUS': 'virtio',
 
-    # The network model to use for network devices. One of virtio, e1000,
-    # or another value supported by libvirt.
-    'NETWORK_MODEL': 'virtio',
-
     # The IP of this node
     'NODE_IP': node_ip,
     'NODE_NAME': node_name,

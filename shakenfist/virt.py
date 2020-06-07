@@ -169,7 +169,7 @@ class Instance(object):
                             images.transcode_image(hashed_image_path)
                         with util.RecordedOperation('resize image', self) as ro:
                             resized_image_path = images.resize_image(
-                                hashed_image_path, str(disk['size']) + 'G')
+                                hashed_image_path, disk['size'])
                         with util.RecordedOperation('create copy on write layer', self) as ro:
                             images.create_cow(resized_image_path, disk['path'])
 
@@ -357,7 +357,8 @@ class Instance(object):
             networks.append(
                 {
                     'macaddr': iface['macaddr'],
-                    'bridge': n.subst_dict()['vx_bridge']
+                    'bridge': n.subst_dict()['vx_bridge'],
+                    'model': iface['model']
                 }
             )
 
@@ -367,7 +368,6 @@ class Instance(object):
             vcpus=self.db_entry['cpus'],
             disks=self.db_entry['block_devices']['devices'],
             networks=networks,
-            network_model=config.parsed.get('NETWORK_MODEL'),
             instance_path=self.instance_path,
             console_port=self.db_entry['console_port'],
             vdi_port=self.db_entry['vdi_port']

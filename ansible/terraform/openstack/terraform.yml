@@ -1,6 +1,6 @@
 - name: Deploy infrastructure
   terraform:
-    project_path: ./terraform/openstack
+    project_path: "{{ansible_root}}/terraform/openstack"
     state: present
     force_init: true
     variables:
