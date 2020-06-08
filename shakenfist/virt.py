@@ -56,6 +56,13 @@ def _get_disk_device_base(bus):
     return bases.get(bus, 'sd')
 
 
+def _get_defaulted_disk_type(disk):
+    kind = disk.get('type')
+    if kind:
+        return kind
+    return 'disk'
+
+
 class Instance(object):
     def __init__(self, db_entry):
         self.db_entry = db_entry
@@ -90,7 +97,7 @@ class Instance(object):
                     'bus': bus,
                     'path': os.path.join(self.instance_path, root_device + '.qcow2'),
                     'base': self.db_entry['disk_spec'][0].get('base'),
-                    'present_as': self.db_entry['disk_spec'][0].get('type', 'disk'),
+                    'present_as': _get_defaulted_disk_bus(self.db_entry['type'][0]),
                     'snapshot_ignores': False
                 },
                 {
@@ -115,7 +122,7 @@ class Instance(object):
                 'bus': bus,
                 'path': os.path.join(self.instance_path, device + '.qcow2'),
                 'base': d.get('base'),
-                'present_as': d.get('type', 'disk'),
+                'present_as': _get_defaulted_disk_bus(d),
                 'snapshot_ignores': False
             })
             i += 1
