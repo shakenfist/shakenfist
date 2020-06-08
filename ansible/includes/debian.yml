@@ -9,23 +9,24 @@
   apt:
     name:
       [
+        "arping",
+        "bridge-utils",
+        "cpu-checker",
         "default-libmysqlclient-dev",
-        "qemu-kvm",
+        "dnsmasq",
+        "dnsutils",
+        "git",
+        "libssl-dev",
         "libvirt-daemon-system",
         "libvirt-dev",
-        "git",
-        "pwgen",
-        "dnsutils",
         "mysql-client",
+        "net-tools",
+        "prometheus-node-exporter",
+        "pwgen",
         "python-libvirt",
         "python3-libvirt",
-        "libssl-dev",
-        "net-tools",
-        "bridge-utils",
-        "dnsmasq",
-        "arping",
-        "cpu-checker",
-        "prometheus-node-exporter",
+        "qemu-kvm",
+        "unzip",
       ]
     state: latest
 
