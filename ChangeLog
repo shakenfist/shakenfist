@@ -1,6 +1,19 @@
 CHANGES
 =======
 
+* Typo fix
+* Continued work on terraform provider
+* Handle empty string for disk types
+* Working on adding instances to terraform provider
+* The terraform provider can create networks
+* A first cut of a terraform provider, only for networks!
+* Move golang REST client to its own repo so 'go get' works
+* Add a module for the golang REST API
+* Remove compiled example
+* Add missing network create and delete methods
+* Add a compiled version of the example
+* Implement a simple golang REST client
+* Give GCP test runs a few more resources
 * Add unit tests for images
 * Identify images and only transcode and resize as required
 * Remove unused variable
