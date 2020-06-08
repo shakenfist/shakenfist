@@ -448,3 +448,28 @@
         name: sf
         enabled: yes
         state: restarted
+
+    - name: Fetch terraform
+      shell: wget https://releases.hashicorp.com/terraform/0.12.26/terraform_0.12.26_linux_amd64.zip -O /tmp/terraform.zip
+
+    - name: Extract terraform
+      unarchive:
+        src: /tmp/terraform.zip
+        dest: /usr/local/bin/
+        remote_src: yes
+
+    - name: Copy terraform provider
+      copy:
+        src: ../golang/terraform-provider-shakenfist/terraform-provider-shakenfist
+        dest: /root/terraform-provider-shakenfist
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx
+
+    - name: Copy example.tf
+      copy:
+        src: ../example.tf
+        dest: /root/example.tf
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
