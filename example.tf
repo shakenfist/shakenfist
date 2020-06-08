@@ -14,22 +14,23 @@ resource "shakenfist_network" "mynet" {
 }
 
 resource "shakenfist_instance" "myinstance" {
-  name   = "my instance"
+  name   = "myinstance"
   cpus   = 1
   memory = 1
-  disks = [
-    {
-      size = 8
-      base = "cirros"
-    }
-  ]
-  networks = [
-    {
-      uuid = shakenfist_network.mynet.uuid
-    }
-  ]
+
   ssh_key   = "..."
   user_data = ""
+
+  # Terraform 0.12 introduced object types, which would be a
+  # much nicer way of dowing these two, but I can't for the
+  # life of me figure out how to make them work. Contributions
+  # gratefully accepted!
+  disks = [
+    "size=8,base=cirros"
+  ]
+  networks = [
+    "uuid=${shakenfist_network.mynet.uuid}"
+  ]
 }
 
 output "mynet_output" {

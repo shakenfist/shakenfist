@@ -4,6 +4,7 @@ package provider
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/hashicorp/terraform/helper/schema"
@@ -41,33 +42,8 @@ func resourceInstance() *schema.Resource {
 				Type:     schema.TypeList,
 				Required: true,
 				ForceNew: true,
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"base": {
-							Type:        schema.TypeString,
-							Description: "Base URL for the disk",
-							ForceNew:    true,
-							Optional:    true,
-						},
-						"size": {
-							Type:        schema.TypeInt,
-							Description: "The size of the disk",
-							ForceNew:    true,
-							Optional:    true,
-						},
-						"bus": {
-							Type:        schema.TypeString,
-							Description: "The bus to attach the disk to (defaults to virtio)",
-							ForceNew:    true,
-							Optional:    true,
-						},
-						"type": {
-							Type:        schema.TypeString,
-							Description: "The type of the disk (one of disk or cdrom, defaults to disk)",
-							ForceNew:    true,
-							Optional:    true,
-						},
-					},
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
 				},
 			},
 			"networks": {
@@ -75,31 +51,7 @@ func resourceInstance() *schema.Resource {
 				Required: true,
 				ForceNew: true,
 				Elem: &schema.Schema{
-					Type: schema.TypeMap,
-					Elem: &schema.Resource{
-						Schema: map[string]*schema.Schema{
-							"uuid": {
-								Type:        schema.TypeString,
-								Required:    true,
-								Description: "The UUID of the network",
-							},
-							"address": {
-								Type:        schema.TypeString,
-								Description: "The IPv4 address on the network (one will be allocated if not specified)",
-								ForceNew:    true,
-							},
-							"macaddress": {
-								Type:        schema.TypeString,
-								Description: "The macaddress of the network interface (one will be allocated if not specified)",
-								ForceNew:    true,
-							},
-							"model": {
-								Type:        schema.TypeString,
-								Description: "The model of the network device (defaults to virtio)",
-								ForceNew:    true,
-							},
-						},
-					},
+					Type: schema.TypeString,
 				},
 			},
 			"ssh_key": {
@@ -130,29 +82,41 @@ func resourceCreateInstance(d *schema.ResourceData, m interface{}) error {
 
 	var disks []shakenfist_go.DiskSpec
 	for _, disk := range d.Get("disks").([]interface{}) {
-		diskMap := disk.(map[string]interface{})
-		disks = append(disks,
-			shakenfist_go.DiskSpec{
-				Base: diskMap["base"].(string),
-				Size: diskMap["size"].(int),
-				Bus:  diskMap["bus"].(string),
-				Type: diskMap["type"].(string),
-			})
+		var diskSpec shakenfist_go.DiskSpec
+		for _, diskElem := range strings.Split(disk.(string), ",") {
+			elems := strings.Split(diskElem, "=")
+			if elems[0] == "base" {
+				diskSpec.Base = elems[1]
+			} else if elems[0] == "size" {
+				diskSpec.Size, _ = strconv.Atoi(elems[1])
+			} else if elems[0] == "bus" {
+				diskSpec.Bus = elems[1]
+			} else if elems[0] == "type" {
+				diskSpec.Type = elems[1]
+			}
+		}
+		disks = append(disks, diskSpec)
 	}
 
 	var networks []shakenfist_go.NetworkSpec
 	for _, net := range d.Get("networks").([]interface{}) {
-		netMap := net.(map[string]interface{})
-		networks = append(networks,
-			shakenfist_go.NetworkSpec{
-				NetworkUUID: netMap["uuid"].(string),
-				Address:     netMap["address"].(string),
-				MACAddress:  netMap["macaddress"].(string),
-				Model:       netMap["model"].(string),
-			})
+		var netSpec shakenfist_go.NetworkSpec
+		for _, netElem := range strings.Split(net.(string), ",") {
+			elems := strings.Split(netElem, "=")
+			if elems[0] == "uuid" {
+				netSpec.NetworkUUID = elems[1]
+			} else if elems[0] == "address" {
+				netSpec.Address = elems[1]
+			} else if elems[0] == "macaddress" {
+				netSpec.MACAddress = elems[1]
+			} else if elems[0] == "model" {
+				netSpec.Model = elems[1]
+			}
+		}
+		networks = append(networks, netSpec)
 	}
 
-	inst, err := apiClient.CreateInstance(d.Get("name)").(string), d.Get("cpus").(int),
+	inst, err := apiClient.CreateInstance(d.Get("name").(string), d.Get("cpus").(int),
 		d.Get("memory").(int), networks, disks, d.Get("ssh_key").(string),
 		d.Get("user_data").(string))
 	if err != nil {
