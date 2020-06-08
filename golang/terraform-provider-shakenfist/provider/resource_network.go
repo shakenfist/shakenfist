@@ -11,17 +11,6 @@ import (
 	"github.com/mikalstill/shakenfist_go"
 )
 
-func validateName(v interface{}, k string) (ws []string, es []error) {
-	var errs []error
-	var warns []string
-	_, ok := v.(string)
-	if !ok {
-		errs = append(errs, fmt.Errorf("Expected name to be a string"))
-		return warns, errs
-	}
-	return warns, errs
-}
-
 func validateNetblock(v interface{}, k string) (ws []string, es []error) {
 	var errs []error
 	var warns []string
@@ -45,11 +34,10 @@ func resourceNetwork() *schema.Resource {
 	return &schema.Resource{
 		Schema: map[string]*schema.Schema{
 			"name": {
-				Type:         schema.TypeString,
-				Required:     true,
-				Description:  "The name of the network",
-				ForceNew:     true,
-				ValidateFunc: validateName,
+				Type:        schema.TypeString,
+				Required:    true,
+				Description: "The name of the network",
+				ForceNew:    true,
 			},
 			"uuid": {
 				Type:        schema.TypeString,

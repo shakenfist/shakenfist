@@ -13,6 +13,29 @@ resource "shakenfist_network" "mynet" {
   provide_nat  = true
 }
 
+resource "shakenfist_instance" "myinstance" {
+  name   = "my instance"
+  cpus   = 1
+  memory = 1
+  disks = [
+    {
+      size = 8
+      base = "cirros"
+    }
+  ]
+  networks = [
+    {
+      uuid = shakenfist_network.mynet.uuid
+    }
+  ]
+  ssh_key   = "..."
+  user_data = ""
+}
+
 output "mynet_output" {
   value = shakenfist_network.mynet
+}
+
+output "myinstance_output" {
+  value = shakenfist_instance.myinstance
 }
