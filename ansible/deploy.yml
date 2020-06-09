@@ -514,3 +514,11 @@
         owner: root
         group: root
         mode: u=r,g=r,o=r
+
+    - name: Copy cleanup script
+      copy:
+        src: ../cleanup.sh
+        dest: /srv/shakenfist/cleanup.sh
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx
