@@ -6,6 +6,9 @@
     - vars
 
   tasks:
+    - name: Ensure unit tests pass
+      shell: tox -epy37
+
     - include: terraform/{{cloud}}/terraform.yml
 
     - name: Wait for instances to boot
