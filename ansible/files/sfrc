@@ -15,4 +15,9 @@ export SHAKENFIST_NETWORK_MODEL="virtio"
 eval "$(_SF_CLIENT_COMPLETE=source sf-client)"
 
 alias sfmysql="mysql -h {{hostvars['localhost']['database_node_ip']}} -u sf --password={{db_user_password}} sf"
-alias sfmesh="bridge fdb show brport vxlan-1"
+alias sfmesh="bridge fdb show brport vxlan-$1"
+
+# Use the v3 etcd API
+export ETCDCTL_API=3
+export ETCDCTL_ENDPOINT="{{hostvars['localhost']['database_node_ip']}}"
+alias sfetcd="etcdctl --user="root:{{db_root_password}}" $@"

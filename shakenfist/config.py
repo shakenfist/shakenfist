@@ -55,6 +55,9 @@ CONFIG_DEFAULTS = {
     #    database.
     'SQL_URL': 'mysql://root:foo@localhost/sf',
     'CLEANER_DELAY': 3600,
+    'ETCD_USER': 'sf',
+    'ETCD_PASSWORD': 'foo',
+    'ETCD_SERVER': 'localhost',
 
     # What nova called an availability zone
     'ZONE': 'shaken',

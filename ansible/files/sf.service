@@ -17,6 +17,10 @@ Environment=SHAKENFIST_DB_ROOT_PASSWORD="{{db_root_password}}"
 Environment=SHAKENFIST_DB_PASSWORD="{{db_user_password}}"
 Environment=SHAKENFIST_SQL_URL="mysql://sf:{{db_user_password}}@{{hostvars['localhost']['database_node_ip']}}/sf"
 
+Environment=SHAKENFIST_ETCD_USER="sf"
+Environment=SHAKENFIST_ETCD_PASSWORD="{{db_user_password}}"
+Environment=SHAKENFIST_ETCD_SERVER="{{hostvars['localhost']['database_node_ip']}}"
+
 ExecStart=/bin/sh -c 'sf-daemon'
 
 StandardOutput=syslog

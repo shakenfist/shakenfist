@@ -227,6 +227,67 @@
         SHAKENFIST_DB_PASSWORD: "{{db_user_password}}"
         SHAKENFIST_SQL_URL: "mysql://sf:{{db_user_password}}@{{node_ip}}/sf"
 
+    - name: Create a etcd user
+      user:
+        name: sfetcd
+        comment: shakenfist etcd
+        group: daemon
+      register: sfetcd_user_complex
+
+    - name: Test if we have an etcd
+      shell: docker inspect sfetcd
+      ignore_errors: True
+      register: has_sfetcd
+
+    - name: Make /srv/shakenfist/etcd
+      file:
+        path: /srv/shakenfist/etcd
+        state: directory
+        owner: sfetcd
+        mode: u=rwx,g=,o=
+      when: has_sfetcd.rc == 1
+
+    - name: Fix etcd permissions
+      file:
+        path: /srv/shakenfist/etcd
+        recurse: true
+        owner: sfetcd
+        mode: u=rwx,g=,o=
+      when: has_sfetcd.rc == 1
+
+    - name: Write etcd configuration file
+      template:
+        src: files/etcd.conf
+        dest: /srv/shakenfist/etcd.conf.yml
+        owner: sfetcd
+        group: sudo
+        mode: u=r,g=r,o=
+      when: has_sfetcd.rc == 1
+
+    - name: Create etcd docker container
+      docker_container:
+        name: sfetcd
+        image: bitnami/etcd
+        restart_policy: always
+        volumes:
+          - /srv/shakenfist/etcd:/data
+          - /srv/shakenfist/etcd.conf.yml:/opt/bitnami/etcd/conf/etcd.conf.yml
+        ports:
+          - 0.0.0.0:2379:2379
+          - 0.0.0.0:2380:2380
+        env:
+          ETCD_ROOT_PASSWORD: "{{db_root_password}}"
+        user: "{{sfetcd_user_complex.uid}}"
+      when: has_sfetcd.rc == 1
+
+    - name: Create etcd user
+      shell: ETCDCTL_API=3 etcdctl --user="root:{{db_root_password}}" user add "sf:{{db_user_password}}"
+      when: has_sfetcd.rc == 1
+
+    - name: Give etcd user root permissions
+      shell: ETCDCTL_API=3 etcdctl --user="root:{{db_root_password}}" user grant sf root
+      when: has_sfetcd.rc == 1
+
     - name: Create a prometheus user
       user:
         name: sfprometheus

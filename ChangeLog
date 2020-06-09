@@ -1,6 +1,7 @@
 CHANGES
 =======
 
+* Add etcd into the mix, this is the plan for locking
 * Add some notes on how to do releases
 
 0.1
