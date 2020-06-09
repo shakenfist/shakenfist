@@ -1,6 +1,10 @@
 CHANGES
 =======
 
+* Move python unit tests into ansible
+* Sort debian packages
+* Update changelog
+* Deploy terraform provider and an example to /root
 * Typo fix
 * Continued work on terraform provider
 * Handle empty string for disk types
