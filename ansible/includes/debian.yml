@@ -15,6 +15,7 @@
         "default-libmysqlclient-dev",
         "dnsmasq",
         "dnsutils",
+        "etcd-client",
         "git",
         "libssl-dev",
         "libvirt-daemon-system",

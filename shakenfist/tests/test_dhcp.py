@@ -30,6 +30,12 @@ class DHCPTestCase(testtools.TestCase):
                 return '/a/b/c'
             if key == 'ZONE':
                 return 'shakenfist'
+            if key == 'ETCD_USER':
+                return 'sf'
+            if key == 'ETCD_PASSWORD':
+                return 'foo'
+            if key == 'ETCD_SERVER':
+                return 'localhost'
             raise Exception('Unknown config key')
 
         self.config = mock.patch('shakenfist.config.parsed.get',
