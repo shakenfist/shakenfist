@@ -1,6 +1,7 @@
 CHANGES
 =======
 
+* Handle DB migrations
 * Install shakenfist from a wheel
 * Move python unit tests into ansible
 * Sort debian packages
