@@ -6,6 +6,26 @@
     - vars
 
   tasks:
+    - name: Ensure unit tests pass
+      shell: tox -epy37
+
+    - name: Build a wheel for shakenfist
+      shell:
+        cmd: python3 setup.py sdist bdist_wheel
+        chdir: ..
+
+    - name: Find the most recent wheel for shakenfist
+      shell: ls ../dist/*.whl | tail -1 | sed 's/\.\.\/dist\///'
+      register: wheel_complex
+
+    - name: Extract instance uuid
+      set_fact:
+        wheel_path: "{{wheel_complex.stdout}}"
+
+    - name: Log wheel details
+      debug:
+        msg: "Wheel is: {{hostvars['localhost']['wheel_path']}}"
+
     - include: terraform/{{cloud}}/terraform.yml
 
     - name: Wait for instances to boot
@@ -62,15 +82,20 @@
         state: directory
         mode: "0755"
 
+    - name: Ensure the source directory is absent
+      file:
+        path: /srv/shakenfist/src/
+        state: absent
+
     - name: Copy shakenfist
       synchronize:
-        src: ../../.
-        dest: /srv/shakenfist/src/
+        src: ../dist/{{hostvars['localhost']['wheel_path']}}
+        dest: /srv/shakenfist/
 
     - name: Install shakenfist
-      command: pip3 install -e .
+      command: pip3 install {{hostvars['localhost']['wheel_path']}}
       args:
-        chdir: /srv/shakenfist/src
+        chdir: /srv/shakenfist/
 
     - name: Create config directory
       file:
@@ -171,10 +196,26 @@
         priv: "sf.*:ALL,GRANT"
         state: present
 
+    - name: Make /srv/shakenfist/mysql_migrations
+      file:
+        path: /srv/shakenfist/mysql_migrations
+        state: directory
+        mode: "0755"
+
+    - name: Copy migrations
+      synchronize:
+        src: ../shakenfist/alembic
+        dest: /srv/shakenfist/mysql_migrations/
+
+    - name: Copy migrations configuration
+      synchronize:
+        src: ../shakenfist/alembic.ini
+        dest: /srv/shakenfist/mysql_migrations/
+
     - name: Upgrade database schema
       command: alembic upgrade head
       args:
-        chdir: /srv/shakenfist/src/shakenfist
+        chdir: /srv/shakenfist/mysql_migrations
       environment:
         SHAKENFIST_NODE_IP: "{{node_ip}}"
         SHAKENFIST_DB_ROOT_PASSWORD: "{{db_root_password}}"
@@ -448,3 +489,36 @@
         name: sf
         enabled: yes
         state: restarted
+
+    - name: Fetch terraform
+      shell: wget https://releases.hashicorp.com/terraform/0.12.26/terraform_0.12.26_linux_amd64.zip -O /tmp/terraform.zip
+
+    - name: Extract terraform
+      unarchive:
+        src: /tmp/terraform.zip
+        dest: /usr/local/bin/
+        remote_src: yes
+
+    - name: Copy terraform provider
+      copy:
+        src: ../golang/terraform-provider-shakenfist/terraform-provider-shakenfist
+        dest: /root/terraform-provider-shakenfist
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx
+
+    - name: Copy example.tf
+      copy:
+        src: ../example.tf
+        dest: /root/example.tf
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
+
+    - name: Copy cleanup script
+      copy:
+        src: ../cleanup.sh
+        dest: /srv/shakenfist/cleanup.sh
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx

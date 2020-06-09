@@ -177,23 +177,23 @@ Here's a simple feature matrix:
 
 | Feature                                           | Implemented | Planned | Not Planned |
 |---------------------------------------------------|-------------|---------|-------------|
-| Servers / instances                               | Yes         |         |             |
-| Networks                                          | Yes         |         |             |
-| Multiple NICs for a given server                  | Yes         |         |             |
-| Pre-cache a server image                          | Yes         |         |             |
-| Floating IPs                                      | Yes         |         |             |
-| Pause                                             | Yes         |         |             |
-| Reboot (hard and soft)                            | Yes         |         |             |
+| Servers / instances                               | v0.1        |         |             |
+| Networks                                          | v0.1        |         |             |
+| Multiple NICs for a given server                  | v0.1        |         |             |
+| Pre-cache a server image                          | v0.1        |         |             |
+| Floating IPs                                      | v0.1        |         |             |
+| Pause                                             | v0.1        |         |             |
+| Reboot (hard and soft)                            | v0.1        |         |             |
 | Security groups                                   |             | Yes     |             |
-| Text console                                      | Yes         |         |             |
-| VDI                                               | Yes         |         |             |
-| User data                                         | Yes         |         |             |
-| Keypairs                                          | Yes         |         |             |
-| Virtual networks allow overlapping IP allocations | Yes         |         |             |
+| Text console                                      | v0.1        |         |             |
+| VDI                                               | v0.1        |         |             |
+| User data                                         | v0.1        |         |             |
+| Keypairs                                          | v0.1        |         |             |
+| Virtual networks allow overlapping IP allocations | v0.1        |         |             |
 | REST API authentication and object ownership      |             | Yes     |             |
-| Snapshots (of all disks)                          | Yes         |         |             |
-| Central API service                               | Yes, in a meshy sort of way |         |             |
-| Scheduling                                        | Yes         |         |             |
+| Snapshots (of all disks)                          | v0.1        |         |             |
+| Central API service                               | v0.1, in a meshy sort of way |         |             |
+| Scheduling                                        | v0.1        |         |             |
 | Volumes                                           |             |         | No plans    |
 | Quotas                                            |             |         | No plans    |
 | API versioning                                    |             |         | No plans    |

@@ -1,8 +1,5 @@
 #!/bin/bash -ex
 
-tox -epy37
-
-
 cwd=`pwd`
 TERRAFORM_VARS=""
 ANSIBLE_VARS="cloud=$CLOUD bootdelay=$BOOTDELAY ansible_root=$cwd"

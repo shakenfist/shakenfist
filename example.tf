@@ -13,6 +13,30 @@ resource "shakenfist_network" "mynet" {
   provide_nat  = true
 }
 
+resource "shakenfist_instance" "myinstance" {
+  name   = "myinstance"
+  cpus   = 1
+  memory = 1
+
+  ssh_key   = "..."
+  user_data = ""
+
+  # Terraform 0.12 introduced object types, which would be a
+  # much nicer way of dowing these two, but I can't for the
+  # life of me figure out how to make them work. Contributions
+  # gratefully accepted!
+  disks = [
+    "size=8,base=cirros"
+  ]
+  networks = [
+    "uuid=${shakenfist_network.mynet.uuid}"
+  ]
+}
+
 output "mynet_output" {
   value = shakenfist_network.mynet
+}
+
+output "myinstance_output" {
+  value = shakenfist_instance.myinstance
 }

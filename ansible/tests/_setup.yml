@@ -59,7 +59,7 @@
     content: |
       #!/bin/bash -e
 
-      /srv/shakenfist/src/cleanup.sh
+      /srv/shakenfist/cleanup.sh
       [ `virsh list | grep running | wc -l` -eq 0 ]
       [ `ifconfig | grep -c br-vxlan` -eq 0 ]
       /opt/sfmysql "delete from network_interfaces"
