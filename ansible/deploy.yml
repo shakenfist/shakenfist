@@ -82,6 +82,11 @@
         state: directory
         mode: "0755"
 
+    - name: Ensure the source directory is absent
+      file:
+        path: /srv/shakenfist/src/
+        state: absent
+
     - name: Copy shakenfist
       synchronize:
         src: ../dist/{{hostvars['localhost']['wheel_path']}}
@@ -191,10 +196,26 @@
         priv: "sf.*:ALL,GRANT"
         state: present
 
+    - name: Make /srv/shakenfist/mysql_migrations
+      file:
+        path: /srv/shakenfist/mysql_migrations
+        state: directory
+        mode: "0755"
+
+    - name: Copy migrations
+      synchronize:
+        src: ../shakenfist/alembic
+        dest: /srv/shakenfist/mysql_migrations/
+
+    - name: Copy migrations configuration
+      synchronize:
+        src: ../shakenfist/alembic.ini
+        dest: /srv/shakenfist/mysql_migrations/
+
     - name: Upgrade database schema
       command: alembic upgrade head
       args:
-        chdir: /srv/shakenfist/src/shakenfist
+        chdir: /srv/shakenfist/mysql_migrations
       environment:
         SHAKENFIST_NODE_IP: "{{node_ip}}"
         SHAKENFIST_DB_ROOT_PASSWORD: "{{db_root_password}}"

@@ -1,6 +1,7 @@
 CHANGES
 =======
 
+* Install shakenfist from a wheel
 * Move python unit tests into ansible
 * Sort debian packages
 * Update changelog
