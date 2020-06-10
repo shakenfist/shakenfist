@@ -17,6 +17,10 @@ class WriteException(Exception):
     pass
 
 
+class ReadException(Exception):
+    pass
+
+
 def get_client():
     return etcd3.client(
         user=config.parsed.get('ETCD_USER'),
@@ -41,7 +45,7 @@ def _construct_key(objecttype, subtype, name):
         return '/sf/%s/%s' % (objecttype, name)
     if subtype:
         return '/sf/%s/%s/*' % (objecttype, subtype)
-    return '/sf/%s/%s' % objecttype
+    return '/sf/%s' % objecttype
 
 
 def put(objecttype, subtype, name, data, ttl=None):
@@ -53,7 +57,7 @@ def put(objecttype, subtype, name, data, ttl=None):
         except Exception as e:
             LOG.info('Failed to write %s, attempt %d: %s' % (path, attempt, e))
 
-    raise LockException('Cannot write %s' % path)
+    raise WriteException('Cannot write %s' % path)
 
 
 def get(objecttype, subtype, name):
@@ -64,20 +68,21 @@ def get(objecttype, subtype, name):
         except Exception as e:
             LOG.info('Failed to read %s, attempt %d: %s' % (path, attempt, e))
 
-    raise LockException('Cannot read %s' % path)
+    raise ReadException('Cannot read %s' % path)
 
 
-def get_all(objecttype, subtype):
+def get_all(objecttype, subtype, sort_order=None):
     path = _construct_key(objecttype, subtype, None)
     for attempt in range(3):
         try:
-            for value, meta in get_client().get_prefix(path):
+            for value, meta in get_client().get_prefix(path, sort_order=sort_order):
                 yield json.loads(value)
+            return
         except Exception as e:
             LOG.info('Failed to fetch all %s, attempt %d: %s'
                      % (path, attempt, e))
 
-    raise LockException('Cannot fetch all %s' % path)
+    raise ReadException('Cannot fetch all %s' % path)
 
 
 def delete(objecttype, subtype, name):
@@ -85,8 +90,9 @@ def delete(objecttype, subtype, name):
     for attempt in range(3):
         try:
             get_client().delete(path)
+            return
         except Exception as e:
             LOG.info('Failed to delete %s, attempt %d: %s' %
                      (path, attempt, e))
 
-    raise LockException('Cannot delete %s' % path)
+    raise WriteException('Cannot delete %s' % path)
