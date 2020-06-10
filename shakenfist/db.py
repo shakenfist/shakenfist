@@ -15,6 +15,7 @@ from sqlalchemy.sql.expression import func
 
 
 from shakenfist import config
+from shakenfist import etcd
 
 
 LOG = logging.getLogger(__file__)
@@ -39,70 +40,27 @@ def ensure_valid_session():
         see_this_node()
 
 
-class Node(Base):
-    __tablename__ = 'nodes'
-
-    fqdn = Column(String, primary_key=True)
-    lastseen = Column(DateTime)
-    ip = Column(String)
-
-    def __init__(self, fqdn, ip):
-        self.fqdn = fqdn
-        self.ip = ip
-        self.lastseen = datetime.datetime.now()
-
-    def export(self):
-        return {
-            'fqdn': self.fqdn,
-            'ip': self.ip,
-            'lastseen': self.lastseen
-        }
-
-
 def see_this_node():
-    try:
-        node = SESSION.query(Node).filter(
-            Node.fqdn == config.parsed.get('NODE_NAME')).one()
-    except exc.NoResultFound:
-        node = Node(config.parsed.get('NODE_NAME'),
-                    config.parsed.get('NODE_IP'))
-        SESSION.add(node)
-
-    node.lastseen = datetime.datetime.now()
-    SESSION.commit()
+    etcd.put('node', None,
+             config.parsed.get('NODE_NAME'),
+             {
+                 'fqdn': config.parsed.get('NODE_NAME'),
+                 'ip': config.parsed.get('NODE_IP'),
+                 'lastseen': time.time(),
+             })
 
 
 def get_node_ips():
-    ensure_valid_session()
-
-    try:
-        nodes = SESSION.query(Node).all()
-        for node in nodes:
-            yield node.ip
-    except exc.NoResultFound:
-        pass
+    for value in etcd.get_all('node', None):
+        yield value['ip']
 
 
 def get_node(fqdn):
-    ensure_valid_session()
-
-    try:
-        node = SESSION.query(Node).filter(
-            Node.fqdn == fqdn).one()
-        return node.export()
-    except exc.NoResultFound:
-        pass
+    return etcd.get('node', None, config.parsed.get('NODE_NAME'))
 
 
 def get_nodes():
-    ensure_valid_session()
-
-    try:
-        nodes = SESSION.query(Node).all()
-        for n in nodes:
-            yield n.export()
-    except exc.NoResultFound:
-        pass
+    return etcd.get_all('node', None)
 
 
 class Network(Base):
