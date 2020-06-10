@@ -339,10 +339,8 @@ def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key, us
     ensure_valid_session()
 
     try:
-        # TODO(mikal): this is naive and we should at least check
-        # we haven't double allocated the port number on this node.
-        console_port = random.randrange(30000, 31000)
-        vdi_port = random.randrange(30000, 31000)
+        console_port = allocate_console_port(instance_uuid)
+        vdi_port = allocate_console_port(instance_uuid)
         i = Instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key,
                      config.parsed.get('NODE_NAME'), console_port,
                      vdi_port, user_data)
@@ -377,6 +375,9 @@ def update_instance_state(instance_uuid, state):
 
 def hard_delete_instance(instance_uuid):
     ensure_valid_session()
+
+    free_console_port(self.console_port)
+    free_console_port(self.vdi_port)
 
     try:
         for s in SESSION.query(Snapshot).filter(
@@ -738,3 +739,27 @@ def get_metrics(fqdn):
             yield m.export()
     except exc.NoResultFound:
         pass
+
+
+def allocate_console_port(instance_uuid):
+    node = config.parsed.get('NODE_NAME')
+    with etcd.get_lock('console/%s' % node) as _:
+        consumed = []
+        for value in etcd.get_all('console', node):
+            consumed.append(value['port'])
+
+        port = random.randint(30000, 50000)
+        while port in consumed:
+            port = random.randint(30000, 50000)
+
+        etcd.put(
+            'console', node, port,
+            {
+                'instance_uuid': instance_uuid,
+            })
+
+
+def free_console_port(port):
+    node = config.parsed.get('NODE_NAME')
+    with etcd.get_lock('console/%s' % node) as _:
+        etcd.delete('console', node, port)
