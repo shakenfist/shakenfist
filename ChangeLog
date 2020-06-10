@@ -1,6 +1,7 @@
 CHANGES
 =======
 
+* Record console and VDI ports in use in etcd
 * Move node registration to etcd
 * Add etcd into the mix, this is the plan for locking
 * Add some notes on how to do releases
