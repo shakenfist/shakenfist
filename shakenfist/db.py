@@ -51,15 +51,18 @@ def see_this_node():
 
 
 def get_node_ips():
+    see_this_node()
     for value in etcd.get_all('node', None):
         yield value['ip']
 
 
 def get_node(fqdn):
+    see_this_node()
     return etcd.get('node', None, config.parsed.get('NODE_NAME'))
 
 
 def get_nodes():
+    see_this_node()
     return etcd.get_all('node', None)
 
 
@@ -619,65 +622,31 @@ def get_instance_snapshots(instance_uuid):
         pass
 
 
-class Event(Base):
-    __tablename__ = 'events'
-
-    timestamp = Column(DateTime)
-    object_type = Column(String, primary_key=True)
-    object_uuid = Column(String, primary_key=True)
-    fqdn = Column(String, primary_key=True)
-    operation = Column(String, primary_key=True)
-    phase = Column(String, primary_key=True)
-    duration = Column(Float)
-    message = Column(String)
-
-    def __init__(self, object_type, object_uuid, operation, phase, duration, message):
-        self.timestamp = datetime.datetime.now()
-        self.object_type = object_type
-        self.object_uuid = object_uuid
-        self.fqdn = config.parsed.get('NODE_NAME')
-        self.operation = operation
-        self.phase = phase
-        self.duration = duration
-        self.message = message
-
-    def export(self):
-        return {
-            'timestamp': self.timestamp,
-            'object_type': self.object_type,
-            'object_uuid': self.object_uuid,
-            'fqdn': self.fqdn,
-            'operation': self.operation,
-            'phase': self.phase,
-            'duration': self.duration,
-            'message': self.message
-        }
-
-
 def add_event(object_type, object_uuid, operation, phase, duration, message):
-    ensure_valid_session()
-
-    try:
-        SESSION.add(Event(object_type, object_uuid, operation, phase,
-                          duration, message))
-    finally:
-        SESSION.commit()
+    see_this_node()
+    t = time.time()
+    etcd.put('event/%s' % object_type, object_uuid, t,
+             {
+                 'timestamp': t,
+                 'object_type': object_type,
+                 'object_uuid': object_uuid,
+                 'fqdn': config.parsed.get('NODE_NAME'),
+                 'operation': operation,
+                 'phase': phase,
+                 'duration': duration,
+                 'message': message
+             })
 
 
 def get_events(object_type, object_uuid):
-    ensure_valid_session()
-
-    try:
-        events = SESSION.query(Event).filter(
-            Event.object_type == object_type).filter(
-                Event.object_uuid == object_uuid).all()
-        for e in events:
-            yield e.export()
-    except exc.NoResultFound:
-        pass
+    see_this_node()
+    for m in etcd.get_all('event/%s' % object_type, object_uuid,
+                          sort_order='ascend'):
+        yield m
 
 
 def update_metric(metric, value):
+    see_this_node()
     node = config.parsed.get('NODE_NAME')
     etcd.put('metric', node, metric,
              {
@@ -689,15 +658,18 @@ def update_metric(metric, value):
 
 
 def get_metric(fqdn, metric):
+    see_this_node()
     return etcd.get('metric', fqdn, metric)
 
 
 def get_metrics(fqdn):
+    see_this_node()
     for m in etcd.get_all('metric', fqdn):
         yield m
 
 
 def allocate_console_port(instance_uuid):
+    see_this_node()
     node = config.parsed.get('NODE_NAME')
     with etcd.get_lock('console/%s' % node) as _:
         consumed = []
@@ -716,6 +688,7 @@ def allocate_console_port(instance_uuid):
 
 
 def free_console_port(port):
+    see_this_node()
     node = config.parsed.get('NODE_NAME')
     with etcd.get_lock('console/%s' % node) as _:
         etcd.delete('console', node, port)
