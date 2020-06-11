@@ -55,6 +55,15 @@ def main():
     for key in config.parsed.config:
         LOG.info('Configuration item %s = %s' % (key, config.parsed.get(key)))
 
+    # Check in early and often
+    db.see_this_node()
+
+    # Resource usage publisher, we need this early because scheduling decisions
+    # might happen quite early on.
+    resource_pid = os.fork()
+    if resource_pid == 0:
+        resource_daemon.monitor().run()
+
     # If I am the network node, I need some setup
     if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
         # Bootstrap the floating network in the Networks table
@@ -102,11 +111,6 @@ def main():
     net_pid = os.fork()
     if net_pid == 0:
         net_daemon.monitor().run()
-
-    # Resource usage publisher
-    resource_pid = os.fork()
-    if resource_pid == 0:
-        resource_daemon.monitor().run()
 
     # Old object deleter
     cleaner_pid = os.fork()

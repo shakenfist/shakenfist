@@ -1,8 +1,6 @@
 # Copyright 2019 Michael Still
 
 import base64
-import datetime
-import etcd3
 import jinja2
 import logging
 import io
@@ -11,6 +9,7 @@ import libvirt
 import os
 import pycdlib
 import shutil
+import time
 import uuid
 
 from oslo_concurrency import processutils
@@ -460,7 +459,7 @@ class Instance(object):
                 self._snapshot_device(
                     d['path'], os.path.join(snappath, d['device']))
                 db.create_snapshot(snapshot_uuid, d['device'], self.db_entry['uuid'],
-                                   datetime.datetime.now())
+                                   time.time())
 
         return snapshot_uuid
 
