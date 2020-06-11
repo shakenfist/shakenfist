@@ -333,7 +333,9 @@ class Network(object):
             # as an overlay cloud...
             node_ips = [config.parsed.get('NETWORK_NODE_IP')]
             for fqdn in node_fqdns:
-                node_ips.append(db.get_node(fqdn)['ip'])
+                ip = db.get_node(fqdn)['ip']
+                if not ip in node_ips:
+                    node_ips.append(ip)
 
             for node in self.discover_mesh():
                 if node in node_ips:

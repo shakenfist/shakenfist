@@ -41,13 +41,14 @@ def ensure_valid_session():
 
 
 def see_this_node():
-    etcd.put('node', None,
-             config.parsed.get('NODE_NAME'),
-             {
-                 'fqdn': config.parsed.get('NODE_NAME'),
-                 'ip': config.parsed.get('NODE_IP'),
-                 'lastseen': time.time(),
-             })
+    etcd.put(
+        'node', None,
+        config.parsed.get('NODE_NAME'),
+        {
+            'fqdn': config.parsed.get('NODE_NAME'),
+            'ip': config.parsed.get('NODE_IP'),
+            'lastseen': time.time(),
+        })
 
 
 def get_node_ips():
@@ -58,7 +59,7 @@ def get_node_ips():
 
 def get_node(fqdn):
     see_this_node()
-    return etcd.get('node', None, config.parsed.get('NODE_NAME'))
+    return etcd.get('node', None, fqdn)
 
 
 def get_nodes():
@@ -578,64 +579,40 @@ def remove_floating_from_interface(interface_uuid):
         SESSION.commit()
 
 
-class Snapshot(Base):
-    __tablename__ = 'snapshots'
-
-    uuid = Column(String, primary_key=True)
-    device = Column(String, primary_key=True)
-    instance_uuid = Column(String)
-    created = Column(DateTime)
-
-    def __init__(self, snapshot_uuid, device, instance_uuid, created):
-        self.uuid = snapshot_uuid
-        self.device = device
-        self.instance_uuid = instance_uuid
-        self.created = created
-
-    def export(self):
-        return {
-            'uuid': self.uuid,
-            'device': self.device,
-            'instance_uuid': self.instance_uuid,
-            'created': self.created
-        }
-
-
 def create_snapshot(snapshot_uuid, device, instance_uuid, created):
-    ensure_valid_session()
-
-    try:
-        SESSION.add(Snapshot(snapshot_uuid, device, instance_uuid, created))
-    finally:
-        SESSION.commit()
+    see_this_node()
+    etcd.put(
+        'snapshot', instance_uuid, created,
+        {
+            'uuid': snapshot_uuid,
+            'device': device,
+            'instance_uuid': instance_uuid,
+            'created': created
+        })
 
 
 def get_instance_snapshots(instance_uuid):
-    ensure_valid_session()
-
-    try:
-        snapshots = SESSION.query(Snapshot).filter(
-            Snapshot.instance_uuid == instance_uuid).all()
-        for s in snapshots:
-            yield s.export()
-    except exc.NoResultFound:
-        pass
+    see_this_node()
+    for m in etcd.get_all('snapshot', instance_uuid,
+                          sort_order='ascend'):
+        yield m
 
 
 def add_event(object_type, object_uuid, operation, phase, duration, message):
     see_this_node()
     t = time.time()
-    etcd.put('event/%s' % object_type, object_uuid, t,
-             {
-                 'timestamp': t,
-                 'object_type': object_type,
-                 'object_uuid': object_uuid,
-                 'fqdn': config.parsed.get('NODE_NAME'),
-                 'operation': operation,
-                 'phase': phase,
-                 'duration': duration,
-                 'message': message
-             })
+    etcd.put(
+        'event/%s' % object_type, object_uuid, t,
+        {
+            'timestamp': t,
+            'object_type': object_type,
+            'object_uuid': object_uuid,
+            'fqdn': config.parsed.get('NODE_NAME'),
+            'operation': operation,
+            'phase': phase,
+            'duration': duration,
+            'message': message
+        })
 
 
 def get_events(object_type, object_uuid):
@@ -648,13 +625,14 @@ def get_events(object_type, object_uuid):
 def update_metric(metric, value):
     see_this_node()
     node = config.parsed.get('NODE_NAME')
-    etcd.put('metric', node, metric,
-             {
-                 'fqdn': node,
-                 'metric': metric,
-                 'value': value,
-                 'timestamp': time.time()
-             })
+    etcd.put(
+        'metric', node, metric,
+        {
+            'fqdn': node,
+            'metric': metric,
+            'value': value,
+            'timestamp': time.time()
+        })
 
 
 def get_metric(fqdn, metric):
@@ -684,11 +662,13 @@ def allocate_console_port(instance_uuid):
             'console', node, port,
             {
                 'instance_uuid': instance_uuid,
+                'port': port,
             })
+        return port
 
 
 def free_console_port(port):
     see_this_node()
     node = config.parsed.get('NODE_NAME')
     with etcd.get_lock('console/%s' % node) as _:
-        etcd.delete('console', node, port)
+        etcd.delete('console', node, str(port))

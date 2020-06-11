@@ -1,6 +1,8 @@
 CHANGES
 =======
 
+* Move events to etcd
+* Fix silly bugs
 * Move metrics to etcd
 * Record console and VDI ports in use in etcd
 * Move node registration to etcd

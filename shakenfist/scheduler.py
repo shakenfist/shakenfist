@@ -7,6 +7,7 @@ import time
 
 from shakenfist import config
 from shakenfist import db
+from shakenfist import etcd
 from shakenfist import util
 
 LOG = logging.getLogger(__file__)
@@ -27,8 +28,11 @@ class Scheduler(object):
         for node in db.get_nodes():
             node_name = node['fqdn']
             metrics[node_name] = {}
-            for m in db.get_metrics(node_name):
-                metrics[node_name][m['metric']] = float(m['value'])
+            try:
+                for m in db.get_metrics(node_name):
+                    metrics[node_name][m['metric']] = float(m['value'])
+            except etcd.ReadException:
+                pass
 
         self.metrics = metrics
         self.metrics_updated = time.time()

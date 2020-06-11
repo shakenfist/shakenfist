@@ -34,6 +34,8 @@ def get_lock(name, ttl=60):
             return get_client().lock(name, ttl=ttl)
         except Exception as e:
             LOG.info('Failed to acquire lock, attempt %d: %s' % (attempt, e))
+        finally:
+            LOG.debug('Locked etcd key "%s"' % name)
 
     raise LockException('Cannot acquire lock')
 
@@ -44,7 +46,7 @@ def _construct_key(objecttype, subtype, name):
     if name:
         return '/sf/%s/%s' % (objecttype, name)
     if subtype:
-        return '/sf/%s/%s/*' % (objecttype, subtype)
+        return '/sf/%s/%s' % (objecttype, subtype)
     return '/sf/%s' % objecttype
 
 
@@ -56,33 +58,40 @@ def put(objecttype, subtype, name, data, ttl=None):
             return get_client().put(path, encoded, lease=None)
         except Exception as e:
             LOG.info('Failed to write %s, attempt %d: %s' % (path, attempt, e))
+        finally:
+            LOG.debug('Wrote etcd key "%s"' % path)
 
-    raise WriteException('Cannot write %s' % path)
+    raise WriteException('Cannot write "%s"' % path)
 
 
 def get(objecttype, subtype, name):
     path = _construct_key(objecttype, subtype, name)
     for attempt in range(3):
         try:
-            return json.loads(get_client().get(path))
+            value, _ = get_client().get(path)
+            return json.loads(value)
         except Exception as e:
             LOG.info('Failed to read %s, attempt %d: %s' % (path, attempt, e))
+        finally:
+            LOG.debug('Read etcd key "%s"' % path)
 
-    raise ReadException('Cannot read %s' % path)
+    raise ReadException('Cannot read "%s"' % path)
 
 
 def get_all(objecttype, subtype, sort_order=None):
     path = _construct_key(objecttype, subtype, None)
     for attempt in range(3):
         try:
-            for value, meta in get_client().get_prefix(path, sort_order=sort_order):
+            for value, _ in get_client().get_prefix(path, sort_order=sort_order):
                 yield json.loads(value)
             return
         except Exception as e:
             LOG.info('Failed to fetch all %s, attempt %d: %s'
                      % (path, attempt, e))
+        finally:
+            LOG.debug('Searched etcd range "%s"' % path)
 
-    raise ReadException('Cannot fetch all %s' % path)
+    raise ReadException('Cannot fetch all "%s"' % path)
 
 
 def delete(objecttype, subtype, name):
@@ -94,5 +103,7 @@ def delete(objecttype, subtype, name):
         except Exception as e:
             LOG.info('Failed to delete %s, attempt %d: %s' %
                      (path, attempt, e))
+        finally:
+            LOG.debug('Deleted etcd key "%s"' % path)
 
-    raise WriteException('Cannot delete %s' % path)
+    raise WriteException('Cannot delete "%s"' % path)

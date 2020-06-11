@@ -391,12 +391,7 @@ class InstanceEvents(Resource):
     def get(self, instance_uuid=None, instance_from_db=None):
         db.add_event('instance', instance_uuid,
                      'api', 'get events', None, None)
-
-        out = []
-        for event in db.get_events('instance', instance_uuid):
-            event['timestamp'] = event['timestamp'].timestamp()
-            out.append(event)
-        return out
+        return db.get_events('instance', instance_uuid)
 
 
 class InstanceSnapshot(Resource):
@@ -417,7 +412,7 @@ class InstanceSnapshot(Resource):
                      'api', 'get', None, None)
         out = []
         for snap in db.get_instance_snapshots(instance_uuid):
-            snap['created'] = snap['created'].timestamp()
+            snap['created'] = snap['created']
             out.append(snap)
         return out
 
@@ -615,12 +610,7 @@ class NetworkEvents(Resource):
     def get(self, network_uuid=None, network_from_db=None):
         db.add_event('network', network_uuid,
                      'api', 'get events', None, None)
-
-        out = []
-        for event in db.get_events('network', network_uuid):
-            event['timestamp'] = event['timestamp'].timestamp()
-            out.append(event)
-        return out
+        return db.get_events('network', network_uuid)
 
 
 class Nodes(Resource):
