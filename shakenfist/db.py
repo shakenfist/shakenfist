@@ -457,24 +457,6 @@ class NetworkInterface(Base):
         }
 
 
-def is_address_free(network_uuid, address):
-    ensure_valid_session()
-
-    try:
-        query = SESSION.query(NetworkInterface).filter(
-            NetworkInterface.network_uuid == network_uuid).filter(
-                NetworkInterface.ipv4 == address)
-
-        query = query.filter(NetworkInterface.state != 'deleted')
-        query = query.filter(NetworkInterface.state != 'error')
-
-        if query.count() > 0:
-            return False
-        return True
-    except exc.NoResultFound:
-        return True
-
-
 def create_network_interface(interface_uuid, netdesc, instance_uuid, order):
     ensure_valid_session()
 
