@@ -15,7 +15,7 @@
         chdir: ..
 
     - name: Find the most recent wheel for shakenfist
-      shell: ls ../dist/*.whl | tail -1 | sed 's/\.\.\/dist\///'
+      shell: ls -rt ../dist/*.whl | tail -1 | sed 's/\.\.\/dist\///'
       register: wheel_complex
 
     - name: Extract instance uuid
@@ -91,6 +91,10 @@
       synchronize:
         src: ../dist/{{hostvars['localhost']['wheel_path']}}
         dest: /srv/shakenfist/
+
+    - name: Uninstall shakenfist, if present
+      command: pip3 uninstall -y shakenfist
+      ignore_errors: True
 
     - name: Install shakenfist
       command: pip3 install {{hostvars['localhost']['wheel_path']}}

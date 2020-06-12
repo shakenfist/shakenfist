@@ -1,6 +1,7 @@
 CHANGES
 =======
 
+* Be more efficient about writing metrics to etcd
 * Move ipmanager to etcd
 * Move snapshots to etcd, and unrelated bug fixes
 * Move events to etcd
