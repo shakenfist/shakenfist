@@ -15,6 +15,9 @@ class FakeNetwork(object):
     def __init__(self):
         self.ipmanager = ipmanager.NetBlock('127.0.0.0/8')
         self.router = self.ipmanager.get_address_at_index(1)
+        self.netmask = '255.0.0.0'
+        self.dhcp_start = '127.0.0.2'
+        self.broadcast = '127.255.255.255'
 
 
 class VirtTestCase(testtools.TestCase):

@@ -3,8 +3,7 @@ import json
 import random
 
 
-def from_db(j):
-    d = json.loads(j)
+def from_db(d):
     nb = NetBlock(d['ipmanager.v1']['ipblock'])
     for addr in d['ipmanager.v1']['in_use']:
         nb.reserve(addr)
@@ -83,9 +82,9 @@ class NetBlock(object):
             if not ip_str in in_use:
                 in_use.append(ip_str)
 
-        return json.dumps({
+        return {
             'ipmanager.v1': {
                 'ipblock': self.ipblock,
                 'in_use': in_use
             }
-        })
+        }

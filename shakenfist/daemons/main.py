@@ -13,7 +13,6 @@ from shakenfist.daemons import external_api as external_api_daemon
 from shakenfist.daemons import net as net_daemon
 from shakenfist.daemons import resources as resource_daemon
 from shakenfist import db
-from shakenfist import ipmanager
 from shakenfist import net
 from shakenfist import util
 from shakenfist import virt
@@ -85,9 +84,10 @@ def main():
             # to it. We can do egress NAT in that state, even if floating IPs
             # don't work.
             with util.RecordedOperation('create physical bridge', 'startup') as _:
-                subst['master_float'] = floating_network.ipmanager.get_address_at_index(
-                    1)
-                subst['netmask'] = floating_network.ipmanager.netmask
+                # No locking as read only
+                ipm = db.get_ipmanager('floating')
+                subst['master_float'] = ipm.get_address_at_index(1)
+                subst['netmask'] = ipm.netmask
 
                 processutils.execute(
                     'ip link add %(physical_bridge)s type bridge' % subst, shell=True)
