@@ -118,7 +118,7 @@ class monitor(object):
                     if not metric in gauges:
                         gauges[metric] = Gauge(metric, '')
                     gauges[metric].set(stats[metric])
-                    db.update_metric(metric, stats[metric])
+                db.update_metrics_bulk(stats)
 
                 gauges['updated_at'].set_to_current_time()
 

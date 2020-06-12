@@ -29,7 +29,7 @@ class Scheduler(object):
             node_name = node['fqdn']
             metrics[node_name] = {}
             try:
-                for m in db.get_metrics(node_name):
+                for m in db.get_metrics(node_name)['metrics']:
                     metrics[node_name][m['metric']] = float(m['value'])
             except etcd.ReadException:
                 pass
