@@ -622,28 +622,22 @@ def get_events(object_type, object_uuid):
         yield m
 
 
-def update_metric(metric, value):
+def update_metrics_bulk(metrics):
     see_this_node()
     node = config.parsed.get('NODE_NAME')
     etcd.put(
-        'metric', node, metric,
+        'metrics', node, None,
         {
             'fqdn': node,
-            'metric': metric,
-            'value': value,
-            'timestamp': time.time()
+            'timestamp': time.time(),
+            'metrics': metrics
         })
-
-
-def get_metric(fqdn, metric):
-    see_this_node()
-    return etcd.get('metric', fqdn, metric)
 
 
 def get_metrics(fqdn):
     see_this_node()
-    for m in etcd.get_all('metric', fqdn):
-        yield m
+    d = etcd.get('metrics', fqdn, None)
+    return d['metrics']
 
 
 def allocate_console_port(instance_uuid):

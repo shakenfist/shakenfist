@@ -1,6 +1,7 @@
 CHANGES
 =======
 
+* Move snapshots to etcd, and unrelated bug fixes
 * Move events to etcd
 * Fix silly bugs
 * Move metrics to etcd
