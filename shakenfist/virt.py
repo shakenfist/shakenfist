@@ -16,6 +16,7 @@ from oslo_concurrency import processutils
 
 from shakenfist import config
 from shakenfist import db
+from shakenfist import etcd
 from shakenfist import images
 from shakenfist import net
 from shakenfist import util
@@ -137,7 +138,7 @@ class Instance(object):
             os.makedirs(self.instance_path)
 
         # Generate a config drive
-        with util.RecordedOperation('make config drive', self) as ro:
+        with util.RecordedOperation('make config drive', self) as _:
             self._make_config_drive(os.path.join(
                 self.instance_path, self.db_entry['block_devices']['devices'][1]['path']))
 
@@ -146,7 +147,7 @@ class Instance(object):
             modified_disks = []
             for disk in self.db_entry['block_devices']['devices']:
                 if disk.get('base'):
-                    with util.RecordedOperation('fetch image', self) as ro:
+                    with util.RecordedOperation('fetch image', self) as _:
                         hashed_image_path = images.fetch_image(disk['base'])
 
                     try:
@@ -218,9 +219,11 @@ class Instance(object):
 
         with util.RecordedOperation('release network addreses', self) as _:
             for ni in db.get_instance_interfaces(self.db_entry['uuid']):
-                n = net.from_db(ni['network_uuid'])
-                n.ipmanager.release(ni['ipv4'])
-                n.persist_ipmanager()
+                with etcd.get_lock('sf/ipmanager/%s' % ni['network_uuid'],
+                                   ttl=120) as _:
+                    ipm = db.get_ipmanager(ni['network_uuid'])
+                    ipm.release(ni['ipv4'])
+                    db.persist_ipmanager(ni['network_uuid'], ipm.save())
 
         db.update_instance_state(self.db_entry['uuid'], 'deleted')
 
@@ -309,7 +312,7 @@ class Instance(object):
                         'link': devname,
                         'type': 'ipv4',
                         'ip_address': iface['ipv4'],
-                        'netmask': str(n.ipmanager.netmask),
+                        'netmask': str(n.netmask),
                         'routes': [
                             {
                                 'network': '0.0.0.0',

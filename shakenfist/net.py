@@ -15,7 +15,6 @@ from shakenfist import config
 from shakenfist import db
 from shakenfist import dhcp
 from shakenfist import etcd
-from shakenfist import ipmanager
 from shakenfist import util
 
 
@@ -34,7 +33,6 @@ def from_db(uuid):
                    provide_nat=dbnet['provide_nat'],
                    ipblock=dbnet['netblock'],
                    physical_nic=config.parsed.get('NODE_EGRESS_NIC'),
-                   ipmanager_state=dbnet['ipmanager'],
                    floating_gateway=dbnet['floating_gateway'])
 
 
@@ -42,7 +40,7 @@ class Network(object):
     # NOTE(mikal): it should be noted that the maximum interface name length
     # on Linux is 15 user visible characters.
     def __init__(self, uuid=None, vxlan_id=1, provide_dhcp=False, provide_nat=False,
-                 physical_nic='eth0', ipblock=None, ipmanager_state=None, floating_gateway=None):
+                 physical_nic='eth0', ipblock=None, floating_gateway=None):
         self.uuid = uuid
         self.vxlan_id = vxlan_id
         self.provide_dhcp = provide_dhcp
@@ -50,17 +48,18 @@ class Network(object):
         self.physical_nic = physical_nic
         self.floating_gateway = floating_gateway
 
-        if ipmanager_state:
-            self.ipmanager = ipmanager.from_db(ipmanager_state.decode('utf-8'))
-            self.router = self.ipmanager.get_address_at_index(1)
-        else:
-            with etcd.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
-                self.ipmanager = ipmanager.NetBlock(ipblock)
-                self.router = self.ipmanager.get_address_at_index(1)
-                self.ipmanager.reserve(self.router)
-                self.persist_ipmanager()
+        with etcd.get_lock('sf/ipmanager/%s' % self.uuid, ttl=120) as _:
+            ipm = db.get_ipmanager(self.uuid)
 
-        self.netmask = self.ipmanager.netmask
+            self.ipblock = ipm.network_address
+            self.router = ipm.get_address_at_index(1)
+            self.dhcp_start = ipm.get_address_at_index(2)
+            self.netmask = ipm.netmask
+            self.broadcast = ipm.broadcast_address
+            self.network_address = ipm.network_address
+
+            ipm.reserve(self.router)
+            db.persist_ipmanager(self.uuid, ipm.save())
 
     def __str__(self):
         return 'network(%s, vxid %s)' % (self.uuid, self.vxlan_id)
@@ -84,15 +83,12 @@ class Network(object):
             'namespace': self.uuid,
             'in_namespace': 'ip netns exec %s' % self.uuid,
 
-            'ipblock': self.ipmanager.network_address,
-            'netmask': self.ipmanager.netmask,
+            'ipblock': self.ipblock,
+            'netmask': self.netmask,
             'router': self.router,
-            'broadcast': self.ipmanager.broadcast_address,
+            'broadcast': self.broadcast,
         }
         return retval
-
-    def persist_ipmanager(self):
-        db.persist_ipmanager(self.uuid, self.ipmanager.save())
 
     def persist_floating_gateway(self):
         db.persist_floating_gateway(self.uuid, self.floating_gateway)
@@ -187,16 +183,18 @@ class Network(object):
             return
 
         subst = self.subst_dict()
-        floatnet = from_db('floating')
         if not self.floating_gateway:
-            with etcd.get_lock('sf/net/floating', ttl=120) as _:
-                self.floating_gateway = floatnet.ipmanager.get_random_free_address()
+            with etcd.get_lock('sf/ipmanager/floating', ttl=120) as _:
+                ipm = db.get_ipmanager('floating')
+                self.floating_gateway = ipm.get_random_free_address()
+                db.persist_ipmanager('floating', ipm.save())
                 self.persist_floating_gateway()
-                floatnet.persist_ipmanager()
 
-        subst['floating_router'] = floatnet.ipmanager.get_address_at_index(1)
+        # No lock because no data changing
+        ipm = db.get_ipmanager('floating')
+        subst['floating_router'] = ipm.get_address_at_index(1)
         subst['floating_gateway'] = self.floating_gateway
-        subst['floating_netmask'] = floatnet.netmask
+        subst['floating_netmask'] = ipm.netmask
 
         with etcd.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
             if not subst['floating_gateway'] in list(util.get_interface_addresses(
@@ -212,7 +210,7 @@ class Network(object):
                         '%(in_namespace)s route add default gw %(floating_router)s' % subst,
                         shell=True)
 
-            if not util.nat_rules_for_ipblock(self.ipmanager.network_address):
+            if not util.nat_rules_for_ipblock(self.network_address):
                 with util.RecordedOperation('enable nat', self) as _:
                     processutils.execute(
                         'echo 1 > /proc/sys/net/ipv4/ip_forward', shell=True)
@@ -263,9 +261,10 @@ class Network(object):
                                              shell=True)
 
                 if self.floating_gateway:
-                    floatnet = from_db('floating')
-                    floatnet.ipmanager.release(self.floating_gateway)
-                    floatnet.persist_ipmanager()
+                    with etcd.get_lock('sf/ipmanager/floating', ttl=120) as _:
+                        ipm = db.get_ipmanager('floating')
+                        ipm.release(self.floating_gateway)
+                        db.persist_ipmanager('floating', ipm.save())
 
     def update_dhcp(self):
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):

@@ -17,6 +17,9 @@ class FakeNetwork(object):
     def __init__(self):
         self.ipmanager = ipmanager.NetBlock('10.0.0.0/8')
         self.router = self.ipmanager.get_address_at_index(1)
+        self.dhcp_start = '10.0.0.2'
+        self.netmask = '255.0.0.0'
+        self.broadcast = '10.255.255.255'
 
 
 class DHCPTestCase(testtools.TestCase):
@@ -36,6 +39,8 @@ class DHCPTestCase(testtools.TestCase):
                 return 'foo'
             if key == 'ETCD_SERVER':
                 return 'localhost'
+            if key == 'NODE_IP':
+                return '127.0.0.1'
             raise Exception('Unknown config key')
 
         self.config = mock.patch('shakenfist.config.parsed.get',

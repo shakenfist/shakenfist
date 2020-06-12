@@ -16,6 +16,7 @@ from sqlalchemy.sql.expression import func
 
 from shakenfist import config
 from shakenfist import etcd
+from shakenfist import ipmanager
 
 
 LOG = logging.getLogger(__file__)
@@ -90,7 +91,6 @@ class Network(Base):
         self.provide_dhcp = provide_dhcp
         self.provide_nat = provide_nat
         self.owner = owner
-        self.ipmanager = None
         self.floating_gateway = None
         self.name = name
         self.state = 'initial'
@@ -104,7 +104,6 @@ class Network(Base):
             'provide_dhcp': self.provide_dhcp,
             'provide_nat': self.provide_nat,
             'owner': self.owner,
-            'ipmanager': self.ipmanager,
             'floating_gateway': self.floating_gateway,
             'name': self.name,
             'state': self.state,
@@ -145,11 +144,15 @@ def get_networks(all=False):
 
 
 def allocate_network(netblock, provide_dhcp=True, provide_nat=False, name=None):
+    see_this_node()
+
+    netid = str(uuid.uuid4())
+    ipm = ipmanager.NetBlock(netblock)
+    etcd.put('ipmanager', None, netid, ipm.save())
+
     ensure_valid_session()
 
     try:
-        netid = str(uuid.uuid4())
-
         for r in SESSION.query(func.max(Network.vxid)).first():
             if r:
                 vxid = r + 1
@@ -206,6 +209,10 @@ def hard_delete_network(network_uuid):
 
 
 def create_floating_network(netblock):
+    see_this_node()
+    ipm = ipmanager.NetBlock(netblock)
+    etcd.put('ipmanager', None, 'floating', ipm.save())
+
     ensure_valid_session()
 
     try:
@@ -215,14 +222,14 @@ def create_floating_network(netblock):
         SESSION.commit()
 
 
-def persist_ipmanager(network_uuid, data):
-    ensure_valid_session()
+def get_ipmanager(network_uuid):
+    see_this_node()
+    return ipmanager.from_db(etcd.get('ipmanager', None, network_uuid))
 
-    try:
-        n = SESSION.query(Network).filter(Network.uuid == network_uuid).one()
-        n.ipmanager = data.encode('utf-8')
-    finally:
-        SESSION.commit()
+
+def persist_ipmanager(network_uuid, data):
+    see_this_node()
+    etcd.put('ipmanager', None, network_uuid, data)
 
 
 def persist_floating_gateway(network_uuid, gateway):
@@ -380,8 +387,9 @@ def update_instance_state(instance_uuid, state):
 def hard_delete_instance(instance_uuid):
     ensure_valid_session()
 
-    free_console_port(self.console_port)
-    free_console_port(self.vdi_port)
+    # TODO(mikal): once instances are in etcd
+    # free_console_port(self.console_port)
+    # free_console_port(self.vdi_port)
 
     try:
         for s in SESSION.query(Snapshot).filter(

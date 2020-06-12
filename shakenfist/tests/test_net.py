@@ -9,6 +9,10 @@ class NetTestCase(testtools.TestCase):
     def setUp(self):
         super(NetTestCase, self).setUp()
 
+        self.ipmanager_get = mock.patch(
+            'shakenfist.db.get_ipmanager')
+        self.mock_ipmanager_get = self.ipmanager_get.start()
+
         self.ipmanager_persist = mock.patch(
             'shakenfist.db.persist_ipmanager')
         self.mock_ipmanager_persist = self.ipmanager_persist.start()
