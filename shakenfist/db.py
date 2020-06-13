@@ -243,185 +243,78 @@ def persist_floating_gateway(network_uuid, gateway):
         SESSION.commit()
 
 
-class Instance(Base):
-    __tablename__ = 'instances'
-
-    uuid = Column(String, primary_key=True)
-    name = Column(String)
-    cpus = Column(Integer)
-    memory = Column(Integer)
-    disk_spec = Column(String)
-    ssh_key = Column(String)
-    node = Column(String)
-    console_port = Column(Integer)
-    vdi_port = Column(Integer)
-    user_data = Column(String)
-    block_devices = Column(BLOB)
-    state = Column(String)
-    state_updated = Column(DateTime)
-
-    def __init__(self, instance_uuid, name, cpus, memory_mb, disk_spec,
-                 ssh_key, node, console_port, vdi_port, user_data):
-        self.uuid = instance_uuid
-        self.name = name
-        self.cpus = cpus
-        self.memory = memory_mb
-        self.disk_spec = disk_spec
-        self.ssh_key = ssh_key
-        self.node = node
-        self.console_port = console_port
-        self.vdi_port = vdi_port
-        self.user_data = user_data
-        self.block_devices = None
-        self.state = 'initial'
-        self.state_updated = datetime.datetime.now()
-
-    def export(self):
-        if self.block_devices:
-            block_devices = json.loads(self.block_devices)
-        else:
-            block_devices = None
-
-        if self.disk_spec:
-            disk_spec = json.loads(self.disk_spec)
-        else:
-            disk_spec = None
-
-        return {
-            'uuid': self.uuid,
-            'name': self.name,
-            'cpus': self.cpus,
-            'memory': self.memory,
-            'disk_spec': disk_spec,
-            'ssh_key': self.ssh_key,
-            'node': self.node,
-            'console_port': self.console_port,
-            'vdi_port': self.vdi_port,
-            'user_data': self.user_data,
-            'block_devices': block_devices,
-            'state': self.state,
-            'state_updated': self.state_updated.timestamp()
-        }
-
-
 def get_instance(instance_uuid):
-    ensure_valid_session()
-
-    try:
-        return SESSION.query(Instance).filter(
-            Instance.uuid == instance_uuid).one().export()
-    except exc.NoResultFound:
-        return None
-    finally:
-        SESSION.commit()
+    see_this_node()
+    return etcd.get('instance', None, instance_uuid)
 
 
 def get_instances(only_node=None, all=False):
-    ensure_valid_session()
-
-    try:
-        if only_node:
-            query = SESSION.query(Instance).filter(
-                Instance.node == only_node)
-        else:
-            query = SESSION.query(Instance)
-
+    see_this_node()
+    for i in etcd.get_all('instance', None):
         if not all:
-            query = query.filter(Instance.state != 'deleted')
-            query = query.filter(Instance.state != 'error')
-
-        for i in query.all():
-            yield i.export()
-    except exc.NoResultFound:
-        pass
+            if not i['state'] in ['deleted', 'error']:
+                yield i
+        else:
+            yield i
 
 
 def persist_block_devices(instance_uuid, block_devices):
-    ensure_valid_session()
-
-    try:
-        i = SESSION.query(Instance).filter(
-            Instance.uuid == instance_uuid).one()
-        i.block_devices = json.dumps(block_devices).encode('utf-8')
-    finally:
-        SESSION.commit()
+    see_this_node()
+    i = get_instance(instance_uuid)
+    i['block_devices'] = block_devices
+    etcd.put('instance', None, instance_uuid, i)
 
 
 def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key, user_data):
-    ensure_valid_session()
-
-    try:
-        console_port = allocate_console_port(instance_uuid)
-        vdi_port = allocate_console_port(instance_uuid)
-        i = Instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key,
-                     config.parsed.get('NODE_NAME'), console_port,
-                     vdi_port, user_data)
-        SESSION.add(i)
-        return i.export()
-    finally:
-        SESSION.commit()
+    see_this_node()
+    d = {
+        'uuid': instance_uuid,
+        'name': name,
+        'cpus': cpus,
+        'memory': memory_mb,
+        'disk_spec': disk_spec,
+        'ssh_key': ssh_key,
+        'node': config.parsed.get('NODE_NAME'),
+        'console_port': allocate_console_port(instance_uuid),
+        'vdi_port': allocate_console_port(instance_uuid),
+        'user_data': user_data,
+        'block_devices': None,
+        'state': 'initial',
+                 'state_updated': time.time()
+    }
+    etcd.put('instance', None, instance_uuid, d)
+    return d
 
 
 def place_instance(instance_uuid, node):
-    ensure_valid_session()
-
-    try:
-        i = SESSION.query(Instance).filter(
-            Instance.uuid == instance_uuid).one()
-        i.node = node
-    finally:
-        SESSION.commit()
+    see_this_node()
+    i = get_instance(instance_uuid)
+    i['node'] = node
+    etcd.put('instance', None, instance_uuid, i)
 
 
 def update_instance_state(instance_uuid, state):
-    ensure_valid_session()
-
-    try:
-        i = SESSION.query(Instance).filter(
-            Instance.uuid == instance_uuid).one()
-        i.state = state
-        i.state_updated = datetime.datetime.now()
-    finally:
-        SESSION.commit()
+    see_this_node()
+    i = get_instance(instance_uuid)
+    i['state'] = state
+    i['state_updated'] = time.time()
+    etcd.put('instance', None, instance_uuid, i)
 
 
 def hard_delete_instance(instance_uuid):
-    ensure_valid_session()
-
-    # TODO(mikal): once instances are in etcd
-    # free_console_port(self.console_port)
-    # free_console_port(self.vdi_port)
-
-    try:
-        for s in SESSION.query(Snapshot).filter(
-                Snapshot.instance_uuid == instance_uuid):
-            SESSION.delete(s)
-        for ni in SESSION.query(NetworkInterface).filter(
-                NetworkInterface.instance_uuid == instance_uuid).all():
-            SESSION.delete(ni)
-        i = SESSION.query(Instance).filter(
-            Instance.uuid == instance_uuid).one()
-        SESSION.delete(i)
-    except exc.NoResultFound:
-        return None
-    finally:
-        SESSION.commit()
+    see_this_node()
+    i = get_instance(instance_uuid)
+    free_console_port(i['console_port'])
+    free_console_port(i['vdi_port'])
+    etcd.delete('instance', None, instance_uuid)
 
 
 def get_stale_instances(delay):
-    ensure_valid_session()
-
-    horizon = datetime.datetime.now() - datetime.timedelta(seconds=delay)
-
-    for state in ['deleted', 'error']:
-        try:
-            query = SESSION.query(Instance).filter(
-                Instance.state_updated < horizon).filter(
-                    Instance.state == state)
-            for i in query.all():
-                yield i.export()
-        except exc.NoResultFound:
-            pass
+    see_this_node()
+    for i in etcd.get_all('instance', None):
+        if i['state'] in ['deleted', 'error']:
+            if time.time() - i['state_updated'] > delay:
+                yield i
 
 
 def create_network_interface(interface_uuid, netdesc, instance_uuid, order):
