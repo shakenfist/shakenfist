@@ -1,6 +1,13 @@
 CHANGES
 =======
 
+* Add some notes on how to do releases
+
+0.1
+---
+
+* Update readme ready for release tag
+* Copy cleanup script
 * Handle DB migrations
 * Install shakenfist from a wheel
 * Move python unit tests into ansible

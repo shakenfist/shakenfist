@@ -9,13 +9,18 @@
     - name: Ensure unit tests pass
       shell: tox -epy37
 
+    - name: Clear out old wheels
+      shell:
+        cmd: rm *.whl *.tar.gz
+        chdir: ../dist
+
     - name: Build a wheel for shakenfist
       shell:
         cmd: python3 setup.py sdist bdist_wheel
         chdir: ..
 
     - name: Find the most recent wheel for shakenfist
-      shell: ls ../dist/*.whl | tail -1 | sed 's/\.\.\/dist\///'
+      shell: ls -rt ../dist/*.whl | tail -1 | sed 's/\.\.\/dist\///'
       register: wheel_complex
 
     - name: Extract instance uuid
