@@ -69,6 +69,8 @@ def get(objecttype, subtype, name):
     for attempt in range(3):
         try:
             value, _ = get_client().get(path)
+            if value is None:
+                return None
             return json.loads(value)
         except Exception as e:
             LOG.info('Failed to read %s, attempt %d: %s' % (path, attempt, e))

@@ -28,7 +28,7 @@ LOG.setLevel(logging.DEBUG)
 
 def from_definition(uuid=None, name=None, disks=None, memory_mb=None,
                     vcpus=None, ssh_key=None, user_data=None):
-    db_entry = db.create_instance(uuid, name, vcpus, memory_mb, json.dumps(disks),
+    db_entry = db.create_instance(uuid, name, vcpus, memory_mb, disks,
                                   ssh_key, user_data)
     return Instance(db_entry)
 
