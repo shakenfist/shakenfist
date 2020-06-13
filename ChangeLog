@@ -1,6 +1,7 @@
 CHANGES
 =======
 
+* Use leases to expire old information in etcd
 * Metrics are already floats now that they are in etcd
 * Remove unused method
 * Push the most recent wheel, and uninstall old wheels
