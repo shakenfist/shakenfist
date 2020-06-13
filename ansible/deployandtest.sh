@@ -21,7 +21,7 @@ then
 else
   cd terraform/$CLOUD
   terraform destroy -auto-approve $TERRAFORM_VARS
-  cd ../..
+  cd $cwd
 fi
 
 ansible-playbook -i hosts --extra-vars "$ANSIBLE_VARS" deploy.yml
