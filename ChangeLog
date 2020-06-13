@@ -1,6 +1,7 @@
 CHANGES
 =======
 
+* Metrics are already floats now that they are in etcd
 * Remove unused method
 * Push the most recent wheel, and uninstall old wheels
 * Be more efficient about writing metrics to etcd

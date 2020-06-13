@@ -48,7 +48,8 @@ def see_this_node():
             'fqdn': config.parsed.get('NODE_NAME'),
             'ip': config.parsed.get('NODE_IP'),
             'lastseen': time.time(),
-        })
+        },
+        ttl=120)
 
 
 def get_node_ips():
@@ -613,7 +614,8 @@ def update_metrics_bulk(metrics):
             'fqdn': node,
             'timestamp': time.time(),
             'metrics': metrics
-        })
+        },
+        ttl=120)
 
 
 def get_metrics(fqdn):
