@@ -424,150 +424,71 @@ def get_stale_instances(delay):
             pass
 
 
-class NetworkInterface(Base):
-    __tablename__ = 'network_interfaces'
-
-    uuid = Column(String, primary_key=True)
-    network_uuid = Column(String)
-    instance_uuid = Column(String)
-    macaddr = Column(String)
-    ipv4 = Column(String)
-    order = Column(Integer)
-    floating = Column(String)
-    state = Column(String)
-    state_updated = Column(DateTime)
-    model = Column(String)
-
-    def __init__(self, interface_uuid, network_uuid, instance_uuid, macaddr, ipv4, order,
-                 floating, model):
-        self.uuid = interface_uuid
-        self.network_uuid = network_uuid
-        self.instance_uuid = instance_uuid
-        self.macaddr = macaddr
-        self.ipv4 = ipv4
-        self.order = order
-        self.floating = floating
-        self.state = 'initial'
-        self.state_updated = datetime.datetime.now()
-        self.model = model
-
-    def export(self):
-        return {
-            'uuid': self.uuid,
-            'network_uuid': self.network_uuid,
-            'instance_uuid': self.instance_uuid,
-            'macaddr': self.macaddr,
-            'ipv4': self.ipv4,
-            'order': self.order,
-            'floating': self.floating,
-            'state': self.state,
-            'state_updated': self.state_updated.timestamp(),
-            'model': self.model
-        }
-
-
 def create_network_interface(interface_uuid, netdesc, instance_uuid, order):
-    ensure_valid_session()
-
-    try:
-        SESSION.add(NetworkInterface(
-            interface_uuid, netdesc['network_uuid'], instance_uuid, netdesc['macaddress'], netdesc['address'], order, None, netdesc['model']))
-    finally:
-        SESSION.commit()
+    see_this_node()
+    etcd.put('networkinterface', None, interface_uuid,
+             {
+                 'uuid': interface_uuid,
+                 'network_uuid': netdesc['network_uuid'],
+                 'instance_uuid': instance_uuid,
+                 'macaddr': netdesc['macaddress'],
+                 'ipv4': netdesc['address'],
+                 'order': order,
+                 'floating': None,
+                 'state': 'initial',
+                 'state_updated': time.time(),
+                 'model': netdesc['model']
+             })
 
 
 def hard_delete_network_interface(interface_uuid):
-    ensure_valid_session()
-
-    try:
-        for i in SESSION.query(NetworkInterface).filter(
-                NetworkInterface.instance_uuid == interface_uuid).all():
-            SESSION.delete(i)
-    except exc.NoResultFound:
-        return None
-    finally:
-        SESSION.commit()
+    see_this_node()
+    etcd.delete('networkinterface', None, interface_uuid)
 
 
 def get_instance_interfaces(instance_uuid):
-    ensure_valid_session()
-
-    try:
-        query = SESSION.query(NetworkInterface).filter(
-            NetworkInterface.instance_uuid == instance_uuid)
-
-        query = query.filter(NetworkInterface.state != 'deleted')
-        query = query.filter(NetworkInterface.state != 'error')
-
-        for i in query.all():
-            yield i.export()
-    except exc.NoResultFound:
-        pass
+    see_this_node()
+    for ni in etcd.get_all('networkinterface', None):
+        if ni['state'] == 'deleted':
+            continue
+        if ni['instance_uuid'] == instance_uuid:
+            yield ni
 
 
 def get_network_interfaces(network_uuid):
-    ensure_valid_session()
-
-    try:
-        query = SESSION.query(NetworkInterface).filter(
-            NetworkInterface.network_uuid == network_uuid)
-
-        query = query.filter(NetworkInterface.state != 'deleted')
-        query = query.filter(NetworkInterface.state != 'error')
-
-        for i in query.all():
-            yield i.export()
-    except exc.NoResultFound:
-        pass
+    see_this_node()
+    for ni in etcd.get_all('networkinterface', None):
+        if ni['state'] == 'deleted':
+            continue
+        if ni['network_uuid'] == network_uuid:
+            yield ni
 
 
 def get_interface(interface_uuid):
-    ensure_valid_session()
-
-    try:
-        query = SESSION.query(NetworkInterface).filter(
-            NetworkInterface.uuid == interface_uuid)
-
-        query = query.filter(NetworkInterface.state != 'deleted')
-        query = query.filter(NetworkInterface.state != 'error')
-
-        return query.one().export()
-    except exc.NoResultFound:
-        pass
+    see_this_node()
+    return etcd.get('networkinterface', None, interface_uuid)
 
 
 def update_network_interface_state(interface_uuid, state):
-    ensure_valid_session()
-
-    try:
-        i = SESSION.query(NetworkInterface).filter(
-            NetworkInterface.uuid == interface_uuid).one()
-        i.state = state
-        i.state_updated = datetime.datetime.now()
-    finally:
-        SESSION.commit()
+    see_this_node
+    ni = get_interface(interface_uuid)
+    ni['state'] = state
+    ni['state_updated'] = time.time()
+    etcd.put('networkinterface', None, interface_uuid, ni)
 
 
 def add_floating_to_interface(interface_uuid, addr):
-    ensure_valid_session()
-
-    try:
-        ni = SESSION.query(NetworkInterface).filter(
-            NetworkInterface.uuid == interface_uuid).one()
-        ni.floating = addr
-    finally:
-        SESSION.commit()
+    see_this_node
+    ni = get_interface(interface_uuid)
+    ni['floating'] = addr
+    etcd.put('networkinterface', None, interface_uuid, ni)
 
 
 def remove_floating_from_interface(interface_uuid):
-    ensure_valid_session()
-
-    try:
-        ni = SESSION.query(NetworkInterface).filter(
-            NetworkInterface.uuid == interface_uuid).one()
-        ni.floating = None
-    finally:
-        SESSION.commit()
+    see_this_node
+    ni = get_interface(interface_uuid)
+    ni['floating'] = None
+    etcd.put('networkinterface', None, interface_uuid, ni)
 
 
 def create_snapshot(snapshot_uuid, device, instance_uuid, created):
