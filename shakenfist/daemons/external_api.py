@@ -4,6 +4,7 @@ from flask_restful import fields, marshal_with
 import ipaddress
 import json
 import logging
+import re
 import requests
 import setproctitle
 import sys
@@ -245,6 +246,9 @@ class Instances(Resource):
     def post(self, name=None, cpus=None, memory=None, network=None,
              disk=None, ssh_key=None, user_data=None, placed_on=None, instance_uuid=None):
         global SCHEDULER
+
+        # We need to santize the name so its safe for DNS
+        name = re.sub('([^a-zA-Z0-9_\-])', '', name)
 
         # The instance needs to exist in the DB before network interfaces are created
         if not instance_uuid:
