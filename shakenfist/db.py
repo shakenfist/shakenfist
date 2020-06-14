@@ -3,6 +3,7 @@
 import datetime
 import json
 import logging
+import randmac
 import random
 import time
 import uuid
@@ -319,6 +320,20 @@ def get_stale_instances(delay):
 
 def create_network_interface(interface_uuid, netdesc, instance_uuid, order):
     see_this_node()
+    if not 'macaddress' in netdesc or not netdesc['macaddress']:
+        with etcd.get_lock('macaddress', ttl=120) as _:
+            possible_mac = str(randmac.RandMac(
+                '00:00:00:00:00:00', False)).lstrip('\'').rstrip('\'')
+            while etcd.get('macaddress', None, possible_mac):
+                possible_mac = str(randmac.RandMac(
+                    '00:00:00:00:00:00', False)).lstrip('\'').rstrip('\'')
+
+            etcd.put('macaddress', None, possible_mac,
+                     {
+                         'interface_uuid': interface_uuid
+                     })
+            netdesc['macaddress'] = possible_mac
+
     etcd.put('networkinterface', None, interface_uuid,
              {
                  'uuid': interface_uuid,
@@ -336,6 +351,8 @@ def create_network_interface(interface_uuid, netdesc, instance_uuid, order):
 
 def hard_delete_network_interface(interface_uuid):
     see_this_node()
+    d = etcd.get('networkinterface', None, interface_uuid)
+    etcd.delete('macaddress', None, d['macaddr'])
     etcd.delete('networkinterface', None, interface_uuid)
 
 

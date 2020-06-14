@@ -4,7 +4,6 @@ from flask_restful import fields, marshal_with
 import ipaddress
 import json
 import logging
-import randmac
 import requests
 import setproctitle
 import sys
@@ -354,10 +353,6 @@ class Instances(Resource):
                 db.persist_ipmanager(netdesc['network_uuid'], ipm.save())
                 allocations[netdesc['network_uuid']].append(
                     (netdesc['address'], order))
-
-            if not 'macaddress' in netdesc or not netdesc['macaddress']:
-                netdesc['macaddress'] = str(randmac.RandMac(
-                    '00:00:00:00:00:00', True)).lstrip('\'').rstrip('\'')
 
             if not 'model' in netdesc or not netdesc['model']:
                 netdesc['model'] = 'virtio'
