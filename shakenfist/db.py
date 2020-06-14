@@ -70,79 +70,21 @@ def get_nodes():
     return etcd.get_all('node', None)
 
 
-class Network(Base):
-    __tablename__ = 'networks'
-
-    uuid = Column(String, primary_key=True)
-    vxid = Column(Integer)
-    netblock = Column(String)
-    provide_dhcp = Column(Boolean)
-    provide_nat = Column(Boolean)
-    owner = Column(String)
-    ipmanager = Column(BLOB)
-    floating_gateway = Column(String)
-    name = Column(String)
-    state = Column(String)
-    state_updated = Column(DateTime)
-
-    def __init__(self, network_uuid, vxid, netblock, provide_dhcp, provide_nat,
-                 owner, name):
-        self.uuid = network_uuid
-        self.vxid = vxid
-        self.netblock = netblock
-        self.provide_dhcp = provide_dhcp
-        self.provide_nat = provide_nat
-        self.owner = owner
-        self.floating_gateway = None
-        self.name = name
-        self.state = 'initial'
-        self.state_updated = datetime.datetime.now()
-
-    def export(self):
-        return {
-            'uuid': self.uuid,
-            'vxid': self.vxid,
-            'netblock': self.netblock,
-            'provide_dhcp': self.provide_dhcp,
-            'provide_nat': self.provide_nat,
-            'owner': self.owner,
-            'floating_gateway': self.floating_gateway,
-            'name': self.name,
-            'state': self.state,
-            'state_updated': self.state_updated.timestamp()
-        }
-
-
 def get_network(network_uuid):
-    ensure_valid_session()
-
-    try:
-        query = SESSION.query(Network).filter(
-            Network.uuid == network_uuid)
-
-        query = query.filter(Network.state != 'deleted')
-        query = query.filter(Network.state != 'error')
-
-        return query.one().export()
-    except exc.NoResultFound:
-        return None
+    see_this_node()
+    return etcd.get('network', None, network_uuid)
 
 
 def get_networks(all=False):
-    ensure_valid_session()
-
-    try:
-        query = SESSION.query(Network)
-
-        if not all:
-            query = query.filter(Network.state != 'deleted')
-            query = query.filter(Network.state != 'error')
-
-        for n in query.all():
-            if n.uuid != 'floating':
-                yield n.export()
-    except exc.NoResultFound:
-        pass
+    see_this_node()
+    for i in etcd.get_all('network', None):
+        if all:
+            yield i
+        else:
+            if i['network_uuid'] == 'floating':
+                continue
+            if not i['state'] in ['deleted', 'error']:
+                yield i
 
 
 def allocate_network(netblock, provide_dhcp=True, provide_nat=False, name=None):
@@ -152,76 +94,70 @@ def allocate_network(netblock, provide_dhcp=True, provide_nat=False, name=None):
     ipm = ipmanager.NetBlock(netblock)
     etcd.put('ipmanager', None, netid, ipm.save())
 
-    ensure_valid_session()
+    with etcd.get_lock('vxlan') as _:
+        vxid = 1
+        while etcd.get('vxlan', None, vxid):
+            vxid += 1
 
-    try:
-        for r in SESSION.query(func.max(Network.vxid)).first():
-            if r:
-                vxid = r + 1
-            else:
-                vxid = 1
+        etcd.put('vxlan', None, vxid,
+                 {
+                     'network_uuid': netid
+                 })
 
-        n = Network(netid, vxid, netblock, provide_dhcp,
-                    provide_nat, None, name)
-        SESSION.add(n)
-        return n.export()
-    finally:
-        SESSION.commit()
+    d = {
+        'uuid': netid,
+        'vxid': vxid,
+        'netblock': netblock,
+        'provide_dhcp': provide_dhcp,
+        'provide_nat': provide_nat,
+        'owner': None,
+        'floating_gateway': None,
+        'name': name,
+        'state': 'initial',
+        'state_updated': time.time()
+    }
+    etcd.put('network', None, netid, d)
+    return d
 
 
 def update_network_state(network_uuid, state):
-    ensure_valid_session()
-
-    try:
-        i = SESSION.query(Network).filter(
-            Network.uuid == network_uuid).one()
-        i.state = state
-        i.state_updated = datetime.datetime.now()
-    finally:
-        SESSION.commit()
+    see_this_node()
+    n = get_network(network_uuid)
+    n['state'] = state
+    n['state_updated'] = time.time()
+    etcd.put('network', None, network_uuid, n)
 
 
 def get_stale_networks(delay):
-    ensure_valid_session()
-
-    horizon = datetime.datetime.now() - datetime.timedelta(seconds=delay)
-
-    for state in ['deleted', 'error']:
-        try:
-            query = SESSION.query(Network).filter(
-                Network.state_updated < horizon).filter(
-                    Network.state == state)
-            for n in query.all():
-                yield n.export()
-        except exc.NoResultFound:
-            pass
+    see_this_node()
+    for n in etcd.get_all('network', None):
+        if n['state'] in ['deleted', 'error']:
+            if time.time() - n['state_updated'] > delay:
+                yield n
 
 
 def hard_delete_network(network_uuid):
-    ensure_valid_session()
-
-    try:
-        for n in SESSION.query(Network).filter(
-                Network.uuid == network_uuid).all():
-            SESSION.delete(n)
-    except exc.NoResultFound:
-        return None
-    finally:
-        SESSION.commit()
+    see_this_node()
+    etcd.delete('network', None, network_uuid)
 
 
 def create_floating_network(netblock):
     see_this_node()
     ipm = ipmanager.NetBlock(netblock)
     etcd.put('ipmanager', None, 'floating', ipm.save())
-
-    ensure_valid_session()
-
-    try:
-        n = Network('floating', 0, netblock, False, False, None, 'floating')
-        SESSION.add(n)
-    finally:
-        SESSION.commit()
+    etcd.put('network', None, 'floating',
+             {
+                 'uuid': 'floating',
+                 'vxid': 0,
+                 'netblock': netblock,
+                 'provide_dhcp': False,
+                 'provide_nat': False,
+                 'owner': None,
+                 'floating_gateway': None,
+                 'name': 'floating',
+                 'state': 'initial',
+                 'state_updated': time.time()
+             })
 
 
 def get_ipmanager(network_uuid):
@@ -235,13 +171,10 @@ def persist_ipmanager(network_uuid, data):
 
 
 def persist_floating_gateway(network_uuid, gateway):
-    ensure_valid_session()
-
-    try:
-        n = SESSION.query(Network).filter(Network.uuid == network_uuid).one()
-        n.floating_gateway = gateway
-    finally:
-        SESSION.commit()
+    see_this_node()
+    n = get_network(network_uuid)
+    n['floating_gateway'] = gateway
+    etcd.put('network', None, network_uuid, n)
 
 
 def get_instance(instance_uuid):
