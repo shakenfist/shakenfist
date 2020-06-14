@@ -57,7 +57,7 @@ def get_networks(all=False):
         if all:
             yield i
         else:
-            if i['network_uuid'] == 'floating':
+            if i['uuid'] == 'floating':
                 continue
             if not i['state'] in ['deleted', 'error']:
                 yield i
@@ -102,6 +102,9 @@ def update_network_state(network_uuid, state):
     n['state'] = state
     n['state_updated'] = time.time()
     etcd.put('network', None, network_uuid, n)
+
+    if state == 'deleted':
+        etcd.delete('vxlan', None, n['vxid'])
 
 
 def get_stale_networks(delay):

@@ -46,8 +46,8 @@ def _construct_key(objecttype, subtype, name):
     if name:
         return '/sf/%s/%s' % (objecttype, name)
     if subtype:
-        return '/sf/%s/%s' % (objecttype, subtype)
-    return '/sf/%s' % objecttype
+        return '/sf/%s/%s/' % (objecttype, subtype)
+    return '/sf/%s/' % objecttype
 
 
 def put(objecttype, subtype, name, data, ttl=None):
