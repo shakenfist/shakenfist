@@ -42,9 +42,6 @@
 
           [ `sf-client --simple instance list | grep -v uuid | wc -l` -eq 0 ]
           [ `virsh list | grep running | wc -l` -eq 0 ]
-          [ `/bin/bash /opt/sfmysql "select * from instances where state='created'" | wc -l` -eq 0 ]
-          [ `/bin/bash /opt/sfmysql "select * from network_interfaces where state='created'" | wc -l` -eq 0 ]
-          [ `/bin/bash /opt/sfmysql "select * from networks where state='created' \G" | grep -c uuid` -lt 2 ]
         dest: /tmp/shell_script
         owner: root
         group: root

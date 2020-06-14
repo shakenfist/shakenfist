@@ -2,9 +2,6 @@ pycdlib             # lgpl
 randmac             # mit
 oslo.concurrency    # apache2
 jinja2              # bsd
-sqlalchemy          # mit
-alembic             # mit
-mysqlclient         # gpl
 setproctitle        # bsd
 click>=7.1.1        # bsd
 prettytable         # bsd

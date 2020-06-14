@@ -20,7 +20,6 @@
         "libssl-dev",
         "libvirt-daemon-system",
         "libvirt-dev",
-        "mysql-client",
         "net-tools",
         "prometheus-node-exporter",
         "pwgen",

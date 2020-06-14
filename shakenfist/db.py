@@ -8,12 +8,6 @@ import random
 import time
 import uuid
 
-from sqlalchemy import create_engine
-from sqlalchemy import BLOB, Boolean, Column, Float, Integer, String, DateTime
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import exc, scoped_session, sessionmaker
-from sqlalchemy.sql.expression import func
-
 
 from shakenfist import config
 from shakenfist import etcd
@@ -22,24 +16,6 @@ from shakenfist import ipmanager
 
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
-
-
-Base = declarative_base()
-ENGINE = create_engine(config.parsed.get('SQL_URL'))
-SESSIONMAKER = sessionmaker(bind=ENGINE)
-SESSION = scoped_session(SESSIONMAKER)
-
-
-def ensure_valid_session():
-    global SESSION
-    global SESSIONMAKER
-
-    try:
-        see_this_node()
-        return
-    except:
-        SESSION = scoped_session(SESSIONMAKER)
-        see_this_node()
 
 
 def see_this_node():

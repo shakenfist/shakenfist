@@ -13,10 +13,6 @@ Environment=SHAKENFIST_NODE_EGRESS_NIC="{{node_egress_nic}}"
 Environment=SHAKENFIST_FLOATING_NETWORK="{{floating_network_ipblock}}"
 Environment=SHAKENFIST_NETWORK_NODE_IP="{{hostvars['localhost']['network_node_ip']}}"
 
-Environment=SHAKENFIST_DB_ROOT_PASSWORD="{{db_root_password}}"
-Environment=SHAKENFIST_DB_PASSWORD="{{db_user_password}}"
-Environment=SHAKENFIST_SQL_URL="mysql://sf:{{db_user_password}}@{{hostvars['localhost']['database_node_ip']}}/sf"
-
 Environment=SHAKENFIST_ETCD_USER="sf"
 Environment=SHAKENFIST_ETCD_PASSWORD="{{db_user_password}}"
 Environment=SHAKENFIST_ETCD_SERVER="{{hostvars['localhost']['database_node_ip']}}"
