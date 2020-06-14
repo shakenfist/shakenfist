@@ -76,11 +76,6 @@
   tasks:
     - include: includes/python3.yml
 
-    - name: install mariadb client
-      apt:
-        name: ["mariadb-client"]
-        state: latest
-
     - name: Make /srv/shakenfist/
       file:
         path: /srv/shakenfist
@@ -96,6 +91,10 @@
       synchronize:
         src: ../dist/{{hostvars['localhost']['wheel_path']}}
         dest: /srv/shakenfist/
+
+    - name: Uninstall shakenfist, if present
+      command: pip3 uninstall -y shakenfist
+      ignore_errors: True
 
     - name: Install shakenfist
       command: pip3 install {{hostvars['localhost']['wheel_path']}}
@@ -139,93 +138,66 @@
   tasks:
     - include: includes/docker.yml
 
-    - name: Install mariadb
-      apt:
-        name: ["mariadb-server", "python-pymysql", "python3-pymysql"]
-        state: latest
+    - name: Create a etcd user
+      user:
+        name: sfetcd
+        comment: shakenfist etcd
+        group: daemon
+      register: sfetcd_user_complex
 
-    - name: Ensure mariabdb is running and starts on boot
-      service:
-        name: mysql
-        state: started
-        enabled: yes
+    - name: Test if we have an etcd
+      shell: docker inspect sfetcd
+      ignore_errors: True
+      register: has_sfetcd
 
-    - name: Change mariadb root password
-      mysql_user:
-        name: root
-        login_unix_socket: /var/run/mysqld/mysqld.sock
-        password: "{{db_root_password}}"
-        priv: "*.*:ALL,GRANT"
-        check_implicit_admin: true
-
-    - name: Create `/root/.my.cnf` with root password credentials
-      copy:
-        content: |
-          [client]
-          user=root
-          password={{db_root_password}}
-        dest: /root/.my.cnf
-        owner: root
-        mode: u=rw,g=,o=
-
-    - name: Tweak mariadb server config
-      copy:
-        src: files/my.cnf
-        dest: /etc/mysql/mariadb.conf.d/50-server.cnf
-        owner: root
-        mode: u=rw,g=r,o=r
-
-    - name: Restart mariadb
-      service:
-        name: mysql
-        state: restarted
-
-    - name: Create the database
-      mysql_db:
-        login_user: root
-        login_password: "{{db_root_password}}"
-        login_unix_socket: /var/run/mysqld/mysqld.sock
-        name: sf
-        encoding: ascii
-        collation: ascii_general_ci
-        state: present
-
-    - name: Create our database user
-      mysql_user:
-        login_user: root
-        login_password: "{{db_root_password}}"
-        login_unix_socket: /var/run/mysqld/mysqld.sock
-        name: sf
-        host: "%"
-        password: "{{db_user_password}}"
-        priv: "sf.*:ALL,GRANT"
-        state: present
-
-    - name: Make /srv/shakenfist/mysql_migrations
+    - name: Make /srv/shakenfist/etcd
       file:
-        path: /srv/shakenfist/mysql_migrations
+        path: /srv/shakenfist/etcd
         state: directory
-        mode: "0755"
+        owner: sfetcd
+        mode: u=rwx,g=,o=
+      when: has_sfetcd.rc == 1
 
-    - name: Copy migrations
-      synchronize:
-        src: ../shakenfist/alembic
-        dest: /srv/shakenfist/mysql_migrations/
+    - name: Fix etcd permissions
+      file:
+        path: /srv/shakenfist/etcd
+        recurse: true
+        owner: sfetcd
+        mode: u=rwx,g=,o=
+      when: has_sfetcd.rc == 1
 
-    - name: Copy migrations configuration
-      synchronize:
-        src: ../shakenfist/alembic.ini
-        dest: /srv/shakenfist/mysql_migrations/
+    - name: Write etcd configuration file
+      template:
+        src: files/etcd.conf
+        dest: /srv/shakenfist/etcd.conf.yml
+        owner: sfetcd
+        group: sudo
+        mode: u=r,g=r,o=
+      when: has_sfetcd.rc == 1
 
-    - name: Upgrade database schema
-      command: alembic upgrade head
-      args:
-        chdir: /srv/shakenfist/mysql_migrations
-      environment:
-        SHAKENFIST_NODE_IP: "{{node_ip}}"
-        SHAKENFIST_DB_ROOT_PASSWORD: "{{db_root_password}}"
-        SHAKENFIST_DB_PASSWORD: "{{db_user_password}}"
-        SHAKENFIST_SQL_URL: "mysql://sf:{{db_user_password}}@{{node_ip}}/sf"
+    - name: Create etcd docker container
+      docker_container:
+        name: sfetcd
+        image: bitnami/etcd
+        restart_policy: always
+        volumes:
+          - /srv/shakenfist/etcd:/data
+          - /srv/shakenfist/etcd.conf.yml:/opt/bitnami/etcd/conf/etcd.conf.yml
+        ports:
+          - 0.0.0.0:2379:2379
+          - 0.0.0.0:2380:2380
+        env:
+          ETCD_ROOT_PASSWORD: "{{db_root_password}}"
+        user: "{{sfetcd_user_complex.uid}}"
+      when: has_sfetcd.rc == 1
+
+    - name: Create etcd user
+      shell: ETCDCTL_API=3 etcdctl --user="root:{{db_root_password}}" user add "sf:{{db_user_password}}"
+      when: has_sfetcd.rc == 1
+
+    - name: Give etcd user root permissions
+      shell: ETCDCTL_API=3 etcdctl --user="root:{{db_root_password}}" user grant sf root
+      when: has_sfetcd.rc == 1
 
     - name: Create a prometheus user
       user:

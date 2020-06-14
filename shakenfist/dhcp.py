@@ -29,9 +29,9 @@ class DHCP(object):
             'zone': config.parsed.get('ZONE'),
 
             'router': n.router,
-            'dhcp_start': n.ipmanager.get_address_at_index(2),
-            'netmask': n.ipmanager.netmask,
-            'broadcast': n.ipmanager.broadcast_address,
+            'dhcp_start': n.dhcp_start,
+            'netmask': n.netmask,
+            'broadcast': n.broadcast,
 
             'in_namespace': 'ip netns exec %s' % self.network_uuid,
             'interface': interface

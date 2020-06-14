@@ -2,9 +2,6 @@ pycdlib             # lgpl
 randmac             # mit
 oslo.concurrency    # apache2
 jinja2              # bsd
-sqlalchemy          # mit
-alembic             # mit
-mysqlclient         # gpl
 setproctitle        # bsd
 click>=7.1.1        # bsd
 prettytable         # bsd
@@ -15,6 +12,7 @@ flask               # bsd
 flask_restful       # bsd
 psutil              # bsd
 prometheus_client   # apache2
+etcd3               # apache2
 
 # Is difficult to get install working, use system packages
 libvirt-python      # lgpl

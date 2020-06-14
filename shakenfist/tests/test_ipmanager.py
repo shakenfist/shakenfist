@@ -35,7 +35,7 @@ class IPManagerTestCase(testtools.TestCase):
     def test_get_free_random_ip(self):
         ipm = ipmanager.NetBlock('10.0.0.0/8')
 
-        for i in range(65025):
+        for _ in range(65025):
             ipm.get_random_free_address()
 
         # The extra two are the reserved network and broadcast

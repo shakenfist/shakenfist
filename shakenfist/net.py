@@ -7,7 +7,6 @@ import random
 import re
 import requests
 
-from oslo_concurrency import lockutils
 from oslo_concurrency import processutils
 
 
@@ -15,7 +14,7 @@ from shakenfist.client import apiclient
 from shakenfist import config
 from shakenfist import db
 from shakenfist import dhcp
-from shakenfist import ipmanager
+from shakenfist import etcd
 from shakenfist import util
 
 
@@ -34,7 +33,6 @@ def from_db(uuid):
                    provide_nat=dbnet['provide_nat'],
                    ipblock=dbnet['netblock'],
                    physical_nic=config.parsed.get('NODE_EGRESS_NIC'),
-                   ipmanager_state=dbnet['ipmanager'],
                    floating_gateway=dbnet['floating_gateway'])
 
 
@@ -42,7 +40,7 @@ class Network(object):
     # NOTE(mikal): it should be noted that the maximum interface name length
     # on Linux is 15 user visible characters.
     def __init__(self, uuid=None, vxlan_id=1, provide_dhcp=False, provide_nat=False,
-                 physical_nic='eth0', ipblock=None, ipmanager_state=None, floating_gateway=None):
+                 physical_nic='eth0', ipblock=None, floating_gateway=None):
         self.uuid = uuid
         self.vxlan_id = vxlan_id
         self.provide_dhcp = provide_dhcp
@@ -50,16 +48,18 @@ class Network(object):
         self.physical_nic = physical_nic
         self.floating_gateway = floating_gateway
 
-        if ipmanager_state:
-            self.ipmanager = ipmanager.from_db(ipmanager_state.decode('utf-8'))
-            self.router = self.ipmanager.get_address_at_index(1)
-        else:
-            self.ipmanager = ipmanager.NetBlock(ipblock)
-            self.router = self.ipmanager.get_address_at_index(1)
-            self.ipmanager.reserve(self.router)
-            self.persist_ipmanager()
+        with etcd.get_lock('sf/ipmanager/%s' % self.uuid, ttl=120) as _:
+            ipm = db.get_ipmanager(self.uuid)
 
-        self.netmask = self.ipmanager.netmask
+            self.ipblock = ipm.network_address
+            self.router = ipm.get_address_at_index(1)
+            self.dhcp_start = ipm.get_address_at_index(2)
+            self.netmask = ipm.netmask
+            self.broadcast = ipm.broadcast_address
+            self.network_address = ipm.network_address
+
+            ipm.reserve(self.router)
+            db.persist_ipmanager(self.uuid, ipm.save())
 
     def __str__(self):
         return 'network(%s, vxid %s)' % (self.uuid, self.vxlan_id)
@@ -83,15 +83,12 @@ class Network(object):
             'namespace': self.uuid,
             'in_namespace': 'ip netns exec %s' % self.uuid,
 
-            'ipblock': self.ipmanager.network_address,
-            'netmask': self.ipmanager.netmask,
+            'ipblock': self.ipblock,
+            'netmask': self.netmask,
             'router': self.router,
-            'broadcast': self.ipmanager.broadcast_address,
+            'broadcast': self.broadcast,
         }
         return retval
-
-    def persist_ipmanager(self):
-        db.persist_ipmanager(self.uuid, self.ipmanager.save())
 
     def persist_floating_gateway(self):
         db.persist_floating_gateway(self.uuid, self.floating_gateway)
@@ -99,7 +96,7 @@ class Network(object):
     def create(self):
         subst = self.subst_dict()
 
-        with lockutils.lock('sf_net_%s' % self.uuid, external=True, lock_path='/tmp/'):
+        with etcd.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
             if not util.check_for_interface(subst['vx_interface']):
                 with util.RecordedOperation('create vxlan interface', self) as _:
                     processutils.execute(
@@ -186,17 +183,20 @@ class Network(object):
             return
 
         subst = self.subst_dict()
-        floatnet = from_db('floating')
         if not self.floating_gateway:
-            self.floating_gateway = floatnet.ipmanager.get_random_free_address()
-            self.persist_floating_gateway()
-            floatnet.persist_ipmanager()
+            with etcd.get_lock('sf/ipmanager/floating', ttl=120) as _:
+                ipm = db.get_ipmanager('floating')
+                self.floating_gateway = ipm.get_random_free_address()
+                db.persist_ipmanager('floating', ipm.save())
+                self.persist_floating_gateway()
 
-        subst['floating_router'] = floatnet.ipmanager.get_address_at_index(1)
+        # No lock because no data changing
+        ipm = db.get_ipmanager('floating')
+        subst['floating_router'] = ipm.get_address_at_index(1)
         subst['floating_gateway'] = self.floating_gateway
-        subst['floating_netmask'] = floatnet.netmask
+        subst['floating_netmask'] = ipm.netmask
 
-        with lockutils.lock('sf_net_%s' % self.uuid, external=True, lock_path='/tmp/'):
+        with etcd.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
             if not subst['floating_gateway'] in list(util.get_interface_addresses(
                     subst['namespace'], subst['physical_veth_inner'])):
                 with util.RecordedOperation('enable virtual routing', self) as _:
@@ -210,7 +210,7 @@ class Network(object):
                         '%(in_namespace)s route add default gw %(floating_router)s' % subst,
                         shell=True)
 
-            if not util.nat_rules_for_ipblock(self.ipmanager.network_address):
+            if not util.nat_rules_for_ipblock(self.network_address):
                 with util.RecordedOperation('enable nat', self) as _:
                     processutils.execute(
                         'echo 1 > /proc/sys/net/ipv4/ip_forward', shell=True)
@@ -232,7 +232,7 @@ class Network(object):
         subst = self.subst_dict()
 
         # Cleanup local node
-        with lockutils.lock('sf_net_%s' % self.uuid, external=True, lock_path='/tmp/'):
+        with etcd.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
             if util.check_for_interface(subst['vx_bridge']):
                 with util.RecordedOperation('delete vxlan bridge', self) as _:
                     processutils.execute('ip link delete %(vx_bridge)s' % subst,
@@ -243,34 +243,35 @@ class Network(object):
                     processutils.execute('ip link delete %(vx_interface)s' % subst,
                                          shell=True)
 
-        # If this is the network node do additional cleanup
-        if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
-            if util.check_for_interface(subst['vx_veth_outer']):
-                with util.RecordedOperation('delete router veth', self) as _:
-                    processutils.execute('ip link delete %(vx_veth_outer)s' % subst,
-                                         shell=True)
+            # If this is the network node do additional cleanup
+            if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
+                if util.check_for_interface(subst['vx_veth_outer']):
+                    with util.RecordedOperation('delete router veth', self) as _:
+                        processutils.execute('ip link delete %(vx_veth_outer)s' % subst,
+                                             shell=True)
 
-            if util.check_for_interface(subst['physical_veth_outer']):
-                with util.RecordedOperation('delete physical veth', self) as _:
-                    processutils.execute('ip link delete %(physical_veth_outer)s' % subst,
-                                         shell=True)
+                if util.check_for_interface(subst['physical_veth_outer']):
+                    with util.RecordedOperation('delete physical veth', self) as _:
+                        processutils.execute('ip link delete %(physical_veth_outer)s' % subst,
+                                             shell=True)
 
-            if os.path.exists('/var/run/netns/%(namespace)s' % subst):
-                with util.RecordedOperation('delete netns', self) as _:
-                    processutils.execute('ip netns del %(namespace)s' % subst,
-                                         shell=True)
+                if os.path.exists('/var/run/netns/%(namespace)s' % subst):
+                    with util.RecordedOperation('delete netns', self) as _:
+                        processutils.execute('ip netns del %(namespace)s' % subst,
+                                             shell=True)
 
-            if self.floating_gateway:
-                floatnet = from_db('floating')
-                floatnet.ipmanager.release(self.floating_gateway)
-                floatnet.persist_ipmanager()
+                if self.floating_gateway:
+                    with etcd.get_lock('sf/ipmanager/floating', ttl=120) as _:
+                        ipm = db.get_ipmanager('floating')
+                        ipm.release(self.floating_gateway)
+                        db.persist_ipmanager('floating', ipm.save())
 
     def update_dhcp(self):
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
             self.ensure_mesh()
             subst = self.subst_dict()
             with util.RecordedOperation('update dhcp', self) as _:
-                with lockutils.lock('sf_net_%s' % self.uuid, external=True, lock_path='/tmp/'):
+                with etcd.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
                     d = dhcp.DHCP(self.uuid, subst['vx_veth_inner'])
                     d.restart_dhcpd()
         else:
@@ -287,7 +288,7 @@ class Network(object):
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
             subst = self.subst_dict()
             with util.RecordedOperation('remove dhcp', self) as _:
-                with lockutils.lock('sf_net_%s' % self.uuid, external=True, lock_path='/tmp/'):
+                with etcd.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
                     d = dhcp.DHCP(self.uuid, subst['vx_veth_inner'])
                     d.remove_dhcpd()
         else:
@@ -331,7 +332,9 @@ class Network(object):
             # as an overlay cloud...
             node_ips = [config.parsed.get('NETWORK_NODE_IP')]
             for fqdn in node_fqdns:
-                node_ips.append(db.get_node(fqdn)['ip'])
+                ip = db.get_node(fqdn)['ip']
+                if not ip in node_ips:
+                    node_ips.append(ip)
 
             for node in self.discover_mesh():
                 if node in node_ips:

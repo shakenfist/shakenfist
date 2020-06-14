@@ -4,7 +4,6 @@ from flask_restful import fields, marshal_with
 import ipaddress
 import json
 import logging
-import randmac
 import requests
 import setproctitle
 import sys
@@ -15,6 +14,7 @@ import uuid
 from shakenfist.client import apiclient
 from shakenfist import config
 from shakenfist import db
+from shakenfist import etcd
 from shakenfist import images
 from shakenfist import net
 from shakenfist import scheduler
@@ -321,8 +321,10 @@ class Instances(Resource):
             for network_uuid in allocations:
                 n = net.from_db(network_uuid)
                 for addr, _ in allocations[network_uuid]:
-                    n.ipmanager.release(addr)
-                n.persist_ipmanager()
+                    with etcd.get_lock('sf/ipmanager/%s' % n.uuid, ttl=120) as _:
+                        ipm = db.get_ipmanager(n.uuid)
+                        ipm.release(addr)
+                        db.persist_ipmanager(n.uuid, ipm.save())
             return error(status_code, message)
 
         order = 0
@@ -338,21 +340,19 @@ class Instances(Resource):
                 nets[netdesc['network_uuid']] = n
                 n.create()
 
-            allocations.setdefault(netdesc['network_uuid'], [])
-            if not 'address' in netdesc or not netdesc['address']:
-                netdesc['address'] = nets[netdesc['network_uuid']
-                                          ].ipmanager.get_random_free_address()
-            else:
-                if not nets[netdesc['network_uuid']].ipmanager.reserve(netdesc['address']):
-                    error_with_cleanup(409, 'address %s in use' %
-                                       netdesc['address'])
-            nets[netdesc['network_uuid']].persist_ipmanager()
-            allocations[netdesc['network_uuid']].append(
-                (netdesc['address'], order))
-
-            if not 'macaddress' in netdesc or not netdesc['macaddress']:
-                netdesc['macaddress'] = str(randmac.RandMac(
-                    '00:00:00:00:00:00', True)).lstrip('\'').rstrip('\'')
+            with etcd.get_lock('sf/ipmanager/%s' % netdesc['network_uuid'],
+                               ttl=120) as _:
+                allocations.setdefault(netdesc['network_uuid'], [])
+                ipm = db.get_ipmanager(netdesc['network_uuid'])
+                if not 'address' in netdesc or not netdesc['address']:
+                    netdesc['address'] = ipm.get_random_free_address()
+                else:
+                    if not ipm.reserve(netdesc['address']):
+                        error_with_cleanup(409, 'address %s in use' %
+                                           netdesc['address'])
+                db.persist_ipmanager(netdesc['network_uuid'], ipm.save())
+                allocations[netdesc['network_uuid']].append(
+                    (netdesc['address'], order))
 
             if not 'model' in netdesc or not netdesc['model']:
                 netdesc['model'] = 'virtio'
@@ -391,12 +391,7 @@ class InstanceEvents(Resource):
     def get(self, instance_uuid=None, instance_from_db=None):
         db.add_event('instance', instance_uuid,
                      'api', 'get events', None, None)
-
-        out = []
-        for event in db.get_events('instance', instance_uuid):
-            event['timestamp'] = event['timestamp'].timestamp()
-            out.append(event)
-        return out
+        return db.get_events('instance', instance_uuid)
 
 
 class InstanceSnapshot(Resource):
@@ -417,7 +412,7 @@ class InstanceSnapshot(Resource):
                      'api', 'get', None, None)
         out = []
         for snap in db.get_instance_snapshots(instance_uuid):
-            snap['created'] = snap['created'].timestamp()
+            snap['created'] = snap['created']
             out.append(snap)
         return out
 
@@ -495,8 +490,11 @@ class InterfaceFloat(Resource):
         if not float_net:
             return error(404, 'floating network not found')
 
-        addr = float_net.ipmanager.get_random_free_address()
-        float_net.persist_ipmanager()
+        with etcd.get_lock('sf/ipmanager/floating', ttl=120) as _:
+            ipm = db.get_ipmanager('floating')
+            addr = ipm.get_random_free_address()
+            db.persist_ipmanager('floating', ipm.save())
+
         db.add_floating_to_interface(ni['uuid'], addr)
         n.add_floating_ip(addr, ni['ipv4'])
 
@@ -521,8 +519,11 @@ class InterfaceDefloat(Resource):
         if not float_net:
             return error(404, 'floating network not found')
 
-        float_net.ipmanager.release(ni['floating'])
-        float_net.persist_ipmanager()
+        with etcd.get_lock('sf/ipmanager/floating', ttl=120) as _:
+            ipm = db.get_ipmanager('floating')
+            ipm.release(ni['floating'])
+            db.persist_ipmanager('floating', ipm.save())
+
         db.remove_floating_from_interface(ni['uuid'])
         n.remove_floating_ip(ni['floating'], ni['ipv4'])
 
@@ -558,9 +559,10 @@ class Network(Resource):
         n.delete()
 
         if n.floating_gateway:
-            floating_network = net.from_db('floating')
-            floating_network.ipmanager.release(n.floating_gateway)
-            floating_network.persist_ipmanager()
+            with etcd.get_lock('sf/ipmanager/floating', ttl=120) as _:
+                ipm = db.get_ipmanager('floating')
+                ipm.release(n.floating_gateway)
+                db.persist_ipmanager('floating', ipm.save())
 
         db.update_network_state(network_uuid, 'deleted')
 
@@ -607,6 +609,7 @@ class Networks(Resource):
                     'uuid': network['uuid']
                 }))
 
+        db.update_network_state(network['uuid'], 'created')
         return network
 
 
@@ -615,12 +618,7 @@ class NetworkEvents(Resource):
     def get(self, network_uuid=None, network_from_db=None):
         db.add_event('network', network_uuid,
                      'api', 'get events', None, None)
-
-        out = []
-        for event in db.get_events('network', network_uuid):
-            event['timestamp'] = event['timestamp'].timestamp()
-            out.append(event)
-        return out
+        return db.get_events('network', network_uuid)
 
 
 class Nodes(Resource):

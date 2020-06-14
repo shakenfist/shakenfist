@@ -1,14 +1,3 @@
-- name: Create sfmysql helper wrapper
-  copy:
-    content: |
-      #!/bin/bash -e
-      . /etc/sf/sfrc
-      mysql -h $_DB_NODE_IP -u sf --password=$_DB_PASSWORD sf -e "$1"
-    dest: /opt/sfmysql
-    owner: root
-    group: root
-    mode: u=rx,g=rx,o=rx
-
 - name: Create telnet console helper
   copy:
     src: files/telnet_client.py
@@ -62,12 +51,6 @@
       /srv/shakenfist/cleanup.sh
       [ `virsh list | grep running | wc -l` -eq 0 ]
       [ `ifconfig | grep -c br-vxlan` -eq 0 ]
-      /opt/sfmysql "delete from network_interfaces"
-      /opt/sfmysql "delete from networks"
-      /opt/sfmysql "delete from snapshots"
-      /opt/sfmysql "delete from events"
-      /opt/sfmysql "delete from instances"
-      /opt/sfmysql "delete from nodes"
 
       systemctl restart sf
       sleep 30
