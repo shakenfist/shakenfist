@@ -105,6 +105,7 @@ def update_network_state(network_uuid, state):
 
     if state == 'deleted':
         etcd.delete('vxlan', None, n['vxid'])
+        etcd.delete('ipmanager', None, n['uuid'])
 
 
 def get_stale_networks(delay):
@@ -164,11 +165,12 @@ def get_instance(instance_uuid):
 def get_instances(only_node=None, all=False):
     see_this_node()
     for i in etcd.get_all('instance', None):
+        if only_node and i['node'] != only_node:
+            continue
         if not all:
-            if not i['state'] in ['deleted', 'error']:
-                yield i
-        else:
-            yield i
+            if i['state'] in ['deleted', 'error']:
+                continue
+        yield i
 
 
 def persist_block_devices(instance_uuid, block_devices):
@@ -213,12 +215,14 @@ def update_instance_state(instance_uuid, state):
     i['state_updated'] = time.time()
     etcd.put('instance', None, instance_uuid, i)
 
+    if state == 'deleted':
+        free_console_port(i['console_port'])
+        free_console_port(i['vdi_port'])
+
 
 def hard_delete_instance(instance_uuid):
     see_this_node()
     i = get_instance(instance_uuid)
-    free_console_port(i['console_port'])
-    free_console_port(i['vdi_port'])
     etcd.delete('instance', None, instance_uuid)
 
 
@@ -263,8 +267,6 @@ def create_network_interface(interface_uuid, netdesc, instance_uuid, order):
 
 def hard_delete_network_interface(interface_uuid):
     see_this_node()
-    d = etcd.get('networkinterface', None, interface_uuid)
-    etcd.delete('macaddress', None, d['macaddr'])
     etcd.delete('networkinterface', None, interface_uuid)
 
 
@@ -297,6 +299,9 @@ def update_network_interface_state(interface_uuid, state):
     ni['state'] = state
     ni['state_updated'] = time.time()
     etcd.put('networkinterface', None, interface_uuid, ni)
+
+    if state == 'deleted':
+        etcd.delete('macaddress', None, ni['macaddr'])
 
 
 def add_floating_to_interface(interface_uuid, addr):

@@ -609,6 +609,7 @@ class Networks(Resource):
                     'uuid': network['uuid']
                 }))
 
+        db.update_network_state(network['uuid'], 'created')
         return network
 
 
