@@ -23,7 +23,7 @@
       shell: ls -rt ../dist/*.whl | tail -1 | sed 's/\.\.\/dist\///'
       register: wheel_complex
 
-    - name: Extract instance uuid
+    - name: Extract wheel filename
       set_fact:
         wheel_path: "{{wheel_complex.stdout}}"
 
@@ -480,22 +480,6 @@
       copy:
         src: ../golang/terraform-provider-shakenfist/terraform-provider-shakenfist
         dest: /root/terraform-provider-shakenfist
-        owner: root
-        group: root
-        mode: u=rx,g=rx,o=rx
-
-    - name: Copy example.tf
-      copy:
-        src: ../example.tf
-        dest: /root/example.tf
-        owner: root
-        group: root
-        mode: u=r,g=r,o=r
-
-    - name: Copy cleanup script
-      copy:
-        src: ../cleanup.sh
-        dest: /srv/shakenfist/cleanup.sh
         owner: root
         group: root
         mode: u=rx,g=rx,o=rx
