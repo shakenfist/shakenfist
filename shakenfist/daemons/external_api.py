@@ -395,7 +395,7 @@ class InstanceEvents(Resource):
     def get(self, instance_uuid=None, instance_from_db=None):
         db.add_event('instance', instance_uuid,
                      'api', 'get events', None, None)
-        return db.get_events('instance', instance_uuid)
+        return list(db.get_events('instance', instance_uuid))
 
 
 class InstanceSnapshot(Resource):
@@ -622,7 +622,7 @@ class NetworkEvents(Resource):
     def get(self, network_uuid=None, network_from_db=None):
         db.add_event('network', network_uuid,
                      'api', 'get events', None, None)
-        return db.get_events('network', network_uuid)
+        return list(db.get_events('network', network_uuid))
 
 
 class Nodes(Resource):
