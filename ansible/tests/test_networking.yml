@@ -34,7 +34,6 @@
         content: |
           #!/bin/bash -e
 
-          [ `sf-client --simple instance list | wc -l` -eq 3 ]
           [ `sf-client --simple instance list | grep sf-1 | wc -l` -eq 1 ]
           [ `sf-client --simple instance list | grep sf-2 | wc -l` -eq 1 ]
         dest: /tmp/shell_script
