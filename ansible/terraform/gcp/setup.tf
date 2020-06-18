@@ -2,13 +2,17 @@ variable "project" {
   description = "The google cloud project id to use"
 }
 
+variable "uniqifier" {
+  description = "A unique string to prefix hostnames with"
+}
+
 provider "google" {
   project = var.project
 }
 
 resource "google_compute_instance" "sf_1" {
   machine_type     = "n1-standard-4"
-  name             = "sf-1"
+  name             = "${var.uniqifier}sf-1"
   zone             = "us-central1-b"
   min_cpu_platform = "Intel Haswell"
   boot_disk {
@@ -25,7 +29,7 @@ resource "google_compute_instance" "sf_1" {
 
 resource "google_compute_instance" "sf_2" {
   machine_type     = "n1-standard-4"
-  name             = "sf-2"
+  name             = "${var.uniqifier}sf-2"
   zone             = "us-central1-b"
   min_cpu_platform = "Intel Haswell"
   boot_disk {
@@ -42,7 +46,7 @@ resource "google_compute_instance" "sf_2" {
 
 resource "google_compute_instance" "sfdb" {
   machine_type     = "n1-standard-1"
-  name             = "sfdb"
+  name             = "${var.uniqifier}sfdb"
   zone             = "us-central1-b"
   min_cpu_platform = "Intel Haswell"
   boot_disk {
