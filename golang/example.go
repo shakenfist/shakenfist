@@ -121,7 +121,7 @@ func main() {
 		return
 	}
 
-	fmt.Printf("Fetcehd %s\n", network.Name)
+	fmt.Printf("Fetched %s\n", network.Name)
 	networkUuid := networks[0].UUID
 
 	// --------------------------------------------------------------------------

@@ -199,7 +199,7 @@ def network_events(ctx, network_uuid=None):
         filtered_events = []
         for e in events:
             filtered_events.append(filter_dict(
-                n, ['timestamp', 'fqdn', 'operation', 'phase', 'duration', 'message']))
+                e, ['timestamp', 'fqdn', 'operation', 'phase', 'duration', 'message']))
         print(json.dumps({'networks': filtered_events},
                          indent=4, sort_keys=True))
 
@@ -488,7 +488,7 @@ def instance_events(ctx, instance_uuid=None):
         for e in events:
             filtered_events.append(filter_dict(
                 e, ['timestamp', 'fqdn', 'operation', 'phase', 'duration', 'message']))
-        print(json.dumps({'networks': filtered_events},
+        print(json.dumps({'events': filtered_events},
                          indent=4, sort_keys=True))
 
 
