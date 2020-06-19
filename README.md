@@ -18,6 +18,14 @@ Deployment choices
 
 libvirt is the only supported hypervisor. Instances are specified to libvirt with simple templated XML. If your local requirements are different to what's in the template, you're welcome to change the template to meet your needs. If you're template changes break things, you're also welcome to debug what went wrong for yourself.
 
+Tools to control ShakenFist
+===========================
+Golang API Client Library   https://github.com/shakenfist/client-go
+
+Terraform Provider  https://github.com/shakenfist/terraform-provider-shakenfist
+
+Python Client  https://github.com/shakenfist/client-python
+
 Usage guide
 ===========
 
