@@ -1,4 +1,3 @@
-import libvirt
 import logging
 import os
 import psutil
@@ -10,6 +9,7 @@ from prometheus_client import start_http_server
 
 from shakenfist import config
 from shakenfist import db
+from shakenfist import util
 
 
 LOG = logging.getLogger(__file__)
@@ -17,6 +17,7 @@ LOG.setLevel(logging.DEBUG)
 
 
 def _get_stats():
+    libvirt = util.get_libvirt()
     retval = {}
     conn = libvirt.open(None)
 

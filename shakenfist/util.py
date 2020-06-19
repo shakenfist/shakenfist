@@ -1,5 +1,6 @@
 # Copyright 2020 Michael Still
 
+import importlib
 import ipaddress
 import logging
 import random
@@ -96,3 +97,15 @@ def nat_rules_for_ipblock(ipblock):
             return True
 
     return False
+
+
+LIBVIRT = None
+
+
+def get_libvirt():
+    global LIBVIRT
+
+    if not LIBVIRT:
+        LIBVIRT = importlib.import_module('libvirt')
+
+    return LIBVIRT
