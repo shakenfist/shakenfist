@@ -5,6 +5,7 @@
     force_init: true
     variables:
       project: "{{project}}"
+      uniqifier: "{{uniqifier}}"
   register: terraform_out
 
 - name: Add DB node to ansible
