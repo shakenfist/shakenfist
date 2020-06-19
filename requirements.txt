@@ -14,5 +14,6 @@ psutil              # bsd
 prometheus_client   # apache2
 etcd3               # apache2
 
-# Is difficult to get install working, use system packages
-libvirt-python      # lgpl
+# Is difficult to get install working, use system packages instead. On Ubuntu
+# those are: libvirt-daemon-system libvirt-dev python3-libvirt
+#libvirt-python      # lgpl
