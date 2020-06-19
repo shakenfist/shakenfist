@@ -28,6 +28,7 @@ ansible-playbook -i hosts --extra-vars "$ANSIBLE_VARS" deploy.yml
 
 if [ "%$SKIP_SF_TESTS%" == "%%" ]
 then
+  ansible-playbook -i hosts --extra-vars "$ANSIBLE_VARS" pretest.yml
   for playbook in `ls tests/test_*.yml | grep -v test_final.yml | shuf`
   do
     ansible-playbook -i hosts --extra-vars "$ANSIBLE_VARS" $playbook

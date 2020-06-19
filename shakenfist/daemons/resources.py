@@ -1,4 +1,3 @@
-import libvirt
 import logging
 import os
 import psutil
@@ -10,6 +9,7 @@ from prometheus_client import start_http_server
 
 from shakenfist import config
 from shakenfist import db
+from shakenfist import util
 
 
 LOG = logging.getLogger(__file__)
@@ -17,6 +17,7 @@ LOG.setLevel(logging.DEBUG)
 
 
 def _get_stats():
+    libvirt = util.get_libvirt()
     retval = {}
     conn = libvirt.open(None)
 
@@ -40,7 +41,7 @@ def _get_stats():
             'cpu_load_5': load_5,
             'cpu_load_15': load_15,
         })
-    except:
+    except Exception:
         pass
 
     # Memory info
@@ -115,7 +116,7 @@ class monitor(object):
             try:
                 stats = _get_stats()
                 for metric in stats:
-                    if not metric in gauges:
+                    if metric not in gauges:
                         gauges[metric] = Gauge(metric, '')
                     gauges[metric].set(stats[metric])
                 db.update_metrics_bulk(stats)

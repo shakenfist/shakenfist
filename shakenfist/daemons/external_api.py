@@ -4,6 +4,7 @@ from flask_restful import fields, marshal_with
 import ipaddress
 import json
 import logging
+import re
 import requests
 import setproctitle
 import sys
@@ -246,6 +247,9 @@ class Instances(Resource):
              disk=None, ssh_key=None, user_data=None, placed_on=None, instance_uuid=None):
         global SCHEDULER
 
+        # We need to santize the name so its safe for DNS
+        name = re.sub('([^a-zA-Z0-9_\-])', '', name)
+
         # The instance needs to exist in the DB before network interfaces are created
         if not instance_uuid:
             instance_uuid = str(uuid.uuid4())
@@ -391,7 +395,7 @@ class InstanceEvents(Resource):
     def get(self, instance_uuid=None, instance_from_db=None):
         db.add_event('instance', instance_uuid,
                      'api', 'get events', None, None)
-        return db.get_events('instance', instance_uuid)
+        return list(db.get_events('instance', instance_uuid))
 
 
 class InstanceSnapshot(Resource):
@@ -618,7 +622,7 @@ class NetworkEvents(Resource):
     def get(self, network_uuid=None, network_from_db=None):
         db.add_event('network', network_uuid,
                      'api', 'get events', None, None)
-        return db.get_events('network', network_uuid)
+        return list(db.get_events('network', network_uuid))
 
 
 class Nodes(Resource):

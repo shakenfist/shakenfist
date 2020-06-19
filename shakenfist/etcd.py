@@ -1,6 +1,7 @@
 import etcd3
 import json
 import logging
+import time
 
 from shakenfist import config
 
@@ -29,13 +30,15 @@ def get_client():
 
 
 def get_lock(name, ttl=60):
+    start = time.time()
     for attempt in range(3):
         try:
             return get_client().lock(name, ttl=ttl)
         except Exception as e:
             LOG.info('Failed to acquire lock, attempt %d: %s' % (attempt, e))
         finally:
-            LOG.debug('Locked etcd key "%s"' % name)
+            LOG.debug('Locked etcd key "%s" after %.02f seconds'
+                      % (name, time.time() - start))
 
     raise LockException('Cannot acquire lock')
 
