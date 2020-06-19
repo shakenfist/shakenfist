@@ -153,7 +153,7 @@ class Instance(object):
                         cd = pycdlib.PyCdlib()
                         cd.open(hashed_image_path)
                         disk['present_as'] = 'cdrom'
-                    except:
+                    except Exception:
                         pass
 
                     if disk.get('present_as', 'cdrom') == 'cdrom':
@@ -172,12 +172,12 @@ class Instance(object):
                         disk['device'] = 'hd%s' % disk['device'][-1]
                         disk['bus'] = 'ide'
                     else:
-                        with util.RecordedOperation('transcode image', self) as ro:
+                        with util.RecordedOperation('transcode image', self) as _:
                             images.transcode_image(hashed_image_path)
-                        with util.RecordedOperation('resize image', self) as ro:
+                        with util.RecordedOperation('resize image', self) as _:
                             resized_image_path = images.resize_image(
                                 hashed_image_path, disk['size'])
-                        with util.RecordedOperation('create copy on write layer', self) as ro:
+                        with util.RecordedOperation('create copy on write layer', self) as _:
                             images.create_cow(resized_image_path, disk['path'])
 
                 elif not os.path.exists(disk['path']):
@@ -193,9 +193,9 @@ class Instance(object):
             self.db_entry['uuid'], self.db_entry['block_devices'])
 
         # Create the actual instance
-        with util.RecordedOperation('create domain XML', self) as ro:
+        with util.RecordedOperation('create domain XML', self) as _:
             self._create_domain_xml()
-        with util.RecordedOperation('create domain', self) as ro:
+        with util.RecordedOperation('create domain', self) as _:
             self.power_on()
 
         db.update_instance_state(self.db_entry['uuid'], 'created')
@@ -207,13 +207,13 @@ class Instance(object):
 
                 instance = self._get_domain()
                 instance.undefine()
-            except:
+            except Exception:
                 pass
 
         with util.RecordedOperation('delete disks', self) as _:
             try:
                 shutil.rmtree(self.instance_path)
-            except:
+            except Exception:
                 pass
 
         with util.RecordedOperation('release network addreses', self) as _:
