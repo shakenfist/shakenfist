@@ -10,9 +10,14 @@
       shell: tox -epy37
 
     - name: Clear out old wheels
-      shell:
-        cmd: rm *.whl *.tar.gz
-        chdir: ../dist
+      file:
+        path: ../dist
+        state: absent
+
+    - name: Ensure we have a local dist directory
+      file:
+        path: ../dist
+        state: directory
 
     - name: Build a wheel for shakenfist
       shell:
@@ -307,6 +312,13 @@
     - name: Make /srv/shakenfist/grafana/dashboards
       file:
         path: /srv/shakenfist/grafana/dashboards
+        state: directory
+        owner: sfgrafana
+        mode: u=rwx,g=,o=
+
+    - name: Make /srv/shakenfist/grafana/config/provisioning/datasources
+      file:
+        path: /srv/shakenfist/grafana/config/provisioning/datasources
         state: directory
         owner: sfgrafana
         mode: u=rwx,g=,o=
