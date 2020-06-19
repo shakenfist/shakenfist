@@ -12,7 +12,6 @@
         "arping",
         "bridge-utils",
         "cpu-checker",
-        "default-libmysqlclient-dev",
         "dnsmasq",
         "dnsutils",
         "etcd-client",
