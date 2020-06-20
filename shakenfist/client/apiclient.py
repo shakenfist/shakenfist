@@ -1,8 +1,6 @@
-import base64
 from email.utils import parsedate_to_datetime
 import json
 import logging
-from logging import handlers as logging_handlers
 import requests
 
 
@@ -68,7 +66,7 @@ def _request_url(method, url, data=None):
                       % ('\n    '.join(json.dumps(json.loads(r.text),
                                                   indent=4,
                                                   sort_keys=True).split('\n'))))
-        except:
+        except Exception:
             LOG.debug('Text:\n    %s'
                       % ('\n    '.join(r.text.split('\n'))))
     LOG.debug('-------------------------------------------------------')

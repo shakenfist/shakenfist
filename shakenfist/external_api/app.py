@@ -10,13 +10,11 @@ import re
 import requests
 import setproctitle
 import sys
-import time
 import traceback
 import uuid
 
 from oslo_concurrency import processutils
 
-from shakenfist.client import apiclient
 from shakenfist import config
 from shakenfist import db
 from shakenfist import etcd
@@ -62,11 +60,11 @@ def flask_get_post_body():
     j = {}
     try:
         j = flask.request.get_json(force=True)
-    except:
+    except Exception:
         if flask.request.data:
             try:
                 j = json.loads(flask.request.data)
-            except:
+            except Exception:
                 pass
     return j
 
@@ -87,7 +85,7 @@ def generic_wrapper(func):
 
             LOG.info('External API request: %s %s %s' % (func, args, kwargs))
             return func(*args, **kwargs)
-        except:
+        except Exception:
             return error(500, 'server error')
     return wrapper
 
@@ -253,7 +251,7 @@ class Instances(Resource):
         global SCHEDULER
 
         # We need to santize the name so its safe for DNS
-        name = re.sub('([^a-zA-Z0-9_\-])', '', name)
+        name = re.sub(r'([^a-zA-Z0-9_\-])', '', name)
 
         # The instance needs to exist in the DB before network interfaces are created
         if not instance_uuid:
@@ -338,10 +336,10 @@ class Instances(Resource):
 
         order = 0
         for netdesc in network:
-            if not 'network_uuid' in netdesc or not netdesc['network_uuid']:
+            if 'network_uuid' not in netdesc or not netdesc['network_uuid']:
                 error_with_cleanup(404, 'network not specified')
 
-            if not netdesc['network_uuid'] in nets:
+            if netdesc['network_uuid'] not in nets:
                 n = net.from_db(netdesc['network_uuid'])
                 if not n:
                     error_with_cleanup(
@@ -353,7 +351,7 @@ class Instances(Resource):
                                ttl=120) as _:
                 allocations.setdefault(netdesc['network_uuid'], [])
                 ipm = db.get_ipmanager(netdesc['network_uuid'])
-                if not 'address' in netdesc or not netdesc['address']:
+                if 'address' not in netdesc or not netdesc['address']:
                     netdesc['address'] = ipm.get_random_free_address()
                 else:
                     if not ipm.reserve(netdesc['address']):
@@ -363,7 +361,7 @@ class Instances(Resource):
                 allocations[netdesc['network_uuid']].append(
                     (netdesc['address'], order))
 
-            if not 'model' in netdesc or not netdesc['model']:
+            if 'model' not in netdesc or not netdesc['model']:
                 netdesc['model'] = 'virtio'
 
             db.create_network_interface(

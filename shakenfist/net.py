@@ -4,14 +4,12 @@ import json
 import logging
 from logging import handlers as logging_handlers
 import os
-import random
 import re
 import requests
 
 from oslo_concurrency import processutils
 
 
-from shakenfist.client import apiclient
 from shakenfist import config
 from shakenfist import db
 from shakenfist import dhcp
@@ -304,7 +302,7 @@ class Network(object):
                 }))
 
     def discover_mesh(self):
-        mesh_re = re.compile('00: 00: 00: 00: 00: 00 dst (.*) self permanent')
+        mesh_re = re.compile(r'00: 00: 00: 00: 00: 00 dst (.*) self permanent')
 
         with util.RecordedOperation('discover mesh', self) as _:
             stdout, _ = processutils.execute(
@@ -335,7 +333,7 @@ class Network(object):
             node_ips = [config.parsed.get('NETWORK_NODE_IP')]
             for fqdn in node_fqdns:
                 ip = db.get_node(fqdn)['ip']
-                if not ip in node_ips:
+                if ip not in node_ips:
                     node_ips.append(ip)
 
             for node in self.discover_mesh():

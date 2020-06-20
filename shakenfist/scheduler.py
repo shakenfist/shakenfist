@@ -134,7 +134,7 @@ class Scheduler(object):
                 db.add_event('instance', instance.db_entry['uuid'],
                              'schedule', 'Forced candidates', None, str(candidates))
                 for node in candidates:
-                    if not node in self.metrics:
+                    if node not in self.metrics:
                         raise CandidateNodeNotFoundException(node)
             else:
                 candidates = []
@@ -185,7 +185,7 @@ class Scheduler(object):
             requested_networks = []
             for net in network:
                 network_uuid = net['network_uuid']
-                if not network_uuid in requested_networks:
+                if network_uuid not in requested_networks:
                     requested_networks.append(network_uuid)
 
             candidates = self._find_most_matching_networks(

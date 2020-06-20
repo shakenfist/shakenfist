@@ -5,12 +5,8 @@ import click
 import datetime
 import json
 import logging
-from logging import handlers as logging_handlers
-import os
 from prettytable import PrettyTable
 import sys
-import time
-import uuid
 
 from shakenfist.client import apiclient
 
@@ -53,11 +49,6 @@ def cli(ctx, output, verbose):
 @click.group(help='Node commands')
 def node():
     pass
-
-
-def _get_networks(ctx, args, incomplete):
-    for n in CLIENT.get_networks():
-        yield n['uuid']
 
 
 @node.command(name='list', help='List nodes')
@@ -350,7 +341,7 @@ def instance_show(ctx, instance_uuid=None, snapshots=False):
 
 
 def _parse_spec(spec):
-    if not '@' in spec:
+    if '@' not in spec:
         return spec, None
     return spec.split('@')
 
@@ -544,11 +535,11 @@ def instance_unpause(ctx, instance_uuid=None):
 @click.argument('all', type=click.BOOL, default=False)
 @click.pass_context
 def instance_snapshot(ctx, instance_uuid=None, all=False):
-    uuid = CLIENT.snapshot_instance(instance_uuid, all)
+    snapshot_uuid = CLIENT.snapshot_instance(instance_uuid, all)
     if ctx.obj['OUTPUT'] == 'json':
-        print(json.dumps({'uuid': uuid}, indent=4, sort_keys=True))
+        print(json.dumps({'uuid': snapshot_uuid}, indent=4, sort_keys=True))
     else:
-        print('Created snapshot %s' % uuid)
+        print('Created snapshot %s' % snapshot_uuid)
 
 
 cli.add_command(instance)

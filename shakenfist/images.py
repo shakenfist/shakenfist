@@ -44,7 +44,7 @@ def _resolve_cirros(name):
 
     if name == 'cirros':
         versions = []
-        dir_re = re.compile('.*<a href="([0-9]+\.[0-9]+\.[0-9]+)/">.*/</a>.*')
+        dir_re = re.compile(r'.*<a href="([0-9]+\.[0-9]+\.[0-9]+)/">.*/</a>.*')
         for line in resp.text.split('\n'):
             m = dir_re.match(line)
             if m:
@@ -70,7 +70,7 @@ def _resolve_ubuntu(name):
 
     versions = {}
     dir_re = re.compile(
-        '.*<a href="(.*)/">.*Ubuntu Server ([0-9]+\.[0-9]+).*')
+        r'.*<a href="(.*)/">.*Ubuntu Server ([0-9]+\.[0-9]+).*')
     for line in resp.text.split('\n'):
         m = dir_re.match(line)
         if m:
@@ -221,7 +221,7 @@ def resize_image(hashed_image_path, size):
     return backing_file
 
 
-VALUE_WITH_BRACKETS_RE = re.compile('.* \(([0-9]+) bytes\)')
+VALUE_WITH_BRACKETS_RE = re.compile(r'.* \(([0-9]+) bytes\)')
 
 
 def identify_image(path):
@@ -256,7 +256,7 @@ def identify_image(path):
 
             try:
                 data[key] = float(value)
-            except:
+            except Exception:
                 data[key] = value
 
     return data

@@ -1,11 +1,9 @@
-import flask
-import json
 import logging
-from logging import handlers as logging_handlers
 import mock
 import testtools
 
 
+from shakenfist import config
 from shakenfist.external_api import app as external_api
 
 

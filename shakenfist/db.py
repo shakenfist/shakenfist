@@ -1,7 +1,5 @@
 # Copyright 2020 Michael Still
 
-import datetime
-import json
 import logging
 from logging import handlers as logging_handlers
 import randmac
@@ -224,7 +222,6 @@ def update_instance_state(instance_uuid, state):
 
 def hard_delete_instance(instance_uuid):
     see_this_node()
-    i = get_instance(instance_uuid)
     etcd.delete('instance', None, instance_uuid)
 
 
@@ -238,7 +235,7 @@ def get_stale_instances(delay):
 
 def create_network_interface(interface_uuid, netdesc, instance_uuid, order):
     see_this_node()
-    if not 'macaddress' in netdesc or not netdesc['macaddress']:
+    if 'macaddress' not in netdesc or not netdesc['macaddress']:
         with etcd.get_lock('macaddress', ttl=120) as _:
             possible_mac = str(randmac.RandMac(
                 '00:00:00:00:00:00', False)).lstrip('\'').rstrip('\'')

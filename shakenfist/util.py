@@ -75,7 +75,7 @@ def get_interface_addresses(namespace, name):
     if not stdout:
         return
 
-    inet_re = re.compile(' +inet (.*)/[0-9]+.*')
+    inet_re = re.compile(r' +inet (.*)/[0-9]+.*')
     for line in stdout.split('\n'):
         m = inet_re.match(line)
         if m:
