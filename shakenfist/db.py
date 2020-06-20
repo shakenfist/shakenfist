@@ -3,6 +3,7 @@
 import datetime
 import json
 import logging
+from logging import handlers as logging_handlers
 import randmac
 import random
 import time
@@ -16,6 +17,7 @@ from shakenfist import ipmanager
 
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
+LOG.addHandler(logging_handlers.SysLogHandler(address=('127.0.0.1', 514)))
 
 
 def see_this_node():

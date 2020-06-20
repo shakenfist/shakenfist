@@ -4,6 +4,7 @@ from flask_restful import fields, marshal_with
 import ipaddress
 import json
 import logging
+from logging import handlers as logging_handlers
 import os
 import re
 import requests
@@ -30,6 +31,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
+LOG.addHandler(logging_handlers.SysLogHandler(address=('127.0.0.1', 514)))
 
 
 TESTING = False

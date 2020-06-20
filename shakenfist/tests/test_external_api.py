@@ -1,6 +1,7 @@
 import flask
 import json
 import logging
+from logging import handlers as logging_handlers
 import mock
 import testtools
 

@@ -1,5 +1,6 @@
 import copy
 import logging
+from logging import handlers as logging_handlers
 import re
 import setproctitle
 import time
@@ -16,6 +17,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
+LOG.addHandler(logging_handlers.SysLogHandler(address=('127.0.0.1', 514)))
 
 
 VXLAN_RE = re.compile('[0-9]+: vxlan-([0-9]+).*')

@@ -5,6 +5,7 @@ import click
 import datetime
 import json
 import logging
+from logging import handlers as logging_handlers
 import os
 from prettytable import PrettyTable
 import sys

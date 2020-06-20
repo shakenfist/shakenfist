@@ -2,6 +2,7 @@
 
 import json
 import logging
+from logging import handlers as logging_handlers
 import os
 import random
 import re
@@ -20,6 +21,7 @@ from shakenfist import util
 
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
+LOG.addHandler(logging_handlers.SysLogHandler(address=('127.0.0.1', 514)))
 
 
 def from_db(uuid):

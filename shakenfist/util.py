@@ -2,6 +2,7 @@
 
 import importlib
 import logging
+from logging import handlers as logging_handlers
 import re
 import time
 
@@ -12,6 +13,7 @@ from shakenfist import db
 
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
+LOG.addHandler(logging_handlers.SysLogHandler(address=('127.0.0.1', 514)))
 
 
 class RecordedOperation():

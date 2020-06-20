@@ -1,6 +1,7 @@
 # Copyright 2019 Michael Still
 
 import logging
+from logging import handlers as logging_handlers
 import setproctitle
 import time
 import os
@@ -22,6 +23,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
+LOG.addHandler(logging_handlers.SysLogHandler(address=('127.0.0.1', 514)))
 
 
 def restore_instances():
