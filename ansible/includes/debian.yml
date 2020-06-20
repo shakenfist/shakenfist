@@ -16,6 +16,7 @@
         "dnsutils",
         "etcd-client",
         "git",
+        "gunicorn3",
         "libssl-dev",
         "libvirt-daemon-system",
         "libvirt-dev",

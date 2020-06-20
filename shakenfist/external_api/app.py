@@ -4,6 +4,7 @@ from flask_restful import fields, marshal_with
 import ipaddress
 import json
 import logging
+import os
 import re
 import requests
 import setproctitle
@@ -11,6 +12,8 @@ import sys
 import time
 import traceback
 import uuid
+
+from oslo_concurrency import processutils
 
 from shakenfist.client import apiclient
 from shakenfist import config
@@ -699,6 +702,10 @@ class monitor(object):
         setproctitle.setproctitle('sf api')
 
     def run(self):
-        app.run(
-            host='0.0.0.0',
-            port=config.parsed.get('API_PORT'))
+        processutils.execute(
+            ('gunicorn3 --workers 10 --bind 0.0.0.0:%d '
+             '--log-syslog --log-syslog-prefix sf '
+             '--name "sf api" '
+             'shakenfist.external_api.app:app'
+             % config.parsed.get('API_PORT')),
+            shell=True, env_variables=os.environ)

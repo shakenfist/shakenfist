@@ -9,9 +9,9 @@ from oslo_concurrency import processutils
 
 from shakenfist import config
 from shakenfist.daemons import cleaner as cleaner_daemon
-from shakenfist.daemons import external_api as external_api_daemon
 from shakenfist.daemons import net as net_daemon
 from shakenfist.daemons import resources as resource_daemon
+from shakenfist.external_api import app as external_api_daemon
 from shakenfist import db
 from shakenfist import net
 from shakenfist import util
