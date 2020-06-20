@@ -8,23 +8,11 @@
       uniqifier: "{{uniqifier}}"
   register: terraform_out
 
-- name: Add DB node to ansible
-  add_host:
-    hostname: sfdb
-    ansible_ssh_host: "{{terraform_out.outputs.sfdb_external.value[0]}}"
-    groups: db
-
-- name: Add DB node_ip
-  set_fact:
-    node_ip: "{{terraform_out.outputs.sfdb_internal.value[0]}}"
-  delegate_to: sfdb
-  delegate_facts: true
-
 - name: Add sf-1 to ansible
   add_host:
     hostname: sf-1
     ansible_ssh_host: "{{terraform_out.outputs.sf_1_external.value[0]}}"
-    groups: hypervisors
+    groups: hypervisors, db, etcd_master
 
 - name: Add sf-1 node_ip
   set_fact:
@@ -36,7 +24,7 @@
   add_host:
     hostname: sf-2
     ansible_ssh_host: "{{terraform_out.outputs.sf_2_external.value[0]}}"
-    groups: hypervisors
+    groups: hypervisors, etcd_master
 
 - name: Add sf-2 node_ip
   set_fact:
@@ -44,9 +32,21 @@
   delegate_to: sf-2
   delegate_facts: true
 
+- name: Add sf-3 to ansible
+  add_host:
+    hostname: sf-3
+    ansible_ssh_host: "{{terraform_out.outputs.sf_3_external.value[0]}}"
+    groups: hypervisors, etcd_master
+
+- name: Add sf-3 node_ip
+  set_fact:
+    node_ip: "{{terraform_out.outputs.sf_3_internal.value[0]}}"
+  delegate_to: sf-3
+  delegate_facts: true
+
 - name: Log terraform hosts
   debug:
     msg:
-      - "db: {{hostvars['sfdb']['ansible_ssh_host']}}, {{hostvars['sfdb']['node_ip']}}"
       - "sf-1: {{hostvars['sf-1']['ansible_ssh_host']}}, {{hostvars['sf-1']['node_ip']}}"
       - "sf-2: {{hostvars['sf-2']['ansible_ssh_host']}}, {{hostvars['sf-2']['node_ip']}}"
+      - "sf-3: {{hostvars['sf-3']['ansible_ssh_host']}}, {{hostvars['sf-3']['node_ip']}}"
