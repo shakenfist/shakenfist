@@ -336,7 +336,9 @@ class Network(object):
                 if ip not in node_ips:
                     node_ips.append(ip)
 
-            for node in self.discover_mesh():
+            discovered = list(self.discover_mesh())
+            LOG.info('%s: Discovered mesh elements %s' % (self, discovered))
+            for node in discovered:
                 if node in node_ips:
                     node_ips.remove(node)
                 else:
