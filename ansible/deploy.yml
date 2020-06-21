@@ -362,19 +362,21 @@
       set_fact:
         syslog: "{{hostvars['localhost']['database_node_ip']}}"
 
-    - name: Write syslog file
+    - name: Send syslog to the DB server, unless I am the DB server
       template:
         src: files/rsyslog-client-01-sf.conf
         dest: /etc/rsyslog.d/01-sf.conf
         owner: root
         group: sudo
         mode: u=r,g=r,o=
+      when: hostvars['localhost']['database_node_ip'] != node_ip
 
     - name: Restart syslog
       service:
         name: rsyslog
         enabled: yes
         state: restarted
+      when: hostvars['localhost']['database_node_ip'] != node_ip
 
     - name: Create storage directory
       file:

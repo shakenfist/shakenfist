@@ -11,11 +11,9 @@ from shakenfist import db
 from shakenfist import net
 
 
-logging.basicConfig(level=logging.DEBUG)
-
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
-LOG.addHandler(logging_handlers.SysLogHandler(address=('127.0.0.1', 514)))
+LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 
 
 VXLAN_RE = re.compile(r'[0-9]+: vxlan-([0-9]+).*')

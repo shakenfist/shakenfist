@@ -25,11 +25,9 @@ from shakenfist import util
 from shakenfist import virt
 
 
-logging.basicConfig(level=logging.DEBUG)
-
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
-LOG.addHandler(logging_handlers.SysLogHandler(address=('127.0.0.1', 514)))
+LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 
 
 TESTING = False
@@ -52,7 +50,8 @@ def error(status_code, message):
     resp = flask.Response(json.dumps(body),
                           mimetype='application/json')
     resp.status_code = status_code
-    LOG.info('Returning API error: %d, %s' % (status_code, message))
+    LOG.error('Returning API error: %d, %s\n    %s'
+              % (status_code, message, '\n    '.join(body.get('traceback', ['No traceback']))))
     return resp
 
 
@@ -126,16 +125,16 @@ def redirect_instance_request(func):
     def wrapper(*args, **kwargs):
         i = kwargs.get('instance_from_db_virt')
         if i and i.db_entry['node'] != config.parsed.get('NODE_NAME'):
+            url = 'http://%s:%d%s' % (i.db_entry['node'],
+                                      config.parsed.get('API_PORT'),
+                                      flask.request.environ['PATH_INFO'])
             r = requests.request(
-                flask.request.environ['REQUEST_METHOD'],
-                'http://%s:%d%s'
-                % (i.db_entry['node'],
-                   config.parsed.get('API_PORT'),
-                   flask.request.environ['PATH_INFO']),
+                flask.request.environ['REQUEST_METHOD'], url,
                 data=json.dumps(flask_get_post_body()))
 
-            LOG.info('Returning proxied request: %d, %s'
-                     % (r.status_code, r.text))
+            LOG.info('Proxied %s %s returns: %d, %s'
+                     % (flask.request.environ['REQUEST_METHOD'], url,
+                        r.status_code, r.text))
             resp = flask.Response(r.text,
                                   mimetype='application/json')
             resp.status_code = r.status_code

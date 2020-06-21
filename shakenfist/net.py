@@ -19,7 +19,7 @@ from shakenfist import util
 
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
-LOG.addHandler(logging_handlers.SysLogHandler(address=('127.0.0.1', 514)))
+LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 
 
 def from_db(uuid):

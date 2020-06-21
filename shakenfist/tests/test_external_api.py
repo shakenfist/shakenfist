@@ -7,9 +7,6 @@ from shakenfist import config
 from shakenfist.external_api import app as external_api
 
 
-logging.basicConfig(level=logging.DEBUG)
-
-
 class FakeResponse(object):
     def __init__(self, status_code, text):
         self.status_code = status_code
