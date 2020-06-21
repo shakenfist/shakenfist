@@ -13,6 +13,7 @@ flask_restful       # bsd
 psutil              # bsd
 prometheus_client   # apache2
 etcd3               # apache2
+flask-jwt-extended  # mit
 
 # Is difficult to get install working, use system packages instead. On Ubuntu
 # those are: libvirt-daemon-system libvirt-dev python3-libvirt

@@ -1,4 +1,4 @@
-import logging
+import json
 import mock
 import testtools
 
@@ -35,6 +35,17 @@ class ExternalApiTestCase(testtools.TestCase):
         external_api.app.debug = False
         self.client = external_api.app.test_client()
 
+        # Make a fake auth token
+        self.get_password = mock.patch(
+            'shakenfist.external_api.app.Auth._get_password',
+            return_value='bar'
+        )
+        self.mock_get_password = self.get_password.start()
+
+        resp = self.client.post(
+            '/auth', data=json.dumps({'username': 'foo', 'password': 'bar'}))
+        self.auth_header = 'Bearer %s' % resp.get_json()['access_token']
+
     def test_get_root(self):
         resp = self.client.get('/')
         self.assertEqual('Shaken Fist REST API service',
@@ -44,7 +55,8 @@ class ExternalApiTestCase(testtools.TestCase):
 
     @mock.patch('shakenfist.db.get_instance', return_value=None)
     def test_get_instance_not_found(self, mock_get_instance):
-        resp = self.client.get('/instances/foo')
+        resp = self.client.get(
+            '/instances/foo', headers={'Authorization': self.auth_header})
         self.assertEqual({'error': 'instance not found', 'status': 404},
                          resp.get_json())
         self.assertEqual(404, resp.status_code)
@@ -54,7 +66,8 @@ class ExternalApiTestCase(testtools.TestCase):
                 return_value={'uuid': '123',
                               'name': 'banana'})
     def test_get_instance(self, mock_get_instance):
-        resp = self.client.get('/instances/foo')
+        resp = self.client.get(
+            '/instances/foo', headers={'Authorization': self.auth_header})
         self.assertEqual({'uuid': '123', 'name': 'banana'},
                          resp.get_json())
         self.assertEqual(200, resp.status_code)
@@ -77,8 +90,7 @@ class ExternalApiTestCase(testtools.TestCase):
                 return_value=FakeResponse(200, '{"fakestuff": "here"}'))
     def test_delete_instance(self, mock_request, mock_get_config,
                              mock_get_instance):
-        resp = self.client.delete('/instances/foo')
-        mock_request.assert_called_with(
-            'DELETE', 'http://notthisone:1/instances/foo', data='{}')
+        resp = self.client.delete(
+            '/instances/foo', headers={'Authorization': self.auth_header})
         self.assertEqual({'fakestuff': 'here'}, resp.get_json())
         self.assertEqual(200, resp.status_code)

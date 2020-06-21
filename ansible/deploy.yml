@@ -36,6 +36,10 @@
       debug:
         msg: "Wheel is: {{hostvars['localhost']['wheel_path']}}"
 
+    - name: Generate a random auth secret
+      set_fact:
+        auth_secret: "{{ lookup('password', '/dev/null length=30 chars=ascii_letters') }}"
+
     - include: terraform/{{cloud}}/terraform.yml
 
     - name: Wait for instances to boot
@@ -197,13 +201,6 @@
 
   tasks:
     - include: includes/docker.yml
-
-    - name: Create a etcd user
-      user:
-        name: sfetcd
-        comment: shakenfist etcd
-        group: daemon
-      register: sfetcd_user_complex
 
     - name: Create a prometheus user
       user:
@@ -378,6 +375,9 @@
         ports:
           - 3000:3000
         user: "{{sfgrafana_user_complex.uid}}"
+
+    - name: Create an admin user
+      shell: ETCDCTL_API=3 etcdctl put "/sf/passwords/admin" "{{api_admin_password}}"
 
 - hosts: hypervisors
   any_errors_fatal: true

@@ -12,6 +12,7 @@ Environment=SHAKENFIST_NODE_NAME="{{inventory_hostname}}"
 Environment=SHAKENFIST_NODE_EGRESS_NIC="{{node_egress_nic}}"
 Environment=SHAKENFIST_FLOATING_NETWORK="{{floating_network_ipblock}}"
 Environment=SHAKENFIST_NETWORK_NODE_IP="{{hostvars['localhost']['network_node_ip']}}"
+Environment=SHAKENFIST_AUTH_SECRET_SEED="{{hostvars['localhost']['auth_secret']}}"
 
 ExecStart=/bin/sh -c 'sf-daemon'
 

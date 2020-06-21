@@ -5,6 +5,7 @@ import click
 import datetime
 import json
 import logging
+import os
 from prettytable import PrettyTable
 import sys
 
@@ -17,7 +18,9 @@ LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.INFO)
 
 
-CLIENT = apiclient.Client()
+CLIENT = apiclient.Client(username=os.environ.get('SHAKENFIST_USERNAME'),
+                          password=os.environ.get('SHAKENFIST_PASSWORD'),
+                          base_url=os.environ.get('SHAKENFIST_API_URL'))
 
 
 def filter_dict(d, allowed_keys):
@@ -43,7 +46,11 @@ def cli(ctx, output, verbose):
         LOG.setLevel(logging.DEBUG)
 
         global CLIENT
-        CLIENT = apiclient.Client(verbose=True)
+        CLIENT = apiclient.Client(
+            username=os.environ.get('SHAKENFIST_USERNAME'),
+            password=os.environ.get('SHAKENFIST_PASSWORD'),
+            base_url=os.environ.get('SHAKENFIST_API_URL'),
+            verbose=True)
 
 
 @click.group(help='Node commands')

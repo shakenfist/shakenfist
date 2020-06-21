@@ -1,14 +1,10 @@
-export SHAKENFIST_NODE_IP="{{node_ip}}"
-export SHAKENFIST_NODE_EGRESS_NIC="{{node_egress_nic}}"
-export SHAKENFIST_FLOATING_NETWORK="{{floating_network_ipblock}}"
-export SHAKENFIST_NETWORK_NODE_IP="{{hostvars['localhost']['network_node_ip']}}"
-
-export SHAKENFIST_DISK_BUS="virtio"
-export SHAKENFIST_NETWORK_MODEL="virtio"
-
+# Command line hinting
 eval "$(_SF_CLIENT_COMPLETE=source sf-client)"
-
-alias sfmesh="bridge fdb show brport vxlan-$1"
 
 # Use the v3 etcd API
 export ETCDCTL_API=3
+
+# Client auth
+SHAKENFIST_USERNAME="admin"
+SHAKENFIST_PASSWORD="{{api_admin_password}}"
+SHAKENFIST_API_URL="http://localhost:13000"

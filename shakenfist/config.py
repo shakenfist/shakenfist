@@ -35,6 +35,7 @@ CONFIG_DEFAULTS = {
     'API_PORT': 13000,
     'INCLUDE_TRACEBACKS': '1',
     'PROMETHEUS_METRICS_PORT': 13001,
+    'AUTH_SECRET_SEED': 'foo',
 
     # Scheduler options:
     #  - scheduler_cache_timeout: how long the scheduler should cache things for

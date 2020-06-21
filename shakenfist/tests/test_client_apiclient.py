@@ -12,7 +12,7 @@ class ApiClientTestCase(testtools.TestCase):
         super(ApiClientTestCase, self).setUp()
 
         self.request_url = mock.patch(
-            'shakenfist.client.apiclient._request_url')
+            'shakenfist.client.apiclient.Client._request_url')
         self.mock_request = self.request_url.start()
 
     def test_get_instances(self):
@@ -188,7 +188,7 @@ class GetNodesMock():
 
 
 class ApiClientGetNodesTestCase(testtools.TestCase):
-    @mock.patch('shakenfist.client.apiclient._request_url',
+    @mock.patch('shakenfist.client.apiclient.Client._request_url',
                 return_value=GetNodesMock())
     def test_get_nodes(self, mock_request):
         client = apiclient.Client()

@@ -1,6 +1,10 @@
 import flask
+from flask_jwt_extended import create_access_token
+from flask_jwt_extended import JWTManager
+from flask_jwt_extended import jwt_required
 import flask_restful
-from flask_restful import fields, marshal_with
+from flask_restful import fields
+from flask_restful import marshal_with
 import ipaddress
 import json
 import logging
@@ -12,6 +16,7 @@ import setproctitle
 import sys
 import traceback
 import uuid
+from werkzeug.security import safe_str_cmp
 
 from oslo_concurrency import processutils
 
@@ -130,7 +135,8 @@ def redirect_instance_request(func):
                                       flask.request.environ['PATH_INFO'])
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'], url,
-                data=json.dumps(flask_get_post_body()))
+                data=json.dumps(flask_get_post_body()),
+                headers=flask.request.headers.get('Authorization'))
 
             LOG.info('Proxied %s %s returns: %d, %s'
                      % (flask.request.environ['REQUEST_METHOD'], url,
@@ -182,6 +188,8 @@ def redirect_to_network_node(func):
 
 app = flask.Flask(__name__)
 api = flask_restful.Api(app, catch_all_404s=False)
+app.config['JWT_SECRET_KEY'] = config.parsed.get('AUTH_SECRET_SEED')
+jwt = JWTManager(app)
 
 
 @app.before_request
@@ -203,12 +211,29 @@ class Root(Resource):
         return resp
 
 
+class Auth(Resource):
+    def _get_password(self, username):
+        return etcd.get('passwords', None, username)
+
+    def post(self, username=None, password=None):
+        stored = self._get_password(username)
+        if not username:
+            return error(400, 'Missing username in request')
+        if not password:
+            return error(400, 'Missing password in request')
+        if not safe_str_cmp(password.encode('utf-8'), stored.encode('utf-8')):
+            return error(401, 'Unauthorized')
+        return {'access_token': create_access_token(identity=username)}
+
+
 class Instance(Resource):
+    @jwt_required
     @arg_is_instance_uuid
     def get(self, instance_uuid=None, instance_from_db=None):
         db.add_event('instance', instance_uuid, 'api', 'get', None, None)
         return instance_from_db
 
+    @jwt_required
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def delete(self, instance_uuid=None, instance_from_db_virt=None):
@@ -242,9 +267,11 @@ class Instance(Resource):
 
 
 class Instances(Resource):
+    @jwt_required
     def get(self, all=False):
         return list(db.get_instances(all=all))
 
+    @jwt_required
     def post(self, name=None, cpus=None, memory=None, network=None,
              disk=None, ssh_key=None, user_data=None, placed_on=None, instance_uuid=None):
         global SCHEDULER
@@ -385,6 +412,7 @@ class Instances(Resource):
 
 
 class InstanceInterfaces(Resource):
+    @jwt_required
     @arg_is_instance_uuid
     def get(self, instance_uuid=None, instance_from_db=None):
         db.add_event('instance', instance_uuid,
@@ -393,6 +421,7 @@ class InstanceInterfaces(Resource):
 
 
 class InstanceEvents(Resource):
+    @jwt_required
     @arg_is_instance_uuid
     def get(self, instance_uuid=None, instance_from_db=None):
         db.add_event('instance', instance_uuid,
@@ -401,6 +430,7 @@ class InstanceEvents(Resource):
 
 
 class InstanceSnapshot(Resource):
+    @jwt_required
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db_virt=None, all=None):
@@ -412,6 +442,7 @@ class InstanceSnapshot(Resource):
                      'api', 'create', None, None)
         return snap_uuid
 
+    @jwt_required
     @arg_is_instance_uuid
     def get(self, instance_uuid=None, instance_from_db=None):
         db.add_event('instance', instance_uuid,
@@ -424,6 +455,7 @@ class InstanceSnapshot(Resource):
 
 
 class InstanceRebootSoft(Resource):
+    @jwt_required
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db_virt=None):
@@ -433,6 +465,7 @@ class InstanceRebootSoft(Resource):
 
 
 class InstanceRebootHard(Resource):
+    @jwt_required
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db_virt=None):
@@ -442,6 +475,7 @@ class InstanceRebootHard(Resource):
 
 
 class InstancePowerOff(Resource):
+    @jwt_required
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db_virt=None):
@@ -451,6 +485,7 @@ class InstancePowerOff(Resource):
 
 
 class InstancePowerOn(Resource):
+    @jwt_required
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db_virt=None):
@@ -460,6 +495,7 @@ class InstancePowerOn(Resource):
 
 
 class InstancePause(Resource):
+    @jwt_required
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db_virt=None):
@@ -468,6 +504,7 @@ class InstancePause(Resource):
 
 
 class InstanceUnpause(Resource):
+    @jwt_required
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db_virt=None):
@@ -477,6 +514,7 @@ class InstanceUnpause(Resource):
 
 
 class InterfaceFloat(Resource):
+    @jwt_required
     @redirect_to_network_node
     def post(self, interface_uuid=None):
         db.add_event('interface', interface_uuid,
@@ -506,6 +544,7 @@ class InterfaceFloat(Resource):
 
 
 class InterfaceDefloat(Resource):
+    @jwt_required
     @redirect_to_network_node
     def post(self, interface_uuid=None):
         db.add_event('interface', interface_uuid,
@@ -535,6 +574,7 @@ class InterfaceDefloat(Resource):
 
 
 class Image(Resource):
+    @jwt_required
     def post(self, url=None):
         db.add_event('image', url, 'api', 'cache', None, None)
 
@@ -543,12 +583,14 @@ class Image(Resource):
 
 
 class Network(Resource):
+    @jwt_required
     @arg_is_network_uuid
     def get(self, network_uuid=None, network_from_db=None):
         db.add_event('network', network_uuid, 'api', 'get', None, None)
         del network_from_db['ipmanager']
         return network_from_db
 
+    @jwt_required
     @arg_is_network_uuid
     @redirect_to_network_node
     def delete(self, network_uuid=None, network_from_db=None):
@@ -574,6 +616,7 @@ class Network(Resource):
 
 
 class Networks(Resource):
+    @jwt_required
     @marshal_with({
         'uuid': fields.String,
         'vxlan_id': fields.Integer,
@@ -586,6 +629,7 @@ class Networks(Resource):
     def get(self, all=False):
         return list(db.get_networks(all=all))
 
+    @jwt_required
     def post(self, netblock=None, provide_dhcp=None, provide_nat=None, name=None):
         try:
             ipaddress.ip_network(netblock)
@@ -620,6 +664,7 @@ class Networks(Resource):
 
 
 class NetworkEvents(Resource):
+    @jwt_required
     @arg_is_network_uuid
     def get(self, network_uuid=None, network_from_db=None):
         db.add_event('network', network_uuid,
@@ -628,6 +673,7 @@ class NetworkEvents(Resource):
 
 
 class Nodes(Resource):
+    @jwt_required
     @marshal_with({
         'name': fields.String(attribute='fqdn'),
         'ip': fields.String,
@@ -641,6 +687,7 @@ class Nodes(Resource):
 
 
 class DeployNetworkNode(Resource):
+    @jwt_required
     @redirect_to_network_node
     def put(self, passed_uuid=None):
         n = net.from_db(passed_uuid)
@@ -652,6 +699,7 @@ class DeployNetworkNode(Resource):
 
 
 class UpdateDHCP(Resource):
+    @jwt_required
     @redirect_to_network_node
     def put(self, passed_uuid=None):
         n = net.from_db(passed_uuid)
@@ -662,6 +710,7 @@ class UpdateDHCP(Resource):
 
 
 class RemoveDHCP(Resource):
+    @jwt_required
     @redirect_to_network_node
     def put(self, passed_uuid=None):
         n = net.from_db(passed_uuid)
@@ -672,6 +721,7 @@ class RemoveDHCP(Resource):
 
 
 api.add_resource(Root, '/')
+api.add_resource(Auth, '/auth')
 api.add_resource(Instances, '/instances')
 api.add_resource(Instance, '/instances/<instance_uuid>')
 api.add_resource(InstanceEvents, '/instances/<instance_uuid>/events')
