@@ -51,7 +51,7 @@ def error(status_code, message):
                           mimetype='application/json')
     resp.status_code = status_code
     LOG.error('Returning API error: %d, %s\n    %s'
-              % (status_code, message, '\n    '.join(body.get('traceback', ['No traceback']))))
+              % (status_code, message, '\n    '.join(body.get('traceback', '').split('\n'))))
     return resp
 
 
