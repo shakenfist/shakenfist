@@ -169,7 +169,7 @@ class Network(object):
             self.deploy_nat()
             self.update_dhcp()
         else:
-            admin_token = 'Bearer %s' % util.get_admin_api_token(
+            admin_token = util.get_admin_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
                                   config.parsed.get('API_PORT')))
             requests.request(
@@ -277,7 +277,7 @@ class Network(object):
                     d = dhcp.DHCP(self.uuid, subst['vx_veth_inner'])
                     d.restart_dhcpd()
         else:
-            admin_token = 'Bearer %s' % util.get_admin_api_token(
+            admin_token = util.get_admin_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
                                   config.parsed.get('API_PORT')))
             requests.request(
@@ -296,7 +296,7 @@ class Network(object):
                     d = dhcp.DHCP(self.uuid, subst['vx_veth_inner'])
                     d.remove_dhcpd()
         else:
-            admin_token = 'Bearer %s' % util.get_admin_api_token(
+            admin_token = util.get_admin_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
                                   config.parsed.get('API_PORT')))
             requests.request(
