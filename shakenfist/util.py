@@ -11,6 +11,7 @@ import time
 from oslo_concurrency import processutils
 
 from shakenfist import db
+from shakenfist import etcd
 
 
 LOG = logging.getLogger(__file__)
@@ -115,6 +116,7 @@ def get_libvirt():
 
 def get_admin_api_token(base_url):
     auth_url = base_url + '/auth'
+    LOG.info('Fetching admin auth token from %s' % auth_url)
     password = etcd.get('passwords', None, 'all')['passwords'][0]
     r = requests.request('POST', auth_url,
                          data=json.dumps({
@@ -124,4 +126,6 @@ def get_admin_api_token(base_url):
                          headers={'Content-Type': 'application/json'})
     if r.status_code != 200:
         raise Exception('Unauthorized')
-    return 'Bearer %s' % r.json()['access_token']
+    token = 'Bearer %s' % r.json()['access_token']
+    LOG.info('Admin auth token is %s' % token)
+    return token

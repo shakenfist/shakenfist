@@ -146,7 +146,7 @@ def redirect_instance_request(func):
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'], url,
                 data=json.dumps(flask_get_post_body()),
-                headers=flask.request.headers.get('Authorization'))
+                headers={'Authorization': flask.request.headers.get('Authorization')})
 
             LOG.info('Proxied %s %s returns: %d, %s'
                      % (flask.request.environ['REQUEST_METHOD'], url,
@@ -177,7 +177,9 @@ def redirect_to_network_node(func):
     # Redirect method to the network node
     def wrapper(*args, **kwargs):
         if config.parsed.get('NODE_IP') != config.parsed.get('NETWORK_NODE_IP'):
-            admin_token = 'Bearer %s' % create_access_token(identity='all')
+            admin_token = 'Bearer %s' % util.get_admin_api_token(
+                'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
+                                  config.parsed.get('API_PORT')))
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'],
                 'http://%s:%d%s'
@@ -666,14 +668,16 @@ class Networks(Resource):
             n.create()
             n.ensure_mesh()
         else:
-            admin_token = 'Bearer %s' % create_access_token(identity='all')
+            admin_token = 'Bearer %s' % util.get_admin_api_token(
+                'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
+                                  config.parsed.get('API_PORT')))
             requests.request(
                 'put',
                 ('http://%s:%d/deploy_network_node'
                  % (config.parsed.get('NETWORK_NODE_IP'),
                     config.parsed.get('API_PORT'))),
-                data=json.dumps({'uuid': network['uuid']},
-                                headers={'Authorization': admin_token}))
+                data=json.dumps({'uuid': network['uuid']}),
+                headers={'Authorization': admin_token})
 
         db.update_network_state(network['uuid'], 'created')
         return network

@@ -285,7 +285,7 @@ class Network(object):
                 ('http://%s:%d/update_dhcp'
                  % (config.parsed.get('NETWORK_NODE_IP'),
                     config.parsed.get('API_PORT'))),
-                data=json.dumps({'uuid': self.uuid),
+                data=json.dumps({'uuid': self.uuid}),
                 headers={'Authorization': admin_token})
 
     def remove_dhcp(self):
@@ -308,7 +308,7 @@ class Network(object):
                 headers={'Authorization': admin_token})
 
     def discover_mesh(self):
-        mesh_re = re.compile(r'00: 00: 00: 00: 00: 00 dst (.*) self permanent')
+        mesh_re = re.compile(r'00:00:00:00:00:00 dst (.*) self permanent')
 
         with util.RecordedOperation('discover mesh', self) as _:
             stdout, _ = processutils.execute(
