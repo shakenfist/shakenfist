@@ -178,7 +178,7 @@ def redirect_to_network_node(func):
     # Redirect method to the network node
     def wrapper(*args, **kwargs):
         if config.parsed.get('NODE_IP') != config.parsed.get('NETWORK_NODE_IP'):
-            admin_token = 'Bearer %s' % util.get_admin_api_token(
+            admin_token = util.get_admin_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
                                   config.parsed.get('API_PORT')))
             r = requests.request(
@@ -671,7 +671,7 @@ class Networks(Resource):
             n.create()
             n.ensure_mesh()
         else:
-            admin_token = 'Bearer %s' % util.get_admin_api_token(
+            admin_token = util.get_admin_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
                                   config.parsed.get('API_PORT')))
             requests.request(
