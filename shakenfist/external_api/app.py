@@ -702,7 +702,7 @@ class Nodes(Resource):
     @marshal_with({
         'name': fields.String(attribute='fqdn'),
         'ip': fields.String,
-        'lastseen': fields.DateTime(dt_format='rfc822'),
+        'lastseen': fields.Float,
     })
     def get(self):
         return list(db.get_nodes())

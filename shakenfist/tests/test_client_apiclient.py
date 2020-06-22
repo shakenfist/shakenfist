@@ -196,4 +196,3 @@ class ApiClientGetNodesTestCase(testtools.TestCase):
 
         mock_request.assert_called_with(
             'GET', 'http://localhost:13000/nodes')
-        assert(type(out[0]['lastseen']) == datetime.datetime)

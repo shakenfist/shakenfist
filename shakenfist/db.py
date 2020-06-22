@@ -196,7 +196,7 @@ def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key, us
         'user_data': user_data,
         'block_devices': None,
         'state': 'initial',
-                 'state_updated': time.time()
+        'state_updated': time.time()
     }
     etcd.put('instance', None, instance_uuid, d)
     return d

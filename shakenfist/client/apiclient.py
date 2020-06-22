@@ -1,4 +1,3 @@
-from email.utils import parsedate_to_datetime
 import json
 import logging
 from pbr.version import VersionInfo
@@ -229,9 +228,7 @@ class Client(object):
 
     def get_nodes(self):
         r = self._request_url('GET', self.base_url + '/nodes')
-        for n in r.json():
-            n['lastseen'] = parsedate_to_datetime(n['lastseen'])
-            yield n
+        return r.json()
 
     def float_interface(self, interface_uuid):
         r = self._request_url('POST', self.base_url + '/interfaces/' + interface_uuid +
