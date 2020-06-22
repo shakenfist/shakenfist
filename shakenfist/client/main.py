@@ -18,9 +18,9 @@ LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.INFO)
 
 
-CLIENT = apiclient.Client(username=os.environ.get('SHAKENFIST_USERNAME'),
+CLIENT = apiclient.Client(namespace=os.environ.get('SHAKENFIST_NAMESPACE'),
                           password=os.environ.get('SHAKENFIST_PASSWORD'),
-                          base_url=os.environ.get('SHAKENFIST_API_URL'))
+                          base_url=os.environ.get('SHAKENFIST_API_URL', 'http://localhost:13000'))
 
 
 def filter_dict(d, allowed_keys):
@@ -47,9 +47,10 @@ def cli(ctx, output, verbose):
 
         global CLIENT
         CLIENT = apiclient.Client(
-            username=os.environ.get('SHAKENFIST_USERNAME'),
+            namespace=os.environ.get('SHAKENFIST_NAMESPACE'),
             password=os.environ.get('SHAKENFIST_PASSWORD'),
-            base_url=os.environ.get('SHAKENFIST_API_URL'),
+            base_url=os.environ.get(
+                'SHAKENFIST_API_URL', 'http://localhost:13000'),
             verbose=True)
 
 

@@ -37,6 +37,10 @@ class InsufficientResourcesException(APIException):
     pass
 
 
+class UnauthorizedException(APIException):
+    pass
+
+
 STATUS_CODES_TO_ERRORS = {
     400: RequestMalformedException,
     403: ResourceCannotBeDeletedException,
@@ -48,9 +52,9 @@ STATUS_CODES_TO_ERRORS = {
 
 class Client(object):
     def __init__(self, base_url='http://localhost:13000', verbose=False,
-                 username=None, password=None):
+                 namespace=None, password=None):
         self.base_url = base_url
-        self.username = username
+        self.namespace = namespace
         self.password = password
 
         self.cached_auth = None
@@ -59,12 +63,16 @@ class Client(object):
 
     def _request_url(self, method, url, data=None):
         if not self.cached_auth:
-            r = requests.request('POST', self.base_url + '/auth',
+            auth_url = self.base_url + '/auth'
+            r = requests.request('POST', auth_url,
                                  data=json.dumps(
-                                     {'username': self.username,
+                                     {'namespace': self.namespace,
                                       'password': self.password}),
                                  headers={'Content-Type': 'application/json'})
-            self.cached_auth = 'Bearer %s' % r.json['access_token']
+            if r.status_code != 200:
+                raise UnauthorizedException('API unauthorized', 'POST', auth_url,
+                                            r.status_code, r.text)
+            self.cached_auth = 'Bearer %s' % r.json()['access_token']
 
         h = {'Authorization': self.cached_auth}
         if data:

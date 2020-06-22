@@ -43,7 +43,7 @@ class ExternalApiTestCase(testtools.TestCase):
         self.mock_get_password = self.get_password.start()
 
         resp = self.client.post(
-            '/auth', data=json.dumps({'username': 'foo', 'password': 'bar'}))
+            '/auth', data=json.dumps({'namespace': 'foo', 'password': 'bar'}))
         self.auth_header = 'Bearer %s' % resp.get_json()['access_token']
 
     def test_get_root(self):

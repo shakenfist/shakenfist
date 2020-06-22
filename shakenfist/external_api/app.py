@@ -16,7 +16,6 @@ import setproctitle
 import sys
 import traceback
 import uuid
-from werkzeug.security import safe_str_cmp
 
 from oslo_concurrency import processutils
 
@@ -212,18 +211,21 @@ class Root(Resource):
 
 
 class Auth(Resource):
-    def _get_password(self, username):
-        return etcd.get('passwords', None, username)
+    def _get_password(self, namespace):
+        rec = etcd.get('passwords', None, namespace)
+        if rec:
+            return rec.get('passwords', [])
+        return []
 
-    def post(self, username=None, password=None):
-        stored = self._get_password(username)
-        if not username:
-            return error(400, 'Missing username in request')
+    def post(self, namespace=None, password=None):
+        if not namespace:
+            return error(400, 'Missing namespace in request')
         if not password:
             return error(400, 'Missing password in request')
-        if not safe_str_cmp(password.encode('utf-8'), stored.encode('utf-8')):
+
+        if password not in self._get_password(namespace):
             return error(401, 'Unauthorized')
-        return {'access_token': create_access_token(identity=username)}
+        return {'access_token': create_access_token(identity=namespace)}
 
 
 class Instance(Resource):
