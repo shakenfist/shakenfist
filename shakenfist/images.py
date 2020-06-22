@@ -21,6 +21,12 @@ LOG.setLevel(logging.DEBUG)
 LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 
 
+CIRROS_URL = 'http://download.cirros-cloud.net/'
+
+# This one was changed from 'https://cloud-images.ubuntu.com' as it is unreliable
+UBUNTU_URL = 'http://ubuntu.mirrors.tds.net/ubuntu-cloud-images/releases/'
+
+
 class HTTPError(Exception):
     pass
 
@@ -38,7 +44,7 @@ def resolve_image(name):
 
 
 def _resolve_cirros(name):
-    resp = requests.get('http://download.cirros-cloud.net/',
+    resp = requests.get(CIRROS_URL,
                         headers={'User-Agent': util.get_user_agent()})
     if resp.status_code != 200:
         raise HTTPError('Failed to fetch http://download.cirros-cloud.net/, '
@@ -65,7 +71,7 @@ def _resolve_cirros(name):
 
 
 def _resolve_ubuntu(name):
-    resp = requests.get('https://cloud-images.ubuntu.com',
+    resp = requests.get(UBUNTU_URL,
                         headers={'User-Agent': util.get_user_agent()})
     if resp.status_code != 200:
         raise HTTPError('Failed to fetch https://cloud-images.ubuntu.com, '
@@ -92,8 +98,8 @@ def _resolve_ubuntu(name):
         except Exception:
             raise VersionSpecificationError('Cannot parse version: %s' % name)
 
-    return ('https://cloud-images.ubuntu.com/%(ver)s/current/%(ver)s-server-cloudimg-amd64.img'
-            % {'ver': ver})
+    return ('%(base)s/%(ver)s/current/%(ver)s-server-cloudimg-amd64.img'
+            % {'base': UBUNTU_URL, 'ver': ver})
 
 
 def _get_cache_path():
