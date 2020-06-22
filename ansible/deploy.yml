@@ -187,7 +187,15 @@
         dest: /etc/sf/sfrc
         owner: root
         group: sudo
-        mode: u=rwx,g=rwx,o=
+        mode: u=r,g=r,o=
+
+    - name: Write a global auth file
+      template:
+        src: files/shakenfist.json
+        dest: /etc/sf/shakenfist.json
+        owner: root
+        group: sudo
+        mode: u=r,g=r,o=
 
 - hosts: db
   any_errors_fatal: true
