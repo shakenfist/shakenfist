@@ -4,6 +4,7 @@ import importlib
 import json
 import logging
 from logging import handlers as logging_handlers
+from pbr.version import VersionInfo
 import re
 import requests
 import time
@@ -123,9 +124,15 @@ def get_admin_api_token(base_url):
                              'namespace': 'all',
                              'password': password
                          }),
-                         headers={'Content-Type': 'application/json'})
+                         headers={'Content-Type': 'application/json',
+                                  'User-Agent': get_user_agent()})
     if r.status_code != 200:
         raise Exception('Unauthorized')
     token = 'Bearer %s' % r.json()['access_token']
     LOG.info('Admin auth token is %s' % token)
     return token
+
+
+def get_user_agent():
+    sf_version = VersionInfo('shakenfist').version_string()
+    return 'Mozilla/5.0 (Ubuntu; Linux x86_64) ShakenFist/%s' % sf_version

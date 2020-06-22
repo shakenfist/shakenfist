@@ -1,6 +1,7 @@
 from email.utils import parsedate_to_datetime
 import json
 import logging
+from pbr.version import VersionInfo
 import requests
 
 
@@ -68,13 +69,15 @@ class Client(object):
                                  data=json.dumps(
                                      {'namespace': self.namespace,
                                       'password': self.password}),
-                                 headers={'Content-Type': 'application/json'})
+                                 headers={'Content-Type': 'application/json',
+                                          'User-Agent': get_user_agent()})
             if r.status_code != 200:
                 raise UnauthorizedException('API unauthorized', 'POST', auth_url,
                                             r.status_code, r.text)
             self.cached_auth = 'Bearer %s' % r.json()['access_token']
 
-        h = {'Authorization': self.cached_auth}
+        h = {'Authorization': self.cached_auth,
+             'User-Agent': get_user_agent()}
         if data:
             h['Content-Type'] = 'application/json'
         r = requests.request(method, url, data=json.dumps(data), headers=h)
@@ -239,3 +242,8 @@ class Client(object):
         r = self._request_url('POST', self.base_url + '/interfaces/' + interface_uuid +
                               '/defloat')
         return r.json()
+
+
+def get_user_agent():
+    sf_version = VersionInfo('shakenfist').version_string()
+    return 'Mozilla/5.0 (Ubuntu; Linux x86_64) ShakenFist/%s' % sf_version

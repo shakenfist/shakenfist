@@ -5,6 +5,7 @@ import testtools
 
 from shakenfist import config
 from shakenfist.external_api import app as external_api
+from shakenfist import util
 
 
 class FakeResponse(object):
@@ -91,6 +92,7 @@ class ExternalApiTestCase(testtools.TestCase):
     def test_delete_instance(self, mock_request, mock_get_config,
                              mock_get_instance):
         resp = self.client.delete(
-            '/instances/foo', headers={'Authorization': self.auth_header})
+            '/instances/foo', headers={'Authorization': self.auth_header,
+                                       'User-Agent': util.get_user_agent()})
         self.assertEqual({'fakestuff': 'here'}, resp.get_json())
         self.assertEqual(200, resp.status_code)

@@ -146,7 +146,8 @@ def redirect_instance_request(func):
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'], url,
                 data=json.dumps(flask_get_post_body()),
-                headers={'Authorization': flask.request.headers.get('Authorization')})
+                headers={'Authorization': flask.request.headers.get('Authorization'),
+                         'User-Agent': util.get_user_agent()})
 
             LOG.info('Proxied %s %s returns: %d, %s'
                      % (flask.request.environ['REQUEST_METHOD'], url,
@@ -186,8 +187,9 @@ def redirect_to_network_node(func):
                 % (config.parsed.get('NETWORK_NODE_IP'),
                    config.parsed.get('API_PORT'),
                    flask.request.environ['PATH_INFO']),
-                data=json.dumps(flask.request.get_json(),
-                                headers={'Authorization': admin_token}))
+                data=json.dumps(flask.request.get_json()),
+                headers={'Authorization': admin_token,
+                         'User-Agent': util.get_user_agent()})
 
             LOG.info('Returning proxied request: %d, %s'
                      % (r.status_code, r.text))
@@ -354,7 +356,8 @@ class Instances(Resource):
                                  'http://%s:%d/instances'
                                  % (placed_on,
                                     config.parsed.get('API_PORT')),
-                                 data=json.dumps(body))
+                                 data=json.dumps(body),
+                                 headers={'User-Agent': util.get_user_agent()})
 
             LOG.info('Returning proxied request: %d, %s'
                      % (r.status_code, r.text))
@@ -677,7 +680,8 @@ class Networks(Resource):
                  % (config.parsed.get('NETWORK_NODE_IP'),
                     config.parsed.get('API_PORT'))),
                 data=json.dumps({'uuid': network['uuid']}),
-                headers={'Authorization': admin_token})
+                headers={'Authorization': admin_token,
+                         'User-Agent': util.get_user_agent()})
 
         db.update_network_state(network['uuid'], 'created')
         return network

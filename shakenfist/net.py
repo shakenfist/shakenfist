@@ -178,7 +178,8 @@ class Network(object):
                  % (config.parsed.get('NETWORK_NODE_IP'),
                     config.parsed.get('API_PORT'))),
                 data=json.dumps({'uuid': self.uuid}),
-                headers={'Authorization': admin_token})
+                headers={'Authorization': admin_token,
+                         'User-Agent': util.get_user_agent()})
 
     def deploy_nat(self):
         if not self.provide_nat:
@@ -286,7 +287,8 @@ class Network(object):
                  % (config.parsed.get('NETWORK_NODE_IP'),
                     config.parsed.get('API_PORT'))),
                 data=json.dumps({'uuid': self.uuid}),
-                headers={'Authorization': admin_token})
+                headers={'Authorization': admin_token,
+                         'User-Agent': util.get_user_agent()})
 
     def remove_dhcp(self):
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
@@ -305,7 +307,8 @@ class Network(object):
                  % (config.parsed.get('NETWORK_NODE_IP'),
                     config.parsed.get('API_PORT'))),
                 data=json.dumps({'uuid': self.uuid}),
-                headers={'Authorization': admin_token})
+                headers={'Authorization': admin_token,
+                         'User-Agent': util.get_user_agent()})
 
     def discover_mesh(self):
         mesh_re = re.compile(r'00:00:00:00:00:00 dst (.*) self permanent')

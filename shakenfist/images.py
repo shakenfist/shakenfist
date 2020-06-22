@@ -13,6 +13,7 @@ import shutil
 from oslo_concurrency import processutils
 
 from shakenfist import config
+from shakenfist import util
 
 
 LOG = logging.getLogger(__file__)
@@ -37,7 +38,8 @@ def resolve_image(name):
 
 
 def _resolve_cirros(name):
-    resp = requests.get('http://download.cirros-cloud.net/')
+    resp = requests.get('http://download.cirros-cloud.net/',
+                        headers={'User-Agent': util.get_user_agent()})
     if resp.status_code != 200:
         raise HTTPError('Failed to fetch http://download.cirros-cloud.net/, '
                         'status code %d' % resp.status_code)
@@ -63,7 +65,8 @@ def _resolve_cirros(name):
 
 
 def _resolve_ubuntu(name):
-    resp = requests.get('https://cloud-images.ubuntu.com')
+    resp = requests.get('https://cloud-images.ubuntu.com',
+                        headers={'User-Agent': util.get_user_agent()})
     if resp.status_code != 200:
         raise HTTPError('Failed to fetch https://cloud-images.ubuntu.com, '
                         'status code %d' % resp.status_code)
@@ -114,7 +117,8 @@ VALIDATED_IMAGE_FIELDS = ['Last-Modified', 'Content-Length']
 
 
 def _actual_fetch_image(info, hashed_image_path):
-    resp = requests.get(info['url'], allow_redirects=True, stream=True)
+    resp = requests.get(info['url'], allow_redirects=True, stream=True,
+                        headers={'User-Agent': util.get_user_agent()})
     try:
         if resp.status_code != 200:
             raise HTTPError('Failed to fetch HEAD of %s (status code %d)'
