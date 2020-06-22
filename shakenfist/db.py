@@ -63,7 +63,8 @@ def get_networks(all=False):
                 yield i
 
 
-def allocate_network(netblock, provide_dhcp=True, provide_nat=False, name=None):
+def allocate_network(netblock, provide_dhcp=True, provide_nat=False, name=None,
+                     owner=None):
     see_this_node()
 
     netid = str(uuid.uuid4())
@@ -86,7 +87,7 @@ def allocate_network(netblock, provide_dhcp=True, provide_nat=False, name=None):
         'netblock': netblock,
         'provide_dhcp': provide_dhcp,
         'provide_nat': provide_nat,
-        'owner': None,
+        'owner': owner,
         'floating_gateway': None,
         'name': name,
         'state': 'initial',

@@ -169,14 +169,16 @@ class Network(object):
             self.deploy_nat()
             self.update_dhcp()
         else:
+            admin_token = 'Bearer %s' % util.get_admin_api_token(
+                'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
+                                  config.parsed.get('API_PORT')))
             requests.request(
                 'put',
                 ('http://%s:%d/deploy_network_node'
                  % (config.parsed.get('NETWORK_NODE_IP'),
                     config.parsed.get('API_PORT'))),
-                data=json.dumps({
-                    'uuid': self.uuid
-                }))
+                data=json.dumps({'uuid': self.uuid}),
+                headers={'Authorization': admin_token})
 
     def deploy_nat(self):
         if not self.provide_nat:
@@ -275,14 +277,16 @@ class Network(object):
                     d = dhcp.DHCP(self.uuid, subst['vx_veth_inner'])
                     d.restart_dhcpd()
         else:
+            admin_token = 'Bearer %s' % util.get_admin_api_token(
+                'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
+                                  config.parsed.get('API_PORT')))
             requests.request(
                 'put',
                 ('http://%s:%d/update_dhcp'
                  % (config.parsed.get('NETWORK_NODE_IP'),
                     config.parsed.get('API_PORT'))),
-                data=json.dumps({
-                    'uuid': self.uuid
-                }))
+                data=json.dumps({'uuid': self.uuid),
+                headers={'Authorization': admin_token})
 
     def remove_dhcp(self):
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
@@ -292,14 +296,16 @@ class Network(object):
                     d = dhcp.DHCP(self.uuid, subst['vx_veth_inner'])
                     d.remove_dhcpd()
         else:
+            admin_token = 'Bearer %s' % util.get_admin_api_token(
+                'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
+                                  config.parsed.get('API_PORT')))
             requests.request(
                 'put',
                 ('http://%s:%d/remove_dhcp'
                  % (config.parsed.get('NETWORK_NODE_IP'),
                     config.parsed.get('API_PORT'))),
-                data=json.dumps({
-                    'uuid': self.uuid
-                }))
+                data=json.dumps({'uuid': self.uuid}),
+                headers={'Authorization': admin_token})
 
     def discover_mesh(self):
         mesh_re = re.compile(r'00: 00: 00: 00: 00: 00 dst (.*) self permanent')

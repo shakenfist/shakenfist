@@ -1,5 +1,6 @@
 import flask
 from flask_jwt_extended import create_access_token
+from flask_jwt_extended import get_jwt_identity
 from flask_jwt_extended import JWTManager
 from flask_jwt_extended import jwt_required
 import flask_restful
@@ -97,6 +98,16 @@ class Resource(flask_restful.Resource):
     method_decorators = [generic_wrapper]
 
 
+def caller_is_admin(func):
+    # Ensure only users in the "all" namespace can call this method
+    def wrapper(*args, **kwargs):
+        if get_jwt_identity() != 'all':
+            return error(401, 'Unauthorized')
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
 def arg_is_instance_uuid(func):
     # Method uses the instance from the db
     def wrapper(*args, **kwargs):
@@ -166,13 +177,15 @@ def redirect_to_network_node(func):
     # Redirect method to the network node
     def wrapper(*args, **kwargs):
         if config.parsed.get('NODE_IP') != config.parsed.get('NETWORK_NODE_IP'):
+            admin_token = 'Bearer %s' % create_access_token(identity='all')
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'],
                 'http://%s:%d%s'
                 % (config.parsed.get('NETWORK_NODE_IP'),
                    config.parsed.get('API_PORT'),
                    flask.request.environ['PATH_INFO']),
-                data=json.dumps(flask.request.get_json()))
+                data=json.dumps(flask.request.get_json(),
+                                headers={'Authorization': admin_token}))
 
             LOG.info('Returning proxied request: %d, %s'
                      % (r.status_code, r.text))
@@ -577,6 +590,7 @@ class InterfaceDefloat(Resource):
 
 class Image(Resource):
     @jwt_required
+    @caller_is_admin
     def post(self, url=None):
         db.add_event('image', url, 'api', 'cache', None, None)
 
@@ -639,7 +653,7 @@ class Networks(Resource):
             return error(400, 'cannot parse netblock: %s' % e)
 
         network = db.allocate_network(netblock, provide_dhcp,
-                                      provide_nat, name)
+                                      provide_nat, name, get_jwt_identity())
         db.add_event('network', network['uuid'],
                      'api', 'create', None, None)
 
@@ -652,14 +666,14 @@ class Networks(Resource):
             n.create()
             n.ensure_mesh()
         else:
+            admin_token = 'Bearer %s' % create_access_token(identity='all')
             requests.request(
                 'put',
                 ('http://%s:%d/deploy_network_node'
                  % (config.parsed.get('NETWORK_NODE_IP'),
                     config.parsed.get('API_PORT'))),
-                data=json.dumps({
-                    'uuid': network['uuid']
-                }))
+                data=json.dumps({'uuid': network['uuid']},
+                                headers={'Authorization': admin_token}))
 
         db.update_network_state(network['uuid'], 'created')
         return network
@@ -676,6 +690,7 @@ class NetworkEvents(Resource):
 
 class Nodes(Resource):
     @jwt_required
+    @caller_is_admin
     @marshal_with({
         'name': fields.String(attribute='fqdn'),
         'ip': fields.String,
@@ -690,6 +705,7 @@ class Nodes(Resource):
 
 class DeployNetworkNode(Resource):
     @jwt_required
+    @caller_is_admin
     @redirect_to_network_node
     def put(self, passed_uuid=None):
         n = net.from_db(passed_uuid)
@@ -702,6 +718,7 @@ class DeployNetworkNode(Resource):
 
 class UpdateDHCP(Resource):
     @jwt_required
+    @caller_is_admin
     @redirect_to_network_node
     def put(self, passed_uuid=None):
         n = net.from_db(passed_uuid)
@@ -713,6 +730,7 @@ class UpdateDHCP(Resource):
 
 class RemoveDHCP(Resource):
     @jwt_required
+    @caller_is_admin
     @redirect_to_network_node
     def put(self, passed_uuid=None):
         n = net.from_db(passed_uuid)

@@ -1,9 +1,11 @@
 # Copyright 2020 Michael Still
 
 import importlib
+import json
 import logging
 from logging import handlers as logging_handlers
 import re
+import requests
 import time
 
 from oslo_concurrency import processutils
@@ -109,3 +111,17 @@ def get_libvirt():
         LIBVIRT = importlib.import_module('libvirt')
 
     return LIBVIRT
+
+
+def get_admin_api_token(base_url):
+    auth_url = base_url + '/auth'
+    password = etcd.get('passwords', None, 'all')['passwords'][0]
+    r = requests.request('POST', auth_url,
+                         data=json.dumps({
+                             'namespace': 'all',
+                             'password': password
+                         }),
+                         headers={'Content-Type': 'application/json'})
+    if r.status_code != 200:
+        raise Exception('Unauthorized')
+    return 'Bearer %s' % r.json()['access_token']
