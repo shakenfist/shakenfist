@@ -18,9 +18,7 @@ LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.INFO)
 
 
-CLIENT = apiclient.Client(namespace=os.environ.get('SHAKENFIST_NAMESPACE'),
-                          password=os.environ.get('SHAKENFIST_PASSWORD'),
-                          base_url=os.environ.get('SHAKENFIST_API_URL', 'http://localhost:13000'))
+CLIENT = None
 
 
 def filter_dict(d, allowed_keys):
@@ -36,8 +34,11 @@ def filter_dict(d, allowed_keys):
 @click.option('--simple', 'output', flag_value='simple')
 @click.option('--json', 'output', flag_value='json')
 @click.option('--verbose/--no-verbose', default=False)
+@click.option('--namespace', envvar='SHAKENFIST_NAMESPACE', default=None)
+@click.option('--password', envvar='SHAKENFIST_PASSWORD', default=None)
+@click.option('--apiurl', envvar='SHAKENFIST_API_URL', default=None)
 @click.pass_context
-def cli(ctx, output, verbose):
+def cli(ctx, output, verbose, namespace, password, apiurl):
     if not ctx.obj:
         ctx.obj = {}
     ctx.obj['OUTPUT'] = output
@@ -45,13 +46,32 @@ def cli(ctx, output, verbose):
     if verbose:
         LOG.setLevel(logging.DEBUG)
 
-        global CLIENT
-        CLIENT = apiclient.Client(
-            namespace=os.environ.get('SHAKENFIST_NAMESPACE'),
-            password=os.environ.get('SHAKENFIST_PASSWORD'),
-            base_url=os.environ.get(
-                'SHAKENFIST_API_URL', 'http://localhost:13000'),
-            verbose=True)
+    # Where do we find authentication details? First off, we try command line
+    # flags; then environment variables (thanks for doing this for free click);
+    # and finally ~/.shakenfist (which is a JSON file).
+    if not namespace:
+        user_conf = os.path.expanduser('~/.shakenfist')
+        if os.path.exists(user_conf):
+            with open(user_conf) as f:
+                d = json.loads(f.read())
+                namespace = d['namespace']
+                password = d['password']
+                apiurl = d['apiurl']
+
+    if not namespace:
+        if os.path.exists('/etc/sf/shakenfist.json'):
+            with open('/etc/sf/shakenfist.json') as f:
+                d = json.loads(f.read())
+                namespace = d['namespace']
+                password = d['password']
+                apiurl = d['apiurl']
+
+    global CLIENT
+    CLIENT = apiclient.Client(
+        namespace=namespace,
+        password=password,
+        base_url=apiurl,
+        verbose=verbose)
 
 
 @click.group(help='Node commands')
