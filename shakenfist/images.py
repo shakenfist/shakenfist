@@ -24,7 +24,8 @@ LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 CIRROS_URL = 'http://download.cirros-cloud.net/'
 
 # This one was changed from 'https://cloud-images.ubuntu.com' as it is unreliable
-UBUNTU_URL = 'http://ubuntu.mirrors.tds.net/ubuntu-cloud-images/releases/'
+UBUNTU_URL = 'https://cloud-images.ubuntu.com'
+#UBUNTU_URL = 'http://ubuntu.mirrors.tds.net/ubuntu-cloud-images/releases/'
 
 
 class HTTPError(Exception):
