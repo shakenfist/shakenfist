@@ -1,17 +1,23 @@
 # Copyright 2020 Michael Still
 
 import importlib
+import json
 import logging
+from logging import handlers as logging_handlers
+from pbr.version import VersionInfo
 import re
+import requests
 import time
 
 from oslo_concurrency import processutils
 
 from shakenfist import db
+from shakenfist import etcd
 
 
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
+LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 
 
 class RecordedOperation():
@@ -73,7 +79,7 @@ def get_interface_addresses(namespace, name):
     if not stdout:
         return
 
-    inet_re = re.compile(' +inet (.*)/[0-9]+.*')
+    inet_re = re.compile(r' +inet (.*)/[0-9]+.*')
     for line in stdout.split('\n'):
         m = inet_re.match(line)
         if m:
@@ -107,3 +113,26 @@ def get_libvirt():
         LIBVIRT = importlib.import_module('libvirt')
 
     return LIBVIRT
+
+
+def get_admin_api_token(base_url):
+    auth_url = base_url + '/auth'
+    LOG.info('Fetching admin auth token from %s' % auth_url)
+    password = etcd.get('passwords', None, 'all')['passwords'][0]
+    r = requests.request('POST', auth_url,
+                         data=json.dumps({
+                             'namespace': 'all',
+                             'password': password
+                         }),
+                         headers={'Content-Type': 'application/json',
+                                  'User-Agent': get_user_agent()})
+    if r.status_code != 200:
+        raise Exception('Unauthorized')
+    token = 'Bearer %s' % r.json()['access_token']
+    LOG.info('Admin auth token is %s' % token)
+    return token
+
+
+def get_user_agent():
+    sf_version = VersionInfo('shakenfist').version_string()
+    return 'Mozilla/5.0 (Ubuntu; Linux x86_64) ShakenFist/%s' % sf_version

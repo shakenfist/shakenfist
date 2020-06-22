@@ -8,8 +8,6 @@ import logging
 import os
 from prettytable import PrettyTable
 import sys
-import time
-import uuid
 
 from shakenfist.client import apiclient
 
@@ -20,7 +18,7 @@ LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.INFO)
 
 
-CLIENT = apiclient.Client()
+CLIENT = None
 
 
 def filter_dict(d, allowed_keys):
@@ -36,8 +34,11 @@ def filter_dict(d, allowed_keys):
 @click.option('--simple', 'output', flag_value='simple')
 @click.option('--json', 'output', flag_value='json')
 @click.option('--verbose/--no-verbose', default=False)
+@click.option('--namespace', envvar='SHAKENFIST_NAMESPACE', default=None)
+@click.option('--password', envvar='SHAKENFIST_PASSWORD', default=None)
+@click.option('--apiurl', envvar='SHAKENFIST_API_URL', default=None)
 @click.pass_context
-def cli(ctx, output, verbose):
+def cli(ctx, output, verbose, namespace, password, apiurl):
     if not ctx.obj:
         ctx.obj = {}
     ctx.obj['OUTPUT'] = output
@@ -45,18 +46,37 @@ def cli(ctx, output, verbose):
     if verbose:
         LOG.setLevel(logging.DEBUG)
 
-        global CLIENT
-        CLIENT = apiclient.Client(verbose=True)
+    # Where do we find authentication details? First off, we try command line
+    # flags; then environment variables (thanks for doing this for free click);
+    # and finally ~/.shakenfist (which is a JSON file).
+    if not namespace:
+        user_conf = os.path.expanduser('~/.shakenfist')
+        if os.path.exists(user_conf):
+            with open(user_conf) as f:
+                d = json.loads(f.read())
+                namespace = d['namespace']
+                password = d['password']
+                apiurl = d['apiurl']
+
+    if not namespace:
+        if os.path.exists('/etc/sf/shakenfist.json'):
+            with open('/etc/sf/shakenfist.json') as f:
+                d = json.loads(f.read())
+                namespace = d['namespace']
+                password = d['password']
+                apiurl = d['apiurl']
+
+    global CLIENT
+    CLIENT = apiclient.Client(
+        namespace=namespace,
+        password=password,
+        base_url=apiurl,
+        verbose=verbose)
 
 
 @click.group(help='Node commands')
 def node():
     pass
-
-
-def _get_networks(ctx, args, incomplete):
-    for n in CLIENT.get_networks():
-        yield n['uuid']
 
 
 @node.command(name='list', help='List nodes')
@@ -349,7 +369,7 @@ def instance_show(ctx, instance_uuid=None, snapshots=False):
 
 
 def _parse_spec(spec):
-    if not '@' in spec:
+    if '@' not in spec:
         return spec, None
     return spec.split('@')
 
@@ -543,11 +563,11 @@ def instance_unpause(ctx, instance_uuid=None):
 @click.argument('all', type=click.BOOL, default=False)
 @click.pass_context
 def instance_snapshot(ctx, instance_uuid=None, all=False):
-    uuid = CLIENT.snapshot_instance(instance_uuid, all)
+    snapshot_uuid = CLIENT.snapshot_instance(instance_uuid, all)
     if ctx.obj['OUTPUT'] == 'json':
-        print(json.dumps({'uuid': uuid}, indent=4, sort_keys=True))
+        print(json.dumps({'uuid': snapshot_uuid}, indent=4, sort_keys=True))
     else:
-        print('Created snapshot %s' % uuid)
+        print('Created snapshot %s' % snapshot_uuid)
 
 
 cli.add_command(instance)

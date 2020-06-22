@@ -2,15 +2,14 @@
 
 import json
 import logging
+from logging import handlers as logging_handlers
 import os
-import random
 import re
 import requests
 
 from oslo_concurrency import processutils
 
 
-from shakenfist.client import apiclient
 from shakenfist import config
 from shakenfist import db
 from shakenfist import dhcp
@@ -20,6 +19,7 @@ from shakenfist import util
 
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
+LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 
 
 def from_db(uuid):
@@ -169,14 +169,17 @@ class Network(object):
             self.deploy_nat()
             self.update_dhcp()
         else:
+            admin_token = util.get_admin_api_token(
+                'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
+                                  config.parsed.get('API_PORT')))
             requests.request(
                 'put',
                 ('http://%s:%d/deploy_network_node'
                  % (config.parsed.get('NETWORK_NODE_IP'),
                     config.parsed.get('API_PORT'))),
-                data=json.dumps({
-                    'uuid': self.uuid
-                }))
+                data=json.dumps({'uuid': self.uuid}),
+                headers={'Authorization': admin_token,
+                         'User-Agent': util.get_user_agent()})
 
     def deploy_nat(self):
         if not self.provide_nat:
@@ -275,14 +278,17 @@ class Network(object):
                     d = dhcp.DHCP(self.uuid, subst['vx_veth_inner'])
                     d.restart_dhcpd()
         else:
+            admin_token = util.get_admin_api_token(
+                'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
+                                  config.parsed.get('API_PORT')))
             requests.request(
                 'put',
                 ('http://%s:%d/update_dhcp'
                  % (config.parsed.get('NETWORK_NODE_IP'),
                     config.parsed.get('API_PORT'))),
-                data=json.dumps({
-                    'uuid': self.uuid
-                }))
+                data=json.dumps({'uuid': self.uuid}),
+                headers={'Authorization': admin_token,
+                         'User-Agent': util.get_user_agent()})
 
     def remove_dhcp(self):
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
@@ -292,17 +298,20 @@ class Network(object):
                     d = dhcp.DHCP(self.uuid, subst['vx_veth_inner'])
                     d.remove_dhcpd()
         else:
+            admin_token = util.get_admin_api_token(
+                'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
+                                  config.parsed.get('API_PORT')))
             requests.request(
                 'put',
                 ('http://%s:%d/remove_dhcp'
                  % (config.parsed.get('NETWORK_NODE_IP'),
                     config.parsed.get('API_PORT'))),
-                data=json.dumps({
-                    'uuid': self.uuid
-                }))
+                data=json.dumps({'uuid': self.uuid}),
+                headers={'Authorization': admin_token,
+                         'User-Agent': util.get_user_agent()})
 
     def discover_mesh(self):
-        mesh_re = re.compile('00: 00: 00: 00: 00: 00 dst (.*) self permanent')
+        mesh_re = re.compile(r'00:00:00:00:00:00 dst (.*) self permanent')
 
         with util.RecordedOperation('discover mesh', self) as _:
             stdout, _ = processutils.execute(
@@ -333,10 +342,12 @@ class Network(object):
             node_ips = [config.parsed.get('NETWORK_NODE_IP')]
             for fqdn in node_fqdns:
                 ip = db.get_node(fqdn)['ip']
-                if not ip in node_ips:
+                if ip not in node_ips:
                     node_ips.append(ip)
 
-            for node in self.discover_mesh():
+            discovered = list(self.discover_mesh())
+            LOG.info('%s: Discovered mesh elements %s' % (self, discovered))
+            for node in discovered:
                 if node in node_ips:
                     node_ips.remove(node)
                 else:

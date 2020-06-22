@@ -44,14 +44,15 @@ resource "google_compute_instance" "sf_2" {
   }
 }
 
-resource "google_compute_instance" "sfdb" {
-  machine_type     = "n1-standard-1"
-  name             = "${var.uniqifier}sfdb"
+resource "google_compute_instance" "sf_3" {
+  machine_type     = "n1-standard-4"
+  name             = "${var.uniqifier}sf-3"
   zone             = "us-central1-b"
   min_cpu_platform = "Intel Haswell"
   boot_disk {
     initialize_params {
-      image = "ubuntu-os-cloud/ubuntu-1804-lts"
+      image = "sf-image"
+      size  = 50
     }
   }
   network_interface {
@@ -68,8 +69,8 @@ output "sf_2_external" {
   value = google_compute_instance.sf_2.*.network_interface.0.access_config.0.nat_ip
 }
 
-output "sfdb_external" {
-  value = google_compute_instance.sfdb.*.network_interface.0.access_config.0.nat_ip
+output "sf_3_external" {
+  value = google_compute_instance.sf_3.*.network_interface.0.access_config.0.nat_ip
 }
 
 output "sf_1_internal" {
@@ -80,6 +81,6 @@ output "sf_2_internal" {
   value = google_compute_instance.sf_2.*.network_interface.0.network_ip
 }
 
-output "sfdb_internal" {
-  value = google_compute_instance.sfdb.*.network_interface.0.network_ip
+output "sf_3_internal" {
+  value = google_compute_instance.sf_3.*.network_interface.0.network_ip
 }

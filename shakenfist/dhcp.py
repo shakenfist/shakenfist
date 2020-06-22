@@ -2,6 +2,7 @@
 
 import jinja2
 import logging
+from logging import handlers as logging_handlers
 import os
 import psutil
 import shutil
@@ -12,10 +13,10 @@ from oslo_concurrency import processutils
 from shakenfist import config
 from shakenfist import db
 from shakenfist import net
-from shakenfist import util
 
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
+LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 
 
 class DHCP(object):

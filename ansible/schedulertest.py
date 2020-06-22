@@ -14,7 +14,7 @@ def randomName():
 
 
 def main():
-    c = apiclient.Client(base_url='http://192.168.10.41:13000', verbose=True)
+    c = apiclient.Client(base_url='http://localhost:13000', verbose=True)
 
     # Return to a clean state
     for i in c.get_instances():

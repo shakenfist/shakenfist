@@ -1,5 +1,5 @@
-import copy
 import logging
+from logging import handlers as logging_handlers
 import re
 import setproctitle
 import time
@@ -9,16 +9,14 @@ from oslo_concurrency import processutils
 from shakenfist import config
 from shakenfist import db
 from shakenfist import net
-from shakenfist import util
 
-
-logging.basicConfig(level=logging.DEBUG)
 
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
+LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 
 
-VXLAN_RE = re.compile('[0-9]+: vxlan-([0-9]+).*')
+VXLAN_RE = re.compile(r'[0-9]+: vxlan-([0-9]+).*')
 
 
 def _get_deployed_vxlans():

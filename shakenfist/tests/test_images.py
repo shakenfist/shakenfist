@@ -164,6 +164,7 @@ class ImagesTestCase(testtools.TestCase):
                           images._resolve_cirros, 'cirros')
 
     @mock.patch('requests.get', return_value=FakeResponse(200, UBUNTU_DOWNLOAD_HTML))
+    @mock.patch('shakenfist.images.UBUNTU_URL', 'https://cloud-images.ubuntu.com')
     def test_resolve_ubuntu(self, mock_get):
         u = images._resolve_ubuntu('ubuntu')
         self.assertEqual(

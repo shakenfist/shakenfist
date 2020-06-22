@@ -1,8 +1,8 @@
 #!/bin/bash -ex
 
 cwd=`pwd`
-TERRAFORM_VARS=""
-ANSIBLE_VARS="cloud=$CLOUD bootdelay=$BOOTDELAY ansible_root=$cwd"
+TERRAFORM_VARS="-var=uniqifier=$UNIQIFIER"
+ANSIBLE_VARS="cloud=$CLOUD bootdelay=$BOOTDELAY ansible_root=$cwd uniqifier=$UNIQIFIER"
 for var in $VARIABLES
 do
   TERRAFORM_VARS="$TERRAFORM_VARS -var=$var"
@@ -14,12 +14,14 @@ done
 if [ "$CLOUD" == "nutanix" ]
 then
   cd terraform/nutanix/phase-2
+  terraform init
   terraform destroy -auto-approve $TERRAFORM_VARS -state=../terraform.tfstate
   cd ..
   find . -type f -name "*tfstate*" -exec rm {} \;
   cd ../..
 else
   cd terraform/$CLOUD
+  terraform init
   terraform destroy -auto-approve $TERRAFORM_VARS
   cd $cwd
 fi

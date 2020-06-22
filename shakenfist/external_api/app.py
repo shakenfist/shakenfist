@@ -1,18 +1,25 @@
 import flask
+from flask_jwt_extended import create_access_token
+from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import JWTManager
+from flask_jwt_extended import jwt_required
 import flask_restful
-from flask_restful import fields, marshal_with
+from flask_restful import fields
+from flask_restful import marshal_with
 import ipaddress
 import json
 import logging
+from logging import handlers as logging_handlers
+import os
 import re
 import requests
 import setproctitle
 import sys
-import time
 import traceback
 import uuid
 
-from shakenfist.client import apiclient
+from oslo_concurrency import processutils
+
 from shakenfist import config
 from shakenfist import db
 from shakenfist import etcd
@@ -23,10 +30,9 @@ from shakenfist import util
 from shakenfist import virt
 
 
-logging.basicConfig(level=logging.DEBUG)
-
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
+LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 
 
 TESTING = False
@@ -49,7 +55,8 @@ def error(status_code, message):
     resp = flask.Response(json.dumps(body),
                           mimetype='application/json')
     resp.status_code = status_code
-    LOG.info('Returning API error: %d, %s' % (status_code, message))
+    LOG.error('Returning API error: %d, %s\n    %s'
+              % (status_code, message, '\n    '.join(body.get('traceback', '').split('\n'))))
     return resp
 
 
@@ -57,11 +64,11 @@ def flask_get_post_body():
     j = {}
     try:
         j = flask.request.get_json(force=True)
-    except:
+    except Exception:
         if flask.request.data:
             try:
                 j = json.loads(flask.request.data)
-            except:
+            except Exception:
                 pass
     return j
 
@@ -82,13 +89,23 @@ def generic_wrapper(func):
 
             LOG.info('External API request: %s %s %s' % (func, args, kwargs))
             return func(*args, **kwargs)
-        except:
+        except Exception:
             return error(500, 'server error')
     return wrapper
 
 
 class Resource(flask_restful.Resource):
     method_decorators = [generic_wrapper]
+
+
+def caller_is_admin(func):
+    # Ensure only users in the "all" namespace can call this method
+    def wrapper(*args, **kwargs):
+        if get_jwt_identity() != 'all':
+            return error(401, 'Unauthorized')
+
+        return func(*args, **kwargs)
+    return wrapper
 
 
 def arg_is_instance_uuid(func):
@@ -123,16 +140,18 @@ def redirect_instance_request(func):
     def wrapper(*args, **kwargs):
         i = kwargs.get('instance_from_db_virt')
         if i and i.db_entry['node'] != config.parsed.get('NODE_NAME'):
+            url = 'http://%s:%d%s' % (i.db_entry['node'],
+                                      config.parsed.get('API_PORT'),
+                                      flask.request.environ['PATH_INFO'])
             r = requests.request(
-                flask.request.environ['REQUEST_METHOD'],
-                'http://%s:%d%s'
-                % (i.db_entry['node'],
-                   config.parsed.get('API_PORT'),
-                   flask.request.environ['PATH_INFO']),
-                data=json.dumps(flask_get_post_body()))
+                flask.request.environ['REQUEST_METHOD'], url,
+                data=json.dumps(flask_get_post_body()),
+                headers={'Authorization': flask.request.headers.get('Authorization'),
+                         'User-Agent': util.get_user_agent()})
 
-            LOG.info('Returning proxied request: %d, %s'
-                     % (r.status_code, r.text))
+            LOG.info('Proxied %s %s returns: %d, %s'
+                     % (flask.request.environ['REQUEST_METHOD'], url,
+                        r.status_code, r.text))
             resp = flask.Response(r.text,
                                   mimetype='application/json')
             resp.status_code = r.status_code
@@ -159,13 +178,18 @@ def redirect_to_network_node(func):
     # Redirect method to the network node
     def wrapper(*args, **kwargs):
         if config.parsed.get('NODE_IP') != config.parsed.get('NETWORK_NODE_IP'):
+            admin_token = util.get_admin_api_token(
+                'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
+                                  config.parsed.get('API_PORT')))
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'],
                 'http://%s:%d%s'
                 % (config.parsed.get('NETWORK_NODE_IP'),
                    config.parsed.get('API_PORT'),
                    flask.request.environ['PATH_INFO']),
-                data=json.dumps(flask.request.get_json()))
+                data=json.dumps(flask.request.get_json()),
+                headers={'Authorization': admin_token,
+                         'User-Agent': util.get_user_agent()})
 
             LOG.info('Returning proxied request: %d, %s'
                      % (r.status_code, r.text))
@@ -180,6 +204,8 @@ def redirect_to_network_node(func):
 
 app = flask.Flask(__name__)
 api = flask_restful.Api(app, catch_all_404s=False)
+app.config['JWT_SECRET_KEY'] = config.parsed.get('AUTH_SECRET_SEED')
+jwt = JWTManager(app)
 
 
 @app.before_request
@@ -201,12 +227,32 @@ class Root(Resource):
         return resp
 
 
+class Auth(Resource):
+    def _get_password(self, namespace):
+        rec = etcd.get('passwords', None, namespace)
+        if rec:
+            return rec.get('passwords', [])
+        return []
+
+    def post(self, namespace=None, password=None):
+        if not namespace:
+            return error(400, 'Missing namespace in request')
+        if not password:
+            return error(400, 'Missing password in request')
+
+        if password not in self._get_password(namespace):
+            return error(401, 'Unauthorized')
+        return {'access_token': create_access_token(identity=namespace)}
+
+
 class Instance(Resource):
+    @jwt_required
     @arg_is_instance_uuid
     def get(self, instance_uuid=None, instance_from_db=None):
         db.add_event('instance', instance_uuid, 'api', 'get', None, None)
         return instance_from_db
 
+    @jwt_required
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def delete(self, instance_uuid=None, instance_from_db_virt=None):
@@ -240,15 +286,17 @@ class Instance(Resource):
 
 
 class Instances(Resource):
+    @jwt_required
     def get(self, all=False):
         return list(db.get_instances(all=all))
 
+    @jwt_required
     def post(self, name=None, cpus=None, memory=None, network=None,
              disk=None, ssh_key=None, user_data=None, placed_on=None, instance_uuid=None):
         global SCHEDULER
 
         # We need to santize the name so its safe for DNS
-        name = re.sub('([^a-zA-Z0-9_\-])', '', name)
+        name = re.sub(r'([^a-zA-Z0-9_\-])', '', name)
 
         # The instance needs to exist in the DB before network interfaces are created
         if not instance_uuid:
@@ -308,7 +356,8 @@ class Instances(Resource):
                                  'http://%s:%d/instances'
                                  % (placed_on,
                                     config.parsed.get('API_PORT')),
-                                 data=json.dumps(body))
+                                 data=json.dumps(body),
+                                 headers={'User-Agent': util.get_user_agent()})
 
             LOG.info('Returning proxied request: %d, %s'
                      % (r.status_code, r.text))
@@ -333,10 +382,10 @@ class Instances(Resource):
 
         order = 0
         for netdesc in network:
-            if not 'network_uuid' in netdesc or not netdesc['network_uuid']:
+            if 'network_uuid' not in netdesc or not netdesc['network_uuid']:
                 error_with_cleanup(404, 'network not specified')
 
-            if not netdesc['network_uuid'] in nets:
+            if netdesc['network_uuid'] not in nets:
                 n = net.from_db(netdesc['network_uuid'])
                 if not n:
                     error_with_cleanup(
@@ -348,7 +397,7 @@ class Instances(Resource):
                                ttl=120) as _:
                 allocations.setdefault(netdesc['network_uuid'], [])
                 ipm = db.get_ipmanager(netdesc['network_uuid'])
-                if not 'address' in netdesc or not netdesc['address']:
+                if 'address' not in netdesc or not netdesc['address']:
                     netdesc['address'] = ipm.get_random_free_address()
                 else:
                     if not ipm.reserve(netdesc['address']):
@@ -358,7 +407,7 @@ class Instances(Resource):
                 allocations[netdesc['network_uuid']].append(
                     (netdesc['address'], order))
 
-            if not 'model' in netdesc or not netdesc['model']:
+            if 'model' not in netdesc or not netdesc['model']:
                 netdesc['model'] = 'virtio'
 
             db.create_network_interface(
@@ -383,6 +432,7 @@ class Instances(Resource):
 
 
 class InstanceInterfaces(Resource):
+    @jwt_required
     @arg_is_instance_uuid
     def get(self, instance_uuid=None, instance_from_db=None):
         db.add_event('instance', instance_uuid,
@@ -391,6 +441,7 @@ class InstanceInterfaces(Resource):
 
 
 class InstanceEvents(Resource):
+    @jwt_required
     @arg_is_instance_uuid
     def get(self, instance_uuid=None, instance_from_db=None):
         db.add_event('instance', instance_uuid,
@@ -399,6 +450,7 @@ class InstanceEvents(Resource):
 
 
 class InstanceSnapshot(Resource):
+    @jwt_required
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db_virt=None, all=None):
@@ -410,6 +462,7 @@ class InstanceSnapshot(Resource):
                      'api', 'create', None, None)
         return snap_uuid
 
+    @jwt_required
     @arg_is_instance_uuid
     def get(self, instance_uuid=None, instance_from_db=None):
         db.add_event('instance', instance_uuid,
@@ -422,6 +475,7 @@ class InstanceSnapshot(Resource):
 
 
 class InstanceRebootSoft(Resource):
+    @jwt_required
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db_virt=None):
@@ -431,6 +485,7 @@ class InstanceRebootSoft(Resource):
 
 
 class InstanceRebootHard(Resource):
+    @jwt_required
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db_virt=None):
@@ -440,6 +495,7 @@ class InstanceRebootHard(Resource):
 
 
 class InstancePowerOff(Resource):
+    @jwt_required
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db_virt=None):
@@ -449,6 +505,7 @@ class InstancePowerOff(Resource):
 
 
 class InstancePowerOn(Resource):
+    @jwt_required
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db_virt=None):
@@ -458,6 +515,7 @@ class InstancePowerOn(Resource):
 
 
 class InstancePause(Resource):
+    @jwt_required
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db_virt=None):
@@ -466,6 +524,7 @@ class InstancePause(Resource):
 
 
 class InstanceUnpause(Resource):
+    @jwt_required
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db_virt=None):
@@ -475,6 +534,7 @@ class InstanceUnpause(Resource):
 
 
 class InterfaceFloat(Resource):
+    @jwt_required
     @redirect_to_network_node
     def post(self, interface_uuid=None):
         db.add_event('interface', interface_uuid,
@@ -504,6 +564,7 @@ class InterfaceFloat(Resource):
 
 
 class InterfaceDefloat(Resource):
+    @jwt_required
     @redirect_to_network_node
     def post(self, interface_uuid=None):
         db.add_event('interface', interface_uuid,
@@ -533,6 +594,8 @@ class InterfaceDefloat(Resource):
 
 
 class Image(Resource):
+    @jwt_required
+    @caller_is_admin
     def post(self, url=None):
         db.add_event('image', url, 'api', 'cache', None, None)
 
@@ -541,12 +604,14 @@ class Image(Resource):
 
 
 class Network(Resource):
+    @jwt_required
     @arg_is_network_uuid
     def get(self, network_uuid=None, network_from_db=None):
         db.add_event('network', network_uuid, 'api', 'get', None, None)
         del network_from_db['ipmanager']
         return network_from_db
 
+    @jwt_required
     @arg_is_network_uuid
     @redirect_to_network_node
     def delete(self, network_uuid=None, network_from_db=None):
@@ -572,6 +637,7 @@ class Network(Resource):
 
 
 class Networks(Resource):
+    @jwt_required
     @marshal_with({
         'uuid': fields.String,
         'vxlan_id': fields.Integer,
@@ -584,6 +650,7 @@ class Networks(Resource):
     def get(self, all=False):
         return list(db.get_networks(all=all))
 
+    @jwt_required
     def post(self, netblock=None, provide_dhcp=None, provide_nat=None, name=None):
         try:
             ipaddress.ip_network(netblock)
@@ -591,7 +658,7 @@ class Networks(Resource):
             return error(400, 'cannot parse netblock: %s' % e)
 
         network = db.allocate_network(netblock, provide_dhcp,
-                                      provide_nat, name)
+                                      provide_nat, name, get_jwt_identity())
         db.add_event('network', network['uuid'],
                      'api', 'create', None, None)
 
@@ -604,20 +671,24 @@ class Networks(Resource):
             n.create()
             n.ensure_mesh()
         else:
+            admin_token = util.get_admin_api_token(
+                'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
+                                  config.parsed.get('API_PORT')))
             requests.request(
                 'put',
                 ('http://%s:%d/deploy_network_node'
                  % (config.parsed.get('NETWORK_NODE_IP'),
                     config.parsed.get('API_PORT'))),
-                data=json.dumps({
-                    'uuid': network['uuid']
-                }))
+                data=json.dumps({'uuid': network['uuid']}),
+                headers={'Authorization': admin_token,
+                         'User-Agent': util.get_user_agent()})
 
         db.update_network_state(network['uuid'], 'created')
         return network
 
 
 class NetworkEvents(Resource):
+    @jwt_required
     @arg_is_network_uuid
     def get(self, network_uuid=None, network_from_db=None):
         db.add_event('network', network_uuid,
@@ -626,6 +697,8 @@ class NetworkEvents(Resource):
 
 
 class Nodes(Resource):
+    @jwt_required
+    @caller_is_admin
     @marshal_with({
         'name': fields.String(attribute='fqdn'),
         'ip': fields.String,
@@ -639,6 +712,8 @@ class Nodes(Resource):
 
 
 class DeployNetworkNode(Resource):
+    @jwt_required
+    @caller_is_admin
     @redirect_to_network_node
     def put(self, passed_uuid=None):
         n = net.from_db(passed_uuid)
@@ -650,6 +725,8 @@ class DeployNetworkNode(Resource):
 
 
 class UpdateDHCP(Resource):
+    @jwt_required
+    @caller_is_admin
     @redirect_to_network_node
     def put(self, passed_uuid=None):
         n = net.from_db(passed_uuid)
@@ -660,6 +737,8 @@ class UpdateDHCP(Resource):
 
 
 class RemoveDHCP(Resource):
+    @jwt_required
+    @caller_is_admin
     @redirect_to_network_node
     def put(self, passed_uuid=None):
         n = net.from_db(passed_uuid)
@@ -670,6 +749,7 @@ class RemoveDHCP(Resource):
 
 
 api.add_resource(Root, '/')
+api.add_resource(Auth, '/auth')
 api.add_resource(Instances, '/instances')
 api.add_resource(Instance, '/instances/<instance_uuid>')
 api.add_resource(InstanceEvents, '/instances/<instance_uuid>/events')
@@ -699,6 +779,10 @@ class monitor(object):
         setproctitle.setproctitle('sf api')
 
     def run(self):
-        app.run(
-            host='0.0.0.0',
-            port=config.parsed.get('API_PORT'))
+        processutils.execute(
+            ('gunicorn3 --workers 10 --bind 0.0.0.0:%d '
+             '--log-syslog --log-syslog-prefix sf '
+             '--name "sf api" '
+             'shakenfist.external_api.app:app'
+             % config.parsed.get('API_PORT')),
+            shell=True, env_variables=os.environ)

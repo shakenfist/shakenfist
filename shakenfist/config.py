@@ -2,12 +2,14 @@
 
 import copy
 import logging
+from logging import handlers as logging_handlers
 import os
 import socket
 
 
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
+LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 
 
 node_name = socket.getfqdn()
@@ -33,6 +35,7 @@ CONFIG_DEFAULTS = {
     'API_PORT': 13000,
     'INCLUDE_TRACEBACKS': '1',
     'PROMETHEUS_METRICS_PORT': 13001,
+    'AUTH_SECRET_SEED': 'foo',
 
     # Scheduler options:
     #  - scheduler_cache_timeout: how long the scheduler should cache things for
@@ -53,9 +56,6 @@ CONFIG_DEFAULTS = {
     #  - cleaner_delay: how long to wait before removing old data from the
     #    database.
     'CLEANER_DELAY': 3600,
-    'ETCD_USER': 'sf',
-    'ETCD_PASSWORD': 'foo',
-    'ETCD_SERVER': 'localhost',
 
     # What nova called an availability zone
     'ZONE': 'shaken',

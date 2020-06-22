@@ -1,6 +1,7 @@
 # Copyright 2019 Michael Still
 
 import logging
+from logging import handlers as logging_handlers
 import setproctitle
 import time
 import os
@@ -9,19 +10,18 @@ from oslo_concurrency import processutils
 
 from shakenfist import config
 from shakenfist.daemons import cleaner as cleaner_daemon
-from shakenfist.daemons import external_api as external_api_daemon
 from shakenfist.daemons import net as net_daemon
 from shakenfist.daemons import resources as resource_daemon
+from shakenfist.external_api import app as external_api_daemon
 from shakenfist import db
 from shakenfist import net
 from shakenfist import util
 from shakenfist import virt
 
 
-logging.basicConfig(level=logging.DEBUG)
-
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
+LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 
 
 def restore_instances():

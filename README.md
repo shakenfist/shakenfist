@@ -16,7 +16,7 @@ If there is an existing library which does a thing, we use it. OpenStack suffere
 Deployment choices
 ------------------
 
-libvirt is the only supported hypervisor. Instances are specified to libvirt with simple templated XML. If your local requirements are different to what's in the template, you're welcome to change the template to meet your needs. If you're template changes break things, you're also welcome to debug what went wrong for yourself.
+libvirt is the only supported hypervisor. Instances are specified to libvirt with simple templated XML. If your local requirements are different to what's in the template, you're welcome to change the template to meet your needs. If you're template changes break things, you're also welcome to debug what went wrong for yourself. We provide a sample Ansible based deployer.
 
 Usage guide
 ===========
@@ -155,6 +155,7 @@ Now create your database and hypervisor nodes (where foo-1234 is my Google Compu
 sudo apt-get install ansible
 git clone https://github.com/mikalstill/shakenfist
 cd ansible
+ansible-galaxy install andrewrothstein.etcd-cluster
 ansible-playbook -i ansible/hosts-gcp $VARIABLES_AS_ABOVE ansible/deploy.yml
 ```
 
@@ -210,3 +211,6 @@ Here's a simple feature matrix:
 | Guest agents                                      |             |         | No plans    |
 | Host aggregates                                   |             |         | No plans    |
 | Server tags                                       |             |         | No plans    |
+| ~~Persistence in MySQL~~                          | v0.1        |         |             |
+| Distributed etcd for locking and persistence      | v0.2        |         |             |
+| Production grade REST API via gunicorn            | v0.2        |         |             |

@@ -4,6 +4,7 @@ import email.utils
 import hashlib
 import json
 import logging
+from logging import handlers as logging_handlers
 import os
 import re
 import requests
@@ -12,10 +13,19 @@ import shutil
 from oslo_concurrency import processutils
 
 from shakenfist import config
+from shakenfist import util
 
 
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.DEBUG)
+LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
+
+
+CIRROS_URL = 'http://download.cirros-cloud.net/'
+
+# This one was changed from 'https://cloud-images.ubuntu.com' as it is unreliable
+UBUNTU_URL = 'https://cloud-images.ubuntu.com'
+#UBUNTU_URL = 'http://ubuntu.mirrors.tds.net/ubuntu-cloud-images/releases/'
 
 
 class HTTPError(Exception):
@@ -35,14 +45,15 @@ def resolve_image(name):
 
 
 def _resolve_cirros(name):
-    resp = requests.get('http://download.cirros-cloud.net/')
+    resp = requests.get(CIRROS_URL,
+                        headers={'User-Agent': util.get_user_agent()})
     if resp.status_code != 200:
         raise HTTPError('Failed to fetch http://download.cirros-cloud.net/, '
                         'status code %d' % resp.status_code)
 
     if name == 'cirros':
         versions = []
-        dir_re = re.compile('.*<a href="([0-9]+\.[0-9]+\.[0-9]+)/">.*/</a>.*')
+        dir_re = re.compile(r'.*<a href="([0-9]+\.[0-9]+\.[0-9]+)/">.*/</a>.*')
         for line in resp.text.split('\n'):
             m = dir_re.match(line)
             if m:
@@ -61,14 +72,15 @@ def _resolve_cirros(name):
 
 
 def _resolve_ubuntu(name):
-    resp = requests.get('https://cloud-images.ubuntu.com')
+    resp = requests.get(UBUNTU_URL,
+                        headers={'User-Agent': util.get_user_agent()})
     if resp.status_code != 200:
         raise HTTPError('Failed to fetch https://cloud-images.ubuntu.com, '
                         'status code %d' % resp.status_code)
 
     versions = {}
     dir_re = re.compile(
-        '.*<a href="(.*)/">.*Ubuntu Server ([0-9]+\.[0-9]+).*')
+        r'.*<a href="(.*)/">.*Ubuntu Server ([0-9]+\.[0-9]+).*')
     for line in resp.text.split('\n'):
         m = dir_re.match(line)
         if m:
@@ -87,8 +99,8 @@ def _resolve_ubuntu(name):
         except Exception:
             raise VersionSpecificationError('Cannot parse version: %s' % name)
 
-    return ('https://cloud-images.ubuntu.com/%(ver)s/current/%(ver)s-server-cloudimg-amd64.img'
-            % {'ver': ver})
+    return ('%(base)s/%(ver)s/current/%(ver)s-server-cloudimg-amd64.img'
+            % {'base': UBUNTU_URL, 'ver': ver})
 
 
 def _get_cache_path():
@@ -112,7 +124,8 @@ VALIDATED_IMAGE_FIELDS = ['Last-Modified', 'Content-Length']
 
 
 def _actual_fetch_image(info, hashed_image_path):
-    resp = requests.get(info['url'], allow_redirects=True, stream=True)
+    resp = requests.get(info['url'], allow_redirects=True, stream=True,
+                        headers={'User-Agent': util.get_user_agent()})
     try:
         if resp.status_code != 200:
             raise HTTPError('Failed to fetch HEAD of %s (status code %d)'
@@ -219,7 +232,7 @@ def resize_image(hashed_image_path, size):
     return backing_file
 
 
-VALUE_WITH_BRACKETS_RE = re.compile('.* \(([0-9]+) bytes\)')
+VALUE_WITH_BRACKETS_RE = re.compile(r'.* \(([0-9]+) bytes\)')
 
 
 def identify_image(path):
@@ -254,7 +267,7 @@ def identify_image(path):
 
             try:
                 data[key] = float(value)
-            except:
+            except Exception:
                 data[key] = value
 
     return data
