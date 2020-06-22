@@ -135,25 +135,27 @@ class FakeResponse(object):
 
 class ImagesTestCase(testtools.TestCase):
     @mock.patch('shakenfist.images._resolve_cirros',
-                return_value='!!!cirros!!!')
+                return_value=['!!!cirros!!!', None])
     @mock.patch('shakenfist.images._resolve_ubuntu',
-                return_value='!!!ubuntu!!!')
+                return_value=['!!!ubuntu!!!', None])
     def test_resolve_image(self, mock_ubuntu, mock_centos):
-        self.assertEqual('win10', images.resolve_image('win10'))
-        self.assertEqual('http://example.com/image',
+        self.assertEqual(['win10', None], images.resolve_image('win10'))
+        self.assertEqual(['http://example.com/image', None],
                          images.resolve_image('http://example.com/image'))
-        self.assertEqual('!!!cirros!!!', images.resolve_image('cirros'))
-        self.assertEqual('!!!ubuntu!!!', images.resolve_image('ubuntu'))
+        self.assertEqual(['!!!cirros!!!', None],
+                         images.resolve_image('cirros'))
+        self.assertEqual(['!!!ubuntu!!!', None],
+                         images.resolve_image('ubuntu'))
 
     @mock.patch('requests.get', return_value=FakeResponse(200, CIRROS_DOWNLOAD_HTML))
     def test_resolve_cirros(self, mock_get):
         u = images._resolve_cirros('cirros')
         self.assertEqual(
-            'http://download.cirros-cloud.net/0.5.1/cirros-0.5.1-x86_64-disk.img', u)
+            ['http://download.cirros-cloud.net/0.5.1/cirros-0.5.1-x86_64-disk.img', None], u)
 
         u = images._resolve_cirros('cirros:0.3.4')
         self.assertEqual(
-            'http://download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img', u)
+            ['http://download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img', None], u)
 
         self.assertRaises(images.VersionSpecificationError,
                           images._resolve_cirros, 'cirros***')
@@ -168,15 +170,18 @@ class ImagesTestCase(testtools.TestCase):
     def test_resolve_ubuntu(self, mock_get):
         u = images._resolve_ubuntu('ubuntu')
         self.assertEqual(
-            'https://cloud-images.ubuntu.com/groovy/current/groovy-server-cloudimg-amd64.img', u)
+            ['https://cloud-images.ubuntu.com/groovy/current/groovy-server-cloudimg-amd64.img',
+             'http://ubuntu.mirrors.tds.net/ubuntu-cloud-images/releases/20.10/release/ubuntu-20.10-server-cloudimg-amd64.img'], u)
 
         u = images._resolve_ubuntu('ubuntu:bionic')
         self.assertEqual(
-            'https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.img', u)
+            ['https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.img',
+             'http://ubuntu.mirrors.tds.net/ubuntu-cloud-images/releases/18.04/release/ubuntu-18.04-server-cloudimg-amd64.img'], u)
 
         u = images._resolve_ubuntu('ubuntu:18.04')
         self.assertEqual(
-            'https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.img', u)
+            ['https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.img',
+             'http://ubuntu.mirrors.tds.net/ubuntu-cloud-images/releases/18.04/release/ubuntu-18.04-server-cloudimg-amd64.img'], u)
 
         self.assertRaises(images.VersionSpecificationError,
                           images._resolve_ubuntu, 'ubuntu***')
@@ -218,7 +223,7 @@ class ImagesTestCase(testtools.TestCase):
             'Last-Modified': 'Tue, 10 Sep 2019 07:24:40 GMT',
             'Content-Length': 200000,
             'version': 0
-        }, '/a/b/c/hashed')
+        }, 'url', '/a/b/c/hashed')
         self.assertEqual(0, fetched)
         self.assertEqual(0, info['version'])
 
@@ -230,7 +235,7 @@ class ImagesTestCase(testtools.TestCase):
                 'Last-Modified': 'Tue, 10 Sep 2017 07:24:40 GMT',
                 'Content-Length': 200000,
                 'version': 0
-            }, '/a/b/c/hashed')
+            }, 'url', '/a/b/c/hashed')
             self.assertEqual(100, fetched)
             self.assertEqual(1, info['version'])
 
@@ -245,7 +250,7 @@ class ImagesTestCase(testtools.TestCase):
                 'Last-Modified': 'Tue, 10 Sep 2019 07:24:40 GMT',
                 'Content-Length': 200,
                 'version': 0
-            }, '/a/b/c/hashed')
+            }, 'url', '/a/b/c/hashed')
 
         handle = mock_open()
         handle.write.assert_called_with('AAAAAAAAAA')
@@ -258,7 +263,7 @@ class ImagesTestCase(testtools.TestCase):
                               'Last-Modified': 'Tue, 10 Sep 2019 07:24:40 GMT',
                               'Content-Length': 200000,
                               'version': 0
-                          }, '/a/b/c/hashed')
+                          }, 'url', '/a/b/c/hashed')
 
     @mock.patch('shakenfist.config.parsed.get', return_value='/a/b/c')
     @mock.patch('os.path.exists', return_value=False)
