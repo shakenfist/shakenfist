@@ -18,7 +18,7 @@ from shakenfist import util
 
 
 LOG = logging.getLogger(__file__)
-LOG.setLevel(logging.DEBUG)
+LOG.setLevel(logging.INFO)
 LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 
 
@@ -169,9 +169,10 @@ class Network(object):
             self.deploy_nat()
             self.update_dhcp()
         else:
-            admin_token = util.get_admin_api_token(
+            admin_token = util.get_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
-                                  config.parsed.get('API_PORT')))
+                                  config.parsed.get('API_PORT')),
+                namespace='all')
             requests.request(
                 'put',
                 ('http://%s:%d/deploy_network_node'
@@ -278,9 +279,10 @@ class Network(object):
                     d = dhcp.DHCP(self.uuid, subst['vx_veth_inner'])
                     d.restart_dhcpd()
         else:
-            admin_token = util.get_admin_api_token(
+            admin_token = util.get_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
-                                  config.parsed.get('API_PORT')))
+                                  config.parsed.get('API_PORT')),
+                namespace='all')
             requests.request(
                 'put',
                 ('http://%s:%d/update_dhcp'
@@ -298,9 +300,10 @@ class Network(object):
                     d = dhcp.DHCP(self.uuid, subst['vx_veth_inner'])
                     d.remove_dhcpd()
         else:
-            admin_token = util.get_admin_api_token(
+            admin_token = util.get_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
-                                  config.parsed.get('API_PORT')))
+                                  config.parsed.get('API_PORT')),
+                namespace='all')
             requests.request(
                 'put',
                 ('http://%s:%d/remove_dhcp'
@@ -346,7 +349,7 @@ class Network(object):
                     node_ips.append(ip)
 
             discovered = list(self.discover_mesh())
-            LOG.info('%s: Discovered mesh elements %s' % (self, discovered))
+            LOG.debug('%s: Discovered mesh elements %s' % (self, discovered))
             for node in discovered:
                 if node in node_ips:
                     node_ips.remove(node)

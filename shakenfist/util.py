@@ -16,7 +16,7 @@ from shakenfist import etcd
 
 
 LOG = logging.getLogger(__file__)
-LOG.setLevel(logging.DEBUG)
+LOG.setLevel(logging.INFO)
 LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 
 
@@ -27,7 +27,7 @@ class RecordedOperation():
 
     def __enter__(self):
         self.start_time = time.time()
-        LOG.info('%s: Start %s' % (self.object, self.operation))
+        LOG.debug('%s: Start %s' % (self.object, self.operation))
 
         object_type, object_uuid = self.get_describing_tuple()
         db.add_event(object_type, object_uuid,
@@ -115,14 +115,15 @@ def get_libvirt():
     return LIBVIRT
 
 
-def get_admin_api_token(base_url):
+def get_api_token(base_url, namespace='all'):
     auth_url = base_url + '/auth'
     LOG.info('Fetching admin auth token from %s' % auth_url)
-    password = etcd.get('passwords', None, 'all')['passwords'][0]
+    tokens = etcd.get('namespaces', None, namespace)['tokens']
+    token = tokens[list(tokens.keys())[0]]
     r = requests.request('POST', auth_url,
                          data=json.dumps({
-                             'namespace': 'all',
-                             'password': password
+                             'namespace': namespace,
+                             'token': token
                          }),
                          headers={'Content-Type': 'application/json',
                                   'User-Agent': get_user_agent()})
@@ -135,4 +136,4 @@ def get_admin_api_token(base_url):
 
 def get_user_agent():
     sf_version = VersionInfo('shakenfist').version_string()
-    return 'Mozilla/5.0 (Ubuntu; Linux x86_64) ShakenFist/%s' % sf_version
+    return 'Mozilla/5.0 (Ubuntu; Linux x86_64) Shaken Fist/%s' % sf_version

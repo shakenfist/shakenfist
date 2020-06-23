@@ -31,7 +31,7 @@ from shakenfist import virt
 
 
 LOG = logging.getLogger(__file__)
-LOG.setLevel(logging.DEBUG)
+LOG.setLevel(logging.INFO)
 LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 
 
@@ -76,7 +76,6 @@ def flask_get_post_body():
 def generic_wrapper(func):
     def wrapper(*args, **kwargs):
         try:
-            LOG.info('External API request: %s' % flask.request)
             j = flask_get_post_body()
 
             if j:
@@ -87,7 +86,12 @@ def generic_wrapper(func):
                         destkey = key
                     kwargs[destkey] = j[key]
 
-            LOG.info('External API request: %s %s %s' % (func, args, kwargs))
+            formatted_headers = []
+            for header in flask.request.headers:
+                formatted_headers.append(str(header))
+
+            LOG.info('API request: %s %s\n    Headers:\n        %s\n    Args: %s\n    KWargs: %s'
+                     % (flask.request.method, flask.request.url, '\n        '.join(formatted_headers), args, kwargs))
             return func(*args, **kwargs)
         except Exception:
             return error(500, 'server error')
@@ -143,10 +147,14 @@ def redirect_instance_request(func):
             url = 'http://%s:%d%s' % (i.db_entry['node'],
                                       config.parsed.get('API_PORT'),
                                       flask.request.environ['PATH_INFO'])
+            api_token = util.get_api_token(
+                'http://%s:%d' % (i.db_entry['node'],
+                                  config.parsed.get('API_PORT')),
+                namespace=get_jwt_identity())
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'], url,
                 data=json.dumps(flask_get_post_body()),
-                headers={'Authorization': flask.request.headers.get('Authorization'),
+                headers={'Authorization': api_token,
                          'User-Agent': util.get_user_agent()})
 
             LOG.info('Proxied %s %s returns: %d, %s'
@@ -178,9 +186,10 @@ def redirect_to_network_node(func):
     # Redirect method to the network node
     def wrapper(*args, **kwargs):
         if config.parsed.get('NODE_IP') != config.parsed.get('NETWORK_NODE_IP'):
-            admin_token = util.get_admin_api_token(
+            admin_token = util.get_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
-                                  config.parsed.get('API_PORT')))
+                                  config.parsed.get('API_PORT')),
+                namespace='all')
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'],
                 'http://%s:%d%s'
@@ -228,43 +237,47 @@ class Root(Resource):
 
 
 class Auth(Resource):
-    def _get_password(self, namespace):
-        rec = etcd.get('passwords', None, namespace)
+    def _get_tokens(self, namespace):
+        rec = etcd.get('namespaces', None, namespace)
         if rec:
-            return rec.get('passwords', [])
-        return []
+            return rec.get('tokens', {})
+        return {}
 
-    def post(self, namespace=None, password=None):
+    def post(self, namespace=None, token=None):
         if not namespace:
             return error(400, 'Missing namespace in request')
-        if not password:
-            return error(400, 'Missing password in request')
+        if not token:
+            return error(400, 'Missing token in request')
 
-        if password not in self._get_password(namespace):
-            return error(401, 'Unauthorized')
-        return {'access_token': create_access_token(identity=namespace)}
+        tokens = self._get_tokens(namespace)
+        for unique_name in tokens:
+            if tokens[unique_name] == token:
+                return {'access_token': create_access_token(identity=namespace)}
+
+        return error(401, 'Unauthorized')
 
 
 class AuthNamespaces(Resource):
     @jwt_required
     @caller_is_admin
-    def post(self, namespace=None, password=None):
+    def post(self, namespace=None, unique_name=None, token=None):
         if not namespace:
             return error(400, 'No namespace specified')
-        if not password:
-            return error(400, 'No password specified')
+        if not unique_name:
+            return error(400, 'No unique name specified')
+        if not token:
+            return error(400, 'No token specified')
 
-        with etcd.get_lock('passwords') as _:
-            rec = etcd.get('passwords', None, namespace)
+        with etcd.get_lock('namespaces') as _:
+            rec = etcd.get('namespaces', None, namespace)
             if not rec:
                 rec = {
                     'name': namespace,
-                    'passwords': []
+                    'tokens': {}
                 }
 
-            if password not in rec['passwords']:
-                rec['passwords'].append(password)
-            etcd.put('passwords', None, namespace, rec)
+            rec['tokens'][unique_name] = token
+            etcd.put('namespaces', None, namespace, rec)
 
         return namespace
 
@@ -272,7 +285,7 @@ class AuthNamespaces(Resource):
     @caller_is_admin
     def get(self):
         out = []
-        for rec in etcd.get_all('passwords', None):
+        for rec in etcd.get_all('namespaces', None):
             out.append(rec['name'])
         return out
 
@@ -285,7 +298,7 @@ class AuthNamespace(Resource):
             return error(400, 'No namespace specified')
         if namespace == 'all':
             return error(400, 'Could cannot delete the all namespace')
-        etcd.delete('passwords', None, namespace)
+        etcd.delete('namespaces', None, namespace)
 
 
 class Instance(Resource):
@@ -395,9 +408,10 @@ class Instances(Resource):
             body['placed_on'] = placed_on
             body['instance_uuid'] = instance_uuid
 
-            admin_token = util.get_admin_api_token(
+            admin_token = util.get_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
-                                  config.parsed.get('API_PORT')))
+                                  config.parsed.get('API_PORT')),
+                namespace='all')
             r = requests.request('POST',
                                  'http://%s:%d/instances'
                                  % (placed_on,
@@ -719,9 +733,10 @@ class Networks(Resource):
             n.create()
             n.ensure_mesh()
         else:
-            admin_token = util.get_admin_api_token(
+            admin_token = util.get_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
-                                  config.parsed.get('API_PORT')))
+                                  config.parsed.get('API_PORT')),
+                namespace='all')
             requests.request(
                 'put',
                 ('http://%s:%d/deploy_network_node'

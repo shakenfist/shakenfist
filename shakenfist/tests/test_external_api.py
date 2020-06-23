@@ -13,6 +13,9 @@ class FakeResponse(object):
         self.status_code = status_code
         self.text = text
 
+    def json(self):
+        return json.loads(self.text)
+
 
 class FakeScheduler(object):
     def place_instance(self, *args, **kwargs):
@@ -37,14 +40,14 @@ class ExternalApiTestCase(testtools.TestCase):
         self.client = external_api.app.test_client()
 
         # Make a fake auth token
-        self.get_password = mock.patch(
-            'shakenfist.external_api.app.Auth._get_password',
-            return_value='bar'
+        self.get_tokens = mock.patch(
+            'shakenfist.external_api.app.Auth._get_tokens',
+            return_value={'foo': 'bar'}
         )
-        self.mock_get_password = self.get_password.start()
+        self.mock_get_tokens = self.get_tokens.start()
 
         resp = self.client.post(
-            '/auth', data=json.dumps({'namespace': 'foo', 'password': 'bar'}))
+            '/auth', data=json.dumps({'namespace': 'foo', 'token': 'bar'}))
         self.auth_header = 'Bearer %s' % resp.get_json()['access_token']
 
     def test_get_root(self):
@@ -88,11 +91,12 @@ class ExternalApiTestCase(testtools.TestCase):
                               'NODE_NAME': 'thisone',
                               'STORAGE_PATH': '/a/b/c'})
     @mock.patch('requests.request',
-                return_value=FakeResponse(200, '{"fakestuff": "here"}'))
+                return_value=FakeResponse(200, '{"access_token": "notatoken"}'))
+    @mock.patch('shakenfist.etcd.get', return_value={'tokens': {'foo': 'bar'}})
     def test_delete_instance(self, mock_request, mock_get_config,
-                             mock_get_instance):
+                             mock_get_instance, mock_get):
         resp = self.client.delete(
             '/instances/foo', headers={'Authorization': self.auth_header,
                                        'User-Agent': util.get_user_agent()})
-        self.assertEqual({'fakestuff': 'here'}, resp.get_json())
+        self.assertEqual({'access_token': 'notatoken'}, resp.get_json())
         self.assertEqual(200, resp.status_code)

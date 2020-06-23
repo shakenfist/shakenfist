@@ -62,7 +62,7 @@
         content: |
           #!/bin/bash -e
 
-          sf-client namespace create foo b4n4n4
+          sf-client namespace create foo bar b4n4n4
           [ `sf-client --simple namespace list | wc -l` -eq 3 ]
           sf-client namespace delete foo
           [ `sf-client --simple namespace list | wc -l` -eq 2 ]

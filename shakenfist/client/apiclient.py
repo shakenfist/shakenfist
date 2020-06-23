@@ -52,14 +52,14 @@ STATUS_CODES_TO_ERRORS = {
 
 class Client(object):
     def __init__(self, base_url='http://localhost:13000', verbose=False,
-                 namespace=None, password=None):
+                 namespace=None, token=None):
         self.base_url = base_url
         self.namespace = namespace
-        self.password = password
+        self.token = token
 
         self.cached_auth = None
         if verbose:
-            LOG.setLevel(logging.DEBUG)
+            LOG.setLevel(logging.INFO)
 
     def _request_url(self, method, url, data=None):
         if not self.cached_auth:
@@ -67,7 +67,7 @@ class Client(object):
             r = requests.request('POST', auth_url,
                                  data=json.dumps(
                                      {'namespace': self.namespace,
-                                      'password': self.password}),
+                                      'token': self.token}),
                                  headers={'Content-Type': 'application/json',
                                           'User-Agent': get_user_agent()})
             if r.status_code != 200:
@@ -244,19 +244,20 @@ class Client(object):
         r = self._request_url('GET', self.base_url + '/auth/namespace')
         return r.json()
 
-    def create_namespace(self, namespace, password):
+    def create_namespace(self, namespace, unique_name, token):
         r = self._request_url('POST', self.base_url + '/auth/namespace',
                               data={
                                   'namespace': namespace,
-                                  'password': password
+                                  'unique_name': unique_name,
+                                  'token': token
                               })
         return r.json()
 
     def delete_namespace(self, namespace):
-        self._request_url('DELETE', self.base_url +
-                          '/auth/namespace/' + namespace)
+        self._request_url(
+            'DELETE', self.base_url + '/auth/namespace/' + namespace)
 
 
 def get_user_agent():
     sf_version = VersionInfo('shakenfist').version_string()
-    return 'Mozilla/5.0 (Ubuntu; Linux x86_64) ShakenFist/%s' % sf_version
+    return 'Mozilla/5.0 (Ubuntu; Linux x86_64) Shaken Fist/%s' % sf_version
