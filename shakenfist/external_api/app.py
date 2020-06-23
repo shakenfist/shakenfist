@@ -245,6 +245,38 @@ class Auth(Resource):
         return {'access_token': create_access_token(identity=namespace)}
 
 
+class AuthOperations(Resource):
+    @jwt_required
+    @caller_is_admin
+    def post(self, namespace=None, password=None):
+        if not namespace:
+            return error(400, 'No namespace specified')
+        if not password:
+            return error(400, 'No password specified')
+
+        with etcd.get_lock('passwords') as _:
+            rec = etcd.get('passwords', None, namespace)
+            if not rec:
+                rec = {
+                    'name': namespace,
+                    'passwords': []
+                }
+
+            if password not in rec['passwords']:
+                rec['passwords'].append(password)
+            etcd.put('passwords', None, namespace, rec)
+
+        return namespace
+
+    @jwt_required
+    @caller_is_admin
+    def get(self):
+        out = []
+        for rec in etcd.get_all('passwords', None):
+            out.append(rec['name'])
+        return out
+
+
 class Instance(Resource):
     @jwt_required
     @arg_is_instance_uuid
@@ -750,6 +782,7 @@ class RemoveDHCP(Resource):
 
 api.add_resource(Root, '/')
 api.add_resource(Auth, '/auth')
+api.add_resource(AuthOperations, '/auth/namespace')
 api.add_resource(Instances, '/instances')
 api.add_resource(Instance, '/instances/<instance_uuid>')
 api.add_resource(InstanceEvents, '/instances/<instance_uuid>/events')

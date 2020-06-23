@@ -106,6 +106,50 @@ def node_list(ctx):
 cli.add_command(node)
 
 
+@click.group(help='Namespace commands')
+def namespace():
+    pass
+
+
+def _get_namespaces(ctx, args, incomplete):
+    return list(CLIENT.get_namespaces())
+
+
+@namespace.command(name='list', help='List namespaces')
+@click.pass_context
+def namespace_list(ctx):
+    namespaces = list(CLIENT.get_namespaces())
+
+    if ctx.obj['OUTPUT'] == 'pretty':
+        x = PrettyTable()
+        x.field_names = ['namespace']
+        for n in namespaces:
+            x.add_row([n])
+        print(x)
+
+    elif ctx.obj['OUTPUT'] == 'simple':
+        print('namespace')
+        for n in namespaces:
+            print(n)
+
+    elif ctx.obj['OUTPUT'] == 'json':
+        print(json.dumps(namespaces))
+
+
+@namespace.command(name='create',
+                   help=('Create a namespace.\n\n'
+                         'NAME:     The name of the namespace\n'
+                         'PASSWORD: The password for the namespace'))
+@click.argument('name', type=click.STRING)
+@click.argument('password', type=click.STRING)
+@click.pass_context
+def namespace_create(ctx, name=None, password=None):
+    CLIENT.create_namespace(name, password)
+
+
+cli.add_command(namespace)
+
+
 @click.group(help='Network commands')
 def network():
     pass

@@ -240,6 +240,18 @@ class Client(object):
                               '/defloat')
         return r.json()
 
+    def get_namespaces(self):
+        r = self._request_url('GET', self.base_url + '/auth/namespace')
+        return r.json()
+
+    def create_namespace(self, namespace, password):
+        r = self._request_url('POST', self.base_url + '/auth/namespace',
+                              data={
+                                  'namespace': namespace,
+                                  'password': password
+                              })
+        return r.json()
+
 
 def get_user_agent():
     sf_version = VersionInfo('shakenfist').version_string()
