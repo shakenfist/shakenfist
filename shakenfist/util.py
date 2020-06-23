@@ -119,7 +119,7 @@ def get_admin_api_token(base_url):
     auth_url = base_url + '/auth'
     LOG.info('Fetching admin auth token from %s' % auth_url)
     tokens = etcd.get('namespaces', None, 'all')['tokens']
-    token = tokens[tokens.keys()[0]]
+    token = tokens[list(tokens.keys())[0]]
     r = requests.request('POST', auth_url,
                          data=json.dumps({
                              'namespace': 'all',

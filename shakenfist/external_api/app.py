@@ -76,7 +76,6 @@ def flask_get_post_body():
 def generic_wrapper(func):
     def wrapper(*args, **kwargs):
         try:
-            LOG.info('External API request: %s' % flask.request)
             j = flask_get_post_body()
 
             if j:
@@ -87,7 +86,12 @@ def generic_wrapper(func):
                         destkey = key
                     kwargs[destkey] = j[key]
 
-            LOG.info('External API request: %s %s %s' % (func, args, kwargs))
+            formatted_headers = []
+            for header in flask.request.headers:
+                formatted_headers.append(str(header))
+
+            LOG.info('API request: %s %s\n    Headers:\n        %s\n    Args: %s\n    KWargs: %s'
+                     % (flask.request.method, flask.request.url, '\n        '.join(formatted_headers), args, kwargs))
             return func(*args, **kwargs)
         except Exception:
             return error(500, 'server error')
