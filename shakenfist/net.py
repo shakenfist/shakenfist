@@ -169,9 +169,10 @@ class Network(object):
             self.deploy_nat()
             self.update_dhcp()
         else:
-            admin_token = util.get_admin_api_token(
+            admin_token = util.get_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
-                                  config.parsed.get('API_PORT')))
+                                  config.parsed.get('API_PORT')),
+                namespace='all')
             requests.request(
                 'put',
                 ('http://%s:%d/deploy_network_node'
@@ -278,9 +279,10 @@ class Network(object):
                     d = dhcp.DHCP(self.uuid, subst['vx_veth_inner'])
                     d.restart_dhcpd()
         else:
-            admin_token = util.get_admin_api_token(
+            admin_token = util.get_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
-                                  config.parsed.get('API_PORT')))
+                                  config.parsed.get('API_PORT')),
+                namespace='all')
             requests.request(
                 'put',
                 ('http://%s:%d/update_dhcp'
@@ -298,9 +300,10 @@ class Network(object):
                     d = dhcp.DHCP(self.uuid, subst['vx_veth_inner'])
                     d.remove_dhcpd()
         else:
-            admin_token = util.get_admin_api_token(
+            admin_token = util.get_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
-                                  config.parsed.get('API_PORT')))
+                                  config.parsed.get('API_PORT')),
+                namespace='all')
             requests.request(
                 'put',
                 ('http://%s:%d/remove_dhcp'

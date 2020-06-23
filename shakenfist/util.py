@@ -115,14 +115,14 @@ def get_libvirt():
     return LIBVIRT
 
 
-def get_admin_api_token(base_url):
+def get_api_token(base_url, namespace='all'):
     auth_url = base_url + '/auth'
     LOG.info('Fetching admin auth token from %s' % auth_url)
-    tokens = etcd.get('namespaces', None, 'all')['tokens']
+    tokens = etcd.get('namespaces', None, namespace)['tokens']
     token = tokens[list(tokens.keys())[0]]
     r = requests.request('POST', auth_url,
                          data=json.dumps({
-                             'namespace': 'all',
+                             'namespace': namespace,
                              'token': token
                          }),
                          headers={'Content-Type': 'application/json',

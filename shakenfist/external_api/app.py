@@ -147,10 +147,14 @@ def redirect_instance_request(func):
             url = 'http://%s:%d%s' % (i.db_entry['node'],
                                       config.parsed.get('API_PORT'),
                                       flask.request.environ['PATH_INFO'])
+            api_token = util.get_api_token(
+                'http://%s:%d' % (i.db_entry['node'],
+                                  config.parsed.get('API_PORT')),
+                namespace=get_jwt_identity())
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'], url,
                 data=json.dumps(flask_get_post_body()),
-                headers={'Authorization': flask.request.headers.get('Authorization'),
+                headers={'Authorization': api_token,
                          'User-Agent': util.get_user_agent()})
 
             LOG.info('Proxied %s %s returns: %d, %s'
@@ -182,9 +186,10 @@ def redirect_to_network_node(func):
     # Redirect method to the network node
     def wrapper(*args, **kwargs):
         if config.parsed.get('NODE_IP') != config.parsed.get('NETWORK_NODE_IP'):
-            admin_token = util.get_admin_api_token(
+            admin_token = util.get_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
-                                  config.parsed.get('API_PORT')))
+                                  config.parsed.get('API_PORT')),
+                namespace='all')
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'],
                 'http://%s:%d%s'
@@ -403,9 +408,10 @@ class Instances(Resource):
             body['placed_on'] = placed_on
             body['instance_uuid'] = instance_uuid
 
-            admin_token = util.get_admin_api_token(
+            admin_token = util.get_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
-                                  config.parsed.get('API_PORT')))
+                                  config.parsed.get('API_PORT')),
+                namespace='all')
             r = requests.request('POST',
                                  'http://%s:%d/instances'
                                  % (placed_on,
@@ -727,9 +733,10 @@ class Networks(Resource):
             n.create()
             n.ensure_mesh()
         else:
-            admin_token = util.get_admin_api_token(
+            admin_token = util.get_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
-                                  config.parsed.get('API_PORT')))
+                                  config.parsed.get('API_PORT')),
+                namespace='all')
             requests.request(
                 'put',
                 ('http://%s:%d/deploy_network_node'
