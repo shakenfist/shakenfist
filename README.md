@@ -43,7 +43,7 @@ sf-client --help
 Networking
 ----------
 
-Virtual networks / micro segmentation is provided by VXLAN meshes betwen the instances. Hypervisors are joined to a given mesh when they start their first instance on that network. DHCP services are optionally offered from a "network services" node, which is just a hypervisor node with some extra dnsmasq process. NAT is also optionally available from the network services node. If your network provides NAT, it consumes an IP address from the
+Virtual networks / micro segmentation is provided by VXLAN meshes between the instances. Hypervisors are joined to a given mesh when they start their first instance on that network. DHCP services are optionally offered from a "network services" node, which is just a hypervisor node with some extra dnsmasq process. NAT is also optionally available from the network services node. If your network provides NAT, it consumes an IP address from the
 floating IP pool to do so, and performs NAT in a network namespace on the network node.
 
 You create a network on the command line like this:
@@ -57,7 +57,7 @@ Where "192.168.1.0/24" is the netblock to use, and "mynet" is the name of the ne
 Instances
 ---------
 
-Every instance gets a config drive. Its always an ISO9660 drive. Its always the second virtual disk attached to the VM (vdb on Linux). There is no metadata server. Additionally, there is no image service -- you specify the image to use by providing a URL. That URL is cached, but can be to any HTTP server anywhere. Even better, there are no flavors. You specify what resources your instance should have at boot time and that's what you get. No more being forced into a tshirt sized description of your needs.
+Every instance gets a config drive. Its always an ISO9660 drive. Its always the second virtual disk attached to the VM (vdb on Linux). There is no metadata server. Additionally, there is no image service -- you specify the image to use by providing a URL. That URL is cached, but can be to any HTTP server anywhere. Even better, there are no flavors. You specify what resources your instance should have at boot time and that's what you get. No more being forced into a t-shirt sized description of your needs.
 
 Instances are always cattle. Any feature that made instances feel like pets has not been implemented. That said, you can snapshot an instance. Snapshots aren't reliable backups, just like they're not really reliable backups on OpenStack. There is a small but real chance that a snapshot will contain an inconsistent state if you're snapshotting a busy database or something like that. One minor difference from OpenStack -- when you snapshot your instance you can snapshot all of the virtual disks (except the config drive) if you want to. Snapshots are delivered as files you can download via a mechanism external to Shaken Fist (for example an HTTP server pointed at the snapshot directory).
 
@@ -152,7 +152,7 @@ The ansible takes varying variables depending on your undercloud provider. Here'
 Now create your database and hypervisor nodes (where foo-1234 is my Google Compute project):
 
 ```bash
-sudo apt-get install ansible
+sudo apt-get install ansible tox pwgen
 git clone https://github.com/mikalstill/shakenfist
 cd ansible
 ansible-galaxy install andrewrothstein.etcd-cluster
@@ -180,7 +180,7 @@ Here's a simple feature matrix:
 |---------------------------------------------------|-------------|---------|-------------|
 | Servers / instances                               | v0.1        |         |             |
 | Networks                                          | v0.1        |         |             |
-| Multiple NICs for a given server                  | v0.1        |         |             |
+| Multiple NIC's for a given server                 | v0.1        |         |             |
 | Pre-cache a server image                          | v0.1        |         |             |
 | Floating IPs                                      | v0.1        |         |             |
 | Pause                                             | v0.1        |         |             |
