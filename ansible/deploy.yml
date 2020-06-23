@@ -385,7 +385,7 @@
         user: "{{sfgrafana_user_complex.uid}}"
 
     - name: Create an admin namespace called "all"
-      shell: ETCDCTL_API=3 etcdctl put "/sf/passwords/all" "{\"passwords\"{{":"}} [\"{{api_admin_password}}\"]}"
+      shell: ETCDCTL_API=3 etcdctl put "/sf/passwords/all" "{\"name\"{{":"}} \"all\", \"passwords\"{{":"}} [\"{{api_admin_password}}\"]}"
 
 - hosts: hypervisors
   any_errors_fatal: true

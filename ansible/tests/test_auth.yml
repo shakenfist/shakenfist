@@ -1,0 +1,75 @@
+#########################################
+# Import inventory from terraform
+#########################################
+
+- hosts: localhost
+  gather_facts: yes
+  connection: ssh
+  vars_files:
+    - ../vars
+
+  tasks:
+    - include: ../terraform/{{cloud}}/terraform.yml
+
+#########################################
+# Scenario: a lack of auth should cause an error
+#########################################
+
+- hosts: sf-1
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - ../vars
+
+  tasks:
+    - name: Move global auth file to one side, attempt to do a thing, should fail, move auth file back
+      copy:
+        content: |
+          #!/bin/bash -e
+
+          mv /etc/sf/shakenfist.json /etc/sf/shakenfist.json.disabled
+          sf-client instance list || true
+          ec=$?
+          mv /etc/sf/shakenfist.json.disabled /etc/sf/shakenfist.json
+          exit $ec
+        dest: /tmp/shell_script
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx
+
+    - name: Execute
+      shell: /tmp/shell_script
+
+#########################################
+# Scenario: create a new namespace and then launch something in it
+#########################################
+
+- hosts: sf-1
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars_files:
+    - ../vars
+
+  tasks:
+    - name: Create a new namespace, then delete it
+      copy:
+        content: |
+          #!/bin/bash -e
+
+          sf-client namespace create foo b4n4n4
+          [ `sf-client --simple namespace list | wc -l` -eq 3 ]
+          sf-client namespace delete foo
+          [ `sf-client --simple namespace list | wc -l` -eq 2 ]
+        dest: /tmp/shell_script
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx
+
+    - name: Execute
+      shell: /tmp/shell_script
