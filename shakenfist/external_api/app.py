@@ -245,7 +245,7 @@ class Auth(Resource):
         return {'access_token': create_access_token(identity=namespace)}
 
 
-class AuthOperations(Resource):
+class AuthNamespaces(Resource):
     @jwt_required
     @caller_is_admin
     def post(self, namespace=None, password=None):
@@ -275,6 +275,17 @@ class AuthOperations(Resource):
         for rec in etcd.get_all('passwords', None):
             out.append(rec['name'])
         return out
+
+
+class AuthNamespace(Resource):
+    @jwt_required
+    @caller_is_admin
+    def delete(self, namespace):
+        if not namespace:
+            return error(400, 'No namespace specified')
+        if namespace == 'all':
+            return error(400, 'Could cannot delete the all namespace')
+        etcd.delete('passwords', None, namespace)
 
 
 class Instance(Resource):
@@ -782,7 +793,8 @@ class RemoveDHCP(Resource):
 
 api.add_resource(Root, '/')
 api.add_resource(Auth, '/auth')
-api.add_resource(AuthOperations, '/auth/namespace')
+api.add_resource(AuthNamespaces, '/auth/namespace')
+api.add_resource(AuthNamespace, '/auth/namespace/<namespace>')
 api.add_resource(Instances, '/instances')
 api.add_resource(Instance, '/instances/<instance_uuid>')
 api.add_resource(InstanceEvents, '/instances/<instance_uuid>/events')

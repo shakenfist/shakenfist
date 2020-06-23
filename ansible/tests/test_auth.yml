@@ -57,13 +57,15 @@
     - ../vars
 
   tasks:
-    - name: Create a new namespace
+    - name: Create a new namespace, then delete it
       copy:
         content: |
           #!/bin/bash -e
 
           sf-client namespace create foo b4n4n4
-          [ `sf-client namespace list | wc -l` eq 3 ]
+          [ `sf-client --simple namespace list | wc -l` -eq 3 ]
+          sf-client namespace delete foo
+          [ `sf-client --simple namespace list | wc -l` -eq 2 ]
         dest: /tmp/shell_script
         owner: root
         group: root

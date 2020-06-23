@@ -1,4 +1,4 @@
-- name: Clear out old instances and networks
+- name: Clear out old instances, networks, and namespaces
   shell: |
     for inst in `sf-client --simple instance list | grep -v uuid | cut -f 1 -d ","`
     do

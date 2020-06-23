@@ -147,6 +147,15 @@ def namespace_create(ctx, name=None, password=None):
     CLIENT.create_namespace(name, password)
 
 
+@namespace.command(name='delete',
+                   help=('delete a namespace.\n\n'
+                         'NAME:     The name of the namespace'))
+@click.argument('name', type=click.STRING)
+@click.pass_context
+def namespace_delete(ctx, name=None):
+    CLIENT.delete_namespace(name)
+
+
 cli.add_command(namespace)
 
 
