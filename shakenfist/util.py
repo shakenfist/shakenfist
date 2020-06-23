@@ -136,4 +136,4 @@ def get_api_token(base_url, namespace='all'):
 
 def get_user_agent():
     sf_version = VersionInfo('shakenfist').version_string()
-    return 'Mozilla/5.0 (Ubuntu; Linux x86_64) ShakenFist/%s' % sf_version
+    return 'Mozilla/5.0 (Ubuntu; Linux x86_64) Shaken Fist/%s' % sf_version
