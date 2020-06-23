@@ -44,7 +44,7 @@ def cli(ctx, output, verbose, namespace, token, apiurl):
     ctx.obj['OUTPUT'] = output
 
     if verbose:
-        LOG.setLevel(logging.DEBUG)
+        LOG.setLevel(logging.INFO)
 
     # Where do we find authentication details? First off, we try command line
     # flags; then environment variables (thanks for doing this for free click);

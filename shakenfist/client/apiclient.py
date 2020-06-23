@@ -59,7 +59,7 @@ class Client(object):
 
         self.cached_auth = None
         if verbose:
-            LOG.setLevel(logging.DEBUG)
+            LOG.setLevel(logging.INFO)
 
     def _request_url(self, method, url, data=None):
         if not self.cached_auth:

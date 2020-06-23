@@ -18,7 +18,7 @@ from shakenfist import util
 
 
 LOG = logging.getLogger(__file__)
-LOG.setLevel(logging.DEBUG)
+LOG.setLevel(logging.INFO)
 LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 
 
@@ -346,7 +346,7 @@ class Network(object):
                     node_ips.append(ip)
 
             discovered = list(self.discover_mesh())
-            LOG.info('%s: Discovered mesh elements %s' % (self, discovered))
+            LOG.debug('%s: Discovered mesh elements %s' % (self, discovered))
             for node in discovered:
                 if node in node_ips:
                     node_ips.remove(node)

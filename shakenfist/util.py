@@ -16,7 +16,7 @@ from shakenfist import etcd
 
 
 LOG = logging.getLogger(__file__)
-LOG.setLevel(logging.DEBUG)
+LOG.setLevel(logging.INFO)
 LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 
 
@@ -27,7 +27,7 @@ class RecordedOperation():
 
     def __enter__(self):
         self.start_time = time.time()
-        LOG.info('%s: Start %s' % (self.object, self.operation))
+        LOG.debug('%s: Start %s' % (self.object, self.operation))
 
         object_type, object_uuid = self.get_describing_tuple()
         db.add_event(object_type, object_uuid,

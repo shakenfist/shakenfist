@@ -31,7 +31,7 @@ from shakenfist import virt
 
 
 LOG = logging.getLogger(__file__)
-LOG.setLevel(logging.DEBUG)
+LOG.setLevel(logging.INFO)
 LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 
 
