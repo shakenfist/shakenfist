@@ -37,14 +37,14 @@ class ExternalApiTestCase(testtools.TestCase):
         self.client = external_api.app.test_client()
 
         # Make a fake auth token
-        self.get_password = mock.patch(
-            'shakenfist.external_api.app.Auth._get_password',
-            return_value='bar'
+        self.get_tokens = mock.patch(
+            'shakenfist.external_api.app.Auth._get_tokens',
+            return_value={'foo': 'bar'}
         )
-        self.mock_get_password = self.get_password.start()
+        self.mock_get_tokens = self.get_tokens.start()
 
         resp = self.client.post(
-            '/auth', data=json.dumps({'namespace': 'foo', 'password': 'bar'}))
+            '/auth', data=json.dumps({'namespace': 'foo', 'token': 'bar'}))
         self.auth_header = 'Bearer %s' % resp.get_json()['access_token']
 
     def test_get_root(self):

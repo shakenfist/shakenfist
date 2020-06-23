@@ -228,43 +228,47 @@ class Root(Resource):
 
 
 class Auth(Resource):
-    def _get_password(self, namespace):
-        rec = etcd.get('passwords', None, namespace)
+    def _get_tokens(self, namespace):
+        rec = etcd.get('namespaces', None, namespace)
         if rec:
-            return rec.get('passwords', [])
-        return []
+            return rec.get('tokens', {})
+        return {}
 
-    def post(self, namespace=None, password=None):
+    def post(self, namespace=None, token=None):
         if not namespace:
             return error(400, 'Missing namespace in request')
-        if not password:
-            return error(400, 'Missing password in request')
+        if not token:
+            return error(400, 'Missing token in request')
 
-        if password not in self._get_password(namespace):
-            return error(401, 'Unauthorized')
-        return {'access_token': create_access_token(identity=namespace)}
+        tokens = self._get_tokens(namespace)
+        for unique_name in tokens:
+            if tokens[unique_name] == token:
+                return {'access_token': create_access_token(identity=namespace)}
+
+        return error(401, 'Unauthorized')
 
 
 class AuthNamespaces(Resource):
     @jwt_required
     @caller_is_admin
-    def post(self, namespace=None, password=None):
+    def post(self, namespace=None, unique_name=None, token=None):
         if not namespace:
             return error(400, 'No namespace specified')
-        if not password:
-            return error(400, 'No password specified')
+        if not unique_name:
+            return error(400, 'No unique name specified')
+        if not token:
+            return error(400, 'No token specified')
 
-        with etcd.get_lock('passwords') as _:
-            rec = etcd.get('passwords', None, namespace)
+        with etcd.get_lock('namespaces') as _:
+            rec = etcd.get('namespaces', None, namespace)
             if not rec:
                 rec = {
                     'name': namespace,
-                    'passwords': []
+                    'tokens': {}
                 }
 
-            if password not in rec['passwords']:
-                rec['passwords'].append(password)
-            etcd.put('passwords', None, namespace, rec)
+            rec['tokens'][unique_name] = token
+            etcd.put('namespaces', None, namespace, rec)
 
         return namespace
 
@@ -272,7 +276,7 @@ class AuthNamespaces(Resource):
     @caller_is_admin
     def get(self):
         out = []
-        for rec in etcd.get_all('passwords', None):
+        for rec in etcd.get_all('namespaces', None):
             out.append(rec['name'])
         return out
 
@@ -285,7 +289,7 @@ class AuthNamespace(Resource):
             return error(400, 'No namespace specified')
         if namespace == 'all':
             return error(400, 'Could cannot delete the all namespace')
-        etcd.delete('passwords', None, namespace)
+        etcd.delete('namespaces', None, namespace)
 
 
 class Instance(Resource):

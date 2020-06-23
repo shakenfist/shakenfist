@@ -52,10 +52,10 @@ STATUS_CODES_TO_ERRORS = {
 
 class Client(object):
     def __init__(self, base_url='http://localhost:13000', verbose=False,
-                 namespace=None, password=None):
+                 namespace=None, token=None):
         self.base_url = base_url
         self.namespace = namespace
-        self.password = password
+        self.token = token
 
         self.cached_auth = None
         if verbose:
@@ -67,7 +67,7 @@ class Client(object):
             r = requests.request('POST', auth_url,
                                  data=json.dumps(
                                      {'namespace': self.namespace,
-                                      'password': self.password}),
+                                      'token': self.token}),
                                  headers={'Content-Type': 'application/json',
                                           'User-Agent': get_user_agent()})
             if r.status_code != 200:
@@ -244,17 +244,18 @@ class Client(object):
         r = self._request_url('GET', self.base_url + '/auth/namespace')
         return r.json()
 
-    def create_namespace(self, namespace, password):
+    def create_namespace(self, namespace, unique_name, token):
         r = self._request_url('POST', self.base_url + '/auth/namespace',
                               data={
                                   'namespace': namespace,
-                                  'password': password
+                                  'unique_name': unique_name,
+                                  'token': token
                               })
         return r.json()
 
     def delete_namespace(self, namespace):
-        self._request_url('DELETE', self.base_url +
-                          '/auth/namespace/' + namespace)
+        self._request_url(
+            'DELETE', self.base_url + '/auth/namespace/' + namespace)
 
 
 def get_user_agent():

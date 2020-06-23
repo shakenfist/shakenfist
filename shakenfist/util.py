@@ -118,11 +118,12 @@ def get_libvirt():
 def get_admin_api_token(base_url):
     auth_url = base_url + '/auth'
     LOG.info('Fetching admin auth token from %s' % auth_url)
-    password = etcd.get('passwords', None, 'all')['passwords'][0]
+    tokens = etcd.get('namespaces', None, 'all')['tokens']
+    token = tokens[tokens.keys()[0]]
     r = requests.request('POST', auth_url,
                          data=json.dumps({
                              'namespace': 'all',
-                             'password': password
+                             'token': token
                          }),
                          headers={'Content-Type': 'application/json',
                                   'User-Agent': get_user_agent()})

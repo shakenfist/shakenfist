@@ -35,10 +35,10 @@ def filter_dict(d, allowed_keys):
 @click.option('--json', 'output', flag_value='json')
 @click.option('--verbose/--no-verbose', default=False)
 @click.option('--namespace', envvar='SHAKENFIST_NAMESPACE', default=None)
-@click.option('--password', envvar='SHAKENFIST_PASSWORD', default=None)
+@click.option('--token', envvar='SHAKENFIST_TOKEN', default=None)
 @click.option('--apiurl', envvar='SHAKENFIST_API_URL', default=None)
 @click.pass_context
-def cli(ctx, output, verbose, namespace, password, apiurl):
+def cli(ctx, output, verbose, namespace, token, apiurl):
     if not ctx.obj:
         ctx.obj = {}
     ctx.obj['OUTPUT'] = output
@@ -55,7 +55,7 @@ def cli(ctx, output, verbose, namespace, password, apiurl):
             with open(user_conf) as f:
                 d = json.loads(f.read())
                 namespace = d['namespace']
-                password = d['password']
+                token = d['token']
                 apiurl = d['apiurl']
 
     if not namespace:
@@ -63,13 +63,13 @@ def cli(ctx, output, verbose, namespace, password, apiurl):
             with open('/etc/sf/shakenfist.json') as f:
                 d = json.loads(f.read())
                 namespace = d['namespace']
-                password = d['password']
+                token = d['token']
                 apiurl = d['apiurl']
 
     global CLIENT
     CLIENT = apiclient.Client(
         namespace=namespace,
-        password=password,
+        token=token,
         base_url=apiurl,
         verbose=verbose)
 
@@ -138,13 +138,15 @@ def namespace_list(ctx):
 
 @namespace.command(name='create',
                    help=('Create a namespace.\n\n'
-                         'NAME:     The name of the namespace\n'
-                         'PASSWORD: The password for the namespace'))
+                         'NAMESPACE:   The name of the namespace\n'
+                         'UNIQUE_NAME: The unique name of the token\n'
+                         'TOKEN:       The password for the namespace'))
 @click.argument('name', type=click.STRING)
-@click.argument('password', type=click.STRING)
+@click.argument('unique_name', type=click.STRING)
+@click.argument('token', type=click.STRING)
 @click.pass_context
-def namespace_create(ctx, name=None, password=None):
-    CLIENT.create_namespace(name, password)
+def namespace_create(ctx, name=None, unique_name=None, token=None):
+    CLIENT.create_namespace(name, unique_name, token)
 
 
 @namespace.command(name='delete',
