@@ -237,21 +237,21 @@ class Root(Resource):
 
 
 class Auth(Resource):
-    def _get_tokens(self, namespace):
+    def _get_keys(self, namespace):
         rec = etcd.get('namespaces', None, namespace)
         if rec:
-            return rec.get('tokens', {})
+            return rec.get('keys', {})
         return {}
 
-    def post(self, namespace=None, token=None):
+    def post(self, namespace=None, key=None):
         if not namespace:
             return error(400, 'Missing namespace in request')
-        if not token:
-            return error(400, 'Missing token in request')
+        if not key:
+            return error(400, 'Missing key in request')
 
-        tokens = self._get_tokens(namespace)
-        for unique_name in tokens:
-            if tokens[unique_name] == token:
+        keys = self._get_keys(namespace)
+        for key_name in keys:
+            if keys[key_name] == key:
                 return {'access_token': create_access_token(identity=namespace)}
 
         return error(401, 'Unauthorized')
@@ -260,23 +260,23 @@ class Auth(Resource):
 class AuthNamespaces(Resource):
     @jwt_required
     @caller_is_admin
-    def post(self, namespace=None, unique_name=None, token=None):
+    def post(self, namespace=None, key_name=None, key=None):
         if not namespace:
             return error(400, 'No namespace specified')
-        if not unique_name:
+        if not key_name:
             return error(400, 'No unique name specified')
-        if not token:
-            return error(400, 'No token specified')
+        if not key:
+            return error(400, 'No key specified')
 
         with etcd.get_lock('namespaces') as _:
             rec = etcd.get('namespaces', None, namespace)
             if not rec:
                 rec = {
                     'name': namespace,
-                    'tokens': {}
+                    'keys': {}
                 }
 
-            rec['tokens'][unique_name] = token
+            rec['keys'][key_name] = key
             etcd.put('namespaces', None, namespace, rec)
 
         return namespace
