@@ -257,6 +257,10 @@ class Client(object):
         self._request_url(
             'DELETE', self.base_url + '/auth/namespace/' + namespace)
 
+    def delete_namespace_key(self, namespace, key_name):
+        self._request_url(
+            'DELETE', self.base_url + '/auth/namespace/' + namespace + '/' + key_name)
+
 
 def get_user_agent():
     sf_version = VersionInfo('shakenfist').version_string()

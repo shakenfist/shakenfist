@@ -306,6 +306,24 @@ class AuthNamespace(Resource):
         etcd.delete('namespaces', None, namespace)
 
 
+class AuthNamespaceKey(Resource):
+    @jwt_required
+    @caller_is_admin
+    def delete(self, namespace, key_name):
+        if not namespace:
+            return error(400, 'No namespace specified')
+        if not key_name:
+            return error(400, 'No key name specified')
+
+        with etcd.get_lock('namespaces/%s' % namespace) as _:
+            ns = etcd.get('namespaces', None, namespace)
+            if ns.get('keys') and key_name in ns['keys']:
+                del ns['keys'][key_name]
+            else:
+                return error(404, 'Key name not found in namespace')
+            etcd.put('namespaces', None, namespace, ns)
+
+
 class Instance(Resource):
     @jwt_required
     @arg_is_instance_uuid
@@ -820,6 +838,7 @@ api.add_resource(Root, '/')
 api.add_resource(Auth, '/auth')
 api.add_resource(AuthNamespaces, '/auth/namespace')
 api.add_resource(AuthNamespace, '/auth/namespace/<namespace>')
+api.add_resource(AuthNamespaceKey, '/auth/namespace/<namespace>/<key_name>')
 api.add_resource(Instances, '/instances')
 api.add_resource(Instance, '/instances/<instance_uuid>')
 api.add_resource(InstanceEvents, '/instances/<instance_uuid>/events')
