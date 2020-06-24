@@ -112,9 +112,9 @@ class Resource(flask_restful.Resource):
 
 
 def caller_is_admin(func):
-    # Ensure only users in the "all" namespace can call this method
+    # Ensure only users in the "system" namespace can call this method
     def wrapper(*args, **kwargs):
-        if get_jwt_identity() != 'all':
+        if get_jwt_identity() != 'system':
             return error(401, 'Unauthorized')
 
         return func(*args, **kwargs)
@@ -190,7 +190,7 @@ def requires_instance_ownership(func):
                      % kwargs['instance_uuid'])
             return error(404, 'instance not found')
 
-        if get_jwt_identity() not in [kwargs['instance_from_db']['namespace'], 'all']:
+        if get_jwt_identity() not in [kwargs['instance_from_db']['namespace'], 'system']:
             LOG.info('instance(%s): instance not found, ownership test in decorator'
                      % kwargs['instance_uuid'])
             return error(404, 'instance not found')
@@ -221,7 +221,7 @@ def redirect_to_network_node(func):
             admin_token = util.get_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
                                   config.parsed.get('API_PORT')),
-                namespace='all')
+                namespace='system')
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'],
                 'http://%s:%d%s'
@@ -251,7 +251,7 @@ def requires_network_ownership(func):
                      % kwargs['network_uuid'])
             return error(404, 'network not found')
 
-        if get_jwt_identity() not in [kwargs['network_from_db']['namespace'], 'all']:
+        if get_jwt_identity() not in [kwargs['network_from_db']['namespace'], 'system']:
             LOG.info('network(%s): network not found, ownership test in decorator'
                      % kwargs['network_uuid'])
             return error(404, 'network not found')
@@ -350,8 +350,8 @@ class AuthNamespace(Resource):
     def delete(self, namespace):
         if not namespace:
             return error(400, 'No namespace specified')
-        if namespace == 'all':
-            return error(400, 'Could cannot delete the all namespace')
+        if namespace == 'system':
+            return error(400, 'Could cannot delete the system namespace')
         etcd.delete('namespaces', None, namespace)
 
 
@@ -421,7 +421,7 @@ class Instances(Resource):
     def get(self, all=False):
         out = []
         for i in db.get_instances(all=all):
-            if get_jwt_identity() in [i['owner'], 'all']:
+            if get_jwt_identity() in [i['owner'], 'system']:
                 out.append(i)
         return out
 
@@ -442,7 +442,7 @@ class Instances(Resource):
         # Create instance object
         instance = virt.from_db(instance_uuid)
         if instance:
-            if get_jwt_identity() not in [instance['namespace'], 'all']:
+            if get_jwt_identity() not in [instance['namespace'], 'system']:
                 LOG.info(
                     'instance(%s): instance not found, ownership test' % instance_uuid)
                 return error(404, 'instance not found')
@@ -497,7 +497,7 @@ class Instances(Resource):
             admin_token = util.get_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
                                   config.parsed.get('API_PORT')),
-                namespace='all')
+                namespace='system')
             r = requests.request('POST',
                                  'http://%s:%d/instances'
                                  % (placed_on,
@@ -714,7 +714,7 @@ class InterfaceFloat(Resource):
                      % ni['network_uuid'])
             return error(404, 'network not found')
 
-        if get_jwt_identity() not in [n['namespace'], 'all']:
+        if get_jwt_identity() not in [n['namespace'], 'system']:
             LOG.info('%s: network not found, ownership test' % n)
             return error(404, 'network not found')
 
@@ -750,7 +750,7 @@ class InterfaceDefloat(Resource):
                      % ni['network_uuid'])
             return error(404, 'network not found')
 
-        if get_jwt_identity() not in [n['namespace'], 'all']:
+        if get_jwt_identity() not in [n['namespace'], 'system']:
             LOG.info('%s: network not found, ownership test' % n)
             return error(404, 'network not found')
 
@@ -829,7 +829,7 @@ class Networks(Resource):
     def get(self, all=False):
         out = []
         for n in db.get_networks(all=all):
-            if get_jwt_identity() in [n['namespace'], 'all']:
+            if get_jwt_identity() in [n['namespace'], 'system']:
                 out.append(n)
         return n
 
@@ -859,7 +859,7 @@ class Networks(Resource):
             admin_token = util.get_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
                                   config.parsed.get('API_PORT')),
-                namespace='all')
+                namespace='system')
             requests.request(
                 'put',
                 ('http://%s:%d/deploy_network_node'

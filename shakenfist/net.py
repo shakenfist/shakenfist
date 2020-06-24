@@ -172,7 +172,7 @@ class Network(object):
             admin_token = util.get_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
                                   config.parsed.get('API_PORT')),
-                namespace='all')
+                namespace='system')
             requests.request(
                 'put',
                 ('http://%s:%d/deploy_network_node'
@@ -282,7 +282,7 @@ class Network(object):
             admin_token = util.get_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
                                   config.parsed.get('API_PORT')),
-                namespace='all')
+                namespace='system')
             requests.request(
                 'put',
                 ('http://%s:%d/update_dhcp'
@@ -303,7 +303,7 @@ class Network(object):
             admin_token = util.get_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
                                   config.parsed.get('API_PORT')),
-                namespace='all')
+                namespace='system')
             requests.request(
                 'put',
                 ('http://%s:%d/remove_dhcp'
