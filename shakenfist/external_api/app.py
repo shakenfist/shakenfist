@@ -184,7 +184,7 @@ def requires_instance_ownership(func):
         if not kwargs.get('instance_from_db'):
             return error(404, 'instance not found')
 
-        if kwargs['instance_from_db']['owner'] != get_jwt_identity():
+        if get_jwt_identity() in [kwargs['instance_from_db']['owner'], 'all']:
             return error(404, 'instance not found')
 
         return func(*args, **kwargs)
@@ -239,7 +239,7 @@ def requires_network_ownership(func):
         if not kwargs.get('network_from_db'):
             return error(404, 'network not found')
 
-        if kwargs['network_from_db']['owner'] != get_jwt_identity():
+        if get_jwt_identity() in [kwargs['network_from_db']['owner'], 'all']:
             return error(404, 'network not found')
 
         return func(*args, **kwargs)
@@ -407,7 +407,7 @@ class Instances(Resource):
     def get(self, all=False):
         out = []
         for i in db.get_instances(all=all):
-            if i['owner'] = get_jwt_identity():
+            if get_jwt_identity() in [i['owner'], 'all']:
                 out.append(i)
         return out
 
@@ -428,7 +428,7 @@ class Instances(Resource):
         # Create instance object
         instance = virt.from_db(instance_uuid)
         if instance:
-            if instance['owner'] != get_jwt_identity():
+            if get_jwt_identity() in [instance['owner'], 'all']:
                 return error(404, 'instance not found')
 
         if not instance:
@@ -696,7 +696,7 @@ class InterfaceFloat(Resource):
         if not n:
             return error(404, 'network not found')
 
-        if n['owner'] != get_jwt_identity():
+        if get_jwt_identity() in [n['owner'], 'all']:
             return error(404, 'network not found')
 
         float_net = net.from_db('floating')
@@ -729,7 +729,7 @@ class InterfaceDefloat(Resource):
         if not n:
             return error(404, 'network not found')
 
-        if n['owner'] != get_jwt_identity():
+        if get_jwt_identity() in [n['owner'], 'all']:
             return error(404, 'network not found')
 
         float_net = net.from_db('floating')
@@ -807,7 +807,7 @@ class Networks(Resource):
     def get(self, all=False):
         out = []
         for n in db.get_networks(all=all):
-            if n['owner'] == get_jwt_identity():
+            if get_jwt_identity() in [n['owner'], 'all']:
                 out.append(n)
         return n
 
