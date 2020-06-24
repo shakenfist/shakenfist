@@ -39,7 +39,7 @@ class ApiClientTestCase(testtools.TestCase):
     def test_create_instance(self):
         client = apiclient.Client()
         client.create_instance('foo', 1, 2, ['netuuid1'], ['8@cirros'],
-                               'sshkey', None)
+                               'sshkey', None, None)
 
         self.mock_request.assert_called_with(
             'POST', 'http://localhost:13000/instances',
@@ -50,13 +50,14 @@ class ApiClientTestCase(testtools.TestCase):
                 'network': ['netuuid1'],
                 'disk': ['8@cirros'],
                 'ssh_key': 'sshkey',
-                'user_data': None
+                'user_data': None,
+                'namespace': None
             })
 
     def test_create_instance_user_data(self):
         client = apiclient.Client()
         client.create_instance('foo', 1, 2, ['netuuid1'], ['8@cirros'],
-                               'sshkey', 'userdatabeforebase64')
+                               'sshkey', 'userdatabeforebase64', None)
 
         self.mock_request.assert_called_with(
             'POST', 'http://localhost:13000/instances',
@@ -67,7 +68,8 @@ class ApiClientTestCase(testtools.TestCase):
                 'network': ['netuuid1'],
                 'disk': ['8@cirros'],
                 'ssh_key': 'sshkey',
-                'user_data': "userdatabeforebase64"
+                'user_data': 'userdatabeforebase64',
+                'namespace': None
             })
 
     def test_snapshot_instance(self):
@@ -158,7 +160,7 @@ class ApiClientTestCase(testtools.TestCase):
 
     def test_allocate_network(self):
         client = apiclient.Client()
-        client.allocate_network('192.168.1.0/24', True, True, 'gerkin')
+        client.allocate_network('192.168.1.0/24', True, True, 'gerkin', None)
 
         self.mock_request.assert_called_with(
             'POST', 'http://localhost:13000/networks',
@@ -166,7 +168,8 @@ class ApiClientTestCase(testtools.TestCase):
                 'netblock': '192.168.1.0/24',
                 'provide_dhcp': True,
                 'provide_nat': True,
-                'name': 'gerkin'
+                'name': 'gerkin',
+                'namespace': None
             })
 
 
