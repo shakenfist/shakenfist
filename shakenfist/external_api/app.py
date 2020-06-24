@@ -233,6 +233,19 @@ def redirect_to_network_node(func):
     return wrapper
 
 
+def requires_network_ownership(func):
+    # Requires that @arg_is_network_uuid has already run
+    def wrapper(*args, **kwargs):
+        if not kwargs.get('network_from_db'):
+            return error(404, 'network not found')
+
+        if kwargs['network_from_db']['owner'] != get_jwt_identity():
+            return error(404, 'network not found')
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
 app = flask.Flask(__name__)
 api = flask_restful.Api(app, catch_all_404s=False)
 app.config['JWT_SECRET_KEY'] = config.parsed.get('AUTH_SECRET_SEED')
@@ -739,6 +752,7 @@ class Image(Resource):
 
 
 class Network(Resource):
+    @requires_network_ownership
     @arg_is_network_uuid
     @jwt_required
     def get(self, network_uuid=None, network_from_db=None):
@@ -747,8 +761,9 @@ class Network(Resource):
             del network_from_db['ipmanager']
         return network_from_db
 
-    @arg_is_network_uuid
     @redirect_to_network_node
+    @requires_network_ownership
+    @arg_is_network_uuid
     @jwt_required
     def delete(self, network_uuid=None, network_from_db=None):
         db.add_event('network', network_uuid, 'api', 'delete', None, None)
@@ -784,7 +799,11 @@ class Networks(Resource):
     })
     @jwt_required
     def get(self, all=False):
-        return list(db.get_networks(all=all))
+        out = []
+        for n in db.get_networks(all=all):
+            if n['owner'] == get_jwt_identity():
+                out.append(n)
+        return n
 
     @jwt_required
     def post(self, netblock=None, provide_dhcp=None, provide_nat=None, name=None):
@@ -825,6 +844,7 @@ class Networks(Resource):
 
 
 class NetworkEvents(Resource):
+    @requires_network_ownership
     @arg_is_network_uuid
     @jwt_required
     def get(self, network_uuid=None, network_from_db=None):
