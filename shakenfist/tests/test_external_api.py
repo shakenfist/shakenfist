@@ -69,41 +69,12 @@ class ExternalApiTestCase(testtools.TestCase):
 
     @mock.patch('shakenfist.db.get_instance',
                 return_value={'uuid': '123',
-                              'name': 'banana'})
+                              'name': 'banana',
+                              'owner': 'barry'})
     def test_get_instance(self, mock_get_instance):
         resp = self.client.get(
             '/instances/foo', headers={'Authorization': self.auth_header})
-        self.assertEqual({'uuid': '123', 'name': 'banana'},
+        self.assertEqual({'uuid': '123', 'name': 'banana', 'owner': 'barry'},
                          resp.get_json())
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
-
-    @mock.patch('shakenfist.db.get_instance',
-                return_value={'uuid': '123',
-                              'name': 'banana',
-                              'node': 'notthisone',
-                              'disk_spec': [{
-                                  'base': 'cirros',
-                                  'size': 8
-                              }],
-                              'console_port': 42000,
-                              'vdi_port': 42001,
-                              'block_devices': None})
-    @mock.patch('shakenfist.config.parsed',
-                return_value={'INCLUDE_TRACEBACKS': '1',
-                              'NODE_NAME': 'thisone',
-                              'STORAGE_PATH': '/a/b/c'})
-    @mock.patch('requests.request',
-                return_value=FakeResponse(200, '{"access_token": "notatoken"}'))
-    @mock.patch('shakenfist.etcd.get', return_value={'keys': {'foo': 'bar'}})
-    @mock.patch('shakenfist.etcd.get_lock')
-    @mock.patch('shakenfist.etcd.put')
-    @mock.patch('shakenfist.etcd.get_all')
-    @mock.patch('shakenfist.etcd.delete')
-    def test_delete_instance(self, mock_delete, mock_get_all, mock_write, mock_lock,
-                             mock_get, mock_request, mock_get_config, mock_get_instance):
-        resp = self.client.delete(
-            '/instances/foo', headers={'Authorization': self.auth_header,
-                                       'User-Agent': util.get_user_agent()})
-        self.assertEqual(None, resp.get_json())
-        self.assertEqual(200, resp.status_code)
