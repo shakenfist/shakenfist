@@ -239,9 +239,12 @@ class Root(Resource):
 class Auth(Resource):
     def _get_keys(self, namespace):
         rec = etcd.get('namespaces', None, namespace)
-        if rec:
-            return rec.get('keys', {})
-        return {}
+        keys = []
+        if 'service_key' in rec:
+            keys.append(rec['service_key'])
+        for key_name in rec.get('keys', {}):
+            keys.append(rec['keys'][key_name])
+        return keys
 
     def post(self, namespace=None, key=None):
         if not namespace:
@@ -249,10 +252,8 @@ class Auth(Resource):
         if not key:
             return error(400, 'Missing key in request')
 
-        keys = self._get_keys(namespace)
-        for key_name in keys:
-            if keys[key_name] == key:
-                return {'access_token': create_access_token(identity=namespace)}
+        if key in self._get_keys(namespace):
+            return {'access_token': create_access_token(identity=namespace)}
 
         return error(401, 'Unauthorized')
 

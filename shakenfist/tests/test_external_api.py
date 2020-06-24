@@ -42,7 +42,7 @@ class ExternalApiTestCase(testtools.TestCase):
         # Make a fake auth token
         self.get_keys = mock.patch(
             'shakenfist.external_api.app.Auth._get_keys',
-            return_value={'foo': 'bar'}
+            return_value=['foo', 'bar']
         )
         self.mock_get_keys = self.get_keys.start()
 
@@ -93,8 +93,10 @@ class ExternalApiTestCase(testtools.TestCase):
     @mock.patch('requests.request',
                 return_value=FakeResponse(200, '{"access_token": "notatoken"}'))
     @mock.patch('shakenfist.etcd.get', return_value={'keys': {'foo': 'bar'}})
-    def test_delete_instance(self, mock_request, mock_get_config,
-                             mock_get_instance, mock_get):
+    @mock.patch('shakenfist.etcd.get_lock')
+    @mock.patch('shakenfist.etcd.put')
+    def test_delete_instance(self, mock_write, mock_lock, mock_get, mock_request,
+                             mock_get_config, mock_get_instance):
         resp = self.client.delete(
             '/instances/foo', headers={'Authorization': self.auth_header,
                                        'User-Agent': util.get_user_agent()})
