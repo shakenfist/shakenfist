@@ -427,11 +427,18 @@ class Instances(Resource):
 
     @jwt_required
     def post(self, name=None, cpus=None, memory=None, network=None,
-             disk=None, ssh_key=None, user_data=None, placed_on=None, instance_uuid=None):
+             disk=None, ssh_key=None, user_data=None, placed_on=None, namespace=None,
+             instance_uuid=None):
         global SCHEDULER
 
         # We need to santize the name so its safe for DNS
         name = re.sub(r'([^a-zA-Z0-9_\-])', '', name)
+
+        # If we specified a namespace, we need to be an admin
+        if namespace and get_jwt_identity() != 'system':
+            return error(401, 'only admins can create resources in a different namespace')
+        if not namespace:
+            namespace = get_jwt_identity()
 
         # The instance needs to exist in the DB before network interfaces are created
         if not instance_uuid:
@@ -456,7 +463,7 @@ class Instances(Resource):
                 vcpus=cpus,
                 ssh_key=ssh_key,
                 user_data=user_data,
-                owner=get_jwt_identity()
+                owner=namespace
             )
 
         if not SCHEDULER:
@@ -834,14 +841,20 @@ class Networks(Resource):
         return n
 
     @jwt_required
-    def post(self, netblock=None, provide_dhcp=None, provide_nat=None, name=None):
+    def post(self, netblock=None, provide_dhcp=None, provide_nat=None, name=None,
+             namespace=None):
         try:
             ipaddress.ip_network(netblock)
         except ValueError as e:
             return error(400, 'cannot parse netblock: %s' % e)
 
+        if namespace and get_jwt_identity() != 'system':
+            return error(401, 'only admins can create resources in a different namespace')
+        if not namespace:
+            namespace = get_jwt_identity()
+
         network = db.allocate_network(netblock, provide_dhcp,
-                                      provide_nat, name, get_jwt_identity())
+                                      provide_nat, name, namespace)
         db.add_event('network', network['uuid'],
                      'api', 'create', None, None)
 

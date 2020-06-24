@@ -248,14 +248,19 @@ def network_show(ctx, network_uuid=None):
                        'NAME:             The name of the network\n'
                        '--dhcp/--no-dhcp: Should this network have DHCP?\n'
                        '--nat/--no-nat:   Should this network be able to access'
-                       '                  the Internet via NAT?'))
+                       '                  the Internet via NAT?\n'
+                       '\n'
+                       '--namespace:     If you are an admin, you can create this object in a\n'
+                       '                 different namespace.\n'))
 @click.argument('netblock', type=click.STRING)
 @click.argument('name', type=click.STRING)
 @click.option('--dhcp/--no-dhcp', default=True)
 @click.option('--nat/--no-nat', default=True)
+@click.option('--namespace', type=click.STRING)
 @click.pass_context
-def network_create(ctx, netblock=None, name=None, dhcp=None, nat=None):
-    _show_network(ctx, CLIENT.allocate_network(netblock, dhcp, nat, name))
+def network_create(ctx, netblock=None, name=None, dhcp=None, nat=None, namespace=None):
+    _show_network(ctx, CLIENT.allocate_network(
+        netblock, dhcp, nat, name, namespace))
 
 
 @network.command(name='events', help='Display events for a network')
@@ -466,7 +471,9 @@ def _parse_spec(spec):
                         '                Base64 encoded user data to provide to the instance\n'
                         '                via config drive / cloud-init.\n'
                         '\n'
-                        '--placement/-p: Force placement of instance on specified node'))
+                        '--placement/-p: Force placement of instance on specified node.\n'
+                        '--namespace:    If you are an admin, you can create this object in a\n'
+                        '                different namespace.'))
 @click.argument('name', type=click.STRING)
 @click.argument('cpus', type=click.INT)
 @click.argument('memory', type=click.INT)
@@ -480,10 +487,11 @@ def _parse_spec(spec):
 @click.option('-u', '--userdata', type=click.STRING)
 @click.option('-U', '--encodeduserdata', type=click.STRING)
 @click.option('-p', '--placement', type=click.STRING)
+@click.option('--namespace', type=click.STRING)
 @click.pass_context
 def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networkspec=None,
                     disk=None, diskspec=None, sshkey=None, sshkeydata=None, userdata=None,
-                    encodeduserdata=None, placement=None):
+                    encodeduserdata=None, placement=None, namespace=None):
     if len(disk) < 1 and len(diskspec) < 1:
         print('You must specify at least one disk')
 
@@ -538,7 +546,8 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networ
     _show_instance(
         ctx,
         CLIENT.create_instance(name, cpus, memory, netdefs, diskdefs, sshkey_content,
-                               userdata_content, force_placement=placement))
+                               userdata_content, force_placement=placement,
+                               namespace=namespace))
 
 
 @instance.command(name='delete', help='Delete an instance')

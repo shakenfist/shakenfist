@@ -133,7 +133,8 @@ class Client(object):
             'network': network,
             'disk': disk,
             'ssh_key': sshkey,
-            'user_data': userdata
+            'user_data': userdata,
+            'namespace': namespace
         }
 
         if force_placement:
@@ -216,13 +217,14 @@ class Client(object):
                               '/networks/' + instance_uuid + '/events')
         return r.json()
 
-    def allocate_network(self, netblock, provide_dhcp, provide_nat, name):
+    def allocate_network(self, netblock, provide_dhcp, provide_nat, name, namespace):
         r = self._request_url('POST', self.base_url + '/networks',
                               data={
                                   'netblock': netblock,
                                   'provide_dhcp': provide_dhcp,
                                   'provide_nat': provide_nat,
-                                  'name': name
+                                  'name': name,
+                                  'namespace': namespace
                               })
         return r.json()
 
