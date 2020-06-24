@@ -15,7 +15,7 @@ def main():
     print('Creating key %s' % sys.argv[1])
 
     encoded = str(base64.b64encode(bcrypt.hashpw(
-        sys.argv[2].encode('utf-8'), bcrypt.gensalt()).encode('utf-8')), 'utf-8')
+        sys.argv[2].encode('utf-8'), bcrypt.gensalt())), 'utf-8')
 
     etcd.put('namespaces', None, 'all',
              {

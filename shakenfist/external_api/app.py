@@ -282,7 +282,7 @@ class AuthNamespaces(Resource):
                 }
 
             encoded = str(base64.b64encode(bcrypt.hashpw(
-                sys.argv[2].encode('utf-8'), bcrypt.gensalt()).encode('utf-8')), 'utf-8')
+                sys.argv[2].encode('utf-8'), bcrypt.gensalt())), 'utf-8')
             rec['keys'][key_name] = encoded
             etcd.put('namespaces', None, namespace, rec)
 
