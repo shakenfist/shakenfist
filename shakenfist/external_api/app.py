@@ -685,8 +685,6 @@ class InterfaceFloat(Resource):
     @redirect_to_network_node
     @jwt_required
     def post(self, interface_uuid=None):
-        db.add_event('interface', interface_uuid,
-                     'api', 'float', None, None)
         ni = db.get_interface(interface_uuid)
         if not ni:
             return error(404, 'network interface not found')
@@ -698,10 +696,15 @@ class InterfaceFloat(Resource):
         if not n:
             return error(404, 'network not found')
 
+        if n['owner'] != get_jwt_identity():
+            return error(404, 'network not found')
+
         float_net = net.from_db('floating')
         if not float_net:
             return error(404, 'floating network not found')
 
+        db.add_event('interface', interface_uuid,
+                     'api', 'float', None, None)
         with etcd.get_lock('sf/ipmanager/floating', ttl=120) as _:
             ipm = db.get_ipmanager('floating')
             addr = ipm.get_random_free_address()
@@ -715,8 +718,6 @@ class InterfaceDefloat(Resource):
     @redirect_to_network_node
     @jwt_required
     def post(self, interface_uuid=None):
-        db.add_event('interface', interface_uuid,
-                     'api', 'defloat', None, None)
         ni = db.get_interface(interface_uuid)
         if not ni:
             return error(404, 'network interface not found')
@@ -728,10 +729,15 @@ class InterfaceDefloat(Resource):
         if not n:
             return error(404, 'network not found')
 
+        if n['owner'] != get_jwt_identity():
+            return error(404, 'network not found')
+
         float_net = net.from_db('floating')
         if not float_net:
             return error(404, 'floating network not found')
 
+        db.add_event('interface', interface_uuid,
+                     'api', 'defloat', None, None)
         with etcd.get_lock('sf/ipmanager/floating', ttl=120) as _:
             ipm = db.get_ipmanager('floating')
             ipm.release(ni['floating'])
