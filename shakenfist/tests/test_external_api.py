@@ -42,12 +42,13 @@ class ExternalApiTestCase(testtools.TestCase):
         # Make a fake auth token
         self.get_keys = mock.patch(
             'shakenfist.external_api.app.Auth._get_keys',
-            return_value=['foo', 'bar']
+            return_value=('foo', ['bar'])
         )
         self.mock_get_keys = self.get_keys.start()
 
         resp = self.client.post(
-            '/auth', data=json.dumps({'namespace': 'foo', 'key': 'bar'}))
+            '/auth', data=json.dumps({'namespace': 'foo', 'key': 'foo'}))
+        self.assertEqual(200, resp.status_code)
         self.auth_header = 'Bearer %s' % resp.get_json()['access_token']
 
     def test_get_root(self):

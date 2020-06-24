@@ -1,3 +1,4 @@
+import bcrypt
 import flask
 from flask_jwt_extended import create_access_token
 from flask_jwt_extended import get_jwt_identity
@@ -240,11 +241,9 @@ class Auth(Resource):
     def _get_keys(self, namespace):
         rec = etcd.get('namespaces', None, namespace)
         keys = []
-        if 'service_key' in rec:
-            keys.append(rec['service_key'])
         for key_name in rec.get('keys', {}):
             keys.append(rec['keys'][key_name])
-        return keys
+        return (rec.get('service_key'), keys)
 
     def post(self, namespace=None, key=None):
         if not namespace:
@@ -252,8 +251,12 @@ class Auth(Resource):
         if not key:
             return error(400, 'Missing key in request')
 
-        if key in self._get_keys(namespace):
+        service_key, keys = self._get_keys(namespace)
+        if service_key and key == service_key:
             return {'access_token': create_access_token(identity=namespace)}
+        for possible_key in keys:
+            if bcrypt.checkpw(key.encode('utf-8'), possible_key):
+                return {'access_token': create_access_token(identity=namespace)}
 
         return error(401, 'Unauthorized')
 
@@ -277,7 +280,8 @@ class AuthNamespaces(Resource):
                     'keys': {}
                 }
 
-            rec['keys'][key_name] = key
+            rec['keys'][key_name] = bcrypt.hashpw(
+                key.encode('utf-8'), bcrypt.gensalt())
             etcd.put('namespaces', None, namespace, rec)
 
         return namespace
