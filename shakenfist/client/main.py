@@ -36,7 +36,7 @@ def filter_dict(d, allowed_keys):
 @click.option('--verbose/--no-verbose', default=False)
 @click.option('--namespace', envvar='SHAKENFIST_NAMESPACE', default=None)
 @click.option('--token', envvar='SHAKENFIST_TOKEN', default=None)
-@click.option('--apiurl', envvar='SHAKENFIST_API_URL', default=None)
+@click.option('--apiurl', envvar='SHAKENFIST_API_URL', default='http://localhost:13000')
 @click.pass_context
 def cli(ctx, output, verbose, namespace, token, apiurl):
     if not ctx.obj:
