@@ -1,3 +1,10 @@
+#################################################################################
+# DEAR FUTURE ME... The order of decorators on these API methods deeply deeply  #
+# matters. We need to verify auth before anything, and we need to fetch things  #
+# from the database before we make decisions based on those things. So remember #
+# the inner decorator is executed first!                                        #
+#################################################################################
+
 import base64
 import bcrypt
 import flask
@@ -263,8 +270,8 @@ class Auth(Resource):
 
 
 class AuthNamespaces(Resource):
-    @jwt_required
     @caller_is_admin
+    @jwt_required
     def post(self, namespace=None, key_name=None, key=None):
         if not namespace:
             return error(400, 'No namespace specified')
@@ -288,8 +295,8 @@ class AuthNamespaces(Resource):
 
         return namespace
 
-    @jwt_required
     @caller_is_admin
+    @jwt_required
     def get(self):
         out = []
         for rec in etcd.get_all('namespaces', None):
@@ -298,8 +305,8 @@ class AuthNamespaces(Resource):
 
 
 class AuthNamespace(Resource):
-    @jwt_required
     @caller_is_admin
+    @jwt_required
     def delete(self, namespace):
         if not namespace:
             return error(400, 'No namespace specified')
@@ -309,8 +316,8 @@ class AuthNamespace(Resource):
 
 
 class AuthNamespaceKey(Resource):
-    @jwt_required
     @caller_is_admin
+    @jwt_required
     def delete(self, namespace, key_name):
         if not namespace:
             return error(400, 'No namespace specified')
@@ -327,15 +334,15 @@ class AuthNamespaceKey(Resource):
 
 
 class Instance(Resource):
-    @jwt_required
     @arg_is_instance_uuid
+    @jwt_required
     def get(self, instance_uuid=None, instance_from_db=None):
         db.add_event('instance', instance_uuid, 'api', 'get', None, None)
         return instance_from_db
 
-    @jwt_required
-    @arg_is_instance_uuid_as_virt
     @redirect_instance_request
+    @arg_is_instance_uuid_as_virt
+    @jwt_required
     def delete(self, instance_uuid=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid, 'api', 'delete', None, None)
 
@@ -518,8 +525,8 @@ class Instances(Resource):
 
 
 class InstanceInterfaces(Resource):
-    @jwt_required
     @arg_is_instance_uuid
+    @jwt_required
     def get(self, instance_uuid=None, instance_from_db=None):
         db.add_event('instance', instance_uuid,
                      'api', 'get interfaces', None, None)
@@ -527,8 +534,8 @@ class InstanceInterfaces(Resource):
 
 
 class InstanceEvents(Resource):
-    @jwt_required
     @arg_is_instance_uuid
+    @jwt_required
     def get(self, instance_uuid=None, instance_from_db=None):
         db.add_event('instance', instance_uuid,
                      'api', 'get events', None, None)
@@ -536,9 +543,9 @@ class InstanceEvents(Resource):
 
 
 class InstanceSnapshot(Resource):
-    @jwt_required
-    @arg_is_instance_uuid_as_virt
     @redirect_instance_request
+    @arg_is_instance_uuid_as_virt
+    @jwt_required
     def post(self, instance_uuid=None, instance_from_db_virt=None, all=None):
         snap_uuid = instance_from_db_virt.snapshot(all=all)
         db.add_event('instance', instance_uuid,
@@ -548,8 +555,8 @@ class InstanceSnapshot(Resource):
                      'api', 'create', None, None)
         return snap_uuid
 
-    @jwt_required
     @arg_is_instance_uuid
+    @jwt_required
     def get(self, instance_uuid=None, instance_from_db=None):
         db.add_event('instance', instance_uuid,
                      'api', 'get', None, None)
@@ -561,9 +568,9 @@ class InstanceSnapshot(Resource):
 
 
 class InstanceRebootSoft(Resource):
-    @jwt_required
-    @arg_is_instance_uuid_as_virt
     @redirect_instance_request
+    @arg_is_instance_uuid_as_virt
+    @jwt_required
     def post(self, instance_uuid=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid,
                      'api', 'soft reboot', None, None)
@@ -571,9 +578,9 @@ class InstanceRebootSoft(Resource):
 
 
 class InstanceRebootHard(Resource):
-    @jwt_required
-    @arg_is_instance_uuid_as_virt
     @redirect_instance_request
+    @arg_is_instance_uuid_as_virt
+    @jwt_required
     def post(self, instance_uuid=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid,
                      'api', 'hard reboot', None, None)
@@ -581,9 +588,9 @@ class InstanceRebootHard(Resource):
 
 
 class InstancePowerOff(Resource):
-    @jwt_required
-    @arg_is_instance_uuid_as_virt
     @redirect_instance_request
+    @arg_is_instance_uuid_as_virt
+    @jwt_required
     def post(self, instance_uuid=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid,
                      'api', 'poweroff', None, None)
@@ -591,9 +598,9 @@ class InstancePowerOff(Resource):
 
 
 class InstancePowerOn(Resource):
-    @jwt_required
-    @arg_is_instance_uuid_as_virt
     @redirect_instance_request
+    @arg_is_instance_uuid_as_virt
+    @jwt_required
     def post(self, instance_uuid=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid,
                      'api', 'poweron', None, None)
@@ -601,18 +608,18 @@ class InstancePowerOn(Resource):
 
 
 class InstancePause(Resource):
-    @jwt_required
-    @arg_is_instance_uuid_as_virt
     @redirect_instance_request
+    @arg_is_instance_uuid_as_virt
+    @jwt_required
     def post(self, instance_uuid=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid, 'api', 'pause', None, None)
         return instance_from_db_virt.pause()
 
 
 class InstanceUnpause(Resource):
-    @jwt_required
-    @arg_is_instance_uuid_as_virt
     @redirect_instance_request
+    @arg_is_instance_uuid_as_virt
+    @jwt_required
     def post(self, instance_uuid=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid,
                      'api', 'unpause', None, None)
@@ -620,8 +627,8 @@ class InstanceUnpause(Resource):
 
 
 class InterfaceFloat(Resource):
-    @jwt_required
     @redirect_to_network_node
+    @jwt_required
     def post(self, interface_uuid=None):
         db.add_event('interface', interface_uuid,
                      'api', 'float', None, None)
@@ -650,8 +657,8 @@ class InterfaceFloat(Resource):
 
 
 class InterfaceDefloat(Resource):
-    @jwt_required
     @redirect_to_network_node
+    @jwt_required
     def post(self, interface_uuid=None):
         db.add_event('interface', interface_uuid,
                      'api', 'defloat', None, None)
@@ -680,8 +687,8 @@ class InterfaceDefloat(Resource):
 
 
 class Image(Resource):
-    @jwt_required
     @caller_is_admin
+    @jwt_required
     def post(self, url=None):
         db.add_event('image', url, 'api', 'cache', None, None)
 
@@ -690,17 +697,17 @@ class Image(Resource):
 
 
 class Network(Resource):
-    @jwt_required
     @arg_is_network_uuid
+    @jwt_required
     def get(self, network_uuid=None, network_from_db=None):
         db.add_event('network', network_uuid, 'api', 'get', None, None)
         if network_from_db is not None and 'ipmanager' in network_from_db:
             del network_from_db['ipmanager']
         return network_from_db
 
-    @jwt_required
     @arg_is_network_uuid
     @redirect_to_network_node
+    @jwt_required
     def delete(self, network_uuid=None, network_from_db=None):
         db.add_event('network', network_uuid, 'api', 'delete', None, None)
         if network_uuid == 'floating':
@@ -724,7 +731,6 @@ class Network(Resource):
 
 
 class Networks(Resource):
-    @jwt_required
     @marshal_with({
         'uuid': fields.String,
         'vxlan_id': fields.Integer,
@@ -734,6 +740,7 @@ class Networks(Resource):
         'owner': fields.String,
         'name': fields.String,
     })
+    @jwt_required
     def get(self, all=False):
         return list(db.get_networks(all=all))
 
@@ -776,8 +783,8 @@ class Networks(Resource):
 
 
 class NetworkEvents(Resource):
-    @jwt_required
     @arg_is_network_uuid
+    @jwt_required
     def get(self, network_uuid=None, network_from_db=None):
         db.add_event('network', network_uuid,
                      'api', 'get events', None, None)
@@ -785,13 +792,13 @@ class NetworkEvents(Resource):
 
 
 class Nodes(Resource):
-    @jwt_required
     @caller_is_admin
     @marshal_with({
         'name': fields.String(attribute='fqdn'),
         'ip': fields.String,
         'lastseen': fields.Float,
     })
+    @jwt_required
     def get(self):
         return list(db.get_nodes())
 
@@ -800,9 +807,9 @@ class Nodes(Resource):
 
 
 class DeployNetworkNode(Resource):
-    @jwt_required
-    @caller_is_admin
     @redirect_to_network_node
+    @caller_is_admin
+    @jwt_required
     def put(self, passed_uuid=None):
         n = net.from_db(passed_uuid)
         if not n:
@@ -813,9 +820,9 @@ class DeployNetworkNode(Resource):
 
 
 class UpdateDHCP(Resource):
-    @jwt_required
-    @caller_is_admin
     @redirect_to_network_node
+    @caller_is_admin
+    @jwt_required
     def put(self, passed_uuid=None):
         n = net.from_db(passed_uuid)
         if not n:
@@ -825,9 +832,9 @@ class UpdateDHCP(Resource):
 
 
 class RemoveDHCP(Resource):
-    @jwt_required
-    @caller_is_admin
     @redirect_to_network_node
+    @caller_is_admin
+    @jwt_required
     def put(self, passed_uuid=None):
         n = net.from_db(passed_uuid)
         if not n:

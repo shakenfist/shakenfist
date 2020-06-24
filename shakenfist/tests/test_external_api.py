@@ -86,6 +86,8 @@ class ExternalApiTestCase(testtools.TestCase):
                                   'base': 'cirros',
                                   'size': 8
                               }],
+                              'console_port': 42000,
+                              'vdi_port': 42001,
                               'block_devices': None})
     @mock.patch('shakenfist.config.parsed',
                 return_value={'INCLUDE_TRACEBACKS': '1',
@@ -96,10 +98,12 @@ class ExternalApiTestCase(testtools.TestCase):
     @mock.patch('shakenfist.etcd.get', return_value={'keys': {'foo': 'bar'}})
     @mock.patch('shakenfist.etcd.get_lock')
     @mock.patch('shakenfist.etcd.put')
-    def test_delete_instance(self, mock_write, mock_lock, mock_get, mock_request,
-                             mock_get_config, mock_get_instance):
+    @mock.patch('shakenfist.etcd.get_all')
+    @mock.patch('shakenfist.etcd.delete')
+    def test_delete_instance(self, mock_delete, mock_get_all, mock_write, mock_lock,
+                             mock_get, mock_request, mock_get_config, mock_get_instance):
         resp = self.client.delete(
             '/instances/foo', headers={'Authorization': self.auth_header,
                                        'User-Agent': util.get_user_agent()})
-        self.assertEqual({'access_token': 'notatoken'}, resp.get_json())
+        self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
