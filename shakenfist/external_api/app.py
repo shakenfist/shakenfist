@@ -288,6 +288,9 @@ class Root(Resource):
 class Auth(Resource):
     def _get_keys(self, namespace):
         rec = etcd.get('namespaces', None, namespace)
+        if not rec:
+            return (None, [])
+
         keys = []
         for key_name in rec.get('keys', {}):
             keys.append(base64.b64decode(rec['keys'][key_name]))
