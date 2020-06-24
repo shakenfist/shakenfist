@@ -178,6 +178,19 @@ def redirect_instance_request(func):
     return wrapper
 
 
+def requires_instance_ownership(func):
+    # Requires that @arg_is_instance_uuid has already run
+    def wrapper(*args, **kwargs):
+        if not kwargs.get('instance_from_db'):
+            return error(404, 'instance not found')
+
+        if kwargs['instance_from_db']['owner'] != get_jwt_identity():
+            return error(404, 'instance not found')
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
 def arg_is_network_uuid(func):
     # Method uses the network from the db
     def wrapper(*args, **kwargs):
@@ -334,6 +347,7 @@ class AuthNamespaceKey(Resource):
 
 
 class Instance(Resource):
+    @requires_instance_ownership
     @arg_is_instance_uuid
     @jwt_required
     def get(self, instance_uuid=None, instance_from_db=None):
@@ -342,6 +356,8 @@ class Instance(Resource):
 
     @redirect_instance_request
     @arg_is_instance_uuid_as_virt
+    @requires_instance_ownership
+    @arg_is_instance_uuid
     @jwt_required
     def delete(self, instance_uuid=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid, 'api', 'delete', None, None)
@@ -376,7 +392,11 @@ class Instance(Resource):
 class Instances(Resource):
     @jwt_required
     def get(self, all=False):
-        return list(db.get_instances(all=all))
+        out = []
+        for i in db.get_instances(all=all):
+            if i['owner'] = get_jwt_identity():
+                out.append(i)
+        return out
 
     @jwt_required
     def post(self, name=None, cpus=None, memory=None, network=None,
@@ -394,6 +414,10 @@ class Instances(Resource):
 
         # Create instance object
         instance = virt.from_db(instance_uuid)
+        if instance:
+            if instance['owner'] != get_jwt_identity():
+                return error(404, 'instance not found')
+
         if not instance:
             instance = virt.from_definition(
                 uuid=instance_uuid,
@@ -402,7 +426,8 @@ class Instances(Resource):
                 memory_mb=memory * 1024,
                 vcpus=cpus,
                 ssh_key=ssh_key,
-                user_data=user_data
+                user_data=user_data,
+                owner=get_jwt_identity()
             )
 
         if not SCHEDULER:
@@ -525,6 +550,7 @@ class Instances(Resource):
 
 
 class InstanceInterfaces(Resource):
+    @requires_instance_ownership
     @arg_is_instance_uuid
     @jwt_required
     def get(self, instance_uuid=None, instance_from_db=None):
@@ -534,6 +560,7 @@ class InstanceInterfaces(Resource):
 
 
 class InstanceEvents(Resource):
+    @requires_instance_ownership
     @arg_is_instance_uuid
     @jwt_required
     def get(self, instance_uuid=None, instance_from_db=None):
@@ -545,6 +572,8 @@ class InstanceEvents(Resource):
 class InstanceSnapshot(Resource):
     @redirect_instance_request
     @arg_is_instance_uuid_as_virt
+    @requires_instance_ownership
+    @arg_is_instance_uuid
     @jwt_required
     def post(self, instance_uuid=None, instance_from_db_virt=None, all=None):
         snap_uuid = instance_from_db_virt.snapshot(all=all)
@@ -555,6 +584,7 @@ class InstanceSnapshot(Resource):
                      'api', 'create', None, None)
         return snap_uuid
 
+    @requires_instance_ownership
     @arg_is_instance_uuid
     @jwt_required
     def get(self, instance_uuid=None, instance_from_db=None):
@@ -570,6 +600,8 @@ class InstanceSnapshot(Resource):
 class InstanceRebootSoft(Resource):
     @redirect_instance_request
     @arg_is_instance_uuid_as_virt
+    @requires_instance_ownership
+    @arg_is_instance_uuid
     @jwt_required
     def post(self, instance_uuid=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid,
@@ -580,6 +612,8 @@ class InstanceRebootSoft(Resource):
 class InstanceRebootHard(Resource):
     @redirect_instance_request
     @arg_is_instance_uuid_as_virt
+    @requires_instance_ownership
+    @arg_is_instance_uuid
     @jwt_required
     def post(self, instance_uuid=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid,
@@ -590,6 +624,8 @@ class InstanceRebootHard(Resource):
 class InstancePowerOff(Resource):
     @redirect_instance_request
     @arg_is_instance_uuid_as_virt
+    @requires_instance_ownership
+    @arg_is_instance_uuid
     @jwt_required
     def post(self, instance_uuid=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid,
@@ -600,6 +636,8 @@ class InstancePowerOff(Resource):
 class InstancePowerOn(Resource):
     @redirect_instance_request
     @arg_is_instance_uuid_as_virt
+    @requires_instance_ownership
+    @arg_is_instance_uuid
     @jwt_required
     def post(self, instance_uuid=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid,
@@ -610,6 +648,8 @@ class InstancePowerOn(Resource):
 class InstancePause(Resource):
     @redirect_instance_request
     @arg_is_instance_uuid_as_virt
+    @requires_instance_ownership
+    @arg_is_instance_uuid
     @jwt_required
     def post(self, instance_uuid=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid, 'api', 'pause', None, None)
@@ -619,6 +659,8 @@ class InstancePause(Resource):
 class InstanceUnpause(Resource):
     @redirect_instance_request
     @arg_is_instance_uuid_as_virt
+    @requires_instance_ownership
+    @arg_is_instance_uuid
     @jwt_required
     def post(self, instance_uuid=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid,

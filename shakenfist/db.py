@@ -181,7 +181,7 @@ def persist_block_devices(instance_uuid, block_devices):
     etcd.put('instance', None, instance_uuid, i)
 
 
-def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key, user_data):
+def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key, user_data, owner):
     see_this_node()
     d = {
         'uuid': instance_uuid,
@@ -196,7 +196,8 @@ def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key, us
         'user_data': user_data,
         'block_devices': None,
         'state': 'initial',
-        'state_updated': time.time()
+        'state_updated': time.time(),
+        'owner': owner
     }
     etcd.put('instance', None, instance_uuid, d)
     return d
