@@ -64,7 +64,7 @@ def get_networks(all=False):
 
 
 def allocate_network(netblock, provide_dhcp=True, provide_nat=False, name=None,
-                     owner=None):
+                     namespace=None):
     see_this_node()
 
     netid = str(uuid.uuid4())
@@ -87,7 +87,7 @@ def allocate_network(netblock, provide_dhcp=True, provide_nat=False, name=None,
         'netblock': netblock,
         'provide_dhcp': provide_dhcp,
         'provide_nat': provide_nat,
-        'owner': owner,
+        'namespace': namespace,
         'floating_gateway': None,
         'name': name,
         'state': 'initial',
@@ -133,7 +133,7 @@ def create_floating_network(netblock):
                  'netblock': netblock,
                  'provide_dhcp': False,
                  'provide_nat': False,
-                 'owner': None,
+                 'namespace': None,
                  'floating_gateway': None,
                  'name': 'floating',
                  'state': 'initial',
@@ -181,7 +181,7 @@ def persist_block_devices(instance_uuid, block_devices):
     etcd.put('instance', None, instance_uuid, i)
 
 
-def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key, user_data, owner):
+def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key, user_data, namespace):
     see_this_node()
     d = {
         'uuid': instance_uuid,
@@ -197,7 +197,7 @@ def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key, us
         'block_devices': None,
         'state': 'initial',
         'state_updated': time.time(),
-        'owner': owner
+        'namespace': namespace
     }
     etcd.put('instance', None, instance_uuid, d)
     return d

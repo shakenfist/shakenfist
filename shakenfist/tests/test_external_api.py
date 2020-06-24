@@ -70,11 +70,11 @@ class ExternalApiTestCase(testtools.TestCase):
     @mock.patch('shakenfist.db.get_instance',
                 return_value={'uuid': '123',
                               'name': 'banana',
-                              'owner': 'barry'})
+                              'namespace': 'foo'})
     def test_get_instance(self, mock_get_instance):
         resp = self.client.get(
             '/instances/foo', headers={'Authorization': self.auth_header})
-        self.assertEqual({'uuid': '123', 'name': 'banana', 'owner': 'barry'},
+        self.assertEqual({'uuid': '123', 'name': 'banana', 'namespace': 'foo'},
                          resp.get_json())
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)

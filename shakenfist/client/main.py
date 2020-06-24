@@ -190,22 +190,22 @@ def network_list(ctx, all=False):
 
     if ctx.obj['OUTPUT'] == 'pretty':
         x = PrettyTable()
-        x.field_names = ['uuid', 'name', 'owner', 'netblock']
+        x.field_names = ['uuid', 'name', 'namespace', 'netblock']
         for n in nets:
-            x.add_row([n['uuid'], n['name'], n['owner'], n['netblock']])
+            x.add_row([n['uuid'], n['name'], n['namespace'], n['netblock']])
         print(x)
 
     elif ctx.obj['OUTPUT'] == 'simple':
-        print('uuid,name,owner,netblock')
+        print('uuid,name,namespace,netblock')
         for n in nets:
             print('%s,%s,%s,%s' %
-                  (n['uuid'], n['name'], n['owner'], n['netblock']))
+                  (n['uuid'], n['name'], n['namespace'], n['netblock']))
 
     elif ctx.obj['OUTPUT'] == 'json':
         filtered_nets = []
         for n in nets:
             filtered_nets.append(filter_dict(
-                n, ['uuid', 'name', 'owner', 'netblock']))
+                n, ['uuid', 'name', 'namespace', 'netblock']))
         print(json.dumps({'networks': filtered_nets},
                          indent=4, sort_keys=True))
 
@@ -217,7 +217,7 @@ def _show_network(ctx, n):
 
     if ctx.obj['OUTPUT'] == 'json':
         print(json.dumps(filter_dict(n, ['uuid', 'name', 'vxid', 'netblock', 'provide_dhcp',
-                                         'provide_nat', 'owner']),
+                                         'provide_nat', 'namespace']),
                          indent=4, sort_keys=True))
         return
 
@@ -231,7 +231,7 @@ def _show_network(ctx, n):
     print(format_string % ('netblock', n['netblock']))
     print(format_string % ('provide dhcp', n['provide_dhcp']))
     print(format_string % ('provide nat', n['provide_nat']))
-    print(format_string % ('owner', n['owner']))
+    print(format_string % ('namespace', n['namespace']))
 
 
 @network.command(name='show', help='Show a network')
@@ -320,22 +320,25 @@ def instance_list(ctx, all=False):
 
     if ctx.obj['OUTPUT'] == 'pretty':
         x = PrettyTable()
-        x.field_names = ['uuid', 'name', 'cpus', 'memory', 'hypervisor']
+        x.field_names = ['uuid', 'name', 'namespace',
+                         'cpus', 'memory', 'hypervisor']
         for i in insts:
-            x.add_row([i['uuid'], i['name'], i['cpus'], i['memory'], i['node']])
+            x.add_row([i['uuid'], i['name'], i['namespace'],
+                       i['cpus'], i['memory'], i['node']])
         print(x)
 
     elif ctx.obj['OUTPUT'] == 'simple':
-        print('uuid,name,cpus,memory,hypervisor')
+        print('uuid,name,namespace,cpus,memory,hypervisor')
         for i in insts:
-            print('%s,%s,%s,%s,%s' %
-                  (i['uuid'], i['name'], i['cpus'], i['memory'], i['node']))
+            print('%s,%s,%s,%s,%s'
+                  % (i['uuid'], i['name'], i['namespace'],
+                     i['cpus'], i['memory'], i['node']))
 
     elif ctx.obj['OUTPUT'] == 'json':
         filtered_insts = []
         for i in insts:
             filtered_insts.append(filter_dict(
-                i, ['uuid', 'name', 'cpus', 'memory', 'node']))
+                i, ['uuid', 'name', 'namespace', 'cpus', 'memory', 'node']))
         print(json.dumps({'instances': filtered_insts},
                          indent=4, sort_keys=True))
 
@@ -349,7 +352,7 @@ def _show_instance(ctx, i, include_snapshots=False):
         snapshots = CLIENT.get_instance_snapshots(i['uuid'])
 
     if ctx.obj['OUTPUT'] == 'json':
-        out = filter_dict(i, ['uuid', 'name', 'cpus', 'memory', 'disk_spec',
+        out = filter_dict(i, ['uuid', 'name', 'namespace', 'cpus', 'memory', 'disk_spec',
                               'node', 'console_port', 'vdi_port', 'ssh_key',
                               'user_data'])
         out['network_interfaces'] = []
@@ -373,6 +376,7 @@ def _show_instance(ctx, i, include_snapshots=False):
 
     print(format_string % ('uuid', i['uuid']))
     print(format_string % ('name', i['name']))
+    print(format_string % ('namespace', i['namespace']))
     print(format_string % ('cpus', i['cpus']))
     print(format_string % ('memory', i['memory']))
     print(format_string % ('disk spec', i['disk_spec']))

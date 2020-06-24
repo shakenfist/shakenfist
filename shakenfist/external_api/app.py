@@ -190,7 +190,7 @@ def requires_instance_ownership(func):
                      % kwargs['instance_uuid'])
             return error(404, 'instance not found')
 
-        if get_jwt_identity() not in [kwargs['instance_from_db']['owner'], 'all']:
+        if get_jwt_identity() not in [kwargs['instance_from_db']['namespace'], 'all']:
             LOG.info('instance(%s): instance not found, ownership test in decorator'
                      % kwargs['instance_uuid'])
             return error(404, 'instance not found')
@@ -251,7 +251,7 @@ def requires_network_ownership(func):
                      % kwargs['network_uuid'])
             return error(404, 'network not found')
 
-        if get_jwt_identity() not in [kwargs['network_from_db']['owner'], 'all']:
+        if get_jwt_identity() not in [kwargs['network_from_db']['namespace'], 'all']:
             LOG.info('network(%s): network not found, ownership test in decorator'
                      % kwargs['network_uuid'])
             return error(404, 'network not found')
@@ -442,7 +442,7 @@ class Instances(Resource):
         # Create instance object
         instance = virt.from_db(instance_uuid)
         if instance:
-            if get_jwt_identity() not in [instance['owner'], 'all']:
+            if get_jwt_identity() not in [instance['namespace'], 'all']:
                 LOG.info(
                     'instance(%s): instance not found, ownership test' % instance_uuid)
                 return error(404, 'instance not found')
@@ -714,7 +714,7 @@ class InterfaceFloat(Resource):
                      % ni['network_uuid'])
             return error(404, 'network not found')
 
-        if get_jwt_identity() not in [n['owner'], 'all']:
+        if get_jwt_identity() not in [n['namespace'], 'all']:
             LOG.info('%s: network not found, ownership test' % n)
             return error(404, 'network not found')
 
@@ -750,7 +750,7 @@ class InterfaceDefloat(Resource):
                      % ni['network_uuid'])
             return error(404, 'network not found')
 
-        if get_jwt_identity() not in [n['owner'], 'all']:
+        if get_jwt_identity() not in [n['namespace'], 'all']:
             LOG.info('%s: network not found, ownership test' % n)
             return error(404, 'network not found')
 
@@ -829,7 +829,7 @@ class Networks(Resource):
     def get(self, all=False):
         out = []
         for n in db.get_networks(all=all):
-            if get_jwt_identity() in [n['owner'], 'all']:
+            if get_jwt_identity() in [n['namespace'], 'all']:
                 out.append(n)
         return n
 
