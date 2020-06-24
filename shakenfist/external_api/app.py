@@ -1,3 +1,4 @@
+import base64
 import bcrypt
 import flask
 from flask_jwt_extended import create_access_token
@@ -242,7 +243,7 @@ class Auth(Resource):
         rec = etcd.get('namespaces', None, namespace)
         keys = []
         for key_name in rec.get('keys', {}):
-            keys.append(rec['keys'][key_name])
+            keys.append(base64.b64decode(rec['keys'][key_name]))
         return (rec.get('service_key'), keys)
 
     def post(self, namespace=None, key=None):
@@ -280,8 +281,9 @@ class AuthNamespaces(Resource):
                     'keys': {}
                 }
 
-            rec['keys'][key_name] = bcrypt.hashpw(
-                key.encode('utf-8'), bcrypt.gensalt())
+            encoded = str(base64.b64encode(bcrypt.hashpw(
+                sys.argv[2].encode('utf-8'), bcrypt.gensalt()).encode('utf-8')), 'utf-8')
+            rec['keys'][key_name] = encoded
             etcd.put('namespaces', None, namespace, rec)
 
         return namespace
