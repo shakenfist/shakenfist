@@ -128,6 +128,8 @@ def arg_is_instance_uuid(func):
             kwargs['instance_from_db'] = db.get_instance(
                 kwargs['instance_uuid'])
         if not kwargs.get('instance_from_db'):
+            LOG.info(
+                'instance(%s): instance not found, genuinely missing' % kwargs['instance_uuid'])
             return error(404, 'instance not found')
 
         return func(*args, **kwargs)
@@ -142,6 +144,8 @@ def arg_is_instance_uuid_as_virt(func):
                 kwargs['instance_uuid']
             )
         if not kwargs.get('instance_from_db_virt'):
+            LOG.info(
+                'instance(%s): instance not found, genuinely missing' % kwargs['instance_uuid'])
             return error(404, 'instance not found')
 
         return func(*args, **kwargs)
@@ -182,9 +186,13 @@ def requires_instance_ownership(func):
     # Requires that @arg_is_instance_uuid has already run
     def wrapper(*args, **kwargs):
         if not kwargs.get('instance_from_db'):
+            LOG.info('instance(%s): instance not found, kwarg missing'
+                     % kwargs['instance_uuid'])
             return error(404, 'instance not found')
 
         if get_jwt_identity() in [kwargs['instance_from_db']['owner'], 'all']:
+            LOG.info('instance(%s): instance not found, ownership test in decorator'
+                     % kwargs['instance_uuid'])
             return error(404, 'instance not found')
 
         return func(*args, **kwargs)
@@ -198,6 +206,8 @@ def arg_is_network_uuid(func):
             kwargs['network_from_db'] = db.get_network(
                 kwargs['network_uuid'])
         if not kwargs.get('network_from_db'):
+            LOG.info('network(%s): network not found, genuinely missing' %
+                     kwargs['network_uuid'])
             return error(404, 'network not found')
 
         return func(*args, **kwargs)
@@ -237,9 +247,13 @@ def requires_network_ownership(func):
     # Requires that @arg_is_network_uuid has already run
     def wrapper(*args, **kwargs):
         if not kwargs.get('network_from_db'):
+            LOG.info('network(%s): network not found, kwarg missing'
+                     % kwargs['network_uuid'])
             return error(404, 'network not found')
 
         if get_jwt_identity() in [kwargs['network_from_db']['owner'], 'all']:
+            LOG.info('network(%s): network not found, ownership test in decorator'
+                     % kwargs['network_uuid'])
             return error(404, 'network not found')
 
         return func(*args, **kwargs)
@@ -429,6 +443,8 @@ class Instances(Resource):
         instance = virt.from_db(instance_uuid)
         if instance:
             if get_jwt_identity() in [instance['owner'], 'all']:
+                LOG.info(
+                    'instance(%s): instance not found, ownership test' % instance_uuid)
                 return error(404, 'instance not found')
 
         if not instance:
@@ -694,9 +710,12 @@ class InterfaceFloat(Resource):
 
         n = net.from_db(ni['network_uuid'])
         if not n:
+            LOG.info('network(%s): network not found, genuinely missing'
+                     % ni['network_uuid'])
             return error(404, 'network not found')
 
         if get_jwt_identity() in [n['owner'], 'all']:
+            LOG.info('%s: network not found, ownership test' % n)
             return error(404, 'network not found')
 
         float_net = net.from_db('floating')
@@ -727,9 +746,12 @@ class InterfaceDefloat(Resource):
 
         n = net.from_db(ni['network_uuid'])
         if not n:
+            LOG.info('network(%s): network not found, genuinely missing'
+                     % ni['network_uuid'])
             return error(404, 'network not found')
 
         if get_jwt_identity() in [n['owner'], 'all']:
+            LOG.info('%s: network not found, ownership test' % n)
             return error(404, 'network not found')
 
         float_net = net.from_db('floating')
@@ -827,6 +849,8 @@ class Networks(Resource):
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
             n = net.from_db(network['uuid'])
             if not n:
+                LOG.info('network(%s): network not found, genuinely missing'
+                         % network['uuid'])
                 return error(404, 'network not found')
 
             n.create()
@@ -881,6 +905,8 @@ class DeployNetworkNode(Resource):
     def put(self, passed_uuid=None):
         n = net.from_db(passed_uuid)
         if not n:
+            LOG.info('network(%s): network not found, genuinely missing'
+                     % passed_uuid)
             return error(404, 'network not found')
 
         n.create()
@@ -894,6 +920,8 @@ class UpdateDHCP(Resource):
     def put(self, passed_uuid=None):
         n = net.from_db(passed_uuid)
         if not n:
+            LOG.info('network(%s): network not found, genuinely missing'
+                     % passed_uuid)
             return error(404, 'network not found')
 
         n.update_dhcp()
@@ -906,6 +934,8 @@ class RemoveDHCP(Resource):
     def put(self, passed_uuid=None):
         n = net.from_db(passed_uuid)
         if not n:
+            LOG.info('network(%s): network not found, genuinely missing'
+                     % passed_uuid)
             return error(404, 'network not found')
 
         n.remove_dhcp()
