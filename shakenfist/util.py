@@ -5,8 +5,10 @@ import json
 import logging
 from logging import handlers as logging_handlers
 from pbr.version import VersionInfo
+import random
 import re
 import requests
+import string
 import time
 
 from oslo_concurrency import processutils
@@ -116,22 +118,28 @@ def get_libvirt():
 
 
 def get_api_token(base_url, namespace='all'):
-    auth_url = base_url + '/auth'
-    LOG.info('Fetching admin auth token from %s' % auth_url)
-    tokens = etcd.get('namespaces', None, namespace)['tokens']
-    token = tokens[list(tokens.keys())[0]]
+    with etcd.get_lock('namespaces/%s' % namespace) as _:
+        auth_url = base_url + '/auth'
+        LOG.info('Fetching %s auth token from %s' % (namespace, auth_url))
+        ns = etcd.get('namespaces', None, namespace)
+        if 'service_key' in ns:
+            key = ns['service_key']
+        else:
+            key = ''.join(random.choice(string.ascii_lowercase)
+                          for i in range(50))
+            ns['service_key'] = key
+            etcd.put('namespaces', None, namespace, ns)
+
     r = requests.request('POST', auth_url,
                          data=json.dumps({
                              'namespace': namespace,
-                             'token': token
+                             'key': key
                          }),
                          headers={'Content-Type': 'application/json',
                                   'User-Agent': get_user_agent()})
     if r.status_code != 200:
         raise Exception('Unauthorized')
-    token = 'Bearer %s' % r.json()['access_token']
-    LOG.info('Admin auth token is %s' % token)
-    return token
+    return 'Bearer %s' % r.json()['access_token']
 
 
 def get_user_agent():

@@ -1,3 +1,5 @@
+import base64
+import bcrypt
 import flask
 from flask_jwt_extended import create_access_token
 from flask_jwt_extended import get_jwt_identity
@@ -237,21 +239,24 @@ class Root(Resource):
 
 
 class Auth(Resource):
-    def _get_tokens(self, namespace):
+    def _get_keys(self, namespace):
         rec = etcd.get('namespaces', None, namespace)
-        if rec:
-            return rec.get('tokens', {})
-        return {}
+        keys = []
+        for key_name in rec.get('keys', {}):
+            keys.append(base64.b64decode(rec['keys'][key_name]))
+        return (rec.get('service_key'), keys)
 
-    def post(self, namespace=None, token=None):
+    def post(self, namespace=None, key=None):
         if not namespace:
             return error(400, 'Missing namespace in request')
-        if not token:
-            return error(400, 'Missing token in request')
+        if not key:
+            return error(400, 'Missing key in request')
 
-        tokens = self._get_tokens(namespace)
-        for unique_name in tokens:
-            if tokens[unique_name] == token:
+        service_key, keys = self._get_keys(namespace)
+        if service_key and key == service_key:
+            return {'access_token': create_access_token(identity=namespace)}
+        for possible_key in keys:
+            if bcrypt.checkpw(key.encode('utf-8'), possible_key):
                 return {'access_token': create_access_token(identity=namespace)}
 
         return error(401, 'Unauthorized')
@@ -260,23 +265,25 @@ class Auth(Resource):
 class AuthNamespaces(Resource):
     @jwt_required
     @caller_is_admin
-    def post(self, namespace=None, unique_name=None, token=None):
+    def post(self, namespace=None, key_name=None, key=None):
         if not namespace:
             return error(400, 'No namespace specified')
-        if not unique_name:
+        if not key_name:
             return error(400, 'No unique name specified')
-        if not token:
-            return error(400, 'No token specified')
+        if not key:
+            return error(400, 'No key specified')
 
         with etcd.get_lock('namespaces') as _:
             rec = etcd.get('namespaces', None, namespace)
             if not rec:
                 rec = {
                     'name': namespace,
-                    'tokens': {}
+                    'keys': {}
                 }
 
-            rec['tokens'][unique_name] = token
+            encoded = str(base64.b64encode(bcrypt.hashpw(
+                sys.argv[2].encode('utf-8'), bcrypt.gensalt())), 'utf-8')
+            rec['keys'][key_name] = encoded
             etcd.put('namespaces', None, namespace, rec)
 
         return namespace
@@ -299,6 +306,24 @@ class AuthNamespace(Resource):
         if namespace == 'all':
             return error(400, 'Could cannot delete the all namespace')
         etcd.delete('namespaces', None, namespace)
+
+
+class AuthNamespaceKey(Resource):
+    @jwt_required
+    @caller_is_admin
+    def delete(self, namespace, key_name):
+        if not namespace:
+            return error(400, 'No namespace specified')
+        if not key_name:
+            return error(400, 'No key name specified')
+
+        with etcd.get_lock('namespaces/%s' % namespace) as _:
+            ns = etcd.get('namespaces', None, namespace)
+            if ns.get('keys') and key_name in ns['keys']:
+                del ns['keys'][key_name]
+            else:
+                return error(404, 'Key name not found in namespace')
+            etcd.put('namespaces', None, namespace, ns)
 
 
 class Instance(Resource):
@@ -815,6 +840,7 @@ api.add_resource(Root, '/')
 api.add_resource(Auth, '/auth')
 api.add_resource(AuthNamespaces, '/auth/namespace')
 api.add_resource(AuthNamespace, '/auth/namespace/<namespace>')
+api.add_resource(AuthNamespaceKey, '/auth/namespace/<namespace>/<key_name>')
 api.add_resource(Instances, '/instances')
 api.add_resource(Instance, '/instances/<instance_uuid>')
 api.add_resource(InstanceEvents, '/instances/<instance_uuid>/events')
