@@ -350,7 +350,7 @@
         content: |
           #!/bin/bash -e
           [ `grep -c "<mac address='02:42:4d:0a:86:fe'/>" /srv/shakenfist/instances/{{cirros_netspec_uuid}}/libvirt.xml` -eq 1 ]
-          [ `grep -c "<source bridge='br-vxlan-1'/>" /srv/shakenfist/instances/{{cirros_netspec_uuid}}/libvirt.xml` -eq 1 ]
+          [ `grep -c "<source bridge='br-vxlan-" /srv/shakenfist/instances/{{cirros_netspec_uuid}}/libvirt.xml` -eq 1 ]
         dest: /tmp/shell_script
         owner: root
         group: root

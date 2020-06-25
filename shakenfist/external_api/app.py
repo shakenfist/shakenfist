@@ -875,7 +875,7 @@ class Networks(Resource):
         for n in db.get_networks(all=all):
             if get_jwt_identity() in [n['namespace'], 'system']:
                 out.append(n)
-        return n
+        return out
 
     @jwt_required
     def post(self, netblock=None, provide_dhcp=None, provide_nat=None, name=None,
