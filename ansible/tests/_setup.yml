@@ -10,7 +10,7 @@
       sf-client --simple network delete $net
     done
 
-    for namespace in `sf-client --simple namespace list | grep -v uuid | grep -v all`
+    for namespace in `sf-client --simple namespace list | grep -v uuid | grep -v system`
     do
       sf-client --simple namespace delete $namespace
     done
