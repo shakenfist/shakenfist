@@ -424,7 +424,7 @@ class Instances(Resource):
     def get(self, all=False):
         out = []
         for i in db.get_instances(all=all):
-            if get_jwt_identity() in [i['owner'], 'system']:
+            if get_jwt_identity() in [i['namespace'], 'system']:
                 out.append(i)
         return out
 
@@ -860,7 +860,7 @@ class Networks(Resource):
         'netblock': fields.String,
         'provide_dhcp': fields.Boolean,
         'provide_nat': fields.Boolean,
-        'owner': fields.String,
+        'namespace': fields.String,
         'name': fields.String,
     })
     @jwt_required
