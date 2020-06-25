@@ -115,7 +115,7 @@ def caller_is_admin(func):
     # Ensure only users in the "system" namespace can call this method
     def wrapper(*args, **kwargs):
         if get_jwt_identity() != 'system':
-            return error(401, 'Unauthorized')
+            return error(401, 'unauthorized')
 
         return func(*args, **kwargs)
     return wrapper
@@ -298,9 +298,9 @@ class Auth(Resource):
 
     def post(self, namespace=None, key=None):
         if not namespace:
-            return error(400, 'Missing namespace in request')
+            return error(400, 'missing namespace in request')
         if not key:
-            return error(400, 'Missing key in request')
+            return error(400, 'missing key in request')
 
         service_key, keys = self._get_keys(namespace)
         if service_key and key == service_key:
@@ -309,7 +309,7 @@ class Auth(Resource):
             if bcrypt.checkpw(key.encode('utf-8'), possible_key):
                 return {'access_token': create_access_token(identity=namespace)}
 
-        return error(401, 'Unauthorized')
+        return error(401, 'unauthorized')
 
 
 class AuthNamespaces(Resource):
@@ -317,11 +317,11 @@ class AuthNamespaces(Resource):
     @caller_is_admin
     def post(self, namespace=None, key_name=None, key=None):
         if not namespace:
-            return error(400, 'No namespace specified')
+            return error(400, 'no namespace specified')
         if not key_name:
-            return error(400, 'No unique name specified')
+            return error(400, 'no unique name specified')
         if not key:
-            return error(400, 'No key specified')
+            return error(400, 'no key specified')
 
         with etcd.get_lock('namespaces') as _:
             rec = etcd.get('namespaces', None, namespace)
@@ -352,9 +352,9 @@ class AuthNamespace(Resource):
     @caller_is_admin
     def delete(self, namespace):
         if not namespace:
-            return error(400, 'No namespace specified')
+            return error(400, 'no namespace specified')
         if namespace == 'system':
-            return error(400, 'Could cannot delete the system namespace')
+            return error(400, 'you cannot delete the system namespace')
         etcd.delete('namespaces', None, namespace)
 
 
@@ -363,16 +363,16 @@ class AuthNamespaceKey(Resource):
     @caller_is_admin
     def delete(self, namespace, key_name):
         if not namespace:
-            return error(400, 'No namespace specified')
+            return error(400, 'no namespace specified')
         if not key_name:
-            return error(400, 'No key name specified')
+            return error(400, 'no key name specified')
 
         with etcd.get_lock('namespaces/%s' % namespace) as _:
             ns = etcd.get('namespaces', None, namespace)
             if ns.get('keys') and key_name in ns['keys']:
                 del ns['keys'][key_name]
             else:
-                return error(404, 'Key name not found in namespace')
+                return error(404, 'key name not found in namespace')
             etcd.put('namespaces', None, namespace, ns)
 
 
@@ -479,7 +479,7 @@ class Instances(Resource):
                 db.add_event('instance', instance_uuid,
                              'schedule', 'failed', None, 'insufficient resources')
                 db.update_instance_state(instance_uuid, 'error')
-                return error(507, 'Insufficient capacity')
+                return error(507, 'insufficient capacity')
 
             placed_on = candidates[0]
             db.place_instance(instance_uuid, placed_on)
@@ -494,9 +494,9 @@ class Instances(Resource):
                     db.add_event('instance', instance_uuid,
                                  'schedule', 'failed', None, 'insufficient resources')
                     db.update_instance_state(instance_uuid, 'error')
-                    return error(507, 'Insufficient capacity')
+                    return error(507, 'insufficient capacity')
             except scheduler.CandidateNodeNotFoundException as e:
-                return error(404, 'Node not found: %s' % e)
+                return error(404, 'node not found: %s' % e)
 
         # Have we been placed on a different node?
         if not placed_on == config.parsed.get('NODE_NAME'):
