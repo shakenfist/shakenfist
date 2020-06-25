@@ -335,7 +335,7 @@ def instance_list(ctx, all=False):
     elif ctx.obj['OUTPUT'] == 'simple':
         print('uuid,name,namespace,cpus,memory,hypervisor')
         for i in insts:
-            print('%s,%s,%s,%s,%s'
+            print('%s,%s,%s,%s,%s,%s'
                   % (i['uuid'], i['name'], i['namespace'],
                      i['cpus'], i['memory'], i['node']))
 
