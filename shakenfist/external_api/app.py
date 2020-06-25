@@ -389,7 +389,7 @@ class Instance(Resource):
     @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def delete(self, instance_uuid=None, instance_from_db_virt=None):
+    def delete(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid, 'api', 'delete', None, None)
 
         instance_networks = []
@@ -709,6 +709,8 @@ class InstanceUnpause(Resource):
 
 class InterfaceFloat(Resource):
     @jwt_required
+    @arg_is_instance_uuid
+    @requires_instance_ownership
     @redirect_to_network_node
     def post(self, interface_uuid=None):
         ni = db.get_interface(interface_uuid)
@@ -745,6 +747,8 @@ class InterfaceFloat(Resource):
 
 class InterfaceDefloat(Resource):
     @jwt_required
+    @arg_is_instance_uuid
+    @requires_instance_ownership
     @redirect_to_network_node
     def post(self, interface_uuid=None):
         ni = db.get_interface(interface_uuid)
@@ -777,6 +781,30 @@ class InterfaceDefloat(Resource):
 
         db.remove_floating_from_interface(ni['uuid'])
         n.remove_floating_ip(ni['floating'], ni['ipv4'])
+
+
+class InstanceMetadatas(Resource):
+    @jwt_required
+    @arg_is_instance_uuid
+    @requires_instance_ownership
+    def get(self, instance_uuid=None, instance_from_db=None):
+        return etcd.get('metadata', 'instance', instance_uuid)
+
+
+class InstanceMetadata(Resource):
+    @jwt_required
+    @arg_is_instance_uuid
+    @requires_instance_ownership
+    def post(self, instance_uuid=None, key=None, value=None, instance_from_db=None):
+        if not key:
+            return error(400, 'no key specified')
+        if not value:
+            return error(400, 'no value specified')
+
+        with etcd.get_lock('metadata/instance/%s' % instance_uuid) as _:
+            md = etcd.get('metadata', 'instance', instance_uuid)
+            md['key'] = value
+            etcd.put('metadata', 'instance', instance_uuid, md)
 
 
 class Image(Resource):
@@ -975,6 +1003,9 @@ api.add_resource(InstancePause, '/instances/<instance_uuid>/pause')
 api.add_resource(InstanceUnpause, '/instances/<instance_uuid>/unpause')
 api.add_resource(InterfaceFloat, '/interfaces/<interface_uuid>/float')
 api.add_resource(InterfaceDefloat, '/interfaces/<interface_uuid>/defloat')
+api.add_resource(InstanceMetadatas, '/instances/<instance_uuid>/metadata')
+api.add_resource(InstanceMetadata,
+                 '/instances/<instance_uuid>/metatadata/<key>')
 api.add_resource(Image, '/images')
 api.add_resource(Networks, '/networks')
 api.add_resource(Network, '/networks/<network_uuid>')
