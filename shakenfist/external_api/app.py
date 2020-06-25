@@ -614,7 +614,7 @@ class InstanceSnapshot(Resource):
     @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None, instance_from_db_virt=None, all=None):
+    def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None, all=None):
         snap_uuid = instance_from_db_virt.snapshot(all=all)
         db.add_event('instance', instance_uuid,
                      'api', 'snapshot (all=%s)' % all,
