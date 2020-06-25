@@ -129,7 +129,7 @@ def arg_is_instance_uuid(func):
                 kwargs['instance_uuid'])
         if not kwargs.get('instance_from_db'):
             LOG.info(
-                'instance(%s): instance not found, genuinely missing' % kwargs['instance_uuid'])
+                'instance(%s): instance not found, genuinely missing' % kwargs.get('instance_uuid'))
             return error(404, 'instance not found')
 
         return func(*args, **kwargs)
@@ -145,7 +145,7 @@ def arg_is_instance_uuid_as_virt(func):
             )
         if not kwargs.get('instance_from_db_virt'):
             LOG.info(
-                'instance(%s): instance not found, genuinely missing' % kwargs['instance_uuid'])
+                'instance(%s): instance not found, genuinely missing' % kwargs.get('instance_uuid'))
             return error(404, 'instance not found')
 
         return func(*args, **kwargs)
@@ -642,7 +642,7 @@ class InstanceRebootSoft(Resource):
     @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None, instance_from_db_virt=None):
+    def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid,
                      'api', 'soft reboot', None, None)
         return instance_from_db_virt.reboot(hard=False)
@@ -654,7 +654,7 @@ class InstanceRebootHard(Resource):
     @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None, instance_from_db_virt=None):
+    def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid,
                      'api', 'hard reboot', None, None)
         return instance_from_db_virt.reboot(hard=True)
@@ -666,7 +666,7 @@ class InstancePowerOff(Resource):
     @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None, instance_from_db_virt=None):
+    def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid,
                      'api', 'poweroff', None, None)
         return instance_from_db_virt.power_off()
@@ -678,7 +678,7 @@ class InstancePowerOn(Resource):
     @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None, instance_from_db_virt=None):
+    def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid,
                      'api', 'poweron', None, None)
         return instance_from_db_virt.power_on()
@@ -690,7 +690,7 @@ class InstancePause(Resource):
     @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None, instance_from_db_virt=None):
+    def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid, 'api', 'pause', None, None)
         return instance_from_db_virt.pause()
 
@@ -701,7 +701,7 @@ class InstanceUnpause(Resource):
     @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None, instance_from_db_virt=None):
+    def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid,
                      'api', 'unpause', None, None)
         return instance_from_db_virt.unpause()
@@ -709,8 +709,6 @@ class InstanceUnpause(Resource):
 
 class InterfaceFloat(Resource):
     @jwt_required
-    @arg_is_instance_uuid
-    @requires_instance_ownership
     @redirect_to_network_node
     def post(self, interface_uuid=None):
         ni = db.get_interface(interface_uuid)
@@ -730,6 +728,11 @@ class InterfaceFloat(Resource):
             LOG.info('%s: network not found, ownership test' % n)
             return error(404, 'network not found')
 
+        i = virt.from_db(ni['instance_uuid'])
+        if get_jwt_identity() not in [i.db_entry['namespace'], 'system']:
+            LOG.info('%s: instance not found, ownership test' % i)
+            return error(404, 'instance not found')
+
         float_net = net.from_db('floating')
         if not float_net:
             return error(404, 'floating network not found')
@@ -747,8 +750,6 @@ class InterfaceFloat(Resource):
 
 class InterfaceDefloat(Resource):
     @jwt_required
-    @arg_is_instance_uuid
-    @requires_instance_ownership
     @redirect_to_network_node
     def post(self, interface_uuid=None):
         ni = db.get_interface(interface_uuid)
@@ -767,6 +768,11 @@ class InterfaceDefloat(Resource):
         if get_jwt_identity() not in [n['namespace'], 'system']:
             LOG.info('%s: network not found, ownership test' % n)
             return error(404, 'network not found')
+
+        i = virt.from_db(ni['instance_uuid'])
+        if get_jwt_identity() not in [i.db_entry['namespace'], 'system']:
+            LOG.info('%s: instance not found, ownership test' % i)
+            return error(404, 'instance not found')
 
         float_net = net.from_db('floating')
         if not float_net:
