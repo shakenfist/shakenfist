@@ -724,7 +724,7 @@ class InterfaceFloat(Resource):
                      % ni['network_uuid'])
             return error(404, 'network not found')
 
-        if get_jwt_identity() not in [n['namespace'], 'system']:
+        if get_jwt_identity() not in [n.namespace, 'system']:
             LOG.info('%s: network not found, ownership test' % n)
             return error(404, 'network not found')
 
@@ -765,7 +765,7 @@ class InterfaceDefloat(Resource):
                      % ni['network_uuid'])
             return error(404, 'network not found')
 
-        if get_jwt_identity() not in [n['namespace'], 'system']:
+        if get_jwt_identity() not in [n.namespace, 'system']:
             LOG.info('%s: network not found, ownership test' % n)
             return error(404, 'network not found')
 

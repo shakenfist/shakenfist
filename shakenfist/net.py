@@ -33,20 +33,23 @@ def from_db(uuid):
                    provide_nat=dbnet['provide_nat'],
                    ipblock=dbnet['netblock'],
                    physical_nic=config.parsed.get('NODE_EGRESS_NIC'),
-                   floating_gateway=dbnet['floating_gateway'])
+                   floating_gateway=dbnet['floating_gateway'],
+                   namespace=dbnet['namespace'])
 
 
 class Network(object):
     # NOTE(mikal): it should be noted that the maximum interface name length
     # on Linux is 15 user visible characters.
     def __init__(self, uuid=None, vxlan_id=1, provide_dhcp=False, provide_nat=False,
-                 physical_nic='eth0', ipblock=None, floating_gateway=None):
+                 physical_nic='eth0', ipblock=None, floating_gateway=None,
+                 namespace=None):
         self.uuid = uuid
         self.vxlan_id = vxlan_id
         self.provide_dhcp = provide_dhcp
         self.provide_nat = provide_nat
         self.physical_nic = physical_nic
         self.floating_gateway = floating_gateway
+        self.namespace = namespace
 
         with etcd.get_lock('sf/ipmanager/%s' % self.uuid, ttl=120) as _:
             ipm = db.get_ipmanager(self.uuid)
