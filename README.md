@@ -191,7 +191,7 @@ Here's a simple feature matrix:
 | User data                                         | v0.1        |         |             |
 | Keypairs                                          | v0.1        |         |             |
 | Virtual networks allow overlapping IP allocations | v0.1        |         |             |
-| REST API authentication and object ownership      |             | Yes     |             |
+| REST API authentication and object ownership      | v0.2        |         |             |
 | Snapshots (of all disks)                          | v0.1        |         |             |
 | Central API service                               | v0.1, in a meshy sort of way |         |             |
 | Scheduling                                        | v0.1        |         |             |

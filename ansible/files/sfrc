@@ -5,6 +5,6 @@ eval "$(_SF_CLIENT_COMPLETE=source sf-client)"
 export ETCDCTL_API=3
 
 # Client auth
-export SHAKENFIST_NAMESPACE="all"
-export SHAKENFIST_PASSWORD="{{api_admin_password}}"
+export SHAKENFIST_NAMESPACE="system"
+export SHAKENFIST_KEY="{{api_admin_password}}"
 export SHAKENFIST_API_URL="http://localhost:13000"

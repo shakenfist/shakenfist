@@ -1,3 +1,10 @@
+#################################################################################
+# DEAR FUTURE ME... The order of decorators on these API methods deeply deeply  #
+# matters. We need to verify auth before anything, and we need to fetch things  #
+# from the database before we make decisions based on those things. So remember #
+# the outer decorator is executed first!                                        #
+#################################################################################
+
 import base64
 import bcrypt
 import flask
@@ -105,10 +112,10 @@ class Resource(flask_restful.Resource):
 
 
 def caller_is_admin(func):
-    # Ensure only users in the "all" namespace can call this method
+    # Ensure only users in the "system" namespace can call this method
     def wrapper(*args, **kwargs):
-        if get_jwt_identity() != 'all':
-            return error(401, 'Unauthorized')
+        if get_jwt_identity() != 'system':
+            return error(401, 'unauthorized')
 
         return func(*args, **kwargs)
     return wrapper
@@ -121,6 +128,8 @@ def arg_is_instance_uuid(func):
             kwargs['instance_from_db'] = db.get_instance(
                 kwargs['instance_uuid'])
         if not kwargs.get('instance_from_db'):
+            LOG.info(
+                'instance(%s): instance not found, genuinely missing' % kwargs.get('instance_uuid'))
             return error(404, 'instance not found')
 
         return func(*args, **kwargs)
@@ -135,6 +144,8 @@ def arg_is_instance_uuid_as_virt(func):
                 kwargs['instance_uuid']
             )
         if not kwargs.get('instance_from_db_virt'):
+            LOG.info(
+                'instance(%s): instance not found, genuinely missing' % kwargs.get('instance_uuid'))
             return error(404, 'instance not found')
 
         return func(*args, **kwargs)
@@ -171,6 +182,23 @@ def redirect_instance_request(func):
     return wrapper
 
 
+def requires_instance_ownership(func):
+    # Requires that @arg_is_instance_uuid has already run
+    def wrapper(*args, **kwargs):
+        if not kwargs.get('instance_from_db'):
+            LOG.info('instance(%s): instance not found, kwarg missing'
+                     % kwargs['instance_uuid'])
+            return error(404, 'instance not found')
+
+        if get_jwt_identity() not in [kwargs['instance_from_db']['namespace'], 'system']:
+            LOG.info('instance(%s): instance not found, ownership test in decorator'
+                     % kwargs['instance_uuid'])
+            return error(404, 'instance not found')
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
 def arg_is_network_uuid(func):
     # Method uses the network from the db
     def wrapper(*args, **kwargs):
@@ -178,6 +206,8 @@ def arg_is_network_uuid(func):
             kwargs['network_from_db'] = db.get_network(
                 kwargs['network_uuid'])
         if not kwargs.get('network_from_db'):
+            LOG.info('network(%s): network not found, genuinely missing' %
+                     kwargs['network_uuid'])
             return error(404, 'network not found')
 
         return func(*args, **kwargs)
@@ -191,7 +221,7 @@ def redirect_to_network_node(func):
             admin_token = util.get_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
                                   config.parsed.get('API_PORT')),
-                namespace='all')
+                namespace='system')
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'],
                 'http://%s:%d%s'
@@ -208,6 +238,23 @@ def redirect_to_network_node(func):
                                   mimetype='application/json')
             resp.status_code = r.status_code
             return resp
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
+def requires_network_ownership(func):
+    # Requires that @arg_is_network_uuid has already run
+    def wrapper(*args, **kwargs):
+        if not kwargs.get('network_from_db'):
+            LOG.info('network(%s): network not found, kwarg missing'
+                     % kwargs['network_uuid'])
+            return error(404, 'network not found')
+
+        if get_jwt_identity() not in [kwargs['network_from_db']['namespace'], 'system']:
+            LOG.info('network(%s): network not found, ownership test in decorator'
+                     % kwargs['network_uuid'])
+            return error(404, 'network not found')
 
         return func(*args, **kwargs)
     return wrapper
@@ -241,6 +288,9 @@ class Root(Resource):
 class Auth(Resource):
     def _get_keys(self, namespace):
         rec = etcd.get('namespaces', None, namespace)
+        if not rec:
+            return (None, [])
+
         keys = []
         for key_name in rec.get('keys', {}):
             keys.append(base64.b64decode(rec['keys'][key_name]))
@@ -248,9 +298,9 @@ class Auth(Resource):
 
     def post(self, namespace=None, key=None):
         if not namespace:
-            return error(400, 'Missing namespace in request')
+            return error(400, 'missing namespace in request')
         if not key:
-            return error(400, 'Missing key in request')
+            return error(400, 'missing key in request')
 
         service_key, keys = self._get_keys(namespace)
         if service_key and key == service_key:
@@ -259,7 +309,7 @@ class Auth(Resource):
             if bcrypt.checkpw(key.encode('utf-8'), possible_key):
                 return {'access_token': create_access_token(identity=namespace)}
 
-        return error(401, 'Unauthorized')
+        return error(401, 'unauthorized')
 
 
 class AuthNamespaces(Resource):
@@ -267,11 +317,11 @@ class AuthNamespaces(Resource):
     @caller_is_admin
     def post(self, namespace=None, key_name=None, key=None):
         if not namespace:
-            return error(400, 'No namespace specified')
+            return error(400, 'no namespace specified')
         if not key_name:
-            return error(400, 'No unique name specified')
+            return error(400, 'no unique name specified')
         if not key:
-            return error(400, 'No key specified')
+            return error(400, 'no key specified')
 
         with etcd.get_lock('namespaces') as _:
             rec = etcd.get('namespaces', None, namespace)
@@ -302,9 +352,9 @@ class AuthNamespace(Resource):
     @caller_is_admin
     def delete(self, namespace):
         if not namespace:
-            return error(400, 'No namespace specified')
-        if namespace == 'all':
-            return error(400, 'Could cannot delete the all namespace')
+            return error(400, 'no namespace specified')
+        if namespace == 'system':
+            return error(400, 'you cannot delete the system namespace')
         etcd.delete('namespaces', None, namespace)
 
 
@@ -313,30 +363,33 @@ class AuthNamespaceKey(Resource):
     @caller_is_admin
     def delete(self, namespace, key_name):
         if not namespace:
-            return error(400, 'No namespace specified')
+            return error(400, 'no namespace specified')
         if not key_name:
-            return error(400, 'No key name specified')
+            return error(400, 'no key name specified')
 
         with etcd.get_lock('namespaces/%s' % namespace) as _:
             ns = etcd.get('namespaces', None, namespace)
             if ns.get('keys') and key_name in ns['keys']:
                 del ns['keys'][key_name]
             else:
-                return error(404, 'Key name not found in namespace')
+                return error(404, 'key name not found in namespace')
             etcd.put('namespaces', None, namespace, ns)
 
 
 class Instance(Resource):
     @jwt_required
     @arg_is_instance_uuid
+    @requires_instance_ownership
     def get(self, instance_uuid=None, instance_from_db=None):
         db.add_event('instance', instance_uuid, 'api', 'get', None, None)
         return instance_from_db
 
     @jwt_required
+    @arg_is_instance_uuid
+    @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def delete(self, instance_uuid=None, instance_from_db_virt=None):
+    def delete(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid, 'api', 'delete', None, None)
 
         instance_networks = []
@@ -369,15 +422,26 @@ class Instance(Resource):
 class Instances(Resource):
     @jwt_required
     def get(self, all=False):
-        return list(db.get_instances(all=all))
+        out = []
+        for i in db.get_instances(all=all):
+            if get_jwt_identity() in [i['namespace'], 'system']:
+                out.append(i)
+        return out
 
     @jwt_required
     def post(self, name=None, cpus=None, memory=None, network=None,
-             disk=None, ssh_key=None, user_data=None, placed_on=None, instance_uuid=None):
+             disk=None, ssh_key=None, user_data=None, placed_on=None, namespace=None,
+             instance_uuid=None):
         global SCHEDULER
 
         # We need to santize the name so its safe for DNS
         name = re.sub(r'([^a-zA-Z0-9_\-])', '', name)
+
+        # If we specified a namespace, we need to be an admin
+        if namespace and get_jwt_identity() != 'system':
+            return error(401, 'only admins can create resources in a different namespace')
+        if not namespace:
+            namespace = get_jwt_identity()
 
         # The instance needs to exist in the DB before network interfaces are created
         if not instance_uuid:
@@ -387,6 +451,12 @@ class Instances(Resource):
 
         # Create instance object
         instance = virt.from_db(instance_uuid)
+        if instance:
+            if get_jwt_identity() not in [instance['namespace'], 'system']:
+                LOG.info(
+                    'instance(%s): instance not found, ownership test' % instance_uuid)
+                return error(404, 'instance not found')
+
         if not instance:
             instance = virt.from_definition(
                 uuid=instance_uuid,
@@ -395,7 +465,8 @@ class Instances(Resource):
                 memory_mb=memory * 1024,
                 vcpus=cpus,
                 ssh_key=ssh_key,
-                user_data=user_data
+                user_data=user_data,
+                owner=namespace
             )
 
         if not SCHEDULER:
@@ -408,7 +479,7 @@ class Instances(Resource):
                 db.add_event('instance', instance_uuid,
                              'schedule', 'failed', None, 'insufficient resources')
                 db.update_instance_state(instance_uuid, 'error')
-                return error(507, 'Insufficient capacity')
+                return error(507, 'insufficient capacity')
 
             placed_on = candidates[0]
             db.place_instance(instance_uuid, placed_on)
@@ -423,9 +494,9 @@ class Instances(Resource):
                     db.add_event('instance', instance_uuid,
                                  'schedule', 'failed', None, 'insufficient resources')
                     db.update_instance_state(instance_uuid, 'error')
-                    return error(507, 'Insufficient capacity')
+                    return error(507, 'insufficient capacity')
             except scheduler.CandidateNodeNotFoundException as e:
-                return error(404, 'Node not found: %s' % e)
+                return error(404, 'node not found: %s' % e)
 
         # Have we been placed on a different node?
         if not placed_on == config.parsed.get('NODE_NAME'):
@@ -436,7 +507,7 @@ class Instances(Resource):
             admin_token = util.get_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
                                   config.parsed.get('API_PORT')),
-                namespace='all')
+                namespace='system')
             r = requests.request('POST',
                                  'http://%s:%d/instances'
                                  % (placed_on,
@@ -520,6 +591,7 @@ class Instances(Resource):
 class InstanceInterfaces(Resource):
     @jwt_required
     @arg_is_instance_uuid
+    @requires_instance_ownership
     def get(self, instance_uuid=None, instance_from_db=None):
         db.add_event('instance', instance_uuid,
                      'api', 'get interfaces', None, None)
@@ -529,6 +601,7 @@ class InstanceInterfaces(Resource):
 class InstanceEvents(Resource):
     @jwt_required
     @arg_is_instance_uuid
+    @requires_instance_ownership
     def get(self, instance_uuid=None, instance_from_db=None):
         db.add_event('instance', instance_uuid,
                      'api', 'get events', None, None)
@@ -537,9 +610,11 @@ class InstanceEvents(Resource):
 
 class InstanceSnapshot(Resource):
     @jwt_required
+    @arg_is_instance_uuid
+    @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None, instance_from_db_virt=None, all=None):
+    def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None, all=None):
         snap_uuid = instance_from_db_virt.snapshot(all=all)
         db.add_event('instance', instance_uuid,
                      'api', 'snapshot (all=%s)' % all,
@@ -550,6 +625,7 @@ class InstanceSnapshot(Resource):
 
     @jwt_required
     @arg_is_instance_uuid
+    @requires_instance_ownership
     def get(self, instance_uuid=None, instance_from_db=None):
         db.add_event('instance', instance_uuid,
                      'api', 'get', None, None)
@@ -562,9 +638,11 @@ class InstanceSnapshot(Resource):
 
 class InstanceRebootSoft(Resource):
     @jwt_required
+    @arg_is_instance_uuid
+    @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None, instance_from_db_virt=None):
+    def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid,
                      'api', 'soft reboot', None, None)
         return instance_from_db_virt.reboot(hard=False)
@@ -572,9 +650,11 @@ class InstanceRebootSoft(Resource):
 
 class InstanceRebootHard(Resource):
     @jwt_required
+    @arg_is_instance_uuid
+    @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None, instance_from_db_virt=None):
+    def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid,
                      'api', 'hard reboot', None, None)
         return instance_from_db_virt.reboot(hard=True)
@@ -582,9 +662,11 @@ class InstanceRebootHard(Resource):
 
 class InstancePowerOff(Resource):
     @jwt_required
+    @arg_is_instance_uuid
+    @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None, instance_from_db_virt=None):
+    def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid,
                      'api', 'poweroff', None, None)
         return instance_from_db_virt.power_off()
@@ -592,9 +674,11 @@ class InstancePowerOff(Resource):
 
 class InstancePowerOn(Resource):
     @jwt_required
+    @arg_is_instance_uuid
+    @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None, instance_from_db_virt=None):
+    def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid,
                      'api', 'poweron', None, None)
         return instance_from_db_virt.power_on()
@@ -602,18 +686,22 @@ class InstancePowerOn(Resource):
 
 class InstancePause(Resource):
     @jwt_required
+    @arg_is_instance_uuid
+    @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None, instance_from_db_virt=None):
+    def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid, 'api', 'pause', None, None)
         return instance_from_db_virt.pause()
 
 
 class InstanceUnpause(Resource):
     @jwt_required
+    @arg_is_instance_uuid
+    @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None, instance_from_db_virt=None):
+    def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
         db.add_event('instance', instance_uuid,
                      'api', 'unpause', None, None)
         return instance_from_db_virt.unpause()
@@ -623,8 +711,6 @@ class InterfaceFloat(Resource):
     @jwt_required
     @redirect_to_network_node
     def post(self, interface_uuid=None):
-        db.add_event('interface', interface_uuid,
-                     'api', 'float', None, None)
         ni = db.get_interface(interface_uuid)
         if not ni:
             return error(404, 'network interface not found')
@@ -634,12 +720,25 @@ class InterfaceFloat(Resource):
 
         n = net.from_db(ni['network_uuid'])
         if not n:
+            LOG.info('network(%s): network not found, genuinely missing'
+                     % ni['network_uuid'])
             return error(404, 'network not found')
+
+        if get_jwt_identity() not in [n.namespace, 'system']:
+            LOG.info('%s: network not found, ownership test' % n)
+            return error(404, 'network not found')
+
+        i = virt.from_db(ni['instance_uuid'])
+        if get_jwt_identity() not in [i.db_entry['namespace'], 'system']:
+            LOG.info('%s: instance not found, ownership test' % i)
+            return error(404, 'instance not found')
 
         float_net = net.from_db('floating')
         if not float_net:
             return error(404, 'floating network not found')
 
+        db.add_event('interface', interface_uuid,
+                     'api', 'float', None, None)
         with etcd.get_lock('sf/ipmanager/floating', ttl=120) as _:
             ipm = db.get_ipmanager('floating')
             addr = ipm.get_random_free_address()
@@ -653,8 +752,6 @@ class InterfaceDefloat(Resource):
     @jwt_required
     @redirect_to_network_node
     def post(self, interface_uuid=None):
-        db.add_event('interface', interface_uuid,
-                     'api', 'defloat', None, None)
         ni = db.get_interface(interface_uuid)
         if not ni:
             return error(404, 'network interface not found')
@@ -664,12 +761,25 @@ class InterfaceDefloat(Resource):
 
         n = net.from_db(ni['network_uuid'])
         if not n:
+            LOG.info('network(%s): network not found, genuinely missing'
+                     % ni['network_uuid'])
             return error(404, 'network not found')
+
+        if get_jwt_identity() not in [n.namespace, 'system']:
+            LOG.info('%s: network not found, ownership test' % n)
+            return error(404, 'network not found')
+
+        i = virt.from_db(ni['instance_uuid'])
+        if get_jwt_identity() not in [i.db_entry['namespace'], 'system']:
+            LOG.info('%s: instance not found, ownership test' % i)
+            return error(404, 'instance not found')
 
         float_net = net.from_db('floating')
         if not float_net:
             return error(404, 'floating network not found')
 
+        db.add_event('interface', interface_uuid,
+                     'api', 'defloat', None, None)
         with etcd.get_lock('sf/ipmanager/floating', ttl=120) as _:
             ipm = db.get_ipmanager('floating')
             ipm.release(ni['floating'])
@@ -677,6 +787,30 @@ class InterfaceDefloat(Resource):
 
         db.remove_floating_from_interface(ni['uuid'])
         n.remove_floating_ip(ni['floating'], ni['ipv4'])
+
+
+class InstanceMetadatas(Resource):
+    @jwt_required
+    @arg_is_instance_uuid
+    @requires_instance_ownership
+    def get(self, instance_uuid=None, instance_from_db=None):
+        return etcd.get('metadata', 'instance', instance_uuid)
+
+
+class InstanceMetadata(Resource):
+    @jwt_required
+    @arg_is_instance_uuid
+    @requires_instance_ownership
+    def post(self, instance_uuid=None, key=None, value=None, instance_from_db=None):
+        if not key:
+            return error(400, 'no key specified')
+        if not value:
+            return error(400, 'no value specified')
+
+        with etcd.get_lock('metadata/instance/%s' % instance_uuid) as _:
+            md = etcd.get('metadata', 'instance', instance_uuid)
+            md['key'] = value
+            etcd.put('metadata', 'instance', instance_uuid, md)
 
 
 class Image(Resource):
@@ -692,6 +826,7 @@ class Image(Resource):
 class Network(Resource):
     @jwt_required
     @arg_is_network_uuid
+    @requires_network_ownership
     def get(self, network_uuid=None, network_from_db=None):
         db.add_event('network', network_uuid, 'api', 'get', None, None)
         if network_from_db is not None and 'ipmanager' in network_from_db:
@@ -700,6 +835,7 @@ class Network(Resource):
 
     @jwt_required
     @arg_is_network_uuid
+    @requires_network_ownership
     @redirect_to_network_node
     def delete(self, network_uuid=None, network_from_db=None):
         db.add_event('network', network_uuid, 'api', 'delete', None, None)
@@ -724,28 +860,38 @@ class Network(Resource):
 
 
 class Networks(Resource):
-    @jwt_required
     @marshal_with({
         'uuid': fields.String,
         'vxlan_id': fields.Integer,
         'netblock': fields.String,
         'provide_dhcp': fields.Boolean,
         'provide_nat': fields.Boolean,
-        'owner': fields.String,
+        'namespace': fields.String,
         'name': fields.String,
     })
+    @jwt_required
     def get(self, all=False):
-        return list(db.get_networks(all=all))
+        out = []
+        for n in db.get_networks(all=all):
+            if get_jwt_identity() in [n['namespace'], 'system']:
+                out.append(n)
+        return out
 
     @jwt_required
-    def post(self, netblock=None, provide_dhcp=None, provide_nat=None, name=None):
+    def post(self, netblock=None, provide_dhcp=None, provide_nat=None, name=None,
+             namespace=None):
         try:
             ipaddress.ip_network(netblock)
         except ValueError as e:
             return error(400, 'cannot parse netblock: %s' % e)
 
+        if namespace and get_jwt_identity() != 'system':
+            return error(401, 'only admins can create resources in a different namespace')
+        if not namespace:
+            namespace = get_jwt_identity()
+
         network = db.allocate_network(netblock, provide_dhcp,
-                                      provide_nat, name, get_jwt_identity())
+                                      provide_nat, name, namespace)
         db.add_event('network', network['uuid'],
                      'api', 'create', None, None)
 
@@ -753,6 +899,8 @@ class Networks(Resource):
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
             n = net.from_db(network['uuid'])
             if not n:
+                LOG.info('network(%s): network not found, genuinely missing'
+                         % network['uuid'])
                 return error(404, 'network not found')
 
             n.create()
@@ -761,7 +909,7 @@ class Networks(Resource):
             admin_token = util.get_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
                                   config.parsed.get('API_PORT')),
-                namespace='all')
+                namespace='system')
             requests.request(
                 'put',
                 ('http://%s:%d/deploy_network_node'
@@ -778,6 +926,7 @@ class Networks(Resource):
 class NetworkEvents(Resource):
     @jwt_required
     @arg_is_network_uuid
+    @requires_network_ownership
     def get(self, network_uuid=None, network_from_db=None):
         db.add_event('network', network_uuid,
                      'api', 'get events', None, None)
@@ -806,6 +955,8 @@ class DeployNetworkNode(Resource):
     def put(self, passed_uuid=None):
         n = net.from_db(passed_uuid)
         if not n:
+            LOG.info('network(%s): network not found, genuinely missing'
+                     % passed_uuid)
             return error(404, 'network not found')
 
         n.create()
@@ -819,6 +970,8 @@ class UpdateDHCP(Resource):
     def put(self, passed_uuid=None):
         n = net.from_db(passed_uuid)
         if not n:
+            LOG.info('network(%s): network not found, genuinely missing'
+                     % passed_uuid)
             return error(404, 'network not found')
 
         n.update_dhcp()
@@ -831,6 +984,8 @@ class RemoveDHCP(Resource):
     def put(self, passed_uuid=None):
         n = net.from_db(passed_uuid)
         if not n:
+            LOG.info('network(%s): network not found, genuinely missing'
+                     % passed_uuid)
             return error(404, 'network not found')
 
         n.remove_dhcp()
@@ -854,6 +1009,9 @@ api.add_resource(InstancePause, '/instances/<instance_uuid>/pause')
 api.add_resource(InstanceUnpause, '/instances/<instance_uuid>/unpause')
 api.add_resource(InterfaceFloat, '/interfaces/<interface_uuid>/float')
 api.add_resource(InterfaceDefloat, '/interfaces/<interface_uuid>/defloat')
+api.add_resource(InstanceMetadatas, '/instances/<instance_uuid>/metadata')
+api.add_resource(InstanceMetadata,
+                 '/instances/<instance_uuid>/metatadata/<key>')
 api.add_resource(Image, '/images')
 api.add_resource(Networks, '/networks')
 api.add_resource(Network, '/networks/<network_uuid>')

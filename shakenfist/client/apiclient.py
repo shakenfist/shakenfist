@@ -59,7 +59,7 @@ class Client(object):
 
         self.cached_auth = None
         if verbose:
-            LOG.setLevel(logging.INFO)
+            LOG.setLevel(logging.DEBUG)
 
     def _request_url(self, method, url, data=None):
         if not self.cached_auth:
@@ -125,7 +125,7 @@ class Client(object):
         return r.json()
 
     def create_instance(self, name, cpus, memory, network, disk, sshkey, userdata,
-                        force_placement=None):
+                        namespace=None, force_placement=None):
         body = {
             'name': name,
             'cpus': cpus,
@@ -133,7 +133,8 @@ class Client(object):
             'network': network,
             'disk': disk,
             'ssh_key': sshkey,
-            'user_data': userdata
+            'user_data': userdata,
+            'namespace': namespace
         }
 
         if force_placement:
@@ -216,13 +217,14 @@ class Client(object):
                               '/networks/' + instance_uuid + '/events')
         return r.json()
 
-    def allocate_network(self, netblock, provide_dhcp, provide_nat, name):
+    def allocate_network(self, netblock, provide_dhcp, provide_nat, name, namespace):
         r = self._request_url('POST', self.base_url + '/networks',
                               data={
                                   'netblock': netblock,
                                   'provide_dhcp': provide_dhcp,
                                   'provide_nat': provide_nat,
-                                  'name': name
+                                  'name': name,
+                                  'namespace': namespace
                               })
         return r.json()
 

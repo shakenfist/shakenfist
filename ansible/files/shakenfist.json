@@ -1,5 +1,5 @@
 {
-    "namespace": "all",
+    "namespace": "system",
     "key": "{{api_admin_password}}",
     "apiurl": "http://localhost:13000"
 }

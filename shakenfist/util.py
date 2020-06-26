@@ -117,7 +117,7 @@ def get_libvirt():
     return LIBVIRT
 
 
-def get_api_token(base_url, namespace='all'):
+def get_api_token(base_url, namespace='system'):
     with etcd.get_lock('namespaces/%s' % namespace) as _:
         auth_url = base_url + '/auth'
         LOG.info('Fetching %s auth token from %s' % (namespace, auth_url))

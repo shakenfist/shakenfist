@@ -384,7 +384,7 @@
           - 3000:3000
         user: "{{sfgrafana_user_complex.uid}}"
 
-    - name: Create an admin namespace called "all" with a password configured
+    - name: Create an admin namespace called "system" with a password configured
       shell: sf-passwd deploy "{{api_admin_password}}"
 
 - hosts: hypervisors
