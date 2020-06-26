@@ -36,17 +36,23 @@ def restore_instances():
 
     with util.RecordedOperation('restore networks', None) as _:
         for network in networks:
-            LOG.info('Restoring network %s' % network)
-            n = net.from_db(network)
-            n.create()
-            n.ensure_mesh()
-            n.update_dhcp()
+            try:
+                n = net.from_db(network)
+                LOG.info('%s Restoring network' % n)
+                n.create()
+                n.ensure_mesh()
+                n.update_dhcp()
+            except Exception as e:
+                LOG.error('%s Failed to restore network: %s' % (n, e))
 
     with util.RecordedOperation('restore instances', None) as _:
         for instance in instances:
-            LOG.info('Restoring instance %s' % instance)
-            i = virt.from_db(instance)
-            i.create()
+            try:
+                i = virt.from_db(instance)
+                LOG.info('%s Restoring instance' % i)
+                i.create()
+            except Exception as e:
+                LOG.error('%s Failed to restore instance: %s' % (i, e))
 
 
 def main():
