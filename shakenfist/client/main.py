@@ -46,26 +46,6 @@ def cli(ctx, output, verbose, namespace, key, apiurl):
     if verbose:
         LOG.setLevel(logging.INFO)
 
-    # Where do we find authentication details? First off, we try command line
-    # flags; then environment variables (thanks for doing this for free click);
-    # and finally ~/.shakenfist (which is a JSON file).
-    if not namespace:
-        user_conf = os.path.expanduser('~/.shakenfist')
-        if os.path.exists(user_conf):
-            with open(user_conf) as f:
-                d = json.loads(f.read())
-                namespace = d['namespace']
-                key = d['key']
-                apiurl = d['apiurl']
-
-    if not namespace:
-        if os.path.exists('/etc/sf/shakenfist.json'):
-            with open('/etc/sf/shakenfist.json') as f:
-                d = json.loads(f.read())
-                namespace = d['namespace']
-                key = d['key']
-                apiurl = d['apiurl']
-
     global CLIENT
     CLIENT = apiclient.Client(
         namespace=namespace,
@@ -165,7 +145,7 @@ def namespace_delete(ctx, namespace=None):
 @click.argument('namespace', type=click.STRING)
 @click.argument('keyname', type=click.STRING)
 @click.pass_context
-def namespace_delete(ctx, namespace=None, keyname=None):
+def namespace_delete_key(ctx, namespace=None, keyname=None):
     CLIENT.delete_namespace_key(namespace, keyname)
 
 
