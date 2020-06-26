@@ -239,7 +239,7 @@ class Client(object):
                               '/networks/' + instance_uuid + '/events')
         return r.json()
 
-    def allocate_network(self, netblock, provide_dhcp, provide_nat, name, namespace):
+    def allocate_network(self, netblock, provide_dhcp, provide_nat, name, namespace=None):
         r = self._request_url('POST', self.base_url + '/networks',
                               data={
                                   'netblock': netblock,
