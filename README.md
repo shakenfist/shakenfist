@@ -122,54 +122,7 @@ Maybe one day I will.
 Installation
 ============
 
-Build an acceptable deployment, noting that only Ubuntu is supported.
-
-On Google Cloud, you need to enable nested virt first:
-
-```bash
-# Create an image with nested virt enabled (only once)
-gcloud compute disks create sf-source-disk --image-project ubuntu-os-cloud \
-    --image-family ubuntu-1804-lts --zone us-central1-b
-gcloud compute images create sf-image \
-  --source-disk sf-source-disk --source-disk-zone us-central1-b \
-  --licenses "https://compute.googleapis.com/compute/v1/projects/vm-options/global/licenses/enable-vmx"
-```
-
-Update the contents of ansible/vars with locally valid values. Its a YAML file if that helps.
-
-The ansible takes varying variables depending on your undercloud provider. Here's a handy dandy table:
-
-| Cloud                 | Variables                      | Example               |
-|-----------------------|--------------------------------|-----------------------|
-| Google Compute Engine | Your google compute project ID | -var project=foo-1234 |
-|-----------------------|--------------------------------|-----------------------|
-| Nutanix               | Your username                  | -var username=admin   |
-|                       | Your password                  | -var password=foo     |
-|                       | Your endpoint host             | -var 192.168.10.30    |
-|                       | The subnet UUID                | -var subnet=...       |
-|-----------------------|--------------------------------|-----------------------|
-
-Now create your database and hypervisor nodes (where foo-1234 is my Google Compute project):
-
-```bash
-sudo apt-get install ansible tox pwgen
-git clone https://github.com/mikalstill/shakenfist
-cd ansible
-ansible-galaxy install andrewrothstein.etcd-cluster
-ansible-playbook -i ansible/hosts-gcp $VARIABLES_AS_ABOVE ansible/deploy.yml
-```
-
-There are automated tests, which you can run like this:
-
-```bash
-ansible-playbook -i ansible/hosts-gcp $VARIABLES_AS_ABOVE ansible/test.yml
-```
-
-At the moment you interact with Shaken Fist via a command line client or the REST API. For now, do something like this to get some help:
-
-```bash
-sf-client --help
-```
+Installation tooling has moved to https://github.com/shakenfist/deploy -- please look there for assistance with installation.
 
 Features
 ========
