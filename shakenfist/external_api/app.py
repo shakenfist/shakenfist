@@ -429,7 +429,7 @@ class Instance(Resource):
 class Instances(Resource):
     @jwt_required
     def get(self, all=False):
-        return db.get_instances(all=all, namespace=get_jwt_identity())
+        return list(db.get_instances(all=all, namespace=get_jwt_identity()))
 
     @jwt_required
     def post(self, name=None, cpus=None, memory=None, network=None,
@@ -874,7 +874,7 @@ class Networks(Resource):
     })
     @jwt_required
     def get(self, all=False):
-        return db.get_networks(all=all, namespace=get_jwt_identity())
+        return list(db.get_networks(all=all, namespace=get_jwt_identity()))
 
     @jwt_required
     def post(self, netblock=None, provide_dhcp=None, provide_nat=None, name=None,
