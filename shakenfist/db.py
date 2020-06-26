@@ -51,16 +51,18 @@ def get_network(network_uuid):
     return etcd.get('network', None, network_uuid)
 
 
-def get_networks(all=False):
+def get_networks(all=False, namespace=None):
     see_this_node()
-    for i in etcd.get_all('network', None):
-        if all:
-            yield i
-        else:
-            if i['uuid'] == 'floating':
+    for n in etcd.get_all('network', None):
+        if n['uuid'] == 'floating':
+            continue
+        if not all:
+            if n['state'] in ['deleted', 'error']:
                 continue
-            if not i['state'] in ['deleted', 'error']:
-                yield i
+        if namespace:
+            if namespace not in [n['namespace'], 'system']:
+                continue
+        yield n
 
 
 def allocate_network(netblock, provide_dhcp=True, provide_nat=False, name=None,
@@ -163,13 +165,16 @@ def get_instance(instance_uuid):
     return etcd.get('instance', None, instance_uuid)
 
 
-def get_instances(only_node=None, all=False):
+def get_instances(only_node=None, all=False, namespace=None):
     see_this_node()
     for i in etcd.get_all('instance', None):
         if only_node and i['node'] != only_node:
             continue
         if not all:
             if i['state'] in ['deleted', 'error']:
+                continue
+        if namespace:
+            if namespace not in [i['namespace'], 'system']:
                 continue
         yield i
 
