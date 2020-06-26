@@ -355,6 +355,13 @@ class AuthNamespace(Resource):
             return error(400, 'no namespace specified')
         if namespace == 'system':
             return error(400, 'you cannot delete the system namespace')
+
+        # The namespace must be empty
+        if len(db.get_instances(all=True, namespace=namespace)) > 0:
+            return error(400, 'you cannot delete a namespace with instances')
+        if len(db.get_networks(all=True, namespace=namespace)) > 0:
+            return error(400, 'you cannot delete a namespace with networks')
+
         etcd.delete('namespaces', None, namespace)
 
 
@@ -422,11 +429,7 @@ class Instance(Resource):
 class Instances(Resource):
     @jwt_required
     def get(self, all=False):
-        out = []
-        for i in db.get_instances(all=all):
-            if get_jwt_identity() in [i['namespace'], 'system']:
-                out.append(i)
-        return out
+        return db.get_instances(all=all, namespace=get_jwt_identity())
 
     @jwt_required
     def post(self, name=None, cpus=None, memory=None, network=None,
@@ -871,11 +874,7 @@ class Networks(Resource):
     })
     @jwt_required
     def get(self, all=False):
-        out = []
-        for n in db.get_networks(all=all):
-            if get_jwt_identity() in [n['namespace'], 'system']:
-                out.append(n)
-        return out
+        return db.get_networks(all=all, namespace=get_jwt_identity())
 
     @jwt_required
     def post(self, netblock=None, provide_dhcp=None, provide_nat=None, name=None,
