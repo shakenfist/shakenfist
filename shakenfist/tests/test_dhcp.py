@@ -51,9 +51,9 @@ class DHCPTestCase(testtools.TestCase):
                                   return_value=FakeNetwork())
         self.mock_network = self.network.start()
 
-        with open('%s/../../ansible/files/dhcp.tmpl' % TEST_DIR) as f:
+        with open('%s/files/dhcp.tmpl' % TEST_DIR) as f:
             dhcp_tmpl = f.read()
-        with open('%s/../../ansible/files/dhcphosts.tmpl' % TEST_DIR) as f:
+        with open('%s/files/dhcphosts.tmpl' % TEST_DIR) as f:
             dhcphosts_tmpl = f.read()
 
         def fake_read_template(self, filename):
