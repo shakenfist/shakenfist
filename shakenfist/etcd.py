@@ -112,6 +112,7 @@ def delete_all(objecttype, subtype, sort_order=None):
     for attempt in range(3):
         try:
             etcd3.client().delete_prefix(path)
+            return
         except Exception as e:
             LOG.info('Failed to delete all %s, attempt %d: %s'
                      % (path, attempt, e))
