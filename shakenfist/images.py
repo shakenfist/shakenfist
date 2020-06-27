@@ -135,7 +135,7 @@ def _hash_image_url(image_url):
 VALIDATED_IMAGE_FIELDS = ['Last-Modified', 'Content-Length']
 
 
-def _actual_fetch_image(info, info_key, hashed_image_path):
+def _actual_fetch_image(info, info_key, hashed_image_path, lock=None):
     resp = requests.get(info[info_key], allow_redirects=True, stream=True,
                         headers={'User-Agent': util.get_user_agent()})
     try:
@@ -159,6 +159,8 @@ def _actual_fetch_image(info, info_key, hashed_image_path):
                 for chunk in resp.iter_content(chunk_size=8192):
                     fetched += len(chunk)
                     f.write(chunk)
+                    if lock:
+                        lock.refresh()
 
         return info, fetched
 
@@ -166,7 +168,7 @@ def _actual_fetch_image(info, info_key, hashed_image_path):
         resp.close()
 
 
-def fetch_image(image_url):
+def fetch_image(image_url, lock=None):
     """Download the image if we don't already have the latest version in cache."""
 
     image_urls = resolve_image(image_url)
@@ -188,7 +190,8 @@ def fetch_image(image_url):
 
     fetched = 0
     try:
-        info, fetched = _actual_fetch_image(info, 'url', hashed_image_path)
+        info, fetched = _actual_fetch_image(
+            info, 'url', hashed_image_path, lock=lock)
     except requests.exceptions.ConnectionError:
         info, fetched = _actual_fetch_image(
             info, 'alternate_url', hashed_image_path)
@@ -203,6 +206,9 @@ def fetch_image(image_url):
     # Decompress if required
     if image_url.endswith('.gz'):
         if not os.path.exists(hashed_image_path + '.v%03d.orig' % info['version']):
+            if lock:
+                lock.refresh()
+
             processutils.execute(
                 'gunzip -k -q -c %(img)s > %(img)s.orig' % {
                     'img': hashed_image_path + '.v%03d' % info['version']},

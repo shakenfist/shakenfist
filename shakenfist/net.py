@@ -83,8 +83,8 @@ class Network(object):
             'physical_veth_outer': 'phy-%s-o' % self.vxlan_id,
             'physical_veth_inner': 'phy-%s-i' % self.vxlan_id,
 
-            'namespace': self.uuid,
-            'in_namespace': 'ip netns exec %s' % self.uuid,
+            'netns': self.uuid,
+            'in_netns': 'ip netns exec %s' % self.uuid,
 
             'ipblock': self.ipblock,
             'netmask': self.netmask,
@@ -132,10 +132,10 @@ class Network(object):
                         'brctl setageing %(vx_bridge)s 0' % subst, shell=True)
 
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
-            if not os.path.exists('/var/run/netns/%(namespace)s' % subst):
+            if not os.path.exists('/var/run/netns/%(netns)s' % subst):
                 with util.RecordedOperation('create netns', self) as _:
                     processutils.execute(
-                        'ip netns add %(namespace)s' % subst, shell=True)
+                        'ip netns add %(netns)s' % subst, shell=True)
 
             if not util.check_for_interface(subst['vx_veth_outer']):
                 with util.RecordedOperation('create router veth', self) as _:
@@ -143,15 +143,15 @@ class Network(object):
                         'ip link add %(vx_veth_outer)s type veth peer name %(vx_veth_inner)s' % subst,
                         shell=True)
                     processutils.execute(
-                        'ip link set %(vx_veth_inner)s netns %(namespace)s' % subst, shell=True)
+                        'ip link set %(vx_veth_inner)s netns %(netns)s' % subst, shell=True)
                     processutils.execute(
                         'brctl addif %(vx_bridge)s %(vx_veth_outer)s' % subst, shell=True)
                     processutils.execute(
                         'ip link set %(vx_veth_outer)s up' % subst, shell=True)
                     processutils.execute(
-                        '%(in_namespace)s ip link set %(vx_veth_inner)s up' % subst, shell=True)
+                        '%(in_netns)s ip link set %(vx_veth_inner)s up' % subst, shell=True)
                     processutils.execute(
-                        '%(in_namespace)s ip addr add %(router)s/%(netmask)s dev %(vx_veth_inner)s' % subst,
+                        '%(in_netns)s ip addr add %(router)s/%(netmask)s dev %(vx_veth_inner)s' % subst,
                         shell=True)
 
             if not util.check_for_interface(subst['physical_veth_outer']):
@@ -166,7 +166,7 @@ class Network(object):
                     processutils.execute(
                         'ip link set %(physical_veth_outer)s up' % subst, shell=True)
                     processutils.execute(
-                        'ip link set %(physical_veth_inner)s netns %(namespace)s' % subst,
+                        'ip link set %(physical_veth_inner)s netns %(netns)s' % subst,
                         shell=True)
 
             self.deploy_nat()
@@ -205,16 +205,16 @@ class Network(object):
 
         with etcd.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
             if not subst['floating_gateway'] in list(util.get_interface_addresses(
-                    subst['namespace'], subst['physical_veth_inner'])):
+                    subst['netns'], subst['physical_veth_inner'])):
                 with util.RecordedOperation('enable virtual routing', self) as _:
                     processutils.execute(
-                        '%(in_namespace)s ip addr add %(floating_gateway)s/%(floating_netmask)s '
+                        '%(in_netns)s ip addr add %(floating_gateway)s/%(floating_netmask)s '
                         'dev %(physical_veth_inner)s' % subst,
                         shell=True)
                     processutils.execute(
-                        '%(in_namespace)s ip link set %(physical_veth_inner)s up' % subst, shell=True)
+                        '%(in_netns)s ip link set %(physical_veth_inner)s up' % subst, shell=True)
                     processutils.execute(
-                        '%(in_namespace)s route add default gw %(floating_router)s' % subst,
+                        '%(in_netns)s route add default gw %(floating_router)s' % subst,
                         shell=True)
 
             if not util.nat_rules_for_ipblock(self.network_address):
@@ -222,15 +222,15 @@ class Network(object):
                     processutils.execute(
                         'echo 1 > /proc/sys/net/ipv4/ip_forward', shell=True)
                     processutils.execute(
-                        '%(in_namespace)s iptables -A FORWARD -o %(physical_veth_inner)s '
+                        '%(in_netns)s iptables -A FORWARD -o %(physical_veth_inner)s '
                         '-i %(vx_veth_inner)s -j ACCEPT' % subst,
                         shell=True)
                     processutils.execute(
-                        '%(in_namespace)s iptables -A FORWARD -i %(physical_veth_inner)s '
+                        '%(in_netns)s iptables -A FORWARD -i %(physical_veth_inner)s '
                         '-o %(vx_veth_inner)s -j ACCEPT' % subst,
                         shell=True)
                     processutils.execute(
-                        '%(in_namespace)s iptables -t nat -A POSTROUTING -s %(ipblock)s/%(netmask)s '
+                        '%(in_netns)s iptables -t nat -A POSTROUTING -s %(ipblock)s/%(netmask)s '
                         '-o %(physical_veth_inner)s -j MASQUERADE' % subst,
                         shell=True
                     )
@@ -262,9 +262,9 @@ class Network(object):
                         processutils.execute('ip link delete %(physical_veth_outer)s' % subst,
                                              shell=True)
 
-                if os.path.exists('/var/run/netns/%(namespace)s' % subst):
+                if os.path.exists('/var/run/netns/%(netns)s' % subst):
                     with util.RecordedOperation('delete netns', self) as _:
-                        processutils.execute('ip netns del %(namespace)s' % subst,
+                        processutils.execute('ip netns del %(netns)s' % subst,
                                              shell=True)
 
                 if self.floating_gateway:
@@ -392,7 +392,7 @@ class Network(object):
             'dev %(physical_veth_outer)s' % subst,
             shell=True)
         processutils.execute(
-            '%(in_namespace)s iptables -t nat -A PREROUTING '
+            '%(in_netns)s iptables -t nat -A PREROUTING '
             '-d %(floating_address)s -j DNAT --to-destination %(inner_address)s' % subst,
             shell=True)
 
@@ -408,6 +408,6 @@ class Network(object):
             'dev %(physical_veth_outer)s' % subst,
             shell=True)
         processutils.execute(
-            '%(in_namespace)s iptables -t nat -D PREROUTING '
+            '%(in_netns)s iptables -t nat -D PREROUTING '
             '-d %(floating_address)s -j DNAT --to-destination %(inner_address)s' % subst,
             shell=True)

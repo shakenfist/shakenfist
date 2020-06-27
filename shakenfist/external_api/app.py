@@ -287,7 +287,7 @@ class Root(Resource):
 
 class Auth(Resource):
     def _get_keys(self, namespace):
-        rec = etcd.get('namespaces', None, namespace)
+        rec = etcd.get('namespace', None, namespace)
         if not rec:
             return (None, [])
 
@@ -323,8 +323,8 @@ class AuthNamespaces(Resource):
         if not key:
             return error(400, 'no key specified')
 
-        with etcd.get_lock('namespaces') as _:
-            rec = etcd.get('namespaces', None, namespace)
+        with etcd.get_lock('sf/namespace') as _:
+            rec = etcd.get('namespace', None, namespace)
             if not rec:
                 rec = {
                     'name': namespace,
@@ -334,7 +334,7 @@ class AuthNamespaces(Resource):
             encoded = str(base64.b64encode(bcrypt.hashpw(
                 key.encode('utf-8'), bcrypt.gensalt())), 'utf-8')
             rec['keys'][key_name] = encoded
-            etcd.put('namespaces', None, namespace, rec)
+            etcd.put('namespace', None, namespace, rec)
 
         return namespace
 
@@ -342,7 +342,7 @@ class AuthNamespaces(Resource):
     @caller_is_admin
     def get(self):
         out = []
-        for rec in etcd.get_all('namespaces', None):
+        for rec in etcd.get_all('namespace', None):
             out.append(rec['name'])
         return out
 
@@ -354,15 +354,35 @@ class AuthNamespace(Resource):
         if not namespace:
             return error(400, 'no namespace specified')
         if namespace == 'system':
-            return error(400, 'you cannot delete the system namespace')
+            return error(403, 'you cannot delete the system namespace')
 
         # The namespace must be empty
-        if len(db.get_instances(all=True, namespace=namespace)) > 0:
+        instances = []
+        deleted_instances = []
+        for i in db.get_instances(all=True, namespace=namespace):
+            if i['state'] == 'deleted':
+                deleted_instances.append(i['uuid'])
+            else:
+                instances.append(i['uuid'])
+        if len(instances) > 0:
             return error(400, 'you cannot delete a namespace with instances')
-        if len(db.get_networks(all=True, namespace=namespace)) > 0:
+
+        networks = []
+        deleted_networks = []
+        for n in db.get_networks(all=True, namespace=namespace):
+            if n['state'] == 'deleted':
+                deleted_networks.append(n['uuid'])
+            else:
+                networks.append(n['uuid'])
+        if len(networks) > 0:
             return error(400, 'you cannot delete a namespace with networks')
 
-        etcd.delete('namespaces', None, namespace)
+        for instance_uuid in deleted_instances:
+            db.hard_delete_instance(instance_uuid)
+        for network_uuid in deleted_networks:
+            db.hard_delete_network(network_uuid)
+
+        etcd.delete('namespace', None, namespace)
 
 
 class AuthNamespaceKey(Resource):
@@ -374,13 +394,13 @@ class AuthNamespaceKey(Resource):
         if not key_name:
             return error(400, 'no key name specified')
 
-        with etcd.get_lock('namespaces/%s' % namespace) as _:
-            ns = etcd.get('namespaces', None, namespace)
+        with etcd.get_lock('sf/namespace/%s' % namespace) as _:
+            ns = etcd.get('namespace', None, namespace)
             if ns.get('keys') and key_name in ns['keys']:
                 del ns['keys'][key_name]
             else:
                 return error(404, 'key name not found in namespace')
-            etcd.put('namespaces', None, namespace, ns)
+            etcd.put('namespace', None, namespace, ns)
 
 
 class Instance(Resource):
@@ -397,39 +417,41 @@ class Instance(Resource):
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def delete(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
-        db.add_event('instance', instance_uuid, 'api', 'delete', None, None)
+        with etcd.get_lock('/sf/instance/%s' % instance_uuid) as _:
+            db.add_event('instance', instance_uuid,
+                         'api', 'delete', None, None)
 
-        instance_networks = []
-        for iface in list(db.get_instance_interfaces(instance_uuid)):
-            if not iface['network_uuid'] in instance_networks:
-                instance_networks.append(iface['network_uuid'])
-                db.update_network_interface_state(iface['uuid'], 'deleted')
+            instance_networks = []
+            for iface in list(db.get_instance_interfaces(instance_uuid)):
+                if not iface['network_uuid'] in instance_networks:
+                    instance_networks.append(iface['network_uuid'])
+                    db.update_network_interface_state(iface['uuid'], 'deleted')
 
-        host_networks = []
-        for inst in list(db.get_instances(only_node=config.parsed.get('NODE_NAME'))):
-            if not inst['uuid'] == instance_uuid:
-                for iface in db.get_instance_interfaces(inst['uuid']):
-                    if not iface['network_uuid'] in host_networks:
-                        host_networks.append(iface['network_uuid'])
+            host_networks = []
+            for inst in list(db.get_instances(only_node=config.parsed.get('NODE_NAME'))):
+                if not inst['uuid'] == instance_uuid:
+                    for iface in db.get_instance_interfaces(inst['uuid']):
+                        if not iface['network_uuid'] in host_networks:
+                            host_networks.append(iface['network_uuid'])
 
-        instance_from_db_virt.delete()
+            instance_from_db_virt.delete()
 
-        for network in instance_networks:
-            n = net.from_db(network)
-            if n:
-                if network in host_networks:
-                    with util.RecordedOperation('deallocate ip address',
-                                                instance_from_db_virt) as _:
-                        n.update_dhcp()
-                else:
-                    with util.RecordedOperation('remove network', n) as _:
-                        n.delete()
+            for network in instance_networks:
+                n = net.from_db(network)
+                if n:
+                    if network in host_networks:
+                        with util.RecordedOperation('deallocate ip address',
+                                                    instance_from_db_virt) as _:
+                            n.update_dhcp()
+                    else:
+                        with util.RecordedOperation('remove network', n) as _:
+                            n.delete()
 
 
 class Instances(Resource):
     @jwt_required
     def get(self, all=False):
-        return db.get_instances(all=all, namespace=get_jwt_identity())
+        return list(db.get_instances(all=all, namespace=get_jwt_identity()))
 
     @jwt_required
     def post(self, name=None, cpus=None, memory=None, network=None,
@@ -455,7 +477,7 @@ class Instances(Resource):
         # Create instance object
         instance = virt.from_db(instance_uuid)
         if instance:
-            if get_jwt_identity() not in [instance['namespace'], 'system']:
+            if get_jwt_identity() not in [instance.db_entry['namespace'], 'system']:
                 LOG.info(
                     'instance(%s): instance not found, ownership test' % instance_uuid)
                 return error(404, 'instance not found')
@@ -506,17 +528,17 @@ class Instances(Resource):
             body = flask_get_post_body()
             body['placed_on'] = placed_on
             body['instance_uuid'] = instance_uuid
+            body['namespace'] = namespace
 
-            admin_token = util.get_api_token(
-                'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
-                                  config.parsed.get('API_PORT')),
-                namespace='system')
+            token = util.get_api_token(
+                'http://%s:%d' % (placed_on, config.parsed.get('API_PORT')),
+                namespace=namespace)
             r = requests.request('POST',
                                  'http://%s:%d/instances'
                                  % (placed_on,
                                     config.parsed.get('API_PORT')),
                                  data=json.dumps(body),
-                                 headers={'Authorization': admin_token,
+                                 headers={'Authorization': token,
                                           'User-Agent': util.get_user_agent()})
 
             LOG.info('Returning proxied request: %d, %s'
@@ -576,19 +598,20 @@ class Instances(Resource):
             order += 1
 
         # Now we can start the instance
-        with util.RecordedOperation('ensure networks exist', instance) as _:
-            for network_uuid in nets:
-                n = nets[network_uuid]
-                n.ensure_mesh()
-                n.update_dhcp()
+        with etcd.get_lock('sf/instance/%s' % instance.db_entry['uuid'], ttl=900) as lock:
+            with util.RecordedOperation('ensure networks exist', instance) as _:
+                for network_uuid in nets:
+                    n = nets[network_uuid]
+                    n.ensure_mesh()
+                    n.update_dhcp()
 
-        with util.RecordedOperation('instance creation', instance) as _:
-            instance.create()
+            with util.RecordedOperation('instance creation', instance) as _:
+                instance.create(lock=lock)
 
-        for iface in db.get_instance_interfaces(instance.db_entry['uuid']):
-            db.update_network_interface_state(iface['uuid'], 'created')
+            for iface in db.get_instance_interfaces(instance.db_entry['uuid']):
+                db.update_network_interface_state(iface['uuid'], 'created')
 
-        return db.get_instance(instance_uuid)
+            return db.get_instance(instance_uuid)
 
 
 class InstanceInterfaces(Resource):
@@ -810,7 +833,7 @@ class InstanceMetadata(Resource):
         if not value:
             return error(400, 'no value specified')
 
-        with etcd.get_lock('metadata/instance/%s' % instance_uuid) as _:
+        with etcd.get_lock('sf/metadata/instance/%s' % instance_uuid) as _:
             md = etcd.get('metadata', 'instance', instance_uuid)
             md['key'] = value
             etcd.put('metadata', 'instance', instance_uuid, md)
@@ -874,7 +897,7 @@ class Networks(Resource):
     })
     @jwt_required
     def get(self, all=False):
-        return db.get_networks(all=all, namespace=get_jwt_identity())
+        return list(db.get_networks(all=all, namespace=get_jwt_identity()))
 
     @jwt_required
     def post(self, netblock=None, provide_dhcp=None, provide_nat=None, name=None,
@@ -908,7 +931,7 @@ class Networks(Resource):
             admin_token = util.get_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
                                   config.parsed.get('API_PORT')),
-                namespace='system')
+                namespace=namespace)
             requests.request(
                 'put',
                 ('http://%s:%d/deploy_network_node'

@@ -131,7 +131,7 @@ class Instance(object):
 
         self.db_entry['block_devices']['finalized'] = False
 
-    def create(self):
+    def create(self, lock=None):
         # Ensure we have state on disk
         if not os.path.exists(self.instance_path):
             LOG.debug('%s: Creating instance storage at %s' %
@@ -149,7 +149,8 @@ class Instance(object):
             for disk in self.db_entry['block_devices']['devices']:
                 if disk.get('base'):
                     with util.RecordedOperation('fetch image', self) as _:
-                        hashed_image_path = images.fetch_image(disk['base'])
+                        hashed_image_path = images.fetch_image(
+                            disk['base'], lock=lock)
 
                     try:
                         cd = pycdlib.PyCdlib()
@@ -168,18 +169,35 @@ class Instance(object):
                             os.link(hashed_image_path, disk['path'])
                         except OSError:
                             # Different filesystems
+                            if lock:
+                                lock.refresh()
+
                             shutil.copyfile(hashed_image_path, disk['path'])
+
+                            if lock:
+                                lock.refresh()
 
                         # Due to limitations in some installers, cdroms are always on IDE
                         disk['device'] = 'hd%s' % disk['device'][-1]
                         disk['bus'] = 'ide'
                     else:
                         with util.RecordedOperation('transcode image', self) as _:
+                            if lock:
+                                lock.refresh()
+
                             images.transcode_image(hashed_image_path)
+
                         with util.RecordedOperation('resize image', self) as _:
+                            if lock:
+                                lock.refresh()
+
                             resized_image_path = images.resize_image(
                                 hashed_image_path, disk['size'])
+
                         with util.RecordedOperation('create copy on write layer', self) as _:
+                            if lock:
+                                lock.refresh
+
                             images.create_cow(resized_image_path, disk['path'])
 
                 elif not os.path.exists(disk['path']):
@@ -188,6 +206,7 @@ class Instance(object):
                                          shell=True)
 
                 modified_disks.append(disk)
+
             self.db_entry['block_devices']['devices'] = modified_disks
             self.db_entry['block_devices']['finalized'] = True
 

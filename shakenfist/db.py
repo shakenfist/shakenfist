@@ -73,7 +73,7 @@ def allocate_network(netblock, provide_dhcp=True, provide_nat=False, name=None,
     ipm = ipmanager.NetBlock(netblock)
     etcd.put('ipmanager', None, netid, ipm.save())
 
-    with etcd.get_lock('vxlan') as _:
+    with etcd.get_lock('sf/vxlan') as _:
         vxid = 1
         while etcd.get('vxlan', None, vxid):
             vxid += 1
@@ -122,6 +122,7 @@ def get_stale_networks(delay):
 def hard_delete_network(network_uuid):
     see_this_node()
     etcd.delete('network', None, network_uuid)
+    etcd.delete_all('event/network', network_uuid)
 
 
 def create_floating_network(netblock):
@@ -230,6 +231,7 @@ def update_instance_state(instance_uuid, state):
 def hard_delete_instance(instance_uuid):
     see_this_node()
     etcd.delete('instance', None, instance_uuid)
+    etcd.delete_all('event/instance', instance_uuid)
 
 
 def get_stale_instances(delay):
@@ -243,7 +245,7 @@ def get_stale_instances(delay):
 def create_network_interface(interface_uuid, netdesc, instance_uuid, order):
     see_this_node()
     if 'macaddress' not in netdesc or not netdesc['macaddress']:
-        with etcd.get_lock('macaddress', ttl=120) as _:
+        with etcd.get_lock('sf/macaddress', ttl=120) as _:
             possible_mac = str(randmac.RandMac(
                 '00:00:00:00:00:00', False)).lstrip('\'').rstrip('\'')
             while etcd.get('macaddress', None, possible_mac):
@@ -274,6 +276,7 @@ def create_network_interface(interface_uuid, netdesc, instance_uuid, order):
 def hard_delete_network_interface(interface_uuid):
     see_this_node()
     etcd.delete('networkinterface', None, interface_uuid)
+    etcd.delete_all('event/networkinterface', interface_uuid)
 
 
 def get_instance_interfaces(instance_uuid):
@@ -389,7 +392,7 @@ def get_metrics(fqdn):
 def allocate_console_port(instance_uuid):
     see_this_node()
     node = config.parsed.get('NODE_NAME')
-    with etcd.get_lock('console/%s' % node) as _:
+    with etcd.get_lock('sf/console/%s' % node) as _:
         consumed = []
         for value in etcd.get_all('console', node):
             consumed.append(value['port'])
@@ -410,5 +413,5 @@ def allocate_console_port(instance_uuid):
 def free_console_port(port):
     see_this_node()
     node = config.parsed.get('NODE_NAME')
-    with etcd.get_lock('console/%s' % node) as _:
+    with etcd.get_lock('sf/console/%s' % node) as _:
         etcd.delete('console', node, str(port))

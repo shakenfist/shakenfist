@@ -53,6 +53,7 @@ def restore_instances():
                 i.create()
             except Exception as e:
                 LOG.error('%s Failed to restore instance: %s' % (i, e))
+                db.update_instance_state(instance, 'error')
 
 
 def main():

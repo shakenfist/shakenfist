@@ -366,6 +366,7 @@ def _show_instance(ctx, i, include_snapshots=False):
     print(format_string % ('memory', i['memory']))
     print(format_string % ('disk spec', i['disk_spec']))
     print(format_string % ('node', i['node']))
+    print(format_string % ('state', i['state']))
 
     # NOTE(mikal): I am not sure we should expose this, but it will do
     # for now until a proxy is written.

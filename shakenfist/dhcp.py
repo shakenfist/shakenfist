@@ -34,7 +34,7 @@ class DHCP(object):
             'netmask': n.netmask,
             'broadcast': n.broadcast,
 
-            'in_namespace': 'ip netns exec %s' % self.network_uuid,
+            'in_netns': 'ip netns exec %s' % self.network_uuid,
             'interface': interface
         }
 
@@ -111,5 +111,5 @@ class DHCP(object):
         self._make_hosts()
         if not self._send_signal(signal.SIGHUP):
             processutils.execute(
-                '%(in_namespace)s dnsmasq --conf-file=%(config_dir)s/config' % self.subst,
+                '%(in_netns)s dnsmasq --conf-file=%(config_dir)s/config' % self.subst,
                 shell=True)
