@@ -417,33 +417,35 @@ class Instance(Resource):
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def delete(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
-        db.add_event('instance', instance_uuid, 'api', 'delete', None, None)
+        with etcd.get_lock('/sf/instances/%s' % instance_uuid) as _:
+            db.add_event('instance', instance_uuid,
+                         'api', 'delete', None, None)
 
-        instance_networks = []
-        for iface in list(db.get_instance_interfaces(instance_uuid)):
-            if not iface['network_uuid'] in instance_networks:
-                instance_networks.append(iface['network_uuid'])
-                db.update_network_interface_state(iface['uuid'], 'deleted')
+            instance_networks = []
+            for iface in list(db.get_instance_interfaces(instance_uuid)):
+                if not iface['network_uuid'] in instance_networks:
+                    instance_networks.append(iface['network_uuid'])
+                    db.update_network_interface_state(iface['uuid'], 'deleted')
 
-        host_networks = []
-        for inst in list(db.get_instances(only_node=config.parsed.get('NODE_NAME'))):
-            if not inst['uuid'] == instance_uuid:
-                for iface in db.get_instance_interfaces(inst['uuid']):
-                    if not iface['network_uuid'] in host_networks:
-                        host_networks.append(iface['network_uuid'])
+            host_networks = []
+            for inst in list(db.get_instances(only_node=config.parsed.get('NODE_NAME'))):
+                if not inst['uuid'] == instance_uuid:
+                    for iface in db.get_instance_interfaces(inst['uuid']):
+                        if not iface['network_uuid'] in host_networks:
+                            host_networks.append(iface['network_uuid'])
 
-        instance_from_db_virt.delete()
+            instance_from_db_virt.delete()
 
-        for network in instance_networks:
-            n = net.from_db(network)
-            if n:
-                if network in host_networks:
-                    with util.RecordedOperation('deallocate ip address',
-                                                instance_from_db_virt) as _:
-                        n.update_dhcp()
-                else:
-                    with util.RecordedOperation('remove network', n) as _:
-                        n.delete()
+            for network in instance_networks:
+                n = net.from_db(network)
+                if n:
+                    if network in host_networks:
+                        with util.RecordedOperation('deallocate ip address',
+                                                    instance_from_db_virt) as _:
+                            n.update_dhcp()
+                    else:
+                        with util.RecordedOperation('remove network', n) as _:
+                            n.delete()
 
 
 class Instances(Resource):
@@ -453,7 +455,7 @@ class Instances(Resource):
 
     @jwt_required
     def post(self, name=None, cpus=None, memory=None, network=None,
-             disk=None, ssh_key=None, user_data=None, placed_on=None, namespace=None,
+             disk=None, ssh_key=None, user_data=None, placed_on=None, namespace=None, create_instance
              instance_uuid=None):
         global SCHEDULER
 
@@ -596,19 +598,20 @@ class Instances(Resource):
             order += 1
 
         # Now we can start the instance
-        with util.RecordedOperation('ensure networks exist', instance) as _:
-            for network_uuid in nets:
-                n = nets[network_uuid]
-                n.ensure_mesh()
-                n.update_dhcp()
+        with etcd.get_lock('instance/%s' % instance.db_entry['uuid'], ttl=900) as lock:
+            with util.RecordedOperation('ensure networks exist', instance) as _:
+                for network_uuid in nets:
+                    n = nets[network_uuid]
+                    n.ensure_mesh()
+                    n.update_dhcp()
 
-        with util.RecordedOperation('instance creation', instance) as _:
-            instance.create()
+            with util.RecordedOperation('instance creation', instance) as _:
+                instance.create(lock=lock)
 
-        for iface in db.get_instance_interfaces(instance.db_entry['uuid']):
-            db.update_network_interface_state(iface['uuid'], 'created')
+            for iface in db.get_instance_interfaces(instance.db_entry['uuid']):
+                db.update_network_interface_state(iface['uuid'], 'created')
 
-        return db.get_instance(instance_uuid)
+            return db.get_instance(instance_uuid)
 
 
 class InstanceInterfaces(Resource):
