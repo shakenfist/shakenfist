@@ -121,7 +121,7 @@ def get_api_token(base_url, namespace='system'):
     with etcd.get_lock('sf/namespace/%s' % namespace) as _:
         auth_url = base_url + '/auth'
         LOG.info('Fetching %s auth token from %s' % (namespace, auth_url))
-        ns = etcd.get('namespaces', None, namespace)
+        ns = etcd.get('namespace', None, namespace)
         if 'service_key' in ns:
             key = ns['service_key']
         else:
