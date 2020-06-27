@@ -455,7 +455,7 @@ class Instances(Resource):
 
     @jwt_required
     def post(self, name=None, cpus=None, memory=None, network=None,
-             disk=None, ssh_key=None, user_data=None, placed_on=None, namespace=None, create_instance
+             disk=None, ssh_key=None, user_data=None, placed_on=None, namespace=None,
              instance_uuid=None):
         global SCHEDULER
 
