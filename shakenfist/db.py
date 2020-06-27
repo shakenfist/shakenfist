@@ -146,7 +146,10 @@ def create_floating_network(netblock):
 
 def get_ipmanager(network_uuid):
     see_this_node()
-    return ipmanager.from_db(etcd.get('ipmanager', None, network_uuid))
+    ipm = etcd.get('ipmanager', None, network_uuid)
+    if not ipm:
+        raise Exception('IP Manager not found for network %s' % network_uuid)
+    return ipmanager.from_db(ipm)
 
 
 def persist_ipmanager(network_uuid, data):
