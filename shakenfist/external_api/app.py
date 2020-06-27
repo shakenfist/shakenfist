@@ -475,7 +475,7 @@ class Instances(Resource):
         # Create instance object
         instance = virt.from_db(instance_uuid)
         if instance:
-            if get_jwt_identity() not in [instance['namespace'], 'system']:
+            if get_jwt_identity() not in [instance.db_entry['namespace'], 'system']:
                 LOG.info(
                     'instance(%s): instance not found, ownership test' % instance_uuid)
                 return error(404, 'instance not found')
