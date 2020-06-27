@@ -287,7 +287,7 @@ class Root(Resource):
 
 class Auth(Resource):
     def _get_keys(self, namespace):
-        rec = etcd.get('namespaces', None, namespace)
+        rec = etcd.get('namespace', None, namespace)
         if not rec:
             return (None, [])
 
@@ -323,8 +323,8 @@ class AuthNamespaces(Resource):
         if not key:
             return error(400, 'no key specified')
 
-        with etcd.get_lock('namespaces') as _:
-            rec = etcd.get('namespaces', None, namespace)
+        with etcd.get_lock('sf/namespace') as _:
+            rec = etcd.get('namespace', None, namespace)
             if not rec:
                 rec = {
                     'name': namespace,
@@ -334,7 +334,7 @@ class AuthNamespaces(Resource):
             encoded = str(base64.b64encode(bcrypt.hashpw(
                 key.encode('utf-8'), bcrypt.gensalt())), 'utf-8')
             rec['keys'][key_name] = encoded
-            etcd.put('namespaces', None, namespace, rec)
+            etcd.put('namespace', None, namespace, rec)
 
         return namespace
 
@@ -342,7 +342,7 @@ class AuthNamespaces(Resource):
     @caller_is_admin
     def get(self):
         out = []
-        for rec in etcd.get_all('namespaces', None):
+        for rec in etcd.get_all('namespace', None):
             out.append(rec['name'])
         return out
 
@@ -382,7 +382,7 @@ class AuthNamespace(Resource):
         for network_uuid in deleted_networks:
             db.hard_delete_network(network_uuid)
 
-        etcd.delete('namespaces', None, namespace)
+        etcd.delete('namespace', None, namespace)
 
 
 class AuthNamespaceKey(Resource):
@@ -394,13 +394,13 @@ class AuthNamespaceKey(Resource):
         if not key_name:
             return error(400, 'no key name specified')
 
-        with etcd.get_lock('namespaces/%s' % namespace) as _:
-            ns = etcd.get('namespaces', None, namespace)
+        with etcd.get_lock('sf/namespace/%s' % namespace) as _:
+            ns = etcd.get('namespace', None, namespace)
             if ns.get('keys') and key_name in ns['keys']:
                 del ns['keys'][key_name]
             else:
                 return error(404, 'key name not found in namespace')
-            etcd.put('namespaces', None, namespace, ns)
+            etcd.put('namespace', None, namespace, ns)
 
 
 class Instance(Resource):
@@ -417,7 +417,7 @@ class Instance(Resource):
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def delete(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
-        with etcd.get_lock('/sf/instances/%s' % instance_uuid) as _:
+        with etcd.get_lock('/sf/instance/%s' % instance_uuid) as _:
             db.add_event('instance', instance_uuid,
                          'api', 'delete', None, None)
 
@@ -598,7 +598,7 @@ class Instances(Resource):
             order += 1
 
         # Now we can start the instance
-        with etcd.get_lock('instance/%s' % instance.db_entry['uuid'], ttl=900) as lock:
+        with etcd.get_lock('sf/instance/%s' % instance.db_entry['uuid'], ttl=900) as lock:
             with util.RecordedOperation('ensure networks exist', instance) as _:
                 for network_uuid in nets:
                     n = nets[network_uuid]
@@ -833,7 +833,7 @@ class InstanceMetadata(Resource):
         if not value:
             return error(400, 'no value specified')
 
-        with etcd.get_lock('metadata/instance/%s' % instance_uuid) as _:
+        with etcd.get_lock('sf/metadata/instance/%s' % instance_uuid) as _:
             md = etcd.get('metadata', 'instance', instance_uuid)
             md['key'] = value
             etcd.put('metadata', 'instance', instance_uuid, md)

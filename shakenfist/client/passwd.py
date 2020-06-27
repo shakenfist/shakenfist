@@ -17,7 +17,7 @@ def main():
     encoded = str(base64.b64encode(bcrypt.hashpw(
         sys.argv[2].encode('utf-8'), bcrypt.gensalt())), 'utf-8')
 
-    etcd.put('namespaces', None, 'system',
+    etcd.put('namespace', None, 'system',
              {
                  'name': 'system',
                  'keys': {
