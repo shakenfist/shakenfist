@@ -526,10 +526,10 @@ class Instances(Resource):
             body = flask_get_post_body()
             body['placed_on'] = placed_on
             body['instance_uuid'] = instance_uuid
+            body['namespace'] = namespace
 
             token = util.get_api_token(
-                'http://%s:%d' % (config.parsed.get('NODE_NAME'),
-                                  config.parsed.get('API_PORT')),
+                'http://%s:%d' % (placed_on, config.parsed.get('API_PORT')),
                 namespace=namespace)
             r = requests.request('POST',
                                  'http://%s:%d/instances'
