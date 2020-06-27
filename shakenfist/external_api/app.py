@@ -357,10 +357,21 @@ class AuthNamespace(Resource):
             return error(400, 'you cannot delete the system namespace')
 
         # The namespace must be empty
-        if len(list(db.get_instances(all=True, namespace=namespace))) > 0:
+        instances = []
+        deleted_instances = []
+        for i in db.get_instances(all=True, namespace=namespace):
+            if i['state'] == 'deleted':
+                deleted_instances.append(i['uuid'])
+            else:
+                instances.append(i['uuid'])
+        if len(instances) > 0:
             return error(400, 'you cannot delete a namespace with instances')
+
         if len(list(db.get_networks(all=True, namespace=namespace))) > 0:
             return error(400, 'you cannot delete a namespace with networks')
+
+        for instance_uuid in deleted_instances:
+            db.hard_delete_instance(instance_uuid)
 
         etcd.delete('namespaces', None, namespace)
 
