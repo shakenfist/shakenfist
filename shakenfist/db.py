@@ -122,6 +122,7 @@ def get_stale_networks(delay):
 def hard_delete_network(network_uuid):
     see_this_node()
     etcd.delete('network', None, network_uuid)
+    etcd.delete_all('event/network', network_uuid)
 
 
 def create_floating_network(netblock):
@@ -230,6 +231,7 @@ def update_instance_state(instance_uuid, state):
 def hard_delete_instance(instance_uuid):
     see_this_node()
     etcd.delete('instance', None, instance_uuid)
+    etcd.delete_all('event/instance', instance_uuid)
 
 
 def get_stale_instances(delay):
@@ -274,6 +276,7 @@ def create_network_interface(interface_uuid, netdesc, instance_uuid, order):
 def hard_delete_network_interface(interface_uuid):
     see_this_node()
     etcd.delete('networkinterface', None, interface_uuid)
+    etcd.delete_all('event/networkinterface', interface_uuid)
 
 
 def get_instance_interfaces(instance_uuid):

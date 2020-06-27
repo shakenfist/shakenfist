@@ -105,3 +105,17 @@ def delete(objecttype, subtype, name):
             LOG.debug('Deleted etcd key "%s"' % path)
 
     raise WriteException('Cannot delete "%s"' % path)
+
+
+def delete_all(objecttype, subtype, sort_order=None):
+    path = _construct_key(objecttype, subtype, None)
+    for attempt in range(3):
+        try:
+            etcd3.client().delete_prefix(path)
+        except Exception as e:
+            LOG.info('Failed to delete all %s, attempt %d: %s'
+                     % (path, attempt, e))
+        finally:
+            LOG.debug('Deleted etcd range "%s"' % path)
+
+    raise WriteException('Cannot delete all "%s"' % path)
