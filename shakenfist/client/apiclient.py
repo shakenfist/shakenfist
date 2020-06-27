@@ -279,7 +279,7 @@ class Client(object):
 
     def delete_namespace(self, namespace):
         # Ensure the namespace is empty first
-        for i in self.get_instances():
+        for i in self.get_instances(all=True):
             self.delete_instance(i['uuid'])
         for n in self.get_networks():
             self.delete_network(n['uuid'])
