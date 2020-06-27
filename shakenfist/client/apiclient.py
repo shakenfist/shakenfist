@@ -278,6 +278,13 @@ class Client(object):
         return r.json()
 
     def delete_namespace(self, namespace):
+        if not namespace:
+            namespace = self.namespace
+
+        if namespace == 'system':
+            raise ResourceCannotBeDeletedException(
+                'you cannot delete the system namespace')
+
         # Ensure the namespace is empty first
         for i in self.get_instances(all=True):
             self.delete_instance(i['uuid'])

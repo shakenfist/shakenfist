@@ -928,7 +928,7 @@ class Networks(Resource):
             admin_token = util.get_api_token(
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
                                   config.parsed.get('API_PORT')),
-                namespace='system')
+                namespace=namespace)
             requests.request(
                 'put',
                 ('http://%s:%d/deploy_network_node'
