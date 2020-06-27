@@ -354,7 +354,7 @@ class AuthNamespace(Resource):
         if not namespace:
             return error(400, 'no namespace specified')
         if namespace == 'system':
-            return error(400, 'you cannot delete the system namespace')
+            return error(403, 'you cannot delete the system namespace')
 
         # The namespace must be empty
         instances = []
