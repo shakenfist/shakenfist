@@ -527,16 +527,16 @@ class Instances(Resource):
             body['placed_on'] = placed_on
             body['instance_uuid'] = instance_uuid
 
-            admin_token = util.get_api_token(
-                'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
+            token = util.get_api_token(
+                'http://%s:%d' % (config.parsed.get('NODE_NAME'),
                                   config.parsed.get('API_PORT')),
-                namespace='system')
+                namespace=namespace)
             r = requests.request('POST',
                                  'http://%s:%d/instances'
                                  % (placed_on,
                                     config.parsed.get('API_PORT')),
                                  data=json.dumps(body),
-                                 headers={'Authorization': admin_token,
+                                 headers={'Authorization': token,
                                           'User-Agent': util.get_user_agent()})
 
             LOG.info('Returning proxied request: %d, %s'
