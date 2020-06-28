@@ -464,7 +464,6 @@ class Instances(Resource):
         # We need to sanitise the name so its safe for DNS
         name = re.sub(r'([^a-zA-Z0-9_\-])', '', name)
 
-        # Default to the namespace for the identity
         if not namespace:
             namespace = get_jwt_identity()
 
@@ -915,8 +914,6 @@ class Networks(Resource):
         except ValueError as e:
             return error(400, 'cannot parse netblock: %s' % e)
 
-        if namespace != get_jwt_identity() and get_jwt_identity() != 'system':
-            return error(401, 'only admins can create resources in a different namespace')
         if not namespace:
             namespace = get_jwt_identity()
 
