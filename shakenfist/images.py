@@ -9,10 +9,14 @@ import os
 import re
 import requests
 import shutil
+import urllib3
 
 from oslo_concurrency import processutils
 
 from shakenfist import config
+from shakenfist import exceptions
+from shakenfist import image_resolver_cirros
+from shakenfist import image_resolver_ubuntu
 from shakenfist import util
 
 
@@ -21,98 +25,17 @@ LOG.setLevel(logging.INFO)
 LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 
 
-CIRROS_URL = 'http://download.cirros-cloud.net/'
-
-# The official Ubuntu download URL 'https://cloud-images.ubuntu.com' is unreliable.
-# We try it first, but then try an alternative location on failure.
-UBUNTU_URL = 'https://cloud-images.ubuntu.com'
-UBUNTU_DOWNLOAD = '%(base)s/%(vername)s/current/%(vername)s-server-cloudimg-amd64.img'
-UBUNTU_ALTERNATE_DOWNLOAD = ('http://ubuntu.mirrors.tds.net/ubuntu-cloud-images/releases/'
-                             '%(vernum)s/release/ubuntu-%(vernum)s-server-cloudimg-amd64.img')
-
-
-class HTTPError(Exception):
-    pass
-
-
-class VersionSpecificationError(Exception):
-    pass
+resolvers = {
+    'cirros': image_resolver_cirros,
+    'ubuntu': image_resolver_ubuntu
+}
 
 
 def resolve_image(name):
-    if name.startswith('cirros'):
-        return _resolve_cirros(name)
-    if name.startswith('ubuntu'):
-        return _resolve_ubuntu(name)
-    return [name, None]
-
-
-def _resolve_cirros(name):
-    resp = requests.get(CIRROS_URL,
-                        headers={'User-Agent': util.get_user_agent()})
-    if resp.status_code != 200:
-        raise HTTPError('Failed to fetch http://download.cirros-cloud.net/, '
-                        'status code %d' % resp.status_code)
-
-    if name == 'cirros':
-        versions = []
-        dir_re = re.compile(r'.*<a href="([0-9]+\.[0-9]+\.[0-9]+)/">.*/</a>.*')
-        for line in resp.text.split('\n'):
-            m = dir_re.match(line)
-            if m:
-                versions.append(m.group(1))
-        LOG.info('Found cirros versions: %s' % versions)
-        ver = versions[-1]
-    else:
-        try:
-            # Name is assumed to be in the form cirros:0.4.0
-            _, ver = name.split(':')
-        except Exception:
-            raise VersionSpecificationError('Cannot parse version: %s' % name)
-
-    return ['http://download.cirros-cloud.net/%(ver)s/cirros-%(ver)s-x86_64-disk.img'
-            % {'ver': ver}, None]
-
-
-def _resolve_ubuntu(name):
-    resp = requests.get(UBUNTU_URL,
-                        headers={'User-Agent': util.get_user_agent()})
-    if resp.status_code != 200:
-        raise HTTPError('Failed to fetch https://cloud-images.ubuntu.com, '
-                        'status code %d' % resp.status_code)
-
-    num_to_name = {}
-    name_to_num = {}
-    dir_re = re.compile(
-        r'.*<a href="(.*)/">.*Ubuntu Server ([0-9]+\.[0-9]+).*')
-    for line in resp.text.split('\n'):
-        m = dir_re.match(line)
-        if m:
-            num_to_name[m.group(2)] = m.group(1)
-            name_to_num[m.group(1)] = m.group(2)
-    LOG.info('Found ubuntu versions: %s' % num_to_name)
-
-    vernum = None
-    vername = None
-
-    if name == 'ubuntu':
-        vernum = sorted(num_to_name.keys())[-1]
-        vername = num_to_name[vernum]
-    else:
-        try:
-            # Name is assumed to be in the form ubuntu:18.04 or ubuntu:bionic
-            _, version = name.split(':')
-            if version in num_to_name:
-                vernum = version
-                vername = num_to_name[version]
-            else:
-                vername = version
-                vernum = name_to_num[version]
-        except Exception:
-            raise VersionSpecificationError('Cannot parse version: %s' % name)
-
-    return [UBUNTU_DOWNLOAD % {'base': UBUNTU_URL, 'vernum': vernum, 'vername': vername},
-            UBUNTU_ALTERNATE_DOWNLOAD % {'vernum': vernum, 'vername': vername}]
+    for resolver in resolvers:
+        if name.startswith(resolver):
+            return resolvers[resolver].resolve(name)
+    return name
 
 
 def _get_cache_path():
@@ -140,8 +63,9 @@ def _actual_fetch_image(info, info_key, hashed_image_path, lock=None):
                         headers={'User-Agent': util.get_user_agent()})
     try:
         if resp.status_code != 200:
-            raise HTTPError('Failed to fetch HEAD of %s (status code %d)'
-                            % (info[info_key], resp.status_code))
+            raise exceptions.HTTPError(
+                'Failed to fetch HEAD of %s (status code %d)'
+                % (info[info_key], resp.status_code))
 
         image_dirty = False
         for field in VALIDATED_IMAGE_FIELDS:
@@ -171,16 +95,15 @@ def _actual_fetch_image(info, info_key, hashed_image_path, lock=None):
 def fetch_image(image_url, lock=None):
     """Download the image if we don't already have the latest version in cache."""
 
-    image_urls = resolve_image(image_url)
-    hashed_image_url = _hash_image_url(image_urls[0])
+    image_url = resolve_image(image_url)
+    hashed_image_url = _hash_image_url(image_url)
 
     # Populate cache if its empty
     hashed_image_path = os.path.join(_get_cache_path(), hashed_image_url)
 
     if not os.path.exists(hashed_image_path + '.info'):
         info = {
-            'url': image_urls[0],
-            'alternate_url': image_urls[1],
+            'url': image_url,
             'hash': hashed_image_url,
             'version': 0
         }
@@ -189,12 +112,8 @@ def fetch_image(image_url, lock=None):
             info = json.loads(f.read())
 
     fetched = 0
-    try:
-        info, fetched = _actual_fetch_image(
-            info, 'url', hashed_image_path, lock=lock)
-    except requests.exceptions.ConnectionError:
-        info, fetched = _actual_fetch_image(
-            info, 'alternate_url', hashed_image_path)
+    info, fetched = _actual_fetch_image(
+        info, 'url', hashed_image_path, lock=lock)
 
     if fetched > 0:
         with open(hashed_image_path + '.info', 'w') as f:

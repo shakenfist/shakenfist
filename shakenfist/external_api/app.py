@@ -464,14 +464,13 @@ class Instances(Resource):
         # We need to sanitise the name so its safe for DNS
         name = re.sub(r'([^a-zA-Z0-9_\-])', '', name)
 
-        # Default to the namespace for the identity
         if not namespace:
             namespace = get_jwt_identity()
 
         # If accessing a foreign namespace, we need to be an admin
         if get_jwt_identity() not in [namespace, 'system']:
             return error(401,
-                'only admins can create resources in a different namespace')
+                         'only admins can create resources in a different namespace')
 
         # The instance needs to exist in the DB before network interfaces are created
         if not instance_uuid:
@@ -582,6 +581,8 @@ class Instances(Resource):
 
             with etcd.get_lock('sf/ipmanager/%s' % netdesc['network_uuid'],
                                ttl=120) as _:
+                db.add_event('network', netdesc['network_uuid'], 'allocate address',
+                             None, None, instance_uuid)
                 allocations.setdefault(netdesc['network_uuid'], [])
                 ipm = db.get_ipmanager(netdesc['network_uuid'])
                 if 'address' not in netdesc or not netdesc['address']:
@@ -903,17 +904,18 @@ class Network(Resource):
         if len(list(db.get_network_interfaces(network_uuid))) > 0:
             return error(403, 'you cannot delete an in use network')
 
-        n = net.from_db(network_uuid)
-        n.remove_dhcp()
-        n.delete()
+        with etcd.get_lock('sf/network/%s' % network_uuid, ttl=900) as _:
+            n = net.from_db(network_uuid)
+            n.remove_dhcp()
+            n.delete()
 
-        if n.floating_gateway:
-            with etcd.get_lock('sf/ipmanager/floating', ttl=120) as _:
-                ipm = db.get_ipmanager('floating')
-                ipm.release(n.floating_gateway)
-                db.persist_ipmanager('floating', ipm.save())
+            if n.floating_gateway:
+                with etcd.get_lock('sf/ipmanager/floating', ttl=120) as _:
+                    ipm = db.get_ipmanager('floating')
+                    ipm.release(n.floating_gateway)
+                    db.persist_ipmanager('floating', ipm.save())
 
-        db.update_network_state(network_uuid, 'deleted')
+            db.update_network_state(network_uuid, 'deleted')
 
 
 class Networks(Resource):
@@ -938,14 +940,13 @@ class Networks(Resource):
         except ValueError as e:
             return error(400, 'cannot parse netblock: %s' % e)
 
-        # Default to the namespace for the identity
         if not namespace:
             namespace = get_jwt_identity()
 
         # If accessing a foreign name namespace, we need to be an admin
         if get_jwt_identity() not in [namespace, 'system']:
             return error(401,
-                'only admins can create resources in a different namespace')
+                         'only admins can create resources in a different namespace')
 
         network = db.allocate_network(netblock, provide_dhcp,
                                       provide_nat, name, namespace)
@@ -953,30 +954,33 @@ class Networks(Resource):
                      'api', 'create', None, None)
 
         # Networks should immediately appear on the network node
-        if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
-            n = net.from_db(network['uuid'])
-            if not n:
-                LOG.info('network(%s): network not found, genuinely missing'
-                         % network['uuid'])
-                return error(404, 'network not found')
+        with etcd.get_lock('sf/network/%s' % network['uuid'], ttl=900) as _:
+            if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
+                n = net.from_db(network['uuid'])
+                if not n:
+                    LOG.info('network(%s): network not found, genuinely missing'
+                             % network['uuid'])
+                    return error(404, 'network not found')
 
-            n.create()
-            n.ensure_mesh()
-        else:
-            admin_token = util.get_api_token(
-                'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
-                                  config.parsed.get('API_PORT')),
-                namespace=namespace)
-            requests.request(
-                'put',
-                ('http://%s:%d/deploy_network_node'
-                 % (config.parsed.get('NETWORK_NODE_IP'),
-                    config.parsed.get('API_PORT'))),
-                data=json.dumps({'uuid': network['uuid']}),
-                headers={'Authorization': admin_token,
-                         'User-Agent': util.get_user_agent()})
+                n.create()
+                n.ensure_mesh()
+            else:
+                admin_token = util.get_api_token(
+                    'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
+                                      config.parsed.get('API_PORT')),
+                    namespace=namespace)
+                requests.request(
+                    'put',
+                    ('http://%s:%d/deploy_network_node'
+                     % (config.parsed.get('NETWORK_NODE_IP'),
+                        config.parsed.get('API_PORT'))),
+                    data=json.dumps({'uuid': network['uuid']}),
+                    headers={'Authorization': admin_token,
+                             'User-Agent': util.get_user_agent()})
 
-        db.update_network_state(network['uuid'], 'created')
+            db.add_event('network', network['uuid'],
+                         'api', 'created', None, None)
+            db.update_network_state(network['uuid'], 'created')
         return network
 
 
@@ -1010,6 +1014,8 @@ class DeployNetworkNode(Resource):
     @caller_is_admin
     @redirect_to_network_node
     def put(self, passed_uuid=None):
+        db.add_event('network', passed_uuid,
+                     'network node', 'deploy', None, None)
         n = net.from_db(passed_uuid)
         if not n:
             LOG.info('network(%s): network not found, genuinely missing'
@@ -1025,6 +1031,8 @@ class UpdateDHCP(Resource):
     @caller_is_admin
     @redirect_to_network_node
     def put(self, passed_uuid=None):
+        db.add_event('network', passed_uuid,
+                     'network node', 'update dhcp', None, None)
         n = net.from_db(passed_uuid)
         if not n:
             LOG.info('network(%s): network not found, genuinely missing'
@@ -1039,6 +1047,8 @@ class RemoveDHCP(Resource):
     @caller_is_admin
     @redirect_to_network_node
     def put(self, passed_uuid=None):
+        db.add_event('network', passed_uuid,
+                     'network node', 'remove dhcp', None, None)
         n = net.from_db(passed_uuid)
         if not n:
             LOG.info('network(%s): network not found, genuinely missing'
@@ -1089,7 +1099,7 @@ class monitor(object):
         processutils.execute(
             ('gunicorn3 --workers 10 --bind 0.0.0.0:%d '
              '--log-syslog --log-syslog-prefix sf '
-             '--name "sf api" '
+             '--timeout 300 --name "sf api" '
              'shakenfist.external_api.app:app'
              % config.parsed.get('API_PORT')),
             shell=True, env_variables=os.environ)

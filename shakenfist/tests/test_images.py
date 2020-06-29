@@ -3,7 +3,10 @@ import six
 import testtools
 
 
+from shakenfist import exceptions
 from shakenfist import images
+from shakenfist import image_resolver_cirros
+from shakenfist import image_resolver_ubuntu
 
 
 QEMU_IMG_OUT = """foo
@@ -134,62 +137,66 @@ class FakeResponse(object):
 
 
 class ImagesTestCase(testtools.TestCase):
-    @mock.patch('shakenfist.images._resolve_cirros',
-                return_value=['!!!cirros!!!', None])
-    @mock.patch('shakenfist.images._resolve_ubuntu',
-                return_value=['!!!ubuntu!!!', None])
+    @mock.patch('shakenfist.image_resolver_cirros.resolve',
+                return_value='!!!cirros!!!')
+    @mock.patch('shakenfist.image_resolver_ubuntu.resolve',
+                return_value='!!!ubuntu!!!')
     def test_resolve_image(self, mock_ubuntu, mock_centos):
-        self.assertEqual(['win10', None], images.resolve_image('win10'))
-        self.assertEqual(['http://example.com/image', None],
+        self.assertEqual('win10', images.resolve_image('win10'))
+        self.assertEqual('http://example.com/image',
                          images.resolve_image('http://example.com/image'))
-        self.assertEqual(['!!!cirros!!!', None],
+        self.assertEqual('!!!cirros!!!',
                          images.resolve_image('cirros'))
-        self.assertEqual(['!!!ubuntu!!!', None],
+        self.assertEqual('!!!ubuntu!!!',
                          images.resolve_image('ubuntu'))
 
     @mock.patch('requests.get', return_value=FakeResponse(200, CIRROS_DOWNLOAD_HTML))
     def test_resolve_cirros(self, mock_get):
-        u = images._resolve_cirros('cirros')
+        u = image_resolver_cirros.resolve('cirros')
         self.assertEqual(
-            ['http://download.cirros-cloud.net/0.5.1/cirros-0.5.1-x86_64-disk.img', None], u)
+            'http://download.cirros-cloud.net/0.5.1/cirros-0.5.1-x86_64-disk.img', u)
 
-        u = images._resolve_cirros('cirros:0.3.4')
+        u = image_resolver_cirros.resolve('cirros:0.3.4')
         self.assertEqual(
-            ['http://download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img', None], u)
+            'http://download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img', u)
 
-        self.assertRaises(images.VersionSpecificationError,
-                          images._resolve_cirros, 'cirros***')
+        self.assertRaises(exceptions.VersionSpecificationError,
+                          image_resolver_cirros.resolve, 'cirros***')
 
     @mock.patch('requests.get', return_value=FakeResponse(404, None))
     def test_resolve_cirros_error(self, mock_get):
-        self.assertRaises(images.HTTPError,
-                          images._resolve_cirros, 'cirros')
+        self.assertRaises(exceptions.HTTPError,
+                          image_resolver_cirros.resolve, 'cirros')
 
     @mock.patch('requests.get', return_value=FakeResponse(200, UBUNTU_DOWNLOAD_HTML))
-    @mock.patch('shakenfist.images.UBUNTU_URL', 'https://cloud-images.ubuntu.com')
+    @mock.patch('shakenfist.image_resolver_ubuntu.UBUNTU_URL',
+                'https://cloud-images.ubuntu.com')
     def test_resolve_ubuntu(self, mock_get):
-        u = images._resolve_ubuntu('ubuntu')
+        u = image_resolver_ubuntu.resolve('ubuntu')
         self.assertEqual(
-            ['https://cloud-images.ubuntu.com/groovy/current/groovy-server-cloudimg-amd64.img',
-             'http://ubuntu.mirrors.tds.net/ubuntu-cloud-images/releases/20.10/release/ubuntu-20.10-server-cloudimg-amd64.img'], u)
+            ('https://cloud-images.ubuntu.com/groovy/current/'
+             'groovy-server-cloudimg-amd64.img'),
+            u)
 
-        u = images._resolve_ubuntu('ubuntu:bionic')
+        u = image_resolver_ubuntu.resolve('ubuntu:bionic')
         self.assertEqual(
-            ['https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.img',
-             'http://ubuntu.mirrors.tds.net/ubuntu-cloud-images/releases/18.04/release/ubuntu-18.04-server-cloudimg-amd64.img'], u)
+            ('https://cloud-images.ubuntu.com/bionic/current/'
+             'bionic-server-cloudimg-amd64.img'),
+            u)
 
-        u = images._resolve_ubuntu('ubuntu:18.04')
+        u = image_resolver_ubuntu.resolve('ubuntu:18.04')
         self.assertEqual(
-            ['https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.img',
-             'http://ubuntu.mirrors.tds.net/ubuntu-cloud-images/releases/18.04/release/ubuntu-18.04-server-cloudimg-amd64.img'], u)
+            ('https://cloud-images.ubuntu.com/bionic/current/'
+             'bionic-server-cloudimg-amd64.img'),
+            u)
 
-        self.assertRaises(images.VersionSpecificationError,
-                          images._resolve_ubuntu, 'ubuntu***')
+        self.assertRaises(exceptions.VersionSpecificationError,
+                          image_resolver_ubuntu.resolve, 'ubuntu***')
 
     @mock.patch('requests.get', return_value=FakeResponse(404, None))
     def test_resolve_ubuntu_error(self, mock_get):
-        self.assertRaises(images.HTTPError,
-                          images._resolve_ubuntu, 'ubuntu')
+        self.assertRaises(exceptions.HTTPError,
+                          image_resolver_ubuntu.resolve, 'ubuntu')
 
     @mock.patch('shakenfist.config.parsed.get', return_value='/a/b/c')
     @mock.patch('os.path.exists', return_value=True)
@@ -257,7 +264,7 @@ class ImagesTestCase(testtools.TestCase):
 
     @mock.patch('requests.get', return_value=FakeResponse(404, '',))
     def test_actual_fetch_image_raises(self, mock_request_head):
-        self.assertRaises(images.HTTPError, images._actual_fetch_image,
+        self.assertRaises(exceptions.HTTPError, images._actual_fetch_image,
                           {
                               'url': 'http://example.com',
                               'Last-Modified': 'Tue, 10 Sep 2019 07:24:40 GMT',
