@@ -149,8 +149,16 @@ class Instance(object):
             for disk in self.db_entry['block_devices']['devices']:
                 if disk.get('base'):
                     with util.RecordedOperation('fetch image', self) as _:
-                        hashed_image_path = images.fetch_image(
-                            disk['base'], lock=lock)
+                        image_url = images.resolve(disk['base'])
+                        hashed_image_path, info, image_dirty, resp = \
+                            images.requires_fetch(image_url)
+
+                        if image_dirty:
+                            hashed_image_path = images.fetch(hashed_image_path,
+                                                             info, resp, lock=lock)
+                        else:
+                            hashed_image_path = '%s.v%03d' % (
+                                hashed_image_path, info['version'])
 
                     try:
                         cd = pycdlib.PyCdlib()
@@ -185,13 +193,13 @@ class Instance(object):
                             if lock:
                                 lock.refresh()
 
-                            images.transcode_image(hashed_image_path)
+                            images.transcode(hashed_image_path)
 
                         with util.RecordedOperation('resize image', self) as _:
                             if lock:
                                 lock.refresh()
 
-                            resized_image_path = images.resize_image(
+                            resized_image_path = images.resize(
                                 hashed_image_path, disk['size'])
 
                         with util.RecordedOperation('create copy on write layer', self) as _:
