@@ -304,7 +304,7 @@ class Auth(Resource):
 
         service_key, keys = self._get_keys(namespace)
         if service_key and key == service_key:
-            return {'access_token': create_access_token(identity=namespace)}
+            return {'access_token': create_access_token(identity='system')}
         for possible_key in keys:
             if bcrypt.checkpw(key.encode('utf-8'), possible_key):
                 return {'access_token': create_access_token(identity=namespace)}
@@ -322,6 +322,8 @@ class AuthNamespaces(Resource):
             return error(400, 'no unique name specified')
         if not key:
             return error(400, 'no key specified')
+        if key_name == 'service_key':
+            return error(403, 'illegal key name')
 
         with etcd.get_lock('sf/namespace') as _:
             rec = etcd.get('namespace', None, namespace)
@@ -459,7 +461,7 @@ class Instances(Resource):
              instance_uuid=None):
         global SCHEDULER
 
-        # We need to santize the name so its safe for DNS
+        # We need to sanitise the name so its safe for DNS
         name = re.sub(r'([^a-zA-Z0-9_\-])', '', name)
 
         # If we specified a namespace, we need to be an admin
@@ -1033,7 +1035,7 @@ api.add_resource(InterfaceFloat, '/interfaces/<interface_uuid>/float')
 api.add_resource(InterfaceDefloat, '/interfaces/<interface_uuid>/defloat')
 api.add_resource(InstanceMetadatas, '/instances/<instance_uuid>/metadata')
 api.add_resource(InstanceMetadata,
-                 '/instances/<instance_uuid>/metatadata/<key>')
+                 '/instances/<instance_uuid>/metadata/<key>')
 api.add_resource(Image, '/images')
 api.add_resource(Networks, '/networks')
 api.add_resource(Network, '/networks/<network_uuid>')
