@@ -342,10 +342,8 @@ def _show_instance(ctx, i, include_snapshots=False):
                               'user_data'])
         out['network_interfaces'] = []
         for interface in CLIENT.get_instance_interfaces(i['uuid']):
-            out['network_interfaces'].append(
-                filter_dict(
-                    interface, ['uuid', 'network_uuid', 'macaddr', 'order',
-                                'ipv4', 'floating']))
+            _show_interface(ctx, interface, out)
+
         if include_snapshots:
             out['snapshots'] = []
             for snap in snapshots:
@@ -383,19 +381,12 @@ def _show_instance(ctx, i, include_snapshots=False):
         print('Interfaces:')
         for interface in CLIENT.get_instance_interfaces(i['uuid']):
             print()
-            print(format_string % ('uuid', interface['uuid']))
-            print(format_string % ('network', interface['network_uuid']))
-            print(format_string % ('macaddr', interface['macaddr']))
-            print(format_string % ('order', interface['order']))
-            print(format_string % ('ipv4', interface['ipv4']))
-            print(format_string % ('floating', interface['floating']))
+            _show_interface(ctx, interface)
+
     else:
         print('iface,interface uuid,network uuid,macaddr,order,ipv4,floating')
         for interface in CLIENT.get_instance_interfaces(i['uuid']):
-            print('iface,%s,%s,%s,%s,%s,%s'
-                  % (interface['uuid'], interface['network_uuid'],
-                     interface['macaddr'], interface['order'], interface['ipv4'],
-                     interface['floating']))
+            _show_interface(ctx, interface)
 
     if include_snapshots:
         print()
@@ -638,9 +629,67 @@ def interface():
     pass
 
 
+def _get_instance_interfaces(ctx, args, incomplete):
+    for i in CLIENT.get_instances():
+        for interface in CLIENT.get_instance_interfaces(i['uuid']):
+            yield interface['uuid']
+
+
+def _show_interface(ctx, interface, out=[]):
+    if not interface:
+        print('Interface not found')
+        sys.exit(1)
+
+    if ctx.obj['OUTPUT'] == 'json':
+        if 'network_interfaces' not in out:
+            out['network_interfaces'] = []
+
+        out['network_interfaces'].append(
+            filter_dict(
+                interface, ['uuid', 'network_uuid', 'macaddr', 'order',
+                            'ipv4', 'floating']))
+        return
+
+    if ctx.obj['OUTPUT'] == 'pretty':
+        format_string = '    %-8s: %s'
+        print(format_string % ('uuid', interface['uuid']))
+        print(format_string % ('network', interface['network_uuid']))
+        print(format_string % ('macaddr', interface['macaddr']))
+        print(format_string % ('order', interface['order']))
+        print(format_string % ('ipv4', interface['ipv4']))
+        print(format_string % ('floating', interface['floating']))
+    else:
+        print('iface,%s,%s,%s,%s,%s,%s'
+                % (interface['uuid'], interface['network_uuid'],
+                    interface['macaddr'], interface['order'], interface['ipv4'],
+                    interface['floating']))
+
+
+@interface.command(name='show', help='Show an interface')
+@click.argument('interface_uuid', type=click.STRING,
+                autocompletion=_get_instance_interfaces)
+@click.pass_context
+def interface_show(ctx, interface_uuid=None):
+    interface = CLIENT.get_interface(interface_uuid)
+
+    if ctx.obj['OUTPUT'] == 'json':
+        out = {'network_interfaces': []}
+        _show_interface(ctx, interface, out)
+        print(json.dumps(out, indent=4, sort_keys=True))
+        return
+
+    if ctx.obj['OUTPUT'] == 'pretty':
+        print('Interface:')
+    else:
+        print('iface,interface uuid,network uuid,macaddr,order,ipv4,floating')
+
+    _show_interface(ctx, interface)
+
+
 @interface.command(name='float',
                    help='Add a floating IP to an interface')
-@click.argument('interface_uuid', type=click.STRING)
+@click.argument('interface_uuid', type=click.STRING,
+                autocompletion=_get_instance_interfaces)
 @click.pass_context
 def interface_float(ctx, interface_uuid=None):
     CLIENT.float_interface(interface_uuid)
@@ -650,9 +699,10 @@ def interface_float(ctx, interface_uuid=None):
 
 @interface.command(name='defloat',
                    help='Remove a floating IP to an interface')
-@click.argument('interface_uuid', type=click.STRING)
+@click.argument('interface_uuid', type=click.STRING,
+                autocompletion=_get_instance_interfaces)
 @click.pass_context
-def interface_deloat(ctx, interface_uuid=None):
+def interface_defloat(ctx, interface_uuid=None):
     CLIENT.defloat_interface(interface_uuid)
     if ctx.obj['OUTPUT'] == 'json':
         print('{}')
