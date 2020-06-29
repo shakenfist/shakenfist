@@ -738,6 +738,32 @@ class InstanceUnpause(Resource):
         return instance_from_db_virt.unpause()
 
 
+class Interface(Resource):
+    @jwt_required
+    @redirect_to_network_node
+    def get(self, interface_uuid=None):
+        ni = db.get_interface(interface_uuid)
+        if not ni:
+            return error(404, 'interface not found')
+
+        n = net.from_db(ni['network_uuid'])
+        if not n:
+            LOG.info('network(%s): network not found, genuinely missing'
+                     % ni['network_uuid'])
+            return error(404, 'interface network not found')
+
+        if get_jwt_identity() not in [n.namespace, 'system']:
+            LOG.info('%s: interface not found, ownership test' % n)
+            return error(404, 'interface not found')
+
+        i = virt.from_db(ni['instance_uuid'])
+        if get_jwt_identity() not in [i.db_entry['namespace'], 'system']:
+            LOG.info('%s: instance not found, ownership test' % i)
+            return error(404, 'interface not found')
+
+        return ni
+
+
 class InterfaceFloat(Resource):
     @jwt_required
     @redirect_to_network_node
@@ -1038,6 +1064,7 @@ api.add_resource(InstancePowerOff, '/instances/<instance_uuid>/poweroff')
 api.add_resource(InstancePowerOn, '/instances/<instance_uuid>/poweron')
 api.add_resource(InstancePause, '/instances/<instance_uuid>/pause')
 api.add_resource(InstanceUnpause, '/instances/<instance_uuid>/unpause')
+api.add_resource(Interface, '/interfaces/<interface_uuid>')
 api.add_resource(InterfaceFloat, '/interfaces/<interface_uuid>/float')
 api.add_resource(InterfaceDefloat, '/interfaces/<interface_uuid>/defloat')
 api.add_resource(InstanceMetadatas, '/instances/<instance_uuid>/metadata')
