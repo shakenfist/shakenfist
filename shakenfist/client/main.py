@@ -21,6 +21,19 @@ LOG.setLevel(logging.INFO)
 CLIENT = None
 
 
+def auto_complete(func):
+    global CLIENT
+
+    if not CLIENT:
+        CLIENT = apiclient.Client(
+            namespace=os.getenv("SHAKENFIST_NAMESPACE"),
+            key=os.getenv('SHAKENFIST_KEY'),
+            base_url=os.getenv('SHAKENFIST_API_URL', 'http://localhost:13000'),
+            )
+
+    return func
+
+
 def filter_dict(d, allowed_keys):
     out = {}
     for key in allowed_keys:
@@ -91,6 +104,7 @@ def namespace():
     pass
 
 
+@auto_complete
 def _get_namespaces(ctx, args, incomplete):
     return list(CLIENT.get_namespaces())
 
@@ -157,6 +171,7 @@ def network():
     pass
 
 
+@auto_complete
 def _get_networks(ctx, args, incomplete):
     for n in list(CLIENT.get_networks()):
         yield n['uuid']
@@ -292,6 +307,7 @@ def instance():
     pass
 
 
+@auto_complete
 def _get_instances(ctx, args, incomplete):
     for i in CLIENT.get_instances():
         yield i['uuid']
@@ -629,6 +645,7 @@ def interface():
     pass
 
 
+@auto_complete
 def _get_instance_interfaces(ctx, args, incomplete):
     for i in CLIENT.get_instances():
         for interface in CLIENT.get_instance_interfaces(i['uuid']):
