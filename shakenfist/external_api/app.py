@@ -304,7 +304,7 @@ class Auth(Resource):
 
         service_key, keys = self._get_keys(namespace)
         if service_key and key == service_key:
-            return {'access_token': create_access_token(identity='system')}
+            return {'access_token': create_access_token(identity=namespace)}
         for possible_key in keys:
             if bcrypt.checkpw(key.encode('utf-8'), possible_key):
                 return {'access_token': create_access_token(identity=namespace)}
@@ -464,11 +464,14 @@ class Instances(Resource):
         # We need to sanitise the name so its safe for DNS
         name = re.sub(r'([^a-zA-Z0-9_\-])', '', name)
 
-        # If we specified a namespace, we need to be an admin
-        if namespace and get_jwt_identity() != 'system':
-            return error(401, 'only admins can create resources in a different namespace')
+        # Default to the namespace for the identity
         if not namespace:
             namespace = get_jwt_identity()
+
+        # If accessing a foreign namespace, we need to be an admin
+        if get_jwt_identity() not in [namespace, 'system']:
+            return error(401,
+                'only admins can create resources in a different namespace')
 
         # The instance needs to exist in the DB before network interfaces are created
         if not instance_uuid:
@@ -909,10 +912,14 @@ class Networks(Resource):
         except ValueError as e:
             return error(400, 'cannot parse netblock: %s' % e)
 
-        if namespace and get_jwt_identity() != 'system':
-            return error(401, 'only admins can create resources in a different namespace')
+        # Default to the namespace for the identity
         if not namespace:
             namespace = get_jwt_identity()
+
+        # If accessing a foreign name namespace, we need to be an admin
+        if get_jwt_identity() not in [namespace, 'system']:
+            return error(401,
+                'only admins can create resources in a different namespace')
 
         network = db.allocate_network(netblock, provide_dhcp,
                                       provide_nat, name, namespace)
