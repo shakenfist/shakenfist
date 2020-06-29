@@ -60,6 +60,12 @@ CONFIG_DEFAULTS = {
     # What nova called an availability zone
     'ZONE': 'shaken',
 
+    # Do we have preferred mirrors for Ubuntu or Cirros?
+    'DOWNLOAD_URL_CIRROS': ('http://download.cirros-cloud.net/%(vernum)s/'
+                            'cirros-%(vernum)s-x86_64-disk.img'),
+    'DOWNLOAD_URL_UBUNTU': ('%(base)s/%(vername)s/current/'
+                            '%(vername)s-server-cloudimg-amd64.img'),
+
     # NODE SPECIFIC
     # -------------
 

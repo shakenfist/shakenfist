@@ -27,20 +27,22 @@ class DHCPTestCase(testtools.TestCase):
         super(DHCPTestCase, self).setUp()
 
         def fake_config(key):
-            if key == 'NODE_NAME':
-                return 'foo'
-            if key == 'STORAGE_PATH':
-                return '/a/b/c'
-            if key == 'ZONE':
-                return 'shakenfist'
-            if key == 'ETCD_USER':
-                return 'sf'
-            if key == 'ETCD_PASSWORD':
-                return 'foo'
-            if key == 'ETCD_SERVER':
-                return 'localhost'
-            if key == 'NODE_IP':
-                return '127.0.0.1'
+            fc = {
+                'NODE_NAME': 'foo',
+                'STORAGE_PATH': '/a/b/c',
+                'ZONE': 'shakenfist',
+                'ETCD_USER': 'sf',
+                'ETCD_PASSWORD': 'foo',
+                'ETCD_SERVER': 'localhost',
+                'NODE_IP': '127.0.0.1',
+                'DOWNLOAD_URL_CIRROS': ('http://download.cirros-cloud.net/%(vernum)s/'
+                                        'cirros-%(vernum)s-x86_64-disk.img'),
+                'DOWNLOAD_URL_UBUNTU': ('%(base)s/%(vername)s/current/'
+                                        '%(vername)s-server-cloudimg-amd64.img'),
+            }
+
+            if key in fc:
+                return fc[key]
             raise Exception('Unknown config key')
 
         self.config = mock.patch('shakenfist.config.parsed.get',
