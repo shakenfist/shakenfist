@@ -31,7 +31,7 @@ resolvers = {
 }
 
 
-def resolve_image(name):
+def resolve(name):
     for resolver in resolvers:
         if name.startswith(resolver):
             return resolvers[resolver].resolve(name)
@@ -58,49 +58,7 @@ def _hash_image_url(image_url):
 VALIDATED_IMAGE_FIELDS = ['Last-Modified', 'Content-Length']
 
 
-def _actual_fetch_image(info, info_key, hashed_image_path, lock=None):
-    resp = requests.get(info[info_key], allow_redirects=True, stream=True,
-                        headers={'User-Agent': util.get_user_agent()})
-    try:
-        if resp.status_code != 200:
-            raise exceptions.HTTPError(
-                'Failed to fetch HEAD of %s (status code %d)'
-                % (info[info_key], resp.status_code))
-
-        image_dirty = False
-        for field in VALIDATED_IMAGE_FIELDS:
-            if info.get(field) != resp.headers.get(field):
-                image_dirty = True
-
-        fetched = 0
-        if image_dirty:
-            info['version'] += 1
-            info['fetched_at'] = email.utils.formatdate()
-            for field in VALIDATED_IMAGE_FIELDS:
-                info[field] = resp.headers.get(field)
-
-            with open(hashed_image_path + '.v%03d' % info['version'], 'wb') as f:
-                for chunk in resp.iter_content(chunk_size=8192):
-                    fetched += len(chunk)
-                    f.write(chunk)
-                    if lock:
-                        lock.refresh()
-
-        return info, fetched
-
-    finally:
-        resp.close()
-
-
-def fetch_image(image_url, lock=None):
-    """Download the image if we don't already have the latest version in cache."""
-
-    image_url = resolve_image(image_url)
-    hashed_image_url = _hash_image_url(image_url)
-
-    # Populate cache if its empty
-    hashed_image_path = os.path.join(_get_cache_path(), hashed_image_url)
-
+def _read_info(image_url, hashed_image_url, hashed_image_path):
     if not os.path.exists(hashed_image_path + '.info'):
         info = {
             'url': image_url,
@@ -111,19 +69,54 @@ def fetch_image(image_url, lock=None):
         with open(hashed_image_path + '.info') as f:
             info = json.loads(f.read())
 
+    return info
+
+
+def requires_fetch(image_url):
+    hashed_image_url = _hash_image_url(image_url)
+    hashed_image_path = os.path.join(_get_cache_path(), hashed_image_url)
+    info = _read_info(image_url, hashed_image_url, hashed_image_path)
+
+    resp = requests.get(image_url, allow_redirects=True, stream=True,
+                        headers={'User-Agent': util.get_user_agent()})
+    if resp.status_code != 200:
+        raise exceptions.HTTPError(
+            'Failed to fetch HEAD of %s (status code %d)'
+            % (image_url, resp.status_code))
+
+    image_dirty = False
+    for field in VALIDATED_IMAGE_FIELDS:
+        if info.get(field) != resp.headers.get(field):
+            image_dirty = True
+
+    return hashed_image_path, info, image_dirty, resp
+
+
+def fetch(hashed_image_path, info, resp, lock=None):
+    """Download the image if we don't already have the latest version in cache."""
+
     fetched = 0
-    info, fetched = _actual_fetch_image(
-        info, 'url', hashed_image_path, lock=lock)
+    info['version'] += 1
+    info['fetched_at'] = email.utils.formatdate()
+    for field in VALIDATED_IMAGE_FIELDS:
+        info[field] = resp.headers.get(field)
+
+    with open(hashed_image_path + '.v%03d' % info['version'], 'wb') as f:
+        for chunk in resp.iter_content(chunk_size=8192):
+            fetched += len(chunk)
+            f.write(chunk)
+            if lock:
+                lock.refresh()
 
     if fetched > 0:
         with open(hashed_image_path + '.info', 'w') as f:
             f.write(json.dumps(info, indent=4, sort_keys=True))
 
         LOG.info('Fetching image %s complete (%d bytes)' %
-                 (image_url, fetched))
+                 (info['url'], fetched))
 
     # Decompress if required
-    if image_url.endswith('.gz'):
+    if info['url'].endswith('.gz'):
         if not os.path.exists(hashed_image_path + '.v%03d.orig' % info['version']):
             if lock:
                 lock.refresh()
@@ -137,13 +130,13 @@ def fetch_image(image_url, lock=None):
     return '%s.v%03d' % (hashed_image_path, info['version'])
 
 
-def transcode_image(hashed_image_path):
+def transcode(hashed_image_path):
     """Convert the image to qcow2."""
 
     if os.path.exists(hashed_image_path + '.qcow2'):
         return
 
-    current_format = identify_image(hashed_image_path).get('file format')
+    current_format = identify(hashed_image_path).get('file format')
     if current_format == 'qcow2':
         os.link(hashed_image_path, hashed_image_path + '.qcow2')
         return
@@ -154,7 +147,7 @@ def transcode_image(hashed_image_path):
         shell=True)
 
 
-def resize_image(hashed_image_path, size):
+def resize(hashed_image_path, size):
     """Resize the image to the specified size."""
 
     backing_file = hashed_image_path + '.qcow2' + '.' + str(size) + 'G'
@@ -162,7 +155,7 @@ def resize_image(hashed_image_path, size):
     if os.path.exists(backing_file):
         return backing_file
 
-    current_size = identify_image(hashed_image_path).get('virtual size')
+    current_size = identify(hashed_image_path).get('virtual size')
 
     if current_size == size * 1024 * 1024 * 1024:
         os.link(hashed_image_path, backing_file)
@@ -179,7 +172,7 @@ def resize_image(hashed_image_path, size):
 VALUE_WITH_BRACKETS_RE = re.compile(r'.* \(([0-9]+) bytes\)')
 
 
-def identify_image(path):
+def identify(path):
     """Work out what an image is."""
 
     if not os.path.exists(path):
