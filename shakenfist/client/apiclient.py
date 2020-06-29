@@ -254,6 +254,10 @@ class Client(object):
         r = self._request_url('GET', self.base_url + '/nodes')
         return r.json()
 
+    def get_interface(self, interface_uuid):
+        r = self._request_url('GET', self.base_url + '/interfaces/' + interface_uuid)
+        return r.json()
+
     def float_interface(self, interface_uuid):
         r = self._request_url('POST', self.base_url + '/interfaces/' + interface_uuid +
                               '/float')
