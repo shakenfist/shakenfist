@@ -1072,7 +1072,7 @@ class monitor(object):
         processutils.execute(
             ('gunicorn3 --workers 10 --bind 0.0.0.0:%d '
              '--log-syslog --log-syslog-prefix sf '
-             '--name "sf api" '
+             '--timeout 300 --name "sf api" '
              'shakenfist.external_api.app:app'
              % config.parsed.get('API_PORT')),
             shell=True, env_variables=os.environ)
