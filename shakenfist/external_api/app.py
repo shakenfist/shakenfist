@@ -322,6 +322,8 @@ class AuthNamespaces(Resource):
             return error(400, 'no unique name specified')
         if not key:
             return error(400, 'no key specified')
+        if key_name == 'service_key':
+            return error(403, 'illegal key name')
 
         with etcd.get_lock('sf/namespace') as _:
             rec = etcd.get('namespace', None, namespace)
@@ -459,14 +461,17 @@ class Instances(Resource):
              instance_uuid=None):
         global SCHEDULER
 
-        # We need to santize the name so its safe for DNS
+        # We need to sanitise the name so its safe for DNS
         name = re.sub(r'([^a-zA-Z0-9_\-])', '', name)
 
-        # If we specified a namespace, we need to be an admin
-        if namespace and get_jwt_identity() != 'system':
-            return error(401, 'only admins can create resources in a different namespace')
+        # Default to the namespace for the identity
         if not namespace:
             namespace = get_jwt_identity()
+
+        # If accessing a foreign namespace, we need to be an admin
+        if get_jwt_identity() not in [namespace, 'system']:
+            return error(401,
+                'only admins can create resources in a different namespace')
 
         # The instance needs to exist in the DB before network interfaces are created
         if not instance_uuid:
@@ -907,10 +912,14 @@ class Networks(Resource):
         except ValueError as e:
             return error(400, 'cannot parse netblock: %s' % e)
 
-        if namespace and get_jwt_identity() != 'system':
-            return error(401, 'only admins can create resources in a different namespace')
+        # Default to the namespace for the identity
         if not namespace:
             namespace = get_jwt_identity()
+
+        # If accessing a foreign name namespace, we need to be an admin
+        if get_jwt_identity() not in [namespace, 'system']:
+            return error(401,
+                'only admins can create resources in a different namespace')
 
         network = db.allocate_network(netblock, provide_dhcp,
                                       provide_nat, name, namespace)
@@ -1033,7 +1042,7 @@ api.add_resource(InterfaceFloat, '/interfaces/<interface_uuid>/float')
 api.add_resource(InterfaceDefloat, '/interfaces/<interface_uuid>/defloat')
 api.add_resource(InstanceMetadatas, '/instances/<instance_uuid>/metadata')
 api.add_resource(InstanceMetadata,
-                 '/instances/<instance_uuid>/metatadata/<key>')
+                 '/instances/<instance_uuid>/metadata/<key>')
 api.add_resource(Image, '/images')
 api.add_resource(Networks, '/networks')
 api.add_resource(Network, '/networks/<network_uuid>')
