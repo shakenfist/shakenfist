@@ -1,3 +1,5 @@
+import base64
+import bcrypt
 import json
 import mock
 import testtools
@@ -20,6 +22,76 @@ class FakeResponse(object):
 class FakeScheduler(object):
     def place_instance(self, *args, **kwargs):
         return config.parsed.get('NODE_NAME')
+
+
+def _encode_key(key):
+    return bcrypt.hashpw(key.encode('utf-8'), bcrypt.gensalt())
+
+
+class AuthTestCase(testtools.TestCase):
+    def setUp(self):
+        super(AuthTestCase, self).setUp()
+
+        external_api.TESTING = True
+        external_api.app.testing = True
+        external_api.app.debug = False
+        self.client = external_api.app.test_client()
+
+    def test_post_auth_no_args(self):
+        resp = self.client.post('/auth', data=json.dumps({}))
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual(
+            {
+                'error': 'missing namespace in request',
+                'status': 400
+            },
+            resp.get_json())
+
+    def test_post_auth_no_key(self):
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'banana'}))
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual(
+            {
+                'error': 'missing key in request',
+                'status': 400
+            },
+            resp.get_json())
+
+    @mock.patch('shakenfist.external_api.app.Auth._get_keys',
+                return_value=(None, [_encode_key('cheese')]))
+    def test_post_auth(self, mock_get_keys):
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'banana', 'key': 'cheese'}))
+        self.assertEqual(200, resp.status_code)
+        self.assertIn('access_token', resp.get_json())
+
+    @mock.patch('shakenfist.external_api.app.Auth._get_keys',
+                return_value=('cheese', [_encode_key('bacon')]))
+    def test_post_auth_not_authorized(self, mock_get_keys):
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'banana', 'key': 'hamster'}))
+        self.assertEqual(401, resp.status_code)
+        self.assertEqual(
+            {
+                'error': 'unauthorized',
+                'status': 401
+            },
+            resp.get_json())
+
+    @mock.patch('shakenfist.etcd.get',
+                return_value={
+                    'service_key': 'cheese',
+                    'keys': {
+                        'key1': str(base64.b64encode(_encode_key('bacon')), 'utf-8'),
+                        'key2': str(base64.b64encode(_encode_key('sausage')), 'utf-8')
+                    }
+                })
+    def test_post_auth_service_key(self, mock_get):
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'banana', 'key': 'cheese'}))
+        self.assertEqual(200, resp.status_code)
+        self.assertIn('access_token', resp.get_json())
 
 
 class ExternalApiTestCase(testtools.TestCase):
@@ -47,7 +119,7 @@ class ExternalApiTestCase(testtools.TestCase):
         self.mock_get_keys = self.get_keys.start()
 
         resp = self.client.post(
-            '/auth', data=json.dumps({'namespace': 'foo', 'key': 'foo'}))
+            '/auth', data=json.dumps({'namespace': 'system', 'key': 'foo'}))
         self.assertEqual(200, resp.status_code)
         self.auth_header = 'Bearer %s' % resp.get_json()['access_token']
 
@@ -58,14 +130,183 @@ class ExternalApiTestCase(testtools.TestCase):
         self.assertEqual(200, resp.status_code)
         self.assertEqual('text/plain; charset=utf-8', resp.content_type)
 
-    @mock.patch('shakenfist.db.get_instance', return_value=None)
-    def test_get_instance_not_found(self, mock_get_instance):
-        resp = self.client.get(
-            '/instances/foo', headers={'Authorization': self.auth_header})
-        self.assertEqual({'error': 'instance not found', 'status': 404},
-                         resp.get_json())
+    def test_auth_add_key_missing_args(self):
+        resp = self.client.post('/auth/namespace',
+                                headers={'Authorization': self.auth_header},
+                                data=json.dumps({}))
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual(
+            {
+                'error': 'no namespace specified',
+                'status': 400
+            },
+            resp.get_json())
+
+    def test_auth_add_key_missing_keyname(self):
+        resp = self.client.post('/auth/namespace',
+                                headers={'Authorization': self.auth_header},
+                                data=json.dumps({
+                                    'namespace': 'foo'
+                                }))
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual(
+            {
+                'error': 'no unique name specified',
+                'status': 400
+            },
+            resp.get_json())
+
+    def test_auth_add_key_missing_key(self):
+        resp = self.client.post('/auth/namespace',
+                                headers={'Authorization': self.auth_header},
+                                data=json.dumps({
+                                    'namespace': 'foo',
+                                    'key_name': 'bernard'
+                                }))
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual(
+            {
+                'error': 'no key specified',
+                'status': 400
+            },
+            resp.get_json())
+
+    def test_auth_add_key_illegal_keyname(self):
+        resp = self.client.post('/auth/namespace',
+                                headers={'Authorization': self.auth_header},
+                                data=json.dumps({
+                                    'namespace': 'foo',
+                                    'key_name': 'service_key',
+                                    'key': 'cheese'
+                                }))
+        self.assertEqual(403, resp.status_code)
+        self.assertEqual(
+            {
+                'error': 'illegal key name',
+                'status': 403
+            },
+            resp.get_json())
+
+    @mock.patch('shakenfist.etcd.get_lock')
+    @mock.patch('shakenfist.etcd.get', return_value=None)
+    @mock.patch('shakenfist.etcd.put')
+    @mock.patch('bcrypt.hashpw', return_value='terminator'.encode('utf-8'))
+    def test_auth_add_key_new_namespace(self, mock_hashpw, mock_put, mock_get, mock_lock):
+        resp = self.client.post('/auth/namespace',
+                                headers={'Authorization': self.auth_header},
+                                data=json.dumps({
+                                    'namespace': 'foo',
+                                    'key_name': 'bernard',
+                                    'key': 'cheese'
+                                }))
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual('foo', resp.get_json())
+        mock_put.assert_called_with(
+            'namespace', None, 'foo',
+            {'name': 'foo', 'keys': {'bernard': 'dGVybWluYXRvcg=='}})
+
+    @mock.patch('shakenfist.etcd.get_all',
+                return_value=[
+                    {'name': 'aaa'}, {'name': 'bbb'}, {'name': 'ccc'}
+                ])
+    def test_get_namespaces(self, mock_get_all):
+        resp = self.client.get('/auth/namespace',
+                               headers={'Authorization': self.auth_header})
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(['aaa', 'bbb', 'ccc'], resp.get_json())
+
+    def test_delete_namespace_missing_args(self):
+        resp = self.client.delete('/auth/namespace',
+                                  headers={'Authorization': self.auth_header})
+        self.assertEqual(405, resp.status_code)
+        self.assertEqual(
+            {
+                'message': 'The method is not allowed for the requested URL.'
+            },
+            resp.get_json())
+
+    def test_delete_namespace_system(self):
+        resp = self.client.delete('/auth/namespace/system',
+                                  headers={'Authorization': self.auth_header})
+        self.assertEqual(403, resp.status_code)
+        self.assertEqual(
+            {
+                'error': 'you cannot delete the system namespace',
+                'status': 403
+            },
+            resp.get_json())
+
+    @mock.patch('shakenfist.db.get_instances',
+                return_value=[{'uuid': '123', 'state': 'created'}])
+    def test_delete_namespace_with_instances(self, mock_get_instances):
+        resp = self.client.delete('/auth/namespace/foo',
+                                  headers={'Authorization': self.auth_header})
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual(
+            {
+                'error': 'you cannot delete a namespace with instances',
+                'status': 400
+            },
+            resp.get_json())
+
+    @mock.patch('shakenfist.db.get_instances', return_value=[])
+    @mock.patch('shakenfist.db.get_networks',
+                return_value=[{'uuid': '123', 'state': 'created'}])
+    def test_delete_namespace_with_networks(self, mock_get_networks, mock_get_instances):
+        resp = self.client.delete('/auth/namespace/foo',
+                                  headers={'Authorization': self.auth_header})
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual(
+            {
+                'error': 'you cannot delete a namespace with networks',
+                'status': 400
+            },
+            resp.get_json())
+
+    @mock.patch('shakenfist.db.get_instances',
+                return_value=[{'uuid': '123', 'state': 'deleted'}])
+    @mock.patch('shakenfist.db.get_networks',
+                return_value=[{'uuid': '123', 'state': 'deleted'}])
+    @mock.patch('shakenfist.db.hard_delete_instance')
+    @mock.patch('shakenfist.db.hard_delete_network')
+    @mock.patch('shakenfist.etcd.delete')
+    def test_delete_namespace_with_deleted(self, mock_etcd_delete,
+                                           mock_hd_network, mock_hd_instance,
+                                           mock_get_networks, mock_get_instances):
+        resp = self.client.delete('/auth/namespace/foo',
+                                  headers={'Authorization': self.auth_header})
+        self.assertEqual(200, resp.status_code)
+        mock_hd_instance.assert_called()
+        mock_hd_network.assert_called()
+        mock_etcd_delete.assert_called()
+
+    def test_delete_namespace_key_missing_args(self):
+        resp = self.client.delete('/auth/namespace/system/',
+                                  headers={'Authorization': self.auth_header})
         self.assertEqual(404, resp.status_code)
-        self.assertEqual('application/json', resp.content_type)
+        self.assertEqual(None, resp.get_json())
+
+    @mock.patch('shakenfist.etcd.get_lock')
+    @mock.patch('shakenfist.etcd.get', return_value={'keys': {}})
+    def test_delete_namespace_key_missing_key(self, mock_get, mock_lock):
+        resp = self.client.delete('/auth/namespace/system/mykey',
+                                  headers={'Authorization': self.auth_header})
+        self.assertEqual(404, resp.status_code)
+        self.assertEqual(
+            {
+                'error': 'key name not found in namespace',
+                'status': 404
+            },
+            resp.get_json())
+
+    @mock.patch('shakenfist.etcd.get_lock')
+    @mock.patch('shakenfist.etcd.get', return_value={'keys': {'mykey': 'foo'}})
+    @mock.patch('shakenfist.etcd.put')
+    def test_delete_namespace_key_missing_key(self, mock_put, mock_get, mock_lock):
+        resp = self.client.delete('/auth/namespace/system/mykey',
+                                  headers={'Authorization': self.auth_header})
+        self.assertEqual(200, resp.status_code)
+        mock_put.assert_called_with('namespace', None, 'system', {'keys': {}})
 
     @mock.patch('shakenfist.db.get_instance',
                 return_value={'uuid': '123',
@@ -77,4 +318,13 @@ class ExternalApiTestCase(testtools.TestCase):
         self.assertEqual({'uuid': '123', 'name': 'banana', 'namespace': 'foo'},
                          resp.get_json())
         self.assertEqual(200, resp.status_code)
+        self.assertEqual('application/json', resp.content_type)
+
+    @mock.patch('shakenfist.db.get_instance', return_value=None)
+    def test_get_instance_not_found(self, mock_get_instance):
+        resp = self.client.get(
+            '/instances/foo', headers={'Authorization': self.auth_header})
+        self.assertEqual({'error': 'instance not found', 'status': 404},
+                         resp.get_json())
+        self.assertEqual(404, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
