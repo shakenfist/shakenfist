@@ -182,18 +182,19 @@ class Scheduler(object):
                          'schedule', 'Have enough idle disk', None, str(candidates))
 
             # What nodes have the highest number of networks already present?
-            requested_networks = []
-            for net in network:
-                network_uuid = net['network_uuid']
-                if network_uuid not in requested_networks:
-                    requested_networks.append(network_uuid)
+            if network:
+                requested_networks = []
+                for net in network:
+                    network_uuid = net['network_uuid']
+                    if network_uuid not in requested_networks:
+                        requested_networks.append(network_uuid)
 
-            candidates = self._find_most_matching_networks(
-                requested_networks, candidates)
-            LOG.info('Scheduling %s, %s have most matching networks'
-                     % (instance, candidates))
-            db.add_event('instance', instance.db_entry['uuid'],
-                         'schedule', 'Have most matching networks', None, str(candidates))
+                candidates = self._find_most_matching_networks(
+                    requested_networks, candidates)
+                LOG.info('Scheduling %s, %s have most matching networks'
+                            % (instance, candidates))
+                db.add_event('instance', instance.db_entry['uuid'],
+                                'schedule', 'Have most matching networks', None, str(candidates))
 
             # What nodes have the base image already?
             requested_images = []

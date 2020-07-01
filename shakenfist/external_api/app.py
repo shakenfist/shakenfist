@@ -567,41 +567,42 @@ class Instances(Resource):
             return error(status_code, message)
 
         order = 0
-        for netdesc in network:
-            if 'network_uuid' not in netdesc or not netdesc['network_uuid']:
-                error_with_cleanup(404, 'network not specified')
+        if network:
+            for netdesc in network:
+                if 'network_uuid' not in netdesc or not netdesc['network_uuid']:
+                    error_with_cleanup(404, 'network not specified')
 
-            if netdesc['network_uuid'] not in nets:
-                n = net.from_db(netdesc['network_uuid'])
-                if not n:
-                    error_with_cleanup(
-                        404, 'network %s not found' % netdesc['network_uuid'])
-                nets[netdesc['network_uuid']] = n
-                n.create()
+                if netdesc['network_uuid'] not in nets:
+                    n = net.from_db(netdesc['network_uuid'])
+                    if not n:
+                        error_with_cleanup(
+                            404, 'network %s not found' % netdesc['network_uuid'])
+                    nets[netdesc['network_uuid']] = n
+                    n.create()
 
-            with etcd.get_lock('sf/ipmanager/%s' % netdesc['network_uuid'],
-                               ttl=120) as _:
-                db.add_event('network', netdesc['network_uuid'], 'allocate address',
-                             None, None, instance_uuid)
-                allocations.setdefault(netdesc['network_uuid'], [])
-                ipm = db.get_ipmanager(netdesc['network_uuid'])
-                if 'address' not in netdesc or not netdesc['address']:
-                    netdesc['address'] = ipm.get_random_free_address()
-                else:
-                    if not ipm.reserve(netdesc['address']):
-                        error_with_cleanup(409, 'address %s in use' %
-                                           netdesc['address'])
-                db.persist_ipmanager(netdesc['network_uuid'], ipm.save())
-                allocations[netdesc['network_uuid']].append(
-                    (netdesc['address'], order))
+                with etcd.get_lock('sf/ipmanager/%s' % netdesc['network_uuid'],
+                                ttl=120) as _:
+                    db.add_event('network', netdesc['network_uuid'], 'allocate address',
+                                None, None, instance_uuid)
+                    allocations.setdefault(netdesc['network_uuid'], [])
+                    ipm = db.get_ipmanager(netdesc['network_uuid'])
+                    if 'address' not in netdesc or not netdesc['address']:
+                        netdesc['address'] = ipm.get_random_free_address()
+                    else:
+                        if not ipm.reserve(netdesc['address']):
+                            error_with_cleanup(409, 'address %s in use' %
+                                            netdesc['address'])
+                    db.persist_ipmanager(netdesc['network_uuid'], ipm.save())
+                    allocations[netdesc['network_uuid']].append(
+                        (netdesc['address'], order))
 
-            if 'model' not in netdesc or not netdesc['model']:
-                netdesc['model'] = 'virtio'
+                if 'model' not in netdesc or not netdesc['model']:
+                    netdesc['model'] = 'virtio'
 
-            db.create_network_interface(
-                str(uuid.uuid4()), netdesc, instance_uuid, order)
+                db.create_network_interface(
+                    str(uuid.uuid4()), netdesc, instance_uuid, order)
 
-            order += 1
+                order += 1
 
         # Now we can start the instance
         with etcd.get_lock('sf/instance/%s' % instance.db_entry['uuid'], ttl=900) as lock:
