@@ -423,7 +423,9 @@ class AuthMetadata(Resource):
 
         with etcd.get_lock('sf/metadata/namespace/%s' % namespace) as _:
             md = etcd.get('metadata', 'namespace', namespace)
-            md['key'] = value
+            if md is None:
+                md = {}
+            md[key] = value
             etcd.put('metadata', 'namespace', namespace, md)
 
 
@@ -1038,7 +1040,9 @@ class NetworkMetadata(Resource):
 
         with etcd.get_lock('sf/metadata/network/%s' % network_uuid) as _:
             md = etcd.get('metadata', 'network', network_uuid)
-            md['key'] = value
+            if md is None:
+                md = {}
+            md[key] = value
             etcd.put('metadata', 'network', network_uuid, md)
 
 
