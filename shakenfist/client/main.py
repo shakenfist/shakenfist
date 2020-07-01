@@ -29,7 +29,7 @@ def auto_complete(func):
             namespace=os.getenv("SHAKENFIST_NAMESPACE"),
             key=os.getenv('SHAKENFIST_KEY'),
             base_url=os.getenv('SHAKENFIST_API_URL', 'http://localhost:13000'),
-            )
+        )
 
     return func
 
@@ -349,6 +349,8 @@ def _show_instance(ctx, i, include_snapshots=False):
         print('Instance not found')
         sys.exit(1)
 
+    metadata = CLIENT.get_instance_metadata(i['uuid'])
+    interfaces = CLIENT.get_instance_interfaces(i['uuid'])
     if include_snapshots:
         snapshots = CLIENT.get_instance_snapshots(i['uuid'])
 
@@ -357,8 +359,10 @@ def _show_instance(ctx, i, include_snapshots=False):
                               'node', 'console_port', 'vdi_port', 'ssh_key',
                               'user_data'])
         out['network_interfaces'] = []
-        for interface in CLIENT.get_instance_interfaces(i['uuid']):
+        for interface in interfaces:
             _show_interface(ctx, interface, out)
+
+        out['metadata'] = metadata
 
         if include_snapshots:
             out['snapshots'] = []
@@ -394,14 +398,25 @@ def _show_instance(ctx, i, include_snapshots=False):
     print()
     if ctx.obj['OUTPUT'] == 'pretty':
         format_string = '    %-8s: %s'
+        print('Metadata:')
+        for key in metadata:
+            print(format_string % (key, metadata[key]))
+
+    else:
+        print('key,value')
+        for key in metadata:
+            print('%s,%s' % (key, metadata[key]))
+
+    print()
+    if ctx.obj['OUTPUT'] == 'pretty':
         print('Interfaces:')
-        for interface in CLIENT.get_instance_interfaces(i['uuid']):
+        for interface in interfaces:
             print()
             _show_interface(ctx, interface)
 
     else:
         print('iface,interface uuid,network uuid,macaddr,order,ipv4,floating')
-        for interface in CLIENT.get_instance_interfaces(i['uuid']):
+        for interface in interfaces:
             _show_interface(ctx, interface)
 
     if include_snapshots:
@@ -579,6 +594,17 @@ def instance_events(ctx, instance_uuid=None):
                          indent=4, sort_keys=True))
 
 
+@instance.command(name='set-metadata', help='Set a metadata item')
+@click.argument('instance_uuid', type=click.STRING, autocompletion=_get_instances)
+@click.argument('key', type=click.STRING)
+@click.argument('value', type=click.STRING)
+@click.pass_context
+def instance_set_metadata(ctx, instance_uuid=None, key=None, value=None):
+    CLIENT.set_instance_metadata_item(instance_uuid, key, value)
+    if ctx.obj['OUTPUT'] == 'json':
+        print('{}')
+
+
 @instance.command(name='reboot', help='Reboot instance')
 @click.argument('instance_uuid', type=click.STRING, autocompletion=_get_instances)
 @click.option('--hard/--soft', default=False)
@@ -677,9 +703,9 @@ def _show_interface(ctx, interface, out=[]):
         print(format_string % ('floating', interface['floating']))
     else:
         print('iface,%s,%s,%s,%s,%s,%s'
-                % (interface['uuid'], interface['network_uuid'],
-                    interface['macaddr'], interface['order'], interface['ipv4'],
-                    interface['floating']))
+              % (interface['uuid'], interface['network_uuid'],
+                 interface['macaddr'], interface['order'], interface['ipv4'],
+                 interface['floating']))
 
 
 @interface.command(name='show', help='Show an interface')

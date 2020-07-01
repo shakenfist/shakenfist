@@ -146,6 +146,16 @@ class Client(object):
                               '/interfaces')
         return r.json()
 
+    def get_instance_metadata(self, instance_uuid):
+        r = self._request_url('GET', self.base_url + '/instances/' + instance_uuid +
+                              '/metadata')
+        return r.json()
+
+    def set_instance_metadata_item(self, instance_uuid, key, value):
+        r = self._request_url('POST', self.base_url + '/instances/' + instance_uuid +
+                              '/metadata/' + key, data={'value': value})
+        return r.json()
+
     def create_instance(self, name, cpus, memory, network, disk, sshkey, userdata,
                         namespace=None, force_placement=None):
         body = {
