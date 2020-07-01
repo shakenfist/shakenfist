@@ -867,7 +867,9 @@ class InstanceMetadata(Resource):
 
         with etcd.get_lock('sf/metadata/instance/%s' % instance_uuid) as _:
             md = etcd.get('metadata', 'instance', instance_uuid)
-            md['key'] = value
+            if md is None:
+                md = {}
+            md[key] = value
             etcd.put('metadata', 'instance', instance_uuid, md)
 
 
