@@ -260,6 +260,16 @@ class Client(object):
                               })
         return r.json()
 
+    def get_network_metadata(self, network_uuid):
+        r = self._request_url('GET', self.base_url + '/networks/' + network_uuid +
+                              '/metadata')
+        return r.json()
+
+    def set_network_metadata_item(self, network_uuid, key, value):
+        r = self._request_url('POST', self.base_url + '/networks/' + network_uuid +
+                              '/metadata/' + key, data={'value': value})
+        return r.json()
+
     def get_nodes(self):
         r = self._request_url('GET', self.base_url + '/nodes')
         return r.json()

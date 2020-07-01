@@ -996,6 +996,30 @@ class NetworkEvents(Resource):
         return list(db.get_events('network', network_uuid))
 
 
+class NetworkMetadatas(Resource):
+    @jwt_required
+    @arg_is_network_uuid
+    @requires_network_ownership
+    def get(self, network_uuid=None, network_from_db=None):
+        return etcd.get('metadata', 'network', network_uuid)
+
+
+class NetworkMetadata(Resource):
+    @jwt_required
+    @arg_is_network_uuid
+    @requires_network_ownership
+    def post(self, network_uuid=None, key=None, value=None, network_from_db=None):
+        if not key:
+            return error(400, 'no key specified')
+        if not value:
+            return error(400, 'no value specified')
+
+        with etcd.get_lock('sf/metadata/network/%s' % network_uuid) as _:
+            md = etcd.get('metadata', 'network', network_uuid)
+            md['key'] = value
+            etcd.put('metadata', 'network', network_uuid, md)
+
+
 class Nodes(Resource):
     @jwt_required
     @caller_is_admin
@@ -1087,6 +1111,9 @@ api.add_resource(Image, '/images')
 api.add_resource(Networks, '/networks')
 api.add_resource(Network, '/networks/<network_uuid>')
 api.add_resource(NetworkEvents, '/networks/<network_uuid>/events')
+api.add_resource(NetworkMetadatas, '/networks/<network_uuid>/metadata')
+api.add_resource(NetworkMetadata,
+                 '/networks/<network_uuid>/metadata/<key>')
 api.add_resource(Nodes, '/nodes')
 
 api.add_resource(DeployNetworkNode, '/deploy_network_node')
