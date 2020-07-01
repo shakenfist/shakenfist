@@ -163,6 +163,34 @@ def namespace_delete_key(ctx, namespace=None, keyname=None):
     CLIENT.delete_namespace_key(namespace, keyname)
 
 
+@namespace.command(name='get-metadata', help='Get metadata items')
+@click.argument('namespace', type=click.STRING)
+@click.argument('key', type=click.STRING)
+@click.argument('value', type=click.STRING)
+@click.pass_context
+def namespace_set_metadata(ctx, namespace=None:
+    metadata = CLIENT.get_namespace_metadata(namespace)
+
+    if ctx.obj['OUTPUT'] == 'json':
+        return metadata
+
+    format_string = '%-12s: %s'
+    if ctx.obj['OUTPUT'] == 'simple':
+        format_string = '%s:%s'
+    for key in metadata:
+        print(format_string % (key, metadata[key]))
+
+@namespace.command(name='set-metadata', help='Set a metadata item')
+@click.argument('namespace', type=click.STRING)
+@click.argument('key', type=click.STRING)
+@click.argument('value', type=click.STRING)
+@click.pass_context
+def namespace_set_metadata(ctx, namespace=None, key=None, value=None):
+    CLIENT.set_namespace_metadata_item(namespace, key, value)
+    if ctx.obj['OUTPUT'] == 'json':
+        print('{}')
+
+
 cli.add_command(namespace)
 
 

@@ -308,6 +308,29 @@ class ExternalApiTestCase(testtools.TestCase):
         self.assertEqual(200, resp.status_code)
         mock_put.assert_called_with('namespace', None, 'system', {'keys': {}})
 
+    @mock.patch('shakenfist.etcd.get', return_value={'a': 'a', 'b': 'b'})
+    def test_get_namespace_metadata(self, mock_etcd_get):
+        resp = self.client.get(
+            '/auth/namespace/foo/metadata', headers={'Authorization': self.auth_header})
+        self.assertEqual({'a': 'a', 'b': 'b'}, resp.get_json())
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual('application/json', resp.content_type)
+
+    @mock.patch('shakenfist.etcd.get', return_value={})
+    @mock.patch('shakenfist.etcd.put')
+    @mock.patch('shakenfist.etcd.get_lock')
+    def test_post_namespace_metadata(self, mock_etcd_get_lock, mock_etcd_put,
+                                     mock_etcd_get):
+        resp = self.client.post('/auth/namespace/foo/metadata/foo',
+                                headers={'Authorization': self.auth_header},
+                                data=json.dumps({
+                                    'value': 'bar'
+                                }))
+        self.assertEqual(None, resp.get_json())
+        self.assertEqual(200, resp.status_code)
+        mock_etcd_put.assert_called_with(
+            'metadata', 'namespace', 'foo', {'key': 'bar'})
+
     @mock.patch('shakenfist.db.get_instance',
                 return_value={'uuid': '123',
                               'name': 'banana',

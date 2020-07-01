@@ -312,6 +312,16 @@ class Client(object):
         self._request_url(
             'DELETE', self.base_url + '/auth/namespace/' + namespace + '/key/' + key_name)
 
+    def get_namespace_metadata(self, namespace):
+        r = self._request_url('GET', self.base_url + '/auth/namespace/' + namespace +
+                              '/metadata')
+        return r.json()
+
+    def set_namespace_metadata_item(self, network_uuid, key, value):
+        r = self._request_url('POST', self.base_url + '/auth/namespace/' + namespace +
+                              '/metadata/' + key, data={'value': value})
+        return r.json()
+
 
 def get_user_agent():
     sf_version = VersionInfo('shakenfist').version_string()
