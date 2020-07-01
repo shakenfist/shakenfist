@@ -405,6 +405,30 @@ class AuthNamespaceKey(Resource):
             etcd.put('namespace', None, namespace, ns)
 
 
+class AuthMetadatas(Resource):
+    @jwt_required
+    @caller_is_admin
+    def get(self, namespace):
+        return etcd.get('metadata', 'namespace', namespace)
+
+
+class AuthMetadata(Resource):
+    @jwt_required
+    @caller_is_admin
+    def post(self, namespace, key=None, value=None):
+        if not key:
+            return error(400, 'no key specified')
+        if not value:
+            return error(400, 'no value specified')
+
+        with etcd.get_lock('sf/metadata/namespace/%s' % namespace) as _:
+            md = etcd.get('metadata', 'namespace', namespace)
+            if md is None:
+                md = {}
+            md[key] = value
+            etcd.put('metadata', 'namespace', namespace, md)
+
+
 class Instance(Resource):
     @jwt_required
     @arg_is_instance_uuid
@@ -996,6 +1020,32 @@ class NetworkEvents(Resource):
         return list(db.get_events('network', network_uuid))
 
 
+class NetworkMetadatas(Resource):
+    @jwt_required
+    @arg_is_network_uuid
+    @requires_network_ownership
+    def get(self, network_uuid=None, network_from_db=None):
+        return etcd.get('metadata', 'network', network_uuid)
+
+
+class NetworkMetadata(Resource):
+    @jwt_required
+    @arg_is_network_uuid
+    @requires_network_ownership
+    def post(self, network_uuid=None, key=None, value=None, network_from_db=None):
+        if not key:
+            return error(400, 'no key specified')
+        if not value:
+            return error(400, 'no value specified')
+
+        with etcd.get_lock('sf/metadata/network/%s' % network_uuid) as _:
+            md = etcd.get('metadata', 'network', network_uuid)
+            if md is None:
+                md = {}
+            md[key] = value
+            etcd.put('metadata', 'network', network_uuid, md)
+
+
 class Nodes(Resource):
     @jwt_required
     @caller_is_admin
@@ -1061,10 +1111,16 @@ class RemoveDHCP(Resource):
 
 
 api.add_resource(Root, '/')
+
 api.add_resource(Auth, '/auth')
 api.add_resource(AuthNamespaces, '/auth/namespace')
 api.add_resource(AuthNamespace, '/auth/namespace/<namespace>')
-api.add_resource(AuthNamespaceKey, '/auth/namespace/<namespace>/<key_name>')
+api.add_resource(AuthNamespaceKey,
+                 '/auth/namespace/<namespace>/key/<key_name>')
+api.add_resource(AuthMetadatas, '/auth/namespace/<namespace>/metadata')
+api.add_resource(AuthMetadata,
+                 '/auth/namespace/<namespace>/metadata/<key>')
+
 api.add_resource(Instances, '/instances')
 api.add_resource(Instance, '/instances/<instance_uuid>')
 api.add_resource(InstanceEvents, '/instances/<instance_uuid>/events')
@@ -1082,10 +1138,16 @@ api.add_resource(InterfaceDefloat, '/interfaces/<interface_uuid>/defloat')
 api.add_resource(InstanceMetadatas, '/instances/<instance_uuid>/metadata')
 api.add_resource(InstanceMetadata,
                  '/instances/<instance_uuid>/metadata/<key>')
+
 api.add_resource(Image, '/images')
+
 api.add_resource(Networks, '/networks')
 api.add_resource(Network, '/networks/<network_uuid>')
 api.add_resource(NetworkEvents, '/networks/<network_uuid>/events')
+api.add_resource(NetworkMetadatas, '/networks/<network_uuid>/metadata')
+api.add_resource(NetworkMetadata,
+                 '/networks/<network_uuid>/metadata/<key>')
+
 api.add_resource(Nodes, '/nodes')
 
 api.add_resource(DeployNetworkNode, '/deploy_network_node')

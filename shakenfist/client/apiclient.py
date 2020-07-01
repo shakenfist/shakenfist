@@ -146,6 +146,16 @@ class Client(object):
                               '/interfaces')
         return r.json()
 
+    def get_instance_metadata(self, instance_uuid):
+        r = self._request_url('GET', self.base_url + '/instances/' + instance_uuid +
+                              '/metadata')
+        return r.json()
+
+    def set_instance_metadata_item(self, instance_uuid, key, value):
+        r = self._request_url('POST', self.base_url + '/instances/' + instance_uuid +
+                              '/metadata/' + key, data={'value': value})
+        return r.json()
+
     def create_instance(self, name, cpus, memory, network, disk, sshkey, userdata,
                         namespace=None, force_placement=None):
         body = {
@@ -250,12 +260,23 @@ class Client(object):
                               })
         return r.json()
 
+    def get_network_metadata(self, network_uuid):
+        r = self._request_url('GET', self.base_url + '/networks/' + network_uuid +
+                              '/metadata')
+        return r.json()
+
+    def set_network_metadata_item(self, network_uuid, key, value):
+        r = self._request_url('POST', self.base_url + '/networks/' + network_uuid +
+                              '/metadata/' + key, data={'value': value})
+        return r.json()
+
     def get_nodes(self):
         r = self._request_url('GET', self.base_url + '/nodes')
         return r.json()
 
     def get_interface(self, interface_uuid):
-        r = self._request_url('GET', self.base_url + '/interfaces/' + interface_uuid)
+        r = self._request_url('GET', self.base_url +
+                              '/interfaces/' + interface_uuid)
         return r.json()
 
     def float_interface(self, interface_uuid):
@@ -289,7 +310,17 @@ class Client(object):
 
     def delete_namespace_key(self, namespace, key_name):
         self._request_url(
-            'DELETE', self.base_url + '/auth/namespace/' + namespace + '/' + key_name)
+            'DELETE', self.base_url + '/auth/namespace/' + namespace + '/key/' + key_name)
+
+    def get_namespace_metadata(self, namespace):
+        r = self._request_url('GET', self.base_url + '/auth/namespace/' + namespace +
+                              '/metadata')
+        return r.json()
+
+    def set_namespace_metadata_item(self, network_uuid, key, value):
+        r = self._request_url('POST', self.base_url + '/auth/namespace/' + namespace +
+                              '/metadata/' + key, data={'value': value})
+        return r.json()
 
 
 def get_user_agent():
