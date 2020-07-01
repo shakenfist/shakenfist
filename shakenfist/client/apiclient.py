@@ -255,7 +255,8 @@ class Client(object):
         return r.json()
 
     def get_interface(self, interface_uuid):
-        r = self._request_url('GET', self.base_url + '/interfaces/' + interface_uuid)
+        r = self._request_url('GET', self.base_url +
+                              '/interfaces/' + interface_uuid)
         return r.json()
 
     def float_interface(self, interface_uuid):
@@ -289,7 +290,7 @@ class Client(object):
 
     def delete_namespace_key(self, namespace, key_name):
         self._request_url(
-            'DELETE', self.base_url + '/auth/namespace/' + namespace + '/' + key_name)
+            'DELETE', self.base_url + '/auth/namespace/' + namespace + '/key/' + key_name)
 
 
 def get_user_agent():

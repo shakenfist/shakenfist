@@ -289,7 +289,7 @@ class ExternalApiTestCase(testtools.TestCase):
     @mock.patch('shakenfist.etcd.get_lock')
     @mock.patch('shakenfist.etcd.get', return_value={'keys': {}})
     def test_delete_namespace_key_missing_key(self, mock_get, mock_lock):
-        resp = self.client.delete('/auth/namespace/system/mykey',
+        resp = self.client.delete('/auth/namespace/system/key/mykey',
                                   headers={'Authorization': self.auth_header})
         self.assertEqual(404, resp.status_code)
         self.assertEqual(
@@ -303,7 +303,7 @@ class ExternalApiTestCase(testtools.TestCase):
     @mock.patch('shakenfist.etcd.get', return_value={'keys': {'mykey': 'foo'}})
     @mock.patch('shakenfist.etcd.put')
     def test_delete_namespace_key(self, mock_put, mock_get, mock_lock):
-        resp = self.client.delete('/auth/namespace/system/mykey',
+        resp = self.client.delete('/auth/namespace/system/key/mykey',
                                   headers={'Authorization': self.auth_header})
         self.assertEqual(200, resp.status_code)
         mock_put.assert_called_with('namespace', None, 'system', {'keys': {}})
