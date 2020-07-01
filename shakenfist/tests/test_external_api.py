@@ -329,7 +329,7 @@ class ExternalApiTestCase(testtools.TestCase):
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
         mock_etcd_put.assert_called_with(
-            'metadata', 'namespace', 'foo', {'key': 'bar'})
+            'metadata', 'namespace', 'foo', {'foo': 'bar'})
 
     @mock.patch('shakenfist.db.get_instance',
                 return_value={'uuid': '123',
@@ -381,7 +381,7 @@ class ExternalApiTestCase(testtools.TestCase):
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
         mock_etcd_put.assert_called_with(
-            'metadata', 'instance', 'foo', {'key': 'bar'})
+            'metadata', 'instance', 'foo', {'foo': 'bar'})
 
     @mock.patch('shakenfist.db.get_network',
                 return_value={'uuid': 'foo',
@@ -412,4 +412,4 @@ class ExternalApiTestCase(testtools.TestCase):
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
         mock_etcd_put.assert_called_with(
-            'metadata', 'network', 'foo', {'key': 'bar'})
+            'metadata', 'network', 'foo', {'foo': 'bar'})
