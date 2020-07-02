@@ -168,7 +168,7 @@ def namespace_delete_key(ctx, namespace=None, keyname=None):
 @click.argument('key', type=click.STRING)
 @click.argument('value', type=click.STRING)
 @click.pass_context
-def namespace_set_metadata(ctx, namespace=None:
+def namespace_set_metadata(ctx, namespace=None):
     metadata = CLIENT.get_namespace_metadata(namespace)
 
     if ctx.obj['OUTPUT'] == 'json':
@@ -244,7 +244,7 @@ def _show_network(ctx, n):
         filtered = filter_dict(n, ['uuid', 'name', 'vxid', 'netblock', 'provide_dhcp',
                                          'provide_nat', 'namespace'])
         filtered['metadata'] = metadata
-        print(json.dumps(filtered, indent=4, sort_keys=True)
+        print(json.dumps(filtered, indent=4, sort_keys=True))
         return
 
     format_string='%-12s: %s'
