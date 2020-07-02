@@ -318,12 +318,6 @@ class AuthNamespaces(Resource):
     def post(self, namespace=None, key_name=None, key=None):
         if not namespace:
             return error(400, 'no namespace specified')
-        if not key_name:
-            return error(400, 'no unique name specified')
-        if not key:
-            return error(400, 'no key specified')
-        if key_name == 'service_key':
-            return error(403, 'illegal key name')
 
         with etcd.get_lock('sf/namespace') as _:
             rec = etcd.get('namespace', None, namespace)
@@ -333,9 +327,15 @@ class AuthNamespaces(Resource):
                     'keys': {}
                 }
 
-            encoded = str(base64.b64encode(bcrypt.hashpw(
-                key.encode('utf-8'), bcrypt.gensalt())), 'utf-8')
-            rec['keys'][key_name] = encoded
+            # Allow shortcut of creating key at same time as the namespace
+            if key_name and key:
+                if key_name == 'service_key':
+                    return error(403, 'illegal key name')
+
+                encoded = str(base64.b64encode(bcrypt.hashpw(
+                    key.encode('utf-8'), bcrypt.gensalt())), 'utf-8')
+                rec['keys'][key_name] = encoded
+
             etcd.put('namespace', None, namespace, rec)
 
         return namespace
@@ -387,7 +387,42 @@ class AuthNamespace(Resource):
         etcd.delete('namespace', None, namespace)
 
 
+class AuthNamespaceKeys(Resource):
+    @jwt_required
+    @caller_is_admin
+    def get(self, namespace=None):
+        out = []
+        LOG.warn("REC=%s",etcd.get('namespace', None, namespace))
+        for keyname in etcd.get('namespace', None, namespace)['keys']:
+            out.append(keyname)
+        return out
+
 class AuthNamespaceKey(Resource):
+    @jwt_required
+    @caller_is_admin
+    def post(self, namespace=None, key_name=None, key=None):
+        if not namespace:
+            return error(400, 'no namespace specified')
+        if not key_name:
+            return error(400, 'no key name specified')
+        if not key:
+            return error(400, 'no key specified')
+        if key_name == 'service_key':
+            return error(403, 'illegal key name')
+
+        with etcd.get_lock('sf/namespace') as _:
+            rec = etcd.get('namespace', None, namespace)
+            if not rec:
+                return error(404, 'namespace does not exist')
+
+            encoded = str(base64.b64encode(bcrypt.hashpw(
+                key.encode('utf-8'), bcrypt.gensalt())), 'utf-8')
+            rec['keys'][key_name] = encoded
+
+            etcd.put('namespace', None, namespace, rec)
+
+        return key_name
+
     @jwt_required
     @caller_is_admin
     def delete(self, namespace, key_name):
@@ -1116,6 +1151,8 @@ api.add_resource(Root, '/')
 api.add_resource(Auth, '/auth')
 api.add_resource(AuthNamespaces, '/auth/namespace')
 api.add_resource(AuthNamespace, '/auth/namespace/<namespace>')
+api.add_resource(AuthNamespaceKeys,
+                 '/auth/namespace/<namespace>/key')
 api.add_resource(AuthNamespaceKey,
                  '/auth/namespace/<namespace>/key/<key_name>')
 api.add_resource(AuthMetadatas, '/auth/namespace/<namespace>/metadata')
