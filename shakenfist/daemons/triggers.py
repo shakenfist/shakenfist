@@ -28,15 +28,17 @@ class monitor(object):
         while True:
             for inst in list(db.get_instances(only_node=config.parsed.get('NODE_NAME'))):
                 if inst['uuid'] not in files_by_instance:
+                    console_path = os.path.join(
+                        config.parsed.get('STORAGE_PATH'), 'instances', inst['uuid'], 'console.log')
                     try:
-                        f = open(os.path.join(
-                            config.parsed.get('STORAGE_PATH'), 'instances', inst['uuid'], 'console.log'))
+                        f = open(console_path)
                         f.seek(0, 2)
                         files_by_instance[inst['uuid']] = f
                         files_by_fileno[f.fileno()] = inst['uuid']
 
                     except FileNotFoundError:
-                        pass
+                        LOG.info(
+                            'File not found while setting up triggers: %s' % console_path)
 
             readable, _, exceptional = select.select(
                 file_objects, [], file_objects, 0.5)
