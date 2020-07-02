@@ -328,7 +328,9 @@ class AuthNamespaces(Resource):
                 }
 
             # Allow shortcut of creating key at same time as the namespace
-            if key_name and key:
+            if key_name:
+                if not key:
+                    return error(400, 'no key specified')
                 if key_name == 'service_key':
                     return error(403, 'illegal key name')
 
@@ -386,6 +388,10 @@ class AuthNamespace(Resource):
 
         etcd.delete('namespace', None, namespace)
 
+        # Delete metadata
+        with etcd.get_lock('sf/metadata/namespace/%s' % namespace) as _:
+            etcd.delete('metadata', 'namespace', namespace)
+
 
 class AuthNamespaceKeys(Resource):
     @jwt_required
@@ -438,10 +444,6 @@ class AuthNamespaceKey(Resource):
             else:
                 return error(404, 'key name not found in namespace')
             etcd.put('namespace', None, namespace, ns)
-
-        # Delete metadata
-        with etcd.get_lock('sf/metadata/namespace/%s' % namespace) as _:
-            etcd.delete('metadata', 'namespace', namespace)
 
 
 class AuthMetadatas(Resource):
