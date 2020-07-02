@@ -327,7 +327,7 @@ class Client(object):
                               '/metadata')
         return r.json()
 
-    def set_namespace_metadata_item(self, network_uuid, key, value):
+    def set_namespace_metadata_item(self, namespace, key, value):
         r = self._request_url('POST', self.base_url + '/auth/namespace/' + namespace +
                               '/metadata/' + key, data={'value': value})
         return r.json()
