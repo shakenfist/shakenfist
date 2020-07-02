@@ -439,6 +439,10 @@ class AuthNamespaceKey(Resource):
                 return error(404, 'key name not found in namespace')
             etcd.put('namespace', None, namespace, ns)
 
+        # Delete metadata
+        with etcd.get_lock('sf/metadata/namespace/%s' % namespace) as _:
+            etcd.delete('metadata', 'namespace', namespace)
+
 
 class AuthMetadatas(Resource):
     @jwt_required
@@ -461,6 +465,19 @@ class AuthMetadata(Resource):
             if md is None:
                 md = {}
             md[key] = value
+            etcd.put('metadata', 'namespace', namespace, md)
+
+    @jwt_required
+    @caller_is_admin
+    def delete(self, namespace, key=None, value=None):
+        if not key:
+            return error(400, 'no key specified')
+
+        with etcd.get_lock('sf/metadata/namespace/%s' % namespace) as _:
+            md = etcd.get('metadata', 'namespace', namespace)
+            if md is None or key not in md:
+                return error(404, 'key not found')
+            del md[key]
             etcd.put('metadata', 'namespace', namespace, md)
 
 
@@ -507,6 +524,10 @@ class Instance(Resource):
                     else:
                         with util.RecordedOperation('remove network', n) as _:
                             n.delete()
+
+        # Delete metadata
+        with etcd.get_lock('sf/metadata/instance/%s' % instance_uuid) as _:
+            etcd.delete('metadata', 'instance', instance_uuid)
 
 
 class Instances(Resource):
@@ -932,6 +953,20 @@ class InstanceMetadata(Resource):
             md[key] = value
             etcd.put('metadata', 'instance', instance_uuid, md)
 
+    @jwt_required
+    @arg_is_instance_uuid
+    @requires_instance_ownership
+    def delete(self, instance_uuid=None, key=None, instance_from_db=None):
+        if not key:
+            return error(400, 'no key specified')
+
+        with etcd.get_lock('sf/metadata/instance/%s' % instance_uuid) as _:
+            md = etcd.get('metadata', 'instance', instance_uuid)
+            if md is None or key not in md:
+                return error(404, 'key not found')
+            del md[key]
+            etcd.put('metadata', 'instance', instance_uuid, md)
+
 
 class Image(Resource):
     @jwt_required
@@ -978,6 +1013,10 @@ class Network(Resource):
                     db.persist_ipmanager('floating', ipm.save())
 
             db.update_network_state(network_uuid, 'deleted')
+
+        # Delete metadata
+        with etcd.get_lock('sf/metadata/network/%s' % network_uuid) as _:
+            etcd.delete('metadata', 'network', network_uuid)
 
 
 class Networks(Resource):
@@ -1079,6 +1118,20 @@ class NetworkMetadata(Resource):
             if md is None:
                 md = {}
             md[key] = value
+            etcd.put('metadata', 'network', network_uuid, md)
+
+    @jwt_required
+    @arg_is_network_uuid
+    @requires_network_ownership
+    def delete(self, network_uuid=None, key=None, network_from_db=None):
+        if not key:
+            return error(400, 'no key specified')
+
+        with etcd.get_lock('sf/metadata/network/%s' % network_uuid) as _:
+            md = etcd.get('metadata', 'network', network_uuid)
+            if md is None or key not in md:
+                return error(404, 'key not found')
+            del md[key]
             etcd.put('metadata', 'network', network_uuid, md)
 
 
