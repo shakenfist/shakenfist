@@ -112,7 +112,8 @@ def namespace():
 
 @auto_complete
 def _get_namespaces(ctx, args, incomplete):
-    return list(CLIENT.get_namespaces())
+    choices = CLIENT.get_namespaces()
+    return [arg for arg in choices if arg.startswith(incomplete)]
 
 
 @namespace.command(name='list', help='List namespaces')
@@ -271,8 +272,8 @@ def network():
 
 @auto_complete
 def _get_networks(ctx, args, incomplete):
-    for n in list(CLIENT.get_networks()):
-        yield n['uuid']
+    choices = [i['uuid'] for i in CLIENT.get_networks()]
+    return [arg for arg in choices if arg.startswith(incomplete)]
 
 
 @network.command(name='list', help='List networks')
@@ -443,8 +444,8 @@ def instance():
 
 @auto_complete
 def _get_instances(ctx, args, incomplete):
-    for i in CLIENT.get_instances():
-        yield i['uuid']
+    choices = [i['uuid'] for i in CLIENT.get_instances()]
+    return [arg for arg in choices if arg.startswith(incomplete)]
 
 
 @instance.command(name='list', help='List instances')
@@ -817,9 +818,11 @@ def interface():
 
 @auto_complete
 def _get_instance_interfaces(ctx, args, incomplete):
+    choices = []
     for i in CLIENT.get_instances():
         for interface in CLIENT.get_instance_interfaces(i['uuid']):
-            yield interface['uuid']
+            choices.append(interface['uuid'])
+    return [arg for arg in choices if arg.startswith(incomplete)]
 
 
 def _show_interface(ctx, interface, out=[]):
