@@ -568,7 +568,7 @@ class Instances(Resource):
                 uuid=instance_uuid,
                 name=name,
                 disks=disk,
-                memory_mb=memory * 1024,
+                memory_mb=memory,
                 vcpus=cpus,
                 ssh_key=ssh_key,
                 user_data=user_data,

@@ -64,27 +64,27 @@ Instances are always cattle. Any feature that made instances feel like pets has 
 You start an instance like this:
 
 ```bash
-sf-client instance create "myinstance" 1 2 -d 8@cirros -n netuuid
+sf-client instance create "myinstance" 1 2048 -d 8@cirros -n netuuid
 ```
 
-Where "myinstance" is the name of the instance, it has 1 vCPU, 2gb of RAM, a single 8gb disk (more on this in a second) and a single network interface on the network with the UUID "netuuid".
+Where "myinstance" is the name of the instance, it has 1 vCPU, 2048MB of RAM, a single 8gb disk (more on this in a second) and a single network interface on the network with the UUID "netuuid".
 
 "8@cirros" is a "short disk specification". These are in the form size@image, where the @image is optional. You can specify more than one disk, so this is valid:
 
 ```bash
-sf-client instance create "myinstance" 1 2 -d 8@cirros -d 8 -d 8 -n netuuid
+sf-client instance create "myinstance" 1 2048 -d 8@cirros -d 8 -d 8 -n netuuid
 ```
 
 In this case we have three disks, all of 8gb. The boot disk is imaged with cirros. The "cirros" here is shorthand. By default, you specify a URL for the image you want, so to boot a cirros instance you might use http://download.cirros-cloud.net/0.5.1/cirros-0.5.1-x86_64-disk.img -- that gets old though, so for common cloud images there is a shorthand format, where Shaken Fist knows how to generate the download URL from a short description. In this case "cirros" means "the latest release of cirros". You can also specify a version like this:
 
 ```bash
-sf-client instance create "myinstance" 1 2 -d 8@cirros:0.5.1 -d 8 -d 8 -n netuuid
+sf-client instance create "myinstance" 1 2048 -d 8@cirros:0.5.1 -d 8 -d 8 -n netuuid
 ```
 
 "Common cloud images" is currently defined as cirros and Ubuntu. You can also use a "detailed disk specification", which is what fancy people use. It's syntax is similar:
 
 ```bash
-sf-client instance create "myinstance" 1 2 -D size=8,base=cirros,bus=ide,type=cdrom -d 8 -d 8 -n netuuid
+sf-client instance create "myinstance" 1 2048 -D size=8,base=cirros,bus=ide,type=cdrom -d 8 -d 8 -n netuuid
 ```
 
 The specification is composed of a series of key-value pairs. Valid keys are: size; base; bus; and type. If you don't specify a key, you'll get a reasonable default. Here's how the keys work:
@@ -97,7 +97,7 @@ The specification is composed of a series of key-value pairs. Valid keys are: si
 Similarly, networks have a "short network specification", where you can specify the UUID of a network, but also optionally the IP address to use for the interface. You can also have more than one network interface, so this is valid:
 
 ```bash
-sf-client instance create "myinstance" 1 2 -d 8@cirros -n netuuid1@192.168.1.2 \
+sf-client instance create "myinstance" 1 2048 -d 8@cirros -n netuuid1@192.168.1.2 \
     -n netuuid2@10.0.0.4
 ```
 
