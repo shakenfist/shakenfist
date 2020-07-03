@@ -387,10 +387,7 @@ class AuthNamespace(Resource):
             db.hard_delete_network(network_uuid)
 
         etcd.delete('namespace', None, namespace)
-
-        # Delete metadata
-        with etcd.get_lock('sf/metadata/namespace/%s' % namespace) as _:
-            etcd.delete('metadata', 'namespace', namespace)
+        etcd.delete('metadata', 'namespace', namespace)
 
 
 class AuthNamespaceKeys(Resource):
@@ -525,10 +522,6 @@ class Instance(Resource):
                     else:
                         with util.RecordedOperation('remove network', n) as _:
                             n.delete()
-
-        # Delete metadata
-        with etcd.get_lock('sf/metadata/instance/%s' % instance_uuid) as _:
-            etcd.delete('metadata', 'instance', instance_uuid)
 
 
 class Instances(Resource):
@@ -1014,10 +1007,6 @@ class Network(Resource):
                     db.persist_ipmanager('floating', ipm.save())
 
             db.update_network_state(network_uuid, 'deleted')
-
-        # Delete metadata
-        with etcd.get_lock('sf/metadata/network/%s' % network_uuid) as _:
-            etcd.delete('metadata', 'network', network_uuid)
 
 
 class Networks(Resource):

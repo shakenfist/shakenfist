@@ -329,6 +329,7 @@ def _show_network(ctx, n):
     print(format_string % ('provide dhcp', n['provide_dhcp']))
     print(format_string % ('provide nat', n['provide_nat']))
     print(format_string % ('namespace', n['namespace']))
+    print(format_string % ('state', n['state']))
 
     print()
     if ctx.obj['OUTPUT'] == 'pretty':
