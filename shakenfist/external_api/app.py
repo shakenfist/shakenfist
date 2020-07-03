@@ -338,6 +338,9 @@ class AuthNamespaces(Resource):
                     key.encode('utf-8'), bcrypt.gensalt())), 'utf-8')
                 rec['keys'][key_name] = encoded
 
+            # Initialise metadata
+            etcd.put('metadata', 'namespace', namespace, {})
+
             etcd.put('namespace', None, namespace, rec)
 
         return namespace
@@ -387,10 +390,7 @@ class AuthNamespace(Resource):
             db.hard_delete_network(network_uuid)
 
         etcd.delete('namespace', None, namespace)
-
-        # Delete metadata
-        with etcd.get_lock('sf/metadata/namespace/%s' % namespace) as _:
-            etcd.delete('metadata', 'namespace', namespace)
+        etcd.delete('metadata', 'namespace', namespace)
 
 
 class AuthNamespaceKeys(Resource):
@@ -526,10 +526,6 @@ class Instance(Resource):
                         with util.RecordedOperation('remove network', n) as _:
                             n.delete()
 
-        # Delete metadata
-        with etcd.get_lock('sf/metadata/instance/%s' % instance_uuid) as _:
-            etcd.delete('metadata', 'instance', instance_uuid)
-
 
 class Instances(Resource):
     @jwt_required
@@ -572,7 +568,7 @@ class Instances(Resource):
                 uuid=instance_uuid,
                 name=name,
                 disks=disk,
-                memory_mb=memory * 1024,
+                memory_mb=memory,
                 vcpus=cpus,
                 ssh_key=ssh_key,
                 user_data=user_data,
@@ -684,6 +680,9 @@ class Instances(Resource):
                     str(uuid.uuid4()), netdesc, instance_uuid, order)
 
                 order += 1
+
+        # Initialise metadata
+        etcd.put('metadata', 'instance', instance_uuid, {})
 
         # Now we can start the instance
         with etcd.get_lock('sf/instance/%s' % instance.db_entry['uuid'], ttl=900) as lock:
@@ -1015,10 +1014,6 @@ class Network(Resource):
 
             db.update_network_state(network_uuid, 'deleted')
 
-        # Delete metadata
-        with etcd.get_lock('sf/metadata/network/%s' % network_uuid) as _:
-            etcd.delete('metadata', 'network', network_uuid)
-
 
 class Networks(Resource):
     @marshal_with({
@@ -1083,6 +1078,10 @@ class Networks(Resource):
             db.add_event('network', network['uuid'],
                          'api', 'created', None, None)
             db.update_network_state(network['uuid'], 'created')
+
+            # Initialise metadata
+            etcd.put('metadata', 'network', network['uuid'], {})
+
         return network
 
 
@@ -1203,15 +1202,15 @@ class RemoveDHCP(Resource):
 api.add_resource(Root, '/')
 
 api.add_resource(Auth, '/auth')
-api.add_resource(AuthNamespaces, '/auth/namespace')
-api.add_resource(AuthNamespace, '/auth/namespace/<namespace>')
+api.add_resource(AuthNamespaces, '/auth/namespaces')
+api.add_resource(AuthNamespace, '/auth/namespaces/<namespace>')
 api.add_resource(AuthNamespaceKeys,
-                 '/auth/namespace/<namespace>/key')
+                 '/auth/namespaces/<namespace>/keys')
 api.add_resource(AuthNamespaceKey,
-                 '/auth/namespace/<namespace>/key/<key_name>')
-api.add_resource(AuthMetadatas, '/auth/namespace/<namespace>/metadata')
+                 '/auth/namespaces/<namespace>/keys/<key_name>')
+api.add_resource(AuthMetadatas, '/auth/namespaces/<namespace>/metadata')
 api.add_resource(AuthMetadata,
-                 '/auth/namespace/<namespace>/metadata/<key>')
+                 '/auth/namespaces/<namespace>/metadata/<key>')
 
 api.add_resource(Instances, '/instances')
 api.add_resource(Instance, '/instances/<instance_uuid>')

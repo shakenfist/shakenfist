@@ -300,40 +300,47 @@ class Client(object):
         return r.json()
 
     def get_namespaces(self):
-        r = self._request_url('GET', self.base_url + '/auth/namespace')
+        r = self._request_url('GET', self.base_url + '/auth/namespaces')
         return r.json()
 
-    def create_namespace(self, namespace, key_name, key):
-        r = self._request_url('POST', self.base_url + '/auth/namespace',
-                              data={
-                                  'namespace': namespace,
-                                  'key_name': key_name,
-                                  'key': key
-                              })
+    def create_namespace(self, namespace):
+        r = self._request_url('POST', self.base_url + '/auth/namespaces',
+                              data={'namespace': namespace})
         return r.json()
 
     def delete_namespace(self, namespace):
         if not namespace:
             namespace = self.namespace
         self._request_url(
-            'DELETE', self.base_url + '/auth/namespace/' + namespace)
+            'DELETE', self.base_url + '/auth/namespaces/' + namespace)
+
+    def get_namespace_keynames(self, namespace):
+        r = self._request_url('GET', self.base_url + '/auth/namespaces/' +
+                              namespace + '/keys')
+        return r.json()
+
+    def add_namespace_key(self, namespace, key_name, key):
+        r = self._request_url('POST', self.base_url + '/auth/namespaces/' +
+                              namespace + '/keys/' + key_name,
+                              data={'key': key})
+        return r.json()
 
     def delete_namespace_key(self, namespace, key_name):
         self._request_url(
-            'DELETE', self.base_url + '/auth/namespace/' + namespace + '/key/' + key_name)
+            'DELETE', self.base_url + '/auth/namespaces/' + namespace + '/keys/' + key_name)
 
     def get_namespace_metadata(self, namespace):
-        r = self._request_url('GET', self.base_url + '/auth/namespace/' + namespace +
+        r = self._request_url('GET', self.base_url + '/auth/namespaces/' + namespace +
                               '/metadata')
         return r.json()
 
     def set_namespace_metadata_item(self, namespace, key, value):
-        r = self._request_url('POST', self.base_url + '/auth/namespace/' + namespace +
+        r = self._request_url('POST', self.base_url + '/auth/namespaces/' + namespace +
                               '/metadata/' + key, data={'value': value})
         return r.json()
 
     def delete_namespace_metadata_item(self, namespace, key):
-        r = self._request_url('DELETE', self.base_url + '/auth/namespace/' + namespace +
+        r = self._request_url('DELETE', self.base_url + '/auth/namespaces/' + namespace +
                               '/metadata/' + key)
         return r.json()
 

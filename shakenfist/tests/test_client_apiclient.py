@@ -137,6 +137,77 @@ class ApiClientTestCase(testtools.TestCase):
             'POST', 'http://localhost:13000/images',
             data={'url': 'imageurl'})
 
+    def test_create_namespace(self):
+        client = apiclient.Client()
+        client.create_namespace('testspace')
+
+        self.mock_request.assert_called_with(
+            'POST', 'http://localhost:13000/auth/namespaces',
+            data={'namespace': 'testspace'})
+
+    def test_get_namespace_keynames(self):
+        client = apiclient.Client()
+        client.get_namespace_keynames('testspace')
+
+        self.mock_request.assert_called_with(
+            'GET', 'http://localhost:13000/auth/namespaces/testspace/keys')
+
+    def test_add_namespace_key(self):
+        client = apiclient.Client()
+        client.add_namespace_key('testspace', 'keyname', 'secretkey')
+
+        self.mock_request.assert_called_with(
+            'POST',
+            'http://localhost:13000/auth/namespaces/testspace/keys/keyname',
+            data={'key': 'secretkey'})
+
+    def test_delete_namespace_key(self):
+        client = apiclient.Client()
+        client.delete_namespace_key('testspace', 'keyname')
+
+        self.mock_request.assert_called_with(
+            'DELETE',
+            'http://localhost:13000/auth/namespaces/testspace/keys/keyname')
+
+    def test_get_namespace_metadata(self):
+        client = apiclient.Client()
+        client.get_namespace_metadata('testspace')
+
+        self.mock_request.assert_called_with(
+            'GET', 'http://localhost:13000/auth/namespaces/testspace/metadata')
+
+    def test_set_namespace_metadata_item(self):
+        client = apiclient.Client()
+        client.set_namespace_metadata_item('testspace', 'billy', 'bob')
+
+        self.mock_request.assert_called_with(
+            'POST',
+            'http://localhost:13000/auth/namespaces/testspace/metadata/billy',
+            data={'value': 'bob'})
+
+    def test_delete_namespace_metadata_item(self):
+        client = apiclient.Client()
+        client.delete_namespace_metadata_item('testspace', 'billy')
+
+        self.mock_request.assert_called_with(
+            'DELETE',
+            'http://localhost:13000/auth/namespaces/testspace/metadata/billy')
+
+    def test_delete_instance_metadata_item(self):
+        client = apiclient.Client()
+        client.delete_instance_metadata_item('instance1', 'petname')
+
+        self.mock_request.assert_called_with(
+            'DELETE',
+            'http://localhost:13000/instances/instance1/metadata/petname')
+
+    def test_delete_network_metadata_item(self):
+        client = apiclient.Client()
+        client.delete_network_metadata_item('net1', 'herd')
+
+        self.mock_request.assert_called_with(
+            'DELETE', 'http://localhost:13000/networks/net1/metadata/herd')
+
     def test_get_networks(self):
         client = apiclient.Client()
         client.get_networks()

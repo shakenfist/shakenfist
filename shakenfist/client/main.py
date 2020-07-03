@@ -42,6 +42,12 @@ def filter_dict(d, allowed_keys):
     return out
 
 
+def longest_str(d):
+    if not d:
+        return 0
+    return max(len(k) for k in d)
+
+
 @click.group()
 @click.option('--pretty', 'output', flag_value='pretty', default=True)
 @click.option('--simple', 'output', flag_value='simple')
@@ -106,7 +112,8 @@ def namespace():
 
 @auto_complete
 def _get_namespaces(ctx, args, incomplete):
-    return list(CLIENT.get_namespaces())
+    choices = CLIENT.get_namespaces()
+    return [arg for arg in choices if arg.startswith(incomplete)]
 
 
 @namespace.command(name='list', help='List namespaces')
@@ -132,15 +139,11 @@ def namespace_list(ctx):
 
 @namespace.command(name='create',
                    help=('Create a namespace.\n\n'
-                         'NAMESPACE: The name of the namespace\n'
-                         'KEY_NAME:  The unique name of the key\n'
-                         'KEY:       The password for the namespace'))
+                         'NAMESPACE: The name of the namespace'))
 @click.argument('namespace', type=click.STRING)
-@click.argument('key_name', type=click.STRING)
-@click.argument('key', type=click.STRING)
 @click.pass_context
-def namespace_create(ctx, namespace=None, key_name=None, key=None):
-    CLIENT.create_namespace(namespace, key_name, key)
+def namespace_create(ctx, namespace=None):
+    CLIENT.create_namespace(namespace)
 
 
 @namespace.command(name='delete',
@@ -152,7 +155,66 @@ def namespace_delete(ctx, namespace=None):
     CLIENT.delete_namespace(namespace)
 
 
-@namespace.command(name='delete_key',
+def _show_namespace(ctx, namespace):
+    if namespace not in CLIENT.get_namespaces():
+        print('Namespace not found')
+        sys.exit(1)
+
+    key_names = CLIENT.get_namespace_keynames(namespace)
+    metadata = CLIENT.get_namespace_metadata(namespace)
+
+    if ctx.obj['OUTPUT'] == 'json':
+        out = {'key_names': key_names,
+                'metadata': metadata,
+        }
+        print(json.dumps(out, indent=4, sort_keys=True))
+        return
+
+    if ctx.obj['OUTPUT'] == 'pretty':
+        format_string='    %s'
+        print('Key Names:')
+        if key_names:
+            for key in key_names:
+                print(format_string % (key))
+
+        print('Metadata:')
+        if metadata:
+            format_string='    %-' + str(longest_str(metadata)) + 's: %s'
+            for key in metadata:
+                print(format_string % (key, metadata[key]))
+
+    else:
+        print('metadata,keyname')
+        if key_names:
+            for key in key_names:
+                print('keyname,%s' % (key))
+        print('metadata,key,value')
+        if metadata:
+            for key in metadata:
+                print('metadata,%s,%s' % (key, metadata[key]))
+
+
+@namespace.command(name='show', help='Show a namespace')
+@click.argument('namespace', type=click.STRING, autocompletion=_get_namespaces)
+@click.pass_context
+def namespace_show(ctx, namespace=None):
+    _show_namespace(ctx, namespace)
+
+
+@namespace.command(name='add-key',
+                   help=('add a key to a namespace.\n\n'
+                         'NAMESPACE: The name of the namespace\n'
+                         'KEY_NAME:  The unique name of the key\n'
+                         'KEY:       The password for the namespace'))
+@click.argument('namespace', type=click.STRING)
+@click.argument('keyname', type=click.STRING)
+@click.argument('key', type=click.STRING)
+@click.pass_context
+def namespace_add_key(ctx, namespace=None, keyname=None, key=None):
+    CLIENT.add_namespace_key(namespace, keyname, key)
+
+
+@namespace.command(name='delete-key',
                    help=('delete a specific key from a namespace.\n\n'
                          'NAMESPACE: The name of the namespace\n'
                          'KEYNAME:   The name of the key'))
@@ -165,8 +227,6 @@ def namespace_delete_key(ctx, namespace=None, keyname=None):
 
 @namespace.command(name='get-metadata', help='Get metadata items')
 @click.argument('namespace', type=click.STRING)
-@click.argument('key', type=click.STRING)
-@click.argument('value', type=click.STRING)
 @click.pass_context
 def namespace_get_metadata(ctx, namespace=None):
     metadata = CLIENT.get_namespace_metadata(namespace)
@@ -212,8 +272,8 @@ def network():
 
 @auto_complete
 def _get_networks(ctx, args, incomplete):
-    for n in list(CLIENT.get_networks()):
-        yield n['uuid']
+    choices = [i['uuid'] for i in CLIENT.get_networks()]
+    return [arg for arg in choices if arg.startswith(incomplete)]
 
 
 @network.command(name='list', help='List networks')
@@ -269,6 +329,7 @@ def _show_network(ctx, n):
     print(format_string % ('provide dhcp', n['provide_dhcp']))
     print(format_string % ('provide nat', n['provide_nat']))
     print(format_string % ('namespace', n['namespace']))
+    print(format_string % ('state', n['state']))
 
     print()
     if ctx.obj['OUTPUT'] == 'pretty':
@@ -384,8 +445,8 @@ def instance():
 
 @auto_complete
 def _get_instances(ctx, args, incomplete):
-    for i in CLIENT.get_instances():
-        yield i['uuid']
+    choices = [i['uuid'] for i in CLIENT.get_instances()]
+    return [arg for arg in choices if arg.startswith(incomplete)]
 
 
 @instance.command(name='list', help='List instances')
@@ -758,9 +819,11 @@ def interface():
 
 @auto_complete
 def _get_instance_interfaces(ctx, args, incomplete):
+    choices = []
     for i in CLIENT.get_instances():
         for interface in CLIENT.get_instance_interfaces(i['uuid']):
-            yield interface['uuid']
+            choices.append(interface['uuid'])
+    return [arg for arg in choices if arg.startswith(incomplete)]
 
 
 def _show_interface(ctx, interface, out=[]):
