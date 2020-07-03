@@ -398,7 +398,6 @@ class AuthNamespaceKeys(Resource):
     @caller_is_admin
     def get(self, namespace=None):
         out = []
-        LOG.warn("REC=%s",etcd.get('namespace', None, namespace))
         for keyname in etcd.get('namespace', None, namespace)['keys']:
             out.append(keyname)
         return out
