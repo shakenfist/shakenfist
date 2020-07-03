@@ -318,12 +318,6 @@ class AuthNamespaces(Resource):
     def post(self, namespace=None, key_name=None, key=None):
         if not namespace:
             return error(400, 'no namespace specified')
-        if not key_name:
-            return error(400, 'no unique name specified')
-        if not key:
-            return error(400, 'no key specified')
-        if key_name == 'service_key':
-            return error(403, 'illegal key name')
 
         with etcd.get_lock('sf/namespace') as _:
             rec = etcd.get('namespace', None, namespace)
@@ -333,9 +327,17 @@ class AuthNamespaces(Resource):
                     'keys': {}
                 }
 
-            encoded = str(base64.b64encode(bcrypt.hashpw(
-                key.encode('utf-8'), bcrypt.gensalt())), 'utf-8')
-            rec['keys'][key_name] = encoded
+            # Allow shortcut of creating key at same time as the namespace
+            if key_name:
+                if not key:
+                    return error(400, 'no key specified')
+                if key_name == 'service_key':
+                    return error(403, 'illegal key name')
+
+                encoded = str(base64.b64encode(bcrypt.hashpw(
+                    key.encode('utf-8'), bcrypt.gensalt())), 'utf-8')
+                rec['keys'][key_name] = encoded
+
             etcd.put('namespace', None, namespace, rec)
 
         return namespace
@@ -386,8 +388,46 @@ class AuthNamespace(Resource):
 
         etcd.delete('namespace', None, namespace)
 
+        # Delete metadata
+        with etcd.get_lock('sf/metadata/namespace/%s' % namespace) as _:
+            etcd.delete('metadata', 'namespace', namespace)
+
+
+class AuthNamespaceKeys(Resource):
+    @jwt_required
+    @caller_is_admin
+    def get(self, namespace=None):
+        out = []
+        for keyname in etcd.get('namespace', None, namespace)['keys']:
+            out.append(keyname)
+        return out
 
 class AuthNamespaceKey(Resource):
+    @jwt_required
+    @caller_is_admin
+    def post(self, namespace=None, key_name=None, key=None):
+        if not namespace:
+            return error(400, 'no namespace specified')
+        if not key_name:
+            return error(400, 'no key name specified')
+        if not key:
+            return error(400, 'no key specified')
+        if key_name == 'service_key':
+            return error(403, 'illegal key name')
+
+        with etcd.get_lock('sf/namespace') as _:
+            rec = etcd.get('namespace', None, namespace)
+            if not rec:
+                return error(404, 'namespace does not exist')
+
+            encoded = str(base64.b64encode(bcrypt.hashpw(
+                key.encode('utf-8'), bcrypt.gensalt())), 'utf-8')
+            rec['keys'][key_name] = encoded
+
+            etcd.put('namespace', None, namespace, rec)
+
+        return key_name
+
     @jwt_required
     @caller_is_admin
     def delete(self, namespace, key_name):
@@ -426,6 +466,19 @@ class AuthMetadata(Resource):
             if md is None:
                 md = {}
             md[key] = value
+            etcd.put('metadata', 'namespace', namespace, md)
+
+    @jwt_required
+    @caller_is_admin
+    def delete(self, namespace, key=None, value=None):
+        if not key:
+            return error(400, 'no key specified')
+
+        with etcd.get_lock('sf/metadata/namespace/%s' % namespace) as _:
+            md = etcd.get('metadata', 'namespace', namespace)
+            if md is None or key not in md:
+                return error(404, 'key not found')
+            del md[key]
             etcd.put('metadata', 'namespace', namespace, md)
 
 
@@ -472,6 +525,10 @@ class Instance(Resource):
                     else:
                         with util.RecordedOperation('remove network', n) as _:
                             n.delete()
+
+        # Delete metadata
+        with etcd.get_lock('sf/metadata/instance/%s' % instance_uuid) as _:
+            etcd.delete('metadata', 'instance', instance_uuid)
 
 
 class Instances(Resource):
@@ -897,6 +954,20 @@ class InstanceMetadata(Resource):
             md[key] = value
             etcd.put('metadata', 'instance', instance_uuid, md)
 
+    @jwt_required
+    @arg_is_instance_uuid
+    @requires_instance_ownership
+    def delete(self, instance_uuid=None, key=None, instance_from_db=None):
+        if not key:
+            return error(400, 'no key specified')
+
+        with etcd.get_lock('sf/metadata/instance/%s' % instance_uuid) as _:
+            md = etcd.get('metadata', 'instance', instance_uuid)
+            if md is None or key not in md:
+                return error(404, 'key not found')
+            del md[key]
+            etcd.put('metadata', 'instance', instance_uuid, md)
+
 
 class Image(Resource):
     @jwt_required
@@ -943,6 +1014,10 @@ class Network(Resource):
                     db.persist_ipmanager('floating', ipm.save())
 
             db.update_network_state(network_uuid, 'deleted')
+
+        # Delete metadata
+        with etcd.get_lock('sf/metadata/network/%s' % network_uuid) as _:
+            etcd.delete('metadata', 'network', network_uuid)
 
 
 class Networks(Resource):
@@ -1046,6 +1121,20 @@ class NetworkMetadata(Resource):
             md[key] = value
             etcd.put('metadata', 'network', network_uuid, md)
 
+    @jwt_required
+    @arg_is_network_uuid
+    @requires_network_ownership
+    def delete(self, network_uuid=None, key=None, network_from_db=None):
+        if not key:
+            return error(400, 'no key specified')
+
+        with etcd.get_lock('sf/metadata/network/%s' % network_uuid) as _:
+            md = etcd.get('metadata', 'network', network_uuid)
+            if md is None or key not in md:
+                return error(404, 'key not found')
+            del md[key]
+            etcd.put('metadata', 'network', network_uuid, md)
+
 
 class Nodes(Resource):
     @jwt_required
@@ -1116,6 +1205,8 @@ api.add_resource(Root, '/')
 api.add_resource(Auth, '/auth')
 api.add_resource(AuthNamespaces, '/auth/namespace')
 api.add_resource(AuthNamespace, '/auth/namespace/<namespace>')
+api.add_resource(AuthNamespaceKeys,
+                 '/auth/namespace/<namespace>/key')
 api.add_resource(AuthNamespaceKey,
                  '/auth/namespace/<namespace>/key/<key_name>')
 api.add_resource(AuthMetadatas, '/auth/namespace/<namespace>/metadata')

@@ -156,6 +156,11 @@ class Client(object):
                               '/metadata/' + key, data={'value': value})
         return r.json()
 
+    def delete_instance_metadata_item(self, instance_uuid, key):
+        r = self._request_url('DELETE', self.base_url + '/instances/' + instance_uuid +
+                              '/metadata/' + key)
+        return r.json()
+
     def create_instance(self, name, cpus, memory, network, disk, sshkey, userdata,
                         namespace=None, force_placement=None):
         body = {
@@ -270,6 +275,11 @@ class Client(object):
                               '/metadata/' + key, data={'value': value})
         return r.json()
 
+    def delete_network_metadata_item(self, network_uuid, key):
+        r = self._request_url('DELETE', self.base_url + '/networks/' + network_uuid +
+                              '/metadata/' + key)
+        return r.json()
+
     def get_nodes(self):
         r = self._request_url('GET', self.base_url + '/nodes')
         return r.json()
@@ -317,11 +327,15 @@ class Client(object):
                               '/metadata')
         return r.json()
 
-    def set_namespace_metadata_item(self, network_uuid, key, value):
+    def set_namespace_metadata_item(self, namespace, key, value):
         r = self._request_url('POST', self.base_url + '/auth/namespace/' + namespace +
                               '/metadata/' + key, data={'value': value})
         return r.json()
 
+    def delete_namespace_metadata_item(self, namespace, key):
+        r = self._request_url('DELETE', self.base_url + '/auth/namespace/' + namespace +
+                              '/metadata/' + key)
+        return r.json()
 
 def get_user_agent():
     sf_version = VersionInfo('shakenfist').version_string()

@@ -168,7 +168,7 @@ def namespace_delete_key(ctx, namespace=None, keyname=None):
 @click.argument('key', type=click.STRING)
 @click.argument('value', type=click.STRING)
 @click.pass_context
-def namespace_set_metadata(ctx, namespace=None):
+def namespace_get_metadata(ctx, namespace=None):
     metadata = CLIENT.get_namespace_metadata(namespace)
 
     if ctx.obj['OUTPUT'] == 'json':
@@ -180,6 +180,7 @@ def namespace_set_metadata(ctx, namespace=None):
     for key in metadata:
         print(format_string % (key, metadata[key]))
 
+
 @namespace.command(name='set-metadata', help='Set a metadata item')
 @click.argument('namespace', type=click.STRING)
 @click.argument('key', type=click.STRING)
@@ -187,6 +188,16 @@ def namespace_set_metadata(ctx, namespace=None):
 @click.pass_context
 def namespace_set_metadata(ctx, namespace=None, key=None, value=None):
     CLIENT.set_namespace_metadata_item(namespace, key, value)
+    if ctx.obj['OUTPUT'] == 'json':
+        print('{}')
+
+
+@namespace.command(name='delete-metadata', help='Delete a metadata item')
+@click.argument('namespace', type=click.STRING)
+@click.argument('key', type=click.STRING)
+@click.pass_context
+def namespace_delete_metadata(ctx, namespace=None, key=None):
+    CLIENT.delete_namespace_metadata_item(namespace, key)
     if ctx.obj['OUTPUT'] == 'json':
         print('{}')
 
@@ -238,7 +249,7 @@ def _show_network(ctx, n):
         print('Network not found')
         sys.exit(1)
 
-    metadata = CLIENT.get_network_metadata(i['uuid'])
+    metadata = CLIENT.get_network_metadata(n['uuid'])
 
     if ctx.obj['OUTPUT'] == 'json':
         filtered = filter_dict(n, ['uuid', 'name', 'vxid', 'netblock', 'provide_dhcp',
@@ -349,6 +360,16 @@ def network_delete(ctx, network_uuid=None):
 @click.pass_context
 def network_set_metadata(ctx, network_uuid=None, key=None, value=None):
     CLIENT.set_network_metadata_item(network_uuid, key, value)
+    if ctx.obj['OUTPUT'] == 'json':
+        print('{}')
+
+
+@network.command(name='delete-metadata', help='Delete a metadata item')
+@click.argument('network_uuid', type=click.STRING, autocompletion=_get_networks)
+@click.argument('key', type=click.STRING)
+@click.pass_context
+def network_delete_metadata(ctx, network_uuid=None, key=None, value=None):
+    CLIENT.delete_network_metadata_item(network_uuid, key)
     if ctx.obj['OUTPUT'] == 'json':
         print('{}')
 
@@ -655,6 +676,16 @@ def instance_events(ctx, instance_uuid=None):
 @click.pass_context
 def instance_set_metadata(ctx, instance_uuid=None, key=None, value=None):
     CLIENT.set_instance_metadata_item(instance_uuid, key, value)
+    if ctx.obj['OUTPUT'] == 'json':
+        print('{}')
+
+
+@instance.command(name='delete-metadata', help='Delete a metadata item')
+@click.argument('instance_uuid', type=click.STRING, autocompletion=_get_instances)
+@click.argument('key', type=click.STRING)
+@click.pass_context
+def instance_delete_metadata(ctx, instance_uuid=None, key=None):
+    CLIENT.delete_instance_metadata_item(instance_uuid, key)
     if ctx.obj['OUTPUT'] == 'json':
         print('{}')
 
