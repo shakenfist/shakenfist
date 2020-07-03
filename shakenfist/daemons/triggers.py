@@ -2,6 +2,7 @@ import logging
 from logging import handlers as logging_handlers
 import multiprocessing
 import os
+import re
 import select
 import setproctitle
 import signal
@@ -17,6 +18,11 @@ LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 
 
 def observe(path, instance_uuid):
+    regexps = {
+        'cirros login prompt': ['^cirros login:.*',
+                                re.compile('^cirros login:.*')]
+    }
+
     f = None
     while not f:
         try:
@@ -38,8 +44,13 @@ def observe(path, instance_uuid):
 
             for line in lines[:-1]:
                 if line:
-                    LOG.info('Trigger read from %s console: "%s"'
-                             % (instance_uuid, line))
+                    for trigger in regexps:
+                        m = regexps[trigger][1].match(line)
+                        if m:
+                            LOG.info('Trigger %s matched for %s'
+                                     % (trigger, instance_uuid))
+                            db.add_event('instance', instance_uuid, 'trigger',
+                                         None, None, trigger)
 
         time.sleep(1)
 
