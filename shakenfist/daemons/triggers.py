@@ -1,8 +1,10 @@
 import logging
 from logging import handlers as logging_handlers
+import multiprocessing
 import os
 import select
 import setproctitle
+import signal
 import time
 
 from shakenfist import config
@@ -14,52 +16,81 @@ LOG.setLevel(logging.INFO)
 LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 
 
+def observe(path, instance_uuid):
+    f = None
+    while not f:
+        try:
+            f = open(path)
+        except Exception:
+            pass
+        time.sleep(1)
+
+    LOG.info('Monitoring %s for triggers' % path)
+    f.seek(0, os.SEEK_END)
+    buffer = ''
+
+    while True:
+        d = f.read()
+        if d:
+            buffer += d
+            lines = buffer.split('\n')
+            buffer = lines[-1]
+
+            for line in lines[:-1]:
+                if line:
+                    LOG.info('Trigger read from %s console: "%s"'
+                             % (instance_uuid, line))
+
+        time.sleep(1)
+
+
 class monitor(object):
     def __init__(self):
         setproctitle.setproctitle('sf triggers')
 
     def run(self):
-        files_by_instance = {}
-        files_by_fileno = {}
-        file_objects = []
-
-        queued_data = {}
+        observers = {}
 
         while True:
+            # Cleanup terminated observers
+            all_observers = list(observers.keys())
+            for instance_uuid in all_observers:
+                if not observers[instance_uuid].is_alive():
+                    LOG.info('Trigger observer for instance %s has terminated'
+                             % instance_uuid)
+                    del observers[instance_uuid]
+
+            # Start missing observers
+            extra_instances = list(observers.keys())
             for inst in list(db.get_instances(only_node=config.parsed.get('NODE_NAME'))):
-                if inst['uuid'] not in files_by_instance:
+                if inst['uuid'] in extra_instances:
+                    extra_instances.remove(inst['uuid'])
+
+                if inst['state'] != 'created':
+                    continue
+
+                if inst['uuid'] not in observers:
                     console_path = os.path.join(
                         config.parsed.get('STORAGE_PATH'), 'instances', inst['uuid'], 'console.log')
-                    try:
-                        f = open(console_path)
-                        f.seek(0, 2)
-                        files_by_instance[inst['uuid']] = f
-                        files_by_fileno[f.fileno()] = inst['uuid']
+                    p = multiprocessing.Process(
+                        target=observe, args=(console_path, inst['uuid']),
+                        name='sf trigger %s' % inst['uuid'])
+                    p.start()
 
-                    except FileNotFoundError:
-                        LOG.info(
-                            'File not found while setting up triggers: %s' % console_path)
+                    observers[inst['uuid']] = p
+                    LOG.info('Started trigger observer for instance %s'
+                             % inst['uuid'])
 
-            readable, _, exceptional = select.select(
-                file_objects, [], file_objects, 0.5)
+            # Cleanup extra observers
+            for instance_uuid in extra_instances:
+                p = observers[instance_uuid]
+                try:
+                    os.kill(p.pid, signal.SIGKILL)
+                except Exception:
+                    pass
 
-            for f in exceptional:
-                instance_uuid = files_by_fileno.get(f.fileno())
-                if instance_uuid and instance_uuid in files_by_instance:
-                    del files_by_instance[instance_uuid]
-                if f.fileno() in files_by_fileno:
-                    del files_by_fileno[f.fileno()]
-                if f in file_objects:
-                    file_objects.remove(f)
+                del observers[instance_uuid]
+                LOG.info('Finished trigger observer for instance %s'
+                         % instance_uuid)
 
-            for f in readable:
-                d = f.read(1)
-                instance_uuid = files_by_fileno.get(f.fileno())
-                if instance_uuid:
-                    queued_data.setdefault(instance_uuid, '')
-                    if d != '\n':
-                        queued_data[instance_uuid] += d
-                    else:
-                        LOG.info('Read from %s console: %s' %
-                                 (instance_uuid, queued_data[instance_uuid]))
-                        queued_data[instance_uuid] = ''
+            time.sleep(1)
