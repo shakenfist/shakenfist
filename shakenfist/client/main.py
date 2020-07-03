@@ -42,6 +42,12 @@ def filter_dict(d, allowed_keys):
     return out
 
 
+def longest_str(d):
+    if not d:
+        return 0
+    return max(len(k) for k in d)
+
+
 @click.group()
 @click.option('--pretty', 'output', flag_value='pretty', default=True)
 @click.option('--simple', 'output', flag_value='simple')
@@ -152,6 +158,51 @@ def namespace_delete(ctx, namespace=None):
     CLIENT.delete_namespace(namespace)
 
 
+def _show_namespace(ctx, namespace):
+    if namespace not in CLIENT.get_namespaces():
+        print('Namespace not found')
+        sys.exit(1)
+
+    key_names = CLIENT.get_namespace_keynames(namespace)
+    metadata = CLIENT.get_namespace_metadata(namespace)
+
+    if ctx.obj['OUTPUT'] == 'json':
+        out = {'key_names': key_names,
+                'metadata': metadata,
+        }
+        print(json.dumps(out, indent=4, sort_keys=True))
+        return
+
+    if ctx.obj['OUTPUT'] == 'pretty':
+        format_string='    %s'
+        print('Key Names:')
+        if key_names:
+            for key in key_names:
+                print(format_string % (key))
+
+        print('Metadata:')
+        if metadata:
+            format_string='    %-' + str(longest_str(metadata)) + 's: %s'
+            for key in metadata:
+                print(format_string % (key, metadata[key]))
+
+    else:
+        print('metadata,keyname')
+        if key_names:
+            for key in key_names:
+                print('keyname,%s' % (key))
+        print('metadata,key,value')
+        if metadata:
+            for key in metadata:
+                print('metadata,%s,%s' % (key, metadata[key]))
+
+
+@namespace.command(name='show', help='Show a namespace')
+@click.argument('namespace', type=click.STRING, autocompletion=_get_namespaces)
+@click.pass_context
+def namespace_show(ctx, namespace=None):
+    _show_namespace(ctx, namespace)
+
 @namespace.command(name='delete_key',
                    help=('delete a specific key from a namespace.\n\n'
                          'NAMESPACE: The name of the namespace\n'
@@ -165,8 +216,6 @@ def namespace_delete_key(ctx, namespace=None, keyname=None):
 
 @namespace.command(name='get-metadata', help='Get metadata items')
 @click.argument('namespace', type=click.STRING)
-@click.argument('key', type=click.STRING)
-@click.argument('value', type=click.STRING)
 @click.pass_context
 def namespace_get_metadata(ctx, namespace=None):
     metadata = CLIENT.get_namespace_metadata(namespace)

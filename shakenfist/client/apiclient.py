@@ -318,6 +318,11 @@ class Client(object):
         self._request_url(
             'DELETE', self.base_url + '/auth/namespace/' + namespace)
 
+    def get_namespace_keynames(self, namespace):
+        r = self._request_url('GET', self.base_url + '/auth/namespace/' +
+                              namespace + '/key')
+        return r.json()
+
     def delete_namespace_key(self, namespace, key_name):
         self._request_url(
             'DELETE', self.base_url + '/auth/namespace/' + namespace + '/key/' + key_name)
