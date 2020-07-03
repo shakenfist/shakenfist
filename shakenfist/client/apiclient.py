@@ -303,13 +303,9 @@ class Client(object):
         r = self._request_url('GET', self.base_url + '/auth/namespace')
         return r.json()
 
-    def create_namespace(self, namespace, key_name, key):
+    def create_namespace(self, namespace):
         r = self._request_url('POST', self.base_url + '/auth/namespace',
-                              data={
-                                  'namespace': namespace,
-                                  'key_name': key_name,
-                                  'key': key
-                              })
+                              data={'namespace': namespace})
         return r.json()
 
     def delete_namespace(self, namespace):
@@ -321,6 +317,12 @@ class Client(object):
     def get_namespace_keynames(self, namespace):
         r = self._request_url('GET', self.base_url + '/auth/namespace/' +
                               namespace + '/key')
+        return r.json()
+
+    def add_namespace_key(self, namespace, key_name, key):
+        r = self._request_url('POST', self.base_url + '/auth/namespace/' +
+                              namespace + '/key/' + key_name,
+                              data={'key': key})
         return r.json()
 
     def delete_namespace_key(self, namespace, key_name):

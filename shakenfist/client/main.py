@@ -138,15 +138,11 @@ def namespace_list(ctx):
 
 @namespace.command(name='create',
                    help=('Create a namespace.\n\n'
-                         'NAMESPACE: The name of the namespace\n'
-                         'KEY_NAME:  The unique name of the key\n'
-                         'KEY:       The password for the namespace'))
+                         'NAMESPACE: The name of the namespace'))
 @click.argument('namespace', type=click.STRING)
-@click.argument('key_name', type=click.STRING)
-@click.argument('key', type=click.STRING)
 @click.pass_context
-def namespace_create(ctx, namespace=None, key_name=None, key=None):
-    CLIENT.create_namespace(namespace, key_name, key)
+def namespace_create(ctx, namespace=None):
+    CLIENT.create_namespace(namespace)
 
 
 @namespace.command(name='delete',
@@ -203,7 +199,21 @@ def _show_namespace(ctx, namespace):
 def namespace_show(ctx, namespace=None):
     _show_namespace(ctx, namespace)
 
-@namespace.command(name='delete_key',
+
+@namespace.command(name='add-key',
+                   help=('add a key to a namespace.\n\n'
+                         'NAMESPACE: The name of the namespace\n'
+                         'KEY_NAME:  The unique name of the key\n'
+                         'KEY:       The password for the namespace'))
+@click.argument('namespace', type=click.STRING)
+@click.argument('keyname', type=click.STRING)
+@click.argument('key', type=click.STRING)
+@click.pass_context
+def namespace_add_key(ctx, namespace=None, keyname=None, key=None):
+    CLIENT.add_namespace_key(namespace, keyname, key)
+
+
+@namespace.command(name='delete-key',
                    help=('delete a specific key from a namespace.\n\n'
                          'NAMESPACE: The name of the namespace\n'
                          'KEYNAME:   The name of the key'))
