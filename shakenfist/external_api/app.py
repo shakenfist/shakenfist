@@ -338,6 +338,9 @@ class AuthNamespaces(Resource):
                     key.encode('utf-8'), bcrypt.gensalt())), 'utf-8')
                 rec['keys'][key_name] = encoded
 
+            # Initialise metadata
+            etcd.put('metadata', 'namespace', namespace, {})
+
             etcd.put('namespace', None, namespace, rec)
 
         return namespace
@@ -677,6 +680,9 @@ class Instances(Resource):
                     str(uuid.uuid4()), netdesc, instance_uuid, order)
 
                 order += 1
+
+        # Initialise metadata
+        etcd.put('metadata', 'instance', instance_uuid, {})
 
         # Now we can start the instance
         with etcd.get_lock('sf/instance/%s' % instance.db_entry['uuid'], ttl=900) as lock:
@@ -1072,6 +1078,10 @@ class Networks(Resource):
             db.add_event('network', network['uuid'],
                          'api', 'created', None, None)
             db.update_network_state(network['uuid'], 'created')
+
+            # Initialise metadata
+            etcd.put('metadata', 'network', network['uuid'], {})
+
         return network
 
 
