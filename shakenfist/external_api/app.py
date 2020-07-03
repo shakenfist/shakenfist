@@ -1203,15 +1203,15 @@ class RemoveDHCP(Resource):
 api.add_resource(Root, '/')
 
 api.add_resource(Auth, '/auth')
-api.add_resource(AuthNamespaces, '/auth/namespace')
-api.add_resource(AuthNamespace, '/auth/namespace/<namespace>')
+api.add_resource(AuthNamespaces, '/auth/namespaces')
+api.add_resource(AuthNamespace, '/auth/namespaces/<namespace>')
 api.add_resource(AuthNamespaceKeys,
-                 '/auth/namespace/<namespace>/key')
+                 '/auth/namespaces/<namespace>/keys')
 api.add_resource(AuthNamespaceKey,
-                 '/auth/namespace/<namespace>/key/<key_name>')
-api.add_resource(AuthMetadatas, '/auth/namespace/<namespace>/metadata')
+                 '/auth/namespaces/<namespace>/keys/<key_name>')
+api.add_resource(AuthMetadatas, '/auth/namespaces/<namespace>/metadata')
 api.add_resource(AuthMetadata,
-                 '/auth/namespace/<namespace>/metadata/<key>')
+                 '/auth/namespaces/<namespace>/metadata/<key>')
 
 api.add_resource(Instances, '/instances')
 api.add_resource(Instance, '/instances/<instance_uuid>')
