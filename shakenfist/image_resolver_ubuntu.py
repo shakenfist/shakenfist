@@ -57,6 +57,5 @@ def resolve(name):
                 'Cannot parse version: %s' % name)
 
     return (config.parsed.get('DOWNLOAD_URL_UBUNTU')
-            % {'base': UBUNTU_URL,
-               'vernum': vernum,
+            % {'vernum': vernum,
                'vername': vername})
