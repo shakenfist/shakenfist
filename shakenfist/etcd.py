@@ -10,6 +10,9 @@ LOG.setLevel(logging.INFO)
 LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 
 
+ETCD_ATTEMPTS = 5
+
+
 class LockException(Exception):
     pass
 
@@ -24,11 +27,12 @@ class ReadException(Exception):
 
 def get_lock(name, ttl=60):
     start = time.time()
-    for attempt in range(3):
+    for attempt in range(ETCD_ATTEMPTS):
         try:
             return etcd3.client().lock(name, ttl=ttl)
         except Exception as e:
             LOG.info('Failed to acquire lock, attempt %d: %s' % (attempt, e))
+            time.sleep(0.2)
         finally:
             LOG.debug('Locked etcd key "%s" after %.02f seconds'
                       % (name, time.time() - start))
@@ -49,11 +53,12 @@ def _construct_key(objecttype, subtype, name):
 def put(objecttype, subtype, name, data, ttl=None):
     path = _construct_key(objecttype, subtype, name)
     encoded = json.dumps(data, indent=4, sort_keys=True)
-    for attempt in range(3):
+    for attempt in range(ETCD_ATTEMPTS):
         try:
             return etcd3.client().put(path, encoded, lease=None)
         except Exception as e:
             LOG.info('Failed to write %s, attempt %d: %s' % (path, attempt, e))
+            time.sleep(0.2)
         finally:
             LOG.debug('Wrote etcd key "%s"' % path)
 
@@ -62,7 +67,7 @@ def put(objecttype, subtype, name, data, ttl=None):
 
 def get(objecttype, subtype, name):
     path = _construct_key(objecttype, subtype, name)
-    for attempt in range(3):
+    for attempt in range(ETCD_ATTEMPTS):
         try:
             value, _ = etcd3.client().get(path)
             if value is None:
@@ -70,6 +75,7 @@ def get(objecttype, subtype, name):
             return json.loads(value)
         except Exception as e:
             LOG.info('Failed to read %s, attempt %d: %s' % (path, attempt, e))
+            time.sleep(0.2)
         finally:
             LOG.debug('Read etcd key "%s"' % path)
 
@@ -78,7 +84,7 @@ def get(objecttype, subtype, name):
 
 def get_all(objecttype, subtype, sort_order=None):
     path = _construct_key(objecttype, subtype, None)
-    for attempt in range(3):
+    for attempt in range(ETCD_ATTEMPTS):
         try:
             for value, _ in etcd3.client().get_prefix(path, sort_order=sort_order):
                 yield json.loads(value)
@@ -86,6 +92,7 @@ def get_all(objecttype, subtype, sort_order=None):
         except Exception as e:
             LOG.info('Failed to fetch all %s, attempt %d: %s'
                      % (path, attempt, e))
+            time.sleep(0.2)
         finally:
             LOG.debug('Searched etcd range "%s"' % path)
 
@@ -94,13 +101,14 @@ def get_all(objecttype, subtype, sort_order=None):
 
 def delete(objecttype, subtype, name):
     path = _construct_key(objecttype, subtype, name)
-    for attempt in range(3):
+    for attempt in range(ETCD_ATTEMPTS):
         try:
             etcd3.client().delete(path)
             return
         except Exception as e:
             LOG.info('Failed to delete %s, attempt %d: %s' %
                      (path, attempt, e))
+            time.sleep(0.2)
         finally:
             LOG.debug('Deleted etcd key "%s"' % path)
 
@@ -109,13 +117,14 @@ def delete(objecttype, subtype, name):
 
 def delete_all(objecttype, subtype, sort_order=None):
     path = _construct_key(objecttype, subtype, None)
-    for attempt in range(3):
+    for attempt in range(ETCD_ATTEMPTS):
         try:
             etcd3.client().delete_prefix(path)
             return
         except Exception as e:
             LOG.info('Failed to delete all %s, attempt %d: %s'
                      % (path, attempt, e))
+            time.sleep(0.2)
         finally:
             LOG.debug('Deleted etcd range "%s"' % path)
 
