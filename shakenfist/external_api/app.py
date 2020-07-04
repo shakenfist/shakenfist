@@ -987,7 +987,7 @@ class Image(Resource):
                 images.requires_fetch(image_url)
 
             if image_dirty:
-                images.fetch(hashed_image_path, info, resp, lock=lock)
+                images.fetch(hashed_image_path, info, resp)
 
 
 class Network(Resource):
