@@ -400,9 +400,12 @@ class Instance(object):
                 }
             )
 
+        # NOTE(mikal): the database stores memory allocations in MB, but the domain
+        # XML takes them in KB. That wouldn't be worth a comment here if I hadn't
+        # spent _ages_ finding a bug related to it.
         xml = t.render(
             uuid=self.db_entry['uuid'],
-            memory=self.db_entry['memory'] * 1024,
+            memory=self.db_entry['memory'] * 1024 * 1024,
             vcpus=self.db_entry['cpus'],
             disks=self.db_entry['block_devices']['devices'],
             networks=networks,

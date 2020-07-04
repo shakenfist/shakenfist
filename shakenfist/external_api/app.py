@@ -402,6 +402,7 @@ class AuthNamespaceKeys(Resource):
             out.append(keyname)
         return out
 
+
 class AuthNamespaceKey(Resource):
     @jwt_required
     @caller_is_admin
@@ -981,7 +982,12 @@ class Image(Resource):
         db.add_event('image', url, 'api', 'cache', None, None)
 
         with util.RecordedOperation('cache image', url) as _:
-            images.fetch_image(url)
+            image_url = images.resolve(url)
+            hashed_image_path, info, image_dirty, resp = \
+                images.requires_fetch(image_url)
+
+            if image_dirty:
+                images.fetch(hashed_image_path, info, resp, lock=lock)
 
 
 class Network(Resource):

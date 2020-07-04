@@ -22,6 +22,10 @@ class RequestMalformedException(APIException):
     pass
 
 
+class UnauthorizedException(APIException):
+    pass
+
+
 class ResourceCannotBeDeletedException(APIException):
     pass
 
@@ -38,12 +42,9 @@ class InsufficientResourcesException(APIException):
     pass
 
 
-class UnauthorizedException(APIException):
-    pass
-
-
 STATUS_CODES_TO_ERRORS = {
     400: RequestMalformedException,
+    401: UnauthorizedException,
     403: ResourceCannotBeDeletedException,
     404: ResourceNotFoundException,
     409: ResourceInUseException,
@@ -83,20 +84,7 @@ class Client(object):
         if verbose:
             LOG.setLevel(logging.DEBUG)
 
-    def _request_url(self, method, url, data=None):
-        if not self.cached_auth:
-            auth_url = self.base_url + '/auth'
-            r = requests.request('POST', auth_url,
-                                 data=json.dumps(
-                                     {'namespace': self.namespace,
-                                      'key': self.key}),
-                                 headers={'Content-Type': 'application/json',
-                                          'User-Agent': get_user_agent()})
-            if r.status_code != 200:
-                raise UnauthorizedException('API unauthorized', 'POST', auth_url,
-                                            r.status_code, r.text)
-            self.cached_auth = 'Bearer %s' % r.json()['access_token']
-
+    def _actual_request_url(self, method, url, data=None):
         h = {'Authorization': self.cached_auth,
              'User-Agent': get_user_agent()}
         if data:
@@ -130,6 +118,29 @@ class Client(object):
             raise APIException(
                 'API request failed', method, url, r.status_code, r.text)
         return r
+
+    def _authenticate(self):
+        auth_url = self.base_url + '/auth'
+        r = requests.request('POST', auth_url,
+                             data=json.dumps(
+                                 {'namespace': self.namespace,
+                                     'key': self.key}),
+                             headers={'Content-Type': 'application/json',
+                                      'User-Agent': get_user_agent()})
+        if r.status_code != 200:
+            raise UnauthorizedException('API unauthorized', 'POST', auth_url,
+                                        r.status_code, r.text)
+        return 'Bearer %s' % r.json()['access_token']
+
+    def _request_url(self, method, url, data=None):
+        if not self.cached_auth:
+            self.cached_auth = self._authenticate()
+
+        try:
+            return self._actual_request_url(method, url, data=data)
+        except UnauthorizedException:
+            self.cached_auth = self._authenticate()
+            return self._actual_request_url(method, url, data=data)
 
     def get_instances(self, all=False):
         r = self._request_url('GET', self.base_url +
@@ -343,6 +354,7 @@ class Client(object):
         r = self._request_url('DELETE', self.base_url + '/auth/namespaces/' + namespace +
                               '/metadata/' + key)
         return r.json()
+
 
 def get_user_agent():
     sf_version = VersionInfo('shakenfist').version_string()
