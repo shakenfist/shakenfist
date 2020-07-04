@@ -20,6 +20,8 @@ class monitor(object):
         setproctitle.setproctitle('sf cleaner')
 
     def run(self):
+        last_compaction = 0
+
         while True:
             # Cleanup soft deleted instances and networks
             delay = config.parsed.get('CLEANER_DELAY')
@@ -34,13 +36,15 @@ class monitor(object):
 
             # Perform etcd maintenance, but only if we are the network node
             if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
-                # We need to determine what revision to compact to, so we keep a
-                # key which stores when we last compacted and we use it's latest
-                # revision number as the revision to compact to.
-                c = etcd3.client()
-                c.put('/sf/compact', json.dumps({'compacted_at': time.time()}))
-                _, kv = c.get('/sf/compact')
-                c.compact(kv.mod_revision, physical=True)
-                c.defragment()
+                if time.time() - last_compaction > 1800:
+                    # We need to determine what revision to compact to, so we keep a
+                    # key which stores when we last compacted and we use it's latest
+                    # revision number as the revision to compact to.
+                    c = etcd3.client()
+                    c.put('/sf/compact',
+                          json.dumps({'compacted_at': time.time()}))
+                    _, kv = c.get('/sf/compact')
+                    c.compact(kv.mod_revision, physical=True)
+                    c.defragment()
 
             time.sleep(60)
