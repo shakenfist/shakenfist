@@ -12,8 +12,9 @@ from shakenfist import config
 from shakenfist.daemons import cleaner as cleaner_daemon
 from shakenfist.daemons import net as net_daemon
 from shakenfist.daemons import resources as resource_daemon
-from shakenfist.external_api import app as external_api_daemon
+from shakenfist.daemons import triggers as trigger_daemon
 from shakenfist import db
+from shakenfist.external_api import app as external_api_daemon
 from shakenfist import net
 from shakenfist import util
 from shakenfist import virt
@@ -129,11 +130,17 @@ def main():
     if external_api_pid == 0:
         external_api_daemon.monitor().run()
 
+    # Triggers
+    trigger_pid = os.fork()
+    if trigger_pid == 0:
+        trigger_daemon.monitor().run()
+
     setproctitle.setproctitle('sf main')
     LOG.info('network monitor pid is %d' % net_pid)
     LOG.info('external api pid is %d' % external_api_pid)
     LOG.info('resources monitor pid is %d' % resource_pid)
     LOG.info('cleaner pid is %d' % cleaner_pid)
+    LOG.info('trigger pid is %d' % trigger_pid)
 
     restore_instances()
 

@@ -313,14 +313,14 @@ def _show_network(ctx, n):
 
     if ctx.obj['OUTPUT'] == 'json':
         filtered = filter_dict(n, ['uuid', 'name', 'vxid', 'netblock', 'provide_dhcp',
-                                         'provide_nat', 'namespace'])
+                                   'provide_nat', 'namespace'])
         filtered['metadata'] = metadata
         print(json.dumps(filtered, indent=4, sort_keys=True))
         return
 
-    format_string='%-12s: %s'
+    format_string = '%-12s: %s'
     if ctx.obj['OUTPUT'] == 'simple':
-        format_string='%s:%s'
+        format_string = '%s:%s'
 
     print(format_string % ('uuid', n['uuid']))
     print(format_string % ('name', n['name']))
@@ -333,7 +333,7 @@ def _show_network(ctx, n):
 
     print()
     if ctx.obj['OUTPUT'] == 'pretty':
-        format_string='    %-8s: %s'
+        format_string = '    %-8s: %s'
         print('Metadata:')
         for key in metadata:
             print(format_string % (key, metadata[key]))
@@ -377,13 +377,13 @@ def network_create(ctx, netblock=None, name=None, dhcp=None, nat=None, namespace
 @click.argument('network_uuid', type=click.STRING, autocompletion=_get_networks)
 @click.pass_context
 def network_events(ctx, network_uuid=None):
-    events=CLIENT.get_network_events(network_uuid)
+    events = CLIENT.get_network_events(network_uuid)
     if ctx.obj['OUTPUT'] == 'pretty':
-        x=PrettyTable()
-        x.field_names=['timestamp', 'node',
+        x = PrettyTable()
+        x.field_names = ['timestamp', 'node',
                          'operation', 'phase', 'duration', 'message']
         for e in events:
-            e['timestamp']=datetime.datetime.fromtimestamp(e['timestamp'])
+            e['timestamp'] = datetime.datetime.fromtimestamp(e['timestamp'])
             x.add_row([e['timestamp'], e['fqdn'], e['operation'], e['phase'],
                        e['duration'], e['message']])
         print(x)
@@ -391,13 +391,13 @@ def network_events(ctx, network_uuid=None):
     elif ctx.obj['OUTPUT'] == 'simple':
         print('timestamp,node,operation,phase,duration,message')
         for e in events:
-            e['timestamp']=datetime.datetime.fromtimestamp(e['timestamp'])
+            e['timestamp'] = datetime.datetime.fromtimestamp(e['timestamp'])
             x.add_row('%s,%s,%s,%s,%s,%s'
                       % (e['timestamp'], e['fqdn'], e['operation'], e['phase'],
                          e['duration'], e['message']))
 
     elif ctx.obj['OUTPUT'] == 'json':
-        filtered_events=[]
+        filtered_events = []
         for e in events:
             filtered_events.append(filter_dict(
                 e, ['timestamp', 'fqdn', 'operation', 'phase', 'duration', 'message']))
@@ -453,11 +453,11 @@ def _get_instances(ctx, args, incomplete):
 @click.argument('all', type=click.BOOL, default=False)
 @click.pass_context
 def instance_list(ctx, all=False):
-    insts=CLIENT.get_instances(all=all)
+    insts = CLIENT.get_instances(all=all)
 
     if ctx.obj['OUTPUT'] == 'pretty':
-        x=PrettyTable()
-        x.field_names=['uuid', 'name', 'namespace',
+        x = PrettyTable()
+        x.field_names = ['uuid', 'name', 'namespace',
                          'cpus', 'memory', 'hypervisor']
         for i in insts:
             x.add_row([i['uuid'], i['name'], i['namespace'],
@@ -472,7 +472,7 @@ def instance_list(ctx, all=False):
                      i['cpus'], i['memory'], i['node']))
 
     elif ctx.obj['OUTPUT'] == 'json':
-        filtered_insts=[]
+        filtered_insts = []
         for i in insts:
             filtered_insts.append(filter_dict(
                 i, ['uuid', 'name', 'namespace', 'cpus', 'memory', 'node']))
@@ -485,23 +485,23 @@ def _show_instance(ctx, i, include_snapshots=False):
         print('Instance not found')
         sys.exit(1)
 
-    metadata=CLIENT.get_instance_metadata(i['uuid'])
-    interfaces=CLIENT.get_instance_interfaces(i['uuid'])
+    metadata = CLIENT.get_instance_metadata(i['uuid'])
+    interfaces = CLIENT.get_instance_interfaces(i['uuid'])
     if include_snapshots:
-        snapshots=CLIENT.get_instance_snapshots(i['uuid'])
+        snapshots = CLIENT.get_instance_snapshots(i['uuid'])
 
     if ctx.obj['OUTPUT'] == 'json':
-        out=filter_dict(i, ['uuid', 'name', 'namespace', 'cpus', 'memory', 'disk_spec',
+        out = filter_dict(i, ['uuid', 'name', 'namespace', 'cpus', 'memory', 'disk_spec',
                               'node', 'console_port', 'vdi_port', 'ssh_key',
                               'user_data'])
-        out['network_interfaces']=[]
+        out['network_interfaces'] = []
         for interface in interfaces:
             _show_interface(ctx, interface, out)
 
-        out['metadata']=metadata
+        out['metadata'] = metadata
 
         if include_snapshots:
-            out['snapshots']=[]
+            out['snapshots'] = []
             for snap in snapshots:
                 out['snapshots'].append(filter_dict(
                     snap, ['uuid', 'device', 'created']))
@@ -509,9 +509,9 @@ def _show_instance(ctx, i, include_snapshots=False):
         print(json.dumps(out, indent=4, sort_keys=True))
         return
 
-    format_string='%-12s: %s'
+    format_string = '%-12s: %s'
     if ctx.obj['OUTPUT'] == 'simple':
-        format_string='%s:%s'
+        format_string = '%s:%s'
 
     print(format_string % ('uuid', i['uuid']))
     print(format_string % ('name', i['name']))
@@ -533,7 +533,7 @@ def _show_instance(ctx, i, include_snapshots=False):
 
     print()
     if ctx.obj['OUTPUT'] == 'pretty':
-        format_string='    %-8s: %s'
+        format_string = '    %-8s: %s'
         print('Metadata:')
         for key in metadata:
             print(format_string % (key, metadata[key]))
@@ -558,7 +558,7 @@ def _show_instance(ctx, i, include_snapshots=False):
     if include_snapshots:
         print()
         if ctx.obj['OUTPUT'] == 'pretty':
-            format_string='    %-8s: %s'
+            format_string = '    %-8s: %s'
             print('Snapshots:')
             for snap in snapshots:
                 print()
@@ -634,25 +634,25 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networ
     if len(disk) < 1 and len(diskspec) < 1:
         print('You must specify at least one disk')
 
-    sshkey_content=None
+    sshkey_content = None
     if sshkey:
         with open(sshkey) as f:
-            sshkey_content=f.read()
+            sshkey_content = f.read()
     if sshkeydata:
-        sshkey_content=sshkeydata
+        sshkey_content = sshkeydata
 
-    userdata_content=None
+    userdata_content = None
     if userdata:
         with open(userdata) as f:
-            userdata_content=f.read()
-        userdata_content=str(base64.b64encode(
+            userdata_content = f.read()
+        userdata_content = str(base64.b64encode(
             userdata_content.encode('utf-8')), 'utf-8')
     if encodeduserdata:
-        userdata_content=encodeduserdata
+        userdata_content = encodeduserdata
 
-    diskdefs=[]
+    diskdefs = []
     for d in disk:
-        size, base=_parse_spec(d)
+        size, base = _parse_spec(d)
         diskdefs.append({
             'size': int(size),
             'base': base,
@@ -660,15 +660,15 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networ
             'type': 'disk',
         })
     for d in diskspec:
-        defn={}
+        defn = {}
         for elem in d.split(','):
-            key, value=elem.split('=')
-            defn[key]=value
+            key, value = elem.split('=')
+            defn[key] = value
         diskdefs.append(defn)
 
-    netdefs=[]
+    netdefs = []
     for n in network:
-        network_uuid, address=_parse_spec(n)
+        network_uuid, address = _parse_spec(n)
         netdefs.append({
             'network_uuid': network_uuid,
             'address': address,
@@ -676,10 +676,10 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networ
             'model': 'virtio'
         })
     for n in networkspec:
-        defn={}
+        defn = {}
         for elem in n.split(','):
-            key, value=elem.split('=')
-            defn[key]=value
+            key, value = elem.split('=')
+            defn[key] = value
         netdefs.append(defn)
 
     _show_instance(
@@ -702,13 +702,13 @@ def instance_delete(ctx, instance_uuid=None):
 @click.argument('instance_uuid', type=click.STRING, autocompletion=_get_instances)
 @click.pass_context
 def instance_events(ctx, instance_uuid=None):
-    events=CLIENT.get_instance_events(instance_uuid)
+    events = CLIENT.get_instance_events(instance_uuid)
     if ctx.obj['OUTPUT'] == 'pretty':
-        x=PrettyTable()
-        x.field_names=['timestamp', 'node',
+        x = PrettyTable()
+        x.field_names = ['timestamp', 'node',
                          'operation', 'phase', 'duration', 'message']
         for e in events:
-            e['timestamp']=datetime.datetime.fromtimestamp(e['timestamp'])
+            e['timestamp'] = datetime.datetime.fromtimestamp(e['timestamp'])
             x.add_row([e['timestamp'], e['fqdn'], e['operation'], e['phase'],
                        e['duration'], e['message']])
         print(x)
@@ -716,13 +716,13 @@ def instance_events(ctx, instance_uuid=None):
     elif ctx.obj['OUTPUT'] == 'simple':
         print('timestamp,node,operation,phase,duration,message')
         for e in events:
-            e['timestamp']=datetime.datetime.fromtimestamp(e['timestamp'])
+            e['timestamp'] = datetime.datetime.fromtimestamp(e['timestamp'])
             print('%s,%s,%s,%s,%s,%s'
                   % (e['timestamp'], e['fqdn'], e['operation'], e['phase'],
                      e['duration'], e['message']))
 
     elif ctx.obj['OUTPUT'] == 'json':
-        filtered_events=[]
+        filtered_events = []
         for e in events:
             filtered_events.append(filter_dict(
                 e, ['timestamp', 'fqdn', 'operation', 'phase', 'duration', 'message']))
@@ -802,7 +802,7 @@ def instance_unpause(ctx, instance_uuid=None):
 @click.argument('all', type=click.BOOL, default=False)
 @click.pass_context
 def instance_snapshot(ctx, instance_uuid=None, all=False):
-    snapshot_uuid=CLIENT.snapshot_instance(instance_uuid, all)
+    snapshot_uuid = CLIENT.snapshot_instance(instance_uuid, all)
     if ctx.obj['OUTPUT'] == 'json':
         print(json.dumps({'uuid': snapshot_uuid}, indent=4, sort_keys=True))
     else:
@@ -833,7 +833,7 @@ def _show_interface(ctx, interface, out=[]):
 
     if ctx.obj['OUTPUT'] == 'json':
         if 'network_interfaces' not in out:
-            out['network_interfaces']=[]
+            out['network_interfaces'] = []
 
         out['network_interfaces'].append(
             filter_dict(
@@ -842,7 +842,7 @@ def _show_interface(ctx, interface, out=[]):
         return
 
     if ctx.obj['OUTPUT'] == 'pretty':
-        format_string='    %-8s: %s'
+        format_string = '    %-8s: %s'
         print(format_string % ('uuid', interface['uuid']))
         print(format_string % ('network', interface['network_uuid']))
         print(format_string % ('macaddr', interface['macaddr']))
@@ -861,10 +861,10 @@ def _show_interface(ctx, interface, out=[]):
                 autocompletion=_get_instance_interfaces)
 @click.pass_context
 def interface_show(ctx, interface_uuid=None):
-    interface=CLIENT.get_interface(interface_uuid)
+    interface = CLIENT.get_interface(interface_uuid)
 
     if ctx.obj['OUTPUT'] == 'json':
-        out={'network_interfaces': []}
+        out = {'network_interfaces': []}
         _show_interface(ctx, interface, out)
         print(json.dumps(out, indent=4, sort_keys=True))
         return

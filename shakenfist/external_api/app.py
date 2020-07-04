@@ -449,7 +449,10 @@ class AuthMetadatas(Resource):
     @jwt_required
     @caller_is_admin
     def get(self, namespace):
-        return etcd.get('metadata', 'namespace', namespace)
+        md = etcd.get('metadata', 'namespace', namespace)
+        if not md:
+            return {}
+        return md
 
 
 class AuthMetadata(Resource):
@@ -658,9 +661,9 @@ class Instances(Resource):
                     n.create()
 
                 with etcd.get_lock('sf/ipmanager/%s' % netdesc['network_uuid'],
-                                ttl=120) as _:
+                                   ttl=120) as _:
                     db.add_event('network', netdesc['network_uuid'], 'allocate address',
-                                None, None, instance_uuid)
+                                 None, None, instance_uuid)
                     allocations.setdefault(netdesc['network_uuid'], [])
                     ipm = db.get_ipmanager(netdesc['network_uuid'])
                     if 'address' not in netdesc or not netdesc['address']:
@@ -668,7 +671,7 @@ class Instances(Resource):
                     else:
                         if not ipm.reserve(netdesc['address']):
                             error_with_cleanup(409, 'address %s in use' %
-                                            netdesc['address'])
+                                               netdesc['address'])
                     db.persist_ipmanager(netdesc['network_uuid'], ipm.save())
                     allocations[netdesc['network_uuid']].append(
                         (netdesc['address'], order))
@@ -933,7 +936,10 @@ class InstanceMetadatas(Resource):
     @arg_is_instance_uuid
     @requires_instance_ownership
     def get(self, instance_uuid=None, instance_from_db=None):
-        return etcd.get('metadata', 'instance', instance_uuid)
+        md = etcd.get('metadata', 'instance', instance_uuid)
+        if not md:
+            return {}
+        return md
 
 
 class InstanceMetadata(Resource):
@@ -1100,7 +1106,10 @@ class NetworkMetadatas(Resource):
     @arg_is_network_uuid
     @requires_network_ownership
     def get(self, network_uuid=None, network_from_db=None):
-        return etcd.get('metadata', 'network', network_uuid)
+        md = etcd.get('metadata', 'network', network_uuid)
+        if not md:
+            return {}
+        return md
 
 
 class NetworkMetadata(Resource):
