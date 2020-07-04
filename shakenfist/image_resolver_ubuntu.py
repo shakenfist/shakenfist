@@ -22,8 +22,7 @@ def resolve(name):
                         headers={'User-Agent': util.get_user_agent()})
     if resp.status_code != 200:
         raise exceptions.HTTPError(
-            'Failed to fetch https://cloud-images.ubuntu.com, '
-            'status code %d' % resp.status_code)
+            'Failed to fetch %s, status code %d' % (UBUNTU_URL, resp.status_code))
 
     num_to_name = {}
     name_to_num = {}
