@@ -11,6 +11,7 @@ LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 
 
 ETCD_ATTEMPTS = 5
+ETCD_ATTEMPT_DELAY = 0.5
 
 
 class LockException(Exception):
@@ -32,7 +33,7 @@ def get_lock(name, ttl=60):
             return etcd3.client().lock(name, ttl=ttl)
         except Exception as e:
             LOG.info('Failed to acquire lock, attempt %d: %s' % (attempt, e))
-            time.sleep(0.2)
+            time.sleep(ETCD_ATTEMPT_DELAY)
         finally:
             LOG.debug('Locked etcd key "%s" after %.02f seconds'
                       % (name, time.time() - start))
@@ -58,7 +59,7 @@ def put(objecttype, subtype, name, data, ttl=None):
             return etcd3.client().put(path, encoded, lease=None)
         except Exception as e:
             LOG.info('Failed to write %s, attempt %d: %s' % (path, attempt, e))
-            time.sleep(0.2)
+            time.sleep(ETCD_ATTEMPT_DELAY)
         finally:
             LOG.debug('Wrote etcd key "%s"' % path)
 
@@ -75,7 +76,7 @@ def get(objecttype, subtype, name):
             return json.loads(value)
         except Exception as e:
             LOG.info('Failed to read %s, attempt %d: %s' % (path, attempt, e))
-            time.sleep(0.2)
+            time.sleep(ETCD_ATTEMPT_DELAY)
         finally:
             LOG.debug('Read etcd key "%s"' % path)
 
@@ -92,7 +93,7 @@ def get_all(objecttype, subtype, sort_order=None):
         except Exception as e:
             LOG.info('Failed to fetch all %s, attempt %d: %s'
                      % (path, attempt, e))
-            time.sleep(0.2)
+            time.sleep(ETCD_ATTEMPT_DELAY)
         finally:
             LOG.debug('Searched etcd range "%s"' % path)
 
@@ -108,7 +109,7 @@ def delete(objecttype, subtype, name):
         except Exception as e:
             LOG.info('Failed to delete %s, attempt %d: %s' %
                      (path, attempt, e))
-            time.sleep(0.2)
+            time.sleep(ETCD_ATTEMPT_DELAY)
         finally:
             LOG.debug('Deleted etcd key "%s"' % path)
 
@@ -124,7 +125,7 @@ def delete_all(objecttype, subtype, sort_order=None):
         except Exception as e:
             LOG.info('Failed to delete all %s, attempt %d: %s'
                      % (path, attempt, e))
-            time.sleep(0.2)
+            time.sleep(ETCD_ATTEMPT_DELAY)
         finally:
             LOG.debug('Deleted etcd range "%s"' % path)
 
