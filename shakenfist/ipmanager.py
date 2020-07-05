@@ -63,15 +63,15 @@ class NetBlock(object):
                 addr = self.get_random_address()
                 free = self.reserve_if_free(addr)
                 if free:
-                    return addr
+                    return str(addr)
 
         else:
             idx = 1
-            while True:
+            while idx < self.num_addresses:
                 addr = self.get_address_at_index(idx)
                 free = self.reserve_if_free(addr)
                 if free:
-                    return addr
+                    return str(addr)
 
                 idx += 1
 
