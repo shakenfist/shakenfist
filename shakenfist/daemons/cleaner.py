@@ -47,4 +47,6 @@ class monitor(object):
                     c.compact(kv.mod_revision, physical=True)
                     c.defragment()
 
+                    last_compaction = time.time()
+
             time.sleep(60)
