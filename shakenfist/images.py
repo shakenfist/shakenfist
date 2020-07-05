@@ -9,6 +9,7 @@ import os
 import re
 import requests
 import shutil
+import time
 import urllib3
 
 from oslo_concurrency import processutils
@@ -101,12 +102,14 @@ def fetch(hashed_image_path, info, resp, lock=None):
     for field in VALIDATED_IMAGE_FIELDS:
         info[field] = resp.headers.get(field)
 
+    last_lock_refresh = 0
     with open(hashed_image_path + '.v%03d' % info['version'], 'wb') as f:
         for chunk in resp.iter_content(chunk_size=8192):
             fetched += len(chunk)
             f.write(chunk)
-            if lock:
+            if lock and (time.time() - last_lock_refresh > 10):
                 lock.refresh()
+                last_lock_refresh = time.time()
 
     if fetched > 0:
         with open(hashed_image_path + '.info', 'w') as f:
