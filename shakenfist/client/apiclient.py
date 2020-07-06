@@ -310,6 +310,13 @@ class Client(object):
                               '/defloat')
         return r.json()
 
+    def get_console_data(self, instance_uuid, length=None):
+        url = self.base_url + '/instances/' + instance_uuid + '/consoledata'
+        if length:
+            url += '?length=%d' % length
+        r = self._request_url('GET', url)
+        return r.text
+
     def get_namespaces(self):
         r = self._request_url('GET', self.base_url + '/auth/namespaces')
         return r.json()
