@@ -34,19 +34,22 @@ class monitor(object):
                 LOG.info('Hard deleting network %s' % n['uuid'])
                 db.hard_delete_network(n['uuid'])
 
-            # Perform etcd maintenance, but only if we are the network node
-            if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
-                if time.time() - last_compaction > 1800:
-                    # We need to determine what revision to compact to, so we keep a
-                    # key which stores when we last compacted and we use it's latest
-                    # revision number as the revision to compact to.
-                    c = etcd3.client()
-                    c.put('/sf/compact',
-                          json.dumps({'compacted_at': time.time()}))
-                    _, kv = c.get('/sf/compact')
-                    c.compact(kv.mod_revision, physical=True)
-                    c.defragment()
+            for ni in db.get_stale_network_interfaces(delay):
+                LOG.info('Hard deleting network interface %s' % ni['uuid'])
+                db.hard_delete_network_interface(ni['uuid'])
 
-                    last_compaction = time.time()
+            # Perform etcd maintenance
+            if time.time() - last_compaction > 1800:
+                # We need to determine what revision to compact to, so we keep a
+                # key which stores when we last compacted and we use it's latest
+                # revision number as the revision to compact to.
+                c = etcd3.client()
+                c.put('/sf/compact',
+                      json.dumps({'compacted_at': time.time()}))
+                _, kv = c.get('/sf/compact')
+                c.compact(kv.mod_revision, physical=True)
+                c.defragment()
+
+                last_compaction = time.time()
 
             time.sleep(60)

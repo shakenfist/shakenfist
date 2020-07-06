@@ -278,6 +278,14 @@ def create_network_interface(interface_uuid, netdesc, instance_uuid, order):
              })
 
 
+def get_stale_network_interfaces(delay):
+    see_this_node()
+    for n in etcd.get_all('networkinterface', None):
+        if n['state'] in ['deleted', 'error']:
+            if time.time() - n['state_updated'] > delay:
+                yield n
+
+
 def hard_delete_network_interface(interface_uuid):
     see_this_node()
     etcd.delete('networkinterface', None, interface_uuid)
