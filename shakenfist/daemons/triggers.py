@@ -19,8 +19,7 @@ LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 
 def observe(path, instance_uuid):
     regexps = {
-        'cirros login prompt': ['^cirros login:.*',
-                                re.compile('^cirros login:.*')]
+        'login prompt': ['^.* login: .*', re.compile('.* login: .*')]
     }
 
     f = None

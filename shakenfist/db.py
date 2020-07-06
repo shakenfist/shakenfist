@@ -227,10 +227,6 @@ def update_instance_state(instance_uuid, state):
     i['state_updated'] = time.time()
     etcd.put('instance', None, instance_uuid, i)
 
-    if state == 'deleted':
-        free_console_port(i['console_port'])
-        free_console_port(i['vdi_port'])
-
 
 def hard_delete_instance(instance_uuid):
     see_this_node()
@@ -276,6 +272,14 @@ def create_network_interface(interface_uuid, netdesc, instance_uuid, order):
                  'state_updated': time.time(),
                  'model': netdesc['model']
              })
+
+
+def get_stale_network_interfaces(delay):
+    see_this_node()
+    for n in etcd.get_all('networkinterface', None):
+        if n['state'] in ['deleted', 'error']:
+            if time.time() - n['state_updated'] > delay:
+                yield n
 
 
 def hard_delete_network_interface(interface_uuid):
@@ -417,6 +421,4 @@ def allocate_console_port(instance_uuid):
 
 def free_console_port(port):
     see_this_node()
-    node = config.parsed.get('NODE_NAME')
-    with etcd.get_lock('sf/console/%s' % node) as _:
-        etcd.delete('console', node, str(port))
+    etcd.delete('console', config.parsed.get('NODE_NAME'), port)

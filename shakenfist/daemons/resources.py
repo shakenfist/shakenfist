@@ -31,10 +31,12 @@ def _get_stats():
     })
 
     retval['cpu_max_per_instance'] = conn.getMaxVcpus(None)
-    for i in range(present_cpus):
-        per_cpu_stats = conn.getCPUStats(i)
-        for key in per_cpu_stats:
-            retval['cpu_core%d_%s' % (i, key)] = per_cpu_stats[key]
+
+    # This is disable as data we don't currently use
+    # for i in range(present_cpus):
+    #    per_cpu_stats = conn.getCPUStats(i)
+    #    for key in per_cpu_stats:
+    #        retval['cpu_core%d_%s' % (i, key)] = per_cpu_stats[key]
 
     try:
         load_1, load_5, load_15 = psutil.getloadavg()

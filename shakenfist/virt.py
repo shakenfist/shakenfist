@@ -254,6 +254,8 @@ class Instance(object):
                     db.persist_ipmanager(ni['network_uuid'], ipm.save())
 
         db.update_instance_state(self.db_entry['uuid'], 'deleted')
+        db.free_console_port(self.db_entry['console_port'])
+        db.free_console_port(self.db_entry['vdi_port'])
 
     def _make_config_drive(self, disk_path):
         """Create a config drive"""
