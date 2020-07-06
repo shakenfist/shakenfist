@@ -975,6 +975,24 @@ class InstanceMetadata(Resource):
             etcd.put('metadata', 'instance', instance_uuid, md)
 
 
+class InstanceConsoleData(Resource):
+    @jwt_required
+    @arg_is_instance_uuid
+    @arg_is_instance_uuid_as_virt
+    @requires_instance_ownership
+    @redirect_instance_request
+    def get(self, instance_uuid=None, length=None, instance_from_db=None, instance_from_db_virt=None):
+        length = 10240
+        if 'length' in flask_restful.request.args:
+            length = int(flask_restful.request.args['length'])
+
+        resp = flask.Response(
+            instance_from_db_virt.get_console_data(length),
+            mimetype='text/plain')
+        resp.status_code = 200
+        return resp
+
+
 class Image(Resource):
     @jwt_required
     @caller_is_admin
@@ -1244,6 +1262,7 @@ api.add_resource(InterfaceDefloat, '/interfaces/<interface_uuid>/defloat')
 api.add_resource(InstanceMetadatas, '/instances/<instance_uuid>/metadata')
 api.add_resource(InstanceMetadata,
                  '/instances/<instance_uuid>/metadata/<key>')
+api.add_resource(InstanceConsoleData, '/instances/<instance_uuid>/consoledata')
 
 api.add_resource(Image, '/images')
 

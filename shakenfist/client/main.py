@@ -165,13 +165,13 @@ def _show_namespace(ctx, namespace):
 
     if ctx.obj['OUTPUT'] == 'json':
         out = {'key_names': key_names,
-                'metadata': metadata,
-        }
+               'metadata': metadata,
+               }
         print(json.dumps(out, indent=4, sort_keys=True))
         return
 
     if ctx.obj['OUTPUT'] == 'pretty':
-        format_string='    %s'
+        format_string = '    %s'
         print('Key Names:')
         if key_names:
             for key in key_names:
@@ -179,7 +179,7 @@ def _show_namespace(ctx, namespace):
 
         print('Metadata:')
         if metadata:
-            format_string='    %-' + str(longest_str(metadata)) + 's: %s'
+            format_string = '    %-' + str(longest_str(metadata)) + 's: %s'
             for key in metadata:
                 print(format_string % (key, metadata[key]))
 
@@ -795,6 +795,14 @@ def instance_unpause(ctx, instance_uuid=None):
     CLIENT.unpause_instance(instance_uuid)
     if ctx.obj['OUTPUT'] == 'json':
         print('{}')
+
+
+@instance.command(name='consoledata', help='Get console data for an instance')
+@click.argument('instance_uuid', type=click.STRING, autocompletion=_get_instances)
+@click.argument('length', type=click.INT, default=10240)
+@click.pass_context
+def instance_consoledata(ctx, instance_uuid=None, length=None):
+    print(CLIENT.get_console_data(instance_uuid, length=length))
 
 
 @instance.command(name='snapshot', help='Snapshot instance')

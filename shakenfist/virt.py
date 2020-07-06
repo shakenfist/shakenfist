@@ -1,6 +1,7 @@
 # Copyright 2019 Michael Still
 
 import base64
+import errno
 import jinja2
 import logging
 from logging import handlers as logging_handlers
@@ -517,3 +518,14 @@ class Instance(object):
     def unpause(self):
         instance = self._get_domain()
         instance.resume()
+
+    def get_console_data(self, length):
+        console_path = os.path.join(self.instance_path, 'console.log')
+        if not os.path.exists(console_path):
+            return ''
+
+        offset = max(0, os.stat(console_path).st_size - length)
+
+        with open(console_path) as f:
+            f.seek(offset)
+            return f.read()
