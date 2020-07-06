@@ -227,10 +227,6 @@ def update_instance_state(instance_uuid, state):
     i['state_updated'] = time.time()
     etcd.put('instance', None, instance_uuid, i)
 
-    if state == 'deleted':
-        free_console_port(i['console_port'])
-        free_console_port(i['vdi_port'])
-
 
 def hard_delete_instance(instance_uuid):
     see_this_node()
@@ -425,6 +421,4 @@ def allocate_console_port(instance_uuid):
 
 def free_console_port(port):
     see_this_node()
-    node = config.parsed.get('NODE_NAME')
-    with etcd.get_lock('sf/console/%s' % node) as _:
-        etcd.delete('console', node, str(port))
+    etcd.delete('console', config.parsed.get('NODE_NAME'), port)
