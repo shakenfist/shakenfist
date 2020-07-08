@@ -397,8 +397,12 @@ class AuthNamespaceKeys(Resource):
     @jwt_required
     @caller_is_admin
     def get(self, namespace=None):
+        rec = etcd.get('namespace', None, namespace)
+        if not rec:
+            return error(404, 'namespace does not exist')
+
         out = []
-        for keyname in etcd.get('namespace', None, namespace)['keys']:
+        for keyname in rec['keys']:
             out.append(keyname)
         return out
 
