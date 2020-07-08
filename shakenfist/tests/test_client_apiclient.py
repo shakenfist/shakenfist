@@ -38,7 +38,7 @@ class ApiClientTestCase(testtools.TestCase):
 
     def test_create_instance(self):
         client = apiclient.Client()
-        client.create_instance('foo', 1, 2, ['netuuid1'], ['8@cirros'],
+        client.create_instance('foo', 1, 2048, ['netuuid1'], ['8@cirros'],
                                'sshkey', None, None)
 
         self.mock_request.assert_called_with(
@@ -46,7 +46,7 @@ class ApiClientTestCase(testtools.TestCase):
             data={
                 'name': 'foo',
                 'cpus': 1,
-                'memory': 2,
+                'memory': 2048,
                 'network': ['netuuid1'],
                 'disk': ['8@cirros'],
                 'ssh_key': 'sshkey',
@@ -56,7 +56,7 @@ class ApiClientTestCase(testtools.TestCase):
 
     def test_create_instance_user_data(self):
         client = apiclient.Client()
-        client.create_instance('foo', 1, 2, ['netuuid1'], ['8@cirros'],
+        client.create_instance('foo', 1, 2048, ['netuuid1'], ['8@cirros'],
                                'sshkey', 'userdatabeforebase64', None)
 
         self.mock_request.assert_called_with(
@@ -64,7 +64,7 @@ class ApiClientTestCase(testtools.TestCase):
             data={
                 'name': 'foo',
                 'cpus': 1,
-                'memory': 2,
+                'memory': 2048,
                 'network': ['netuuid1'],
                 'disk': ['8@cirros'],
                 'ssh_key': 'sshkey',
