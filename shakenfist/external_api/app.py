@@ -260,6 +260,22 @@ def requires_network_ownership(func):
     return wrapper
 
 
+def metadata_putpost(meta_type, owner, key, value):
+        if meta_type not in ['namespace', 'instance', 'network']:
+            return error(500, 'invalid meta_type %s' % meta_type)
+        if not key:
+            return error(400, 'no key specified')
+        if not value:
+            return error(400, 'no value specified')
+
+        with etcd.get_lock('sf/metadata/%s/%s' % (meta_type, owner)) as _:
+            md = etcd.get('metadata', meta_type, owner)
+            if md is None:
+                md = {}
+            md[key] = value
+            etcd.put('metadata', meta_type, owner, md)
+
+
 app = flask.Flask(__name__)
 api = flask_restful.Api(app, catch_all_404s=False)
 app.config['JWT_SECRET_KEY'] = config.parsed.get('AUTH_SECRET_SEED')
@@ -393,6 +409,30 @@ class AuthNamespace(Resource):
         etcd.delete('metadata', 'namespace', namespace)
 
 
+def _namespace_keys_putpost(namespace=None, key_name=None, key=None):
+    if not namespace:
+        return error(400, 'no namespace specified')
+    if not key_name:
+        return error(400, 'no key name specified')
+    if not key:
+        return error(400, 'no key specified')
+    if key_name == 'service_key':
+        return error(403, 'illegal key name')
+
+    with etcd.get_lock('sf/namespace') as _:
+        rec = etcd.get('namespace', None, namespace)
+        if not rec:
+            return error(404, 'namespace does not exist')
+
+        encoded = str(base64.b64encode(bcrypt.hashpw(
+            key.encode('utf-8'), bcrypt.gensalt())), 'utf-8')
+        rec['keys'][key_name] = encoded
+
+        etcd.put('namespace', None, namespace, rec)
+
+    return key_name
+
+
 class AuthNamespaceKeys(Resource):
     @jwt_required
     @caller_is_admin
@@ -406,32 +446,23 @@ class AuthNamespaceKeys(Resource):
             out.append(keyname)
         return out
 
+    @jwt_required
+    @caller_is_admin
+    def post(self, namespace=None, key_name=None, key=None):
+       return _namespace_keys_putpost(namespace, key_name, key)
+
 
 class AuthNamespaceKey(Resource):
     @jwt_required
     @caller_is_admin
-    def post(self, namespace=None, key_name=None, key=None):
-        if not namespace:
-            return error(400, 'no namespace specified')
-        if not key_name:
-            return error(400, 'no key name specified')
-        if not key:
-            return error(400, 'no key specified')
-        if key_name == 'service_key':
-            return error(403, 'illegal key name')
+    def put(self, namespace=None, key_name=None, key=None):
+        rec = etcd.get('namespace', None, namespace)
+        if not rec:
+            return error(404, 'namespace does not exist')
+        if key_name not in rec['keys']:
+            return error(404, 'key does not exist')
 
-        with etcd.get_lock('sf/namespace') as _:
-            rec = etcd.get('namespace', None, namespace)
-            if not rec:
-                return error(404, 'namespace does not exist')
-
-            encoded = str(base64.b64encode(bcrypt.hashpw(
-                key.encode('utf-8'), bcrypt.gensalt())), 'utf-8')
-            rec['keys'][key_name] = encoded
-
-            etcd.put('namespace', None, namespace, rec)
-
-        return key_name
+        return _namespace_keys_putpost(namespace, key_name, key)
 
     @jwt_required
     @caller_is_admin
@@ -459,22 +490,18 @@ class AuthMetadatas(Resource):
             return {}
         return md
 
+    @jwt_required
+    @caller_is_admin
+    def post(self, namespace, key=None, value=None):
+        return metadata_putpost('namespace', namespace, key, value)
+
 
 class AuthMetadata(Resource):
     @jwt_required
     @caller_is_admin
-    def post(self, namespace, key=None, value=None):
-        if not key:
-            return error(400, 'no key specified')
-        if not value:
-            return error(400, 'no value specified')
+    def put(self, namespace, key=None, value=None):
+        return metadata_putpost('namespace', namespace, key, value)
 
-        with etcd.get_lock('sf/metadata/namespace/%s' % namespace) as _:
-            md = etcd.get('metadata', 'namespace', namespace)
-            if md is None:
-                md = {}
-            md[key] = value
-            etcd.put('metadata', 'namespace', namespace, md)
 
     @jwt_required
     @caller_is_admin
@@ -946,23 +973,19 @@ class InstanceMetadatas(Resource):
             return {}
         return md
 
+    @jwt_required
+    @arg_is_instance_uuid
+    @requires_instance_ownership
+    def post(self, instance_uuid=None, key=None, value=None, instance_from_db=None):
+        return metadata_putpost('instance', instance_uuid, key, value)
+
 
 class InstanceMetadata(Resource):
     @jwt_required
     @arg_is_instance_uuid
     @requires_instance_ownership
-    def post(self, instance_uuid=None, key=None, value=None, instance_from_db=None):
-        if not key:
-            return error(400, 'no key specified')
-        if not value:
-            return error(400, 'no value specified')
-
-        with etcd.get_lock('sf/metadata/instance/%s' % instance_uuid) as _:
-            md = etcd.get('metadata', 'instance', instance_uuid)
-            if md is None:
-                md = {}
-            md[key] = value
-            etcd.put('metadata', 'instance', instance_uuid, md)
+    def put(self, instance_uuid=None, key=None, value=None, instance_from_db=None):
+        return metadata_putpost('instance', instance_uuid, key, value)
 
     @jwt_required
     @arg_is_instance_uuid
@@ -1139,23 +1162,19 @@ class NetworkMetadatas(Resource):
             return {}
         return md
 
+    @jwt_required
+    @arg_is_network_uuid
+    @requires_network_ownership
+    def post(self, network_uuid=None, key=None, value=None, network_from_db=None):
+        return metadata_putpost('network', network_uuid, key, value)
+
 
 class NetworkMetadata(Resource):
     @jwt_required
     @arg_is_network_uuid
     @requires_network_ownership
-    def post(self, network_uuid=None, key=None, value=None, network_from_db=None):
-        if not key:
-            return error(400, 'no key specified')
-        if not value:
-            return error(400, 'no value specified')
-
-        with etcd.get_lock('sf/metadata/network/%s' % network_uuid) as _:
-            md = etcd.get('metadata', 'network', network_uuid)
-            if md is None:
-                md = {}
-            md[key] = value
-            etcd.put('metadata', 'network', network_uuid, md)
+    def put(self, network_uuid=None, key=None, value=None, network_from_db=None):
+        return metadata_putpost('network', network_uuid, key, value)
 
     @jwt_required
     @arg_is_network_uuid

@@ -154,12 +154,12 @@ class ApiClientTestCase(testtools.TestCase):
 
     def test_add_namespace_key(self):
         client = apiclient.Client()
-        client.add_namespace_key('testspace', 'keyname', 'secretkey')
+        client.add_namespace_key('testspace', 'testkeyname', 'secretkey')
 
         self.mock_request.assert_called_with(
             'POST',
-            'http://localhost:13000/auth/namespaces/testspace/keys/keyname',
-            data={'key': 'secretkey'})
+            'http://localhost:13000/auth/namespaces/testspace/keys',
+            data={'key_name':'testkeyname', 'key': 'secretkey'})
 
     def test_delete_namespace_key(self):
         client = apiclient.Client()
@@ -181,7 +181,7 @@ class ApiClientTestCase(testtools.TestCase):
         client.set_namespace_metadata_item('testspace', 'billy', 'bob')
 
         self.mock_request.assert_called_with(
-            'POST',
+            'PUT',
             'http://localhost:13000/auth/namespaces/testspace/metadata/billy',
             data={'value': 'bob'})
 
