@@ -635,7 +635,9 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networ
         print('You must specify at least one disk')
 
     if memory < 256:
-        print('WARNING: Assuming you have specified memory in GB\n')
+        if ctx.obj['OUTPUT'] != 'json':
+            print('WARNING: Assuming you have specified memory in GB.')
+            print('WARNING: This behaviour will be removed in the v0.3 release.')
         memory *= 1024
 
     sshkey_content = None
