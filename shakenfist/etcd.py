@@ -4,6 +4,11 @@ import logging
 from logging import handlers as logging_handlers
 import time
 
+####################################################################
+# Please do not call this file directly, but instead call it via   #
+# the db.py abstraction.                                           #
+####################################################################
+
 
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.INFO)

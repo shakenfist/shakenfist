@@ -17,7 +17,7 @@ from oslo_concurrency import processutils
 
 from shakenfist import config
 from shakenfist import db
-from shakenfist import etcd
+from shakenfist import db
 from shakenfist import images
 from shakenfist import net
 from shakenfist import util
@@ -248,8 +248,8 @@ class Instance(object):
 
         with util.RecordedOperation('release network addreses', self) as _:
             for ni in db.get_instance_interfaces(self.db_entry['uuid']):
-                with etcd.get_lock('sf/ipmanager/%s' % ni['network_uuid'],
-                                   ttl=120) as _:
+                with db.get_lock('sf/ipmanager/%s' % ni['network_uuid'],
+                                 ttl=120) as _:
                     ipm = db.get_ipmanager(ni['network_uuid'])
                     ipm.release(ni['ipv4'])
                     db.persist_ipmanager(ni['network_uuid'], ipm.save())

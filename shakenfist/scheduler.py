@@ -8,7 +8,7 @@ import time
 
 from shakenfist import config
 from shakenfist import db
-from shakenfist import etcd
+from shakenfist import db
 from shakenfist import util
 
 LOG = logging.getLogger(__file__)
