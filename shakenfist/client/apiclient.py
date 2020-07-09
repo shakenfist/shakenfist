@@ -163,7 +163,7 @@ class Client(object):
         return r.json()
 
     def set_instance_metadata_item(self, instance_uuid, key, value):
-        r = self._request_url('POST', self.base_url + '/instances/' + instance_uuid +
+        r = self._request_url('PUT', self.base_url + '/instances/' + instance_uuid +
                               '/metadata/' + key, data={'value': value})
         return r.json()
 
@@ -282,7 +282,7 @@ class Client(object):
         return r.json()
 
     def set_network_metadata_item(self, network_uuid, key, value):
-        r = self._request_url('POST', self.base_url + '/networks/' + network_uuid +
+        r = self._request_url('PUT', self.base_url + '/networks/' + network_uuid +
                               '/metadata/' + key, data={'value': value})
         return r.json()
 
@@ -339,8 +339,8 @@ class Client(object):
 
     def add_namespace_key(self, namespace, key_name, key):
         r = self._request_url('POST', self.base_url + '/auth/namespaces/' +
-                              namespace + '/keys/' + key_name,
-                              data={'key': key})
+                              namespace + '/keys',
+                              data={'key_name':key_name, 'key': key})
         return r.json()
 
     def delete_namespace_key(self, namespace, key_name):
@@ -353,7 +353,7 @@ class Client(object):
         return r.json()
 
     def set_namespace_metadata_item(self, namespace, key, value):
-        r = self._request_url('POST', self.base_url + '/auth/namespaces/' + namespace +
+        r = self._request_url('PUT', self.base_url + '/auth/namespaces/' + namespace +
                               '/metadata/' + key, data={'value': value})
         return r.json()
 
