@@ -14,7 +14,7 @@ import time
 from oslo_concurrency import processutils
 
 from shakenfist import db
-from shakenfist import etcd
+from shakenfist import db
 
 
 LOG = logging.getLogger(__file__)
@@ -118,17 +118,17 @@ def get_libvirt():
 
 
 def get_api_token(base_url, namespace='system'):
-    with etcd.get_lock('sf/namespace/%s' % namespace) as _:
+    with db.get_lock('sf/namespace/%s' % namespace) as _:
         auth_url = base_url + '/auth'
         LOG.info('Fetching %s auth token from %s' % (namespace, auth_url))
-        ns = etcd.get('namespace', None, namespace)
+        ns = db.get_namespace(namespace)
         if 'service_key' in ns:
             key = ns['service_key']
         else:
             key = ''.join(random.choice(string.ascii_lowercase)
                           for i in range(50))
             ns['service_key'] = key
-            etcd.put('namespace', None, namespace, ns)
+            db.persist_namespace(namespace, ns)
 
     r = requests.request('POST', auth_url,
                          data=json.dumps({

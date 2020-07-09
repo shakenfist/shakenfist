@@ -7,7 +7,7 @@ import time
 
 from shakenfist import config
 from shakenfist import db
-from shakenfist import etcd
+from shakenfist import db
 
 
 LOG = logging.getLogger(__file__)

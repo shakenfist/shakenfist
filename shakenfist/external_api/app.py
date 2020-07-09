@@ -31,7 +31,7 @@ from oslo_concurrency import processutils
 
 from shakenfist import config
 from shakenfist import db
-from shakenfist import etcd
+from shakenfist import db
 from shakenfist import images
 from shakenfist import net
 from shakenfist import scheduler
@@ -268,12 +268,12 @@ def _metadata_putpost(meta_type, owner, key, value):
     if not value:
         return error(400, 'no value specified')
 
-    with etcd.get_lock('sf/metadata/%s/%s' % (meta_type, owner)) as _:
-        md = etcd.get('metadata', meta_type, owner)
+    with db.get_lock('sf/metadata/%s/%s' % (meta_type, owner)) as _:
+        md = db.get_metadata(meta_type, owner)
         if md is None:
             md = {}
         md[key] = value
-        etcd.put('metadata', meta_type, owner, md)
+        db.persist_metadata(meta_type, owner, md)
 
 
 app = flask.Flask(__name__)
@@ -303,7 +303,7 @@ class Root(Resource):
 
 class Auth(Resource):
     def _get_keys(self, namespace):
-        rec = etcd.get('namespace', None, namespace)
+        rec = db.get_namespace(namespace)
         if not rec:
             return (None, [])
 
@@ -335,8 +335,8 @@ class AuthNamespaces(Resource):
         if not namespace:
             return error(400, 'no namespace specified')
 
-        with etcd.get_lock('sf/namespace') as _:
-            rec = etcd.get('namespace', None, namespace)
+        with db.get_lock('sf/namespace') as _:
+            rec = db.get_namespace(namespace)
             if not rec:
                 rec = {
                     'name': namespace,
@@ -355,9 +355,8 @@ class AuthNamespaces(Resource):
                 rec['keys'][key_name] = encoded
 
             # Initialise metadata
-            etcd.put('metadata', 'namespace', namespace, {})
-
-            etcd.put('namespace', None, namespace, rec)
+            db.persist_metadata('namespace', namespace, {})
+            db.persist_namespace(namespace, rec)
 
         return namespace
 
@@ -365,7 +364,7 @@ class AuthNamespaces(Resource):
     @caller_is_admin
     def get(self):
         out = []
-        for rec in etcd.get_all('namespace', None):
+        for rec in db.list_namespaces():
             out.append(rec['name'])
         return out
 
@@ -405,8 +404,8 @@ class AuthNamespace(Resource):
         for network_uuid in deleted_networks:
             db.hard_delete_network(network_uuid)
 
-        etcd.delete('namespace', None, namespace)
-        etcd.delete('metadata', 'namespace', namespace)
+        db.delete_namespace(namespace)
+        db.delete_metadata('namespace', namespace)
 
 
 def _namespace_keys_putpost(namespace=None, key_name=None, key=None):
@@ -419,8 +418,8 @@ def _namespace_keys_putpost(namespace=None, key_name=None, key=None):
     if key_name == 'service_key':
         return error(403, 'illegal key name')
 
-    with etcd.get_lock('sf/namespace') as _:
-        rec = etcd.get('namespace', None, namespace)
+    with db.get_lock('sf/namespace') as _:
+        rec = db.get_namespace(namespace)
         if not rec:
             return error(404, 'namespace does not exist')
 
@@ -428,7 +427,7 @@ def _namespace_keys_putpost(namespace=None, key_name=None, key=None):
             key.encode('utf-8'), bcrypt.gensalt())), 'utf-8')
         rec['keys'][key_name] = encoded
 
-        etcd.put('namespace', None, namespace, rec)
+        db.persist_namespace(namespace, rec)
 
     return key_name
 
@@ -437,7 +436,7 @@ class AuthNamespaceKeys(Resource):
     @jwt_required
     @caller_is_admin
     def get(self, namespace=None):
-        rec = etcd.get('namespace', None, namespace)
+        rec = db.get_namespace(namespace)
         if not rec:
             return error(404, 'namespace does not exist')
 
@@ -456,7 +455,7 @@ class AuthNamespaceKey(Resource):
     @jwt_required
     @caller_is_admin
     def put(self, namespace=None, key_name=None, key=None):
-        rec = etcd.get('namespace', None, namespace)
+        rec = db.get_namespace(namespace)
         if not rec:
             return error(404, 'namespace does not exist')
         if key_name not in rec['keys']:
@@ -472,20 +471,20 @@ class AuthNamespaceKey(Resource):
         if not key_name:
             return error(400, 'no key name specified')
 
-        with etcd.get_lock('sf/namespace/%s' % namespace) as _:
-            ns = etcd.get('namespace', None, namespace)
+        with db.get_lock('sf/namespace/%s' % namespace) as _:
+            ns = db.get_namespace(namespace)
             if ns.get('keys') and key_name in ns['keys']:
                 del ns['keys'][key_name]
             else:
                 return error(404, 'key name not found in namespace')
-            etcd.put('namespace', None, namespace, ns)
+            db.persist_namespace(namespace, ns)
 
 
 class AuthMetadatas(Resource):
     @jwt_required
     @caller_is_admin
     def get(self, namespace):
-        md = etcd.get('metadata', 'namespace', namespace)
+        md = db.get_metadata('namespace', namespace)
         if not md:
             return {}
         return md
@@ -508,12 +507,12 @@ class AuthMetadata(Resource):
         if not key:
             return error(400, 'no key specified')
 
-        with etcd.get_lock('sf/metadata/namespace/%s' % namespace) as _:
-            md = etcd.get('metadata', 'namespace', namespace)
+        with db.get_lock('sf/metadata/namespace/%s' % namespace) as _:
+            md = db.get_metadata('namespace', namespace)
             if md is None or key not in md:
                 return error(404, 'key not found')
             del md[key]
-            etcd.put('metadata', 'namespace', namespace, md)
+            db.persist_metadata('namespace', namespace, md)
 
 
 class Instance(Resource):
@@ -530,7 +529,7 @@ class Instance(Resource):
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def delete(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
-        with etcd.get_lock('/sf/instance/%s' % instance_uuid) as _:
+        with db.get_lock('/sf/instance/%s' % instance_uuid) as _:
             db.add_event('instance', instance_uuid,
                          'api', 'delete', None, None)
 
@@ -671,7 +670,7 @@ class Instances(Resource):
             for network_uuid in allocations:
                 n = net.from_db(network_uuid)
                 for addr, _ in allocations[network_uuid]:
-                    with etcd.get_lock('sf/ipmanager/%s' % n.uuid, ttl=120) as _:
+                    with db.get_lock('sf/ipmanager/%s' % n.uuid, ttl=120) as _:
                         ipm = db.get_ipmanager(n.uuid)
                         ipm.release(addr)
                         db.persist_ipmanager(n.uuid, ipm.save())
@@ -691,8 +690,8 @@ class Instances(Resource):
                     nets[netdesc['network_uuid']] = n
                     n.create()
 
-                with etcd.get_lock('sf/ipmanager/%s' % netdesc['network_uuid'],
-                                   ttl=120) as _:
+                with db.get_lock('sf/ipmanager/%s' % netdesc['network_uuid'],
+                                 ttl=120) as _:
                     db.add_event('network', netdesc['network_uuid'], 'allocate address',
                                  None, None, instance_uuid)
                     allocations.setdefault(netdesc['network_uuid'], [])
@@ -716,10 +715,10 @@ class Instances(Resource):
                 order += 1
 
         # Initialise metadata
-        etcd.put('metadata', 'instance', instance_uuid, {})
+        db.persist_metadata('instance', instance_uuid, {})
 
         # Now we can start the instance
-        with etcd.get_lock('sf/instance/%s' % instance.db_entry['uuid'], ttl=900) as lock:
+        with db.get_lock('sf/instance/%s' % instance.db_entry['uuid'], ttl=900) as lock:
             with util.RecordedOperation('ensure networks exist', instance) as _:
                 for network_uuid in nets:
                     n = nets[network_uuid]
@@ -912,7 +911,7 @@ class InterfaceFloat(Resource):
 
         db.add_event('interface', interface_uuid,
                      'api', 'float', None, None)
-        with etcd.get_lock('sf/ipmanager/floating', ttl=120) as _:
+        with db.get_lock('sf/ipmanager/floating', ttl=120) as _:
             ipm = db.get_ipmanager('floating')
             addr = ipm.get_random_free_address()
             db.persist_ipmanager('floating', ipm.save())
@@ -953,7 +952,7 @@ class InterfaceDefloat(Resource):
 
         db.add_event('interface', interface_uuid,
                      'api', 'defloat', None, None)
-        with etcd.get_lock('sf/ipmanager/floating', ttl=120) as _:
+        with db.get_lock('sf/ipmanager/floating', ttl=120) as _:
             ipm = db.get_ipmanager('floating')
             ipm.release(ni['floating'])
             db.persist_ipmanager('floating', ipm.save())
@@ -967,7 +966,7 @@ class InstanceMetadatas(Resource):
     @arg_is_instance_uuid
     @requires_instance_ownership
     def get(self, instance_uuid=None, instance_from_db=None):
-        md = etcd.get('metadata', 'instance', instance_uuid)
+        md = db.get_metadata('instance', instance_uuid)
         if not md:
             return {}
         return md
@@ -993,12 +992,12 @@ class InstanceMetadata(Resource):
         if not key:
             return error(400, 'no key specified')
 
-        with etcd.get_lock('sf/metadata/instance/%s' % instance_uuid) as _:
-            md = etcd.get('metadata', 'instance', instance_uuid)
+        with db.get_lock('sf/metadata/instance/%s' % instance_uuid) as _:
+            md = db.get_metadata('instance', instance_uuid)
             if md is None or key not in md:
                 return error(404, 'key not found')
             del md[key]
-            etcd.put('metadata', 'instance', instance_uuid, md)
+            db.persist_metadata('instance', instance_uuid, md)
 
 
 class InstanceConsoleData(Resource):
@@ -1058,13 +1057,13 @@ class Network(Resource):
         if len(list(db.get_network_interfaces(network_uuid))) > 0:
             return error(403, 'you cannot delete an in use network')
 
-        with etcd.get_lock('sf/network/%s' % network_uuid, ttl=900) as _:
+        with db.get_lock('sf/network/%s' % network_uuid, ttl=900) as _:
             n = net.from_db(network_uuid)
             n.remove_dhcp()
             n.delete()
 
             if n.floating_gateway:
-                with etcd.get_lock('sf/ipmanager/floating', ttl=120) as _:
+                with db.get_lock('sf/ipmanager/floating', ttl=120) as _:
                     ipm = db.get_ipmanager('floating')
                     ipm.release(n.floating_gateway)
                     db.persist_ipmanager('floating', ipm.save())
@@ -1108,7 +1107,7 @@ class Networks(Resource):
                      'api', 'create', None, None)
 
         # Networks should immediately appear on the network node
-        with etcd.get_lock('sf/network/%s' % network['uuid'], ttl=900) as _:
+        with db.get_lock('sf/network/%s' % network['uuid'], ttl=900) as _:
             if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
                 n = net.from_db(network['uuid'])
                 if not n:
@@ -1137,7 +1136,7 @@ class Networks(Resource):
             db.update_network_state(network['uuid'], 'created')
 
             # Initialise metadata
-            etcd.put('metadata', 'network', network['uuid'], {})
+            db.persist_metadata('network', network['uuid'], {})
 
         return network
 
@@ -1157,7 +1156,7 @@ class NetworkMetadatas(Resource):
     @arg_is_network_uuid
     @requires_network_ownership
     def get(self, network_uuid=None, network_from_db=None):
-        md = etcd.get('metadata', 'network', network_uuid)
+        md = db.get_metadata('network', network_uuid)
         if not md:
             return {}
         return md
@@ -1183,12 +1182,12 @@ class NetworkMetadata(Resource):
         if not key:
             return error(400, 'no key specified')
 
-        with etcd.get_lock('sf/metadata/network/%s' % network_uuid) as _:
-            md = etcd.get('metadata', 'network', network_uuid)
+        with db.get_lock('sf/metadata/network/%s' % network_uuid) as _:
+            md = db.get_metadata('network', network_uuid)
             if md is None or key not in md:
                 return error(404, 'key not found')
             del md[key]
-            etcd.put('metadata', 'network', network_uuid, md)
+            db.persist_metadata('network', network_uuid, md)
 
 
 class Nodes(Resource):

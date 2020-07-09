@@ -30,6 +30,10 @@ def see_this_node():
         ttl=120)
 
 
+def get_lock(name, ttl=60):
+    return etcd.get_lock(name, ttl=ttl)
+
+
 def get_node_ips():
     see_this_node()
     for value in etcd.get_all('node', None):
@@ -123,7 +127,7 @@ def hard_delete_network(network_uuid):
     see_this_node()
     etcd.delete('network', None, network_uuid)
     etcd.delete_all('event/network', network_uuid)
-    etcd.delete('metadata', 'network', network_uuid)
+    delete_metadata('network', network_uuid)
 
 
 def create_floating_network(netblock):
@@ -232,7 +236,7 @@ def hard_delete_instance(instance_uuid):
     see_this_node()
     etcd.delete('instance', None, instance_uuid)
     etcd.delete_all('event/instance', instance_uuid)
-    etcd.delete('metadata', 'instance', instance_uuid)
+    delete_metadata('instance', instance_uuid)
 
 
 def get_stale_instances(delay):
@@ -422,3 +426,31 @@ def allocate_console_port(instance_uuid):
 def free_console_port(port):
     see_this_node()
     etcd.delete('console', config.parsed.get('NODE_NAME'), port)
+
+
+def list_namespaces():
+    return etcd.get_all('namespace', None)
+
+
+def get_namespace(namespace):
+    return etcd.get('namespace', None, namespace)
+
+
+def persist_namespace(namespace, data):
+    etcd.put('namespace', None, namespace, data)
+
+
+def delete_namespace(namespace):
+    etcd.delete('namespace', None, namespace)
+
+
+def get_metadata(object_type, name):
+    etcd.get('metadata', object_type, name)
+
+
+def persist_metadata(object_type, name, metadata):
+    etcd.put('metadata', object_type, name, metadata)
+
+
+def delete_metadata(object_type, name):
+    etcd.delete('metadata', object_type, name)

@@ -142,7 +142,7 @@ class ExternalApiTestCase(testtools.TestCase):
             },
             resp.get_json())
 
-    @mock.patch('shakenfist.etcd.get_lock')
+    @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.etcd.get', return_value=None)
     @mock.patch('shakenfist.etcd.put')
     def test_auth_add_key_missing_keyname(self, mock_put, mock_get, mock_lock):
@@ -152,9 +152,9 @@ class ExternalApiTestCase(testtools.TestCase):
                                     'namespace': 'foo'
                                 }))
         self.assertEqual(200, resp.status_code)
-        self.assertEqual('foo',resp.get_json())
+        self.assertEqual('foo', resp.get_json())
 
-    @mock.patch('shakenfist.etcd.get_lock')
+    @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.etcd.get', return_value=None)
     @mock.patch('shakenfist.etcd.put')
     def test_auth_add_key_missing_key(self, mock_put, mock_get, mock_lock):
@@ -172,7 +172,7 @@ class ExternalApiTestCase(testtools.TestCase):
             },
             resp.get_json())
 
-    @mock.patch('shakenfist.etcd.get_lock')
+    @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.etcd.get', return_value=None)
     def test_auth_add_key_illegal_keyname(self, mock_get, mock_lock):
         resp = self.client.post('/auth/namespaces',
@@ -190,7 +190,7 @@ class ExternalApiTestCase(testtools.TestCase):
             resp.get_json())
         self.assertEqual(403, resp.status_code)
 
-    @mock.patch('shakenfist.etcd.get_lock')
+    @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.etcd.get', return_value=None)
     @mock.patch('shakenfist.etcd.put')
     @mock.patch('bcrypt.hashpw', return_value='terminator'.encode('utf-8'))
@@ -273,7 +273,7 @@ class ExternalApiTestCase(testtools.TestCase):
     @mock.patch('shakenfist.db.hard_delete_instance')
     @mock.patch('shakenfist.db.hard_delete_network')
     @mock.patch('shakenfist.etcd.delete')
-    @mock.patch('shakenfist.etcd.get_lock')
+    @mock.patch('shakenfist.db.get_lock')
     def test_delete_namespace_with_deleted(self, mock_lock, mock_etcd_delete,
                                            mock_hd_network, mock_hd_instance,
                                            mock_get_networks, mock_get_instances):
@@ -291,7 +291,7 @@ class ExternalApiTestCase(testtools.TestCase):
         self.assertEqual(404, resp.status_code)
         self.assertEqual(None, resp.get_json())
 
-    @mock.patch('shakenfist.etcd.get_lock')
+    @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.etcd.get', return_value={'keys': {}})
     def test_delete_namespace_key_missing_key(self, mock_get, mock_lock):
         resp = self.client.delete('/auth/namespaces/system/keys/mykey',
@@ -304,7 +304,7 @@ class ExternalApiTestCase(testtools.TestCase):
             },
             resp.get_json())
 
-    @mock.patch('shakenfist.etcd.get_lock')
+    @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.etcd.get', return_value={'keys': {'mykey': 'foo'}})
     @mock.patch('shakenfist.etcd.put')
     def test_delete_namespace_key(self, mock_put, mock_get, mock_lock):
@@ -313,34 +313,34 @@ class ExternalApiTestCase(testtools.TestCase):
         self.assertEqual(200, resp.status_code)
         mock_put.assert_called_with('namespace', None, 'system', {'keys': {}})
 
-    @mock.patch('shakenfist.etcd.get', return_value={'a': 'a', 'b': 'b'})
-    def test_get_namespace_metadata(self, mock_etcd_get):
+    @mock.patch('shakenfist.db.get_metadata', return_value={'a': 'a', 'b': 'b'})
+    def test_get_namespace_metadata(self, mock_md_get):
         resp = self.client.get(
             '/auth/namespaces/foo/metadata', headers={'Authorization': self.auth_header})
         self.assertEqual({'a': 'a', 'b': 'b'}, resp.get_json())
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
 
-    @mock.patch('shakenfist.etcd.get', return_value={})
-    @mock.patch('shakenfist.etcd.put')
-    @mock.patch('shakenfist.etcd.get_lock')
-    def test_put_namespace_metadata(self, mock_etcd_get_lock, mock_etcd_put,
-                                     mock_etcd_get):
+    @mock.patch('shakenfist.db.get_metadata', return_value={})
+    @mock.patch('shakenfist.db.persist_metadata')
+    @mock.patch('shakenfist.db.get_lock')
+    def test_put_namespace_metadata(self, mock_get_lock, mock_md_put,
+                                    mock_md_get):
         resp = self.client.put('/auth/namespaces/foo/metadata/foo',
-                                headers={'Authorization': self.auth_header},
-                                data=json.dumps({
-                                    'value': 'bar'
-                                }))
+                               headers={'Authorization': self.auth_header},
+                               data=json.dumps({
+                                   'key': 'foo',
+                                   'value': 'bar'
+                               }))
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
-        mock_etcd_put.assert_called_with(
-            'metadata', 'namespace', 'foo', {'foo': 'bar'})
+        mock_md_put.assert_called_with('namespace', 'foo', {'foo': 'bar'})
 
-    @mock.patch('shakenfist.etcd.get', return_value={})
-    @mock.patch('shakenfist.etcd.put')
-    @mock.patch('shakenfist.etcd.get_lock')
-    def test_post_namespace_metadata(self, mock_etcd_get_lock, mock_etcd_put,
-                                     mock_etcd_get):
+    @mock.patch('shakenfist.db.get_metadata', return_value={})
+    @mock.patch('shakenfist.db.persist_metadata')
+    @mock.patch('shakenfist.db.get_lock')
+    def test_post_namespace_metadata(self, mock_get_lock, mock_md_put,
+                                     mock_md_get):
         resp = self.client.post('/auth/namespaces/foo/metadata',
                                 headers={'Authorization': self.auth_header},
                                 data=json.dumps({
@@ -349,37 +349,35 @@ class ExternalApiTestCase(testtools.TestCase):
                                 }))
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
-        mock_etcd_put.assert_called_with(
-            'metadata', 'namespace', 'foo', {'foo': 'bar'})
+        mock_md_put.assert_called_with('namespace', 'foo', {'foo': 'bar'})
 
-    @mock.patch('shakenfist.etcd.get', return_value={'foo': 'bar', 'real': 'smart'})
-    @mock.patch('shakenfist.etcd.put')
-    @mock.patch('shakenfist.etcd.get_lock')
-    def test_delete_namespace_metadata(self, mock_etcd_get_lock, mock_etcd_put,
-                                       mock_etcd_get):
+    @mock.patch('shakenfist.db.get_metadata', return_value={'foo': 'bar', 'real': 'smart'})
+    @mock.patch('shakenfist.db.persist_metadata')
+    @mock.patch('shakenfist.db.get_lock')
+    def test_delete_namespace_metadata(self, mock_get_lock, mock_md_put,
+                                       mock_md_get):
         resp = self.client.delete('/auth/namespaces/foo/metadata/foo',
                                   headers={'Authorization': self.auth_header})
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
-        mock_etcd_put.assert_called_with(
-            'metadata', 'namespace', 'foo', {'real': 'smart'})
+        mock_md_put.assert_called_with('namespace', 'foo', {'real': 'smart'})
 
-    @mock.patch('shakenfist.etcd.get', return_value={})
-    @mock.patch('shakenfist.etcd.put')
-    @mock.patch('shakenfist.etcd.get_lock')
-    def test_delete_namespace_metadata_bad_key(self, mock_etcd_get_lock,
-                                                mock_etcd_put, mock_etcd_get):
+    @mock.patch('shakenfist.db.get_metadata', return_value={})
+    @mock.patch('shakenfist.db.persist_metadata')
+    @mock.patch('shakenfist.db.get_lock')
+    def test_delete_namespace_metadata_bad_key(self, mock_get_lock,
+                                               mock_md_put, mock_md_get):
         resp = self.client.delete('/auth/namespaces/foo/metadata/wrong',
                                   headers={'Authorization': self.auth_header})
         self.assertEqual({'error': 'key not found', 'status': 404},
                          resp.get_json())
         self.assertEqual(404, resp.status_code)
 
-    @mock.patch('shakenfist.etcd.get', return_value={'foo': 'bar', 'real': 'smart'})
-    @mock.patch('shakenfist.etcd.put')
-    @mock.patch('shakenfist.etcd.get_lock')
-    def test_delete_namespace_metadata_no_keys(self, mock_etcd_get_lock,
-                                                mock_etcd_put, mock_etcd_get):
+    @mock.patch('shakenfist.db.get_metadata', return_value={'foo': 'bar', 'real': 'smart'})
+    @mock.patch('shakenfist.db.persist_metadata')
+    @mock.patch('shakenfist.db.get_lock')
+    def test_delete_namespace_metadata_no_keys(self, mock_get_lock,
+                                               mock_md_put, mock_md_get):
         resp = self.client.delete('/auth/namespaces/foo/metadata/wrong',
                                   headers={'Authorization': self.auth_header})
         self.assertEqual({'error': 'key not found', 'status': 404},
@@ -411,8 +409,8 @@ class ExternalApiTestCase(testtools.TestCase):
                 return_value={'uuid': 'foo',
                               'name': 'banana',
                               'namespace': 'foo'})
-    @mock.patch('shakenfist.etcd.get', return_value={'a': 'a', 'b': 'b'})
-    def test_get_instance_metadata(self, mock_get_instance, mock_etcd_get):
+    @mock.patch('shakenfist.db.get_metadata', return_value={'a': 'a', 'b': 'b'})
+    def test_get_instance_metadata(self, mock_get_instance, mock_md_get):
         resp = self.client.get(
             '/instances/foo/metadata', headers={'Authorization': self.auth_header})
         self.assertEqual({'a': 'a', 'b': 'b'}, resp.get_json())
@@ -423,30 +421,30 @@ class ExternalApiTestCase(testtools.TestCase):
                 return_value={'uuid': 'foo',
                               'name': 'banana',
                               'namespace': 'foo'})
-    @mock.patch('shakenfist.etcd.get', return_value={})
-    @mock.patch('shakenfist.etcd.put')
-    @mock.patch('shakenfist.etcd.get_lock')
-    def test_put_instance_metadata(self, mock_etcd_get_lock, mock_etcd_put,
-                                    mock_etcd_get, mock_get_instance):
+    @mock.patch('shakenfist.db.get_metadata', return_value={})
+    @mock.patch('shakenfist.db.persist_metadata')
+    @mock.patch('shakenfist.db.get_lock')
+    def test_put_instance_metadata(self, mock_get_lock, mock_md_put,
+                                   mock_md_get, mock_get_instance):
         resp = self.client.put('/instances/foo/metadata/foo',
-                                headers={'Authorization': self.auth_header},
-                                data=json.dumps({
-                                    'value': 'bar'
-                                }))
+                               headers={'Authorization': self.auth_header},
+                               data=json.dumps({
+                                   'key': 'foo',
+                                   'value': 'bar'
+                               }))
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
-        mock_etcd_put.assert_called_with(
-            'metadata', 'instance', 'foo', {'foo': 'bar'})
+        mock_md_put.assert_called_with('instance', 'foo', {'foo': 'bar'})
 
     @mock.patch('shakenfist.db.get_instance',
                 return_value={'uuid': 'foo',
                               'name': 'banana',
                               'namespace': 'foo'})
-    @mock.patch('shakenfist.etcd.get', return_value={})
-    @mock.patch('shakenfist.etcd.put')
-    @mock.patch('shakenfist.etcd.get_lock')
-    def test_post_instance_metadata(self, mock_etcd_get_lock, mock_etcd_put,
-                                    mock_etcd_get, mock_get_instance):
+    @mock.patch('shakenfist.db.get_metadata', return_value={})
+    @mock.patch('shakenfist.db.persist_metadata')
+    @mock.patch('shakenfist.db.get_lock')
+    def test_post_instance_metadata(self, mock_get_lock, mock_md_put,
+                                    mock_md_get, mock_get_instance):
         resp = self.client.post('/instances/foo/metadata',
                                 headers={'Authorization': self.auth_header},
                                 data=json.dumps({
@@ -455,15 +453,14 @@ class ExternalApiTestCase(testtools.TestCase):
                                 }))
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
-        mock_etcd_put.assert_called_with(
-            'metadata', 'instance', 'foo', {'foo': 'bar'})
+        mock_md_put.assert_called_with('instance', 'foo', {'foo': 'bar'})
 
     @mock.patch('shakenfist.db.get_network',
                 return_value={'uuid': 'foo',
                               'name': 'banana',
                               'namespace': 'foo'})
-    @mock.patch('shakenfist.etcd.get', return_value={'a': 'a', 'b': 'b'})
-    def test_get_network_metadata(self, mock_get_network, mock_etcd_get):
+    @mock.patch('shakenfist.db.get_metadata', return_value={'a': 'a', 'b': 'b'})
+    def test_get_network_metadata(self, mock_get_network, mock_md_get):
         resp = self.client.get(
             '/networks/foo/metadata', headers={'Authorization': self.auth_header})
         self.assertEqual({'a': 'a', 'b': 'b'}, resp.get_json())
@@ -474,30 +471,30 @@ class ExternalApiTestCase(testtools.TestCase):
                 return_value={'uuid': 'foo',
                               'name': 'banana',
                               'namespace': 'foo'})
-    @mock.patch('shakenfist.etcd.get', return_value={})
-    @mock.patch('shakenfist.etcd.put')
-    @mock.patch('shakenfist.etcd.get_lock')
-    def test_put_network_metadata(self, mock_etcd_get_lock, mock_etcd_put,
-                                   mock_etcd_get, mock_get_network):
+    @mock.patch('shakenfist.db.get_metadata', return_value={})
+    @mock.patch('shakenfist.db.persist_metadata')
+    @mock.patch('shakenfist.db.get_lock')
+    def test_put_network_metadata(self, mock_get_lock, mock_md_put,
+                                  mock_md_get, mock_get_network):
         resp = self.client.put('/networks/foo/metadata/foo',
-                                headers={'Authorization': self.auth_header},
-                                data=json.dumps({
-                                    'value': 'bar'
-                                }))
+                               headers={'Authorization': self.auth_header},
+                               data=json.dumps({
+                                   'key': 'foo',
+                                   'value': 'bar'
+                               }))
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
-        mock_etcd_put.assert_called_with(
-            'metadata', 'network', 'foo', {'foo': 'bar'})
+        mock_md_put.assert_called_with('network', 'foo', {'foo': 'bar'})
 
     @mock.patch('shakenfist.db.get_network',
                 return_value={'uuid': 'foo',
                               'name': 'banana',
                               'namespace': 'foo'})
-    @mock.patch('shakenfist.etcd.get', return_value={})
-    @mock.patch('shakenfist.etcd.put')
-    @mock.patch('shakenfist.etcd.get_lock')
-    def test_post_network_metadata(self, mock_etcd_get_lock, mock_etcd_put,
-                                   mock_etcd_get, mock_get_network):
+    @mock.patch('shakenfist.db.get_metadata', return_value={})
+    @mock.patch('shakenfist.db.persist_metadata')
+    @mock.patch('shakenfist.db.get_lock')
+    def test_post_network_metadata(self, mock_get_lock, mock_md_put,
+                                   mock_md_get, mock_get_network):
         resp = self.client.post('/networks/foo/metadata',
                                 headers={'Authorization': self.auth_header},
                                 data=json.dumps({
@@ -506,34 +503,32 @@ class ExternalApiTestCase(testtools.TestCase):
                                 }))
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
-        mock_etcd_put.assert_called_with(
-            'metadata', 'network', 'foo', {'foo': 'bar'})
+        mock_md_put.assert_called_with('network', 'foo', {'foo': 'bar'})
 
     @mock.patch('shakenfist.db.get_instance',
                 return_value={'uuid': 'foo',
                               'name': 'banana',
                               'namespace': 'foo'})
-    @mock.patch('shakenfist.etcd.get', return_value={'foo': 'bar', 'real': 'smart'})
-    @mock.patch('shakenfist.etcd.put')
-    @mock.patch('shakenfist.etcd.get_lock')
-    def test_delete_instance_metadata(self, mock_etcd_get_lock, mock_etcd_put,
-                                      mock_etcd_get, mock_get_instance):
+    @mock.patch('shakenfist.db.get_metadata', return_value={'foo': 'bar', 'real': 'smart'})
+    @mock.patch('shakenfist.db.persist_metadata')
+    @mock.patch('shakenfist.db.get_lock')
+    def test_delete_instance_metadata(self, mock_get_lock, mock_md_put,
+                                      mock_md_get, mock_get_instance):
         resp = self.client.delete('/instances/foo/metadata/foo',
                                   headers={'Authorization': self.auth_header})
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
-        mock_etcd_put.assert_called_with(
-            'metadata', 'instance', 'foo', {'real': 'smart'})
+        mock_md_put.assert_called_with('instance', 'foo', {'real': 'smart'})
 
     @mock.patch('shakenfist.db.get_instance',
                 return_value={'uuid': 'foo',
                               'name': 'banana',
                               'namespace': 'foo'})
-    @mock.patch('shakenfist.etcd.get', return_value={'foo': 'bar', 'real': 'smart'})
-    @mock.patch('shakenfist.etcd.put')
-    @mock.patch('shakenfist.etcd.get_lock')
-    def test_delete_instance_metadata_bad_key(self, mock_etcd_get_lock,
-                                              mock_etcd_put, mock_etcd_get,
+    @mock.patch('shakenfist.db.get_metadata', return_value={'foo': 'bar', 'real': 'smart'})
+    @mock.patch('shakenfist.db.persist_metadata')
+    @mock.patch('shakenfist.db.get_lock')
+    def test_delete_instance_metadata_bad_key(self, mock_get_lock,
+                                              mock_md_put, mock_md_get,
                                               mock_get_instance):
         resp = self.client.delete('/instances/foo/metadata/wrong',
                                   headers={'Authorization': self.auth_header})
@@ -545,31 +540,29 @@ class ExternalApiTestCase(testtools.TestCase):
                 return_value={'uuid': 'foo',
                               'name': 'banana',
                               'namespace': 'foo'})
-    @mock.patch('shakenfist.etcd.get', return_value={'foo': 'bar', 'real': 'smart'})
-    @mock.patch('shakenfist.etcd.put')
-    @mock.patch('shakenfist.etcd.get_lock')
-    def test_delete_network_metadata(self, mock_etcd_get_lock, mock_etcd_put,
-                                     mock_etcd_get, mock_get_network):
+    @mock.patch('shakenfist.db.get_metadata', return_value={'foo': 'bar', 'real': 'smart'})
+    @mock.patch('shakenfist.db.persist_metadata')
+    @mock.patch('shakenfist.db.get_lock')
+    def test_delete_network_metadata(self, mock_get_lock, mock_md_put,
+                                     mock_md_get, mock_get_network):
         resp = self.client.delete('/networks/foo/metadata/foo',
                                   headers={'Authorization': self.auth_header})
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
-        mock_etcd_put.assert_called_with(
-            'metadata', 'network', 'foo', {'real': 'smart'})
+        mock_md_put.assert_called_with('network', 'foo', {'real': 'smart'})
 
     @mock.patch('shakenfist.db.get_network',
                 return_value={'uuid': 'foo',
                               'name': 'banana',
                               'namespace': 'foo'})
-    @mock.patch('shakenfist.etcd.get', return_value={'foo': 'bar', 'real': 'smart'})
-    @mock.patch('shakenfist.etcd.put')
-    @mock.patch('shakenfist.etcd.get_lock')
-    def test_delete_network_metadata_bad_key(self, mock_etcd_get_lock,
-                                             mock_etcd_put, mock_etcd_get,
+    @mock.patch('shakenfist.db.get_metadata', return_value={'foo': 'bar', 'real': 'smart'})
+    @mock.patch('shakenfist.db.persist_metadata')
+    @mock.patch('shakenfist.db.get_lock')
+    def test_delete_network_metadata_bad_key(self, mock_get_lock,
+                                             mock_md_put, mock_md_get,
                                              mock_get_network):
         resp = self.client.delete('/networks/foo/metadata/wrong',
                                   headers={'Authorization': self.auth_header})
         self.assertEqual({'error': 'key not found', 'status': 404},
                          resp.get_json())
         self.assertEqual(404, resp.status_code)
-

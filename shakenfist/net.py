@@ -13,7 +13,7 @@ from oslo_concurrency import processutils
 from shakenfist import config
 from shakenfist import db
 from shakenfist import dhcp
-from shakenfist import etcd
+from shakenfist import db
 from shakenfist import util
 
 
@@ -51,7 +51,7 @@ class Network(object):
         self.floating_gateway = floating_gateway
         self.namespace = namespace
 
-        with etcd.get_lock('sf/ipmanager/%s' % self.uuid, ttl=120) as _:
+        with db.get_lock('sf/ipmanager/%s' % self.uuid, ttl=120) as _:
             ipm = db.get_ipmanager(self.uuid)
 
             self.ipblock = ipm.network_address
@@ -99,7 +99,7 @@ class Network(object):
     def create(self):
         subst = self.subst_dict()
 
-        with etcd.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
+        with db.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
             if not util.check_for_interface(subst['vx_interface']):
                 with util.RecordedOperation('create vxlan interface', self) as _:
                     processutils.execute(
@@ -191,7 +191,7 @@ class Network(object):
 
         subst = self.subst_dict()
         if not self.floating_gateway:
-            with etcd.get_lock('sf/ipmanager/floating', ttl=120) as _:
+            with db.get_lock('sf/ipmanager/floating', ttl=120) as _:
                 ipm = db.get_ipmanager('floating')
                 self.floating_gateway = ipm.get_random_free_address()
                 db.persist_ipmanager('floating', ipm.save())
@@ -203,7 +203,7 @@ class Network(object):
         subst['floating_gateway'] = self.floating_gateway
         subst['floating_netmask'] = ipm.netmask
 
-        with etcd.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
+        with db.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
             if not subst['floating_gateway'] in list(util.get_interface_addresses(
                     subst['netns'], subst['physical_veth_inner'])):
                 with util.RecordedOperation('enable virtual routing', self) as _:
@@ -239,7 +239,7 @@ class Network(object):
         subst = self.subst_dict()
 
         # Cleanup local node
-        with etcd.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
+        with db.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
             if util.check_for_interface(subst['vx_bridge']):
                 with util.RecordedOperation('delete vxlan bridge', self) as _:
                     processutils.execute('ip link delete %(vx_bridge)s' % subst,
@@ -268,7 +268,7 @@ class Network(object):
                                              shell=True)
 
                 if self.floating_gateway:
-                    with etcd.get_lock('sf/ipmanager/floating', ttl=120) as _:
+                    with db.get_lock('sf/ipmanager/floating', ttl=120) as _:
                         ipm = db.get_ipmanager('floating')
                         ipm.release(self.floating_gateway)
                         db.persist_ipmanager('floating', ipm.save())
@@ -278,7 +278,7 @@ class Network(object):
             self.ensure_mesh()
             subst = self.subst_dict()
             with util.RecordedOperation('update dhcp', self) as _:
-                with etcd.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
+                with db.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
                     d = dhcp.DHCP(self.uuid, subst['vx_veth_inner'])
                     d.restart_dhcpd()
         else:
@@ -299,7 +299,7 @@ class Network(object):
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
             subst = self.subst_dict()
             with util.RecordedOperation('remove dhcp', self) as _:
-                with etcd.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
+                with db.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
                     d = dhcp.DHCP(self.uuid, subst['vx_veth_inner'])
                     d.remove_dhcpd()
         else:
