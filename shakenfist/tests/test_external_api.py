@@ -336,6 +336,21 @@ class ExternalApiTestCase(testtools.TestCase):
         self.assertEqual(200, resp.status_code)
         mock_md_put.assert_called_with('namespace', 'foo', {'foo': 'bar'})
 
+    @mock.patch('shakenfist.db.get_metadata', return_value={})
+    @mock.patch('shakenfist.db.persist_metadata')
+    @mock.patch('shakenfist.db.get_lock')
+    def test_post_namespace_metadata(self, mock_get_lock, mock_md_put,
+                                     mock_md_get):
+        resp = self.client.post('/auth/namespaces/foo/metadata',
+                                headers={'Authorization': self.auth_header},
+                                data=json.dumps({
+                                    'key': 'foo',
+                                    'value': 'bar'
+                                }))
+        self.assertEqual(None, resp.get_json())
+        self.assertEqual(200, resp.status_code)
+        mock_md_put.assert_called_with('namespace', 'foo', {'foo': 'bar'})
+
     @mock.patch('shakenfist.db.get_metadata', return_value={'foo': 'bar', 'real': 'smart'})
     @mock.patch('shakenfist.db.persist_metadata')
     @mock.patch('shakenfist.db.get_lock')
@@ -421,6 +436,25 @@ class ExternalApiTestCase(testtools.TestCase):
         self.assertEqual(200, resp.status_code)
         mock_md_put.assert_called_with('instance', 'foo', {'foo': 'bar'})
 
+    @mock.patch('shakenfist.db.get_instance',
+                return_value={'uuid': 'foo',
+                              'name': 'banana',
+                              'namespace': 'foo'})
+    @mock.patch('shakenfist.db.get_metadata', return_value={})
+    @mock.patch('shakenfist.db.persist_metadata')
+    @mock.patch('shakenfist.db.get_lock')
+    def test_post_instance_metadata(self, mock_get_lock, mock_md_put,
+                                    mock_md_get, mock_get_instance):
+        resp = self.client.post('/instances/foo/metadata',
+                                headers={'Authorization': self.auth_header},
+                                data=json.dumps({
+                                    'key': 'foo',
+                                    'value': 'bar'
+                                }))
+        self.assertEqual(None, resp.get_json())
+        self.assertEqual(200, resp.status_code)
+        mock_md_put.assert_called_with('instance', 'foo', {'foo': 'bar'})
+
     @mock.patch('shakenfist.db.get_network',
                 return_value={'uuid': 'foo',
                               'name': 'banana',
@@ -448,6 +482,25 @@ class ExternalApiTestCase(testtools.TestCase):
                                    'key': 'foo',
                                    'value': 'bar'
                                }))
+        self.assertEqual(None, resp.get_json())
+        self.assertEqual(200, resp.status_code)
+        mock_md_put.assert_called_with('network', 'foo', {'foo': 'bar'})
+
+    @mock.patch('shakenfist.db.get_network',
+                return_value={'uuid': 'foo',
+                              'name': 'banana',
+                              'namespace': 'foo'})
+    @mock.patch('shakenfist.db.get_metadata', return_value={})
+    @mock.patch('shakenfist.db.persist_metadata')
+    @mock.patch('shakenfist.db.get_lock')
+    def test_post_network_metadata(self, mock_get_lock, mock_md_put,
+                                   mock_md_get, mock_get_network):
+        resp = self.client.post('/networks/foo/metadata',
+                                headers={'Authorization': self.auth_header},
+                                data=json.dumps({
+                                    'key': 'foo',
+                                    'value': 'bar'
+                                }))
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
         mock_md_put.assert_called_with('network', 'foo', {'foo': 'bar'})
