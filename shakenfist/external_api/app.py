@@ -260,20 +260,20 @@ def requires_network_ownership(func):
     return wrapper
 
 
-def metadata_putpost(meta_type, owner, key, value):
-        if meta_type not in ['namespace', 'instance', 'network']:
-            return error(500, 'invalid meta_type %s' % meta_type)
-        if not key:
-            return error(400, 'no key specified')
-        if not value:
-            return error(400, 'no value specified')
+def _metadata_putpost(meta_type, owner, key, value):
+    if meta_type not in ['namespace', 'instance', 'network']:
+        return error(500, 'invalid meta_type %s' % meta_type)
+    if not key:
+        return error(400, 'no key specified')
+    if not value:
+        return error(400, 'no value specified')
 
-        with etcd.get_lock('sf/metadata/%s/%s' % (meta_type, owner)) as _:
-            md = etcd.get('metadata', meta_type, owner)
-            if md is None:
-                md = {}
-            md[key] = value
-            etcd.put('metadata', meta_type, owner, md)
+    with etcd.get_lock('sf/metadata/%s/%s' % (meta_type, owner)) as _:
+        md = etcd.get('metadata', meta_type, owner)
+        if md is None:
+            md = {}
+        md[key] = value
+        etcd.put('metadata', meta_type, owner, md)
 
 
 app = flask.Flask(__name__)
@@ -449,7 +449,7 @@ class AuthNamespaceKeys(Resource):
     @jwt_required
     @caller_is_admin
     def post(self, namespace=None, key_name=None, key=None):
-       return _namespace_keys_putpost(namespace, key_name, key)
+        return _namespace_keys_putpost(namespace, key_name, key)
 
 
 class AuthNamespaceKey(Resource):
@@ -493,15 +493,14 @@ class AuthMetadatas(Resource):
     @jwt_required
     @caller_is_admin
     def post(self, namespace, key=None, value=None):
-        return metadata_putpost('namespace', namespace, key, value)
+        return _metadata_putpost('namespace', namespace, key, value)
 
 
 class AuthMetadata(Resource):
     @jwt_required
     @caller_is_admin
     def put(self, namespace, key=None, value=None):
-        return metadata_putpost('namespace', namespace, key, value)
-
+        return _metadata_putpost('namespace', namespace, key, value)
 
     @jwt_required
     @caller_is_admin
@@ -977,7 +976,7 @@ class InstanceMetadatas(Resource):
     @arg_is_instance_uuid
     @requires_instance_ownership
     def post(self, instance_uuid=None, key=None, value=None, instance_from_db=None):
-        return metadata_putpost('instance', instance_uuid, key, value)
+        return _metadata_putpost('instance', instance_uuid, key, value)
 
 
 class InstanceMetadata(Resource):
@@ -985,7 +984,7 @@ class InstanceMetadata(Resource):
     @arg_is_instance_uuid
     @requires_instance_ownership
     def put(self, instance_uuid=None, key=None, value=None, instance_from_db=None):
-        return metadata_putpost('instance', instance_uuid, key, value)
+        return _metadata_putpost('instance', instance_uuid, key, value)
 
     @jwt_required
     @arg_is_instance_uuid
@@ -1167,7 +1166,7 @@ class NetworkMetadatas(Resource):
     @arg_is_network_uuid
     @requires_network_ownership
     def post(self, network_uuid=None, key=None, value=None, network_from_db=None):
-        return metadata_putpost('network', network_uuid, key, value)
+        return _metadata_putpost('network', network_uuid, key, value)
 
 
 class NetworkMetadata(Resource):
@@ -1175,7 +1174,7 @@ class NetworkMetadata(Resource):
     @arg_is_network_uuid
     @requires_network_ownership
     def put(self, network_uuid=None, key=None, value=None, network_from_db=None):
-        return metadata_putpost('network', network_uuid, key, value)
+        return _metadata_putpost('network', network_uuid, key, value)
 
     @jwt_required
     @arg_is_network_uuid
@@ -1287,7 +1286,7 @@ api.add_resource(InstanceMetadatas, '/instances/<instance_uuid>/metadata')
 api.add_resource(InstanceMetadata,
                  '/instances/<instance_uuid>/metadata/<key>')
 api.add_resource(InstanceConsoleData, '/instances/<instance_uuid>/consoledata',
-                defaults={'length': 10240})
+                 defaults={'length': 10240})
 
 api.add_resource(Image, '/images')
 
