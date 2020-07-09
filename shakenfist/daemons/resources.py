@@ -48,12 +48,12 @@ def _get_stats():
     except Exception:
         pass
 
-    # Memory info
+    # Memory info - libvirt returns memory in KiB
     memory_status = conn.getMemoryStats(
         libvirt.VIR_NODE_MEMORY_STATS_ALL_CELLS)
     retval.update({
-        'memory_max': memory_status['total'],
-        'memory_available': memory_status['free'],
+        'memory_max': memory_status['total'] // 1024,
+        'memory_available': memory_status['free'] // 1024,
     })
 
     # Disk info
@@ -98,8 +98,8 @@ def _get_stats():
     retval.update({
         'cpu_total_instance_vcpus': total_instance_vcpus,
         'cpu_total_instance_cpu_time': total_instance_cpu_time,
-        'memory_total_instance_max_memory': total_instance_max_memory,
-        'memory_total_instance_actual_memory': total_instance_actual_memory,
+        'memory_total_instance_max_memory': total_instance_max_memory // 1024,
+        'memory_total_instance_actual_memory': total_instance_actual_memory // 1024,
         'instances_total': total_instances,
         'instances_active': total_active_instances,
     })

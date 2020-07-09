@@ -408,7 +408,7 @@ class Instance(object):
         # spent _ages_ finding a bug related to it.
         xml = t.render(
             uuid=self.db_entry['uuid'],
-            memory=self.db_entry['memory'] * 1024 * 1024,
+            memory=self.db_entry['memory'] * 1024,
             vcpus=self.db_entry['cpus'],
             disks=self.db_entry['block_devices']['devices'],
             networks=networks,

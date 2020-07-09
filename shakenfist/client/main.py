@@ -592,7 +592,7 @@ def _parse_spec(spec):
                   help=('Create an instance.\n\n'
                         'NAME:      The name of the instance.\n'
                         'CPUS:      The number of vCPUs for the instance.\n'
-                        'MEMORY:    The amount of RAM for the instance in GB.\n'
+                        'MEMORY:    The amount of RAM for the instance in MB.\n'
                         '\n'
                         'Options (may be repeated, must be specified at least once):\n'
                         '--network/-n:   The uuid of the network to attach the instance to.\n'
@@ -633,6 +633,10 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networ
                     encodeduserdata=None, placement=None, namespace=None):
     if len(disk) < 1 and len(diskspec) < 1:
         print('You must specify at least one disk')
+
+    if memory < 256:
+        print('WARNING: Assuming you have specified memory in GB\n')
+        memory *= 1024
 
     sshkey_content = None
     if sshkey:
