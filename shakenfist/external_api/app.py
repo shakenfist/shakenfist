@@ -1009,9 +1009,10 @@ class InstanceConsoleData(Resource):
     @requires_instance_ownership
     @redirect_instance_request
     def get(self, instance_uuid=None, length=None, instance_from_db=None, instance_from_db_virt=None):
-        length = 10240
-        if 'length' in flask_restful.request.args:
-            length = int(flask_restful.request.args['length'])
+        try:
+            length = int(length)
+        except:
+            return error(400, 'length is not an integer')
 
         resp = flask.Response(
             instance_from_db_virt.get_console_data(length),
@@ -1285,7 +1286,8 @@ api.add_resource(InterfaceDefloat, '/interfaces/<interface_uuid>/defloat')
 api.add_resource(InstanceMetadatas, '/instances/<instance_uuid>/metadata')
 api.add_resource(InstanceMetadata,
                  '/instances/<instance_uuid>/metadata/<key>')
-api.add_resource(InstanceConsoleData, '/instances/<instance_uuid>/consoledata')
+api.add_resource(InstanceConsoleData, '/instances/<instance_uuid>/consoledata',
+                defaults={'length': 10240})
 
 api.add_resource(Image, '/images')
 
