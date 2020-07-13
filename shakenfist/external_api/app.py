@@ -680,12 +680,12 @@ class Instances(Resource):
         if network:
             for netdesc in network:
                 if 'network_uuid' not in netdesc or not netdesc['network_uuid']:
-                    error_with_cleanup(404, 'network not specified')
+                    return error_with_cleanup(404, 'network not specified')
 
                 if netdesc['network_uuid'] not in nets:
                     n = net.from_db(netdesc['network_uuid'])
                     if not n:
-                        error_with_cleanup(
+                        return error_with_cleanup(
                             404, 'network %s not found' % netdesc['network_uuid'])
                     nets[netdesc['network_uuid']] = n
                     n.create()
@@ -700,7 +700,7 @@ class Instances(Resource):
                         netdesc['address'] = ipm.get_random_free_address()
                     else:
                         if not ipm.reserve(netdesc['address']):
-                            error_with_cleanup(409, 'address %s in use' %
+                            return error_with_cleanup(409, 'address %s in use' %
                                                netdesc['address'])
                     db.persist_ipmanager(netdesc['network_uuid'], ipm.save())
                     allocations[netdesc['network_uuid']].append(
