@@ -529,6 +529,10 @@ class Instance(Resource):
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def delete(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
+        # Check if instance has already been deleted
+        if instance_from_db['state'] == 'deleted':
+            return error(404, 'instance not found')
+
         with db.get_lock('/sf/instance/%s' % instance_uuid) as _:
             db.add_event('instance', instance_uuid,
                          'api', 'delete', None, None)
@@ -1056,6 +1060,10 @@ class Network(Resource):
         # We only delete unused networks
         if len(list(db.get_network_interfaces(network_uuid))) > 0:
             return error(403, 'you cannot delete an in use network')
+
+        # Check if network has already been deleted
+        if network_from_db['state'] == 'deleted':
+            return error(404, 'network not found')
 
         with db.get_lock('sf/network/%s' % network_uuid, ttl=900) as _:
             n = net.from_db(network_uuid)
