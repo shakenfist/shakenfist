@@ -38,8 +38,8 @@ class GroupCatchExceptions(click.Group):
             click.echo("ERROR: Cannot delete resource: %s" % error_text(e.text))
             sys.exit(1)
 
-        except apiclient.ResourceNotFoundException:
-            click.echo("ERROR: Resource not found")
+        except apiclient.ResourceNotFoundException as e:
+            click.echo("ERROR: Resource not found: %s" % error_text(e.text))
             sys.exit(1)
 
         except apiclient.ResourceInUseException as e:
