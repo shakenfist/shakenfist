@@ -445,7 +445,7 @@ def delete_namespace(namespace):
 
 
 def get_metadata(object_type, name):
-    etcd.get('metadata', object_type, name)
+    return etcd.get('metadata', object_type, name)
 
 
 def persist_metadata(object_type, name, metadata):

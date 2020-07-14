@@ -37,6 +37,8 @@ class ResourceNotFoundException(APIException):
 class ResourceInUseException(APIException):
     pass
 
+class InternalServerError(APIException):
+    pass
 
 class InsufficientResourcesException(APIException):
     pass
@@ -48,6 +50,7 @@ STATUS_CODES_TO_ERRORS = {
     403: ResourceCannotBeDeletedException,
     404: ResourceNotFoundException,
     409: ResourceInUseException,
+    500: InternalServerError,
     507: InsufficientResourcesException,
 }
 

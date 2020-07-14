@@ -529,6 +529,10 @@ class Instance(Resource):
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def delete(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
+        # Check if instance has already been deleted
+        if instance_from_db['state'] == 'deleted':
+            return error(404, 'instance not found')
+
         with db.get_lock('/sf/instance/%s' % instance_uuid) as _:
             db.add_event('instance', instance_uuid,
                          'api', 'delete', None, None)
@@ -680,12 +684,12 @@ class Instances(Resource):
         if network:
             for netdesc in network:
                 if 'network_uuid' not in netdesc or not netdesc['network_uuid']:
-                    error_with_cleanup(404, 'network not specified')
+                    return error_with_cleanup(404, 'network not specified')
 
                 if netdesc['network_uuid'] not in nets:
                     n = net.from_db(netdesc['network_uuid'])
                     if not n:
-                        error_with_cleanup(
+                        return error_with_cleanup(
                             404, 'network %s not found' % netdesc['network_uuid'])
                     nets[netdesc['network_uuid']] = n
                     n.create()
@@ -700,7 +704,7 @@ class Instances(Resource):
                         netdesc['address'] = ipm.get_random_free_address()
                     else:
                         if not ipm.reserve(netdesc['address']):
-                            error_with_cleanup(409, 'address %s in use' %
+                            return error_with_cleanup(409, 'address %s in use' %
                                                netdesc['address'])
                     db.persist_ipmanager(netdesc['network_uuid'], ipm.save())
                     allocations[netdesc['network_uuid']].append(
@@ -1056,6 +1060,10 @@ class Network(Resource):
         # We only delete unused networks
         if len(list(db.get_network_interfaces(network_uuid))) > 0:
             return error(403, 'you cannot delete an in use network')
+
+        # Check if network has already been deleted
+        if network_from_db['state'] == 'deleted':
+            return error(404, 'network not found')
 
         with db.get_lock('sf/network/%s' % network_uuid, ttl=900) as _:
             n = net.from_db(network_uuid)

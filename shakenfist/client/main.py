@@ -21,6 +21,52 @@ LOG.setLevel(logging.INFO)
 CLIENT = None
 
 
+class GroupCatchExceptions(click.Group):
+    def __call__(self, *args, **kwargs):
+        try:
+            return self.main(*args, **kwargs)
+
+        except apiclient.RequestMalformedException as e:
+            click.echo("ERROR: Malformed Request: %s" % error_text(e.text))
+            sys.exit(1)
+
+        except apiclient.UnauthorizedException:
+            click.echo("ERROR: Not authorized")
+            sys.exit(1)
+
+        except apiclient.ResourceCannotBeDeletedException as e:
+            click.echo("ERROR: Cannot delete resource: %s" % error_text(e.text))
+            sys.exit(1)
+
+        except apiclient.ResourceNotFoundException as e:
+            click.echo("ERROR: Resource not found: %s" % error_text(e.text))
+            sys.exit(1)
+
+        except apiclient.ResourceInUseException as e:
+            click.echo("ERROR: Resource in use:\n%s" % error_text(e.text))
+            sys.exit(1)
+
+        except apiclient.InternalServerError as e:
+            # Print full error since server should not fail
+            click.echo("ERROR: Internal Server Error:\n%s" % e.text)
+            sys.exit(1)
+
+        except apiclient.InsufficientResourcesException as e:
+            click.echo("ERROR: Insufficient Resources:\n%s" % error_text(e.text))
+            sys.exit(1)
+
+
+def error_text(json_text):
+    try:
+        err = json.loads(json_text)
+        if 'error' in err:
+            return err['error']
+    except:
+        pass
+
+    return json_text
+
+
 def auto_complete(func):
     global CLIENT
 
@@ -48,7 +94,7 @@ def longest_str(d):
     return max(len(k) for k in d)
 
 
-@click.group()
+@click.group(cls=GroupCatchExceptions)
 @click.option('--pretty', 'output', flag_value='pretty', default=True)
 @click.option('--simple', 'output', flag_value='simple')
 @click.option('--json', 'output', flag_value='json')
