@@ -12,7 +12,7 @@ If there is an existing library which does a thing, we use it. OpenStack suffere
 
 ## Deployment choices
 
-libvirt is the only supported hypervisor. Instances are specified to libvirt with simple templated XML. If your local requirements are different to what's in the template, you're welcome to change the template to meet your needs. If you're template changes break things, you're also welcome to debug what went wrong for yourself. We provide a sample Ansible based deployer in a [separate github repository](http://github.com/shakenfist/deploy).
+libvirt is the only supported hypervisor. Instances are specified to libvirt with simple templated XML. If your local requirements are different to what's in the template, you're welcome to change the template to meet your needs. If your template changes break things, you're also welcome to debug what went wrong for yourself. We provide a sample Ansible based deployer in a [separate github repository](http://github.com/shakenfist/deploy).
 
 # Usage guide
 
@@ -49,7 +49,7 @@ Where "192.168.1.0/24" is the netblock to use, and "mynet" is the name of the ne
 
 ## Instances
 
-Every instance gets a config drive. Its always an ISO9660 drive. Its always the second virtual disk attached to the VM (vdb on Linux). There is no metadata server. Additionally, there is no image service -- you specify the image to use by providing a URL. That URL is cached, but can be to any HTTP server anywhere. Even better, there are no flavors. You specify what resources your instance should have at boot time and that's what you get. No more being forced into a t-shirt sized description of your needs.
+Every instance gets a config drive. Its always an ISO9660 drive. It's always the second virtual disk attached to the VM (vdb on Linux). There is no metadata server. Additionally, there is no image service -- you specify the image to use by providing a URL. That URL is cached, but can be to any HTTP server anywhere. Even better, there are no flavors. You specify what resources your instance should have at boot time and that's what you get. No more being forced into a t-shirt sized description of your needs.
 
 Instances are always cattle. Any feature that made instances feel like pets has not been implemented. That said, you can snapshot an instance. Snapshots aren't reliable backups, just like they're not really reliable backups on OpenStack. There is a small but real chance that a snapshot will contain an inconsistent state if you're snapshotting a busy database or something like that. One minor difference from OpenStack -- when you snapshot your instance you can snapshot all of the virtual disks (except the config drive) if you want to. Snapshots are delivered as files you can download via a mechanism external to Shaken Fist (for example an HTTP server pointed at the snapshot directory).
 
@@ -73,7 +73,7 @@ In this case we have three disks, all of 8gb. The boot disk is imaged with cirro
 sf-client instance create "myinstance" 1 2048 -d 8@cirros:0.5.1 -d 8 -d 8 -n netuuid
 ```
 
-"Common cloud images" is currently defined as cirros and Ubuntu. You can also use a "detailed disk specification", which is what fancy people use. It's syntax is similar:
+"Common cloud images" is currently defined as cirros and Ubuntu. You can also use a "detailed disk specification", which is what fancy people use. Its syntax is similar:
 
 ```bash
 sf-client instance create "myinstance" 1 2048 -D size=8,base=cirros,bus=ide,type=cdrom -d 8 -d 8 -n netuuid
@@ -83,7 +83,7 @@ The specification is composed of a series of key-value pairs. Valid keys are: si
 
 * _size_ as per the shorthand notation.
 * _base_ as per the shorthand notation, including version specification.
-* _bus_ is any valid disk bus for libvirt, which is virtio, ide, scsi, usb. Use virtio unless you have a really good reason other wise -- the performance of the other are terrible. An example of a good reason is to install virtio drivers into legacy operating systems that lack them natively.
+* _bus_ is any valid disk bus for libvirt, which is virtio, ide, scsi, usb. Use virtio unless you have a really good reason otherwise -- the performance of the others are terrible. An example of a good reason is to install virtio drivers into legacy operating systems that lack them natively.
 * _type_ can be one of disk or cdrom. Note that cdroms are excluded from snapshots.
 
 Similarly, networks have a "short network specification", where you can specify the UUID of a network, but also optionally the IP address to use for the interface. You can also have more than one network interface, so this is valid:
