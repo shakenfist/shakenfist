@@ -97,7 +97,7 @@ class Instance(object):
             self.db_entry['block_devices'] = {'finalized': True}
             return
 
-        bus = _get_defaulted_disk_bus(disk_spec)
+        bus = _get_defaulted_disk_bus(disk_spec[0])
         root_device = _get_disk_device_base(bus) + 'a'
         config_device = _get_disk_device_base(bus) + 'b'
 
