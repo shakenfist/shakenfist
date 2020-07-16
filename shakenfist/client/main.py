@@ -713,8 +713,14 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networ
     for d in disk:
         p = _parse_spec(d)
         size, base = p
+        try:
+            size_int = int(size)
+        except:
+            print("Disk size is not an integer")
+            return
+
         diskdefs.append({
-            'size': int(size),
+            'size': size_int,
             'base': base,
             'bus': None,
             'type': 'disk',
