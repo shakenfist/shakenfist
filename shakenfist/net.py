@@ -319,48 +319,58 @@ class Network(object):
     def discover_mesh(self):
         mesh_re = re.compile(r'00:00:00:00:00:00 dst (.*) self permanent')
 
-        with util.RecordedOperation('discover mesh', self) as _:
-            stdout, _ = processutils.execute(
-                'bridge fdb show brport %(vx_interface)s' % self.subst_dict(),
-                shell=True)
+        stdout, _ = processutils.execute(
+            'bridge fdb show brport %(vx_interface)s' % self.subst_dict(),
+            shell=True)
 
-            for line in stdout.split('\n'):
-                m = mesh_re.match(line)
-                if m:
-                    yield m.group(1)
+        for line in stdout.split('\n'):
+            m = mesh_re.match(line)
+            if m:
+                yield m.group(1)
 
     def ensure_mesh(self):
-        with util.RecordedOperation('ensure mesh', self) as _:
-            instances = []
-            for iface in db.get_network_interfaces(self.uuid):
-                if not iface['instance_uuid'] in instances:
-                    instances.append(iface['instance_uuid'])
+        removed = []
+        added = []
 
-            node_fqdns = []
-            for inst in instances:
-                i = db.get_instance(inst)
-                if not i['node'] in node_fqdns:
-                    node_fqdns.append(i['node'])
+        instances = []
+        for iface in db.get_network_interfaces(self.uuid):
+            if not iface['instance_uuid'] in instances:
+                instances.append(iface['instance_uuid'])
 
-            # NOTE(mikal): why not use DNS here? Well, DNS might be outside
-            # the control of the deployer if we're running in a public cloud
-            # as an overlay cloud...
-            node_ips = [config.parsed.get('NETWORK_NODE_IP')]
-            for fqdn in node_fqdns:
-                ip = db.get_node(fqdn)['ip']
-                if ip not in node_ips:
-                    node_ips.append(ip)
+        node_fqdns = []
+        for inst in instances:
+            i = db.get_instance(inst)
+            if not i['node'] in node_fqdns:
+                node_fqdns.append(i['node'])
 
-            discovered = list(self.discover_mesh())
-            LOG.debug('%s: Discovered mesh elements %s' % (self, discovered))
-            for node in discovered:
-                if node in node_ips:
-                    node_ips.remove(node)
-                else:
-                    self._remove_mesh_element(node)
+        # NOTE(mikal): why not use DNS here? Well, DNS might be outside
+        # the control of the deployer if we're running in a public cloud
+        # as an overlay cloud...
+        node_ips = [config.parsed.get('NETWORK_NODE_IP')]
+        for fqdn in node_fqdns:
+            ip = db.get_node(fqdn)['ip']
+            if ip not in node_ips:
+                node_ips.append(ip)
 
-            for node in node_ips:
-                self._add_mesh_element(node)
+        discovered = list(self.discover_mesh())
+        LOG.debug('%s: Discovered mesh elements %s' % (self, discovered))
+        for node in discovered:
+            if node in node_ips:
+                node_ips.remove(node)
+            else:
+                self._remove_mesh_element(node)
+                removed.append(node)
+
+        for node in node_ips:
+            self._add_mesh_element(node)
+            added.append(node)
+
+        if removed:
+            db.add_event('network', self.uuid, 'remove mesh elements',
+                         None, None, ' '.join(removed))
+        if added:
+            db.add_event('network', self.uuid, 'add mesh elements',
+                         None, None, ' '.join(added))
 
     def _add_mesh_element(self, node):
         LOG.info('%s: Adding new mesh element %s' % (self, node))
