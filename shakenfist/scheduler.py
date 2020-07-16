@@ -209,6 +209,15 @@ class Scheduler(object):
             db.add_event('instance', instance.db_entry['uuid'],
                          'schedule', 'Have most matching images', None, str(candidates))
 
+            # Avoid allocating to network node if possible
+            net_node = db.get_network_node()
+            if len(candidates) > 1 and net_node['fqdn'] in candidates:
+                candidates.remove(net_node['fqdn'])
+                LOG.info('Scheduling %s, %s are non-network nodes'
+                            % (instance, candidates))
+                db.add_event('instance', instance.db_entry['uuid'],
+                             'schedule', 'Are non-network nodes', None, str(candidates))
+
             # Return a shuffled list of options
             random.shuffle(candidates)
             return candidates
