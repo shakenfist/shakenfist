@@ -50,6 +50,13 @@ def get_nodes():
     return etcd.get_all('node', None)
 
 
+def get_network_node():
+    see_this_node()
+    for n in get_nodes():
+        if n['ip'] == config.parsed.get('NETWORK_NODE_IP'):
+            return n
+
+
 def get_network(network_uuid):
     see_this_node()
     return etcd.get('network', None, network_uuid)
