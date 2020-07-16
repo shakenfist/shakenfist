@@ -75,6 +75,22 @@ class monitor(object):
         except libvirt.libvirtError as e:
             LOG.error('Failed to lookup all domains: %s' % e)
 
+    def _compact_etcd(self):
+        try:
+            # We need to determine what revision to compact to, so we keep a
+            # key which stores when we last compacted and we use it's latest
+            # revision number as the revision to compact to.
+            c = etcd3.client()
+            c.put('/sf/compact',
+                  json.dumps({'compacted_at': time.time()}))
+            _, kv = c.get('/sf/compact')
+            c.compact(kv.mod_revision, physical=True)
+            c.defragment()
+            LOG.info('Compacted etcd')
+
+        except Exception:
+            pass
+
     def run(self):
         last_compaction = 0
 
@@ -99,16 +115,7 @@ class monitor(object):
 
             # Perform etcd maintenance
             if time.time() - last_compaction > 1800:
-                # We need to determine what revision to compact to, so we keep a
-                # key which stores when we last compacted and we use it's latest
-                # revision number as the revision to compact to.
-                c = etcd3.client()
-                c.put('/sf/compact',
-                      json.dumps({'compacted_at': time.time()}))
-                _, kv = c.get('/sf/compact')
-                c.compact(kv.mod_revision, physical=True)
-                c.defragment()
-
+                self._compact_etcd()
                 last_compaction = time.time()
 
             time.sleep(60)
