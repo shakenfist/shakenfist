@@ -614,8 +614,6 @@ class Instances(Resource):
         for d in disk:
             if not isinstance(d, dict):
                 return error(400, "Disk specification should contain JSON objects")
-            if not all (k in d for k in ('size', 'base', 'bus', 'type')):
-                return error(400, "Disk specification is missing parameters: %s" % d)
 
         if network:
             for n in network:
@@ -623,10 +621,8 @@ class Instances(Resource):
                     return error(400,
                         "Network specification should contain JSON objects")
 
-                net_params = ('network_uuid', 'address', 'macaddress', 'model')
-                if not all (k in n for k in net_params):
-                    return error(400,
-                        "Network specification is missing parameters: %s" % n)
+                if 'network_uuid' not in n:
+                    return error(400, "Network specification is missing network_uuid")
 
         if not namespace:
             namespace = get_jwt_identity()
