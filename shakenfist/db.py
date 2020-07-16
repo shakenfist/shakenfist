@@ -11,6 +11,7 @@ import uuid
 from shakenfist import config
 from shakenfist import etcd
 from shakenfist import ipmanager
+from shakenfist import util
 
 
 LOG = logging.getLogger(__file__)
@@ -26,6 +27,7 @@ def see_this_node():
             'fqdn': config.parsed.get('NODE_NAME'),
             'ip': config.parsed.get('NODE_IP'),
             'lastseen': time.time(),
+            'version': util.get_version()
         },
         ttl=120)
 
