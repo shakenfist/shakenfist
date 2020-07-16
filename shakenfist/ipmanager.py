@@ -34,10 +34,11 @@ class NetBlock(object):
 
     def reserve(self, address):
         if not self.is_free(address):
-            return
+            return False
 
         self.in_use[address] = True
         self.in_use_counter += 1
+        return True
 
     def release(self, address):
         if self.is_free(address):
@@ -45,12 +46,6 @@ class NetBlock(object):
 
         del self.in_use[address]
         self.in_use_counter -= 1
-
-    def reserve_if_free(self, address):
-        if self.is_free(address):
-            self.reserve(address)
-            return True
-        return False
 
     def get_random_address(self):
         bits = random.getrandbits(
@@ -61,7 +56,7 @@ class NetBlock(object):
         if self.in_use_counter / self.num_addresses < 0.5:
             while True:
                 addr = self.get_random_address()
-                free = self.reserve_if_free(addr)
+                free = self.reserve(addr)
                 if free:
                     return str(addr)
 
@@ -69,7 +64,7 @@ class NetBlock(object):
             idx = 1
             while idx < self.num_addresses:
                 addr = self.get_address_at_index(idx)
-                free = self.reserve_if_free(addr)
+                free = self.reserve(addr)
                 if free:
                     return str(addr)
 
