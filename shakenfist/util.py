@@ -142,6 +142,16 @@ def get_api_token(base_url, namespace='system'):
     return 'Bearer %s' % r.json()['access_token']
 
 
+CACHED_VERSION = None
+
+
+def get_version():
+    global CACHED_VERSION
+
+    if not CACHED_VERSION:
+        CACHED_VERSION = VersionInfo('shakenfist').version_string()
+    return CACHED_VERSION
+
+
 def get_user_agent():
-    sf_version = VersionInfo('shakenfist').version_string()
-    return 'Mozilla/5.0 (Ubuntu; Linux x86_64) Shaken Fist/%s' % sf_version
+    return 'Mozilla/5.0 (Ubuntu; Linux x86_64) Shaken Fist/%s' % get_version()
