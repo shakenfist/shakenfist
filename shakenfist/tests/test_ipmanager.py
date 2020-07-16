@@ -24,10 +24,10 @@ class IPManagerTestCase(testtools.TestCase):
         self.assertEqual(True, ipm.is_free('192.168.1.24'))
         ipm.reserve('192.168.1.24')
         self.assertEqual(False, ipm.is_free('192.168.1.24'))
-        self.assertEqual(False, ipm.reserve_if_free('192.168.1.24'))
+        self.assertEqual(False, ipm.reserve('192.168.1.24'))
 
         self.assertEqual(True, ipm.is_free('192.168.1.42'))
-        self.assertEqual(True, ipm.reserve_if_free('192.168.1.42'))
+        self.assertEqual(True, ipm.reserve('192.168.1.42'))
         self.assertEqual(False, ipm.is_free('192.168.1.42'))
         ipm.release('192.168.1.42')
         self.assertEqual(True, ipm.is_free('192.168.1.42'))
