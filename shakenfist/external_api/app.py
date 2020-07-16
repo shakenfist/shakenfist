@@ -608,6 +608,26 @@ class Instances(Resource):
         # We need to sanitise the name so its safe for DNS
         name = re.sub(r'([^a-zA-Z0-9_\-])', '', name)
 
+        # Sanity check
+        if not disk:
+            return error(400, "Instance must specify at least one disk")
+        for d in disk:
+            if not isinstance(d, dict):
+                return error(400, "Disk specification should contain JSON objects")
+            if not all (k in d for k in ('size', 'base', 'bus', 'type')):
+                return error(400, "Disk specification is missing parameters: %s" % d)
+
+        if network:
+            for n in network:
+                if not isinstance(n, dict):
+                    return error(400,
+                        "Network specification should contain JSON objects")
+
+                net_params = ('network_uuid', 'address', 'macaddress', 'model')
+                if not all (k in n for k in net_params):
+                    return error(400,
+                        "Network specification is missing parameters: %s" % n)
+
         if not namespace:
             namespace = get_jwt_identity()
 
