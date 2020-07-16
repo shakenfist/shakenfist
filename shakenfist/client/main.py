@@ -679,6 +679,7 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networ
                     encodeduserdata=None, placement=None, namespace=None):
     if len(disk) < 1 and len(diskspec) < 1:
         print('You must specify at least one disk')
+        return
 
     if memory < 256:
         if ctx.obj['OUTPUT'] != 'json':
@@ -704,7 +705,12 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networ
 
     diskdefs = []
     for d in disk:
-        size, base = _parse_spec(d)
+        p = _parse_spec(d)
+        if not p[1]:
+            print('Disk short-hand specification should <size>@<base>')
+            return
+
+        size, base = p
         diskdefs.append({
             'size': int(size),
             'base': base,
@@ -714,7 +720,11 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networ
     for d in diskspec:
         defn = {}
         for elem in d.split(','):
-            key, value = elem.split('=')
+            s = elem.split('=')
+            if len(s) != 2:
+                print('Error in disk spec - should be key=value: %s' % elem)
+                return
+            key, value = s
             defn[key] = value
         diskdefs.append(defn)
 
