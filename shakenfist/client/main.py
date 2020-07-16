@@ -685,6 +685,7 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networ
                     encodeduserdata=None, placement=None, namespace=None):
     if len(disk) < 1 and len(diskspec) < 1:
         print('You must specify at least one disk')
+        return
 
     if memory < 256:
         if ctx.obj['OUTPUT'] != 'json':
@@ -710,7 +711,8 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networ
 
     diskdefs = []
     for d in disk:
-        size, base = _parse_spec(d)
+        p = _parse_spec(d)
+        size, base = p
         diskdefs.append({
             'size': int(size),
             'base': base,
@@ -720,8 +722,11 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networ
     for d in diskspec:
         defn = {}
         for elem in d.split(','):
-            key, value = elem.split('=')
-            defn[key] = value
+            s = elem.split('=')
+            if len(s) != 2:
+                print('Error in disk specification - should be key=value: %s' % elem)
+                return
+            defn[s[0]] = s[1]
         diskdefs.append(defn)
 
     netdefs = []
@@ -736,8 +741,11 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networ
     for n in networkspec:
         defn = {}
         for elem in n.split(','):
-            key, value = elem.split('=')
-            defn[key] = value
+            s = elem.split('=')
+            if len(s) != 2:
+                print("Error in network specification - should be key=value: %s" % elem)
+                return
+            defn[s[0]] = s[1]
         netdefs.append(defn)
 
     _show_instance(

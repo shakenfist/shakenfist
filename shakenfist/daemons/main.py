@@ -44,7 +44,7 @@ def restore_instances():
                 n.ensure_mesh()
                 n.update_dhcp()
             except Exception as e:
-                LOG.error('%s Failed to restore network: %s' % (n, e))
+                LOG.error('%s Failed to restore network: %s' % (network, e))
 
     with util.RecordedOperation('restore instances', None) as _:
         for instance in instances:
@@ -53,7 +53,7 @@ def restore_instances():
                 LOG.info('%s Restoring instance' % i)
                 i.create()
             except Exception as e:
-                LOG.error('%s Failed to restore instance: %s' % (i, e))
+                LOG.error('%s Failed to restore instance: %s' % (instance, e))
                 db.update_instance_state(instance, 'error')
 
 
