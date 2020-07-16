@@ -87,7 +87,17 @@ class Instance(object):
         return ('instance', self.db_entry['uuid'])
 
     def _populate_block_devices(self):
-        bus = _get_defaulted_disk_bus(self.db_entry['disk_spec'][0])
+        disk_spec = self.db_entry['disk_spec']
+        if not disk_spec:
+            # This should not occur since the API will filter for zero disks.
+            LOG.error("_populate_block_devices(): Found disk spec empty: %s" %
+                      self.db_entry)
+
+            # Stop continuous crashing by falsely claiming disks are configured.
+            self.db_entry['block_devices'] = {'finalized': True}
+            return
+
+        bus = _get_defaulted_disk_bus(disk_spec)
         root_device = _get_disk_device_base(bus) + 'a'
         config_device = _get_disk_device_base(bus) + 'b'
 
