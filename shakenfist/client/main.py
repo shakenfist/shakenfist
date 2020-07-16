@@ -713,7 +713,7 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networ
     for d in disk:
         p = _parse_spec(d)
         if not p[1]:
-            print('Disk short-hand specification should <size>@<base>')
+            print('Disk short-hand specification is <size>@<base>')
             return
 
         size, base = p
@@ -747,7 +747,7 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networ
         for elem in n.split(','):
             s = elem.split('=')
             if len(s) != 2:
-                print("Error in network specification. No equal sign: %s" % elem)
+                print("Error in network specification. Missing equal sign: %s" % elem)
                 return
             defn[s[0]] = s[1]
         netdefs.append(defn)
