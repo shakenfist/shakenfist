@@ -724,8 +724,7 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networ
             if len(s) != 2:
                 print('Error in disk spec - should be key=value: %s' % elem)
                 return
-            key, value = s
-            defn[key] = value
+            defn[s[0]] = s[1]
         diskdefs.append(defn)
 
     netdefs = []
@@ -740,8 +739,11 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networ
     for n in networkspec:
         defn = {}
         for elem in n.split(','):
-            key, value = elem.split('=')
-            defn[key] = value
+            s = elem.split('=')
+            if len(s) != 2:
+                print("Error in network specification. No equal sign: %s" % elem)
+                return
+            defn[s[0]] = s[1]
         netdefs.append(defn)
 
     _show_instance(
