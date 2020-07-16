@@ -2,12 +2,13 @@ import etcd3
 import json
 import logging
 from logging import handlers as logging_handlers
+import os
 import setproctitle
 import time
 
 from shakenfist import config
 from shakenfist import db
-from shakenfist import db
+from shakenfist import util
 
 
 LOG = logging.getLogger(__file__)
@@ -19,10 +20,68 @@ class monitor(object):
     def __init__(self):
         setproctitle.setproctitle('sf cleaner')
 
+    def _update_power_states(self):
+        libvirt = util.get_libvirt()
+        conn = libvirt.open(None)
+        try:
+            seen = []
+
+            # Active VMs have an ID. Active means running in libvirt
+            # land.
+            for domain_id in conn.listDomainsID():
+                domain = conn.lookupByID(domain_id)
+                if not domain.name().startswith('sf:'):
+                    continue
+
+                instance_uuid = domain.name().split(':')[1]
+                seen.append(domain.name())
+
+                state = domain.state()
+                if state == libvirt.VIR_DOMAIN_SHUTOFF:
+                    db.update_instance_power_state(instance_uuid, 'off')
+                elif state == libvirt.VIR_DOMAIN_CRASHED:
+                    db.update_instance_power_state(
+                        instance_uuid, 'crashed')
+                    db.update_instance_state(
+                        instance_uuid, 'error')
+                elif state in [libvirt.VIR_DOMAIN_PAUSED,
+                               libvirt.VIR_DOMAIN_PMSUSPENDED]:
+                    db.update_instance_power_state(instance_uuid, 'paused')
+                else:
+                    # Covers all "runnning states": BLOCKED, NOSTATE,
+                    # RUNNING, SHUTDOWN
+                    db.update_instance_power_state(instance_uuid, 'on')
+
+            # Inactive VMs just have a name, and are powered off
+            # in our state system.
+            for domain_name in conn.listDefinedDomains():
+                if not domain_name.startswith('sf:'):
+                    continue
+
+                if domain_name not in seen:
+                    instance_uuid = domain_name.split(':')[1]
+                    instance_path = os.path.join(
+                        config.parsed.get('STORAGE_PATH'), 'instances',
+                        instance_uuid)
+
+                    if not os.path.exists(instance_path):
+                        # If we're inactive and our files aren't on disk,
+                        # we have a problem.
+                        db.update_instance_state(instance_uuid, 'error')
+                    else:
+                        db.update_instance_power_state(
+                            instance_uuid, 'off')
+
+        except libvirt.libvirtError as e:
+            LOG.error('Failed to lookup all domains: %s' % e)
+
     def run(self):
         last_compaction = 0
 
         while True:
+            # Update power state of all instances on this hypervisor
+            self._update_power_states()
+
             # Cleanup soft deleted instances and networks
             delay = config.parsed.get('CLEANER_DELAY')
 
