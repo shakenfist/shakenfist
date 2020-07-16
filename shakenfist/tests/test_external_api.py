@@ -27,6 +27,10 @@ class FakeScheduler(object):
 def _encode_key(key):
     return bcrypt.hashpw(key.encode('utf-8'), bcrypt.gensalt())
 
+def _clean_traceback(resp):
+    if 'traceback' in resp:
+        del resp['traceback']
+    return resp
 
 class AuthTestCase(testtools.TestCase):
     def setUp(self):
@@ -54,6 +58,28 @@ class AuthTestCase(testtools.TestCase):
         self.assertEqual(
             {
                 'error': 'missing key in request',
+                'status': 400
+            },
+            resp.get_json())
+
+    def test_post_auth_bad_parameter(self):
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'banana', 'keyyy': 'pwd'}))
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual(
+            {
+                'error': "post() got an unexpected keyword argument 'keyyy'",
+                'status': 400
+            },
+            _clean_traceback(resp.get_json()))
+
+    def test_post_auth_key_non_string(self):
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'banana', 'key': 1234}))
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual(
+            {
+                'error': 'key is not a string',
                 'status': 400
             },
             resp.get_json())
@@ -87,12 +113,53 @@ class AuthTestCase(testtools.TestCase):
                         'key2': str(base64.b64encode(_encode_key('sausage')), 'utf-8')
                     }
                 })
+
     def test_post_auth_service_key(self, mock_get):
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'banana', 'key': 'cheese'}))
         self.assertEqual(200, resp.status_code)
         self.assertIn('access_token', resp.get_json())
 
+    def test_no_auth_header(self):
+        resp = self.client.post('/auth/namespaces',
+                                data=json.dumps({
+                                    'namespace': 'foo'
+                                }))
+        self.assertEqual(401, resp.status_code)
+        self.assertEqual(
+            {
+                'error': 'Missing Authorization Header',
+                'status': 401
+            },
+            _clean_traceback(resp.get_json()))
+
+    def test_auth_header_wrong(self):
+        resp = self.client.post('/auth/namespaces',
+                                headers={'Authorization': "l33thacker"},
+                                data=json.dumps({
+                                    'namespace': 'foo'
+                                }))
+        self.assertEqual(
+            {
+                'error': "Bad Authorization header. Expected value 'Bearer <JWT>'",
+                'status': 401
+            },
+            _clean_traceback(resp.get_json()))
+        self.assertEqual(401, resp.status_code)
+
+    def test_auth_header_bad_jwt(self):
+        resp = self.client.post('/auth/namespaces',
+                                headers={'Authorization': "Bearer l33thacker"},
+                                data=json.dumps({
+                                    'namespace': 'foo'
+                                }))
+        self.assertEqual(
+            {
+                'error': "Invalid JWT in Authorization Header",
+                'status': 401
+            },
+            _clean_traceback(resp.get_json()))
+        self.assertEqual(401, resp.status_code)
 
 class ExternalApiTestCase(testtools.TestCase):
     def setUp(self):

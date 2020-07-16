@@ -8,15 +8,21 @@
 import base64
 import bcrypt
 import flask
+from flask import request
 from flask_jwt_extended import create_access_token
 from flask_jwt_extended import get_jwt_identity
 from flask_jwt_extended import JWTManager
 from flask_jwt_extended import jwt_required
+from flask_jwt_extended.exceptions import (
+    JWTDecodeError, NoAuthorizationError, InvalidHeaderError, WrongTokenError,
+    RevokedTokenError, FreshTokenRequired, CSRFError
+)
 import flask_restful
 from flask_restful import fields
 from flask_restful import marshal_with
 import ipaddress
 import json
+from jwt.exceptions import DecodeError
 import logging
 from logging import handlers as logging_handlers
 import os
@@ -102,8 +108,26 @@ def generic_wrapper(func):
             LOG.info('API request: %s %s\n    Headers:\n        %s\n    Args: %s\n    KWargs: %s'
                      % (flask.request.method, flask.request.url, '\n        '.join(formatted_headers), args, kwargs))
             return func(*args, **kwargs)
+
+        except TypeError as e:
+            return error(400, str(e))
+
+        except (JWTDecodeError,
+                NoAuthorizationError,
+                InvalidHeaderError,
+                WrongTokenError,
+                RevokedTokenError,
+                FreshTokenRequired,
+                CSRFError,
+                ) as e:
+            return error(401, str(e))
+
+        except DecodeError:
+            return error(401, "Invalid JWT in Authorization Header")
+
         except Exception:
-            return error(500, 'server error')
+            return error(500, 'Server Error')
+
     return wrapper
 
 
@@ -317,6 +341,9 @@ class Auth(Resource):
             return error(400, 'missing namespace in request')
         if not key:
             return error(400, 'missing key in request')
+        if not isinstance(key, str):
+            # Must be a string to encode()
+            return error(400, 'key is not a string')
 
         service_key, keys = self._get_keys(namespace)
         if service_key and key == service_key:
@@ -347,6 +374,9 @@ class AuthNamespaces(Resource):
             if key_name:
                 if not key:
                     return error(400, 'no key specified')
+                if not isinstance(key, str):
+                    # Must be a string to encode()
+                    return error(400, 'key is not a string')
                 if key_name == 'service_key':
                     return error(403, 'illegal key name')
 
