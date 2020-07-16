@@ -213,7 +213,8 @@ def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key, us
         'block_devices': None,
         'state': 'initial',
         'state_updated': time.time(),
-        'namespace': namespace
+        'namespace': namespace,
+        'power_state': 'initial'
     }
     etcd.put('instance', None, instance_uuid, d)
     return d
@@ -229,8 +230,34 @@ def place_instance(instance_uuid, node):
 def update_instance_state(instance_uuid, state):
     see_this_node()
     i = get_instance(instance_uuid)
+
+    # We don't write unchanged things to the database
+    if i.get('state') == state:
+        return
+
     i['state'] = state
     i['state_updated'] = time.time()
+    etcd.put('instance', None, instance_uuid, i)
+
+
+def update_instance_power_state(instance_uuid, state):
+    see_this_node()
+    i = get_instance(instance_uuid)
+
+    # We don't write unchanged things to the database
+    if i.get('power_state') == state:
+        return
+
+    # If we are in transition, and its new, then we might
+    # not want to update just yet
+    state_age = time.time() - i.get('power_state_updated', 0)
+    if (i.get('power_state', '').startswith('transition-to-') and
+            i.get('power_state_previous') == state and state_age < 70):
+        return
+
+    i['power_state_previous'] = i.get('power_state', 'unknown')
+    i['power_state'] = state
+    i['power_state_updated'] = time.time()
     etcd.put('instance', None, instance_uuid, i)
 
 
