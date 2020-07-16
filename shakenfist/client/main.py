@@ -35,7 +35,8 @@ class GroupCatchExceptions(click.Group):
             sys.exit(1)
 
         except apiclient.ResourceCannotBeDeletedException as e:
-            click.echo("ERROR: Cannot delete resource: %s" % error_text(e.text))
+            click.echo("ERROR: Cannot delete resource: %s" %
+                       error_text(e.text))
             sys.exit(1)
 
         except apiclient.ResourceNotFoundException as e:
@@ -52,7 +53,8 @@ class GroupCatchExceptions(click.Group):
             sys.exit(1)
 
         except apiclient.InsufficientResourcesException as e:
-            click.echo("ERROR: Insufficient Resources:\n%s" % error_text(e.text))
+            click.echo("ERROR: Insufficient Resources:\n%s" %
+                       error_text(e.text))
             sys.exit(1)
 
 
@@ -504,24 +506,28 @@ def instance_list(ctx, all=False):
     if ctx.obj['OUTPUT'] == 'pretty':
         x = PrettyTable()
         x.field_names = ['uuid', 'name', 'namespace',
-                         'cpus', 'memory', 'hypervisor']
+                         'cpus', 'memory', 'hypervisor',
+                         'power state', 'state']
         for i in insts:
             x.add_row([i['uuid'], i['name'], i['namespace'],
-                       i['cpus'], i['memory'], i['node']])
+                       i['cpus'], i['memory'], i['node'],
+                       i.get('power_state', 'unknown'), i['state']])
         print(x)
 
     elif ctx.obj['OUTPUT'] == 'simple':
-        print('uuid,name,namespace,cpus,memory,hypervisor')
+        print('uuid,name,namespace,cpus,memory,hypervisor,power state,state')
         for i in insts:
-            print('%s,%s,%s,%s,%s,%s'
+            print('%s,%s,%s,%s,%s,%s,%s,%s'
                   % (i['uuid'], i['name'], i['namespace'],
-                     i['cpus'], i['memory'], i['node']))
+                     i['cpus'], i['memory'], i['node'],
+                     i.get('power_state', 'unknown'), i['state']))
 
     elif ctx.obj['OUTPUT'] == 'json':
         filtered_insts = []
         for i in insts:
             filtered_insts.append(filter_dict(
-                i, ['uuid', 'name', 'namespace', 'cpus', 'memory', 'node']))
+                i, ['uuid', 'name', 'namespace', 'cpus', 'memory', 'node',
+                    'power_state', 'state']))
         print(json.dumps({'instances': filtered_insts},
                          indent=4, sort_keys=True))
 
