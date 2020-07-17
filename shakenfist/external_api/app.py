@@ -22,7 +22,7 @@ from flask_restful import fields
 from flask_restful import marshal_with
 import ipaddress
 import json
-from jwt.exceptions import DecodeError
+from jwt.exceptions import DecodeError, PyJWTError
 import logging
 from logging import handlers as logging_handlers
 import os
@@ -112,6 +112,10 @@ def generic_wrapper(func):
         except TypeError as e:
             return error(400, str(e))
 
+        except DecodeError:
+            # Send a more informative message than "Not enough segments"
+            return error(401, "Invalid JWT in Authorization Header")
+
         except (JWTDecodeError,
                 NoAuthorizationError,
                 InvalidHeaderError,
@@ -119,11 +123,9 @@ def generic_wrapper(func):
                 RevokedTokenError,
                 FreshTokenRequired,
                 CSRFError,
+                PyJWTError,
                 ) as e:
             return error(401, str(e))
-
-        except DecodeError:
-            return error(401, "Invalid JWT in Authorization Header")
 
         except Exception:
             return error(500, 'Server Error')
@@ -1251,6 +1253,7 @@ class Nodes(Resource):
         'name': fields.String(attribute='fqdn'),
         'ip': fields.String,
         'lastseen': fields.Float,
+        'version': fields.String,
     })
     def get(self):
         return list(db.get_nodes())
