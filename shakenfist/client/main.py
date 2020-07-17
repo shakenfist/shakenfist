@@ -201,7 +201,7 @@ def namespace_create(ctx, namespace=None):
 
 @namespace.command(name='delete',
                    help=('delete a namespace.\n\n'
-                         'namespace: The name of the namespace'))
+                         'NAMESPACE: The name of the namespace'))
 @click.argument('namespace', type=click.STRING)
 @click.pass_context
 def namespace_delete(ctx, namespace=None):
@@ -252,6 +252,20 @@ def _show_namespace(ctx, namespace):
 @click.pass_context
 def namespace_show(ctx, namespace=None):
     _show_namespace(ctx, namespace)
+
+
+@namespace.command(name='clean',
+                   help=('Clean (delete) namespace of all instances and networks\n\n'))
+@click.option('--confirm',  is_flag=True)
+@click.option('--namespace', type=click.STRING)
+@click.pass_context
+def namespace_clean(ctx, confirm=False, namespace=None):
+    if not confirm:
+        print("You must be sure. Use option --confirm.")
+        return
+
+    CLIENT.delete_all_instances(namespace)
+    CLIENT.delete_all_networks(namespace)
 
 
 @namespace.command(name='add-key',
@@ -424,6 +438,18 @@ def network_show(ctx, network_uuid=None):
 def network_create(ctx, netblock=None, name=None, dhcp=None, nat=None, namespace=None):
     _show_network(ctx, CLIENT.allocate_network(
         netblock, dhcp, nat, name, namespace))
+
+
+@network.command(name='delete-all', help='Delete ALL networks')
+@click.option('--confirm',  is_flag=True)
+@click.option('--namespace', type=click.STRING)
+@click.pass_context
+def network_delete_all(ctx, confirm=False, namespace=None):
+    if not confirm:
+        print("You must be sure. Use option --confirm.")
+        return
+
+    CLIENT.delete_all_networks(namespace)
 
 
 @network.command(name='events', help='Display events for a network')
@@ -774,6 +800,18 @@ def instance_delete(ctx, instance_uuid=None):
     CLIENT.delete_instance(instance_uuid)
     if ctx.obj['OUTPUT'] == 'json':
         print('{}')
+
+
+@instance.command(name='delete-all', help='Delete ALL instances')
+@click.option('--confirm',  is_flag=True)
+@click.option('--namespace', type=click.STRING)
+@click.pass_context
+def instance_delete_all(ctx, confirm=False, namespace=None):
+    if not confirm:
+        print("You must be sure. Use option --confirm.")
+        return
+
+    CLIENT.delete_all_instances(namespace)
 
 
 @instance.command(name='events', help='Display events for an instance')

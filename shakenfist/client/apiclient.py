@@ -155,6 +155,12 @@ class Client(object):
                               '/instances', data={'all': all})
         return r.json()
 
+    def delete_all_instances(self, namespace):
+        r = self._request_url('DELETE', self.base_url + '/instances',
+                              data={'confirm': True,
+                                    'namespace': namespace})
+        return r.json()
+
     def get_instance(self, instance_uuid):
         r = self._request_url('GET', self.base_url +
                               '/instances/' + instance_uuid)
@@ -266,6 +272,12 @@ class Client(object):
     def delete_network(self, network_uuid):
         r = self._request_url('DELETE', self.base_url +
                               '/networks/' + network_uuid)
+        return r.json()
+
+    def delete_all_networks(self, namespace):
+        r = self._request_url('DELETE', self.base_url + '/networks',
+                              data={'confirm': True,
+                                    'namespace': namespace})
         return r.json()
 
     def get_network_events(self, instance_uuid):
