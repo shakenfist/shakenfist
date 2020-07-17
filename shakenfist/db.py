@@ -230,6 +230,11 @@ def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key, us
 def place_instance(instance_uuid, node):
     see_this_node()
     i = get_instance(instance_uuid)
+
+    # We don't write unchanged things to the database
+    if i.get('node') == node:
+        return
+
     i['node'] = node
     etcd.put('instance', None, instance_uuid, i)
 

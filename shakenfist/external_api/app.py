@@ -621,7 +621,7 @@ class Instances(Resource):
             for n in network:
                 if not isinstance(n, dict):
                     return error(400,
-                        "Network specification should contain JSON objects")
+                                 "Network specification should contain JSON objects")
 
                 if 'network_uuid' not in n:
                     return error(400, "Network specification is missing network_uuid")
@@ -673,9 +673,6 @@ class Instances(Resource):
                 return error(507, 'insufficient capacity')
 
             placed_on = candidates[0]
-            db.place_instance(instance_uuid, placed_on)
-            db.add_event('instance', instance_uuid,
-                         'placement', None, None, placed_on)
 
         else:
             try:
@@ -688,6 +685,11 @@ class Instances(Resource):
                     return error(507, 'insufficient capacity')
             except scheduler.CandidateNodeNotFoundException as e:
                 return error(404, 'node not found: %s' % e)
+
+        # Record placement
+        db.place_instance(instance_uuid, placed_on)
+        db.add_event('instance', instance_uuid,
+                     'placement', None, None, placed_on)
 
         # Have we been placed on a different node?
         if not placed_on == config.parsed.get('NODE_NAME'):
@@ -753,7 +755,7 @@ class Instances(Resource):
                     else:
                         if not ipm.reserve(netdesc['address']):
                             return error_with_cleanup(409, 'address %s in use' %
-                                               netdesc['address'])
+                                                      netdesc['address'])
                     db.persist_ipmanager(netdesc['network_uuid'], ipm.save())
                     allocations[netdesc['network_uuid']].append(
                         (netdesc['address'], order))
