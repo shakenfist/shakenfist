@@ -43,7 +43,7 @@ CONFIG_DEFAULTS = {
     #  - ram_overcommit_ratio: how much vRAM per real unit of RAM
     'SCHEDULER_CACHE_TIMEOUT': 30,
     'CPU_OVERCOMMIT_RATIO': 16,
-    'RAM_OVERCOMMIT_RATIO': 1.5,
+    'RAM_OVERCOMMIT_RATIO': 0.9,
 
     # Network options:
     #  - floating_network: a network block used for NAT egress from VMs and
