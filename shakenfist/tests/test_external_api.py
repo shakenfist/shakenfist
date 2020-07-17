@@ -7,6 +7,8 @@ import testtools
 
 from shakenfist import config
 from shakenfist.external_api import app as external_api
+from shakenfist import ipmanager
+from shakenfist import net
 from shakenfist import util
 
 
@@ -472,6 +474,26 @@ class ExternalApiTestCase(testtools.TestCase):
         self.assertEqual(404, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
 
+    # @mock.patch('shakenfist.etcd.put')
+    # @mock.patch('shakenfist.db.get_lock')
+    # def test_delete_all_instances(self,
+    #         mock_db_get_lock,
+    #         mock_etcd_put,
+    #         ):
+
+    #     # mock.patch('shakenfist.net.from_db',
+    #     #         return_value=net.Network()).start()
+
+    #     resp = self.client.delete('/instances',
+    #                               headers={'Authorization': self.auth_header},
+    #                               data=json.dumps({
+    #                                 'confirm': True,
+    #                                 'namespace': 'foo'
+    #                               }))
+    #     self.assertEqual(['30f6da44-look-i-am-uuid'],
+    #                      resp.get_json())
+    #     self.assertEqual(200, resp.status_code)
+
     @mock.patch('shakenfist.db.get_instance',
                 return_value={'uuid': 'foo',
                               'name': 'banana',
@@ -481,8 +503,8 @@ class ExternalApiTestCase(testtools.TestCase):
         resp = self.client.get(
             '/instances/foo/metadata', headers={'Authorization': self.auth_header})
         self.assertEqual({'a': 'a', 'b': 'b'}, resp.get_json())
-        self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
+        self.assertEqual(200, resp.status_code)
 
     @mock.patch('shakenfist.db.get_instance',
                 return_value={'uuid': 'foo',
@@ -584,8 +606,8 @@ class ExternalApiTestCase(testtools.TestCase):
         resp = self.client.delete('/instances/foo/metadata/foo',
                                   headers={'Authorization': self.auth_header})
         self.assertEqual(None, resp.get_json())
-        self.assertEqual(200, resp.status_code)
         mock_md_put.assert_called_with('instance', 'foo', {'real': 'smart'})
+        self.assertEqual(200, resp.status_code)
 
     @mock.patch('shakenfist.db.get_instance',
                 return_value={'uuid': 'foo',
@@ -665,3 +687,101 @@ class ExternalApiTestCase(testtools.TestCase):
                           resp.get_json())
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
+
+
+class ExternalApiNetworkTestCase(ExternalApiTestCase):
+    def setUp(self):
+        super(ExternalApiNetworkTestCase, self).setUp()
+
+        def fake_config(key):
+            fc = {
+                'NODE_NAME': 'seriously',
+                'NODE_IP': '127.0.0.1',
+                'NETWORK_NODE_IP': '127.0.0.1',
+            }
+
+            if key in fc:
+                return fc[key]
+            raise Exception('Unknown config key')
+
+        self.config = mock.patch('shakenfist.config.parsed.get',
+                                 fake_config)
+        self.mock_config = self.config.start()
+
+    def tearDown(self):
+        super(ExternalApiNetworkTestCase, self).tearDown()
+        self.config.stop()
+
+    @mock.patch('shakenfist.db.get_networks',
+                return_value=[{
+                                "floating_gateway": "10.10.0.150",
+                                "name": "bob",
+                                "state": "created",
+                                "uuid": "30f6da44-look-i-am-uuid",
+                                }])
+    @mock.patch('shakenfist.db.get_network_interfaces', return_value=[])
+    @mock.patch('shakenfist.db.get_ipmanager',
+                return_value=ipmanager.NetBlock('10.0.0.0/24'))
+    @mock.patch('shakenfist.net.Network.remove_dhcp')
+    @mock.patch('shakenfist.net.Network.delete')
+    @mock.patch('shakenfist.db.update_network_state')
+    @mock.patch('shakenfist.etcd.put')
+    @mock.patch('shakenfist.db.get_lock')
+    def test_delete_all_networks(self,
+            mock_db_get_lock,
+            mock_etcd_put,
+            mock_update_network_state,
+            mock_delete,
+            mock_remove_dhcp,
+            mock_get_ipmanager,
+            mock_db_get_network_interfaces,
+            mock_db_get_networks,
+            ):
+
+        mock_network = mock.patch('shakenfist.net.from_db',
+                                    return_value=net.Network())
+        mock_network.start()
+
+        resp = self.client.delete('/networks',
+                                  headers={'Authorization': self.auth_header},
+                                  data=json.dumps({
+                                    'confirm': True,
+                                    'namespace': 'foo'
+                                  }))
+        self.assertEqual(['30f6da44-look-i-am-uuid'],
+                         resp.get_json())
+        self.assertEqual(200, resp.status_code)
+
+        mock_network.stop()
+
+    @mock.patch('shakenfist.db.get_networks',
+                return_value=[{
+                                "floating_gateway": "10.10.0.150",
+                                "name": "bob",
+                                "state": "deleted",
+                                "uuid": "30f6da44-look-i-am-uuid",
+                                }])
+    @mock.patch('shakenfist.db.get_network_interfaces', return_value=[])
+    @mock.patch('shakenfist.db.get_ipmanager',
+                return_value=ipmanager.NetBlock('10.0.0.0/24'))
+    @mock.patch('shakenfist.net.Network.remove_dhcp')
+    @mock.patch('shakenfist.etcd.put')
+    @mock.patch('shakenfist.db.get_lock')
+    def test_delete_all_networks_none_to_delete(self,
+            mock_db_get_lock,
+            mock_etcd_put,
+            mock_remove_dhcp,
+            mock_get_ipmanager,
+            mock_db_get_network_interfaces,
+            mock_db_get_networks,
+            ):
+
+        resp = self.client.delete('/networks',
+                                  headers={'Authorization': self.auth_header},
+                                  data=json.dumps({
+                                    'confirm': True,
+                                    'namespace': 'foo'
+                                  }))
+        self.assertEqual([],
+                         resp.get_json())
+        self.assertEqual(200, resp.status_code)
