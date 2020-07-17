@@ -57,6 +57,9 @@ class GroupCatchExceptions(click.Group):
                        error_text(e.text))
             sys.exit(1)
 
+        except apiclient.requests.exceptions.ConnectionError as e:
+            click.echo("ERROR: Unable to connect to server: %s" % e)
+
 
 def error_text(json_text):
     try:
