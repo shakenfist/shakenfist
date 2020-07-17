@@ -239,6 +239,13 @@ def place_instance(instance_uuid, node):
     etcd.put('instance', None, instance_uuid, i)
 
 
+def instance_enforced_deletes_increment(instance_uuid):
+    see_this_node()
+    i = get_instance(instance_uuid)
+    i['enforced_deletes'] = i.get('enforced_deletes', 0) + 1
+    etcd.put('instance', None, instance_uuid, i)
+
+
 def update_instance_state(instance_uuid, state):
     see_this_node()
     i = get_instance(instance_uuid)
