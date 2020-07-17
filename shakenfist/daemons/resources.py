@@ -48,13 +48,27 @@ def _get_stats():
     except Exception:
         pass
 
-    # Memory info - libvirt returns memory in KiB
+    # System memory info, converting bytes to mb
+    stats = psutil.virtual_memory()
+    retval.update({
+        'memory_max': stats.total // 1024 // 1024,
+        'memory_available': stats.available // 1024 // 1024
+    })
+
+    # libvirt memory info, converting kb to mb
     memory_status = conn.getMemoryStats(
         libvirt.VIR_NODE_MEMORY_STATS_ALL_CELLS)
     retval.update({
-        'memory_max': memory_status['total'] // 1024,
-        'memory_available': memory_status['free'] // 1024,
+        'memory_max_libvirt': memory_status['total'] // 1024,
+        'memory_available_libvirt': memory_status['free'] // 1024,
     })
+
+    # Kernel Shared Memory (KSM) information
+    ksm_details = {}
+    for ent in os.listdir('/sys/kernel/mm/ksm'):
+        with open('/sys/kernel/mm/ksm/%s' % ent) as f:
+            ksm_details['memory_ksm_%s' % ent] = int(f.read().rstrip())
+    retval.update(ksm_details)
 
     # Disk info
     s = os.statvfs(config.parsed.get('STORAGE_PATH'))
