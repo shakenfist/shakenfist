@@ -133,20 +133,22 @@ def node_list(ctx):
 
     if ctx.obj['OUTPUT'] == 'pretty':
         x = PrettyTable()
-        x.field_names = ['name', 'ip', 'lastseen']
+        x.field_names = ['name', 'ip', 'lastseen', 'version']
         for n in nodes:
-            x.add_row([n['name'], n['ip'], n['lastseen']])
+            x.add_row([n['name'], n['ip'], n['lastseen'], n['version']])
         print(x)
 
     elif ctx.obj['OUTPUT'] == 'simple':
-        print('name,ip,lastseen')
+        print('name,ip,lastseen,version')
         for n in nodes:
-            print('%s,%s,%s' % (n['name'], n['ip'], n['lastseen']))
+            print('%s,%s,%s,%s' % (
+                    n['name'], n['ip'], n['lastseen'], n['version']))
 
     elif ctx.obj['OUTPUT'] == 'json':
         filtered_nodes = []
         for n in nodes:
-            filtered_nodes.append(filter_dict(n, ['name', 'ip', 'lastseen']))
+            filtered_nodes.append(
+                filter_dict(n, ['name', 'ip', 'lastseen', 'version']))
         print(json.dumps({'nodes': filtered_nodes}, indent=4, sort_keys=True))
 
 
