@@ -2,6 +2,7 @@ import mock
 import testtools
 
 
+from shakenfist import config
 from shakenfist.daemons import cleaner
 
 
@@ -57,6 +58,17 @@ def fake_exists(path):
     return True
 
 
+def fake_config(key):
+    fc = {
+        'NODE_NAME': 'abigcomputer',
+        'STORAGE_PATH': '/srv/shakenfist'
+    }
+
+    if key in fc:
+        return fc[key]
+    raise Exception('Unknown config key %s' % key)
+
+
 FAKE_ETCD_STATE = {}
 
 
@@ -64,7 +76,7 @@ def fake_get(objecttype, subtype, name):
     global FAKE_ETCD_STATE
     return FAKE_ETCD_STATE.get(
         '%s/%s/%s' % (objecttype, subtype, name),
-        {'uuid': name})
+        {'uuid': name, 'node': 'abigcomputer'})
 
 
 def fake_put(objecttype, subtype, name, v):
@@ -84,6 +96,10 @@ class CleanerTestCase(testtools.TestCase):
         self.proctitle = mock.patch('setproctitle.setproctitle')
         self.mock_proctitle = self.proctitle.start()
 
+        self.config = mock.patch('shakenfist.config.parsed.get',
+                                 fake_config)
+        self.mock_config = self.config.start()
+
     @mock.patch('shakenfist.db.see_this_node')
     @mock.patch('shakenfist.etcd.get', side_effect=fake_get)
     @mock.patch('shakenfist.etcd.put', side_effect=fake_put)
@@ -99,6 +115,7 @@ class CleanerTestCase(testtools.TestCase):
                 mock.call('instance', None, 'running',
                           {
                               'uuid': 'running',
+                              'node': 'abigcomputer',
                               'power_state_previous': 'unknown',
                               'power_state': 'on',
                               'power_state_updated': 7
@@ -106,6 +123,7 @@ class CleanerTestCase(testtools.TestCase):
                 mock.call('instance', None, 'shutoff',
                           {
                               'uuid': 'shutoff',
+                              'node': 'abigcomputer',
                               'power_state_previous': 'unknown',
                               'power_state': 'off',
                               'power_state_updated': 7
@@ -113,6 +131,7 @@ class CleanerTestCase(testtools.TestCase):
                 mock.call('instance', None, 'crashed',
                           {
                               'uuid': 'crashed',
+                              'node': 'abigcomputer',
                               'power_state_previous': 'unknown',
                               'power_state': 'crashed',
                               'power_state_updated': 7,
@@ -122,6 +141,7 @@ class CleanerTestCase(testtools.TestCase):
                 mock.call('instance', None, 'crashed',
                           {
                               'uuid': 'crashed',
+                              'node': 'abigcomputer',
                               'power_state_previous': 'unknown',
                               'power_state': 'crashed',
                               'power_state_updated': 7,
@@ -131,6 +151,7 @@ class CleanerTestCase(testtools.TestCase):
                 mock.call('instance', None, 'paused',
                           {
                               'uuid': 'paused',
+                              'node': 'abigcomputer',
                               'power_state_previous': 'unknown',
                               'power_state': 'paused',
                               'power_state_updated': 7
@@ -138,6 +159,7 @@ class CleanerTestCase(testtools.TestCase):
                 mock.call('instance', None, 'suspended',
                           {
                               'uuid': 'suspended',
+                              'node': 'abigcomputer',
                               'power_state_previous': 'unknown',
                               'power_state': 'paused',
                               'power_state_updated': 7
@@ -145,6 +167,7 @@ class CleanerTestCase(testtools.TestCase):
                 mock.call('instance', None, 'foo',
                           {
                               'uuid': 'foo',
+                              'node': 'abigcomputer',
                               'power_state_previous': 'unknown',
                               'power_state': 'off',
                               'power_state_updated': 7
@@ -152,6 +175,7 @@ class CleanerTestCase(testtools.TestCase):
                 mock.call('instance', None, 'bar',
                           {
                               'uuid': 'bar',
+                              'node': 'abigcomputer',
                               'power_state_previous': 'unknown',
                               'power_state': 'off',
                               'power_state_updated': 7
@@ -159,6 +183,7 @@ class CleanerTestCase(testtools.TestCase):
                 mock.call('instance', None, 'nofiles',
                           {
                               'uuid': 'nofiles',
+                              'node': 'abigcomputer',
                               'state': 'error',
                               'state_updated': 7
                           })
