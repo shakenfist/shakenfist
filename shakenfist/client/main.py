@@ -543,9 +543,9 @@ def _show_instance(ctx, i, include_snapshots=False):
         snapshots = CLIENT.get_instance_snapshots(i['uuid'])
 
     if ctx.obj['OUTPUT'] == 'json':
-        out = filter_dict(i, ['uuid', 'name', 'namespace', 'cpus', 'memory', 'disk_spec',
-                              'node', 'console_port', 'vdi_port', 'ssh_key',
-                              'user_data'])
+        out = filter_dict(i, ['uuid', 'name', 'namespace', 'cpus', 'memory',
+                              'disk_spec', 'node', 'console_port', 'vdi_port',
+                              'ssh_key', 'user_data', 'power_state', 'state'])
         out['network_interfaces'] = []
         for interface in interfaces:
             _show_interface(ctx, interface, out)
@@ -572,6 +572,7 @@ def _show_instance(ctx, i, include_snapshots=False):
     print(format_string % ('memory', i['memory']))
     print(format_string % ('disk spec', i['disk_spec']))
     print(format_string % ('node', i['node']))
+    print(format_string % ('power state', i['power_state']))
     print(format_string % ('state', i['state']))
 
     # NOTE(mikal): I am not sure we should expose this, but it will do
@@ -713,8 +714,14 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networ
     for d in disk:
         p = _parse_spec(d)
         size, base = p
+        try:
+            size_int = int(size)
+        except:
+            print("Disk size is not an integer")
+            return
+
         diskdefs.append({
-            'size': int(size),
+            'size': size_int,
             'base': base,
             'bus': None,
             'type': 'disk',
