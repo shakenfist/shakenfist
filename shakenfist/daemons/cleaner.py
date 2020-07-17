@@ -34,6 +34,8 @@ class monitor(object):
                     continue
 
                 instance_uuid = domain.name().split(':')[1]
+                db.place_instance(
+                    instance_uuid, config.parsed.get('NODE_NAME'))
                 seen.append(domain.name())
 
                 state = domain.state()
@@ -60,6 +62,8 @@ class monitor(object):
 
                 if domain_name not in seen:
                     instance_uuid = domain_name.split(':')[1]
+                    db.place_instance(
+                        instance_uuid, config.parsed.get('NODE_NAME'))
                     instance_path = os.path.join(
                         config.parsed.get('STORAGE_PATH'), 'instances',
                         instance_uuid)
