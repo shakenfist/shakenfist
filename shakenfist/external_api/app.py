@@ -1253,6 +1253,7 @@ class Nodes(Resource):
         'name': fields.String(attribute='fqdn'),
         'ip': fields.String,
         'lastseen': fields.Float,
+        'version': fields.String,
     })
     def get(self):
         return list(db.get_nodes())

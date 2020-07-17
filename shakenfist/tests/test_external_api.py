@@ -633,3 +633,35 @@ class ExternalApiTestCase(testtools.TestCase):
         self.assertEqual({'error': 'key not found', 'status': 404},
                          resp.get_json())
         self.assertEqual(404, resp.status_code)
+
+    @mock.patch('shakenfist.db.get_nodes',
+                return_value=[{
+                                "fqdn": "sf-1",
+                                "ip": "192.168.72.240",
+                                "lastseen": 1594952905.2100437,
+                                "version": "0.0.1"
+                              },
+                              {
+                                "fqdn": "sf-2",
+                                "ip": "192.168.72.230",
+                                "lastseen": 1594952904.8870885,
+                                "version": "0.0.1"
+                               }])
+    def test_get_node(self, mock_md_get):
+        resp = self.client.get('/nodes',
+                               headers={'Authorization': self.auth_header})
+        self.assertEqual([{
+                            "name": "sf-1",
+                            "ip": "192.168.72.240",
+                            "lastseen": 1594952905.2100437,
+                            "version": "0.0.1"
+                          },
+                          {
+                            "name": "sf-2",
+                            "ip": "192.168.72.230",
+                            "lastseen": 1594952904.8870885,
+                            "version": "0.0.1"
+                          }],
+                          resp.get_json())
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual('application/json', resp.content_type)
