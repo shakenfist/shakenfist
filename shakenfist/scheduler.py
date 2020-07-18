@@ -48,8 +48,7 @@ class Scheduler(object):
     def _has_sufficient_ram(self, memory, node):
         max_ram = (self.metrics[node].get('memory_max', 0) *
                    config.parsed.get('RAM_OVERCOMMIT_RATIO'))
-        current_ram = self.metrics[node].get(
-            'memory_total_instance_actual_memory', 0)
+        current_ram = self.metrics[node].get('memory_available', 0)
         if current_ram + memory > max_ram:
             return False
         return True
@@ -192,9 +191,9 @@ class Scheduler(object):
                 candidates = self._find_most_matching_networks(
                     requested_networks, candidates)
                 LOG.info('Scheduling %s, %s have most matching networks'
-                            % (instance, candidates))
+                         % (instance, candidates))
                 db.add_event('instance', instance.db_entry['uuid'],
-                                'schedule', 'Have most matching networks', None, str(candidates))
+                             'schedule', 'Have most matching networks', None, str(candidates))
 
             # What nodes have the base image already?
             requested_images = []
@@ -214,7 +213,7 @@ class Scheduler(object):
             if len(candidates) > 1 and net_node['fqdn'] in candidates:
                 candidates.remove(net_node['fqdn'])
                 LOG.info('Scheduling %s, %s are non-network nodes'
-                            % (instance, candidates))
+                         % (instance, candidates))
                 db.add_event('instance', instance.db_entry['uuid'],
                              'schedule', 'Are non-network nodes', None, str(candidates))
 
