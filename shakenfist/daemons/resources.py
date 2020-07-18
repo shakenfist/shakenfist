@@ -111,8 +111,8 @@ def _get_stats():
     retval.update({
         'cpu_total_instance_vcpus': total_instance_vcpus,
         'cpu_total_instance_cpu_time': total_instance_cpu_time,
-        'memory_total_instance_max_memory': total_instance_max_memory // 1024,
-        'memory_total_instance_actual_memory': total_instance_actual_memory // 1024,
+        'memory_total_instance_max': total_instance_max_memory // 1024,
+        'memory_total_instance_actual': total_instance_actual_memory // 1024,
         'instances_total': total_instances,
         'instances_active': total_active_instances,
     })

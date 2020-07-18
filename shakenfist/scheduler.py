@@ -56,7 +56,7 @@ class Scheduler(object):
 
         # ...Secondly, if we're using KSM and over committing memory, we shouldn't
         # overcommit more than by RAM_OVERCOMMIT_RATIO
-        instance_memory = (self.metrics[node].get('memory_total_instance_actual_memory', 0) +
+        instance_memory = (self.metrics[node].get('memory_total_instance_actual', 0) +
                            memory)
         if (instance_memory / self.metrics[node].get('memory_max', 0) >
                 config.parsed.get('RAM_OVERCOMMIT_RATIO')):
