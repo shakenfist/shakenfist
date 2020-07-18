@@ -100,14 +100,13 @@ def _get_stats():
         active = guest.isActive() == 1
         _, maxmem, mem, cpus, cpu_time = guest.info()
 
-        total_instances += 1
         if active:
+            total_instances += 1
             total_active_instances += 1
-
-        total_instance_max_memory += maxmem
-        total_instance_actual_memory += mem
-        total_instance_vcpus += cpus
-        total_instance_cpu_time += cpu_time
+            total_instance_max_memory += maxmem
+            total_instance_actual_memory += mem
+            total_instance_vcpus += cpus
+            total_instance_cpu_time += cpu_time
 
     retval.update({
         'cpu_total_instance_vcpus': total_instance_vcpus,
