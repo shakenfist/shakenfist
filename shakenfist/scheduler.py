@@ -46,11 +46,22 @@ class Scheduler(object):
         return True
 
     def _has_sufficient_ram(self, memory, node):
-        max_ram = (self.metrics[node].get('memory_max', 0) *
-                   config.parsed.get('RAM_OVERCOMMIT_RATIO'))
-        current_ram = self.metrics[node].get('memory_available', 0)
-        if current_ram + memory > max_ram:
+        # There are two things to track here... We must always have RAM_SYSTEM_RESERVATION
+        # gb of RAM for operating system tasks -- assume there is no overlap with existing
+        # VMs when checking this. Note as well that metrics are in MB...
+        available = (self.metrics[node].get('memory_available', 0) -
+                     (config.parsed.get('RAM_SYSTEM_RESERVATION') * 1024))
+        if available - memory < 0.0:
             return False
+
+        # ...Secondly, if we're using KSM and over committing memory, we shouldn't
+        # overcommit more than by RAM_OVERCOMMIT_RATIO
+        instance_memory = (self.metrics[node].get('memory_total_instance_actual_memory', 0) +
+                           memory)
+        if (instance_memory / self.metrics[node].get('memory_max', 0) >
+                config.parsed.get('RAM_OVERCOMMIT_RATIO')):
+            return False
+
         return True
 
     def _has_sufficient_disk(self, instance, node):
