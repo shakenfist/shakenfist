@@ -663,59 +663,84 @@ class Instances(Resource):
         if not SCHEDULER:
             SCHEDULER = scheduler.Scheduler()
 
-        # Have we been placed?
-        if not placed_on:
-            candidates = SCHEDULER.place_instance(instance, network)
-            if len(candidates) == 0:
-                db.add_event('instance', instance_uuid,
-                             'schedule', 'failed', None, 'insufficient resources')
-                db.update_instance_state(instance_uuid, 'error')
-                return error(507, 'insufficient capacity')
+        return self._instance_start(instance_uuid, instance, network, namespace, placed_on)
 
-            placed_on = candidates[0]
+    def _instance_start(self, instance_uuid, instance, network, namespace, placed_on):
+        # Nodes we have attempted to start on
+        attempts = []
 
-        else:
-            try:
-                candidates = SCHEDULER.place_instance(
-                    instance, network, candidates=[placed_on])
+        while len(attempts) < 3:
+            # Have we been placed?
+            if not placed_on:
+                candidates = SCHEDULER.place_instance(instance, network)
                 if len(candidates) == 0:
                     db.add_event('instance', instance_uuid,
                                  'schedule', 'failed', None, 'insufficient resources')
                     db.update_instance_state(instance_uuid, 'error')
                     return error(507, 'insufficient capacity')
-            except scheduler.CandidateNodeNotFoundException as e:
-                return error(404, 'node not found: %s' % e)
 
-        # Record placement
-        db.place_instance(instance_uuid, placed_on)
+                placement = candidates[0]
+
+            else:
+                try:
+                    candidates = SCHEDULER.place_instance(
+                        instance, network, candidates=[placed_on])
+                    if len(candidates) == 0:
+                        db.add_event('instance', instance_uuid,
+                                     'schedule', 'failed', None, 'insufficient resources')
+                        db.update_instance_state(instance_uuid, 'error')
+                        return error(507, 'insufficient capacity')
+                    placement = placed_on
+                except scheduler.CandidateNodeNotFoundException as e:
+                    return error(404, 'node not found: %s' % e)
+
+            # Record placement
+            db.place_instance(instance_uuid, placement)
+            db.add_event('instance', instance_uuid,
+                         'placement', None, None, placement)
+            attempts.append(placement)
+
+            # Have we been placed on a different node?
+            if not placement == config.parsed.get('NODE_NAME'):
+                resp = self._instance_start_remote(
+                    placement, instance_uuid, namespace)
+                if placed_on or resp.status_code == 200:
+                    return resp
+                placement = None
+            else:
+                return self._instance_start_local(instance_uuid, instance, network, namespace)
+
+        # Give up for real
         db.add_event('instance', instance_uuid,
-                     'placement', None, None, placed_on)
+                     'schedule', 'failed', None, 'insufficient resources after retries')
+        db.update_instance_state(instance_uuid, 'error')
+        return error(507, 'insufficient capacity after retries')
 
-        # Have we been placed on a different node?
-        if not placed_on == config.parsed.get('NODE_NAME'):
-            body = flask_get_post_body()
-            body['placed_on'] = placed_on
-            body['instance_uuid'] = instance_uuid
-            body['namespace'] = namespace
+    def _instance_start_remote(self, placed_on, instance_uuid, namespace):
+        body = flask_get_post_body()
+        body['placed_on'] = placed_on
+        body['instance_uuid'] = instance_uuid
+        body['namespace'] = namespace
 
-            token = util.get_api_token(
-                'http://%s:%d' % (placed_on, config.parsed.get('API_PORT')),
-                namespace=namespace)
-            r = requests.request('POST',
-                                 'http://%s:%d/instances'
-                                 % (placed_on,
-                                    config.parsed.get('API_PORT')),
-                                 data=json.dumps(body),
-                                 headers={'Authorization': token,
-                                          'User-Agent': util.get_user_agent()})
+        token = util.get_api_token(
+            'http://%s:%d' % (placed_on, config.parsed.get('API_PORT')),
+            namespace=namespace)
+        r = requests.request('POST',
+                             'http://%s:%d/instances'
+                             % (placed_on,
+                                config.parsed.get('API_PORT')),
+                             data=json.dumps(body),
+                             headers={'Authorization': token,
+                                      'User-Agent': util.get_user_agent()})
 
-            LOG.info('Returning proxied request: %d, %s'
-                     % (r.status_code, r.text))
-            resp = flask.Response(r.text,
-                                  mimetype='application/json')
-            resp.status_code = r.status_code
-            return resp
+        LOG.info('Returning proxied request: %d, %s'
+                 % (r.status_code, r.text))
+        resp = flask.Response(r.text,
+                              mimetype='application/json')
+        resp.status_code = r.status_code
+        return resp
 
+    def _instance_start_local(self, instance_uuid, instance, network, namespace):
         # Check we can get the required IPs
         nets = {}
         allocations = {}
