@@ -83,6 +83,13 @@ class monitor(object):
 
                 if domain_name not in seen:
                     instance_uuid = domain_name.split(':')[1]
+                    instance = db.get_instance(instance_uuid)
+
+                    if instance.get('state') == 'deleted':
+                        domain = conn.lookupByName(domain_name)
+                        domain.undefine()
+                        continue
+
                     db.place_instance(
                         instance_uuid, config.parsed.get('NODE_NAME'))
                     instance_path = os.path.join(
