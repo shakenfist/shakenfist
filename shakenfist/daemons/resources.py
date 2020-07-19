@@ -48,13 +48,27 @@ def _get_stats():
     except Exception:
         pass
 
-    # Memory info - libvirt returns memory in KiB
+    # System memory info, converting bytes to mb
+    stats = psutil.virtual_memory()
+    retval.update({
+        'memory_max': stats.total // 1024 // 1024,
+        'memory_available': stats.available // 1024 // 1024
+    })
+
+    # libvirt memory info, converting kb to mb
     memory_status = conn.getMemoryStats(
         libvirt.VIR_NODE_MEMORY_STATS_ALL_CELLS)
     retval.update({
-        'memory_max': memory_status['total'] // 1024,
-        'memory_available': memory_status['free'] // 1024,
+        'memory_max_libvirt': memory_status['total'] // 1024,
+        'memory_available_libvirt': memory_status['free'] // 1024,
     })
+
+    # Kernel Shared Memory (KSM) information
+    ksm_details = {}
+    for ent in os.listdir('/sys/kernel/mm/ksm'):
+        with open('/sys/kernel/mm/ksm/%s' % ent) as f:
+            ksm_details['memory_ksm_%s' % ent] = int(f.read().rstrip())
+    retval.update(ksm_details)
 
     # Disk info
     s = os.statvfs(config.parsed.get('STORAGE_PATH'))
@@ -86,20 +100,19 @@ def _get_stats():
         active = guest.isActive() == 1
         _, maxmem, mem, cpus, cpu_time = guest.info()
 
-        total_instances += 1
         if active:
+            total_instances += 1
             total_active_instances += 1
-
-        total_instance_max_memory += maxmem
-        total_instance_actual_memory += mem
-        total_instance_vcpus += cpus
-        total_instance_cpu_time += cpu_time
+            total_instance_max_memory += maxmem
+            total_instance_actual_memory += mem
+            total_instance_vcpus += cpus
+            total_instance_cpu_time += cpu_time
 
     retval.update({
         'cpu_total_instance_vcpus': total_instance_vcpus,
         'cpu_total_instance_cpu_time': total_instance_cpu_time,
-        'memory_total_instance_max_memory': total_instance_max_memory // 1024,
-        'memory_total_instance_actual_memory': total_instance_actual_memory // 1024,
+        'memory_total_instance_max': total_instance_max_memory // 1024,
+        'memory_total_instance_actual': total_instance_actual_memory // 1024,
         'instances_total': total_instances,
         'instances_active': total_active_instances,
     })

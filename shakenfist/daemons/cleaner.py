@@ -6,9 +6,12 @@ import os
 import setproctitle
 import time
 
+from oslo_concurrency import processutils
+
 from shakenfist import config
 from shakenfist import db
 from shakenfist import util
+from shakenfist import virt
 
 
 LOG = logging.getLogger(__file__)
@@ -34,9 +37,27 @@ class monitor(object):
                     continue
 
                 instance_uuid = domain.name().split(':')[1]
+                instance = db.get_instance(instance_uuid)
                 db.place_instance(
                     instance_uuid, config.parsed.get('NODE_NAME'))
                 seen.append(domain.name())
+
+                if instance.get('state') == 'deleted':
+                    db.instance_enforced_deletes_increment(instance_uuid)
+                    attempts = instance.get('enforced_deletes', 0)
+                    LOG.warning('Deleting stray instance %s (attempt %d)'
+                                % (instance_uuid, attempts))
+
+                    if attempts > 5:
+                        # Sometimes we just can't delete the VM. Try the big hammer instead.
+                        LOG.warning('Attempting alternate delete method for instance %s'
+                                    % instance_uuid)
+                        processutils.execute(
+                            'virsh destroy "sf:%s"' % instance_uuid, shell=True)
+                    else:
+                        i = virt.from_db(instance_uuid)
+                        i.delete()
+                    continue
 
                 state = domain.state()
                 if state == libvirt.VIR_DOMAIN_SHUTOFF:
@@ -62,6 +83,13 @@ class monitor(object):
 
                 if domain_name not in seen:
                     instance_uuid = domain_name.split(':')[1]
+                    instance = db.get_instance(instance_uuid)
+
+                    if instance.get('state') == 'deleted':
+                        domain = conn.lookupByName(domain_name)
+                        domain.undefine()
+                        continue
+
                     db.place_instance(
                         instance_uuid, config.parsed.get('NODE_NAME'))
                     instance_path = os.path.join(

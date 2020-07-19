@@ -40,10 +40,14 @@ CONFIG_DEFAULTS = {
     # Scheduler options:
     #  - scheduler_cache_timeout: how long the scheduler should cache things for
     #  - cpu_overcommit_ratio: how many vCPUS per real CPU
-    #  - ram_overcommit_ratio: how much vRAM per real unit of RAM
+    #  - ram_overcommit_ratio: how much vRAM per real unit of RAM, that is if
+    #    Kernel Shared Memory (KSM) is enabled, how much to overcommit memory
+    #    because of shared pages.
+    #  - ram_system_reservation: how much RAM is reserved for the OS
     'SCHEDULER_CACHE_TIMEOUT': 30,
     'CPU_OVERCOMMIT_RATIO': 16,
-    'RAM_OVERCOMMIT_RATIO': 0.9,
+    'RAM_OVERCOMMIT_RATIO': 1.5,
+    'RAM_SYSTEM_RESERVATION': 5.0,
 
     # Network options:
     #  - floating_network: a network block used for NAT egress from VMs and
