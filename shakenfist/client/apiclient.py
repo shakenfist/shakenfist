@@ -1,3 +1,4 @@
+import errno
 import json
 import logging
 import os
@@ -72,12 +73,16 @@ class Client(object):
                     base_url = d['apiurl']
 
         if not namespace:
-            if os.path.exists('/etc/sf/shakenfist.json'):
-                with open('/etc/sf/shakenfist.json') as f:
-                    d = json.loads(f.read())
-                    namespace = d['namespace']
-                    key = d['key']
-                    base_url = d['apiurl']
+            try:
+                if os.path.exists('/etc/sf/shakenfist.json'):
+                    with open('/etc/sf/shakenfist.json') as f:
+                        d = json.loads(f.read())
+                        namespace = d['namespace']
+                        key = d['key']
+                        base_url = d['apiurl']
+            except IOError as e:
+                if e.errno != errno.EACCES:
+                    raise
 
         self.base_url = base_url
         self.namespace = namespace
