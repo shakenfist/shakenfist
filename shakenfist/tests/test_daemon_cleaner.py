@@ -92,13 +92,16 @@ class CleanerTestCase(testtools.TestCase):
             'shakenfist.util.get_libvirt',
             return_value=FakeLibvirt())
         self.mock_libvirt = self.libvirt.start()
+        self.addCleanup(self.libvirt.stop)
 
         self.proctitle = mock.patch('setproctitle.setproctitle')
         self.mock_proctitle = self.proctitle.start()
+        self.addCleanup(self.proctitle.stop)
 
         self.config = mock.patch('shakenfist.config.parsed.get',
                                  fake_config)
         self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
 
     @mock.patch('shakenfist.db.see_this_node')
     @mock.patch('shakenfist.etcd.get', side_effect=fake_get)

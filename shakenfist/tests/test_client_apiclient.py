@@ -14,6 +14,7 @@ class ApiClientTestCase(testtools.TestCase):
         self.request_url = mock.patch(
             'shakenfist.client.apiclient.Client._request_url')
         self.mock_request = self.request_url.start()
+        self.addCleanup(self.request_url.stop)
 
     def test_get_instances(self):
         client = apiclient.Client()

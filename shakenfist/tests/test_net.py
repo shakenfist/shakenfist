@@ -12,16 +12,21 @@ class NetTestCase(testtools.TestCase):
         self.ipmanager_get = mock.patch(
             'shakenfist.db.get_ipmanager')
         self.mock_ipmanager_get = self.ipmanager_get.start()
+        self.addCleanup(self.ipmanager_get.stop)
 
         self.ipmanager_persist = mock.patch(
             'shakenfist.db.persist_ipmanager')
         self.mock_ipmanager_persist = self.ipmanager_persist.start()
+        self.addCleanup(self.ipmanager_persist.stop)
 
         self.etcd_client = mock.patch('etcd3.client')
         self.mock_etcd_client = self.etcd_client.start()
+        self.addCleanup(self.etcd_client.stop)
 
         self.etcd_lock = mock.patch('etcd3.Lock')
         self.mock_etcd_lock = self.etcd_lock.start()
+        self.addCleanup(self.etcd_lock.stop)
+
 
     def test_init(self):
         net.Network(uuid='notauuid', vxlan_id=42, provide_dhcp=True,
