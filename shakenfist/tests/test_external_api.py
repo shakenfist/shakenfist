@@ -25,6 +25,11 @@ class FakeScheduler(object):
         return config.parsed.get('NODE_NAME')
 
 
+class FakeInstance(object):
+    def __init__(self, namespace=None):
+        self.db_entry = {'namespace': namespace}
+
+
 def _encode_key(key):
     return bcrypt.hashpw(key.encode('utf-8'), bcrypt.gensalt())
 
@@ -71,7 +76,7 @@ class AuthTestCase(testtools.TestCase):
         self.assertEqual(400, resp.status_code)
         self.assertEqual(
             {
-                'error': "post() got an unexpected keyword argument 'keyyy'",
+                'error': 'post() got an unexpected keyword argument \'keyyy\'',
                 'status': 400
             },
             _clean_traceback(resp.get_json()))
@@ -143,7 +148,7 @@ class AuthTestCase(testtools.TestCase):
                                 }))
         self.assertEqual(
             {
-                'error': "Bad Authorization header. Expected value 'Bearer <JWT>'",
+                'error': 'Bad Authorization header. Expected value \'Bearer <JWT>\'',
                 'status': 401
             },
             _clean_traceback(resp.get_json()))
@@ -647,33 +652,33 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
 
     @mock.patch('shakenfist.db.get_nodes',
                 return_value=[{
-                                'fqdn': 'sf-1',
-                                'ip': '192.168.72.240',
-                                'lastseen': 1594952905.2100437,
-                                'version': '0.0.1'
-                              },
-                              {
-                                'fqdn': 'sf-2',
-                                'ip': '192.168.72.230',
-                                'lastseen': 1594952904.8870885,
-                                'version': '0.0.1'
-                               }])
+                    'fqdn': 'sf-1',
+                    'ip': '192.168.72.240',
+                    'lastseen': 1594952905.2100437,
+                    'version': '0.0.1'
+                },
+                    {
+                    'fqdn': 'sf-2',
+                    'ip': '192.168.72.230',
+                    'lastseen': 1594952904.8870885,
+                    'version': '0.0.1'
+                }])
     def test_get_node(self, mock_md_get):
         resp = self.client.get('/nodes',
                                headers={'Authorization': self.auth_header})
         self.assertEqual([{
-                            'name': 'sf-1',
-                            'ip': '192.168.72.240',
-                            'lastseen': 1594952905.2100437,
-                            'version': '0.0.1'
-                          },
-                          {
-                            'name': 'sf-2',
-                            'ip': '192.168.72.230',
-                            'lastseen': 1594952904.8870885,
-                            'version': '0.0.1'
-                          }],
-                         resp.get_json())
+            'name': 'sf-1',
+            'ip': '192.168.72.240',
+            'lastseen': 1594952905.2100437,
+            'version': '0.0.1'
+        },
+            {
+            'name': 'sf-2',
+            'ip': '192.168.72.230',
+            'lastseen': 1594952904.8870885,
+            'version': '0.0.1'
+        }],
+            resp.get_json())
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
 
@@ -693,20 +698,20 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
     @mock.patch('shakenfist.external_api.app._delete_instance')
     @mock.patch('shakenfist.db.get_instances',
                 return_value=[{
-                                'namespace': 'system',
-                                'node': 'sf-2',
-                                'power_state': 'initial',
-                                'state': 'created',
-                                'uuid': '6a973b82-31b3-4780-93e4-04d99ae49f3f',
-                              },
-                              {
-                                'name': 'timma',
-                                'namespace': 'system',
-                                'node': 'sf-2',
-                                'power_state': 'initial',
-                                'state': 'created',
-                                'uuid': '847b0327-9b17-4148-b4ed-be72b6722c17',
-                              }])
+                    'namespace': 'system',
+                    'node': 'sf-2',
+                    'power_state': 'initial',
+                    'state': 'created',
+                    'uuid': '6a973b82-31b3-4780-93e4-04d99ae49f3f',
+                },
+                    {
+                    'name': 'timma',
+                    'namespace': 'system',
+                    'node': 'sf-2',
+                    'power_state': 'initial',
+                    'state': 'created',
+                    'uuid': '847b0327-9b17-4148-b4ed-be72b6722c17',
+                }])
     @mock.patch('shakenfist.etcd.put')
     @mock.patch('shakenfist.db.get_lock')
     def test_delete_all_instances(self,
@@ -718,8 +723,8 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         resp = self.client.delete('/instances',
                                   headers={'Authorization': self.auth_header},
                                   data=json.dumps({
-                                    'confirm': True,
-                                    'namespace': 'foo'
+                                      'confirm': True,
+                                      'namespace': 'foo'
                                   }))
         self.assertEqual(['6a973b82-31b3-4780-93e4-04d99ae49f3f',
                           '847b0327-9b17-4148-b4ed-be72b6722c17'],
@@ -729,20 +734,20 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
     @mock.patch('shakenfist.external_api.app._delete_instance')
     @mock.patch('shakenfist.db.get_instances',
                 return_value=[{
-                                'namespace': 'system',
-                                'node': 'sf-2',
-                                'power_state': 'initial',
-                                'state': 'deleted',
-                                'uuid': '6a973b82-31b3-4780-93e4-04d99ae49f3f',
-                              },
-                              {
-                                'name': 'timma',
-                                'namespace': 'system',
-                                'node': 'sf-2',
-                                'power_state': 'initial',
-                                'state': 'created',
-                                'uuid': '847b0327-9b17-4148-b4ed-be72b6722c17',
-                              }])
+                    'namespace': 'system',
+                    'node': 'sf-2',
+                    'power_state': 'initial',
+                    'state': 'deleted',
+                    'uuid': '6a973b82-31b3-4780-93e4-04d99ae49f3f',
+                },
+                    {
+                    'name': 'timma',
+                    'namespace': 'system',
+                    'node': 'sf-2',
+                    'power_state': 'initial',
+                    'state': 'created',
+                    'uuid': '847b0327-9b17-4148-b4ed-be72b6722c17',
+                }])
     @mock.patch('shakenfist.etcd.put')
     @mock.patch('shakenfist.db.get_lock')
     def test_delete_all_instances_one_already_deleted(self,
@@ -754,11 +759,206 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         resp = self.client.delete('/instances',
                                   headers={'Authorization': self.auth_header},
                                   data=json.dumps({
-                                    'confirm': True,
-                                    'namespace': 'foo'
+                                      'confirm': True,
+                                      'namespace': 'foo'
                                   }))
         self.assertEqual(['847b0327-9b17-4148-b4ed-be72b6722c17'],
                          resp.get_json())
+        self.assertEqual(200, resp.status_code)
+
+    def test_post_instance_no_disk(self):
+        resp = self.client.post('/instances',
+                                headers={'Authorization': self.auth_header},
+                                data=json.dumps({
+                                    'name': 'test instance',
+                                    'cpus': 1,
+                                    'memory': 1024,
+                                    'network': [],
+                                    'disk': None,
+                                    'ssh_key': None,
+                                    'user_data': None,
+                                    'placed_on': None,
+                                    'namespace': None,
+                                    'instance_uuid': None
+                                }))
+        self.assertEqual(
+            {'error': 'instance must specify at least one disk', 'status': 400},
+            resp.get_json())
+        self.assertEqual(400, resp.status_code)
+
+    def test_post_instance_invalid_disk(self):
+        resp = self.client.post('/instances',
+                                headers={'Authorization': self.auth_header},
+                                data=json.dumps({
+                                    'name': 'test instance',
+                                    'cpus': 1,
+                                    'memory': 1024,
+                                    'network': [],
+                                    'disk': ['8@cirros'],
+                                    'ssh_key': None,
+                                    'user_data': None,
+                                    'placed_on': None,
+                                    'namespace': None,
+                                    'instance_uuid': None
+                                }))
+        self.assertEqual(
+            {'error': 'disk specification should contain JSON objects', 'status': 400},
+            resp.get_json())
+        self.assertEqual(400, resp.status_code)
+
+    def test_post_instance_invalid_network(self):
+        resp = self.client.post('/instances',
+                                headers={'Authorization': self.auth_header},
+                                data=json.dumps({
+                                    'name': 'test instance',
+                                    'cpus': 1,
+                                    'memory': 1024,
+                                    'network': ['87c15186-5f73-4947-a9fb-2183c4951efc'],
+                                    'disk': [{'size': 8,
+                                              'base': 'cirros'}],
+                                    'ssh_key': None,
+                                    'user_data': None,
+                                    'placed_on': None,
+                                    'namespace': None,
+                                    'instance_uuid': None
+                                }))
+        self.assertEqual(
+            {'error': 'network specification should contain JSON objects', 'status': 400},
+            resp.get_json())
+        self.assertEqual(400, resp.status_code)
+
+    def test_post_instance_invalid_network_uuid(self):
+        resp = self.client.post('/instances',
+                                headers={'Authorization': self.auth_header},
+                                data=json.dumps({
+                                    'name': 'test instance',
+                                    'cpus': 1,
+                                    'memory': 1024,
+                                    'network': [
+                                        {'uuid': '87c15186-5f73-4947-a9fb-2183c4951efc'}],
+                                    'disk': [{'size': 8,
+                                              'base': 'cirros'}],
+                                    'ssh_key': None,
+                                    'user_data': None,
+                                    'placed_on': None,
+                                    'namespace': None,
+                                    'instance_uuid': None
+                                }))
+        self.assertEqual(
+            {'error': 'network specification is missing network_uuid', 'status': 400},
+            resp.get_json())
+        self.assertEqual(400, resp.status_code)
+
+    def test_post_instance_only_system_allocates_uuids(self):
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'banana', 'key': 'foo'}))
+        self.assertEqual(200, resp.status_code)
+        non_system_auth_header = 'Bearer %s' % resp.get_json()['access_token']
+
+        resp = self.client.post('/instances',
+                                headers={
+                                    'Authorization': non_system_auth_header},
+                                data=json.dumps({
+                                    'name': 'test instance',
+                                    'cpus': 1,
+                                    'memory': 1024,
+                                    'network': [
+                                        {'network_uuid': '87c15186-5f73-4947-a9fb-2183c4951efc'}],
+                                    'disk': [{'size': 8,
+                                              'base': 'cirros'}],
+                                    'ssh_key': None,
+                                    'user_data': None,
+                                    'placed_on': None,
+                                    'namespace': None,
+                                    'instance_uuid': 'cbc58e78-d9ec-4cd5-b417-f715849126e1'
+                                }))
+        self.assertEqual(
+            {'error': 'Only system can specify an instance uuid', 'status': 401},
+            resp.get_json())
+        self.assertEqual(401, resp.status_code)
+
+    def test_post_instance_only_system_specifies_namespaces(self):
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'banana', 'key': 'foo'}))
+        self.assertEqual(200, resp.status_code)
+        non_system_auth_header = 'Bearer %s' % resp.get_json()['access_token']
+
+        resp = self.client.post('/instances',
+                                headers={
+                                    'Authorization': non_system_auth_header},
+                                data=json.dumps({
+                                    'name': 'test instance',
+                                    'cpus': 1,
+                                    'memory': 1024,
+                                    'network': [
+                                        {'network_uuid': '87c15186-5f73-4947-a9fb-2183c4951efc'}],
+                                    'disk': [{'size': 8,
+                                              'base': 'cirros'}],
+                                    'ssh_key': None,
+                                    'user_data': None,
+                                    'placed_on': None,
+                                    'namespace': 'gerkin',
+                                    'instance_uuid': None
+                                }))
+        self.assertEqual(
+            {'error': 'Only admins can create resources in a different namespace',
+             'status': 401},
+            resp.get_json())
+        self.assertEqual(401, resp.status_code)
+
+    @mock.patch('shakenfist.virt.from_db', return_value=FakeInstance(namespace='foo'))
+    @mock.patch('shakenfist.db.add_event')
+    def test_post_instance_fails_ownership(self, mock_virt_from_db, mock_event):
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'banana', 'key': 'foo'}))
+        self.assertEqual(200, resp.status_code)
+        non_system_auth_header = 'Bearer %s' % resp.get_json()['access_token']
+
+        resp = self.client.post('/instances',
+                                headers={
+                                    'Authorization': non_system_auth_header},
+                                data=json.dumps({
+                                    'name': 'test instance',
+                                    'cpus': 1,
+                                    'memory': 1024,
+                                    'network': [
+                                        {'network_uuid': '87c15186-5f73-4947-a9fb-2183c4951efc'}],
+                                    'disk': [{'size': 8,
+                                              'base': 'cirros'}],
+                                    'ssh_key': None,
+                                    'user_data': None,
+                                    'placed_on': None,
+                                    'namespace': None,
+                                    'instance_uuid': None
+                                }))
+        self.assertEqual({'error': 'instance not found',
+                          'status': 404}, resp.get_json())
+        self.assertEqual(404, resp.status_code)
+
+    @mock.patch('shakenfist.external_api.app.Instances._instance_start',
+                return_value={'out': 'instance start results'})
+    @mock.patch('shakenfist.virt.from_definition')
+    @mock.patch('shakenfist.virt.from_db', return_value=None)
+    @mock.patch('shakenfist.db.add_event')
+    def test_post_instance(self, mock_start, mock_virt_from_defn, mock_virt_from_db, mock_event):
+        resp = self.client.post('/instances',
+                                headers={
+                                    'Authorization': self.auth_header},
+                                data=json.dumps({
+                                    'name': 'test instance',
+                                    'cpus': 1,
+                                    'memory': 1024,
+                                    'network': [
+                                        {'network_uuid': '87c15186-5f73-4947-a9fb-2183c4951efc'}],
+                                    'disk': [{'size': 8,
+                                              'base': 'cirros'}],
+                                    'ssh_key': None,
+                                    'user_data': None,
+                                    'placed_on': None,
+                                    'namespace': None,
+                                    'instance_uuid': None
+                                }))
+        self.assertEqual({'out': 'instance start results'}, resp.get_json())
         self.assertEqual(200, resp.status_code)
 
 
@@ -785,11 +985,11 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
 
     @mock.patch('shakenfist.db.get_networks',
                 return_value=[{
-                                'floating_gateway': '10.10.0.150',
-                                'name': 'bob',
-                                'state': 'created',
-                                'uuid': '30f6da44-look-i-am-uuid',
-                                }])
+                    'floating_gateway': '10.10.0.150',
+                    'name': 'bob',
+                    'state': 'created',
+                    'uuid': '30f6da44-look-i-am-uuid',
+                }])
     @mock.patch('shakenfist.db.get_network_interfaces', return_value=[])
     @mock.patch('shakenfist.db.get_ipmanager',
                 return_value=ipmanager.NetBlock('10.0.0.0/24'))
@@ -816,8 +1016,8 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
         resp = self.client.delete('/networks',
                                   headers={'Authorization': self.auth_header},
                                   data=json.dumps({
-                                    'confirm': True,
-                                    'namespace': 'foo'
+                                      'confirm': True,
+                                      'namespace': 'foo'
                                   }))
         self.assertEqual(['30f6da44-look-i-am-uuid'],
                          resp.get_json())
@@ -827,11 +1027,11 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
 
     @mock.patch('shakenfist.db.get_networks',
                 return_value=[{
-                                'floating_gateway': '10.10.0.150',
-                                'name': 'bob',
-                                'state': 'deleted',
-                                'uuid': '30f6da44-look-i-am-uuid',
-                                }])
+                    'floating_gateway': '10.10.0.150',
+                    'name': 'bob',
+                    'state': 'deleted',
+                    'uuid': '30f6da44-look-i-am-uuid',
+                }])
     @mock.patch('shakenfist.db.get_network_interfaces', return_value=[])
     @mock.patch('shakenfist.db.get_ipmanager',
                 return_value=ipmanager.NetBlock('10.0.0.0/24'))
@@ -849,9 +1049,7 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
         resp = self.client.delete('/networks',
                                   headers={'Authorization': self.auth_header},
                                   data=json.dumps({
-                                    'confirm': True,
-                                    'namespace': 'foo'
+                                      'confirm': True,
+                                      'namespace': 'foo'
                                   }))
-        self.assertEqual([],
-                         resp.get_json())
-        self.assertEqual(200, resp.status_code)
+        self.assertEqual([], resp.get_json())

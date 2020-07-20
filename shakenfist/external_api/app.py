@@ -636,10 +636,14 @@ class Instances(Resource):
         if not namespace:
             namespace = get_jwt_identity()
 
+        # Only system can specify a uuid
+        if instance_uuid and get_jwt_identity() != 'system':
+            return error(401, 'Only system can specify an instance uuid')
+
         # If accessing a foreign namespace, we need to be an admin
         if get_jwt_identity() not in [namespace, 'system']:
             return error(401,
-                         'only admins can create resources in a different namespace')
+                         'Only admins can create resources in a different namespace')
 
         # The instance needs to exist in the DB before network interfaces are created
         if not instance_uuid:
