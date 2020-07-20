@@ -38,6 +38,7 @@ class VirtTestCase(testtools.TestCase):
         self.config = mock.patch('shakenfist.config.parsed.get',
                                  fake_config)
         self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
 
         # self.libvirt = mock.patch('libvirt')
         # self.mock_libvirt = self.libvirt.start()

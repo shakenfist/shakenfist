@@ -48,10 +48,12 @@ class DHCPTestCase(testtools.TestCase):
         self.config = mock.patch('shakenfist.config.parsed.get',
                                  fake_config)
         self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
 
         self.network = mock.patch('shakenfist.net.from_db',
                                   return_value=FakeNetwork())
         self.mock_network = self.network.start()
+        self.addCleanup(self.network.stop)
 
         with open('%s/files/dhcp.tmpl' % TEST_DIR) as f:
             dhcp_tmpl = f.read()
@@ -64,9 +66,11 @@ class DHCPTestCase(testtools.TestCase):
             if filename == 'dhcphosts.tmpl':
                 return jinja2.Template(dhcphosts_tmpl)
             raise Exception('Unknown template')
+
         self.template = mock.patch('shakenfist.dhcp.DHCP._read_template',
                                    fake_read_template)
         self.mock_template = self.template.start()
+        self.addCleanup(self.template.stop)
 
     def test_init(self):
         d = dhcp.DHCP('notauuid', 'eth0')
