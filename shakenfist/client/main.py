@@ -27,38 +27,37 @@ class GroupCatchExceptions(click.Group):
             return self.main(*args, **kwargs)
 
         except apiclient.RequestMalformedException as e:
-            click.echo("ERROR: Malformed Request: %s" % error_text(e.text))
+            click.echo('ERROR: Malformed Request: %s' % error_text(e.text))
             sys.exit(1)
 
         except apiclient.UnauthorizedException:
-            click.echo("ERROR: Not authorized")
+            click.echo('ERROR: Not authorized')
             sys.exit(1)
 
         except apiclient.ResourceCannotBeDeletedException as e:
-            click.echo("ERROR: Cannot delete resource: %s" %
-                       error_text(e.text))
+            click.echo('ERROR: Cannot delete resource: %s' % error_text(e.text))
             sys.exit(1)
 
         except apiclient.ResourceNotFoundException as e:
-            click.echo("ERROR: Resource not found: %s" % error_text(e.text))
+            click.echo('ERROR: Resource not found: %s' % error_text(e.text))
             sys.exit(1)
 
         except apiclient.ResourceInUseException as e:
-            click.echo("ERROR: Resource in use:\n%s" % error_text(e.text))
+            click.echo('ERROR: Resource in use:\n%s' % error_text(e.text))
             sys.exit(1)
 
         except apiclient.InternalServerError as e:
             # Print full error since server should not fail
-            click.echo("ERROR: Internal Server Error:\n%s" % e.text)
+            click.echo('ERROR: Internal Server Error:\n%s' % e.text)
             sys.exit(1)
 
         except apiclient.InsufficientResourcesException as e:
-            click.echo("ERROR: Insufficient Resources:\n%s" %
+            click.echo('ERROR: Insufficient Resources:\n%s' %
                        error_text(e.text))
             sys.exit(1)
 
         except apiclient.requests.exceptions.ConnectionError as e:
-            click.echo("ERROR: Unable to connect to server: %s" % e)
+            click.echo('ERROR: Unable to connect to server: %s' % e)
 
 
 def error_text(json_text):
@@ -77,7 +76,7 @@ def auto_complete(func):
 
     if not CLIENT:
         CLIENT = apiclient.Client(
-            namespace=os.getenv("SHAKENFIST_NAMESPACE"),
+            namespace=os.getenv('SHAKENFIST_NAMESPACE'),
             key=os.getenv('SHAKENFIST_KEY'),
             base_url=os.getenv('SHAKENFIST_API_URL', 'http://localhost:13000'),
         )
@@ -255,13 +254,13 @@ def namespace_show(ctx, namespace=None):
 
 
 @namespace.command(name='clean',
-                   help=('Clean (delete) namespace of all instances and networks\n\n'))
+                   help=('Clean (delete) namespace of all instances and networks'))
 @click.option('--confirm',  is_flag=True)
 @click.option('--namespace', type=click.STRING)
 @click.pass_context
 def namespace_clean(ctx, confirm=False, namespace=None):
     if not confirm:
-        print("You must be sure. Use option --confirm.")
+        print('You must be sure. Use option --confirm.')
         return
 
     CLIENT.delete_all_instances(namespace)
@@ -446,7 +445,7 @@ def network_create(ctx, netblock=None, name=None, dhcp=None, nat=None, namespace
 @click.pass_context
 def network_delete_all(ctx, confirm=False, namespace=None):
     if not confirm:
-        print("You must be sure. Use option --confirm.")
+        print('You must be sure. Use option --confirm.')
         return
 
     CLIENT.delete_all_networks(namespace)
@@ -748,7 +747,7 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networ
         try:
             size_int = int(size)
         except:
-            print("Disk size is not an integer")
+            print('Disk size is not an integer')
             return
 
         diskdefs.append({
@@ -762,7 +761,8 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networ
         for elem in d.split(','):
             s = elem.split('=')
             if len(s) != 2:
-                print('Error in disk specification - should be key=value: %s' % elem)
+                print('Error in disk specification -'
+                      ' should be key=value: %s' % elem)
                 return
             defn[s[0]] = s[1]
         diskdefs.append(defn)
@@ -781,7 +781,8 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networ
         for elem in n.split(','):
             s = elem.split('=')
             if len(s) != 2:
-                print("Error in network specification - should be key=value: %s" % elem)
+                print('Error in network specification -'
+                      ' should be key=value: %s' % elem)
                 return
             defn[s[0]] = s[1]
         netdefs.append(defn)
@@ -808,7 +809,7 @@ def instance_delete(ctx, instance_uuid=None):
 @click.pass_context
 def instance_delete_all(ctx, confirm=False, namespace=None):
     if not confirm:
-        print("You must be sure. Use option --confirm.")
+        print('You must be sure. Use option --confirm.')
         return
 
     CLIENT.delete_all_instances(namespace)
