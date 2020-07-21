@@ -113,8 +113,8 @@ def generic_wrapper(func):
             return error(400, str(e))
 
         except DecodeError:
-            # Send a more informative message than "Not enough segments"
-            return error(401, "Invalid JWT in Authorization Header")
+            # Send a more informative message than 'Not enough segments'
+            return error(401, 'invalid JWT in Authorization header')
 
         except (JWTDecodeError,
                 NoAuthorizationError,
@@ -128,7 +128,7 @@ def generic_wrapper(func):
             return error(401, str(e))
 
         except Exception:
-            return error(500, 'Server Error')
+            return error(500, 'server error')
 
     return wrapper
 
@@ -138,7 +138,7 @@ class Resource(flask_restful.Resource):
 
 
 def caller_is_admin(func):
-    # Ensure only users in the "system" namespace can call this method
+    # Ensure only users in the 'system' namespace can call this method
     def wrapper(*args, **kwargs):
         if get_jwt_identity() != 'system':
             return error(401, 'unauthorized')
@@ -618,19 +618,19 @@ class Instances(Resource):
 
         # Sanity check
         if not disk:
-            return error(400, "Instance must specify at least one disk")
+            return error(400, 'instance must specify at least one disk')
         for d in disk:
             if not isinstance(d, dict):
-                return error(400, "Disk specification should contain JSON objects")
+                return error(400, 'disk specification should contain JSON objects')
 
         if network:
             for n in network:
                 if not isinstance(n, dict):
                     return error(400,
-                                 "Network specification should contain JSON objects")
+                                 'network specification should contain JSON objects')
 
                 if 'network_uuid' not in n:
-                    return error(400, "Network specification is missing network_uuid")
+                    return error(400, 'network specification is missing network_uuid')
 
         if not namespace:
             namespace = get_jwt_identity()
@@ -820,23 +820,24 @@ class Instances(Resource):
 
     @jwt_required
     def delete(self, confirm=False, namespace=None):
-        '''Delete all instances in namespace
-        '''
+        """Delete all instances in the namespace."""
+
         if confirm != True:
-            return error(400, "Parameter confirm is not set true")
+            return error(400, 'parameter confirm is not set true')
 
         if get_jwt_identity() == 'system':
             if not isinstance(namespace, str):
-                return error(400, "system user must specify parameter namespace")
-            # If the system user wishes to delete all instances, then as
-            # confirmation of intention set the namespace parameter to system.
+                # A client using a system key must specify the namespace. This
+                # ensures that deleting all instances in the cluster (by
+                # specifying namespace='system') is a deliberate act.
+                return error(400, 'system user must specify parameter namespace')
 
         else:
             if namespace and namespace != get_jwt_identity():
-                return error(401, "you cannot delete other namespaces")
+                return error(401, 'you cannot delete other namespaces')
             namespace = get_jwt_identity()
 
-        instances_del =[]
+        instances_del = []
         for instance in list(db.get_instances(all=all, namespace=namespace)):
             if instance['state'] == 'deleted':
                 continue
@@ -1266,20 +1267,21 @@ class Networks(Resource):
     @jwt_required
     @redirect_to_network_node
     def delete(self, confirm=False, namespace=None):
-        '''Delete all networks in namespace
-        '''
+        """Delete all networks in the namespace."""
+
         if confirm != True:
-            return error(400, "Parameter confirm is not set true")
+            return error(400, 'parameter confirm is not set true')
 
         if get_jwt_identity() == 'system':
             if not isinstance(namespace, str):
-                return error(400, "system user must specify parameter namespace")
-            # If the system user wishes to delete all instances, then as
-            # confirmation of intention set the namespace parameter to system.
+                # A client using a system key must specify the namespace. This
+                # ensures that deleting all networks in the cluster (by
+                # specifying namespace='system') is a deliberate act.
+                return error(400, 'system user must specify parameter namespace')
 
         else:
             if namespace and namespace != get_jwt_identity():
-                return error(401, "you cannot delete other namespaces")
+                return error(401, 'you cannot delete other namespaces')
             namespace = get_jwt_identity()
 
         networks_del =[]

@@ -137,7 +137,7 @@ class AuthTestCase(testtools.TestCase):
 
     def test_auth_header_wrong(self):
         resp = self.client.post('/auth/namespaces',
-                                headers={'Authorization': "l33thacker"},
+                                headers={'Authorization': 'l33thacker'},
                                 data=json.dumps({
                                     'namespace': 'foo'
                                 }))
@@ -151,13 +151,13 @@ class AuthTestCase(testtools.TestCase):
 
     def test_auth_header_bad_jwt(self):
         resp = self.client.post('/auth/namespaces',
-                                headers={'Authorization': "Bearer l33thacker"},
+                                headers={'Authorization': 'Bearer l33thacker'},
                                 data=json.dumps({
                                     'namespace': 'foo'
                                 }))
         self.assertEqual(
             {
-                'error': "Invalid JWT in Authorization Header",
+                'error': 'invalid JWT in Authorization header',
                 'status': 401
             },
             _clean_traceback(resp.get_json()))
@@ -647,31 +647,31 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
 
     @mock.patch('shakenfist.db.get_nodes',
                 return_value=[{
-                                "fqdn": "sf-1",
-                                "ip": "192.168.72.240",
-                                "lastseen": 1594952905.2100437,
-                                "version": "0.0.1"
+                                'fqdn': 'sf-1',
+                                'ip': '192.168.72.240',
+                                'lastseen': 1594952905.2100437,
+                                'version': '0.0.1'
                               },
                               {
-                                "fqdn": "sf-2",
-                                "ip": "192.168.72.230",
-                                "lastseen": 1594952904.8870885,
-                                "version": "0.0.1"
+                                'fqdn': 'sf-2',
+                                'ip': '192.168.72.230',
+                                'lastseen': 1594952904.8870885,
+                                'version': '0.0.1'
                                }])
     def test_get_node(self, mock_md_get):
         resp = self.client.get('/nodes',
                                headers={'Authorization': self.auth_header})
         self.assertEqual([{
-                            "name": "sf-1",
-                            "ip": "192.168.72.240",
-                            "lastseen": 1594952905.2100437,
-                            "version": "0.0.1"
+                            'name': 'sf-1',
+                            'ip': '192.168.72.240',
+                            'lastseen': 1594952905.2100437,
+                            'version': '0.0.1'
                           },
                           {
-                            "name": "sf-2",
-                            "ip": "192.168.72.230",
-                            "lastseen": 1594952904.8870885,
-                            "version": "0.0.1"
+                            'name': 'sf-2',
+                            'ip': '192.168.72.230',
+                            'lastseen': 1594952904.8870885,
+                            'version': '0.0.1'
                           }],
                          resp.get_json())
         self.assertEqual(200, resp.status_code)
@@ -693,19 +693,19 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
     @mock.patch('shakenfist.external_api.app._delete_instance')
     @mock.patch('shakenfist.db.get_instances',
                 return_value=[{
-                                "namespace": "system",
-                                "node": "sf-2",
-                                "power_state": "initial",
-                                "state": "created",
-                                "uuid": "6a973b82-31b3-4780-93e4-04d99ae49f3f",
+                                'namespace': 'system',
+                                'node': 'sf-2',
+                                'power_state': 'initial',
+                                'state': 'created',
+                                'uuid': '6a973b82-31b3-4780-93e4-04d99ae49f3f',
                               },
                               {
-                                "name": "timma",
-                                "namespace": "system",
-                                "node": "sf-2",
-                                "power_state": "initial",
-                                "state": "created",
-                                "uuid": "847b0327-9b17-4148-b4ed-be72b6722c17",
+                                'name': 'timma',
+                                'namespace': 'system',
+                                'node': 'sf-2',
+                                'power_state': 'initial',
+                                'state': 'created',
+                                'uuid': '847b0327-9b17-4148-b4ed-be72b6722c17',
                               }])
     @mock.patch('shakenfist.etcd.put')
     @mock.patch('shakenfist.db.get_lock')
@@ -729,19 +729,19 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
     @mock.patch('shakenfist.external_api.app._delete_instance')
     @mock.patch('shakenfist.db.get_instances',
                 return_value=[{
-                                "namespace": "system",
-                                "node": "sf-2",
-                                "power_state": "initial",
-                                "state": "deleted",
-                                "uuid": "6a973b82-31b3-4780-93e4-04d99ae49f3f",
+                                'namespace': 'system',
+                                'node': 'sf-2',
+                                'power_state': 'initial',
+                                'state': 'deleted',
+                                'uuid': '6a973b82-31b3-4780-93e4-04d99ae49f3f',
                               },
                               {
-                                "name": "timma",
-                                "namespace": "system",
-                                "node": "sf-2",
-                                "power_state": "initial",
-                                "state": "created",
-                                "uuid": "847b0327-9b17-4148-b4ed-be72b6722c17",
+                                'name': 'timma',
+                                'namespace': 'system',
+                                'node': 'sf-2',
+                                'power_state': 'initial',
+                                'state': 'created',
+                                'uuid': '847b0327-9b17-4148-b4ed-be72b6722c17',
                               }])
     @mock.patch('shakenfist.etcd.put')
     @mock.patch('shakenfist.db.get_lock')
@@ -779,16 +779,16 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
         self.config = mock.patch('shakenfist.config.parsed.get',
                                  fake_config_network)
         self.mock_config = self.config.start()
-        # Without this cleanup, other test classes will have "config.parsed.get"
+        # Without this cleanup, other test classes will have 'config.parsed.get'
         # mocked during parallel testing by stestr.
         self.addCleanup(self.config.stop)
 
     @mock.patch('shakenfist.db.get_networks',
                 return_value=[{
-                                "floating_gateway": "10.10.0.150",
-                                "name": "bob",
-                                "state": "created",
-                                "uuid": "30f6da44-look-i-am-uuid",
+                                'floating_gateway': '10.10.0.150',
+                                'name': 'bob',
+                                'state': 'created',
+                                'uuid': '30f6da44-look-i-am-uuid',
                                 }])
     @mock.patch('shakenfist.db.get_network_interfaces', return_value=[])
     @mock.patch('shakenfist.db.get_ipmanager',
@@ -827,10 +827,10 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
 
     @mock.patch('shakenfist.db.get_networks',
                 return_value=[{
-                                "floating_gateway": "10.10.0.150",
-                                "name": "bob",
-                                "state": "deleted",
-                                "uuid": "30f6da44-look-i-am-uuid",
+                                'floating_gateway': '10.10.0.150',
+                                'name': 'bob',
+                                'state': 'deleted',
+                                'uuid': '30f6da44-look-i-am-uuid',
                                 }])
     @mock.patch('shakenfist.db.get_network_interfaces', return_value=[])
     @mock.patch('shakenfist.db.get_ipmanager',
