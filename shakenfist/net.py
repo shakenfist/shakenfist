@@ -340,6 +340,11 @@ class Network(object):
         node_fqdns = []
         for inst in instances:
             i = db.get_instance(inst)
+            if not i:
+                continue
+            if not i['node']:
+                continue
+
             if not i['node'] in node_fqdns:
                 node_fqdns.append(i['node'])
 

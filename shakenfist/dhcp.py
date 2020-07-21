@@ -68,13 +68,16 @@ class DHCP(object):
 
         instances = []
         for ni in list(db.get_network_interfaces(self.network_uuid)):
-            hostname = db.get_instance(ni['instance_uuid'])
+            instance = db.get_instance(ni['instance_uuid'])
+            if not instance:
+                continue
+
             instances.append(
                 {
                     'uuid': ni['instance_uuid'],
                     'macaddr': ni['macaddr'],
                     'ipv4': ni['ipv4'],
-                    'name': hostname['name'].replace(',', '')
+                    'name': instance.get('name', 'instance').replace(',', '')
                 }
             )
         self.subst['instances'] = instances
