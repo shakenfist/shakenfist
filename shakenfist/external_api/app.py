@@ -113,8 +113,8 @@ def generic_wrapper(func):
             return error(400, str(e))
 
         except DecodeError:
-            # Send a more informative message than "Not enough segments"
-            return error(401, "Invalid JWT in Authorization Header")
+            # Send a more informative message than 'Not enough segments'
+            return error(401, 'invalid JWT in Authorization header')
 
         except (JWTDecodeError,
                 NoAuthorizationError,
@@ -128,7 +128,7 @@ def generic_wrapper(func):
             return error(401, str(e))
 
         except Exception:
-            return error(500, 'Server Error')
+            return error(500, 'server error')
 
     return wrapper
 
@@ -138,7 +138,7 @@ class Resource(flask_restful.Resource):
 
 
 def caller_is_admin(func):
-    # Ensure only users in the "system" namespace can call this method
+    # Ensure only users in the 'system' namespace can call this method
     def wrapper(*args, **kwargs):
         if get_jwt_identity() != 'system':
             return error(401, 'unauthorized')
@@ -547,6 +547,38 @@ class AuthMetadata(Resource):
             db.persist_metadata('namespace', namespace, md)
 
 
+def _delete_instance(instance_uuid, instance_from_db_virt):
+    with db.get_lock('/sf/instance/%s' % instance_uuid) as _:
+        db.add_event('instance', instance_uuid, 'api', 'delete', None, None)
+
+        instance_networks = []
+        for iface in list(db.get_instance_interfaces(instance_uuid)):
+            if not iface['network_uuid'] in instance_networks:
+                instance_networks.append(iface['network_uuid'])
+                db.update_network_interface_state(iface['uuid'], 'deleted')
+
+        host_networks = []
+        for inst in list(
+                db.get_instances(only_node=config.parsed.get('NODE_NAME'))):
+            if not inst['uuid'] == instance_uuid:
+                for iface in db.get_instance_interfaces(inst['uuid']):
+                    if not iface['network_uuid'] in host_networks:
+                        host_networks.append(iface['network_uuid'])
+
+        instance_from_db_virt.delete()
+
+        for network in instance_networks:
+            n = net.from_db(network)
+            if n:
+                if network in host_networks:
+                    with util.RecordedOperation('deallocate ip address',
+                                                instance_from_db_virt) as _:
+                        n.update_dhcp()
+                else:
+                    with util.RecordedOperation('remove network', n) as _:
+                        n.delete()
+
+
 class Instance(Resource):
     @jwt_required
     @arg_is_instance_uuid
@@ -560,40 +592,14 @@ class Instance(Resource):
     @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def delete(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
+    def delete(self, instance_uuid=None,
+                instance_from_db=None, instance_from_db_virt=None):
+
         # Check if instance has already been deleted
         if instance_from_db['state'] == 'deleted':
             return error(404, 'instance not found')
 
-        with db.get_lock('/sf/instance/%s' % instance_uuid) as _:
-            db.add_event('instance', instance_uuid,
-                         'api', 'delete', None, None)
-
-            instance_networks = []
-            for iface in list(db.get_instance_interfaces(instance_uuid)):
-                if not iface['network_uuid'] in instance_networks:
-                    instance_networks.append(iface['network_uuid'])
-                    db.update_network_interface_state(iface['uuid'], 'deleted')
-
-            host_networks = []
-            for inst in list(db.get_instances(only_node=config.parsed.get('NODE_NAME'))):
-                if not inst['uuid'] == instance_uuid:
-                    for iface in db.get_instance_interfaces(inst['uuid']):
-                        if not iface['network_uuid'] in host_networks:
-                            host_networks.append(iface['network_uuid'])
-
-            instance_from_db_virt.delete()
-
-            for network in instance_networks:
-                n = net.from_db(network)
-                if n:
-                    if network in host_networks:
-                        with util.RecordedOperation('deallocate ip address',
-                                                    instance_from_db_virt) as _:
-                            n.update_dhcp()
-                    else:
-                        with util.RecordedOperation('remove network', n) as _:
-                            n.delete()
+        _delete_instance(instance_uuid, instance_from_db_virt)
 
 
 class Instances(Resource):
@@ -612,19 +618,19 @@ class Instances(Resource):
 
         # Sanity check
         if not disk:
-            return error(400, "Instance must specify at least one disk")
+            return error(400, 'instance must specify at least one disk')
         for d in disk:
             if not isinstance(d, dict):
-                return error(400, "Disk specification should contain JSON objects")
+                return error(400, 'disk specification should contain JSON objects')
 
         if network:
             for n in network:
                 if not isinstance(n, dict):
                     return error(400,
-                                 "Network specification should contain JSON objects")
+                                 'network specification should contain JSON objects')
 
                 if 'network_uuid' not in n:
-                    return error(400, "Network specification is missing network_uuid")
+                    return error(400, 'network specification is missing network_uuid')
 
         if not namespace:
             namespace = get_jwt_identity()
@@ -812,6 +818,35 @@ class Instances(Resource):
 
             return db.get_instance(instance_uuid)
 
+    @jwt_required
+    def delete(self, confirm=False, namespace=None):
+        """Delete all instances in the namespace."""
+
+        if confirm != True:
+            return error(400, 'parameter confirm is not set true')
+
+        if get_jwt_identity() == 'system':
+            if not isinstance(namespace, str):
+                # A client using a system key must specify the namespace. This
+                # ensures that deleting all instances in the cluster (by
+                # specifying namespace='system') is a deliberate act.
+                return error(400, 'system user must specify parameter namespace')
+
+        else:
+            if namespace and namespace != get_jwt_identity():
+                return error(401, 'you cannot delete other namespaces')
+            namespace = get_jwt_identity()
+
+        instances_del = []
+        for instance in list(db.get_instances(all=all, namespace=namespace)):
+            if instance['state'] == 'deleted':
+                continue
+
+            instance_from_db_virt = virt.from_db(instance['uuid'])
+            _delete_instance(instance['uuid'], instance_from_db_virt)
+            instances_del.append(instance['uuid'])
+
+        return instances_del
 
 class InstanceInterfaces(Resource):
     @jwt_required
@@ -1113,6 +1148,24 @@ class Image(Resource):
                 images.fetch(hashed_image_path, info, resp)
 
 
+def _delete_network(network_from_db):
+    network_uuid = network_from_db['uuid']
+    db.add_event('network', network_uuid, 'api', 'delete', None, None)
+
+    with db.get_lock('sf/network/%s' % network_uuid, ttl=900) as _:
+        n = net.from_db(network_uuid)
+        n.remove_dhcp()
+        n.delete()
+
+        if n.floating_gateway:
+            with db.get_lock('sf/ipmanager/floating', ttl=120) as _:
+                ipm = db.get_ipmanager('floating')
+                ipm.release(n.floating_gateway)
+                db.persist_ipmanager('floating', ipm.save())
+
+        db.update_network_state(network_uuid, 'deleted')
+
+
 class Network(Resource):
     @jwt_required
     @arg_is_network_uuid
@@ -1128,7 +1181,6 @@ class Network(Resource):
     @requires_network_ownership
     @redirect_to_network_node
     def delete(self, network_uuid=None, network_from_db=None):
-        db.add_event('network', network_uuid, 'api', 'delete', None, None)
         if network_uuid == 'floating':
             return error(403, 'you cannot delete the floating network')
 
@@ -1140,18 +1192,7 @@ class Network(Resource):
         if network_from_db['state'] == 'deleted':
             return error(404, 'network not found')
 
-        with db.get_lock('sf/network/%s' % network_uuid, ttl=900) as _:
-            n = net.from_db(network_uuid)
-            n.remove_dhcp()
-            n.delete()
-
-            if n.floating_gateway:
-                with db.get_lock('sf/ipmanager/floating', ttl=120) as _:
-                    ipm = db.get_ipmanager('floating')
-                    ipm.release(n.floating_gateway)
-                    db.persist_ipmanager('floating', ipm.save())
-
-            db.update_network_state(network_uuid, 'deleted')
+        _delete_network(network_from_db)
 
 
 class Networks(Resource):
@@ -1222,6 +1263,43 @@ class Networks(Resource):
             db.persist_metadata('network', network['uuid'], {})
 
         return network
+
+    @jwt_required
+    @redirect_to_network_node
+    def delete(self, confirm=False, namespace=None):
+        """Delete all networks in the namespace."""
+
+        if confirm != True:
+            return error(400, 'parameter confirm is not set true')
+
+        if get_jwt_identity() == 'system':
+            if not isinstance(namespace, str):
+                # A client using a system key must specify the namespace. This
+                # ensures that deleting all networks in the cluster (by
+                # specifying namespace='system') is a deliberate act.
+                return error(400, 'system user must specify parameter namespace')
+
+        else:
+            if namespace and namespace != get_jwt_identity():
+                return error(401, 'you cannot delete other namespaces')
+            namespace = get_jwt_identity()
+
+        networks_del =[]
+        for net in list(db.get_networks(all=all, namespace=namespace)):
+            if net['uuid'] == 'floating':
+                continue
+
+            # If a network is in use, you should rethink the whole request
+            if len(list(db.get_network_interfaces(net['uuid']))) > 0:
+                return error(403, 'cannot delete an in use network')
+
+            if net['state'] == 'deleted':
+                continue
+
+            _delete_network(net)
+            networks_del.append(net['uuid'])
+
+        return networks_del
 
 
 class NetworkEvents(Resource):

@@ -14,6 +14,7 @@ class ApiClientTestCase(testtools.TestCase):
         self.request_url = mock.patch(
             'shakenfist.client.apiclient.Client._request_url')
         self.mock_request = self.request_url.start()
+        self.addCleanup(self.request_url.stop)
 
     def test_get_instances(self):
         client = apiclient.Client()
@@ -129,6 +130,22 @@ class ApiClientTestCase(testtools.TestCase):
         self.mock_request.assert_called_with(
             'DELETE', 'http://localhost:13000/instances/notreallyauuid')
 
+    def test_delete_all_instances(self):
+        client = apiclient.Client()
+        client.delete_all_instances(None)
+
+        self.mock_request.assert_called_with(
+            'DELETE', 'http://localhost:13000/instances',
+            data={'confirm':True, 'namespace':None})
+
+    def test_delete_all_instances_namespace(self):
+        client = apiclient.Client()
+        client.delete_all_instances('bobspace')
+
+        self.mock_request.assert_called_with(
+            'DELETE', 'http://localhost:13000/instances',
+            data={'confirm':True, 'namespace':'bobspace'})
+
     def test_cache_image(self):
         client = apiclient.Client()
         client.cache_image('imageurl')
@@ -228,6 +245,22 @@ class ApiClientTestCase(testtools.TestCase):
 
         self.mock_request.assert_called_with(
             'DELETE', 'http://localhost:13000/networks/notreallyauuid')
+
+    def test_delete_all_networks(self):
+        client = apiclient.Client()
+        client.delete_all_networks(None)
+
+        self.mock_request.assert_called_with(
+            'DELETE', 'http://localhost:13000/networks',
+            data={'confirm':True, 'namespace':None})
+
+    def test_delete_all_networks_namespace(self):
+        client = apiclient.Client()
+        client.delete_all_networks('bobspace')
+
+        self.mock_request.assert_called_with(
+            'DELETE', 'http://localhost:13000/networks',
+            data={'confirm':True, 'namespace':'bobspace'})
 
     def test_allocate_network(self):
         client = apiclient.Client()
