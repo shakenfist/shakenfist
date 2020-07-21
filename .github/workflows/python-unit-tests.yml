@@ -29,3 +29,9 @@ jobs:
       - name: Test with python 3.7
         run: |
           tox -epy37
+      - name: Test with python 3.7 again
+        run: |
+          tox -epy37
+      - name: Test with python 3.7 again again
+        run: |
+          tox -epy37
