@@ -59,7 +59,7 @@ class monitor(object):
                         i.delete()
                     continue
 
-                state = domain.state()
+                state, _ = domain.state()
                 if state == libvirt.VIR_DOMAIN_SHUTOFF:
                     db.update_instance_power_state(instance_uuid, 'off')
                 elif state == libvirt.VIR_DOMAIN_CRASHED:

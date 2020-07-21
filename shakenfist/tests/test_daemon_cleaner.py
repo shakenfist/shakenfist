@@ -49,7 +49,7 @@ class FakeLibvirtDomain(object):
         return self._name
 
     def state(self):
-        return self._state
+        return [self._state, 1]
 
 
 def fake_exists(path):
