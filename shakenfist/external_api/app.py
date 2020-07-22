@@ -613,8 +613,9 @@ class Instances(Resource):
              instance_uuid=None):
         global SCHEDULER
 
-        # We need to sanitise the name so its safe for DNS
-        name = re.sub(r'([^a-zA-Z0-9_\-])', '', name)
+        # Check that the instance name is safe for use as a DNS host name
+        if name != re.sub(r'([^a-zA-Z0-9_\-])', '', name) or len(name) > 63:
+            return error(400, 'instance name must be useable as a DNS host name')
 
         # Sanity check
         if not disk:
