@@ -59,21 +59,10 @@ class monitor(object):
                         i.delete()
                     continue
 
-                state, _ = domain.state()
-                if state == libvirt.VIR_DOMAIN_SHUTOFF:
-                    db.update_instance_power_state(instance_uuid, 'off')
-                elif state == libvirt.VIR_DOMAIN_CRASHED:
-                    db.update_instance_power_state(
-                        instance_uuid, 'crashed')
-                    db.update_instance_state(
-                        instance_uuid, 'error')
-                elif state in [libvirt.VIR_DOMAIN_PAUSED,
-                               libvirt.VIR_DOMAIN_PMSUSPENDED]:
-                    db.update_instance_power_state(instance_uuid, 'paused')
-                else:
-                    # Covers all "runnning states": BLOCKED, NOSTATE,
-                    # RUNNING, SHUTDOWN
-                    db.update_instance_power_state(instance_uuid, 'on')
+                state = util.extract_power_state(libvirt, domain)
+                db.update_instance_power_state(instance_uuid, state)
+                if state == 'crashed':
+                    db.update_instance_state(instance_uuid, 'error')
 
             # Inactive VMs just have a name, and are powered off
             # in our state system.
