@@ -121,15 +121,17 @@ def extract_power_state(libvirt, domain):
     state, _ = domain.state()
     if state == libvirt.VIR_DOMAIN_SHUTOFF:
         return 'off'
-    elif state == libvirt.VIR_DOMAIN_CRASHED:
+
+    if state == libvirt.VIR_DOMAIN_CRASHED:
         return 'crashed'
-    elif state in [libvirt.VIR_DOMAIN_PAUSED,
-                   libvirt.VIR_DOMAIN_PMSUSPENDED]:
+
+    if state in [libvirt.VIR_DOMAIN_PAUSED,
+                 libvirt.VIR_DOMAIN_PMSUSPENDED]:
         return 'paused'
-    else:
-        # Covers all "runnning states": BLOCKED, NOSTATE,
-        # RUNNING, SHUTDOWN
-        return 'on'
+
+    # Covers all "runnning states": BLOCKED, NOSTATE,
+    # RUNNING, SHUTDOWN
+    return 'on'
 
 
 def get_api_token(base_url, namespace='system'):
