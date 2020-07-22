@@ -593,7 +593,7 @@ class Instance(Resource):
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def delete(self, instance_uuid=None,
-                instance_from_db=None, instance_from_db_virt=None):
+               instance_from_db=None, instance_from_db_virt=None):
 
         # Check if instance has already been deleted
         if instance_from_db['state'] == 'deleted':
@@ -638,12 +638,12 @@ class Instances(Resource):
 
         # Only system can specify a uuid
         if instance_uuid and get_jwt_identity() != 'system':
-            return error(401, 'Only system can specify an instance uuid')
+            return error(401, 'only system can specify an instance uuid')
 
         # If accessing a foreign namespace, we need to be an admin
         if get_jwt_identity() not in [namespace, 'system']:
             return error(401,
-                         'Only admins can create resources in a different namespace')
+                         'only admins can create resources in a different namespace')
 
         # The instance needs to exist in the DB before network interfaces are created
         if not instance_uuid:
@@ -852,6 +852,7 @@ class Instances(Resource):
             instances_del.append(instance['uuid'])
 
         return instances_del
+
 
 class InstanceInterfaces(Resource):
     @jwt_required
@@ -1289,7 +1290,7 @@ class Networks(Resource):
                 return error(401, 'you cannot delete other namespaces')
             namespace = get_jwt_identity()
 
-        networks_del =[]
+        networks_del = []
         for net in list(db.get_networks(all=all, namespace=namespace)):
             if net['uuid'] == 'floating':
                 continue

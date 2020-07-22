@@ -76,7 +76,7 @@ class AuthTestCase(testtools.TestCase):
         self.assertEqual(400, resp.status_code)
         self.assertEqual(
             {
-                'error': 'post() got an unexpected keyword argument \'keyyy\'',
+                'error': "post() got an unexpected keyword argument \'keyyy\'",
                 'status': 400
             },
             _clean_traceback(resp.get_json()))
