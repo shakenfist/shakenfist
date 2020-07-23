@@ -76,7 +76,7 @@ class AuthTestCase(testtools.TestCase):
         self.assertEqual(400, resp.status_code)
         self.assertEqual(
             {
-                'error': "post() got an unexpected keyword argument \'keyyy\'",
+                'error': "post() got an unexpected keyword argument 'keyyy'",
                 'status': 400
             },
             _clean_traceback(resp.get_json()))
@@ -148,7 +148,7 @@ class AuthTestCase(testtools.TestCase):
                                 }))
         self.assertEqual(
             {
-                'error': 'Bad Authorization header. Expected value \'Bearer <JWT>\'',
+                'error': "Bad Authorization header. Expected value 'Bearer <JWT>'",
                 'status': 401
             },
             _clean_traceback(resp.get_json()))
@@ -770,7 +770,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         resp = self.client.post('/instances',
                                 headers={'Authorization': self.auth_header},
                                 data=json.dumps({
-                                    'name': 'test instance',
+                                    'name': 'test_instance',
                                     'cpus': 1,
                                     'memory': 1024,
                                     'network': [],
@@ -790,7 +790,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         resp = self.client.post('/instances',
                                 headers={'Authorization': self.auth_header},
                                 data=json.dumps({
-                                    'name': 'test instance',
+                                    'name': 'test_instance',
                                     'cpus': 1,
                                     'memory': 1024,
                                     'network': [],
@@ -810,7 +810,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         resp = self.client.post('/instances',
                                 headers={'Authorization': self.auth_header},
                                 data=json.dumps({
-                                    'name': 'test instance',
+                                    'name': 'test_instance',
                                     'cpus': 1,
                                     'memory': 1024,
                                     'network': ['87c15186-5f73-4947-a9fb-2183c4951efc'],
@@ -831,7 +831,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         resp = self.client.post('/instances',
                                 headers={'Authorization': self.auth_header},
                                 data=json.dumps({
-                                    'name': 'test instance',
+                                    'name': 'test_instance',
                                     'cpus': 1,
                                     'memory': 1024,
                                     'network': [
@@ -859,7 +859,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                                 headers={
                                     'Authorization': non_system_auth_header},
                                 data=json.dumps({
-                                    'name': 'test instance',
+                                    'name': 'test_instance',
                                     'cpus': 1,
                                     'memory': 1024,
                                     'network': [
@@ -873,7 +873,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                                     'instance_uuid': 'cbc58e78-d9ec-4cd5-b417-f715849126e1'
                                 }))
         self.assertEqual(
-            {'error': 'Only system can specify an instance uuid', 'status': 401},
+            {'error': 'only system can specify an instance uuid', 'status': 401},
             resp.get_json())
         self.assertEqual(401, resp.status_code)
 
@@ -887,7 +887,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                                 headers={
                                     'Authorization': non_system_auth_header},
                                 data=json.dumps({
-                                    'name': 'test instance',
+                                    'name': 'test_instance',
                                     'cpus': 1,
                                     'memory': 1024,
                                     'network': [
@@ -901,7 +901,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                                     'instance_uuid': None
                                 }))
         self.assertEqual(
-            {'error': 'Only admins can create resources in a different namespace',
+            {'error': 'only admins can create resources in a different namespace',
              'status': 401},
             resp.get_json())
         self.assertEqual(401, resp.status_code)
@@ -918,7 +918,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                                 headers={
                                     'Authorization': non_system_auth_header},
                                 data=json.dumps({
-                                    'name': 'test instance',
+                                    'name': 'test_instance',
                                     'cpus': 1,
                                     'memory': 1024,
                                     'network': [
@@ -945,7 +945,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                                 headers={
                                     'Authorization': self.auth_header},
                                 data=json.dumps({
-                                    'name': 'test instance',
+                                    'name': 'test_instance',
                                     'cpus': 1,
                                     'memory': 1024,
                                     'network': [
