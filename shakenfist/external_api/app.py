@@ -733,9 +733,12 @@ class Instances(Resource):
         body['instance_uuid'] = instance_uuid
         body['namespace'] = namespace
 
+        # NOTE(mikal): the user of the system namespace is deliberate here. The
+        # namespace to create the instance in is specified above, but we need to
+        # make this call as system because we have specified an instance UUID.
         token = util.get_api_token(
             'http://%s:%d' % (placed_on, config.parsed.get('API_PORT')),
-            namespace=namespace)
+            namespace='system')
         r = requests.request('POST',
                              'http://%s:%d/instances'
                              % (placed_on,
