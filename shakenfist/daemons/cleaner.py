@@ -54,9 +54,13 @@ class monitor(object):
                                     % instance_uuid)
                         processutils.execute(
                             'virsh destroy "sf:%s"' % instance_uuid, shell=True)
+
+                        db.add_event('instance', instance_uuid,
+                                     'enforced delete', 'complete', None, None)
                     else:
                         i = virt.from_db(instance_uuid)
                         i.delete()
+
                     continue
 
                 state = util.extract_power_state(libvirt, domain)
@@ -77,6 +81,8 @@ class monitor(object):
                     if instance.get('state') == 'deleted':
                         domain = conn.lookupByName(domain_name)
                         domain.undefine()
+                        db.add_event('instance', instance_uuid,
+                                     'deleted stray', 'complete', None, None)
                         continue
 
                     db.place_instance(
@@ -92,6 +98,8 @@ class monitor(object):
                     else:
                         db.update_instance_power_state(
                             instance_uuid, 'off')
+                        db.add_event('instance', instance_uuid,
+                                     'detected poweroff', 'complete', None, None)
 
         except libvirt.libvirtError as e:
             LOG.error('Failed to lookup all domains: %s' % e)

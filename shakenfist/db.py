@@ -254,9 +254,13 @@ def update_instance_state(instance_uuid, state):
     if i.get('state') == state:
         return
 
+    orig_state = i.get('state', 'unknown')
     i['state'] = state
     i['state_updated'] = time.time()
     etcd.put('instance', None, instance_uuid, i)
+
+    add_event('instance', instance_uuid, 'state changed',
+              '%s -> %s' % (orig_state, state), None, None)
 
 
 def update_instance_power_state(instance_uuid, state):
