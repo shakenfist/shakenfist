@@ -463,6 +463,8 @@ class Instance(object):
         db.update_instance_power_state(
             self.db_entry['uuid'],
             util.extract_power_state(libvirt, instance))
+        db.add_event(
+            'instance', self.db_entry['uuid'], 'poweron', 'complete', None, None)
 
     def power_off(self):
         libvirt = util.get_libvirt()
@@ -481,6 +483,9 @@ class Instance(object):
             instance.destroy()
         except libvirt.libvirtError as e:
             LOG.error('%s: Failed to delete domain: %s' % (self, e))
+
+        db.add_event(
+            'instance', self.db_entry['uuid'], 'poweron', 'complete', None, None)
 
     def _snapshot_device(self, source, destination):
         images.snapshot(source, destination)
@@ -525,6 +530,9 @@ class Instance(object):
         else:
             instance.reset()
 
+        db.add_event(
+            'instance', self.db_entry['uuid'], 'reboot', 'complete', None, None)
+
     def pause(self):
         libvirt = util.get_libvirt()
         instance = self._get_domain()
@@ -533,6 +541,9 @@ class Instance(object):
             self.db_entry['uuid'],
             util.extract_power_state(libvirt, instance))
 
+        db.add_event(
+            'instance', self.db_entry['uuid'], 'pause', 'complete', None, None)
+
     def unpause(self):
         libvirt = util.get_libvirt()
         instance = self._get_domain()
@@ -540,6 +551,9 @@ class Instance(object):
         db.update_instance_power_state(
             self.db_entry['uuid'],
             util.extract_power_state(libvirt, instance))
+
+        db.add_event(
+            'instance', self.db_entry['uuid'], 'unpause', 'complete', None, None)
 
     def get_console_data(self, length):
         console_path = os.path.join(self.instance_path, 'console.log')

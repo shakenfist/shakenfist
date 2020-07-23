@@ -104,12 +104,13 @@ class CleanerTestCase(testtools.TestCase):
         self.addCleanup(self.config.stop)
 
     @mock.patch('shakenfist.db.see_this_node')
+    @mock.patch('shakenfist.db.add_event')
     @mock.patch('shakenfist.etcd.get', side_effect=fake_get)
     @mock.patch('shakenfist.etcd.put', side_effect=fake_put)
     @mock.patch('os.path.exists', side_effect=fake_exists)
     @mock.patch('time.time', return_value=7)
     def test_update_power_states(self, mock_time, mock_exists, mock_put,
-                                 mock_get, mock_see):
+                                 mock_get, mock_event, mock_see):
         m = cleaner.monitor()
         m._update_power_states()
 
