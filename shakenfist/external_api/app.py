@@ -719,7 +719,7 @@ class Instances(Resource):
             if not placement == config.parsed.get('NODE_NAME'):
                 resp = self._instance_start_remote(
                     placement, instance_uuid, namespace)
-                if placed_on or resp.status_code == 200:
+                if placed_on or resp.status_code != 507:
                     return resp
                 placement = None
             else:
