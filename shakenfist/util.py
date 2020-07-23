@@ -117,6 +117,23 @@ def get_libvirt():
     return LIBVIRT
 
 
+def extract_power_state(libvirt, domain):
+    state, _ = domain.state()
+    if state == libvirt.VIR_DOMAIN_SHUTOFF:
+        return 'off'
+
+    if state == libvirt.VIR_DOMAIN_CRASHED:
+        return 'crashed'
+
+    if state in [libvirt.VIR_DOMAIN_PAUSED,
+                 libvirt.VIR_DOMAIN_PMSUSPENDED]:
+        return 'paused'
+
+    # Covers all "runnning states": BLOCKED, NOSTATE,
+    # RUNNING, SHUTDOWN
+    return 'on'
+
+
 def get_api_token(base_url, namespace='system'):
     with db.get_lock('sf/namespace/%s' % namespace) as _:
         auth_url = base_url + '/auth'

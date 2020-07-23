@@ -460,6 +460,9 @@ class Instance(object):
             pass
 
         instance.setAutostart(1)
+        db.update_instance_power_state(
+            self.db_entry['uuid'],
+            util.extract_power_state(libvirt, instance))
 
     def power_off(self):
         libvirt = util.get_libvirt()
@@ -523,12 +526,20 @@ class Instance(object):
             instance.reset()
 
     def pause(self):
+        libvirt = util.get_libvirt()
         instance = self._get_domain()
         instance.suspend()
+        db.update_instance_power_state(
+            self.db_entry['uuid'],
+            util.extract_power_state(libvirt, instance))
 
     def unpause(self):
+        libvirt = util.get_libvirt()
         instance = self._get_domain()
         instance.resume()
+        db.update_instance_power_state(
+            self.db_entry['uuid'],
+            util.extract_power_state(libvirt, instance))
 
     def get_console_data(self, length):
         console_path = os.path.join(self.instance_path, 'console.log')
