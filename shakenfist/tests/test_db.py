@@ -16,7 +16,8 @@ class DBTestCase(testtools.TestCase):
     @mock.patch('shakenfist.db.allocate_console_port', side_effect=[1, 2])
     def test_create_instance(self, mock_console_allocate, mock_put, mock_see):
         db.create_instance('uuid42', 'barry', 1, 2048, 'disks',
-                           'sshkey', 'userdata', 'namespace')
+                           'sshkey', 'userdata', 'namespace',
+                           {'memory': 16384, 'model': 'cirrus'})
         mock_see.assert_called()
 
         etcd_write = mock_put.mock_calls[0][1]
@@ -38,7 +39,8 @@ class DBTestCase(testtools.TestCase):
                  'block_devices': None,
                  'state': 'initial',
                  'namespace': 'namespace',
-                 'power_state': 'initial'
+                 'power_state': 'initial',
+                 'video': {'memory': 16384, 'model': 'cirrus'}
              }),
             etcd_write)
 
@@ -55,7 +57,13 @@ class DBTestCase(testtools.TestCase):
         self.assertEqual(('instance', None, 'uuid42'), etcd_write[0:3])
         self.assertTrue(time.time() - etcd_write[3]['state_updated'] < 3)
         del etcd_write[3]['state_updated']
-        self.assertEqual({'state': 'created', 'uuid': 'uuid42'}, etcd_write[3])
+        self.assertEqual(
+            {
+                'state': 'created',
+                'uuid': 'uuid42',
+                'video': {'memory': 16384, 'model': 'cirrus'}
+            },
+            etcd_write[3])
 
     @mock.patch('shakenfist.db.see_this_node')
     @mock.patch('shakenfist.etcd.get',
@@ -81,8 +89,12 @@ class DBTestCase(testtools.TestCase):
         self.assertTrue(time.time() - etcd_write[3]['power_state_updated'] < 3)
         del etcd_write[3]['power_state_updated']
         self.assertEqual(
-
-            {'power_state': 'off', 'power_state_previous': 'on', 'uuid': 'uuid42'},
+            {
+                'power_state': 'off',
+                'power_state_previous': 'on',
+                'uuid': 'uuid42',
+                'video': {'memory': 16384, 'model': 'cirrus'}
+            },
             etcd_write[3])
 
     @mock.patch('shakenfist.db.see_this_node')
@@ -129,9 +141,10 @@ class DBTestCase(testtools.TestCase):
         self.assertTrue(time.time() - etcd_write[3]['power_state_updated'] < 3)
         del etcd_write[3]['power_state_updated']
         self.assertEqual(
-
             {
                 'power_state': 'on',
                 'power_state_previous': 'transition-to-off',
-                'uuid': 'uuid42'},
+                'uuid': 'uuid42',
+                'video': {'memory': 16384, 'model': 'cirrus'}
+            },
             etcd_write[3])

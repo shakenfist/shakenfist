@@ -610,7 +610,7 @@ class Instances(Resource):
     @jwt_required
     def post(self, name=None, cpus=None, memory=None, network=None,
              disk=None, ssh_key=None, user_data=None, placed_on=None, namespace=None,
-             instance_uuid=None):
+             instance_uuid=None, video=None):
         global SCHEDULER
 
         # Check that the instance name is safe for use as a DNS host name
@@ -632,6 +632,9 @@ class Instances(Resource):
 
                 if 'network_uuid' not in n:
                     return error(400, 'network specification is missing network_uuid')
+
+        if not video:
+            video = {'model': 'cirrus', 'memory': 16384}
 
         if not namespace:
             namespace = get_jwt_identity()
@@ -668,7 +671,8 @@ class Instances(Resource):
                 vcpus=cpus,
                 ssh_key=ssh_key,
                 user_data=user_data,
-                owner=namespace
+                owner=namespace,
+                video=video
             )
 
         if not SCHEDULER:
@@ -715,7 +719,7 @@ class Instances(Resource):
             if not placement == config.parsed.get('NODE_NAME'):
                 resp = self._instance_start_remote(
                     placement, instance_uuid, namespace)
-                if placed_on or resp.status_code == 200:
+                if placed_on or resp.status_code != 507:
                     return resp
                 placement = None
             else:
@@ -733,9 +737,12 @@ class Instances(Resource):
         body['instance_uuid'] = instance_uuid
         body['namespace'] = namespace
 
+        # NOTE(mikal): the user of the system namespace is deliberate here. The
+        # namespace to create the instance in is specified above, but we need to
+        # make this call as system because we have specified an instance UUID.
         token = util.get_api_token(
             'http://%s:%d' % (placed_on, config.parsed.get('API_PORT')),
-            namespace=namespace)
+            namespace='system')
         r = requests.request('POST',
                              'http://%s:%d/instances'
                              % (placed_on,

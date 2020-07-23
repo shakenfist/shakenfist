@@ -180,7 +180,13 @@ def persist_floating_gateway(network_uuid, gateway):
 
 def get_instance(instance_uuid):
     see_this_node()
-    return etcd.get('instance', None, instance_uuid)
+    i = etcd.get('instance', None, instance_uuid)
+    if not i:
+        return None
+
+    if not 'video' in i:
+        i['video'] = {'model': 'cirrus', 'memory': 16384}
+    return i
 
 
 def get_instances(only_node=None, all=False, namespace=None):
@@ -194,6 +200,10 @@ def get_instances(only_node=None, all=False, namespace=None):
         if namespace:
             if namespace not in [i['namespace'], 'system']:
                 continue
+
+        if not 'video' in i:
+            i['video'] = {'model': 'cirrus', 'memory': 16384}
+
         yield i
 
 
@@ -204,7 +214,8 @@ def persist_block_devices(instance_uuid, block_devices):
     etcd.put('instance', None, instance_uuid, i)
 
 
-def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key, user_data, namespace):
+def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key,
+                    user_data, namespace, video):
     see_this_node()
     d = {
         'uuid': instance_uuid,
@@ -221,7 +232,8 @@ def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key, us
         'state': 'initial',
         'state_updated': time.time(),
         'namespace': namespace,
-        'power_state': 'initial'
+        'power_state': 'initial',
+        'video': video
     }
     etcd.put('instance', None, instance_uuid, d)
     return d

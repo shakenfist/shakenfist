@@ -29,9 +29,10 @@ LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 
 
 def from_definition(uuid=None, name=None, disks=None, memory_mb=None,
-                    vcpus=None, ssh_key=None, user_data=None, owner=None):
+                    vcpus=None, ssh_key=None, user_data=None, owner=None,
+                    video=None):
     db_entry = db.create_instance(uuid, name, vcpus, memory_mb, disks,
-                                  ssh_key, user_data, owner)
+                                  ssh_key, user_data, owner, video)
     return Instance(db_entry)
 
 
@@ -425,7 +426,9 @@ class Instance(object):
             networks=networks,
             instance_path=self.instance_path,
             console_port=self.db_entry['console_port'],
-            vdi_port=self.db_entry['vdi_port']
+            vdi_port=self.db_entry['vdi_port'],
+            video_model=self.db_entry['video']['model'],
+            video_memory=self.db_entry['video']['memory']
         )
 
         with open(self.xml_file, 'w') as f:

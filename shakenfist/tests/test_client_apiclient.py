@@ -40,7 +40,8 @@ class ApiClientTestCase(testtools.TestCase):
     def test_create_instance(self):
         client = apiclient.Client()
         client.create_instance('foo', 1, 2048, ['netuuid1'], ['8@cirros'],
-                               'sshkey', None, None)
+                               'sshkey', None, namespace=None, force_placement=None,
+                               video={'model': 'cirrus', 'memory': 16384})
 
         self.mock_request.assert_called_with(
             'POST', 'http://localhost:13000/instances',
@@ -52,13 +53,16 @@ class ApiClientTestCase(testtools.TestCase):
                 'disk': ['8@cirros'],
                 'ssh_key': 'sshkey',
                 'user_data': None,
-                'namespace': None
+                'namespace': None,
+                'video': {'memory': 16384, 'model': 'cirrus'}
             })
 
     def test_create_instance_user_data(self):
         client = apiclient.Client()
         client.create_instance('foo', 1, 2048, ['netuuid1'], ['8@cirros'],
-                               'sshkey', 'userdatabeforebase64', None)
+                               'sshkey', 'userdatabeforebase64', namespace=None,
+                               force_placement=None,
+                               video={'model': 'cirrus', 'memory': 16384})
 
         self.mock_request.assert_called_with(
             'POST', 'http://localhost:13000/instances',
@@ -70,7 +74,8 @@ class ApiClientTestCase(testtools.TestCase):
                 'disk': ['8@cirros'],
                 'ssh_key': 'sshkey',
                 'user_data': 'userdatabeforebase64',
-                'namespace': None
+                'namespace': None,
+                'video': {'memory': 16384, 'model': 'cirrus'}
             })
 
     def test_snapshot_instance(self):
@@ -136,7 +141,7 @@ class ApiClientTestCase(testtools.TestCase):
 
         self.mock_request.assert_called_with(
             'DELETE', 'http://localhost:13000/instances',
-            data={'confirm':True, 'namespace':None})
+            data={'confirm': True, 'namespace': None})
 
     def test_delete_all_instances_namespace(self):
         client = apiclient.Client()
@@ -144,7 +149,7 @@ class ApiClientTestCase(testtools.TestCase):
 
         self.mock_request.assert_called_with(
             'DELETE', 'http://localhost:13000/instances',
-            data={'confirm':True, 'namespace':'bobspace'})
+            data={'confirm': True, 'namespace': 'bobspace'})
 
     def test_cache_image(self):
         client = apiclient.Client()
@@ -176,7 +181,7 @@ class ApiClientTestCase(testtools.TestCase):
         self.mock_request.assert_called_with(
             'POST',
             'http://localhost:13000/auth/namespaces/testspace/keys',
-            data={'key_name':'testkeyname', 'key': 'secretkey'})
+            data={'key_name': 'testkeyname', 'key': 'secretkey'})
 
     def test_delete_namespace_key(self):
         client = apiclient.Client()
@@ -252,7 +257,7 @@ class ApiClientTestCase(testtools.TestCase):
 
         self.mock_request.assert_called_with(
             'DELETE', 'http://localhost:13000/networks',
-            data={'confirm':True, 'namespace':None})
+            data={'confirm': True, 'namespace': None})
 
     def test_delete_all_networks_namespace(self):
         client = apiclient.Client()
@@ -260,7 +265,7 @@ class ApiClientTestCase(testtools.TestCase):
 
         self.mock_request.assert_called_with(
             'DELETE', 'http://localhost:13000/networks',
-            data={'confirm':True, 'namespace':'bobspace'})
+            data={'confirm': True, 'namespace': 'bobspace'})
 
     def test_allocate_network(self):
         client = apiclient.Client()
