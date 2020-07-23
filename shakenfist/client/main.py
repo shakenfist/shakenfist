@@ -35,7 +35,8 @@ class GroupCatchExceptions(click.Group):
             sys.exit(1)
 
         except apiclient.ResourceCannotBeDeletedException as e:
-            click.echo('ERROR: Cannot delete resource: %s' % error_text(e.text))
+            click.echo('ERROR: Cannot delete resource: %s' %
+                       error_text(e.text))
             sys.exit(1)
 
         except apiclient.ResourceNotFoundException as e:
@@ -144,7 +145,7 @@ def node_list(ctx):
         print('name,ip,lastseen,version')
         for n in nodes:
             print('%s,%s,%s,%s' % (
-                    n['name'], n['ip'], n['lastseen'], n['version']))
+                n['name'], n['ip'], n['lastseen'], n['version']))
 
     elif ctx.obj['OUTPUT'] == 'json':
         filtered_nodes = []
@@ -671,6 +672,9 @@ def _parse_spec(spec):
     return spec.split('@')
 
 
+# TODO(mikal): this misses the detailed version of disk and network specs, as well
+# as guidance on how to use the video command line. We need to rethink how we're
+# doing this, as its getting pretty long.
 @instance.command(name='create',
                   help=('Create an instance.\n\n'
                         'NAME:      The name of the instance.\n'
@@ -682,6 +686,7 @@ def _parse_spec(spec):
                         '--disk/-d:      The disks attached to the instance, in this format: \n'
                         '                size@image_url where size is in GB and @image_url\n'
                         '                is optional.\n'
+                        '--video/-V:     The video configuration for the instance.\n'
                         '--sshkey/-i:    The path to a ssh public key to configure on the\n'
                         '                instance via config drive / cloud-init.\n'
                         '--sshkeydata/-I:\n'
@@ -709,11 +714,12 @@ def _parse_spec(spec):
 @click.option('-u', '--userdata', type=click.STRING)
 @click.option('-U', '--encodeduserdata', type=click.STRING)
 @click.option('-p', '--placement', type=click.STRING)
+@click.option('-V', '--videospec', type=click.STRING)
 @click.option('--namespace', type=click.STRING)
 @click.pass_context
 def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networkspec=None,
                     disk=None, diskspec=None, sshkey=None, sshkeydata=None, userdata=None,
-                    encodeduserdata=None, placement=None, namespace=None):
+                    encodeduserdata=None, placement=None, videospec=None, namespace=None):
     if len(disk) < 1 and len(diskspec) < 1:
         print('You must specify at least one disk')
         return
@@ -787,11 +793,21 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networ
             defn[s[0]] = s[1]
         netdefs.append(defn)
 
+    video = {'model': 'cirrus', 'memory': 16384}
+    if videospec:
+        for elem in videospec.split(','):
+            s = elem.split('=')
+            if len(s) != 2:
+                print('Error in video specification - '
+                      ' should be key=value: %s' % elem)
+                return
+            video[s[0]] = s[1]
+
     _show_instance(
         ctx,
         CLIENT.create_instance(name, cpus, memory, netdefs, diskdefs, sshkey_content,
                                userdata_content, force_placement=placement,
-                               namespace=namespace))
+                               namespace=namespace, video=video))
 
 
 @instance.command(name='delete', help='Delete an instance')

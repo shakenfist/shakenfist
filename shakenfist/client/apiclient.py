@@ -38,8 +38,10 @@ class ResourceNotFoundException(APIException):
 class ResourceInUseException(APIException):
     pass
 
+
 class InternalServerError(APIException):
     pass
+
 
 class InsufficientResourcesException(APIException):
     pass
@@ -187,7 +189,7 @@ class Client(object):
         return r.json()
 
     def create_instance(self, name, cpus, memory, network, disk, sshkey, userdata,
-                        namespace=None, force_placement=None):
+                        namespace=None, force_placement=None, video=None):
         body = {
             'name': name,
             'cpus': cpus,
@@ -196,7 +198,8 @@ class Client(object):
             'disk': disk,
             'ssh_key': sshkey,
             'user_data': userdata,
-            'namespace': namespace
+            'namespace': namespace,
+            'video': video
         }
 
         if force_placement:
@@ -360,7 +363,7 @@ class Client(object):
     def add_namespace_key(self, namespace, key_name, key):
         r = self._request_url('POST', self.base_url + '/auth/namespaces/' +
                               namespace + '/keys',
-                              data={'key_name':key_name, 'key': key})
+                              data={'key_name': key_name, 'key': key})
         return r.json()
 
     def delete_namespace_key(self, namespace, key_name):

@@ -610,7 +610,7 @@ class Instances(Resource):
     @jwt_required
     def post(self, name=None, cpus=None, memory=None, network=None,
              disk=None, ssh_key=None, user_data=None, placed_on=None, namespace=None,
-             instance_uuid=None):
+             instance_uuid=None, video=None):
         global SCHEDULER
 
         # Check that the instance name is safe for use as a DNS host name
@@ -632,6 +632,9 @@ class Instances(Resource):
 
                 if 'network_uuid' not in n:
                     return error(400, 'network specification is missing network_uuid')
+
+        if not video:
+            video = {'model': 'cirrus', 'memory': 16384}
 
         if not namespace:
             namespace = get_jwt_identity()
@@ -668,7 +671,8 @@ class Instances(Resource):
                 vcpus=cpus,
                 ssh_key=ssh_key,
                 user_data=user_data,
-                owner=namespace
+                owner=namespace,
+                video=video
             )
 
         if not SCHEDULER:
