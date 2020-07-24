@@ -575,8 +575,9 @@ def _show_instance(ctx, i, include_snapshots=False):
 
     if ctx.obj['OUTPUT'] == 'json':
         out = filter_dict(i, ['uuid', 'name', 'namespace', 'cpus', 'memory',
-                              'disk_spec', 'node', 'console_port', 'vdi_port',
-                              'ssh_key', 'user_data', 'power_state', 'state'])
+                              'disk_spec', 'video', 'node', 'console_port',
+                              'vdi_port', 'ssh_key', 'user_data',
+                              'power_state', 'state'])
         out['network_interfaces'] = []
         for interface in interfaces:
             _show_interface(ctx, interface, out)
@@ -602,6 +603,7 @@ def _show_instance(ctx, i, include_snapshots=False):
     print(format_string % ('cpus', i['cpus']))
     print(format_string % ('memory', i['memory']))
     print(format_string % ('disk spec', i['disk_spec']))
+    print(format_string % ('video', i['video']))
     print(format_string % ('node', i['node']))
     print(format_string % ('power state', i['power_state']))
     print(format_string % ('state', i['state']))
