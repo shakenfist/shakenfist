@@ -818,8 +818,17 @@ class Instances(Resource):
                     n.ensure_mesh()
                     n.update_dhcp()
 
-            with util.RecordedOperation('instance creation', instance) as _:
-                instance.create(lock=lock)
+            libvirt = util.get_libvirt()
+            try:
+                with util.RecordedOperation('instance creation',
+                                            instance) as _:
+                    instance.create(lock=lock)
+
+            except libvirt.libvirtError as e:
+                code = e.get_error_code()
+                if code == libvirt.VIR_ERR_CONFIG_UNSUPPORTED:
+                    return error_with_cleanup(400, e.get_error_message())
+                raise e
 
             for iface in db.get_instance_interfaces(instance.db_entry['uuid']):
                 db.update_network_interface_state(iface['uuid'], 'created')
