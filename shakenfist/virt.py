@@ -144,6 +144,8 @@ class Instance(object):
         self.db_entry['block_devices']['finalized'] = False
 
     def create(self, lock=None):
+        db.update_instance_state(self.db_entry['uuid'], 'creating')
+
         # Ensure we have state on disk
         if not os.path.exists(self.instance_path):
             LOG.debug('%s: Creating instance storage at %s' %

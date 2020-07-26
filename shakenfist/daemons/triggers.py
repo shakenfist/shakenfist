@@ -1,3 +1,4 @@
+import fcntl
 import logging
 from logging import handlers as logging_handlers
 import multiprocessing
@@ -22,31 +23,38 @@ def observe(path, instance_uuid):
         'login prompt': ['^.* login: .*', re.compile('.* login: .*')]
     }
 
-    f = None
-    while not f:
+    fd = None
+    while not fd:
         try:
-            f = open(path)
+            if os.path.exists(path):
+                fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
         except Exception:
             pass
         time.sleep(1)
 
     LOG.info('Monitoring %s for triggers' % path)
-    f.seek(0, os.SEEK_END)
-    buffer = ''
+    db.add_event('instance', instance_uuid, 'trigger monitor',
+                 'detected console log', None, None)
+    os.lseek(fd, 0, os.SEEK_END)
 
+    buffer = ''
     while True:
-        d = f.read()
+        d = os.read(fd, 1024).decode('utf-8')
         if d:
+            LOG.debug('Trigger observer read %d bytes for instance %s'
+                      % (len(d), instance_uuid))
             buffer += d
             lines = buffer.split('\n')
             buffer = lines[-1]
 
-            for line in lines[:-1]:
+            for line in lines:
                 if line:
+                    LOG.debug('Trigger observer checks "%s" for instance %s'
+                              % (line, instance_uuid))
                     for trigger in regexps:
                         m = regexps[trigger][1].match(line)
                         if m:
-                            LOG.info('Trigger %s matched for %s'
+                            LOG.info('Trigger %s matched for instance %s'
                                      % (trigger, instance_uuid))
                             db.add_event('instance', instance_uuid, 'trigger',
                                          None, None, trigger)
@@ -68,6 +76,8 @@ class monitor(object):
                 if not observers[instance_uuid].is_alive():
                     LOG.info('Trigger observer for instance %s has terminated'
                              % instance_uuid)
+                    db.add_event(
+                        'instance', instance_uuid, 'trigger monitor', 'crashed', None, None)
                     del observers[instance_uuid]
 
             # Start missing observers
@@ -90,6 +100,8 @@ class monitor(object):
                     observers[inst['uuid']] = p
                     LOG.info('Started trigger observer for instance %s'
                              % inst['uuid'])
+                    db.add_event(
+                        'instance', inst['uuid'], 'trigger monitor', 'started', None, None)
 
             # Cleanup extra observers
             for instance_uuid in extra_instances:
@@ -102,5 +114,7 @@ class monitor(object):
                 del observers[instance_uuid]
                 LOG.info('Finished trigger observer for instance %s'
                          % instance_uuid)
+                db.add_event(
+                    'instance', instance_uuid, 'trigger monitor', 'finished', None, None)
 
             time.sleep(1)
