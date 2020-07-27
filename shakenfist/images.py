@@ -48,7 +48,7 @@ def _get_cache_path():
     return image_cache_path
 
 
-def _hash_image_url(image_url):
+def hash_image_url(image_url):
     h = hashlib.sha256()
     h.update(image_url.encode('utf-8'))
     hashed_image_url = h.hexdigest()
@@ -74,7 +74,7 @@ def _read_info(image_url, hashed_image_url, hashed_image_path):
 
 
 def requires_fetch(image_url):
-    hashed_image_url = _hash_image_url(image_url)
+    hashed_image_url = hash_image_url(image_url)
     hashed_image_path = os.path.join(_get_cache_path(), hashed_image_url)
     info = _read_info(image_url, hashed_image_url, hashed_image_path)
 
@@ -93,8 +93,14 @@ def requires_fetch(image_url):
     return hashed_image_path, info, image_dirty, resp
 
 
-def fetch(hashed_image_path, info, resp, lock=None):
+def fetch(hashed_image_path, info, resp, locks=None):
     """Download the image if we don't already have the latest version in cache."""
+
+    def bump_locks(locks):
+        if locks:
+            for lock in locks:
+                if lock:
+                    lock.refresh()
 
     fetched = 0
     info['version'] += 1
@@ -107,8 +113,8 @@ def fetch(hashed_image_path, info, resp, lock=None):
         for chunk in resp.iter_content(chunk_size=8192):
             fetched += len(chunk)
             f.write(chunk)
-            if lock and (time.time() - last_lock_refresh > 10):
-                lock.refresh()
+            if (time.time() - last_lock_refresh > 10):
+                bump_locks(locks)
                 last_lock_refresh = time.time()
 
     if fetched > 0:
@@ -121,8 +127,7 @@ def fetch(hashed_image_path, info, resp, lock=None):
     # Decompress if required
     if info['url'].endswith('.gz'):
         if not os.path.exists(hashed_image_path + '.v%03d.orig' % info['version']):
-            if lock:
-                lock.refresh()
+            bump_locks(locks)
 
             processutils.execute(
                 'gunzip -k -q -c %(img)s > %(img)s.orig' % {
