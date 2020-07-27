@@ -215,7 +215,7 @@ class ImagesTestCase(testtools.TestCase):
         self.assertEqual('/a/b/c/image_cache', p)
 
     def test_hash_image_url(self):
-        h = images._hash_image_url('http://example.com')
+        h = images.hash_image_url('http://example.com')
         self.assertEqual('f0e6a6a97042a4f1f1c87f5f7d44315b2d'
                          '852c2df5c7991cc66241bf7072d1c4', h)
 
