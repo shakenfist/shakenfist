@@ -23,14 +23,9 @@ def observe(path, instance_uuid):
         'login prompt': ['^.* login: .*', re.compile('.* login: .*')]
     }
 
-    fd = None
-    while not fd:
-        try:
-            if os.path.exists(path):
-                fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
-        except Exception:
-            pass
+    while not os.path.exists(path):
         time.sleep(1)
+    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
 
     LOG.info('Monitoring %s for triggers' % path)
     db.add_event('instance', instance_uuid, 'trigger monitor',
