@@ -1300,15 +1300,9 @@ class Networks(Resource):
                 return error(401, 'you cannot delete other namespaces')
             namespace = get_jwt_identity()
 
-<<<<<<< HEAD
-        networks_del =[]
-        for net in list(db.get_networks(all=all, namespace=namespace)):
-            if net['uuid'] == 'floating':
-=======
         networks_del = []
         for n in list(db.get_networks(all=all, namespace=namespace)):
             if n['uuid'] == 'floating':
->>>>>>> 6c61a07... Handle bad instance config and deleted networks
                 continue
 
             # If a network is in use, you should rethink the whole request
