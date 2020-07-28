@@ -66,7 +66,7 @@ def error_text(json_text):
         err = json.loads(json_text)
         if 'error' in err:
             return err['error']
-    except:
+    except Exception:
         pass
 
     return json_text
@@ -379,13 +379,14 @@ def _show_network(ctx, n):
     metadata = CLIENT.get_network_metadata(n['uuid'])
 
     if ctx.obj['OUTPUT'] == 'json':
-        filtered = filter_dict(n, ['uuid', 'name', 'vxid', 'netblock', 'provide_dhcp',
-                                   'provide_nat', 'namespace'])
+        filtered = filter_dict(n, ['uuid', 'name', 'vxid', 'netblock',
+                                   'provide_dhcp', 'provide_nat',
+                                   'floating_gateway', 'namespace'])
         filtered['metadata'] = metadata
         print(json.dumps(filtered, indent=4, sort_keys=True))
         return
 
-    format_string = '%-12s: %s'
+    format_string = '%-16s: %s'
     if ctx.obj['OUTPUT'] == 'simple':
         format_string = '%s:%s'
 
@@ -395,6 +396,7 @@ def _show_network(ctx, n):
     print(format_string % ('netblock', n['netblock']))
     print(format_string % ('provide dhcp', n['provide_dhcp']))
     print(format_string % ('provide nat', n['provide_nat']))
+    print(format_string % ('floating gateway', n['floating_gateway']))
     print(format_string % ('namespace', n['namespace']))
     print(format_string % ('state', n['state']))
 
@@ -563,6 +565,24 @@ def instance_list(ctx, all=False):
                          indent=4, sort_keys=True))
 
 
+def _pretty_data(row, space_rules):
+    ret = ''
+    for key in space_rules:
+        ret += key + '=' + str(row[key]).ljust(space_rules[key]) + '  '
+    return ret
+
+
+def _pretty_dict(lead_space, rows, space_rules):
+    ret = ''
+
+    if rows:
+        ret += _pretty_data(rows[0], space_rules)
+    for r in rows[1:]:
+        ret += '\n'.ljust(lead_space) + _pretty_data(r, space_rules)
+
+    return ret
+
+
 def _show_instance(ctx, i, include_snapshots=False):
     if not i:
         print('Instance not found')
@@ -593,17 +613,24 @@ def _show_instance(ctx, i, include_snapshots=False):
         print(json.dumps(out, indent=4, sort_keys=True))
         return
 
-    format_string = '%-12s: %s'
     if ctx.obj['OUTPUT'] == 'simple':
         format_string = '%s:%s'
+    else:
+        format_string = '%-12s: %s'
+        d_space = {'type': 5, 'bus': 4, 'size': 2, 'base': 0}
+        v_space = {'model': 0, 'memory': 0}
 
     print(format_string % ('uuid', i['uuid']))
     print(format_string % ('name', i['name']))
     print(format_string % ('namespace', i['namespace']))
     print(format_string % ('cpus', i['cpus']))
     print(format_string % ('memory', i['memory']))
-    print(format_string % ('disk spec', i['disk_spec']))
-    print(format_string % ('video', i['video']))
+    if ctx.obj['OUTPUT'] == 'pretty':
+        print(format_string % ('disk spec',
+                               _pretty_dict(15, i['disk_spec'], d_space)))
+    if ctx.obj['OUTPUT'] == 'pretty':
+        print(format_string % ('video',
+                               _pretty_dict(15, (i['video'],), v_space)))
     print(format_string % ('node', i['node']))
     print(format_string % ('power state', i['power_state']))
     print(format_string % ('state', i['state']))
@@ -616,6 +643,18 @@ def _show_instance(ctx, i, include_snapshots=False):
     print()
     print(format_string % ('ssh key', i['ssh_key']))
     print(format_string % ('user data', i['user_data']))
+
+    if ctx.obj['OUTPUT'] == 'simple':
+        print()
+        print('disk_spec,type,bus,size,base')
+        for d in i['disk_spec']:
+            print('disk_spec,%s,%s,%s,%s' % (
+                d['type'], d['bus'], d['size'], d['base']))
+
+    if ctx.obj['OUTPUT'] == 'simple':
+        print()
+        print('video,model,memory')
+        print('video,%s,%s' % (i['video']['model'], i['video']['memory']))
 
     print()
     if ctx.obj['OUTPUT'] == 'pretty':
@@ -754,7 +793,7 @@ def instance_create(ctx, name=None, cpus=None, memory=None, network=None, networ
         size, base = p
         try:
             size_int = int(size)
-        except:
+        except Exception:
             print('Disk size is not an integer')
             return
 
@@ -981,7 +1020,7 @@ def _show_interface(ctx, interface, out=[]):
         out['network_interfaces'].append(
             filter_dict(
                 interface, ['uuid', 'network_uuid', 'macaddr', 'order',
-                            'ipv4', 'floating']))
+                            'ipv4', 'floating', 'model']))
         return
 
     if ctx.obj['OUTPUT'] == 'pretty':
@@ -992,11 +1031,12 @@ def _show_interface(ctx, interface, out=[]):
         print(format_string % ('order', interface['order']))
         print(format_string % ('ipv4', interface['ipv4']))
         print(format_string % ('floating', interface['floating']))
+        print(format_string % ('model', interface['model']))
     else:
-        print('iface,%s,%s,%s,%s,%s,%s'
+        print('iface,%s,%s,%s,%s,%s,%s,%s'
               % (interface['uuid'], interface['network_uuid'],
                  interface['macaddr'], interface['order'], interface['ipv4'],
-                 interface['floating']))
+                 interface['floating'], interface['model']))
 
 
 @interface.command(name='show', help='Show an interface')
@@ -1015,7 +1055,8 @@ def interface_show(ctx, interface_uuid=None):
     if ctx.obj['OUTPUT'] == 'pretty':
         print('Interface:')
     else:
-        print('iface,interface uuid,network uuid,macaddr,order,ipv4,floating')
+        print('iface,interface uuid,network uuid,'
+              'macaddr,order,ipv4,floating,model')
 
     _show_interface(ctx, interface)
 
