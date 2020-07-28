@@ -13,7 +13,6 @@ from oslo_concurrency import processutils
 from shakenfist import config
 from shakenfist import db
 from shakenfist import dhcp
-from shakenfist import db
 from shakenfist import util
 
 
@@ -25,6 +24,10 @@ LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 def from_db(uuid):
     dbnet = db.get_network(uuid)
     if not dbnet:
+        return None
+
+    if dbnet['state'] == 'deleted':
+        LOG.info('network(%s) net.from_db() network is state=deleted' % uuid)
         return None
 
     return Network(uuid=dbnet['uuid'],
