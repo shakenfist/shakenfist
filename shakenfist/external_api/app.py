@@ -8,7 +8,6 @@
 import base64
 import bcrypt
 import flask
-from flask import request
 from flask_jwt_extended import create_access_token
 from flask_jwt_extended import get_jwt_identity
 from flask_jwt_extended import JWTManager
@@ -36,7 +35,6 @@ import uuid
 from oslo_concurrency import processutils
 
 from shakenfist import config
-from shakenfist import db
 from shakenfist import db
 from shakenfist import images
 from shakenfist import net
@@ -232,7 +230,7 @@ def arg_is_network_uuid(func):
             kwargs['network_from_db'] = db.get_network(
                 kwargs['network_uuid'])
         if not kwargs.get('network_from_db'):
-            LOG.info('network(%s): network not found, genuinely missing' %
+            LOG.info('network(%s): network not found or deleted' %
                      kwargs['network_uuid'])
             return error(404, 'network not found')
 
@@ -826,7 +824,8 @@ class Instances(Resource):
 
             except libvirt.libvirtError as e:
                 code = e.get_error_code()
-                if code == libvirt.VIR_ERR_CONFIG_UNSUPPORTED:
+                if code in (libvirt.VIR_ERR_CONFIG_UNSUPPORTED,
+                            libvirt.VIR_ERR_XML_ERROR):
                     return error_with_cleanup(400, e.get_error_message())
                 raise e
 
@@ -839,7 +838,7 @@ class Instances(Resource):
     def delete(self, confirm=False, namespace=None):
         """Delete all instances in the namespace."""
 
-        if confirm != True:
+        if confirm is not True:
             return error(400, 'parameter confirm is not set true')
 
         if get_jwt_identity() == 'system':
@@ -994,7 +993,7 @@ class Interface(Resource):
 
         n = net.from_db(ni['network_uuid'])
         if not n:
-            LOG.info('network(%s): network not found, genuinely missing'
+            LOG.info('network(%s): network not found or deleted'
                      % ni['network_uuid'])
             return error(404, 'interface network not found')
 
@@ -1023,7 +1022,7 @@ class InterfaceFloat(Resource):
 
         n = net.from_db(ni['network_uuid'])
         if not n:
-            LOG.info('network(%s): network not found, genuinely missing'
+            LOG.info('network(%s): network not found or deleted'
                      % ni['network_uuid'])
             return error(404, 'network not found')
 
@@ -1064,7 +1063,7 @@ class InterfaceDefloat(Resource):
 
         n = net.from_db(ni['network_uuid'])
         if not n:
-            LOG.info('network(%s): network not found, genuinely missing'
+            LOG.info('network(%s): network not found or deleted'
                      % ni['network_uuid'])
             return error(404, 'network not found')
 
@@ -1140,7 +1139,7 @@ class InstanceConsoleData(Resource):
     def get(self, instance_uuid=None, length=None, instance_from_db=None, instance_from_db_virt=None):
         try:
             length = int(length)
-        except:
+        except Exception:
             return error(400, 'length is not an integer')
 
         resp = flask.Response(
@@ -1252,7 +1251,7 @@ class Networks(Resource):
             if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
                 n = net.from_db(network['uuid'])
                 if not n:
-                    LOG.info('network(%s): network not found, genuinely missing'
+                    LOG.info('network(%s): network not found or deleted'
                              % network['uuid'])
                     return error(404, 'network not found')
 
@@ -1286,7 +1285,7 @@ class Networks(Resource):
     def delete(self, confirm=False, namespace=None):
         """Delete all networks in the namespace."""
 
-        if confirm != True:
+        if confirm is not True:
             return error(400, 'parameter confirm is not set true')
 
         if get_jwt_identity() == 'system':
@@ -1301,20 +1300,26 @@ class Networks(Resource):
                 return error(401, 'you cannot delete other namespaces')
             namespace = get_jwt_identity()
 
+<<<<<<< HEAD
         networks_del =[]
         for net in list(db.get_networks(all=all, namespace=namespace)):
             if net['uuid'] == 'floating':
+=======
+        networks_del = []
+        for n in list(db.get_networks(all=all, namespace=namespace)):
+            if n['uuid'] == 'floating':
+>>>>>>> 6c61a07... Handle bad instance config and deleted networks
                 continue
 
             # If a network is in use, you should rethink the whole request
-            if len(list(db.get_network_interfaces(net['uuid']))) > 0:
+            if len(list(db.get_network_interfaces(n['uuid']))) > 0:
                 return error(403, 'cannot delete an in use network')
 
-            if net['state'] == 'deleted':
+            if n['state'] == 'deleted':
                 continue
 
-            _delete_network(net)
-            networks_del.append(net['uuid'])
+            _delete_network(n)
+            networks_del.append(n['uuid'])
 
         return networks_del
 
@@ -1393,7 +1398,7 @@ class DeployNetworkNode(Resource):
                      'network node', 'deploy', None, None)
         n = net.from_db(passed_uuid)
         if not n:
-            LOG.info('network(%s): network not found, genuinely missing'
+            LOG.info('network(%s): network not found or deleted'
                      % passed_uuid)
             return error(404, 'network not found')
 
@@ -1410,7 +1415,7 @@ class UpdateDHCP(Resource):
                      'network node', 'update dhcp', None, None)
         n = net.from_db(passed_uuid)
         if not n:
-            LOG.info('network(%s): network not found, genuinely missing'
+            LOG.info('network(%s): network not found or deleted'
                      % passed_uuid)
             return error(404, 'network not found')
 
@@ -1426,7 +1431,7 @@ class RemoveDHCP(Resource):
                      'network node', 'remove dhcp', None, None)
         n = net.from_db(passed_uuid)
         if not n:
-            LOG.info('network(%s): network not found, genuinely missing'
+            LOG.info('network(%s): network not found or deleted'
                      % passed_uuid)
             return error(404, 'network not found')
 
