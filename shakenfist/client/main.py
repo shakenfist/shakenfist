@@ -44,16 +44,16 @@ class GroupCatchExceptions(click.Group):
             sys.exit(1)
 
         except apiclient.ResourceInUseException as e:
-            click.echo('ERROR: Resource in use:\n%s' % error_text(e.text))
+            click.echo('ERROR: Resource in use: %s' % error_text(e.text))
             sys.exit(1)
 
         except apiclient.InternalServerError as e:
             # Print full error since server should not fail
-            click.echo('ERROR: Internal Server Error:\n%s' % e.text)
+            click.echo('ERROR: Internal Server Error: %s' % e.text)
             sys.exit(1)
 
         except apiclient.InsufficientResourcesException as e:
-            click.echo('ERROR: Insufficient Resources:\n%s' %
+            click.echo('ERROR: Insufficient Resources: %s' %
                        error_text(e.text))
             sys.exit(1)
 

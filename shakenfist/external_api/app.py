@@ -549,12 +549,13 @@ def _delete_instance(instance_uuid, instance_from_db_virt):
     with db.get_lock('/sf/instance/%s' % instance_uuid) as _:
         db.add_event('instance', instance_uuid, 'api', 'delete', None, None)
 
+        # Create list of networks used by instance
         instance_networks = []
         for iface in list(db.get_instance_interfaces(instance_uuid)):
             if not iface['network_uuid'] in instance_networks:
                 instance_networks.append(iface['network_uuid'])
-                db.update_network_interface_state(iface['uuid'], 'deleted')
 
+        # Create list of networks used by all other instances
         host_networks = []
         for inst in list(
                 db.get_instances(only_node=config.parsed.get('NODE_NAME'))):
@@ -565,14 +566,17 @@ def _delete_instance(instance_uuid, instance_from_db_virt):
 
         instance_from_db_virt.delete()
 
+        # Check each network used by the deleted instance
         for network in instance_networks:
             n = net.from_db(network)
             if n:
+                # If network used by another instance, only update
                 if network in host_networks:
                     with util.RecordedOperation('deallocate ip address',
                                                 instance_from_db_virt) as _:
                         n.update_dhcp()
                 else:
+                    # Network not used by any other instance therefore delete
                     with util.RecordedOperation('remove network', n) as _:
                         n.delete()
 
