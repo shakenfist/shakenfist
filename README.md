@@ -1,4 +1,5 @@
 # Shaken Fist: Opinionated to the point of being impolite
+![Python application](https://github.com/shakenfist/shakenfist/workflows/Python%20application/badge.svg)
 
 ## What is this?
 
