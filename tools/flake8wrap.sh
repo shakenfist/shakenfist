@@ -6,7 +6,7 @@
 #
 # Intended to be invoked via tox:
 #
-#   tox -epep8 -- -HEAD
+#   tox -eflake8 -- -HEAD
 #
 # Originally from the OpenStack project.
 

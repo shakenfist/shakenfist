@@ -33,9 +33,9 @@ jobs:
           python -m pip install --upgrade pip
           sudo apt-get install -y -q tox
 
-      - name: Lint with fast8
+      - name: Lint with flake8
         run: |
-          tox -efast8
+          tox -eflake8
 
       - name: Test with python 3.7
         run: |
