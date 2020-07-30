@@ -1,7 +1,6 @@
 # Copyright 2019 Michael Still
 
 import base64
-import errno
 import jinja2
 import logging
 from logging import handlers as logging_handlers
@@ -16,7 +15,6 @@ import uuid
 from oslo_concurrency import processutils
 
 from shakenfist import config
-from shakenfist import db
 from shakenfist import db
 from shakenfist import images
 from shakenfist import net
@@ -257,8 +255,9 @@ class Instance(object):
             except Exception:
                 pass
 
-        with util.RecordedOperation('release network addreses', self) as _:
+        with util.RecordedOperation('release network addresses', self) as _:
             for ni in db.get_instance_interfaces(self.db_entry['uuid']):
+                db.update_network_interface_state(ni['uuid'], 'deleted')
                 with db.get_lock('sf/ipmanager/%s' % ni['network_uuid'],
                                  ttl=120) as _:
                     ipm = db.get_ipmanager(ni['network_uuid'])
