@@ -142,6 +142,8 @@ class Instance(object):
         self.db_entry['block_devices']['finalized'] = False
 
     def create(self, lock=None):
+        db.update_instance_state(self.db_entry['uuid'], 'creating')
+
         # Ensure we have state on disk
         if not os.path.exists(self.instance_path):
             LOG.debug('%s: Creating instance storage at %s' %
@@ -158,17 +160,19 @@ class Instance(object):
             modified_disks = []
             for disk in self.db_entry['block_devices']['devices']:
                 if disk.get('base'):
-                    with util.RecordedOperation('fetch image', self) as _:
-                        image_url = images.resolve(disk['base'])
-                        hashed_image_path, info, image_dirty, resp = \
-                            images.requires_fetch(image_url)
+                    hashed = images.hash_image_url(disk['base'])
+                    with db.get_lock('sf/images/%s' % hashed) as image_lock:
+                        with util.RecordedOperation('fetch image', self) as _:
+                            image_url = images.resolve(disk['base'])
+                            hashed_image_path, info, image_dirty, resp = \
+                                images.requires_fetch(image_url)
 
-                        if image_dirty:
-                            hashed_image_path = images.fetch(hashed_image_path,
-                                                             info, resp, lock=lock)
-                        else:
-                            hashed_image_path = '%s.v%03d' % (
-                                hashed_image_path, info['version'])
+                            if image_dirty:
+                                hashed_image_path = images.fetch(hashed_image_path,
+                                                                 info, resp, locks=[lock, image_lock])
+                            else:
+                                hashed_image_path = '%s.v%03d' % (
+                                    hashed_image_path, info['version'])
 
                     try:
                         cd = pycdlib.PyCdlib()
