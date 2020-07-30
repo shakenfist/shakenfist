@@ -1,4 +1,5 @@
 import mock
+import os
 import six
 import testtools
 
@@ -9,117 +10,17 @@ from shakenfist import image_resolver_cirros
 from shakenfist import image_resolver_ubuntu
 
 
-QEMU_IMG_OUT = """foo
-image: /tmp/foo
-file format: qcow2
-virtual size: 112M (117440512 bytes)
-disk size: 16M
-cluster_size: 65536
-Format specific information:
-    compat: 1.1
-    lazy refcounts: false
-    refcount bits: 16
-    corrupt: false"""
+TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-CIRROS_DOWNLOAD_HTML = """
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
-<html>
- <head>
-  <title>Index of /</title>
- </head>
- <body>
-<h1>Index of /</h1>
-<pre>      <a href="?C=N;O=D">Name</a>                                               <a href="?C=M;O=A">Last modified</a>      <a href="?C=S;O=A">Size</a>  <a href="?C=D;O=A">Description</a><hr>      <a href="0.3.0/">0.3.0/</a>                                             2017-11-20 07:20    -
-      <a href="0.3.1/">0.3.1/</a>                                             2017-11-20 07:18    -
-      <a href="0.3.1~pre1/">0.3.1~pre1/</a>                                        2017-11-20 07:17    -
-      <a href="0.3.1~pre3/">0.3.1~pre3/</a>                                        2017-11-20 07:20    -
-      <a href="0.3.1~pre4/">0.3.1~pre4/</a>                                        2017-11-20 07:18    -
-      <a href="0.3.2/">0.3.2/</a>                                             2017-11-20 07:18    -
-      <a href="0.3.2~pre1/">0.3.2~pre1/</a>                                        2017-11-20 07:19    -
-      <a href="0.3.2~pre2/">0.3.2~pre2/</a>                                        2017-11-20 07:18    -
-      <a href="0.3.2~pre3/">0.3.2~pre3/</a>                                        2017-11-20 07:19    -
-      <a href="0.3.3/">0.3.3/</a>                                             2017-11-20 07:18    -
-      <a href="0.3.3~pre1/">0.3.3~pre1/</a>                                        2017-11-20 07:20    -
-      <a href="0.3.4/">0.3.4/</a>                                             2017-11-20 07:19    -
-      <a href="0.3.4~pre1/">0.3.4~pre1/</a>                                        2017-11-20 07:21    -
-      <a href="0.3.5/">0.3.5/</a>                                             2017-11-20 07:19    -
-      <a href="0.3.6/">0.3.6/</a>                                             2018-12-12 09:51    -
-      <a href="0.4.0/">0.4.0/</a>                                             2017-11-19 20:01    -
-      <a href="0.4.0~pre1/">0.4.0~pre1/</a>                                        2017-11-20 07:20    -
-      <a href="0.5.0/">0.5.0/</a>                                             2020-03-04 07:08    -
-      <a href="0.5.1/">0.5.1/</a>                                             2020-03-09 06:55    -
-      <a href="contrib/">contrib/</a>                                           2020-02-03 07:25    -
-      <a href="daily/">daily/</a>                                             2016-12-01 13:19    -
-      <a href="favicon.gif">favicon.gif</a>                                        2012-10-16 12:53    0
-      <a href="favicon.ico">favicon.ico</a>                                        2012-10-16 12:53    0
-      <a href="old/">old/</a>                                               2017-11-20 09:02    -
-      <a href="streams.old/">streams.old/</a>                                       2020-03-09 07:25    -
-      <a href="streams/">streams/</a>                                           2020-03-09 07:17    -
-      <a href="testing-dl/">testing-dl/</a>                                        2017-11-15 10:07    -
-      <a href="version/">version/</a>                                           2020-03-09 06:56    -
-<hr></pre>
-</body></html>"""
+with open('%s/files/qemu-img-info' % TEST_DIR) as f:
+    QEMU_IMG_OUT = f.read()
 
-UBUNTU_DOWNLOAD_HTML = """
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
- "http://www.w3.org/TR/html4/strict.dtd">
-<html>
- <head>
-  <title>Ubuntu Cloud Images</title>
-  <!-- Main style sheets for CSS2 capable browsers -->
-  <style type="text/css" media="screen">
-  @import url(https://cloud-images.ubuntu.com/include/style.css);
-  pre { background: none; }
-  body { margin: 2em; }
-  table {
-     margin: 0.5em 0;
-     border-collapse: collapse;
-  }
-  td {
-     padding: 0.25em;
-     border: 1pt solid #C1B496; /* ubuntu dark tan */
-  }
-  td p {
-     margin: 0;
-     padding: 0;
-  }
-  </style>
- </head>
- <body><div id="pageWrapper">
-<div id="header"><a href="http://www.ubuntu.com/"></a></div>
+with open('%s/files/cirros-download' % TEST_DIR) as f:
+    CIRROS_DOWNLOAD_HTML = f.read()
 
-<div id="main">
-<h1>Ubuntu Cloud Images</h1>
-
-<p>Ubuntu Cloud Images are the official Ubuntu images and are pre-installed
-disk images that have been customized by Ubuntu engineering to run on
-<a href="http://www.ubuntu.com/cloud/public-cloud">public clouds that provide Ubuntu Certified Images</a>, Openstack,  LXD, and more.  </p>
-
-<p>For more information, please see the following:</p>
-<ul>
-<li><a href="http://cloud.ubuntu.com">Ubuntu Cloud Portal</a></li>
-<li><a href="http://www.ubuntu.com/business/services/cloud">Commercial Support Options</a></li>
-<li><a href="https://help.ubuntu.com/community/UEC/Images">Community Help Page</a></li>
-</ul>
-Cloud image specific bugs should be filed in the <a class="http" href="https://bugs.launchpad.net/cloud-images/+filebug">cloud-images</a> project on Launchpad.net.
-
-<pre><img src="/icons/blank.gif" alt="Icon " width="22" height="22"> <a href="?C=N;O=D">Name</a>                    <a href="?C=M;O=A">Last modified</a>      <a href="?C=S;O=A">Size</a>  <a href="?C=D;O=A">Description</a><hr><img src="../../../../cdicons/folder.png" alt="[DIR]" width="22" height="22"> <a href="bionic/">bionic/</a>                 06-Jun-2020 02:58    -   Ubuntu Server 18.04 LTS (Bionic Beaver) daily builds
-<img src="../../../../cdicons/folder.png" alt="[DIR]" width="22" height="22"> <a href="daily/">daily/</a>                  24-Feb-2016 21:07    -   Daily image builds
-<img src="../../../../cdicons/folder.png" alt="[DIR]" width="22" height="22"> <a href="docs/">docs/</a>                   14-Jun-2018 15:01    -
-<img src="../../../../cdicons/folder.png" alt="[DIR]" width="22" height="22"> <a href="eoan/">eoan/</a>                   06-Jun-2020 02:58    -   Ubuntu Server 19.10 (Eoan Ermine) daily builds
-<img src="../../../../cdicons/folder.png" alt="[DIR]" width="22" height="22"> <a href="focal/">focal/</a>                  06-Jun-2020 02:58    -   Ubuntu Server 20.04 LTS (Focal Fossa) daily builds
-<img src="../../../../cdicons/folder.png" alt="[DIR]" width="22" height="22"> <a href="groovy/">groovy/</a>                 06-Jun-2020 02:58    -   Ubuntu Server 20.10 (Groovy Gorilla) daily builds
-<img src="../../../../cdicons/folder.png" alt="[DIR]" width="22" height="22"> <a href="locator/">locator/</a>                06-Jun-2020 03:36    -   Image Locator
-<img src="../../../../cdicons/folder.png" alt="[DIR]" width="22" height="22"> <a href="minimal/">minimal/</a>                09-Jul-2018 09:32    -   Ubuntu Server minimized image builds
-<img src="../../../../cdicons/folder.png" alt="[DIR]" width="22" height="22"> <a href="precise/">precise/</a>                03-May-2017 02:58    -   Ubuntu Server 12.04 LTS (Precise Pangolin) daily builds [END OF LIFE - for reference only]
-<img src="../../../../cdicons/folder.png" alt="[DIR]" width="22" height="22"> <a href="releases/">releases/</a>               16-Apr-2020 13:52    -   Release image builds
-<img src="../../../../cdicons/folder.png" alt="[DIR]" width="22" height="22"> <a href="server/">server/</a>                 06-Jun-2020 03:36    -   Ubuntu Server Cloud Image Builds
-<img src="../../../../cdicons/folder.png" alt="[DIR]" width="22" height="22"> <a href="trusty/">trusty/</a>                 11-Nov-2019 13:16    -   Ubuntu Server 14.04 LTS (Trusty Tahr) daily builds
-<img src="../../../../cdicons/folder.png" alt="[DIR]" width="22" height="22"> <a href="vagrant/">vagrant/</a>                25-Jan-2017 14:48    -   Vagrant images
-<img src="../../../../cdicons/folder.png" alt="[DIR]" width="22" height="22"> <a href="xenial/">xenial/</a>                 06-Jun-2020 02:58    -   Ubuntu Server 16.04 LTS (Xenial Xerus) daily builds
-<hr></pre>
-</div></div></body></html>"""
+with open('%s/files/ubuntu-download' % TEST_DIR) as f:
+    UBUNTU_DOWNLOAD_HTML = f.read()
 
 
 class FakeResponse(object):

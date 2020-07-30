@@ -10,7 +10,6 @@ import re
 import requests
 import shutil
 import time
-import urllib3
 
 from oslo_concurrency import processutils
 

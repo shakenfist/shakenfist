@@ -1,7 +1,6 @@
 # Copyright 2019 Michael Still
 
 import base64
-import errno
 import jinja2
 import logging
 from logging import handlers as logging_handlers
@@ -16,7 +15,6 @@ import uuid
 from oslo_concurrency import processutils
 
 from shakenfist import config
-from shakenfist import db
 from shakenfist import db
 from shakenfist import images
 from shakenfist import net

@@ -1160,7 +1160,7 @@ class Image(Resource):
     def post(self, url=None):
         db.add_event('image', url, 'api', 'cache', None, None)
 
-        hashed = images.hash_image_url(disk['base'])
+        hashed = images.hash_image_url(url)
         with db.get_lock('sf/images/%s' % hashed) as image_lock:
             with util.RecordedOperation('cache image', url) as _:
                 image_url = images.resolve(url)

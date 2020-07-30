@@ -1,0 +1,11 @@
+foo
+image: /tmp/foo
+file format: qcow2
+virtual size: 112M (117440512 bytes)
+disk size: 16M
+cluster_size: 65536
+Format specific information:
+    compat: 1.1
+    lazy refcounts: false
+    refcount bits: 16
+    corrupt: false

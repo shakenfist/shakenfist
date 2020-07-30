@@ -1,10 +1,8 @@
-import fcntl
 import logging
 from logging import handlers as logging_handlers
 import multiprocessing
 import os
 import re
-import select
 import setproctitle
 import signal
 import time
