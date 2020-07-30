@@ -1164,13 +1164,16 @@ class Image(Resource):
     def post(self, url=None):
         db.add_event('image', url, 'api', 'cache', None, None)
 
-        with util.RecordedOperation('cache image', url) as _:
-            image_url = images.resolve(url)
-            hashed_image_path, info, image_dirty, resp = \
-                images.requires_fetch(image_url)
+        hashed = images.hash_image_url(url)
+        with db.get_lock('sf/images/%s' % hashed) as image_lock:
+            with util.RecordedOperation('cache image', url) as _:
+                image_url = images.resolve(url)
+                hashed_image_path, info, image_dirty, resp = \
+                    images.requires_fetch(image_url)
 
-            if image_dirty:
-                images.fetch(hashed_image_path, info, resp)
+                if image_dirty:
+                    images.fetch(hashed_image_path, info,
+                                 resp, locks=[image_lock])
 
 
 def _delete_network(network_from_db):

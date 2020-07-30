@@ -95,7 +95,7 @@ class monitor(object):
                         # If we're inactive and our files aren't on disk,
                         # we have a problem.
                         db.update_instance_state(instance_uuid, 'error')
-                    else:
+                    elif instance.get('powerstate') != 'off':
                         db.update_instance_power_state(
                             instance_uuid, 'off')
                         db.add_event('instance', instance_uuid,
