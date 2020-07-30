@@ -1310,19 +1310,26 @@ class Networks(Resource):
             namespace = get_jwt_identity()
 
         networks_del = []
+        networks_unable = []
         for n in list(db.get_networks(all=all, namespace=namespace)):
             if n['uuid'] == 'floating':
                 continue
 
-            # If a network is in use, you should rethink the whole request
             if len(list(db.get_network_interfaces(n['uuid']))) > 0:
-                return error(403, 'cannot delete an in use network')
+                LOG.info('network(%s) in use, cannot be deleted by delete-all',
+                         n['uuid'])
+                networks_unable.append(n['uuid'])
+                continue
 
             if n['state'] == 'deleted':
                 continue
 
             _delete_network(n)
             networks_del.append(n['uuid'])
+
+        if networks_unable:
+            return error(403, {'deleted': networks_del,
+                               'unable': networks_unable})
 
         return networks_del
 
