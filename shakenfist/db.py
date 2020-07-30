@@ -184,7 +184,7 @@ def get_instance(instance_uuid):
     if not i:
         return None
 
-    if not 'video' in i:
+    if 'video' not in i:
         i['video'] = {'model': 'cirrus', 'memory': 16384}
     return i
 
@@ -201,7 +201,7 @@ def get_instances(only_node=None, all=False, namespace=None):
             if namespace not in [i['namespace'], 'system']:
                 continue
 
-        if not 'video' in i:
+        if 'video' not in i:
             i['video'] = {'model': 'cirrus', 'memory': 16384}
 
         yield i
@@ -463,7 +463,9 @@ def update_metrics_bulk(metrics):
 def get_metrics(fqdn):
     see_this_node()
     d = etcd.get('metrics', fqdn, None)
-    return d['metrics']
+    if not d:
+        return {}
+    return d.get('metrics', {})
 
 
 def allocate_console_port(instance_uuid):
