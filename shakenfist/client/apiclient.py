@@ -299,6 +299,11 @@ class Client(object):
                               })
         return r.json()
 
+    def get_network_interfaces(self, network_uuid):
+        r = self._request_url('GET', self.base_url + '/networks/'
+                              + network_uuid + '/interfaces')
+        return r.json()
+
     def get_network_metadata(self, network_uuid):
         r = self._request_url('GET', self.base_url + '/networks/' + network_uuid +
                               '/metadata')

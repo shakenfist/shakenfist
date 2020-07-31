@@ -1347,6 +1347,16 @@ class NetworkEvents(Resource):
         return list(db.get_events('network', network_uuid))
 
 
+class NetworkInterfaces(Resource):
+    @jwt_required
+    @arg_is_network_uuid
+    @requires_network_ownership
+    def get(self, network_uuid=None, network_from_db=None):
+        db.add_event('network', network_uuid,
+                     'api', 'get interfaces', None, None)
+        return list(db.get_network_interfaces(network_uuid))
+
+
 class NetworkMetadatas(Resource):
     @jwt_required
     @arg_is_network_uuid
@@ -1489,6 +1499,7 @@ api.add_resource(Image, '/images')
 api.add_resource(Networks, '/networks')
 api.add_resource(Network, '/networks/<network_uuid>')
 api.add_resource(NetworkEvents, '/networks/<network_uuid>/events')
+api.add_resource(NetworkInterfaces, '/networks/<network_uuid>/interfaces')
 api.add_resource(NetworkMetadatas, '/networks/<network_uuid>/metadata')
 api.add_resource(NetworkMetadata,
                  '/networks/<network_uuid>/metadata/<key>')
