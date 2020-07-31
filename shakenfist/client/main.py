@@ -495,6 +495,35 @@ def network_delete(ctx, network_uuid=None):
         print('{}')
 
 
+@network.command(name='instances', help='List instances on a network')
+@click.argument('network_uuid',
+                type=click.STRING, autocompletion=_get_networks)
+@click.pass_context
+def network_list_instances(ctx, network_uuid=None):
+    interfaces = CLIENT.get_network_interfaces(network_uuid)
+
+    if ctx.obj['OUTPUT'] == 'pretty':
+        x = PrettyTable()
+        x.field_names = ['instance_uuid', 'ipv4', 'floating']
+        for ni in interfaces:
+            x.add_row([ni['instance_uuid'], ni['ipv4'], ni['floating']])
+        print(x)
+
+    elif ctx.obj['OUTPUT'] == 'simple':
+        print('instance_uuid,ipv4,floating')
+        for ni in interfaces:
+            print('%s,%s,%s' %
+                  (ni['instance_uuid'], ni['ipv4'], ni['floating']))
+
+    elif ctx.obj['OUTPUT'] == 'json':
+        filtered_ni = []
+        for ni in interfaces:
+            filtered_ni.append(filter_dict(
+                ni, ['instance_uuid', 'ipv4', 'floating']))
+        print(json.dumps({'instances': filtered_ni},
+                         indent=4, sort_keys=True))
+
+
 @network.command(name='set-metadata', help='Set a metadata item')
 @click.argument('network_uuid', type=click.STRING, autocompletion=_get_networks)
 @click.argument('key', type=click.STRING)
