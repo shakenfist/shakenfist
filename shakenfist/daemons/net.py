@@ -43,6 +43,7 @@ class monitor(object):
             # Ensure we are on every network we have a host for
             for network in host_networks:
                 n = net.from_db(network)
+                n.create()
                 n.ensure_mesh()
                 seen_vxids.append(n.vxlan_id)
 
