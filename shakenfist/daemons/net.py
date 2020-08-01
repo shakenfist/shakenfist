@@ -1,30 +1,17 @@
 import logging
 from logging import handlers as logging_handlers
-import re
 import setproctitle
 import time
-
-from oslo_concurrency import processutils
 
 from shakenfist import config
 from shakenfist import db
 from shakenfist import net
+from shakenfist import util
 
 
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.INFO)
 LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
-
-
-VXLAN_RE = re.compile(r'[0-9]+: vxlan-([0-9]+).*')
-
-
-def _get_deployed_vxlans():
-    stdout, _ = processutils.execute('ip link', shell=True)
-    for line in stdout.split('\n'):
-        m = VXLAN_RE.match(line)
-        if m:
-            yield int(m.group(1))
 
 
 class monitor(object):
@@ -35,17 +22,41 @@ class monitor(object):
         while True:
             time.sleep(30)
 
-            # We do not reap unused networks from the network node, as they might be
-            # in use for instances on other hypervisor nodes.
+            # Discover what networks are present
+            _, _, vxid_to_mac = util.discover_interfaces()
+
+            # Determine what networks we should be on
+            host_networks = []
+            seen_vxids = []
+
             if config.parsed.get('NODE_IP') != config.parsed.get('NETWORK_NODE_IP'):
-                host_networks = []
+                # For normal nodes, just the ones we have instances for
                 for inst in list(db.get_instances(only_node=config.parsed.get('NODE_NAME'))):
                     for iface in db.get_instance_interfaces(inst['uuid']):
                         if not iface['network_uuid'] in host_networks:
                             host_networks.append(iface['network_uuid'])
+            else:
+                # For network nodes, its all networks
+                for n in db.get_networks():
+                    host_networks.append(n['uuid'])
 
-                for network in host_networks:
-                    n = net.from_db(network)
-                    n.ensure_mesh()
+            # Ensure we are on every network we have a host for
+            for network in host_networks:
+                n = net.from_db(network)
+                n.ensure_mesh()
+                seen_vxids.append(n.vxlan_id)
 
-                # TODO(mikal): remove stray networks
+            # Determine if there are any extra vxids
+            extra_vxids = list(vxid_to_mac.keys())
+            for seen in seen_vxids:
+                if seen in extra_vxids:
+                    extra_vxids.remove(seen)
+
+            # For now, just log extra vxids
+            if extra_vxids:
+                LOG.warn('Extra vxlans present! IDs are: %s'
+                         % ','.join(extra_vxids))
+
+            # And record vxids in the database
+            db.persist_node_vxid_mapping(
+                config.parsed.get('NODE_NAME'), vxid_to_mac)
