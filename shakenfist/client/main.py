@@ -597,7 +597,7 @@ def instance_list(ctx, all=False):
 def _pretty_data(row, space_rules):
     ret = ''
     for key in space_rules:
-        ret += key + '=' + str(row[key]).ljust(space_rules[key]) + '  '
+        ret += key + '=' + str(row.get(key, '')).ljust(space_rules[key]) + '  '
     return ret
 
 
