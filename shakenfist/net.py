@@ -277,6 +277,9 @@ class Network(object):
                         db.persist_ipmanager('floating', ipm.save())
 
     def update_dhcp(self):
+        if not self.provide_dhcp:
+            return
+
         if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
             self.ensure_mesh()
             subst = self.subst_dict()
