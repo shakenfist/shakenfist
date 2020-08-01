@@ -56,7 +56,22 @@ class monitor(object):
             # For now, just log extra vxids
             if extra_vxids:
                 LOG.warn('Extra vxlans present! IDs are: %s'
-                         % ','.join(extra_vxids))
+                         % extra_vxids)
+
+                # Determine the network uuids for those vxids
+                vxid_to_uuid = {}
+                for n in db.get_networks():
+                    vxid_to_uuid[n['vxid']] = n['uuid']
+
+                for extra in extra_vxids:
+                    if extra in vxid_to_uuid:
+                        n = net.from_db(vxid_to_uuid[extra])
+                        n.delete()
+                        LOG.info('Extra vxlan %s (network %s) removed.'
+                                 % (extra, vxid_to_uuid[extra]))
+                    else:
+                        LOG.error('Extra vxlan %s does not map to any network.'
+                                  % extra)
 
             # And record vxids in the database
             db.persist_node_vxid_mapping(
