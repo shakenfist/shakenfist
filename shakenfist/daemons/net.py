@@ -40,6 +40,22 @@ class monitor(object):
                 for n in db.get_networks():
                     host_networks.append(n['uuid'])
 
+                    # Network nodes also look for interfaces for absent instances
+                    # and delete them
+                    for ni in db.get_network_interfaces(n['uuid']):
+                        inst = db.get_instance(ni['instance_uuid'])
+                        if not inst:
+                            db.hard_delete_network_interface(ni['uuid'])
+                            LOG.info('Hard deleted stray network interface %s '
+                                     'associated with absent instance %s'
+                                     % (ni['uuid'], ni['instance_uuid']))
+                        elif inst.get('state', 'unknown') in ['deleted', 'error', 'unknown']:
+                            db.hard_delete_network_interface(ni['uuid'])
+                            LOG.info('Hard deleted stray network interface %s '
+                                     'associated with %s instance %s'
+                                     % (ni['uuid'], inst.get('state', 'unknown'),
+                                        ni['instance_uuid']))
+
             # Ensure we are on every network we have a host for
             for network in host_networks:
                 n = net.from_db(network)
