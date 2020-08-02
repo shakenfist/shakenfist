@@ -103,8 +103,16 @@ def generic_wrapper(func):
             for header in flask.request.headers:
                 formatted_headers.append(str(header))
 
-            LOG.info('API request: %s %s\n    Headers:\n        %s\n    Args: %s\n    KWargs: %s'
-                     % (flask.request.method, flask.request.url, '\n        '.join(formatted_headers), args, kwargs))
+            msg = 'API request: %s %s\n    Headers:\n        %s' % (
+                flask.request.method, flask.request.url,
+                '\n        '.join(formatted_headers))
+            msg += '\n    Args: %s\n    KWargs: %s' % (args, kwargs)
+
+            if re.match(r'http(|s)://0.0.0.0:\d+/$', flask.request.url):
+                LOG.debug(msg)
+            else:
+                LOG.info(msg)
+
             return func(*args, **kwargs)
 
         except TypeError as e:
