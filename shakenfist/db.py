@@ -488,3 +488,11 @@ def persist_node_vxid_mapping(node, vxid_to_mac):
 
 def get_node_vxid_mapping(node):
     etcd.get('vxid_mapping', None, node)
+
+
+def enqueue(queuename, item):
+    etcd.enqueue(queuename, item)
+
+
+def dequeue(queuename):
+    return etcd.dequeue(queuename)
