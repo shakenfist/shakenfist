@@ -165,14 +165,16 @@ class VirtTestCase(testtools.TestCase):
     @mock.patch('shakenfist.db.get_instance_interfaces',
                 return_value=[
                     {
-                        'instance_uuid': 'fakeuuid',
+                        'uuid': 'ifaceuuid',
+                        'instance_uuid': 'instuuid',
                         'network_uuid': 'netuuid',
                         'macaddr': '1a:91:64:d2:15:39',
                         'ipv4': '127.0.0.5',
                         'order': 0
                     },
                     {
-                        'instance_uuid': 'fakeuuid',
+                        'uuid': 'ifaceuuid2',
+                        'instance_uuid': 'instuuid',
                         'network_uuid': 'netuuid',
                         'macaddr': '1a:91:64:d2:15:40',
                         'ipv4': '127.0.0.6',
@@ -226,14 +228,16 @@ class VirtTestCase(testtools.TestCase):
                                     "id": "eth0",
                                     "mtu": 1450,
                                     "name": "eth0",
-                                    "type": "physical"
+                                    "type": "vif",
+                                    "vif_id": "ifaceuuid"
                                 },
                                 {
                                     "ethernet_mac_address": "1a:91:64:d2:15:40",
                                     "id": "eth1",
                                     "mtu": 1450,
                                     "name": "eth1",
-                                    "type": "physical"
+                                    "type": "vif",
+                                    "vif_id": "ifaceuuid2"
                                 }
                             ],
                             "networks": [

@@ -14,7 +14,6 @@ import time
 from oslo_concurrency import processutils
 
 from shakenfist import db
-from shakenfist import db
 
 
 LOG = logging.getLogger(__file__)
@@ -172,3 +171,39 @@ def get_version():
 
 def get_user_agent():
     return 'Mozilla/5.0 (Ubuntu; Linux x86_64) Shaken Fist/%s' % get_version()
+
+
+def discover_interfaces():
+    mac_to_iface = {
+        '00:00:00:00:00:00': 'broadcast'
+    }
+    iface_to_mac = {}
+    vxid_to_mac = {}
+
+    iface_name = None
+    iface_name_re = re.compile('^[0-9]+: ([^:]+): <')
+
+    link_ether = None
+    link_ether_re = re.compile('^    link/ether (.*) brd .*')
+
+    stdout, _ = processutils.execute(
+        'ip addr list', shell=True)
+    for line in stdout.split('\n'):
+        line = line.rstrip()
+
+        m = iface_name_re.match(line)
+        if m:
+            iface_name = m.group(1)
+            continue
+
+        m = link_ether_re.match(line)
+        if m:
+            link_ether = m.group(1)
+            mac_to_iface[link_ether] = iface_name
+            iface_to_mac[iface_name] = link_ether
+
+            if iface_name.startswith('vxlan-'):
+                vxid = int(iface_name.split('-')[1])
+                vxid_to_mac[vxid] = link_ether
+
+    return mac_to_iface, iface_to_mac, vxid_to_mac
