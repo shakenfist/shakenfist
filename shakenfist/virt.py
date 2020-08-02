@@ -346,7 +346,8 @@ class Instance(object):
                     'id': devname,
                     'name': devname,
                     'mtu': 1450,
-                    'type': 'physical',
+                    'type': 'vif',
+                    'vif_id': iface['uuid']
                 }
             )
 
