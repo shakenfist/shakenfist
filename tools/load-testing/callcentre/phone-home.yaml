@@ -1,0 +1,10 @@
+#cloud-config
+chpasswd:
+  list: |
+    root:testload
+  expire: False
+
+runcmd:
+  - 'curl -s -X POST -H "Content-Type: application/json" --data "{\"machine_id\":{{ .MachineIndex }} }" http://{{ .CCHost }}:8089/phone'
+
+final_message: "*****===== USER DATA PHONE HOME COMPLETE =====*****"

@@ -133,3 +133,6 @@ dmypy.json
 # Terraform
 .terraform/
 *.tfstate*
+
+# Go
+tools/load-testing/callcentre/callcentre
