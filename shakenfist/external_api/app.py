@@ -260,7 +260,7 @@ def redirect_to_network_node(func):
                 % (config.parsed.get('NETWORK_NODE_IP'),
                    config.parsed.get('API_PORT'),
                    flask.request.environ['PATH_INFO']),
-                data=json.dumps(flask.request.get_json()),
+                data=flask.request.data,
                 headers={'Authorization': admin_token,
                          'User-Agent': util.get_user_agent()})
 
