@@ -67,10 +67,7 @@ class monitor(object):
                 seen_vxids.append(n.vxlan_id)
 
         # Determine if there are any extra vxids
-        extra_vxids = list(vxid_to_mac.keys())
-        for seen in seen_vxids:
-            if seen in extra_vxids:
-                extra_vxids.remove(seen)
+        extra_vxids = set(vxid_to_mac.keys()) - set(seen_vxids)
 
         # For now, just log extra vxids
         if extra_vxids:
