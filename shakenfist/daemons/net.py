@@ -59,8 +59,6 @@ class monitor(object):
                 n = net.from_db(network)
                 if not n:
                     continue
-                if n['state'] != 'created':
-                    continue
 
                 n.create()
                 n.ensure_mesh()
