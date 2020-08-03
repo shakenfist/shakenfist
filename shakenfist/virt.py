@@ -250,14 +250,14 @@ class Instance(object):
 
                 instance = self._get_domain()
                 instance.undefine()
-            except Exception:
-                pass
+            except Exception as e:
+                util.ignore_exception('instance delete', e)
 
         with util.RecordedOperation('delete disks', self) as _:
             try:
                 shutil.rmtree(self.instance_path)
-            except Exception:
-                pass
+            except Exception as e:
+                util.ignore_exception('instance delete', e)
 
         with util.RecordedOperation('release network addresses', self) as _:
             for ni in db.get_instance_interfaces(self.db_entry['uuid']):

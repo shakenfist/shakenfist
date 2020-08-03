@@ -9,7 +9,9 @@ import random
 import re
 import requests
 import string
+import sys
 import time
+import traceback
 
 from oslo_concurrency import processutils
 
@@ -207,3 +209,12 @@ def discover_interfaces():
                 vxid_to_mac[vxid] = link_ether
 
     return mac_to_iface, iface_to_mac, vxid_to_mac
+
+
+def ignore_exception(processname, e):
+    msg = '[Exception] Ignored error in %s: %s' % (processname, e)
+    _, _, tb = sys.exc_info()
+    if tb:
+        msg += '\n%s' % traceback.format_exc()
+
+    LOG.error(msg)

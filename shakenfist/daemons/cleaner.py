@@ -117,8 +117,8 @@ class monitor(object):
             c.defragment()
             LOG.info('Compacted etcd')
 
-        except Exception:
-            pass
+        except Exception as e:
+            util.ignore_exception('etcd compaction', e)
 
     def run(self):
         last_compaction = 0

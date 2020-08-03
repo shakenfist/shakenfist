@@ -45,8 +45,8 @@ def _get_stats():
             'cpu_load_5': load_5,
             'cpu_load_15': load_15,
         })
-    except Exception:
-        pass
+    except Exception as e:
+        util.ignore_exception('load average', e)
 
     # System memory info, converting bytes to mb
     stats = psutil.virtual_memory()
@@ -141,6 +141,6 @@ class monitor(object):
                 gauges['updated_at'].set_to_current_time()
 
             except Exception as e:
-                LOG.error('Failed to collect resource statistics: %s' % e)
+                util.ignore_exception('resource statistics', e)
 
             time.sleep(config.parsed.get('SCHEDULER_CACHE_TIMEOUT'))
