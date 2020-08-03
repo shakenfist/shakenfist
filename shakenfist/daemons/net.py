@@ -55,7 +55,7 @@ class monitor(object):
 
         # Ensure we are on every network we have a host for
         for network in host_networks:
-            with db.get_lock('sf/network/%s' % network['uuid'], ttl=120) as _:
+            with db.get_lock('sf/network/%s' % network, ttl=120) as _:
                 n = net.from_db(network)
                 if not n:
                     continue
