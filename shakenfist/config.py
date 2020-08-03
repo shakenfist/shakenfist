@@ -6,6 +6,8 @@ from logging import handlers as logging_handlers
 import os
 import socket
 
+from shakenfist import util
+
 
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.INFO)
@@ -15,12 +17,10 @@ LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 node_name = socket.getfqdn()
 try:
     node_ip = socket.gethostbyname(node_name)
-except Exception:
+except Exception as e:
     # Only for localhost development environments
     node_ip = '127.0.0.1'
-    LOG.warning(
-        'Could not determine hostname. This is a failure for production '
-        'deploys.')
+    util.ignore_exception('config parser', e)
 
 CONFIG_DEFAULTS = {
     # Deployment wide options
