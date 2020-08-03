@@ -6,6 +6,8 @@ from logging import handlers as logging_handlers
 import os
 import socket
 
+from shakenfist import util
+
 
 LOG = logging.getLogger(__file__)
 LOG.setLevel(logging.INFO)
