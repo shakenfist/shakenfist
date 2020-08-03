@@ -21,6 +21,7 @@ var (
 	memory            int
 	cloudInitFilename string
 	serverIP          string
+	deleteOnCallback  bool
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -60,6 +61,8 @@ func init() {
 		0, "Number of instances to start")
 	rootCmd.PersistentFlags().IntVar(&cpu, "cpu",
 		0, "Instance CPU count")
+	rootCmd.PersistentFlags().BoolVar(&deleteOnCallback, "delCallback",
+		false, "Delete instance immediately after it's callback")
 	rootCmd.PersistentFlags().IntVar(&memory, "memory",
 		0, "Instance Memory size in MB")
 	rootCmd.PersistentFlags().StringVar(&serverIP, "ip",
@@ -184,12 +187,14 @@ func runRootCmd() {
 			fmt.Println("    Received callback:", id)
 			callbackCount += 1
 
-			if err := sysClient.DeleteInstance(Machines[id].UUID); err != nil {
-				fmt.Printf("Error deleting instance (%s):%v\n",
-					Machines[id].UUID, err)
+			if deleteOnCallback {
+				if err := sysClient.DeleteInstance(Machines[id].UUID); err != nil {
+					fmt.Printf("Error deleting instance (%s):%v\n",
+						Machines[id].UUID, err)
+				}
 			}
-			delete(Machines, id)
 
+			delete(Machines, id)
 			if len(Machines) == 0 {
 				fmt.Println("\nSUCCESS - All instances have phoned home")
 				exit = true
@@ -206,8 +211,14 @@ func runRootCmd() {
 		}
 	}
 
+	// Ensure all machines are deleted
+	_, err = sysClient.DeleteAllInstances(uniqueName)
+	if err != nil {
+		fmt.Printf("Error deleting all instances: %v\n", err)
+	}
+
 	// Delete SF network used for this load test
-	if err := sysClient.DeleteNetwork(network.UUID); err != nil {
+	if err = sysClient.DeleteNetwork(network.UUID); err != nil {
 		fmt.Printf("Error deleting created network (%s): %v\n",
 			network.UUID, err)
 	}

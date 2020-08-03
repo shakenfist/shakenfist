@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"strconv"
+	"time"
 
 	template "github.com/alecthomas/template"
 	client "github.com/shakenfist/client-go"
@@ -28,6 +29,8 @@ func startInstances(userClient *client.Client, started chan Machine,
 	// Start the instances
 	for i := 0; i < count; i++ {
 		go startOneInstance(i, started, userClient, initTemplate, networkUUID)
+
+		time.Sleep(time.Second)
 	}
 	fmt.Printf("\n--> All start requests sent\n")
 }
