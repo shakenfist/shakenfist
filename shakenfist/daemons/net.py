@@ -104,4 +104,4 @@ class monitor(object):
             try:
                 self._maintain_networks()
             except Exception as e:
-                LOG.error('Ingored exception in network monitor: %s' % e)
+                util.ignore_exception('network monitor', e)
