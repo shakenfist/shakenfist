@@ -78,6 +78,10 @@ CONFIG_DEFAULTS = {
     # See libvirt docs for full list of options.
     'DISK_BUS': 'virtio',
 
+    # The format for disks. Options are qcow (COW layers onto of image cache),
+    # qcow_flat (just qcow2, no COW), and flat (just raw disk).
+    'DISK_FORMAT': 'qcow',
+
     # The IP of this node
     'NODE_IP': node_ip,
     'NODE_NAME': node_name,
