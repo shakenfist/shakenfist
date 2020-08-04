@@ -41,6 +41,7 @@ class ActualLock(etcd3.Lock):
 
 
 def get_lock(name, ttl=60, timeout=10):
+    """Retrieves an Etcd lock object. To actually lock, you need to .acquire() the lock!"""
     return ActualLock(name, ttl, etcd_client=etcd3.client(), timeout=timeout)
 
 

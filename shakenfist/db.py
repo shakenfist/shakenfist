@@ -16,7 +16,7 @@ from shakenfist import util
 LOG = logging.getLogger(__name__)
 
 
-ETCD_ATTEMPT_TIMEOUT = 15 # TODO(andy):Change back to 5 once network bugs fixed
+ETCD_ATTEMPT_TIMEOUT = 15  # TODO(andy):Change back to 5 once network bugs fixed
 
 
 def see_this_node():
