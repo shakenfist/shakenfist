@@ -28,19 +28,20 @@ class ReadException(Exception):
     pass
 
 
-def get_lock(name, ttl=60):
-    start = time.time()
-    for attempt in range(ETCD_ATTEMPTS):
-        try:
-            return etcd3.client().lock(name, ttl=ttl)
-        except Exception as e:
-            LOG.info('Failed to acquire lock, attempt %d: %s' % (attempt, e))
-            time.sleep(ETCD_ATTEMPT_DELAY)
-        finally:
-            LOG.debug('Locked etcd key "%s" after %.02f seconds'
-                      % (name, time.time() - start))
+class ActualLock(etcd3.Lock):
+    def __init__(self, name, ttl=60, etcd_client=None, timeout=10):
+        super(ActualLock, self).__init__(name, ttl, etcd_client)
+        self.timeout = timeout
 
-    raise LockException('Cannot acquire lock')
+    def __enter__(self):
+        LOG.debug("ActualLock.__enter__() timeout=%s name=%s",
+                  self.timeout, self.name)
+        if not self.acquire(timeout=self.timeout):
+            raise LockException('Cannot acquire lock: %s' % self.name)
+
+
+def get_lock(name, ttl=60, timeout=10):
+    return ActualLock(name, ttl, etcd_client=etcd3.client(), timeout=timeout)
 
 
 def _construct_key(objecttype, subtype, name):

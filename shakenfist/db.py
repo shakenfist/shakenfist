@@ -16,6 +16,9 @@ from shakenfist import util
 LOG = logging.getLogger(__name__)
 
 
+ETCD_ATTEMPT_TIMEOUT = 15 # TODO(andy):Change back to 5 once network bugs fixed
+
+
 def see_this_node():
     etcd.put(
         'node', None,
@@ -29,8 +32,8 @@ def see_this_node():
         ttl=120)
 
 
-def get_lock(name, ttl=60):
-    return etcd.get_lock(name, ttl=ttl)
+def get_lock(name, ttl=60, timeout=ETCD_ATTEMPT_TIMEOUT):
+    return etcd.get_lock(name, ttl=ttl, timeout=timeout)
 
 
 def get_node_ips():
