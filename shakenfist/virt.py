@@ -222,6 +222,12 @@ class Instance(object):
 
                             images.create_cow(resized_image_path, disk['path'])
 
+                        # Record the backing store for modern libvirts
+                        disk['backing'] = ('<backingStore type=\'file\'>\n'
+                                           '        <format type=\'qcow2\'/>\n'
+                                           '        <source file=\'%s\'/>\n'
+                                           '      </backingStore>' % resized_image_path)
+
                 elif not os.path.exists(disk['path']):
                     processutils.execute('qemu-img create -f qcow2 %s %sG'
                                          % (disk['path'], disk['size']),
