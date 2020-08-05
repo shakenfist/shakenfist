@@ -16,7 +16,7 @@ type CloudFileData struct {
 	CCHost       string // CallCentre server FQDN or IP
 }
 
-func startInstances(userClient *client.Client, started chan Machine,
+func startInstances(load int, userClient *client.Client, delay int, started chan Machine,
 	networkUUID string) {
 
 	// Load user data file template
@@ -27,10 +27,10 @@ func startInstances(userClient *client.Client, started chan Machine,
 	}
 
 	// Start the instances
-	for i := 0; i < count; i++ {
+	for i := 0; i < load; i++ {
 		go startOneInstance(i, started, userClient, initTemplate, networkUUID)
 
-		time.Sleep(time.Second)
+		time.Sleep(time.Duration(delay) * time.Second)
 	}
 	fmt.Printf("\n--> All start requests sent\n")
 }

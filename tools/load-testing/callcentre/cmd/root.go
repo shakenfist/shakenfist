@@ -16,8 +16,9 @@ import (
 
 var (
 	cfgFile           string
-	count             int
+	instanceLoad      int
 	cpu               int
+	delay             int
 	memory            int
 	cloudInitFilename string
 	serverIP          string
@@ -33,8 +34,8 @@ var rootCmd = &cobra.Command{
   Create a network within that namespace
   Start instances in the namespace
   Wait for each instance to call back via HTTP on port 8089
-  Delete each instance that has called back
-  When all instances have called back, delete the network
+  When all instances have called back, delete all instances
+  Delete the network
   Delete the namespace
 
 If the test fails, the "sf-client namespace clean" command can be used`,
@@ -57,7 +58,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config",
 		"", "Call Centre config file (default is callcentre.yaml)")
 
-	rootCmd.PersistentFlags().IntVar(&count, "count",
+	rootCmd.PersistentFlags().IntVar(&instanceLoad, "load",
 		0, "Number of instances to start")
 	rootCmd.PersistentFlags().IntVar(&cpu, "cpu",
 		0, "Instance CPU count")
@@ -67,6 +68,8 @@ func init() {
 		0, "Instance Memory size in MB")
 	rootCmd.PersistentFlags().StringVar(&serverIP, "ip",
 		"", "This servers reachable IP address from within the instances")
+	rootCmd.PersistentFlags().IntVar(&delay, "delay",
+		1, "Delay between attempting to start instances")
 
 	rootCmd.PersistentFlags().StringVar(&cloudInitFilename, "cloudinit",
 		"phone-home.yaml", "Cloud init phone home YAML filename")
@@ -106,11 +109,11 @@ type Machine struct {
 // runRootCmd is the actual code that executes desired load test
 func runRootCmd() {
 	fmt.Printf("CPU=%d  Memory=%d\n", cpu, memory)
-	fmt.Printf("Starting %d instances...\n\n", count)
+	fmt.Printf("Starting %d instances...\n\n", instanceLoad)
 
 	// Check parameters
-	if count <= 0 {
-		fmt.Println("Count should be greater than 0")
+	if instanceLoad <= 0 {
+		fmt.Println("Load should be greater than 0")
 		return
 	}
 	if cpu <= 0 {
@@ -166,14 +169,16 @@ func runRootCmd() {
 
 	// Get instances started
 	instanceStart := make(chan Machine)
-	go startInstances(userClient, instanceStart, network.UUID)
+	go startInstances(instanceLoad, userClient, delay, instanceStart,
+		network.UUID)
 
 	// Loop waiting for HTTP callbacks from each instance.
 	Machines := make(map[int]Machine)
 	callbackCount := 0
 	started := 0
 
-	for exit := false; !exit; {
+forever:
+	for {
 		// Timer to delay updating list of expected callbacks
 		delay := time.After(5 * time.Second)
 
@@ -181,7 +186,6 @@ func runRootCmd() {
 		case m := <-instanceStart:
 			Machines[m.Index] = m
 			started += 1
-			continue
 
 		case id := <-cb.Received:
 			fmt.Println("    Received callback:", id)
@@ -195,11 +199,10 @@ func runRootCmd() {
 			}
 
 			delete(Machines, id)
-			if len(Machines) == 0 {
+			if started == instanceLoad && len(Machines) == 0 {
 				fmt.Println("\nSUCCESS - All instances have phoned home")
-				exit = true
+				break forever
 			}
-			continue
 
 		case <-delay:
 			fmt.Printf("\nInstances: Started=%d Callbacks=%d Outstanding=%d\n",
@@ -210,6 +213,8 @@ func runRootCmd() {
 			}
 		}
 	}
+
+	fmt.Println("Cleaning up...")
 
 	// Ensure all machines are deleted
 	_, err = sysClient.DeleteAllInstances(uniqueName)
