@@ -30,15 +30,16 @@ var rootCmd = &cobra.Command{
 	Use:   "callcentre",
 	Short: "Call Centre",
 	Long: `Call Centre will:
-  Create a unique namespace
-  Create a network within that namespace
-  Start instances in the namespace
-  Wait for each instance to call back via HTTP on port 8089
-  When all instances have called back, delete all instances
-  Delete the network
-  Delete the namespace
+  1. Create a unique namespace
+  2. Create a network within that namespace
+  3. Start instances in the namespace
+  4. Wait for each instance to call back via HTTP on port 8089
+  5. When all instances have called back, delete all instances
+  6. Delete the network
+  7. Delete the namespace
 
-If the test fails, the "sf-client namespace clean" command can be used`,
+If the test fails, the "sf-client namespace clean" command can be used to
+remove any remaining instances and networks.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		runRootCmd()
 	},
@@ -101,15 +102,16 @@ func initConfig() {
 }
 
 type Machine struct {
-	Index int
-	UUID  string
-	Node  string
+	Index       int
+	UUID        string
+	Node        string
+	ConsolePort int
 }
 
 // runRootCmd is the actual code that executes desired load test
 func runRootCmd() {
-	fmt.Printf("CPU=%d  Memory=%d\n", cpu, memory)
-	fmt.Printf("Starting %d instances...\n\n", instanceLoad)
+	fmt.Printf("Callcentre Load Test:  %d Instances of CPU=%d  Memory=%d\n\n",
+		instanceLoad, cpu, memory)
 
 	// Check parameters
 	if instanceLoad <= 0 {
@@ -156,6 +158,7 @@ func runRootCmd() {
 		uniqueName, userKey)
 
 	// Create new network
+	fmt.Println("Creating network:", uniqueName)
 	network, err := userClient.CreateNetwork("10.0.0.0/24",
 		true, true, uniqueName)
 	if err != nil {
@@ -168,6 +171,7 @@ func runRootCmd() {
 	cb.StartServer()
 
 	// Get instances started
+	fmt.Printf("Starting instances...\n\n")
 	instanceStart := make(chan Machine)
 	go startInstances(instanceLoad, userClient, delay, instanceStart,
 		network.UUID)
@@ -186,6 +190,9 @@ forever:
 		case m := <-instanceStart:
 			Machines[m.Index] = m
 			started += 1
+			fmt.Printf(
+				"  Started Instance %3d: %s  Node: %s  ConsolePort: %d\n",
+				m.Index, m.UUID, m.Node, m.ConsolePort)
 
 		case id := <-cb.Received:
 			fmt.Println("    Received callback:", id)
@@ -208,8 +215,9 @@ forever:
 			fmt.Printf("\nInstances: Started=%d Callbacks=%d Outstanding=%d\n",
 				started, callbackCount, len(Machines))
 			for i := range Machines {
-				fmt.Printf("  %d: %s  %s\n",
-					i, Machines[i].UUID, Machines[i].Node)
+				fmt.Printf("  %d: %s  %s  %d\n",
+					i, Machines[i].UUID, Machines[i].Node,
+					Machines[i].ConsolePort)
 			}
 		}
 	}

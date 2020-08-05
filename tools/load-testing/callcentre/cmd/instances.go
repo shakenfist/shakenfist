@@ -5,9 +5,9 @@ import (
 	"encoding/base64"
 	"fmt"
 	"strconv"
+	"text/template"
 	"time"
 
-	template "github.com/alecthomas/template"
 	client "github.com/shakenfist/client-go"
 )
 
@@ -16,8 +16,8 @@ type CloudFileData struct {
 	CCHost       string // CallCentre server FQDN or IP
 }
 
-func startInstances(load int, userClient *client.Client, delay int, started chan Machine,
-	networkUUID string) {
+func startInstances(load int, userClient *client.Client,
+	delay int, started chan Machine, networkUUID string) {
 
 	// Load user data file template
 	initTemplate, err := template.ParseFiles(cloudInitFilename)
@@ -82,13 +82,10 @@ func startOneInstance(index int, started chan Machine,
 		fmt.Printf("Error starting instance %d: %v\n", index, err)
 	}
 
-	fmt.Printf(
-		"  Started Instance %3d: %s  Node: %s  ConsolePort: %d\n",
-		index, inst.UUID, inst.Node, inst.ConsolePort)
-
 	started <- Machine{
-		Index: index,
-		UUID:  inst.UUID,
-		Node:  inst.Node,
+		Index:       index,
+		UUID:        inst.UUID,
+		Node:        inst.Node,
+		ConsolePort: inst.ConsolePort,
 	}
 }
