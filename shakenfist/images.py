@@ -228,6 +228,27 @@ def create_cow(cache_file, disk_file):
         shell=True)
 
 
+def create_flat(cache_file, disk_file):
+    """Make a flat copy of the disk from the image cache."""
+
+    if os.path.exists(disk_file):
+        return
+
+    shutil.copyfile(cache_file, disk_file)
+
+
+def create_raw(cache_file, disk_file):
+    """Make a raw copy of the disk from the image cache."""
+
+    if os.path.exists(disk_file):
+        return
+
+    processutils.execute(
+        'qemu-img convert -t none -O raw %s %s'
+        % (cache_file, disk_file),
+        shell=True)
+
+
 def snapshot(source, destination):
     """Convert a possibly COW layered disk file into a snapshot."""
 

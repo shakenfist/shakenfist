@@ -100,14 +100,18 @@ class Instance(object):
         root_device = _get_disk_device_base(bus) + 'a'
         config_device = _get_disk_device_base(bus) + 'b'
 
+        disk_type = 'qcow2'
+        if config.parsed.get('DISK_FORMAT') == 'flat':
+            disk_type = 'raw'
+
         self.db_entry['block_devices'] = {
             'devices': [
                 {
-                    'type': 'qcow2',
+                    'type': disk_type,
                     'size': self.db_entry['disk_spec'][0].get('size'),
                     'device': root_device,
                     'bus': bus,
-                    'path': os.path.join(self.instance_path, root_device + '.qcow2'),
+                    'path': os.path.join(self.instance_path, root_device),
                     'base': self.db_entry['disk_spec'][0].get('base'),
                     'present_as': _get_defaulted_disk_type(self.db_entry['disk_spec'][0]),
                     'snapshot_ignores': False
@@ -116,7 +120,7 @@ class Instance(object):
                     'type': 'raw',
                     'device': config_device,
                     'bus': bus,
-                    'path': os.path.join(self.instance_path, config_device + '.raw'),
+                    'path': os.path.join(self.instance_path, config_device),
                     'present_as': 'disk',
                     'snapshot_ignores': True
                 }
@@ -128,11 +132,11 @@ class Instance(object):
             bus = _get_defaulted_disk_bus(d)
             device = _get_disk_device_base(bus) + chr(ord('c') + i)
             self.db_entry['block_devices']['devices'].append({
-                'type': 'qcow2',
+                'type': disk_type,
                 'size': d.get('size'),
                 'device': device,
                 'bus': bus,
-                'path': os.path.join(self.instance_path, device + '.qcow2'),
+                'path': os.path.join(self.instance_path, device),
                 'base': d.get('base'),
                 'present_as': _get_defaulted_disk_type(d),
                 'snapshot_ignores': False
@@ -216,11 +220,38 @@ class Instance(object):
                             resized_image_path = images.resize(
                                 hashed_image_path, disk['size'])
 
-                        with util.RecordedOperation('create copy on write layer', self) as _:
-                            if lock:
-                                lock.refresh
+                        if config.parsed.get('DISK_FORMAT') == 'qcow':
+                            with util.RecordedOperation('create copy on write layer', self) as _:
+                                if lock:
+                                    lock.refresh
 
-                            images.create_cow(resized_image_path, disk['path'])
+                                images.create_cow(
+                                    resized_image_path, disk['path'])
+
+                            # Record the backing store for modern libvirts
+                            disk['backing'] = ('<backingStore type=\'file\'>\n'
+                                               '        <format type=\'qcow2\'/>\n'
+                                               '        <source file=\'%s\'/>\n'
+                                               '      </backingStore>' % resized_image_path)
+
+                        elif config.parsed.get('DISK_FORMAT') == 'qcow_flat':
+                            with util.RecordedOperation('create flat layer', self) as _:
+                                if lock:
+                                    lock.refresh
+
+                                images.create_flat(
+                                    resized_image_path, disk['path'])
+
+                        elif config.parsed.get('DISK_FORMAT') == 'flat':
+                            with util.RecordedOperation('create raw disk', self) as _:
+                                if lock:
+                                    lock.refresh
+
+                                images.create_raw(
+                                    resized_image_path, disk['path'])
+
+                        else:
+                            raise Exception('Unknown disk format')
 
                 elif not os.path.exists(disk['path']):
                     processutils.execute('qemu-img create -f qcow2 %s %sG'

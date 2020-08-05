@@ -33,6 +33,7 @@ CONFIG_DEFAULTS = {
     #  - prometheus_metrics_port: where to expose internal metrics. Do not
     #    allow access from untrusted clients!
     'API_PORT': 13000,
+    'API_TIMEOUT': 900,
     'INCLUDE_TRACEBACKS': '1',
     'PROMETHEUS_METRICS_PORT': 13001,
     'AUTH_SECRET_SEED': 'foo',
@@ -76,6 +77,10 @@ CONFIG_DEFAULTS = {
     # The bus to use for disk devices. One of virtio, scsi, usb, ide, etc.
     # See libvirt docs for full list of options.
     'DISK_BUS': 'virtio',
+
+    # The format for disks. Options are qcow (COW layers onto of image cache),
+    # qcow_flat (just qcow2, no COW), and flat (just raw disk).
+    'DISK_FORMAT': 'qcow',
 
     # The IP of this node
     'NODE_IP': node_ip,

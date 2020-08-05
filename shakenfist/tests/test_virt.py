@@ -29,6 +29,8 @@ class VirtTestCase(testtools.TestCase):
                 return '/a/b/c'
             if key == 'DISK_BUS':
                 return 'virtio'
+            if key == 'DISK_FORMAT':
+                return 'qcow'
             if key == 'ZONE':
                 return 'sfzone'
             if key == 'NODE_NAME':
@@ -69,7 +71,7 @@ class VirtTestCase(testtools.TestCase):
                     'base': 'cirros',
                     'device': 'vda',
                     'bus': 'virtio',
-                    'path': '/a/b/c/instances/fakeuuid/vda.qcow2',
+                    'path': '/a/b/c/instances/fakeuuid/vda',
                     'size': 8,
                     'type': 'qcow2',
                     'present_as': 'disk',
@@ -78,7 +80,7 @@ class VirtTestCase(testtools.TestCase):
                 {
                     'device': 'vdb',
                     'bus': 'virtio',
-                    'path': '/a/b/c/instances/fakeuuid/vdb.raw',
+                    'path': '/a/b/c/instances/fakeuuid/vdb',
                     'type': 'raw',
                     'present_as': 'disk',
                     'snapshot_ignores': True
@@ -114,7 +116,7 @@ class VirtTestCase(testtools.TestCase):
                     'base': 'cirros',
                     'device': 'vda',
                     'bus': 'virtio',
-                    'path': '/a/b/c/instances/fakeuuid/vda.qcow2',
+                    'path': '/a/b/c/instances/fakeuuid/vda',
                     'size': 8,
                     'type': 'qcow2',
                     'present_as': 'disk',
@@ -123,7 +125,7 @@ class VirtTestCase(testtools.TestCase):
                 {
                     'device': 'vdb',
                     'bus': 'virtio',
-                    'path': '/a/b/c/instances/fakeuuid/vdb.raw',
+                    'path': '/a/b/c/instances/fakeuuid/vdb',
                     'type': 'raw',
                     'present_as': 'disk',
                     'snapshot_ignores': True
@@ -132,7 +134,7 @@ class VirtTestCase(testtools.TestCase):
                     'base': None,
                     'device': 'vdc',
                     'bus': 'virtio',
-                    'path': '/a/b/c/instances/fakeuuid/vdc.qcow2',
+                    'path': '/a/b/c/instances/fakeuuid/vdc',
                     'size': 16,
                     'type': 'qcow2',
                     'present_as': 'disk',
@@ -142,7 +144,7 @@ class VirtTestCase(testtools.TestCase):
                     'base': None,
                     'device': 'vdd',
                     'bus': 'virtio',
-                    'path': '/a/b/c/instances/fakeuuid/vdd.qcow2',
+                    'path': '/a/b/c/instances/fakeuuid/vdd',
                     'size': 24,
                     'type': 'qcow2',
                     'present_as': 'disk',
