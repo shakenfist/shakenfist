@@ -26,7 +26,7 @@ class monitor(object):
         host_networks = []
         seen_vxids = []
 
-        if not net.is_network_node():
+        if not util.is_network_node():
             # For normal nodes, just the ones we have instances for
             for inst in list(db.get_instances(only_node=config.parsed.get('NODE_NAME'))):
                 for iface in db.get_instance_interfaces(inst['uuid']):
@@ -104,7 +104,7 @@ class monitor(object):
             time.sleep(30)
 
             try:
-                LOG.info("Daeman:net: Checking networks")
+                LOG.info("Daemon:net: Checking networks")
                 self._maintain_networks()
             except Exception as e:
                 util.ignore_exception('network monitor', e)

@@ -27,7 +27,7 @@ def from_db(uuid):
         return None
 
     if dbnet['state'] == 'deleted':
-        LOG.info('network(%s) net.from_db() network is state=deleted' % uuid)
+        LOG.info('%s: net.from_db() network is state=deleted', uuid)
         return None
 
     return Network(uuid=dbnet['uuid'],
@@ -38,11 +38,6 @@ def from_db(uuid):
                    physical_nic=config.parsed.get('NODE_EGRESS_NIC'),
                    floating_gateway=dbnet['floating_gateway'],
                    namespace=dbnet['namespace'])
-
-
-def is_network_node():
-    """Test if this node is the network node"""
-    return config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP')
 
 
 class Network(object):
@@ -110,7 +105,7 @@ class Network(object):
 
         okay = self.is_created()
 
-        if is_network_node():
+        if self.provide_dhcp and util.is_network_node():
             okay &= self.is_dnsmasq_running()
 
         return okay
@@ -123,14 +118,13 @@ class Network(object):
                                       shell=True)
         net_created = re.match(r'.*[<,]UP[,>].*', out)
         if not net_created:
-            LOG.warning('network(%s) is_created() bridge is not up: %s',
-                        self.uuid, out)
+            LOG.warning('%s: is_created() bridge is not up: %s',
+                        self, out)
 
         return bool(net_created)
 
     def create(self):
-        LOG.info("net.create() (%s) vxlan=%s namespace=%s",
-                 self.uuid, self.vxlan_id, self.namespace)
+        LOG.info('%s: net.create() namespace=%s', self, self.namespace)
         subst = self.subst_dict()
 
         with db.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
@@ -165,7 +159,7 @@ class Network(object):
                     processutils.execute(
                         'brctl setageing %(vx_bridge)s 0' % subst, shell=True)
 
-        if is_network_node():
+        if util.is_network_node():
             if not os.path.exists('/var/run/netns/%(netns)s' % subst):
                 with util.RecordedOperation('create netns', self) as _:
                     processutils.execute(
@@ -210,8 +204,7 @@ class Network(object):
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
                                   config.parsed.get('API_PORT')),
                 namespace='system')
-            LOG.info("net.create() (%s) deploy_network_node on network_node",
-                     self.uuid)
+            LOG.info('%s: calling /deploy_network_node on network_node', self)
             requests.request(
                 'put',
                 ('http://%s:%d/deploy_network_node'
@@ -287,7 +280,7 @@ class Network(object):
                                          shell=True)
 
             # If this is the network node do additional cleanup
-            if is_network_node():
+            if util.is_network_node():
                 if util.check_for_interface(subst['vx_veth_outer']):
                     with util.RecordedOperation('delete router veth', self) as _:
                         processutils.execute('ip link delete %(vx_veth_outer)s' % subst,
@@ -322,15 +315,14 @@ class Network(object):
                 # Found a dnsmasq process for the network
                 return True
 
-        LOG.warning('network(%s) is_dnsmasq_running() it is not!',
-                    self.uuid)
+        LOG.warning('%s: is_dnsmasq_running() it is not!', self)
         return False
 
     def update_dhcp(self):
         if not self.provide_dhcp:
             return
 
-        if is_network_node():
+        if util.is_network_node():
             self.ensure_mesh()
             subst = self.subst_dict()
             with util.RecordedOperation('update dhcp', self) as _:
@@ -352,7 +344,7 @@ class Network(object):
                          'User-Agent': util.get_user_agent()})
 
     def remove_dhcp(self):
-        if is_network_node():
+        if util.is_network_node():
             subst = self.subst_dict()
             with util.RecordedOperation('remove dhcp', self) as _:
                 with db.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:

@@ -1,12 +1,26 @@
-import ipaddress
 import mock
 import testtools
 
 
 from shakenfist import util
+from shakenfist import config
 
 
 class UtilTestCase(testtools.TestCase):
+    def test_is_network_node_yes(self):
+        config.CONFIG_DEFAULTS['NODE_IP'] = '1.1.1.1'
+        config.CONFIG_DEFAULTS['NETWORK_NODE_IP'] = '1.1.1.1'
+        config.parsed = config.Config()
+
+        self.assertTrue(util.is_network_node())
+
+    def test_is_network_node_no(self):
+        config.CONFIG_DEFAULTS['NODE_IP'] = '1.1.1.1'
+        config.CONFIG_DEFAULTS['NETWORK_NODE_IP'] = '2.2.2.2'
+        config.parsed = config.Config()
+
+        self.assertFalse(util.is_network_node())
+
     @mock.patch('oslo_concurrency.processutils.execute',
                 return_value=(None, 'Device "banana0" does not exist.'))
     def test_check_for_interface_missing_interface(self, mock_execute):

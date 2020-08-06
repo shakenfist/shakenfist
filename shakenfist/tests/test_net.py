@@ -7,25 +7,6 @@ from shakenfist import net
 from shakenfist import config
 
 
-class NetTestCase(testtools.TestCase):
-    #
-    # is_network_node_yes()
-    #
-    def test_is_network_node_yes(self):
-        config.CONFIG_DEFAULTS['NODE_IP'] = '1.1.1.1'
-        config.CONFIG_DEFAULTS['NETWORK_NODE_IP'] = '1.1.1.1'
-        config.parsed = config.Config()
-
-        self.assertTrue(net.is_network_node())
-
-    def test_is_network_node_no(self):
-        config.CONFIG_DEFAULTS['NODE_IP'] = '1.1.1.1'
-        config.CONFIG_DEFAULTS['NETWORK_NODE_IP'] = '2.2.2.2'
-        config.parsed = config.Config()
-
-        self.assertFalse(net.is_network_node())
-
-
 class NetworkTestCase(testtools.TestCase):
     def setUp(self):
         super(NetworkTestCase, self).setUp()
@@ -131,8 +112,16 @@ class NetworkNetNodeTestCase(NetworkTestCase):
 
     @mock.patch('shakenfist.net.Network.is_created', return_value=True)
     @mock.patch('shakenfist.net.Network.is_dnsmasq_running', return_value=False)
-    def test_is_okay_no_dns(self, mock_is_dnsmasq, mock_is_created):
+    def test_is_okay_no_masq(self, mock_is_dnsmasq, mock_is_created):
         n = net.Network(uuid='actualuuid', vxlan_id=42, provide_dhcp=True,
+                        provide_nat=True, physical_nic='eth0',
+                        ipblock='192.168.1.0/24')
+        self.assertFalse(n.is_okay())
+
+    @mock.patch('shakenfist.net.Network.is_created', return_value=True)
+    @mock.patch('shakenfist.net.Network.is_dnsmasq_running', return_value=False)
+    def test_is_okay_no_masq_no_dhcp(self, mock_is_dnsmasq, mock_is_created):
+        n = net.Network(uuid='actualuuid', vxlan_id=42, provide_dhcp=False,
                         provide_nat=True, physical_nic='eth0',
                         ipblock='192.168.1.0/24')
         self.assertFalse(n.is_okay())
