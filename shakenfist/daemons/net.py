@@ -60,8 +60,14 @@ class monitor(object):
                 if not n:
                     continue
 
-                n.create()
-                n.ensure_mesh()
+                # If we are not on the mesh, the treat this as a new network, otherwise
+                # just do some mesh maintenance
+                if (not util.check_for_interface('vxlan-%s' % n.vxlan_id) or
+                        not util.check_for_interface('br-vxlan-%s' % n.vxlan_id)):
+                    n.create()
+                else:
+                    n.ensure_mesh()
+
                 seen_vxids.append(n.vxlan_id)
 
         # Determine if there are any extra vxids
