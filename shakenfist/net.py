@@ -40,6 +40,11 @@ def from_db(uuid):
                    namespace=dbnet['namespace'])
 
 
+def is_network_node():
+    """Test if this node is the network node"""
+    return config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP')
+
+
 class Network(object):
     # NOTE(mikal): it should be noted that the maximum interface name length
     # on Linux is 15 user visible characters.
@@ -99,7 +104,33 @@ class Network(object):
     def persist_floating_gateway(self):
         db.persist_floating_gateway(self.uuid, self.floating_gateway)
 
+    def is_okay(self):
+        """Check if network is created and running"""
+        # TODO(andy):This will be built upon with further code re-design
+
+        okay = self.is_created()
+
+        if is_network_node():
+            okay &= self.is_dnsmasq_running()
+
+        return okay
+
+    def is_created(self):
+        """Attempt to ensure network has been created successfully"""
+
+        subst = self.subst_dict()
+        out, _ = processutils.execute('ip link show %(vx_bridge)s' % subst,
+                                      shell=True)
+        net_created = re.match(r'.*[<,]UP[,>].*', out)
+        if not net_created:
+            LOG.warning('network(%s) is_created() bridge is not up: %s',
+                        self.uuid, out)
+
+        return bool(net_created)
+
     def create(self):
+        LOG.info("net.create() (%s) vxlan=%s namespace=%s",
+                 self.uuid, self.vxlan_id, self.namespace)
         subst = self.subst_dict()
 
         with db.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
@@ -134,7 +165,7 @@ class Network(object):
                     processutils.execute(
                         'brctl setageing %(vx_bridge)s 0' % subst, shell=True)
 
-        if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
+        if is_network_node():
             if not os.path.exists('/var/run/netns/%(netns)s' % subst):
                 with util.RecordedOperation('create netns', self) as _:
                     processutils.execute(
@@ -179,6 +210,8 @@ class Network(object):
                 'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
                                   config.parsed.get('API_PORT')),
                 namespace='system')
+            LOG.info("net.create() (%s) deploy_network_node on network_node",
+                     self.uuid)
             requests.request(
                 'put',
                 ('http://%s:%d/deploy_network_node'
@@ -254,7 +287,7 @@ class Network(object):
                                          shell=True)
 
             # If this is the network node do additional cleanup
-            if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
+            if is_network_node():
                 if util.check_for_interface(subst['vx_veth_outer']):
                     with util.RecordedOperation('delete router veth', self) as _:
                         processutils.execute('ip link delete %(vx_veth_outer)s' % subst,
@@ -276,11 +309,28 @@ class Network(object):
                         ipm.release(self.floating_gateway)
                         db.persist_ipmanager('floating', ipm.save())
 
+    def is_dnsmasq_running(self):
+        """Determine if dnsmasq process is running for this network"""
+        try:
+            out, _ = processutils.execute('pgrep -a dnsmasq', shell=True)
+        except processutils.ProcessExecutionError:
+            # Non zero return status caused by no dnsmasq processes
+            out = ''
+
+        for line in out.split('\n'):
+            if self.uuid in line:
+                # Found a dnsmasq process for the network
+                return True
+
+        LOG.warning('network(%s) is_dnsmasq_running() it is not!',
+                    self.uuid)
+        return False
+
     def update_dhcp(self):
         if not self.provide_dhcp:
             return
 
-        if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
+        if is_network_node():
             self.ensure_mesh()
             subst = self.subst_dict()
             with util.RecordedOperation('update dhcp', self) as _:
@@ -302,7 +352,7 @@ class Network(object):
                          'User-Agent': util.get_user_agent()})
 
     def remove_dhcp(self):
-        if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
+        if is_network_node():
             subst = self.subst_dict()
             with util.RecordedOperation('remove dhcp', self) as _:
                 with db.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
