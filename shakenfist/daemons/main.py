@@ -48,12 +48,16 @@ def restore_instances():
 
     with util.RecordedOperation('restore instances', None) as _:
         for instance in instances:
+            if instance.get('power_state', 'unknown') not in ['on', 'transition-to-on',
+                                                              'initial', 'unknown']:
+                continue
+
             try:
                 i = virt.from_db(instance)
                 LOG.info('%s Restoring instance' % i)
                 i.create()
             except Exception as e:
-                util.ignore_exception('restore network %s' % instance, e)
+                util.ignore_exception('restore instance %s' % instance, e)
                 db.update_instance_state(instance, 'error')
 
 
