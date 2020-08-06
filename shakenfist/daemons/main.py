@@ -48,12 +48,14 @@ def restore_instances():
 
     with util.RecordedOperation('restore instances', None) as _:
         for instance in instances:
-            if instance.get('power_state', 'unknown') not in ['on', 'transition-to-on',
-                                                              'initial', 'unknown']:
-                continue
-
             try:
                 i = virt.from_db(instance)
+                if not i:
+                    continue
+                if i.db_entry.get('power_state', 'unknown') not in ['on', 'transition-to-on',
+                                                                    'initial', 'unknown']:
+                    continue
+
                 LOG.info('%s Restoring instance' % i)
                 i.create()
             except Exception as e:
