@@ -26,7 +26,7 @@ class monitor(object):
         host_networks = []
         seen_vxids = []
 
-        if config.parsed.get('NODE_IP') != config.parsed.get('NETWORK_NODE_IP'):
+        if not util.is_network_node():
             # For normal nodes, just the ones we have instances for
             for inst in list(db.get_instances(only_node=config.parsed.get('NODE_NAME'))):
                 for iface in db.get_instance_interfaces(inst['uuid']):
@@ -46,7 +46,10 @@ class monitor(object):
                         LOG.info('Hard deleted stray network interface %s '
                                  'associated with absent instance %s'
                                  % (ni['uuid'], ni['instance_uuid']))
-                    elif inst.get('state', 'unknown') in ['deleted', 'error', 'unknown']:
+
+                    elif inst.get('state', 'unknown') in ['deleted',
+                                                          'error',
+                                                          'unknown']:
                         db.hard_delete_network_interface(ni['uuid'])
                         LOG.info('Hard deleted stray network interface %s '
                                  'associated with %s instance %s'
@@ -60,14 +63,17 @@ class monitor(object):
                 if not n:
                     continue
 
-                n.create()
+                if not n.is_okay():
+                    LOG.info("Daemon:net: maintain_networks() recreating %s",
+                             n.uuid)
+                    n.create()
                 n.ensure_mesh()
                 seen_vxids.append(n.vxlan_id)
 
         # Determine if there are any extra vxids
         extra_vxids = set(vxid_to_mac.keys()) - set(seen_vxids)
 
-        # For now, just log extra vxids
+        # Delete "deleted" SF networks and log unknown vxlans
         if extra_vxids:
             LOG.warn('Extra vxlans present! IDs are: %s'
                      % extra_vxids)
@@ -79,7 +85,8 @@ class monitor(object):
 
             for extra in extra_vxids:
                 if extra in vxid_to_uuid:
-                    with db.get_lock('sf/network/%s' % vxid_to_uuid[extra], ttl=120) as _:
+                    with db.get_lock('sf/network/%s' % vxid_to_uuid[extra],
+                                     ttl=120) as _:
                         n = net.from_db(vxid_to_uuid[extra])
                         n.delete()
                         LOG.info('Extra vxlan %s (network %s) removed.'
@@ -97,6 +104,7 @@ class monitor(object):
             time.sleep(30)
 
             try:
+                LOG.info("Daemon:net: Checking networks")
                 self._maintain_networks()
             except Exception as e:
                 util.ignore_exception('network monitor', e)

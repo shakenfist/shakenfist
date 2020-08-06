@@ -92,18 +92,21 @@ class DHCP(object):
             shutil.rmtree(self.subst['config_dir'])
 
     def _send_signal(self, sig):
-        pidfile = os.path.join(self.subst['config_dir'], 'pid')
-        if os.path.exists(pidfile):
-            with open(pidfile) as f:
-                pid = int(f.read())
-
+        pid = self.get_pid()
+        if pid:
             if not psutil.pid_exists(pid):
                 return False
-
             os.kill(pid, sig)
             return True
-
         return False
+
+    def get_pid(self):
+        pid_file = os.path.join(self.subst['config_dir'], 'pid')
+        if os.path.exists(pid_file):
+            with open(pid_file) as f:
+                pid = int(f.read())
+                return pid
+        return None
 
     def remove_dhcpd(self):
         self._send_signal(signal.SIGKILL)
