@@ -4,6 +4,7 @@ import json
 import logging
 from logging import handlers as logging_handlers
 import os
+import psutil
 import re
 import requests
 
@@ -304,16 +305,11 @@ class Network(object):
 
     def is_dnsmasq_running(self):
         """Determine if dnsmasq process is running for this network"""
-        try:
-            out, _ = processutils.execute('pgrep -a dnsmasq', shell=True)
-        except processutils.ProcessExecutionError:
-            # Non zero return status caused by no dnsmasq processes
-            out = ''
-
-        for line in out.split('\n'):
-            if self.uuid in line:
-                # Found a dnsmasq process for the network
-                return True
+        subst = self.subst_dict()
+        d = dhcp.DHCP(self.uuid, subst['vx_veth_inner'])
+        pid = d.get_pid()
+        if pid and psutil.pid_exists(pid):
+            return True
 
         LOG.warning('%s: is_dnsmasq_running() it is not!', self)
         return False

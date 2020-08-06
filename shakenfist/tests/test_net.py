@@ -1,10 +1,9 @@
 import mock
 import testtools
 
-from oslo_concurrency import processutils
-
 from shakenfist import net
 from shakenfist import config
+from shakenfist import util
 
 
 class NetworkTestCase(testtools.TestCase):
@@ -46,7 +45,7 @@ class NetworkGeneralTestCase(NetworkTestCase):
         config.CONFIG_DEFAULTS['NETWORK_NODE_IP'] = '2.2.2.2'
         config.parsed = config.Config()
 
-        self.assertFalse(net.is_network_node())
+        self.assertFalse(util.is_network_node())
 
 
 class NetworkNormalNodeTestCase(NetworkTestCase):
@@ -124,7 +123,7 @@ class NetworkNetNodeTestCase(NetworkTestCase):
         n = net.Network(uuid='actualuuid', vxlan_id=42, provide_dhcp=False,
                         provide_nat=True, physical_nic='eth0',
                         ipblock='192.168.1.0/24')
-        self.assertFalse(n.is_okay())
+        self.assertTrue(n.is_okay())
 
     #
     # is_created()
@@ -167,38 +166,3 @@ link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
                         provide_nat=True, physical_nic='eth0',
                         ipblock='192.168.1.0/24')
         self.assertFalse(n.is_created())
-    #
-    # is_dnsmasq_running()
-    #
-    pgrep = '''
-5438 dnsmasq --conf-file=/srv/shakenfist/dhcp/29e83e99-ce0c-4340-9eab-4fc07217d002/config
-5812 dnsmasq --conf-file=/srv/shakenfist/dhcp/8abbc9a6-d923-4441-b498-4f8e3c166804/config
-6386 dnsmasq --conf-file=/srv/shakenfist/dhcp/0f5c73eb-708a-4f7c-b4d5-3b63146cac18/config
-'''
-
-    @mock.patch('oslo_concurrency.processutils.execute',
-                return_value=(pgrep, ''))
-    def test_is_dnsmasq_running_yes(self, mock_execute):
-        n = net.Network(uuid='8abbc9a6-d923-4441-b498-4f8e3c166804',
-                        vxlan_id=42, provide_dhcp=True,
-                        provide_nat=True, physical_nic='eth0',
-                        ipblock='192.168.1.0/24')
-        self.assertTrue(n.is_dnsmasq_running())
-
-    @mock.patch('oslo_concurrency.processutils.execute',
-                return_value=(pgrep, ''))
-    def test_is_dnsmasq_running_no(self, mock_execute):
-        n = net.Network(uuid='11111111-d923-4441-b498-4f8e3c166804',
-                        vxlan_id=42, provide_dhcp=True,
-                        provide_nat=True, physical_nic='eth0',
-                        ipblock='192.168.1.0/24')
-        self.assertFalse(n.is_dnsmasq_running())
-
-    @mock.patch('oslo_concurrency.processutils.execute',
-                side_effect=processutils.ProcessExecutionError)
-    def test_is_dnsmasq_running_no_processes(self, mock_execute):
-        n = net.Network(uuid='11111111-d923-4441-b498-4f8e3c166804',
-                        vxlan_id=42, provide_dhcp=True,
-                        provide_nat=True, physical_nic='eth0',
-                        ipblock='192.168.1.0/24')
-        self.assertFalse(n.is_dnsmasq_running())
