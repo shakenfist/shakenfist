@@ -104,25 +104,25 @@ class Network(object):
         """Check if network is created and running"""
         # TODO(andy):This will be built upon with further code re-design
 
-        okay = self.is_created()
+        if not self.is_created():
+            return False
 
         if self.provide_dhcp and util.is_network_node():
-            okay &= self.is_dnsmasq_running()
+            if not self.is_dnsmasq_running():
+                return False
 
-        return okay
+        return True
 
     def is_created(self):
         """Attempt to ensure network has been created successfully"""
 
         subst = self.subst_dict()
-        out, _ = processutils.execute('ip link show %(vx_bridge)s' % subst,
-                                      shell=True)
-        net_created = re.match(r'.*[<,]UP[,>].*', out)
-        if not net_created:
-            LOG.warning('%s: is_created() bridge is not up: %s',
-                        self, out)
+        if not util.check_for_interface(subst['vx_bridge'], up=True):
+            LOG.warning('%s: is_created() %s is not up',
+                        self, subst['vx_bridge'])
+            return False
 
-        return bool(net_created)
+        return True
 
     def create(self):
         LOG.info('%s: net.create() namespace=%s', self, self.namespace)
