@@ -68,7 +68,6 @@ def _get_defaulted_disk_type(disk):
 class Instance(object):
     def __init__(self, db_entry):
         self.db_entry = db_entry
-        self.tenant = None
 
         self.instance_path = os.path.join(
             config.parsed.get('STORAGE_PATH'), 'instances', self.db_entry['uuid'])
@@ -333,7 +332,7 @@ class Instance(object):
             'hostname': '%s.local' % self.db_entry['name'],
             'launch_index': 0,
             'devices': [],
-            'project_id': self.tenant,
+            'project_id': '',
             'name': self.db_entry['name'],
             'public_keys': {
                 'mykey': self.db_entry['ssh_key']
