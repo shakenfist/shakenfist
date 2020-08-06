@@ -107,7 +107,7 @@ class monitor(object):
                         LOG.info('Detected error state for instance %s'
                                  % instance_uuid)
                         db.update_instance_state(instance_uuid, 'error')
-                    elif instance.get('powerstate') != 'off':
+                    elif instance.get('power_state') != 'off':
                         LOG.info('Detected power off for instance %s'
                                  % instance_uuid)
                         db.update_instance_power_state(
