@@ -38,6 +38,14 @@ class monitor(object):
 
                 instance_uuid = domain.name().split(':')[1]
                 instance = db.get_instance(instance_uuid)
+                if not instance:
+                    # Instance is SF but not in database. Kill to reduce load.
+                    LOG.warning('Destroying unknown instance, domain_id=%s' % (
+                        instance_uuid, ))
+                    processutils.execute(
+                        'virsh destroy "sf:%s"' % instance_uuid, shell=True)
+                    continue
+
                 db.place_instance(
                     instance_uuid, config.parsed.get('NODE_NAME'))
                 seen.append(domain.name())
