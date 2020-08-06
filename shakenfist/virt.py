@@ -332,7 +332,7 @@ class Instance(object):
             'hostname': '%s.local' % self.db_entry['name'],
             'launch_index': 0,
             'devices': [],
-            'project_id': '',
+            'project_id': None,
             'name': self.db_entry['name'],
             'public_keys': {
                 'mykey': self.db_entry['ssh_key']
