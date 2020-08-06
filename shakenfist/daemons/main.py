@@ -53,7 +53,7 @@ def restore_instances():
                 LOG.info('%s Restoring instance' % i)
                 i.create()
             except Exception as e:
-                util.ignore_exception('restore network %s' % network, e)
+                util.ignore_exception('restore network %s' % instance, e)
                 db.update_instance_state(instance, 'error')
 
 
