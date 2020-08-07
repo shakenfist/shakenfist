@@ -1,16 +1,49 @@
 # Copyright 2020 Michael Still
 
 import etcd3
-import json
-import string
+
+from oslo_concurrency import processutils
 
 from shakenfist import db
 
 # Very simple data upgrader
 
 
+def clean_events_mesh_operations(etcd_client):
+    # TODO(andy): This can be removed when older versions do not exist
+
+    # We probably need to cleanup excess network mesh events. We also need to
+    # try and fetch small batches because of limits in the amount of data etcd3
+    # can return at one time.
+
+    # Save time and use the already available etcdctl client.
+    net_keys, stderr = processutils.execute(
+        'etcdctl get --prefix /sf/event/network/ | grep sf/event',
+        check_exit_code=[0, 1], shell=True)
+    if stderr:
+        print('ERROR: Unable to retrieve network keys:%s' % stderr)
+        return
+
+    # Split network events into networks
+    network_events = {}
+    for key in net_keys.split('\n'):
+        if not key:
+            continue
+        _blank, _sf, _event, _network, uuid, _time = key.split('/')
+        network_events.setdefault(uuid, []).append(key)
+
+    # Delete all but last 50 events
+    count = 0
+    for keys in network_events.values():
+        for k in keys[:-50]:
+            print('--> Removing verbose network event %s' % k)
+            etcd_client.delete(k)
+            count += 1
+    print(' - Cleaned up %d old network mesh events' % count)
+
+
 def main():
-    client = etcd3.client()
+    etcd_client = etcd3.client()
 
     versions = {}
     for node in db.get_nodes():
@@ -35,24 +68,7 @@ def main():
 
     if major == 0:
         if minor == 2:
-            # We probably need to cleanup excess network mesh events. We also need
-            # to try and fetch small batches because of limits in the amount of data
-            # etcd3 can return at one time.
-            prefixes = list(string.ascii_lowercase)
-            prefixes.extend(list(string.digits))
-            prefixes.append('')
-
-            count = 0
-            for prefix in prefixes:
-                for event, metadata in client.get_prefix('/sf/event/network/%s' % prefix):
-                    event = json.loads(event)
-                    if event['operation'] in ['ensure mesh', 'discover mesh']:
-                        print('--> Removing overly verbose network event %s'
-                              % metadata.key)
-                        client.delete(metadata.key)
-                        count += 1
-
-            print(' - Cleaned up %d old network mesh events' % count)
+            clean_events_mesh_operations(etcd_client)
 
 
 if __name__ == '__main__':
