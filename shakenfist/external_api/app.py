@@ -23,16 +23,11 @@ import ipaddress
 import json
 from jwt.exceptions import DecodeError, PyJWTError
 import logging
-from logging import handlers as logging_handlers
-import os
 import re
 import requests
-import setproctitle
 import sys
 import traceback
 import uuid
-
-from oslo_concurrency import processutils
 
 from shakenfist import config
 from shakenfist import db
@@ -43,9 +38,7 @@ from shakenfist import util
 from shakenfist import virt
 
 
-LOG = logging.getLogger(__file__)
-LOG.setLevel(logging.INFO)
-LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
+LOG, log_handler = util.setup_logging('API')
 
 
 TESTING = False
@@ -103,9 +96,8 @@ def generic_wrapper(func):
             for header in flask.request.headers:
                 formatted_headers.append(str(header))
 
-            msg = 'API request: %s %s\n    Headers:\n        %s' % (
-                flask.request.method, flask.request.url,
-                '\n        '.join(formatted_headers))
+            msg = 'API request: %s %s' % (
+                flask.request.method, flask.request.url)
             msg += '\n    Args: %s\n    KWargs: %s' % (args, kwargs)
 
             if re.match(r'http(|s)://0.0.0.0:\d+/$', flask.request.url):
@@ -313,15 +305,18 @@ api = flask_restful.Api(app, catch_all_404s=False)
 app.config['JWT_SECRET_KEY'] = config.parsed.get('AUTH_SECRET_SEED')
 jwt = JWTManager(app)
 
+# Use our handler to get SF log format (instead of gunicorn's handlers)
+app.logger.handlers = [log_handler]
+
 
 @app.before_request
 def log_request_info():
-    output = 'API request headers:\n'
-    for header, value in flask.request.headers:
-        output += '    %s: %s\n' % (header, value)
-    output += 'API request body: %s' % flask.request.get_data()
-
-    app.logger.info(output)
+    if LOG.level == logging.DEBUG:
+        output = 'API request headers:\n'
+        for header, value in flask.request.headers:
+            output += '    %s: %s\n' % (header, value)
+        output += 'API request body: %s' % flask.request.get_data()
+        LOG.debug(output)
 
 
 class Root(Resource):
@@ -1517,18 +1512,3 @@ api.add_resource(Nodes, '/nodes')
 api.add_resource(DeployNetworkNode, '/deploy_network_node')
 api.add_resource(UpdateDHCP, '/update_dhcp')
 api.add_resource(RemoveDHCP, '/remove_dhcp')
-
-
-class monitor(object):
-    def __init__(self):
-        setproctitle.setproctitle('sf api')
-
-    def run(self):
-        processutils.execute(
-            ('gunicorn --workers 10 --bind 0.0.0.0:%d '
-             '--log-syslog --log-syslog-prefix sf '
-             '--timeout %s --name "sf api" '
-             'shakenfist.external_api.app:app'
-             % (config.parsed.get('API_PORT'),
-                config.parsed.get('API_TIMEOUT'))),
-            shell=True, env_variables=os.environ)

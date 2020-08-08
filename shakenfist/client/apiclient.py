@@ -6,7 +6,7 @@ from pbr.version import VersionInfo
 import requests
 
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
 
 

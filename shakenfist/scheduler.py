@@ -2,7 +2,6 @@
 
 import copy
 import logging
-from logging import handlers as logging_handlers
 import random
 import time
 
@@ -11,9 +10,7 @@ from shakenfist import db
 from shakenfist import etcd
 from shakenfist import util
 
-LOG = logging.getLogger(__file__)
-LOG.setLevel(logging.INFO)
-LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
+LOG = logging.getLogger(__name__)
 
 
 class CandidateNodeNotFoundException(Exception):

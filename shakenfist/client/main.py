@@ -14,7 +14,7 @@ from shakenfist.client import apiclient
 
 logging.basicConfig(level=logging.INFO)
 
-LOG = logging.getLogger(__file__)
+LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
 
 

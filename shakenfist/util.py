@@ -15,13 +15,37 @@ import traceback
 
 from oslo_concurrency import processutils
 
+from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import config
 
 
-LOG = logging.getLogger(__file__)
-LOG.setLevel(logging.INFO)
-LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
+LOG = logging.getLogger(__name__)
+
+
+def log_setlevel(log, id):
+    # Check for configuration override
+    label = 'LOGLEVEL_' + daemon.process_name(id).replace('-', '_').upper()
+    level = config.parsed.get(label)
+    if level:
+        numeric_level = getattr(logging, level.upper(), None)
+        if not isinstance(numeric_level, int):
+            raise ValueError('Invalid log level: %s' % level)
+    else:
+        numeric_level = logging.INFO
+
+    log.setLevel(numeric_level)
+
+
+def setup_logging(id):
+    log = logging.getLogger()
+    handler = logging_handlers.SysLogHandler(address='/dev/log')
+    handler.setFormatter(logging.Formatter(
+        daemon.process_name(id) + ': %(levelname)s %(message)s'))
+    log.addHandler(handler)
+    log_setlevel(log, id)
+
+    return log, handler
 
 
 class RecordedOperation():

@@ -1,7 +1,6 @@
 import etcd3
 import json
 import logging
-from logging import handlers as logging_handlers
 import time
 
 ####################################################################
@@ -10,9 +9,7 @@ import time
 ####################################################################
 
 
-LOG = logging.getLogger(__file__)
-LOG.setLevel(logging.INFO)
-LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
+LOG = logging.getLogger(__name__)
 
 
 ETCD_ATTEMPTS = 5

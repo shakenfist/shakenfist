@@ -2,7 +2,6 @@
 
 import json
 import logging
-from logging import handlers as logging_handlers
 import os
 import psutil
 import re
@@ -17,9 +16,7 @@ from shakenfist import dhcp
 from shakenfist import util
 
 
-LOG = logging.getLogger(__file__)
-LOG.setLevel(logging.INFO)
-LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
+LOG = logging.getLogger(__name__)
 
 
 def from_db(uuid):

@@ -2,16 +2,13 @@
 
 import copy
 import logging
-from logging import handlers as logging_handlers
 import os
 import socket
 
 from shakenfist import util
 
 
-LOG = logging.getLogger(__file__)
-LOG.setLevel(logging.INFO)
-LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
+LOG = logging.getLogger(__name__)
 
 
 node_name = socket.getfqdn()
@@ -89,6 +86,15 @@ CONFIG_DEFAULTS = {
 
     # Where on disk instances are stored
     'STORAGE_PATH': '/srv/shakenfist',
+
+    # LOGGING
+    # -------
+    'LOGLEVEL_SF_API': 'info',
+    'LOGLEVEL_SF_CLEANER': 'info',
+    'LOGLEVEL_SF_MAIN': 'info',
+    'LOGLEVEL_SF_NET': 'info',
+    'LOGLEVEL_SF_RESOURCES': 'info',
+    'LOGLEVEL_SF_TRIGGERS': 'info',
 }
 
 

@@ -4,7 +4,6 @@ import email.utils
 import hashlib
 import json
 import logging
-from logging import handlers as logging_handlers
 import os
 import re
 import requests
@@ -20,9 +19,7 @@ from shakenfist import image_resolver_ubuntu
 from shakenfist import util
 
 
-LOG = logging.getLogger(__file__)
-LOG.setLevel(logging.INFO)
-LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
+LOG = logging.getLogger(__name__)
 
 
 resolvers = {
