@@ -67,10 +67,17 @@ def is_network_node():
     return config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP')
 
 
-def check_for_interface(name):
-    _, stderr = processutils.execute(
+def check_for_interface(name, up=False):
+    stdout, stderr = processutils.execute(
         'ip link show %s' % name, check_exit_code=[0, 1], shell=True)
-    return not stderr.rstrip('\n').endswith(' does not exist.')
+
+    if stderr.rstrip('\n').endswith(' does not exist.'):
+        return False
+
+    if up:
+        return bool(re.match(r'.*[<,]UP[,>].*', stdout))
+
+    return True
 
 
 def get_interface_addresses(namespace, name):
