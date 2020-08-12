@@ -1,28 +1,22 @@
 import etcd3
 import json
 import logging
-from logging import handlers as logging_handlers
 import os
-import setproctitle
 import time
 
 from oslo_concurrency import processutils
 
 from shakenfist import config
+from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import util
 from shakenfist import virt
 
 
-LOG = logging.getLogger(__file__)
-LOG.setLevel(logging.INFO)
-LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
+LOG = logging.getLogger(__name__)
 
 
-class monitor(object):
-    def __init__(self):
-        setproctitle.setproctitle('sf cleaner')
-
+class Monitor(daemon.Daemon):
     def _update_power_states(self):
         libvirt = util.get_libvirt()
         conn = libvirt.open(None)

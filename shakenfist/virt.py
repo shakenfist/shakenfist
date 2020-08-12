@@ -3,7 +3,6 @@
 import base64
 import jinja2
 import logging
-from logging import handlers as logging_handlers
 import io
 import json
 import os
@@ -21,9 +20,7 @@ from shakenfist import net
 from shakenfist import util
 
 
-LOG = logging.getLogger(__file__)
-LOG.setLevel(logging.INFO)
-LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
+LOG = logging.getLogger(__name__)
 
 
 def from_definition(uuid=None, name=None, disks=None, memory_mb=None,
@@ -88,7 +85,7 @@ class Instance(object):
         disk_spec = self.db_entry['disk_spec']
         if not disk_spec:
             # This should not occur since the API will filter for zero disks.
-            LOG.error("_populate_block_devices(): Found disk spec empty: %s" %
+            LOG.error('_populate_block_devices(): Found disk spec empty: %s' %
                       self.db_entry)
 
             # Stop continuous crashing by falsely claiming disks are configured.

@@ -1,19 +1,16 @@
 import logging
-from logging import handlers as logging_handlers
 import multiprocessing
 import os
 import re
-import setproctitle
 import signal
 import time
 
 from shakenfist import config
+from shakenfist.daemons import daemon
 from shakenfist import db
 
 
-LOG = logging.getLogger(__file__)
-LOG.setLevel(logging.INFO)
-LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
+LOG = logging.getLogger(__name__)
 
 
 def observe(path, instance_uuid):
@@ -55,10 +52,7 @@ def observe(path, instance_uuid):
         time.sleep(1)
 
 
-class monitor(object):
-    def __init__(self):
-        setproctitle.setproctitle('sf triggers')
-
+class Monitor(daemon.Daemon):
     def run(self):
         observers = {}
 

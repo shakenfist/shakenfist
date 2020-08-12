@@ -1,21 +1,17 @@
 import logging
-from logging import handlers as logging_handlers
 import os
 import psutil
-import setproctitle
 import time
 
 from prometheus_client import Gauge
 from prometheus_client import start_http_server
 
+from shakenfist.daemons import daemon
 from shakenfist import config
 from shakenfist import db
 from shakenfist import util
 
-
-LOG = logging.getLogger(__file__)
-LOG.setLevel(logging.INFO)
-LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
+LOG = logging.getLogger(__name__)
 
 
 def _get_stats():
@@ -120,12 +116,13 @@ def _get_stats():
     return retval
 
 
-class monitor(object):
-    def __init__(self):
-        setproctitle.setproctitle('sf resources')
+class Monitor(daemon.Daemon):
+    def __init__(self, id):
+        super(Monitor, self).__init__(id)
         start_http_server(config.parsed.get('PROMETHEUS_METRICS_PORT'))
 
     def run(self):
+        LOG.info('Starting...')
         gauges = {'updated_at': Gauge(
             'updated_at', 'The last time metrics were updated')}
 

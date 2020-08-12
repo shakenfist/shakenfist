@@ -1,7 +1,6 @@
 # Copyright 2020 Michael Still
 
 import logging
-from logging import handlers as logging_handlers
 import randmac
 import random
 import time
@@ -14,9 +13,7 @@ from shakenfist import ipmanager
 from shakenfist import util
 
 
-LOG = logging.getLogger(__file__)
-LOG.setLevel(logging.INFO)
-LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
+LOG = logging.getLogger(__name__)
 
 
 def see_this_node():

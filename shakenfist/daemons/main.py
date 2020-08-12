@@ -1,7 +1,5 @@
 # Copyright 2019 Michael Still
 
-import logging
-from logging import handlers as logging_handlers
 import setproctitle
 import time
 import os
@@ -9,20 +7,20 @@ import os
 from oslo_concurrency import processutils
 
 from shakenfist import config
+from shakenfist.daemons import daemon
+from shakenfist.daemons import external_api as external_api_daemon
 from shakenfist.daemons import cleaner as cleaner_daemon
 from shakenfist.daemons import net as net_daemon
 from shakenfist.daemons import resources as resource_daemon
 from shakenfist.daemons import triggers as trigger_daemon
 from shakenfist import db
-from shakenfist.external_api import app as external_api_daemon
+
 from shakenfist import net
 from shakenfist import util
 from shakenfist import virt
 
 
-LOG = logging.getLogger(__file__)
-LOG.setLevel(logging.INFO)
-LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
+LOG, handler = util.setup_logging('main')
 
 
 def restore_instances():
@@ -68,6 +66,8 @@ def main():
     for key in config.parsed.config:
         LOG.info('Configuration item %s = %s' % (key, config.parsed.get(key)))
 
+    util.log_setlevel(LOG, 'main')
+
     # Check in early and often
     db.see_this_node()
 
@@ -75,7 +75,8 @@ def main():
     # might happen quite early on.
     resource_pid = os.fork()
     if resource_pid == 0:
-        resource_daemon.monitor().run()
+        LOG.removeHandler(handler)
+        resource_daemon.Monitor('resources').run()
 
     # If I am the network node, I need some setup
     if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
@@ -124,24 +125,28 @@ def main():
     # Network mesh maintenance
     net_pid = os.fork()
     if net_pid == 0:
-        net_daemon.monitor().run()
+        LOG.removeHandler(handler)
+        net_daemon.Monitor('net').run()
 
     # Old object deleter
     cleaner_pid = os.fork()
     if cleaner_pid == 0:
-        cleaner_daemon.monitor().run()
+        LOG.removeHandler(handler)
+        cleaner_daemon.Monitor('cleaner').run()
 
     # REST API
     external_api_pid = os.fork()
     if external_api_pid == 0:
-        external_api_daemon.monitor().run()
+        LOG.removeHandler(handler)
+        external_api_daemon.Monitor('api').run()
 
     # Triggers
     trigger_pid = os.fork()
     if trigger_pid == 0:
-        trigger_daemon.monitor().run()
+        LOG.removeHandler(handler)
+        trigger_daemon.Monitor('triggers').run()
 
-    setproctitle.setproctitle('sf main')
+    setproctitle.setproctitle(daemon.process_name('main'))
     LOG.info('network monitor pid is %d' % net_pid)
     LOG.info('external api pid is %d' % external_api_pid)
     LOG.info('resources monitor pid is %d' % resource_pid)

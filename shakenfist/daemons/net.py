@@ -1,24 +1,20 @@
 import logging
-from logging import handlers as logging_handlers
-import setproctitle
 import time
 
 from shakenfist import config
+from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import net
 from shakenfist import util
 
 
-LOG = logging.getLogger(__file__)
-LOG.setLevel(logging.INFO)
-LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
+LOG = logging.getLogger(__name__)
 
 
-class monitor(object):
-    def __init__(self):
-        setproctitle.setproctitle('sf net')
-
+class Monitor(daemon.Daemon):
     def _maintain_networks(self):
+        LOG.info('Maintaining networks')
+
         # Discover what networks are present
         _, _, vxid_to_mac = util.discover_interfaces()
 
@@ -64,8 +60,7 @@ class monitor(object):
                     continue
 
                 if not n.is_okay():
-                    LOG.info("Daemon:net: maintain_networks() recreating %s",
-                             n.uuid)
+                    LOG.info('%s: Network not okay - recreating', n)
                     n.create()
                 n.ensure_mesh()
                 seen_vxids.append(n.vxlan_id)
@@ -104,7 +99,6 @@ class monitor(object):
             time.sleep(30)
 
             try:
-                LOG.info("Daemon:net: Checking networks")
                 self._maintain_networks()
             except Exception as e:
                 util.ignore_exception('network monitor', e)

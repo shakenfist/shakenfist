@@ -1,5 +1,4 @@
 import logging
-from logging import handlers as logging_handlers
 import re
 import requests
 
@@ -8,9 +7,7 @@ from shakenfist import exceptions
 from shakenfist import util
 
 
-LOG = logging.getLogger(__file__)
-LOG.setLevel(logging.INFO)
-LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
+LOG = logging.getLogger(__name__)
 
 CIRROS_URL = 'http://download.cirros-cloud.net/'
 
