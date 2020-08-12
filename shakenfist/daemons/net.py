@@ -13,7 +13,7 @@ LOG = logging.getLogger(__name__)
 
 class Monitor(daemon.Daemon):
     def _maintain_networks(self):
-        LOG.info("Maintaining networks")
+        LOG.info('Maintaining networks')
 
         # Discover what networks are present
         _, _, vxid_to_mac = util.discover_interfaces()
@@ -60,7 +60,7 @@ class Monitor(daemon.Daemon):
                     continue
 
                 if not n.is_okay():
-                    LOG.info("%s: Network not okay - recreating", n)
+                    LOG.info('%s: Network not okay - recreating', n)
                     n.create()
                 n.ensure_mesh()
                 seen_vxids.append(n.vxlan_id)

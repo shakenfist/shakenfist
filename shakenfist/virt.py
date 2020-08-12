@@ -85,7 +85,7 @@ class Instance(object):
         disk_spec = self.db_entry['disk_spec']
         if not disk_spec:
             # This should not occur since the API will filter for zero disks.
-            LOG.error("_populate_block_devices(): Found disk spec empty: %s" %
+            LOG.error('_populate_block_devices(): Found disk spec empty: %s' %
                       self.db_entry)
 
             # Stop continuous crashing by falsely claiming disks are configured.
