@@ -16,7 +16,15 @@ LOG.setLevel(logging.INFO)
 LOG.addHandler(logging_handlers.SysLogHandler(address='/dev/log'))
 
 
-class CandidateNodeNotFoundException(Exception):
+class SchedulerException(Exception):
+    pass
+
+
+class CandidateNodeNotFoundException(SchedulerException):
+    pass
+
+
+class LowResourceException(SchedulerException):
     pass
 
 
@@ -135,14 +143,15 @@ class Scheduler(object):
 
     def place_instance(self, instance, network, candidates=None):
         with util.RecordedOperation('schedule', instance) as _:
-            if time.time() - self.metrics_updated > config.parsed.get('SCHEDULER_CACHE_TIMEOUT'):
+            diff = time.time() - self.metrics_updated
+            if diff > config.parsed.get('SCHEDULER_CACHE_TIMEOUT'):
                 self.refresh_metrics()
 
             if candidates:
                 LOG.info('Scheduling %s, %s forced as candidates' %
                          (instance, candidates))
-                db.add_event('instance', instance.db_entry['uuid'],
-                             'schedule', 'Forced candidates', None, str(candidates))
+                db.add_event('instance', instance.db_entry['uuid'], 'schedule',
+                             'Forced candidates', None, str(candidates))
                 for node in candidates:
                     if node not in self.metrics:
                         raise CandidateNodeNotFoundException(node)
@@ -152,35 +161,47 @@ class Scheduler(object):
                     candidates.append(node)
             LOG.info('Scheduling %s, %s start as candidates' %
                      (instance, candidates))
-            db.add_event('instance', instance.db_entry['uuid'],
-                         'schedule', 'Initial candidates', None, str(candidates))
+            db.add_event('instance', instance.db_entry['uuid'], 'schedule',
+                         'Initial candidates', None, str(candidates))
+            if not candidates:
+                raise LowResourceException('No nodes with metrics')
 
             # Can we host that many vCPUs?
             for node in copy.copy(candidates):
-                if instance.db_entry['cpus'] > self.metrics[node].get('cpu_max_per_instance', 0):
+                max_cpu = self.metrics[node].get('cpu_max_per_instance', 0)
+                if instance.db_entry['cpus'] > max_cpu:
                     candidates.remove(node)
             LOG.info('Scheduling %s, %s have enough actual CPU' %
                      (instance, candidates))
-            db.add_event('instance', instance.db_entry['uuid'],
-                         'schedule', 'Have enough actual CPU', None, str(candidates))
+            db.add_event('instance', instance.db_entry['uuid'], 'schedule',
+                         'Have enough actual CPU', None, str(candidates))
+            if not candidates:
+                raise LowResourceException(
+                    'Requested vCPUs exceeds vCPU limit')
 
             # Do we have enough idle CPU?
             for node in copy.copy(candidates):
-                if not self._has_sufficient_cpu(instance.db_entry['cpus'], node):
+                if not self._has_sufficient_cpu(
+                        instance.db_entry['cpus'], node):
                     candidates.remove(node)
             LOG.info('Scheduling %s, %s have enough idle CPU' %
                      (instance, candidates))
-            db.add_event('instance', instance.db_entry['uuid'],
-                         'schedule', 'Have enough idle CPU', None, str(candidates))
+            db.add_event('instance', instance.db_entry['uuid'], 'schedule',
+                         'Have enough idle CPU', None, str(candidates))
+            if not candidates:
+                raise LowResourceException('No nodes with enough idle CPU')
 
             # Do we have enough idle RAM?
             for node in copy.copy(candidates):
-                if not self._has_sufficient_ram(instance.db_entry['memory'], node):
+                if not self._has_sufficient_ram(
+                        instance.db_entry['memory'], node):
                     candidates.remove(node)
             LOG.info('Scheduling %s, %s have enough idle RAM' %
                      (instance, candidates))
-            db.add_event('instance', instance.db_entry['uuid'],
-                         'schedule', 'Have enough idle RAM', None, str(candidates))
+            db.add_event('instance', instance.db_entry['uuid'], 'schedule',
+                         'Have enough idle RAM', None, str(candidates))
+            if not candidates:
+                raise LowResourceException('No nodes with enough idle RAM')
 
             # Do we have enough idle disk?
             for node in copy.copy(candidates):
@@ -188,8 +209,10 @@ class Scheduler(object):
                     candidates.remove(node)
             LOG.info('Scheduling %s, %s have enough idle disk' %
                      (instance, candidates))
-            db.add_event('instance', instance.db_entry['uuid'],
-                         'schedule', 'Have enough idle disk', None, str(candidates))
+            db.add_event('instance', instance.db_entry['uuid'], 'schedule',
+                         'Have enough idle disk', None, str(candidates))
+            if not candidates:
+                raise LowResourceException('No nodes with enough disk space')
 
             # What nodes have the highest number of networks already present?
             if network:
@@ -203,8 +226,9 @@ class Scheduler(object):
                     requested_networks, candidates)
                 LOG.info('Scheduling %s, %s have most matching networks'
                          % (instance, candidates))
-                db.add_event('instance', instance.db_entry['uuid'],
-                             'schedule', 'Have most matching networks', None, str(candidates))
+                db.add_event('instance', instance.db_entry['uuid'], 'schedule',
+                             'Have most matching networks', None,
+                             str(candidates))
 
             # What nodes have the base image already?
             requested_images = []
@@ -216,8 +240,8 @@ class Scheduler(object):
                 requested_images, candidates)
             LOG.info('Scheduling %s, %s have most matching images'
                      % (instance, candidates))
-            db.add_event('instance', instance.db_entry['uuid'],
-                         'schedule', 'Have most matching images', None, str(candidates))
+            db.add_event('instance', instance.db_entry['uuid'], 'schedule',
+                         'Have most matching images', None, str(candidates))
 
             # Avoid allocating to network node if possible
             net_node = db.get_network_node()
@@ -225,8 +249,8 @@ class Scheduler(object):
                 candidates.remove(net_node['fqdn'])
                 LOG.info('Scheduling %s, %s are non-network nodes'
                          % (instance, candidates))
-                db.add_event('instance', instance.db_entry['uuid'],
-                             'schedule', 'Are non-network nodes', None, str(candidates))
+                db.add_event('instance', instance.db_entry['uuid'], 'schedule',
+                             'Are non-network nodes', None, str(candidates))
 
             # Return a shuffled list of options
             random.shuffle(candidates)
