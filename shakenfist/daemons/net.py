@@ -74,21 +74,21 @@ class Monitor(daemon.Daemon):
                      % extra_vxids)
 
             # Determine the network uuids for those vxids
-            vxid_to_uuid = {}
-            for n in db.get_networks():
-                vxid_to_uuid[n['vxid']] = n['uuid']
+            # vxid_to_uuid = {}
+            # for n in db.get_networks():
+            #     vxid_to_uuid[n['vxid']] = n['uuid']
 
-            for extra in extra_vxids:
-                if extra in vxid_to_uuid:
-                    with db.get_lock('sf/network/%s' % vxid_to_uuid[extra],
-                                     ttl=120) as _:
-                        n = net.from_db(vxid_to_uuid[extra])
-                        n.delete()
-                        LOG.info('Extra vxlan %s (network %s) removed.'
-                                 % (extra, vxid_to_uuid[extra]))
-                else:
-                    LOG.error('Extra vxlan %s does not map to any network.'
-                              % extra)
+            # for extra in extra_vxids:
+            #     if extra in vxid_to_uuid:
+            #         with db.get_lock('sf/network/%s' % vxid_to_uuid[extra],
+            #                          ttl=120) as _:
+            #             n = net.from_db(vxid_to_uuid[extra])
+            #             n.delete()
+            #             LOG.info('Extra vxlan %s (network %s) removed.'
+            #                      % (extra, vxid_to_uuid[extra]))
+            #     else:
+            #         LOG.error('Extra vxlan %s does not map to any network.'
+            #                   % extra)
 
         # And record vxids in the database
         db.persist_node_vxid_mapping(
