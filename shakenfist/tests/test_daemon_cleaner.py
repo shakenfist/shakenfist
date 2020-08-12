@@ -61,7 +61,7 @@ def fake_config(key):
     fc = {
         'NODE_NAME': 'abigcomputer',
         'STORAGE_PATH': '/srv/shakenfist',
-        'LOGLEVEL_SF_CLEANER': 'debug',
+        'LOGLEVEL_CLEANER': 'debug',
     }
 
     if key in fc:
@@ -111,7 +111,7 @@ class CleanerTestCase(testtools.TestCase):
     @mock.patch('time.time', return_value=7)
     def test_update_power_states(self, mock_time, mock_exists, mock_put,
                                  mock_get, mock_event, mock_see):
-        m = cleaner.Monitor('CLEANER')
+        m = cleaner.Monitor('cleaner')
         m._update_power_states()
 
         self.assertEqual(

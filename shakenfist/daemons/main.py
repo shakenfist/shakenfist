@@ -20,7 +20,7 @@ from shakenfist import util
 from shakenfist import virt
 
 
-LOG, handler = util.setup_logging('MAIN')
+LOG, handler = util.setup_logging('main')
 
 
 def restore_instances():
@@ -66,7 +66,7 @@ def main():
     for key in config.parsed.config:
         LOG.info('Configuration item %s = %s' % (key, config.parsed.get(key)))
 
-    util.log_setlevel(LOG, 'MAIN')
+    util.log_setlevel(LOG, 'main')
 
     # Check in early and often
     db.see_this_node()
@@ -76,7 +76,7 @@ def main():
     resource_pid = os.fork()
     if resource_pid == 0:
         LOG.removeHandler(handler)
-        resource_daemon.Monitor('RESOURCES').run()
+        resource_daemon.Monitor('resources').run()
 
     # If I am the network node, I need some setup
     if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
@@ -126,27 +126,27 @@ def main():
     net_pid = os.fork()
     if net_pid == 0:
         LOG.removeHandler(handler)
-        net_daemon.Monitor('NET').run()
+        net_daemon.Monitor('net').run()
 
     # Old object deleter
     cleaner_pid = os.fork()
     if cleaner_pid == 0:
         LOG.removeHandler(handler)
-        cleaner_daemon.Monitor('CLEANER').run()
+        cleaner_daemon.Monitor('cleaner').run()
 
     # REST API
     external_api_pid = os.fork()
     if external_api_pid == 0:
         LOG.removeHandler(handler)
-        external_api_daemon.Monitor('API').run()
+        external_api_daemon.Monitor('api').run()
 
     # Triggers
     trigger_pid = os.fork()
     if trigger_pid == 0:
         LOG.removeHandler(handler)
-        trigger_daemon.Monitor('TRIGGERS').run()
+        trigger_daemon.Monitor('triggers').run()
 
-    setproctitle.setproctitle(daemon.process_name('MAIN'))
+    setproctitle.setproctitle(daemon.process_name('main'))
     LOG.info('network monitor pid is %d' % net_pid)
     LOG.info('external api pid is %d' % external_api_pid)
     LOG.info('resources monitor pid is %d' % resource_pid)

@@ -38,7 +38,7 @@ from shakenfist import util
 from shakenfist import virt
 
 
-LOG, log_handler = util.setup_logging('API')
+LOG, log_handler = util.setup_logging('api')
 
 
 TESTING = False

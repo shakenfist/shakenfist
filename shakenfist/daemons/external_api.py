@@ -15,5 +15,5 @@ class Monitor(daemon.Daemon):
              'shakenfist.external_api.app:app'
              % (config.parsed.get('API_PORT'),
                 config.parsed.get('API_TIMEOUT'),
-                daemon.process_name('API'))),
+                daemon.process_name('api'))),
             shell=True, env_variables=os.environ)

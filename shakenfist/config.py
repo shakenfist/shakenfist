@@ -89,12 +89,12 @@ CONFIG_DEFAULTS = {
 
     # LOGGING
     # -------
-    'LOGLEVEL_SF_API': 'info',
-    'LOGLEVEL_SF_CLEANER': 'info',
-    'LOGLEVEL_SF_MAIN': 'info',
-    'LOGLEVEL_SF_NET': 'info',
-    'LOGLEVEL_SF_RESOURCES': 'info',
-    'LOGLEVEL_SF_TRIGGERS': 'info',
+    'LOGLEVEL_API': 'info',
+    'LOGLEVEL_CLEANER': 'info',
+    'LOGLEVEL_MAIN': 'info',
+    'LOGLEVEL_NET': 'info',
+    'LOGLEVEL_RESOURCES': 'info',
+    'LOGLEVEL_TRIGGERS': 'info',
 }
 
 

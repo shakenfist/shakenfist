@@ -4,12 +4,12 @@ from shakenfist import util
 
 
 DAEMON_NAMES = {
-    'API': 'sf-api',
-    'CLEANER': 'sf-cleaner',
-    'MAIN': 'sf-main',
-    'NET': 'sf-net',
-    'RESOURCES': 'sf-resources',
-    'TRIGGERS': 'sf-triggers',
+    'api': 'sf-api',
+    'cleaner': 'sf-cleaner',
+    'main': 'sf-main',
+    'net': 'sf-net',
+    'resources': 'sf-resources',
+    'triggers': 'sf-triggers',
 }
 
 

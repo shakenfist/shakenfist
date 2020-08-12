@@ -24,8 +24,11 @@ LOG = logging.getLogger(__name__)
 
 
 def log_setlevel(log, id):
+    # Check that id is a valid name
+    _ = daemon.process_name(id)
+
     # Check for configuration override
-    label = 'LOGLEVEL_' + daemon.process_name(id).replace('-', '_').upper()
+    label = 'LOGLEVEL_' + id.upper()
     level = config.parsed.get(label)
     if level:
         numeric_level = getattr(logging, level.upper(), None)
