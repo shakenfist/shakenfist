@@ -129,10 +129,12 @@ class Monitor(daemon.Daemon):
             util.ignore_exception('etcd compaction', e)
 
     def run(self):
+        LOG.info('Starting')
         last_compaction = 0
 
         while True:
             # Update power state of all instances on this hypervisor
+            LOG.info('Updating power states')
             self._update_power_states()
 
             # Cleanup soft deleted instances and networks
@@ -152,6 +154,7 @@ class Monitor(daemon.Daemon):
 
             # Perform etcd maintenance
             if time.time() - last_compaction > 1800:
+                LOG.info('Compacting etcd')
                 self._compact_etcd()
                 last_compaction = time.time()
 

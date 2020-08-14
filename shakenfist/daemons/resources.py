@@ -122,7 +122,7 @@ class Monitor(daemon.Daemon):
         start_http_server(config.parsed.get('PROMETHEUS_METRICS_PORT'))
 
     def run(self):
-        LOG.info('Starting...')
+        LOG.info('Starting')
         gauges = {'updated_at': Gauge(
             'updated_at', 'The last time metrics were updated')}
 

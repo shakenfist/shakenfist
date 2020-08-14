@@ -1,13 +1,17 @@
+import logging
 import os
 
 from oslo_concurrency import processutils
 
-from shakenfist.daemons import daemon
 from shakenfist import config
+from shakenfist.daemons import daemon
+
+LOG = logging.getLogger(__name__)
 
 
 class Monitor(daemon.Daemon):
     def run(self):
+        LOG.info('Starting')
         processutils.execute(
             (config.parsed.get('API_COMMAND_LINE')
              % {
