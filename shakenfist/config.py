@@ -34,6 +34,10 @@ CONFIG_DEFAULTS = {
     'INCLUDE_TRACEBACKS': '1',
     'PROMETHEUS_METRICS_PORT': 13001,
     'AUTH_SECRET_SEED': 'foo',
+    'API_COMMAND_LINE': ('gunicorn --workers 10 --bind 0.0.0.0:%(port)d '
+                         '--log-syslog --log-syslog-prefix sf '
+                         '--timeout %(timeout)s --name "%(name)s" '
+                         'shakenfist.external_api.app:app'),
 
     # Scheduler options:
     #  - scheduler_cache_timeout: how long the scheduler should cache things for
