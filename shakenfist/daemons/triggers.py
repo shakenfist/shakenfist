@@ -2,6 +2,7 @@ import logging
 import multiprocessing
 import os
 import re
+import setproctitle
 import signal
 import time
 
@@ -14,6 +15,7 @@ LOG = logging.getLogger(__name__)
 
 
 def observe(path, instance_uuid):
+    setproctitle.setproctitle('sf-tiggers-%s' % instance_uuid)
     regexps = {
         'login prompt': ['^.* login: .*', re.compile('.* login: .*')]
     }
