@@ -16,7 +16,8 @@ from shakenfist import util
 LOG = logging.getLogger(__name__)
 
 
-ETCD_ATTEMPT_TIMEOUT = 15  # TODO(andy):Change back to 5 once network bugs fixed
+# TODO(andy): Change back to 5 once network bugs fixed
+ETCD_ATTEMPT_TIMEOUT = 15
 
 
 def see_this_node():
@@ -37,35 +38,29 @@ def get_lock(name, ttl=60, timeout=ETCD_ATTEMPT_TIMEOUT):
 
 
 def get_node_ips():
-    see_this_node()
     for value in etcd.get_all('node', None):
         yield value['ip']
 
 
 def get_node(fqdn):
-    see_this_node()
     return etcd.get('node', None, fqdn)
 
 
 def get_nodes():
-    see_this_node()
     return etcd.get_all('node', None)
 
 
 def get_network_node():
-    see_this_node()
     for n in get_nodes():
         if n['ip'] == config.parsed.get('NETWORK_NODE_IP'):
             return n
 
 
 def get_network(network_uuid):
-    see_this_node()
     return etcd.get('network', None, network_uuid)
 
 
 def get_networks(all=False, namespace=None):
-    see_this_node()
     for n in etcd.get_all('network', None):
         if n['uuid'] == 'floating':
             continue
@@ -80,7 +75,6 @@ def get_networks(all=False, namespace=None):
 
 def allocate_network(netblock, provide_dhcp=True, provide_nat=False, name=None,
                      namespace=None):
-    see_this_node()
 
     netid = str(uuid.uuid4())
     ipm = ipmanager.NetBlock(netblock)
@@ -113,7 +107,6 @@ def allocate_network(netblock, provide_dhcp=True, provide_nat=False, name=None,
 
 
 def update_network_state(network_uuid, state):
-    see_this_node()
     n = get_network(network_uuid)
     n['state'] = state
     n['state_updated'] = time.time()
@@ -125,7 +118,6 @@ def update_network_state(network_uuid, state):
 
 
 def get_stale_networks(delay):
-    see_this_node()
     for n in etcd.get_all('network', None):
         if n['state'] in ['deleted', 'error']:
             if time.time() - n['state_updated'] > delay:
@@ -133,14 +125,12 @@ def get_stale_networks(delay):
 
 
 def hard_delete_network(network_uuid):
-    see_this_node()
     etcd.delete('network', None, network_uuid)
     etcd.delete_all('event/network', network_uuid)
     delete_metadata('network', network_uuid)
 
 
 def create_floating_network(netblock):
-    see_this_node()
     ipm = ipmanager.NetBlock(netblock)
     etcd.put('ipmanager', None, 'floating', ipm.save())
     etcd.put('network', None, 'floating',
@@ -159,7 +149,6 @@ def create_floating_network(netblock):
 
 
 def get_ipmanager(network_uuid):
-    see_this_node()
     ipm = etcd.get('ipmanager', None, network_uuid)
     if not ipm:
         raise Exception('IP Manager not found for network %s' % network_uuid)
@@ -167,19 +156,16 @@ def get_ipmanager(network_uuid):
 
 
 def persist_ipmanager(network_uuid, data):
-    see_this_node()
     etcd.put('ipmanager', None, network_uuid, data)
 
 
 def persist_floating_gateway(network_uuid, gateway):
-    see_this_node()
     n = get_network(network_uuid)
     n['floating_gateway'] = gateway
     etcd.put('network', None, network_uuid, n)
 
 
 def get_instance(instance_uuid):
-    see_this_node()
     i = etcd.get('instance', None, instance_uuid)
     if not i:
         return None
@@ -190,7 +176,6 @@ def get_instance(instance_uuid):
 
 
 def get_instances(only_node=None, all=False, namespace=None):
-    see_this_node()
     for i in etcd.get_all('instance', None):
         if only_node and i['node'] != only_node:
             continue
@@ -208,7 +193,6 @@ def get_instances(only_node=None, all=False, namespace=None):
 
 
 def persist_block_devices(instance_uuid, block_devices):
-    see_this_node()
     i = get_instance(instance_uuid)
     i['block_devices'] = block_devices
     etcd.put('instance', None, instance_uuid, i)
@@ -216,7 +200,6 @@ def persist_block_devices(instance_uuid, block_devices):
 
 def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key,
                     user_data, namespace, video):
-    see_this_node()
     d = {
         'uuid': instance_uuid,
         'name': name,
@@ -240,7 +223,6 @@ def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key,
 
 
 def place_instance(instance_uuid, node):
-    see_this_node()
     i = get_instance(instance_uuid)
 
     # We don't write unchanged things to the database
@@ -252,14 +234,12 @@ def place_instance(instance_uuid, node):
 
 
 def instance_enforced_deletes_increment(instance_uuid):
-    see_this_node()
     i = get_instance(instance_uuid)
     i['enforced_deletes'] = i.get('enforced_deletes', 0) + 1
     etcd.put('instance', None, instance_uuid, i)
 
 
 def update_instance_state(instance_uuid, state):
-    see_this_node()
     i = get_instance(instance_uuid)
 
     # We don't write unchanged things to the database
@@ -276,7 +256,6 @@ def update_instance_state(instance_uuid, state):
 
 
 def update_instance_power_state(instance_uuid, state):
-    see_this_node()
     i = get_instance(instance_uuid)
 
     # We don't write unchanged things to the database
@@ -297,14 +276,12 @@ def update_instance_power_state(instance_uuid, state):
 
 
 def hard_delete_instance(instance_uuid):
-    see_this_node()
     etcd.delete('instance', None, instance_uuid)
     etcd.delete_all('event/instance', instance_uuid)
     delete_metadata('instance', instance_uuid)
 
 
 def get_stale_instances(delay):
-    see_this_node()
     for i in etcd.get_all('instance', None):
         if i['state'] in ['deleted', 'error']:
             if time.time() - i['state_updated'] > delay:
@@ -312,7 +289,6 @@ def get_stale_instances(delay):
 
 
 def create_network_interface(interface_uuid, netdesc, instance_uuid, order):
-    see_this_node()
     if 'macaddress' not in netdesc or not netdesc['macaddress']:
         with etcd.get_lock('sf/macaddress', ttl=120) as _:
             possible_mac = str(randmac.RandMac(
@@ -343,7 +319,6 @@ def create_network_interface(interface_uuid, netdesc, instance_uuid, order):
 
 
 def get_stale_network_interfaces(delay):
-    see_this_node()
     for n in etcd.get_all('networkinterface', None):
         if n['state'] in ['deleted', 'error']:
             if time.time() - n['state_updated'] > delay:
@@ -351,13 +326,11 @@ def get_stale_network_interfaces(delay):
 
 
 def hard_delete_network_interface(interface_uuid):
-    see_this_node()
     etcd.delete('networkinterface', None, interface_uuid)
     etcd.delete_all('event/networkinterface', interface_uuid)
 
 
 def get_instance_interfaces(instance_uuid):
-    see_this_node()
     for ni in etcd.get_all('networkinterface', None):
         if ni['state'] == 'deleted':
             continue
@@ -366,7 +339,6 @@ def get_instance_interfaces(instance_uuid):
 
 
 def get_network_interfaces(network_uuid):
-    see_this_node()
     for ni in etcd.get_all('networkinterface', None):
         if ni['state'] == 'deleted':
             continue
@@ -375,12 +347,10 @@ def get_network_interfaces(network_uuid):
 
 
 def get_interface(interface_uuid):
-    see_this_node()
     return etcd.get('networkinterface', None, interface_uuid)
 
 
 def update_network_interface_state(interface_uuid, state):
-    see_this_node
     ni = get_interface(interface_uuid)
     ni['state'] = state
     ni['state_updated'] = time.time()
@@ -391,21 +361,18 @@ def update_network_interface_state(interface_uuid, state):
 
 
 def add_floating_to_interface(interface_uuid, addr):
-    see_this_node
     ni = get_interface(interface_uuid)
     ni['floating'] = addr
     etcd.put('networkinterface', None, interface_uuid, ni)
 
 
 def remove_floating_from_interface(interface_uuid):
-    see_this_node
     ni = get_interface(interface_uuid)
     ni['floating'] = None
     etcd.put('networkinterface', None, interface_uuid, ni)
 
 
 def create_snapshot(snapshot_uuid, device, instance_uuid, created):
-    see_this_node()
     etcd.put(
         'snapshot', instance_uuid, created,
         {
@@ -417,14 +384,12 @@ def create_snapshot(snapshot_uuid, device, instance_uuid, created):
 
 
 def get_instance_snapshots(instance_uuid):
-    see_this_node()
     for m in etcd.get_all('snapshot', instance_uuid,
                           sort_order='ascend'):
         yield m
 
 
 def add_event(object_type, object_uuid, operation, phase, duration, message):
-    see_this_node()
     t = time.time()
     etcd.put(
         'event/%s' % object_type, object_uuid, t,
@@ -441,14 +406,12 @@ def add_event(object_type, object_uuid, operation, phase, duration, message):
 
 
 def get_events(object_type, object_uuid):
-    see_this_node()
     for m in etcd.get_all('event/%s' % object_type, object_uuid,
                           sort_order='ascend'):
         yield m
 
 
 def update_metrics_bulk(metrics):
-    see_this_node()
     node = config.parsed.get('NODE_NAME')
     etcd.put(
         'metrics', node, None,
@@ -461,7 +424,6 @@ def update_metrics_bulk(metrics):
 
 
 def get_metrics(fqdn):
-    see_this_node()
     d = etcd.get('metrics', fqdn, None)
     if not d:
         return {}
@@ -469,7 +431,6 @@ def get_metrics(fqdn):
 
 
 def allocate_console_port(instance_uuid):
-    see_this_node()
     node = config.parsed.get('NODE_NAME')
     with etcd.get_lock('sf/console/%s' % node) as _:
         consumed = []
@@ -490,7 +451,6 @@ def allocate_console_port(instance_uuid):
 
 
 def free_console_port(port):
-    see_this_node()
     etcd.delete('console', config.parsed.get('NODE_NAME'), port)
 
 
