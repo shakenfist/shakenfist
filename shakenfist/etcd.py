@@ -34,14 +34,20 @@ class ActualLock(etcd3.Lock):
         self.timeout = timeout
 
     def __enter__(self):
-        LOG.debug("ActualLock.__enter__() timeout=%s name=%s",
+        LOG.debug('ActualLock.__enter__() timeout=%s name=%s',
                   self.timeout, self.name)
         if not self.acquire(timeout=self.timeout):
             raise LockException('Cannot acquire lock: %s' % self.name)
+        return self
 
 
 def get_lock(name, ttl=60, timeout=10):
-    """Retrieves an Etcd lock object. To actually lock, you need to .acquire() the lock!"""
+    """Retrieves an Etcd lock object. It is not locked, to lock use acquire().
+
+    The returned lock can be used as a context manager, with the lock being
+    acquired on entry and released on exit. Note that the lock acquire process
+    will have no timeout.
+    """
     return ActualLock(name, ttl, etcd_client=etcd3.client(), timeout=timeout)
 
 

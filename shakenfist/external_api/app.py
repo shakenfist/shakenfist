@@ -1178,7 +1178,7 @@ class Image(Resource):
             # the image. (Zero timeout is an infinite timeout therefore set 1.)
             images.get_image(url, [], url, timeout=1)
         except etcd.LockException:
-            return error(403, "Another process is already fetching the URL")
+            return error(403, 'Another process is already fetching the URL')
 
 
 def _delete_network(network_from_db):

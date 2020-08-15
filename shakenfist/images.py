@@ -32,7 +32,7 @@ IMAGE_FETCH_LOCK_TIMEOUT = 600   # TODO(andy):Should be linked to HTTP timeout?
 
 
 def get_image(url, locks, op_label, timeout=IMAGE_FETCH_LOCK_TIMEOUT):
-    """Fetch image if not downloaded and return image path"""
+    """Fetch image if not downloaded and return image path."""
     hashed = hash_image_url(url)
     image_lock_name = 'sf/images/%s/%s' % (
         config.parsed.get('NODE_NAME'), hashed)
@@ -45,7 +45,7 @@ def get_image(url, locks, op_label, timeout=IMAGE_FETCH_LOCK_TIMEOUT):
                 requires_fetch(image_url)
 
             if image_dirty:
-                LOG.info("get_image() starting fetch of %s", image_url)
+                LOG.info('get_image() starting fetch of %s', image_url)
                 hashed_image_path = fetch(hashed_image_path, info,
                                           resp, locks=locks.append(image_lock))
             else:
