@@ -15,7 +15,8 @@ LOG = logging.getLogger(__name__)
 
 
 def observe(path, instance_uuid):
-    setproctitle.setproctitle('sf-tiggers-%s' % instance_uuid)
+    setproctitle.setproctitle(
+        '%s-%s' % (daemon.process_name('triggers'), instance_uuid))
     regexps = {
         'login prompt': ['^.* login: .*', re.compile('.* login: .*')]
     }
@@ -87,7 +88,8 @@ class Monitor(daemon.Daemon):
                         config.parsed.get('STORAGE_PATH'), 'instances', inst['uuid'], 'console.log')
                     p = multiprocessing.Process(
                         target=observe, args=(console_path, inst['uuid']),
-                        name='sf-triggers-%s' % inst['uuid'])
+                        name='%s-%s' % (daemon.process_name('triggers'),
+                                        inst['uuid']))
                     p.start()
 
                     observers[inst['uuid']] = p
