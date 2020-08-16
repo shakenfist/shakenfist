@@ -24,7 +24,7 @@ class NetworkTestCase(testtools.TestCase):
         self.mock_etcd_client = self.etcd_client.start()
         self.addCleanup(self.etcd_client.stop)
 
-        self.etcd_lock = mock.patch('etcd3.Lock')
+        self.etcd_lock = mock.patch('shakenfist.etcd.ActualLock')
         self.mock_etcd_lock = self.etcd_lock.start()
         self.addCleanup(self.etcd_lock.stop)
 

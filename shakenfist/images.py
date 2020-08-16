@@ -12,6 +12,7 @@ import time
 
 from oslo_concurrency import processutils
 
+from shakenfist import db
 from shakenfist import config
 from shakenfist import exceptions
 from shakenfist import image_resolver_cirros
@@ -26,6 +27,32 @@ resolvers = {
     'cirros': image_resolver_cirros,
     'ubuntu': image_resolver_ubuntu
 }
+
+IMAGE_FETCH_LOCK_TIMEOUT = 600   # TODO(andy):Should be linked to HTTP timeout?
+
+
+def get_image(url, locks, op_label, timeout=IMAGE_FETCH_LOCK_TIMEOUT):
+    """Fetch image if not downloaded and return image path."""
+    hashed = hash_image_url(url)
+    image_lock_name = 'sf/images/%s/%s' % (
+        config.parsed.get('NODE_NAME'), hashed)
+
+    with db.get_lock(image_lock_name,
+                     timeout=timeout) as image_lock:
+        with util.RecordedOperation('fetch image', op_label) as _:
+            image_url = resolve(url)
+            hashed_image_path, info, image_dirty, resp = \
+                requires_fetch(image_url)
+
+            if image_dirty:
+                LOG.info('get_image() starting fetch of %s', image_url)
+                hashed_image_path = fetch(hashed_image_path, info,
+                                          resp, locks=locks.append(image_lock))
+            else:
+                hashed_image_path = '%s.v%03d' % (
+                    hashed_image_path, info['version'])
+
+    return hashed_image_path
 
 
 def resolve(name):

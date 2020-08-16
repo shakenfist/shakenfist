@@ -31,6 +31,7 @@ import uuid
 
 from shakenfist import config
 from shakenfist import db
+from shakenfist import etcd
 from shakenfist import images
 from shakenfist import net
 from shakenfist import scheduler
@@ -1172,17 +1173,12 @@ class Image(Resource):
     @caller_is_admin
     def post(self, url=None):
         db.add_event('image', url, 'api', 'cache', None, None)
-
-        hashed = images.hash_image_url(url)
-        with db.get_lock('sf/images/%s' % hashed) as image_lock:
-            with util.RecordedOperation('cache image', url) as _:
-                image_url = images.resolve(url)
-                hashed_image_path, info, image_dirty, resp = \
-                    images.requires_fetch(image_url)
-
-                if image_dirty:
-                    images.fetch(hashed_image_path, info,
-                                 resp, locks=[image_lock])
+        try:
+            # Timeout immediately since another process is already downloading
+            # the image. (Zero timeout is an infinite timeout therefore set 1.)
+            images.get_image(url, [], url, timeout=1)
+        except etcd.LockException:
+            return error(403, 'Another process is already fetching the URL')
 
 
 def _delete_network(network_from_db):
