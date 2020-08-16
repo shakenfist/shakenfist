@@ -2,6 +2,7 @@ import logging
 import multiprocessing
 import os
 import re
+import setproctitle
 import signal
 import time
 
@@ -14,6 +15,8 @@ LOG = logging.getLogger(__name__)
 
 
 def observe(path, instance_uuid):
+    setproctitle.setproctitle(
+        '%s-%s' % (daemon.process_name('triggers'), instance_uuid))
     regexps = {
         'login prompt': ['^.* login: .*', re.compile('.* login: .*')]
     }
@@ -54,6 +57,7 @@ def observe(path, instance_uuid):
 
 class Monitor(daemon.Daemon):
     def run(self):
+        LOG.info('Starting')
         observers = {}
 
         while True:
@@ -69,11 +73,14 @@ class Monitor(daemon.Daemon):
 
             # Start missing observers
             extra_instances = list(observers.keys())
-            for inst in list(db.get_instances(only_node=config.parsed.get('NODE_NAME'))):
+
+            for inst in db.get_instances(only_node=config.parsed.get('NODE_NAME')):
                 if inst['uuid'] in extra_instances:
                     extra_instances.remove(inst['uuid'])
 
                 if inst['state'] != 'created':
+                    LOG.info('Instance not created %s == %s' %
+                             (inst['uuid'], inst['state']))
                     continue
 
                 if inst['uuid'] not in observers:
@@ -81,7 +88,8 @@ class Monitor(daemon.Daemon):
                         config.parsed.get('STORAGE_PATH'), 'instances', inst['uuid'], 'console.log')
                     p = multiprocessing.Process(
                         target=observe, args=(console_path, inst['uuid']),
-                        name='sf trigger %s' % inst['uuid'])
+                        name='%s-%s' % (daemon.process_name('triggers'),
+                                        inst['uuid']))
                     p.start()
 
                     observers[inst['uuid']] = p

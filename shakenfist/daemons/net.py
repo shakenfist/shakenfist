@@ -95,6 +95,7 @@ class Monitor(daemon.Daemon):
             config.parsed.get('NODE_NAME'), vxid_to_mac)
 
     def run(self):
+        LOG.info('Starting')
         while True:
             time.sleep(30)
 
