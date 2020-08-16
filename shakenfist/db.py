@@ -494,5 +494,12 @@ def enqueue(queuename, item):
     etcd.enqueue(queuename, item)
 
 
+def enqueue_delete(node, instance_uuid, next_state):
+    enqueue(node, {
+        'tasks': [{'type': 'instance_delete', 'next_state': next_state}],
+        'instance_uuid': instance_uuid
+    })
+
+
 def dequeue(queuename):
     return etcd.dequeue(queuename)

@@ -10,6 +10,7 @@ from shakenfist import config
 from shakenfist.daemons import daemon
 from shakenfist.daemons import external_api as external_api_daemon
 from shakenfist.daemons import cleaner as cleaner_daemon
+from shakenfist.daemons import queues as queues_daemon
 from shakenfist.daemons import net as net_daemon
 from shakenfist.daemons import resources as resource_daemon
 from shakenfist.daemons import triggers as trigger_daemon
@@ -146,12 +147,19 @@ def main():
         LOG.removeHandler(handler)
         trigger_daemon.Monitor('triggers').run()
 
+    # Queues
+    queues_pid = os.fork()
+    if queues_pid == 0:
+        LOG.removeHandler(handler)
+        queues_daemon.Monitor('queues').run()
+
     setproctitle.setproctitle(daemon.process_name('main'))
     LOG.info('network monitor pid is %d' % net_pid)
     LOG.info('external api pid is %d' % external_api_pid)
     LOG.info('resources monitor pid is %d' % resource_pid)
     LOG.info('cleaner pid is %d' % cleaner_pid)
     LOG.info('trigger pid is %d' % trigger_pid)
+    LOG.info('queues pid is %d' % queues_pid)
 
     restore_instances()
 
@@ -159,7 +167,9 @@ def main():
         external_api_pid: 'external api',
         net_pid: 'network monitor',
         resource_pid: 'resource monitor',
-        cleaner_pid: 'cleaner'
+        cleaner_pid: 'cleaner',
+        trigger_pid: 'trigger',
+        queues_pid: 'queues'
     }
 
     while True:

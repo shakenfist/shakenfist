@@ -695,7 +695,21 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         self.mock_virt_from_db = self.virt_from_db.start()
         self.addCleanup(self.virt_from_db.stop)
 
-    @mock.patch('shakenfist.external_api.app._delete_instance')
+        def fake_config_instance(key):
+            fc = {
+                'API_ASYNC_WAIT': 1,
+            }
+            if key in fc:
+                return fc[key]
+            raise Exception('fake_config_instance() Unknown config key')
+
+        self.config = mock.patch('shakenfist.config.parsed.get',
+                                 fake_config_instance)
+        self.mock_config = self.config.start()
+
+        self.addCleanup(self.config.stop)
+
+    @mock.patch('shakenfist.db.enqueue')
     @mock.patch('shakenfist.db.get_instances',
                 return_value=[{
                     'namespace': 'system',
@@ -712,13 +726,18 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                     'state': 'created',
                     'uuid': '847b0327-9b17-4148-b4ed-be72b6722c17',
                 }])
+    @mock.patch('shakenfist.db.get_instance',
+                return_value={
+                    'state': 'deleted',
+                },)
     @mock.patch('shakenfist.etcd.put')
     @mock.patch('shakenfist.db.get_lock')
     def test_delete_all_instances(self,
                                   mock_db_get_lock,
                                   mock_etcd_put,
+                                  mock_get_instance,
                                   mock_get_instances,
-                                  mock_del_instance):
+                                  mock_enqueue):
 
         resp = self.client.delete('/instances',
                                   headers={'Authorization': self.auth_header},
@@ -731,7 +750,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                          resp.get_json())
         self.assertEqual(200, resp.status_code)
 
-    @mock.patch('shakenfist.external_api.app._delete_instance')
+    @mock.patch('shakenfist.db.enqueue')
     @mock.patch('shakenfist.db.get_instances',
                 return_value=[{
                     'namespace': 'system',
@@ -748,13 +767,18 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                     'state': 'created',
                     'uuid': '847b0327-9b17-4148-b4ed-be72b6722c17',
                 }])
+    @mock.patch('shakenfist.db.get_instance',
+                return_value={
+                    'state': 'deleted',
+                },)
     @mock.patch('shakenfist.etcd.put')
     @mock.patch('shakenfist.db.get_lock')
     def test_delete_all_instances_one_already_deleted(self,
                                                       mock_db_get_lock,
                                                       mock_etcd_put,
+                                                      mock_get_instance,
                                                       mock_get_instances,
-                                                      mock_del_instance):
+                                                      mock_enqueue):
 
         resp = self.client.delete('/instances',
                                   headers={'Authorization': self.auth_header},

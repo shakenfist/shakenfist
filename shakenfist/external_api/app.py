@@ -7,6 +7,7 @@
 
 import base64
 import bcrypt
+import copy
 import flask
 from flask_jwt_extended import create_access_token
 from flask_jwt_extended import get_jwt_identity
@@ -26,6 +27,7 @@ import logging
 import re
 import requests
 import sys
+import time
 import traceback
 import uuid
 
@@ -549,42 +551,6 @@ class AuthMetadata(Resource):
             db.persist_metadata('namespace', namespace, md)
 
 
-def _delete_instance(instance_uuid, instance_from_db_virt):
-    with db.get_lock('/sf/instance/%s' % instance_uuid) as _:
-        db.add_event('instance', instance_uuid, 'api', 'delete', None, None)
-
-        # Create list of networks used by instance
-        instance_networks = []
-        for iface in list(db.get_instance_interfaces(instance_uuid)):
-            if not iface['network_uuid'] in instance_networks:
-                instance_networks.append(iface['network_uuid'])
-
-        # Create list of networks used by all other instances
-        host_networks = []
-        for inst in list(
-                db.get_instances(only_node=config.parsed.get('NODE_NAME'))):
-            if not inst['uuid'] == instance_uuid:
-                for iface in db.get_instance_interfaces(inst['uuid']):
-                    if not iface['network_uuid'] in host_networks:
-                        host_networks.append(iface['network_uuid'])
-
-        instance_from_db_virt.delete()
-
-        # Check each network used by the deleted instance
-        for network in instance_networks:
-            n = net.from_db(network)
-            if n:
-                # If network used by another instance, only update
-                if network in host_networks:
-                    with util.RecordedOperation('deallocate ip address',
-                                                instance_from_db_virt) as _:
-                        n.update_dhcp()
-                else:
-                    # Network not used by any other instance therefore delete
-                    with util.RecordedOperation('remove network', n) as _:
-                        n.delete()
-
-
 class Instance(Resource):
     @jwt_required
     @arg_is_instance_uuid
@@ -596,16 +562,27 @@ class Instance(Resource):
     @jwt_required
     @arg_is_instance_uuid
     @requires_instance_ownership
-    @arg_is_instance_uuid_as_virt
-    @redirect_instance_request
-    def delete(self, instance_uuid=None,
-               instance_from_db=None, instance_from_db_virt=None):
+    def delete(self, instance_uuid=None, instance_from_db=None):
 
         # Check if instance has already been deleted
         if instance_from_db['state'] == 'deleted':
             return error(404, 'instance not found')
 
-        _delete_instance(instance_uuid, instance_from_db_virt)
+        # If this instance is not on a node, just do the DB cleanup locally
+        if not instance_from_db['node']:
+            node = config.parsed.get('NODE_NAME')
+        else:
+            node = instance_from_db['node']
+
+        db.enqueue_delete(node, instance_from_db['uuid'], 'deleted')
+
+        start_time = time.time()
+        while time.time() - start_time < config.parsed.get('API_ASYNC_WAIT'):
+            i = db.get_instance(instance_uuid)
+            if i['state'] == 'deleted':
+                return
+
+            time.sleep(0.2)
 
 
 class Instances(Resource):
@@ -876,9 +853,22 @@ class Instances(Resource):
             if instance['state'] == 'deleted':
                 continue
 
-            instance_from_db_virt = virt.from_db(instance['uuid'])
-            _delete_instance(instance['uuid'], instance_from_db_virt)
+            # If this instance is not on a node, just do the DB cleanup locally
+            if not instance['node']:
+                node = config.parsed.get('NODE_NAME')
+            else:
+                node = instance['node']
+
+            db.enqueue_delete(node, instance['uuid'], 'deleted')
             instances_del.append(instance['uuid'])
+
+        waiting_for = copy.copy(instances_del)
+        start_time = time.time()
+        while (len(waiting_for) > 0 and (time.time() - start_time < config.parsed.get('API_ASYNC_WAIT'))):
+            for instance_uuid in copy.copy(waiting_for):
+                i = db.get_instance(instance_uuid)
+                if i['state'] == 'deleted':
+                    waiting_for.remove(instance_uuid)
 
         return instances_del
 

@@ -8,6 +8,7 @@ DAEMON_NAMES = {
     'cleaner': 'sf-cleaner',
     'main': 'sf-main',
     'net': 'sf-net',
+    'queues': 'sf-queues',
     'resources': 'sf-resources',
     'triggers': 'sf-triggers',
 }

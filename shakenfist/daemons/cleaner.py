@@ -45,6 +45,12 @@ class Monitor(daemon.Daemon):
                 seen.append(domain.name())
 
                 if instance.get('state') == 'deleted':
+                    # NOTE(mikal): a delete might be in-flight in the queue.
+                    # We only worry about instances which should have gone
+                    # away five minutes ago.
+                    if time.time() - instance['state_updated'] < 300:
+                        continue
+
                     db.instance_enforced_deletes_increment(instance_uuid)
                     attempts = instance.get('enforced_deletes', 0)
                     LOG.warning('Deleting stray instance %s (attempt %d)'
@@ -62,6 +68,7 @@ class Monitor(daemon.Daemon):
                     else:
                         i = virt.from_db(instance_uuid)
                         i.delete()
+                        i.update_instance_state('deleted')
 
                     continue
 
@@ -81,6 +88,12 @@ class Monitor(daemon.Daemon):
                     instance = db.get_instance(instance_uuid)
 
                     if instance.get('state') == 'deleted':
+                        # NOTE(mikal): a delete might be in-flight in the queue.
+                        # We only worry about instances which should have gone
+                        # away five minutes ago.
+                        if time.time() - instance['state_updated'] < 300:
+                            continue
+
                         domain = conn.lookupByName(domain_name)
                         domain.undefine()
                         LOG.info('Detected stray instance %s'

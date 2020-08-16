@@ -289,7 +289,6 @@ class Instance(object):
                     ipm.release(ni['ipv4'])
                     db.persist_ipmanager(ni['network_uuid'], ipm.save())
 
-        db.update_instance_state(self.db_entry['uuid'], 'deleted')
         db.update_instance_power_state(self.db_entry['uuid'], 'off')
         db.free_console_port(self.db_entry['console_port'])
         db.free_console_port(self.db_entry['vdi_port'])
