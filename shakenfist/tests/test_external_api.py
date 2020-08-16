@@ -940,7 +940,8 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
     @mock.patch('shakenfist.virt.from_definition')
     @mock.patch('shakenfist.virt.from_db', return_value=None)
     @mock.patch('shakenfist.db.add_event')
-    def test_post_instance(self, mock_start, mock_virt_from_defn, mock_virt_from_db, mock_event):
+    @mock.patch('shakenfist.db.persist_metadata')
+    def test_post_instance(self, mock_start, mock_virt_from_defn, mock_virt_from_db, mock_event, mock_metadata):
         resp = self.client.post('/instances',
                                 headers={
                                     'Authorization': self.auth_header},
@@ -960,6 +961,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                                 }))
         self.assertEqual({'out': 'instance start results'}, resp.get_json())
         self.assertEqual(200, resp.status_code)
+        mock_metadata.assert_called()
 
 
 class ExternalApiNetworkTestCase(ExternalApiTestCase):

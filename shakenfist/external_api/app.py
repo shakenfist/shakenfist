@@ -681,6 +681,9 @@ class Instances(Resource):
                 video=video
             )
 
+        # Initialise metadata
+        db.persist_metadata('instance', instance_uuid, {})
+
         if not SCHEDULER:
             SCHEDULER = scheduler.Scheduler()
 
@@ -822,9 +825,6 @@ class Instances(Resource):
                     str(uuid.uuid4()), netdesc, instance_uuid, order)
 
                 order += 1
-
-        # Initialise metadata
-        db.persist_metadata('instance', instance_uuid, {})
 
         # Now we can start the instance
         with db.get_lock('sf/instance/%s' % instance.db_entry['uuid'], ttl=900) as lock:
