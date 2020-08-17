@@ -680,7 +680,8 @@ class Instances(Resource):
                     db.add_event('instance', instance_uuid,
                                  'schedule', 'failed', None,
                                  'insufficient resources: ' + str(e))
-                    db.update_instance_state(instance_uuid, 'error')
+                    db.enqueue_delete(config.get.parsed(
+                        'NODE_NAME'), instance_uuid, 'error')
                     return error(507, str(e))
 
                 placement = candidates[0]
@@ -695,7 +696,8 @@ class Instances(Resource):
                     db.add_event('instance', instance_uuid,
                                  'schedule', 'failed', None,
                                  'insufficient resources: ' + str(e))
-                    db.update_instance_state(instance_uuid, 'error')
+                    db.enqueue_delete(config.get.parsed(
+                        'NODE_NAME'), instance_uuid, 'error')
                     return error(507, str(e))
 
                 except scheduler.CandidateNodeNotFoundException as e:
@@ -720,7 +722,8 @@ class Instances(Resource):
         # Give up for real
         db.add_event('instance', instance_uuid,
                      'schedule', 'failed', None, 'insufficient resources after retries')
-        db.update_instance_state(instance_uuid, 'error')
+        db.enqueue_delete(config.get.parsed(
+            'NODE_NAME'), instance_uuid, 'error')
         return error(507, 'insufficient capacity after retries')
 
     def _instance_start_remote(self, placed_on, instance_uuid, namespace):
