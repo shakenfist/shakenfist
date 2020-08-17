@@ -161,9 +161,9 @@ class Instance(object):
             modified_disks = []
             for disk in self.db_entry['block_devices']['devices']:
                 if disk.get('base'):
+                    _, hashed_image_path = images.hash_image(disk['base'])
                     try:
-                        hashed_image_path = images.get_image(disk['base'],
-                                                             [lock], self)
+                        images.get_image(disk['base'], [lock], self)
                     except etcd.LockException:
                         # TODO(andy): Tidy up the failed instance creation
                         raise

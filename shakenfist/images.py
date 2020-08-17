@@ -33,26 +33,23 @@ IMAGE_FETCH_LOCK_TIMEOUT = 600   # TODO(andy):Should be linked to HTTP timeout?
 
 def get_image(url, locks, op_label, timeout=IMAGE_FETCH_LOCK_TIMEOUT):
     """Fetch image if not downloaded and return image path."""
-    hashed = hash_image_url(url)
+    hashed_image_url, hashed_image_path = hash_image(url)
     image_lock_name = 'sf/images/%s/%s' % (
-        config.parsed.get('NODE_NAME'), hashed)
+        config.parsed.get('NODE_NAME'), hashed_image_url)
 
     with db.get_lock(image_lock_name,
                      timeout=timeout) as image_lock:
         with util.RecordedOperation('fetch image', op_label) as _:
             image_url = resolve(url)
-            hashed_image_path, info, image_dirty, resp = \
-                requires_fetch(image_url)
+            info, image_dirty, resp = requires_fetch(image_url)
 
             if image_dirty:
-                LOG.info('get_image() starting fetch of %s', image_url)
+                LOG.info('get_image starting fetch of %s', image_url)
                 hashed_image_path = fetch(hashed_image_path, info,
                                           resp, locks=locks.append(image_lock))
             else:
                 hashed_image_path = '%s.v%03d' % (
                     hashed_image_path, info['version'])
-
-    return hashed_image_path
 
 
 def resolve(name):
@@ -71,12 +68,13 @@ def _get_cache_path():
     return image_cache_path
 
 
-def hash_image_url(image_url):
+def hash_image(image_url):
     h = hashlib.sha256()
     h.update(image_url.encode('utf-8'))
     hashed_image_url = h.hexdigest()
+    hashed_image_path = os.path.join(_get_cache_path(), hashed_image_url)
     LOG.debug('Image %s hashes to %s' % (image_url, hashed_image_url))
-    return hashed_image_url
+    return hashed_image_url, hashed_image_path
 
 
 VALIDATED_IMAGE_FIELDS = ['Last-Modified', 'Content-Length']
@@ -97,8 +95,7 @@ def _read_info(image_url, hashed_image_url, hashed_image_path):
 
 
 def requires_fetch(image_url):
-    hashed_image_url = hash_image_url(image_url)
-    hashed_image_path = os.path.join(_get_cache_path(), hashed_image_url)
+    hashed_image_url, hashed_image_path = hash_image(image_url)
     info = _read_info(image_url, hashed_image_url, hashed_image_path)
 
     resp = requests.get(image_url, allow_redirects=True, stream=True,
