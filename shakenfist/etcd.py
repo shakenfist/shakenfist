@@ -34,11 +34,18 @@ class ActualLock(etcd3.Lock):
         self.timeout = timeout
 
     def __enter__(self):
-        LOG.debug('ActualLock.__enter__() timeout=%s name=%s',
+        LOG.debug('Lock attempt: timeout=%s name=%s',
                   self.timeout, self.name)
-        if not self.acquire(timeout=self.timeout):
-            raise LockException('Cannot acquire lock: %s' % self.name)
-        return self
+        for attempt in range(ETCD_ATTEMPTS):
+            try:
+                if not self.acquire(timeout=self.timeout):
+                    raise LockException('Cannot acquire lock: %s' % self.name)
+                return self
+
+            except etcd3.exceptions.ConnectionFailedError:
+                time.sleep(ETCD_ATTEMPTS)
+
+        raise LockException('Could not acquire lock after retries.')
 
 
 def get_lock(name, ttl=60, timeout=10):
@@ -142,26 +149,41 @@ def delete_all(objecttype, subtype, sort_order=None):
     raise WriteException('Cannot delete all "%s"' % path)
 
 
-def enqueue(queuename, data):
-    with get_lock('/sf/queue/%s' % queuename) as _:
+def enqueue(queuename, workitem):
+    with get_lock('sf/queue/%s' % queuename) as _:
         i = 0
         entry_time = time.time()
-        entry_name = '%s-%03d' % (entry_time, i)
+        jobname = '%s-%03d' % (entry_time, i)
 
-        while get('queue', queuename, entry_name):
+        while get('queue', queuename, jobname):
             i += 1
-            entry_name = '%s-%03d' % (entry_time, i)
+            jobname = '%s-%03d' % (entry_time, i)
 
-        put('queue', queuename, entry_name, data)
+        put('queue', queuename, jobname, workitem)
+        LOG.info('Enqueued workitem %s for queue %s with work %s'
+                 % (jobname, queuename, workitem))
 
 
 def dequeue(queuename):
-    with get_lock('/sf/queue/%s' % queuename) as _:
-        path = _construct_key('queue', queuename, None)
+    with get_lock('sf/queue/%s' % queuename) as _:
+        queue_path = _construct_key('queue', queuename, None)
 
         client = etcd3.client()
-        for data, metadata in client.get_prefix(path, sort_order='ascend'):
-            client.delete(metadata.key)
-            return json.loads(data)
+        for data, metadata in client.get_prefix(queue_path, sort_order='ascend'):
+            jobname = str(metadata.key).split('/')[-1]
+            workitem = json.loads(data)
 
-    return None
+            put('processing', queuename, jobname, workitem)
+            client.delete(metadata.key)
+            LOG.info('Moved workitem %s from queue to processing for %s with work %s'
+                     % (jobname, queuename, workitem))
+
+            return jobname, workitem
+
+    return None, None
+
+
+def resolve(queuename, jobname):
+    delete('processing', queuename, jobname)
+    LOG.info('Resolved workitem %s for queue %s'
+             % (jobname, queuename))

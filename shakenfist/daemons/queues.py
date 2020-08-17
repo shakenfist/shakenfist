@@ -2,11 +2,13 @@ import copy
 import logging
 import multiprocessing
 import os
+import setproctitle
 import time
 
 from shakenfist import config
 from shakenfist.daemons import daemon
 from shakenfist import db
+from shakenfist import etcd
 from shakenfist import images
 from shakenfist import net
 from shakenfist import util
@@ -15,38 +17,102 @@ from shakenfist import virt
 LOG = logging.getLogger(__name__)
 
 
-def handle(workitem):
-    LOG.info('Worker for item %s has pid %d' % (workitem, os.getpid()))
-    for task in workitem.get('tasks', []):
-        if task.get('type').startswith('instance_') and not workitem.get('instance_uuid'):
-            LOG.error('Instance task lacks instance uuid: %s' % workitem)
+def handle(jobname, workitem):
+    LOG.info('Worker for workitem %s has pid %d' % (jobname, os.getpid()))
+    setproctitle.setproctitle(
+        '%s-%s' % (daemon.process_name('triggers'), jobname))
 
-        if task.get('type') == 'image_fetch':
-            image_fetch(workitem.get('url'))
+    try:
+        for task in workitem.get('tasks', []):
+            if task.get('type').startswith('instance_') and not workitem.get('instance_uuid'):
+                LOG.error('Instance task lacks instance uuid: %s' % workitem)
 
-        if task.get('type') == 'instance_delete':
-            instance_delete(workitem.get('instance_uuid'))
-            db.update_instance_state(
-                workitem.get('instance_uuid'),
-                task.get('next_state', 'unknown'))
+            if task.get('type') == 'image_fetch':
+                image_fetch(task.get('url'))
 
-    LOG.info('Worker for item %s has pid %d, complete'
-             % (workitem, os.getpid()))
+            if task.get('type') == 'instance_preflight':
+                instance_preflight(workitem.get('instance_uuid'))
+
+            if task.get('type') == 'instance_start':
+                instance_start(workitem.get('instance_uuid'),
+                               workitem.get('network'))
+                db.update_instance_state(
+                    workitem.get('instance_uuid'), 'created')
+
+            if task.get('type') == 'instance_delete':
+                instance_delete(workitem.get('instance_uuid'))
+                db.update_instance_state(
+                    workitem.get('instance_uuid'),
+                    task.get('next_state', 'unknown'))
+
+        LOG.info('Worker for workitem %s has pid %d, complete'
+                 % (jobname, os.getpid()))
+
+    finally:
+        db.resolve(config.parsed.get('NODE_NAME'), jobname)
 
 
 def image_fetch(url):
     try:
-        # Timeout immediately since another process is already downloading
-        # the image. (Zero timeout is an infinite timeout therefore set 1).
-        images.get_image(url, [], url, timeout=1)
+        images.get_image(url, [], url, timeout=images.IMAGE_FETCH_LOCK_TIMEOUT)
     except etcd.LockException:
         pass
 
 
-def instance_delete(instance_uuid):
-    with db.get_lock('/sf/instance/%s' % instance_uuid) as _:
+def instance_preflight(instance_uuid):
+    # TODO(mikal): preflight with retries etc
+    pass
+
+
+def instance_start(instance_uuid, network):
+    with db.get_lock('sf/instance/%s' % instance_uuid, ttl=900) as lock:
         db.add_event('instance', instance_uuid,
-                     'api', 'delete', None, None)
+                     'queued', 'create', None, None)
+        instance = virt.from_db(instance_uuid)
+
+        # Collect the networks
+        nets = {}
+        for netdesc in network:
+            if netdesc['network_uuid'] not in nets:
+                n = net.from_db(netdesc['network_uuid'])
+                if not n:
+                    db.enqueue_delete(
+                        config.parsed.get('NODE_NAME'), instance_uuid, 'error')
+                    return
+
+                nets[netdesc['network_uuid']] = n
+
+        # Create the networks
+        with util.RecordedOperation('ensure networks exist', instance) as _:
+            for network_uuid in nets:
+                n = nets[network_uuid]
+                n.create()
+                n.ensure_mesh()
+                n.update_dhcp()
+
+        # Now we can start the isntance
+        libvirt = util.get_libvirt()
+        try:
+            with util.RecordedOperation('instance creation',
+                                        instance) as _:
+                instance.create(lock=lock)
+
+        except libvirt.libvirtError as e:
+            code = e.get_error_code()
+            if code in (libvirt.VIR_ERR_CONFIG_UNSUPPORTED,
+                        libvirt.VIR_ERR_XML_ERROR):
+                db.enqueue_delete(
+                    config.parsed.get('NODE_NAME'), instance_uuid, 'error')
+                return
+
+        for iface in db.get_instance_interfaces(instance.db_entry['uuid']):
+            db.update_network_interface_state(iface['uuid'], 'created')
+
+
+def instance_delete(instance_uuid):
+    with db.get_lock('sf/instance/%s' % instance_uuid) as _:
+        db.add_event('instance', instance_uuid,
+                     'queued', 'delete', None, None)
 
         # Create list of networks used by instance
         instance_networks = []
@@ -94,13 +160,13 @@ class Monitor(daemon.Daemon):
                         w.join(1)
                         workers.remove(w)
 
-                workitem = db.dequeue(config.parsed.get('NODE_NAME'))
+                jobname, workitem = db.dequeue(config.parsed.get('NODE_NAME'))
                 if not workitem:
                     time.sleep(0.2)
                     continue
 
                 p = multiprocessing.Process(
-                    target=handle, args=(workitem,),
+                    target=handle, args=(jobname, workitem,),
                     name='%s-worker' % daemon.process_name('queues'))
                 p.start()
                 workers.append(p)

@@ -959,41 +959,6 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                           'status': 404}, resp.get_json())
         self.assertEqual(404, resp.status_code)
 
-    @mock.patch('shakenfist.external_api.app.Instances._instance_start',
-                return_value={'out': 'instance start results'})
-    @mock.patch('shakenfist.virt.from_definition')
-    @mock.patch('shakenfist.virt.from_db', return_value=None)
-    @mock.patch('shakenfist.db.add_event')
-    @mock.patch('shakenfist.db.persist_metadata')
-    @mock.patch('shakenfist.net.from_db', return_value={'uuid': 'foo'})
-    @mock.patch('shakenfist.db.get_lock')
-    @mock.patch('shakenfist.db.get_ipmanager')
-    @mock.patch('shakenfist.db.persist_ipmanager')
-    @mock.patch('shakenfist.db.create_network_interface')
-    def test_post_instance(self, mock_create_nic, mock_persist_ipmanager, mock_get_ipmanager,
-                           mock_lock, mock_net, mock_md_persist, mock_event,
-                           mock_virt_from_db, mock_virt_from_defn, mock_start):
-        resp = self.client.post('/instances',
-                                headers={
-                                    'Authorization': self.auth_header},
-                                data=json.dumps({
-                                    'name': 'test_instance',
-                                    'cpus': 1,
-                                    'memory': 1024,
-                                    'network': [
-                                        {'network_uuid': '87c15186-5f73-4947-a9fb-2183c4951efc'}],
-                                    'disk': [{'size': 8,
-                                              'base': 'cirros'}],
-                                    'ssh_key': None,
-                                    'user_data': None,
-                                    'placed_on': None,
-                                    'namespace': None,
-                                    'instance_uuid': None
-                                }))
-        self.assertEqual({'out': 'instance start results'}, resp.get_json())
-        self.assertEqual(200, resp.status_code)
-        mock_md_persist.assert_called()
-
 
 class ExternalApiNetworkTestCase(ExternalApiTestCase):
     def setUp(self):

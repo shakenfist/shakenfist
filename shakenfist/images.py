@@ -31,13 +31,15 @@ resolvers = {
 IMAGE_FETCH_LOCK_TIMEOUT = 600   # TODO(andy):Should be linked to HTTP timeout?
 
 
+def _get_image_lock_name(hashed_image_url):
+    return ('sf/images/%s/%s' % (
+        config.parsed.get('NODE_NAME'), hashed_image_url))
+
+
 def get_image(url, locks, op_label, timeout=IMAGE_FETCH_LOCK_TIMEOUT):
     """Fetch image if not downloaded and return image path."""
     hashed_image_url, hashed_image_path = hash_image(url)
-    image_lock_name = 'sf/images/%s/%s' % (
-        config.parsed.get('NODE_NAME'), hashed_image_url)
-
-    with db.get_lock(image_lock_name,
+    with db.get_lock(_get_image_lock_name(hashed_image_url),
                      timeout=timeout) as image_lock:
         with util.RecordedOperation('fetch image', op_label) as _:
             image_url = resolve(url)
@@ -50,6 +52,26 @@ def get_image(url, locks, op_label, timeout=IMAGE_FETCH_LOCK_TIMEOUT):
             else:
                 hashed_image_path = '%s.v%03d' % (
                     hashed_image_path, info['version'])
+
+        _transcode(hashed_image_path, op_label)
+
+    return hashed_image_path
+
+
+def _transcode(hashed_image_path, op_label):
+    with util.RecordedOperation('transcode image', op_label) as _:
+        if os.path.exists(hashed_image_path + '.qcow2'):
+            return
+
+        current_format = identify(hashed_image_path).get('file format')
+        if current_format == 'qcow2':
+            os.link(hashed_image_path, hashed_image_path + '.qcow2')
+            return
+
+        processutils.execute(
+            'qemu-img convert -t none -O qcow2 %s %s.qcow2'
+            % (hashed_image_path, hashed_image_path),
+            shell=True)
 
 
 def resolve(name):
@@ -110,7 +132,7 @@ def requires_fetch(image_url):
         if info.get(field) != resp.headers.get(field):
             image_dirty = True
 
-    return hashed_image_path, info, image_dirty, resp
+    return info, image_dirty, resp
 
 
 def fetch(hashed_image_path, info, resp, locks=None):
@@ -156,23 +178,6 @@ def fetch(hashed_image_path, info, resp, locks=None):
         return '%s.v%03d.orig' % (hashed_image_path, info['version'])
 
     return '%s.v%03d' % (hashed_image_path, info['version'])
-
-
-def transcode(hashed_image_path):
-    """Convert the image to qcow2."""
-
-    if os.path.exists(hashed_image_path + '.qcow2'):
-        return
-
-    current_format = identify(hashed_image_path).get('file format')
-    if current_format == 'qcow2':
-        os.link(hashed_image_path, hashed_image_path + '.qcow2')
-        return
-
-    processutils.execute(
-        'qemu-img convert -t none -O qcow2 %s %s.qcow2'
-        % (hashed_image_path, hashed_image_path),
-        shell=True)
 
 
 def resize(hashed_image_path, size):

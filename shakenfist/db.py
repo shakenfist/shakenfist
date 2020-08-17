@@ -216,7 +216,8 @@ def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key,
         'state_updated': time.time(),
         'namespace': namespace,
         'power_state': 'initial',
-        'video': video
+        'video': video,
+        'node_history': []
     }
     etcd.put('instance', None, instance_uuid, d)
     return d
@@ -490,8 +491,8 @@ def get_node_vxid_mapping(node):
     etcd.get('vxid_mapping', None, node)
 
 
-def enqueue(queuename, item):
-    etcd.enqueue(queuename, item)
+def enqueue(queuename, workitem):
+    etcd.enqueue(queuename, workitem)
 
 
 def enqueue_delete(node, instance_uuid, next_state):
@@ -502,4 +503,13 @@ def enqueue_delete(node, instance_uuid, next_state):
 
 
 def dequeue(queuename):
-    return etcd.dequeue(queuename)
+    try:
+        return etcd.dequeue(queuename)
+    except etcd.LockException:
+        # We didn't acquire the lock, we should just try again later. This probably
+        # indicates congestion.
+        return None, None
+
+
+def resolve(queuename, jobname):
+    etcd.resolve(queuename, jobname)

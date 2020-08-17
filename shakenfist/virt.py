@@ -142,6 +142,10 @@ class Instance(object):
 
         self.db_entry['block_devices']['finalized'] = False
 
+    # NOTE(mikal): this method is now strictly the instance specific steps for
+    # creation. It is assumed that the image sits in local cache already, and
+    # has been transcoded to the right format. This has been done to facilitate
+    # moving to a queue and task based creation mechanism.
     def create(self, lock=None):
         db.update_instance_state(self.db_entry['uuid'], 'creating')
 
@@ -161,12 +165,8 @@ class Instance(object):
             modified_disks = []
             for disk in self.db_entry['block_devices']['devices']:
                 if disk.get('base'):
-                    _, hashed_image_path = images.hash_image(disk['base'])
-                    try:
-                        images.get_image(disk['base'], [lock], self)
-                    except etcd.LockException:
-                        # TODO(andy): Tidy up the failed instance creation
-                        raise
+                    hashed_image_path = images.get_image(
+                        disk['base'], [lock], 'create')
 
                     try:
                         cd = pycdlib.PyCdlib()
@@ -197,12 +197,6 @@ class Instance(object):
                         disk['device'] = 'hd%s' % disk['device'][-1]
                         disk['bus'] = 'ide'
                     else:
-                        with util.RecordedOperation('transcode image', self) as _:
-                            if lock:
-                                lock.refresh()
-
-                            images.transcode(hashed_image_path)
-
                         with util.RecordedOperation('resize image', self) as _:
                             if lock:
                                 lock.refresh()

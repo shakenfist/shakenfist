@@ -96,40 +96,45 @@ class Monitor(daemon.Daemon):
             config.parsed.get('NODE_NAME'), vxid_to_mac)
 
     def _process_network_node_workitems(self):
-        workitem = db.dequeue('networknode')
-        if not workitem:
-            time.sleep(0.2)
-            return
+        jobname, workitem = db.dequeue('networknode')
+        try:
+            if not workitem:
+                time.sleep(0.2)
+                return
 
-        if 'network_uuid' not in workitem:
-            LOG.warn('Network workitem %s lacks network uuid.' % workitem)
-            return
+            if 'network_uuid' not in workitem:
+                LOG.warn('Network workitem %s lacks network uuid.' % workitem)
+                return
 
-        n = net.from_db(workitem.get('network_uuid'))
-        if not n:
-            LOG.warn(
-                'Received workitem for non-existant network: %s' % workitem)
-            return
+            n = net.from_db(workitem.get('network_uuid'))
+            if not n:
+                LOG.warn(
+                    'Received work item for non-existant network: %s' % workitem)
+                return
 
-        # NOTE(mikal): there's really nothing stopping us from processing a bunch
-        # of these jobs in parallel with a pool of workers, but I am not sure its
-        # worth the complexity right now. Are we really going to be changing
-        # networks that much?
-        if workitem.get('type') == 'deploy':
-            n.create()
-            n.ensure_mesh()
-            db.add_event('network', workitem['network_uuid'],
-                         'network node', 'deploy', None, None)
+            # NOTE(mikal): there's really nothing stopping us from processing a bunch
+            # of these jobs in parallel with a pool of workers, but I am not sure its
+            # worth the complexity right now. Are we really going to be changing
+            # networks that much?
+            if workitem.get('type') == 'deploy':
+                n.create()
+                n.ensure_mesh()
+                db.add_event('network', workitem['network_uuid'],
+                             'network node', 'deploy', None, None)
 
-        elif workitem.get('type') == 'update_dhcp':
-            n.update_dhcp()
-            db.add_event('network', workitem['network_uuid'],
-                         'network node', 'update dhcp', None, None)
+            elif workitem.get('type') == 'update_dhcp':
+                n.update_dhcp()
+                db.add_event('network', workitem['network_uuid'],
+                             'network node', 'update dhcp', None, None)
 
-        elif workitem.get('type') == 'remove_dhcp':
-            n.remove_dhcp()
-            db.add_event('network', workitem['network_uuid'],
-                         'network node', 'remove dhcp', None, None)
+            elif workitem.get('type') == 'remove_dhcp':
+                n.remove_dhcp()
+                db.add_event('network', workitem['network_uuid'],
+                             'network node', 'remove dhcp', None, None)
+
+        finally:
+            if jobname:
+                db.resolve('networknode', jobname)
 
     def run(self):
         LOG.info('Starting')

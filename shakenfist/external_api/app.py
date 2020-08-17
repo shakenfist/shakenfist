@@ -582,7 +582,9 @@ class Instance(Resource):
             if i['state'] == 'deleted':
                 return
 
-            time.sleep(0.2)
+            time.sleep(0.5)
+
+        return
 
 
 class Instances(Resource):
@@ -699,137 +701,67 @@ class Instances(Resource):
         if not SCHEDULER:
             SCHEDULER = scheduler.Scheduler()
 
-        return self._instance_start(instance_uuid, instance, network, namespace, placed_on)
-
-    def _instance_start(self, instance_uuid, instance, network, namespace, placed_on):
-        # Nodes we have attempted to start on
-        attempts = []
-
-        while len(attempts) < 3:
-            # Have we been placed?
-            if not placed_on:
-                try:
-                    candidates = SCHEDULER.place_instance(instance, network)
-
-                except scheduler.LowResourceException as e:
-                    db.add_event('instance', instance_uuid,
-                                 'schedule', 'failed', None,
-                                 'insufficient resources: ' + str(e))
-                    db.enqueue_delete(config.get.parsed(
-                        'NODE_NAME'), instance_uuid, 'error')
-                    return error(507, str(e))
-
-                placement = candidates[0]
-
-            else:
-                try:
-                    candidates = SCHEDULER.place_instance(
-                        instance, network, candidates=[placed_on])
-                    placement = placed_on
-
-                except scheduler.LowResourceException as e:
-                    db.add_event('instance', instance_uuid,
-                                 'schedule', 'failed', None,
-                                 'insufficient resources: ' + str(e))
-                    db.enqueue_delete(config.get.parsed(
-                        'NODE_NAME'), instance_uuid, 'error')
-                    return error(507, str(e))
-
-                except scheduler.CandidateNodeNotFoundException as e:
-                    return error(404, 'node not found: %s' % e)
-
-            # Record placement
-            db.place_instance(instance_uuid, placement)
-            db.add_event('instance', instance_uuid,
-                         'placement', None, None, placement)
-            attempts.append(placement)
-
-            # Have we been placed on a different node?
-            if not placement == config.parsed.get('NODE_NAME'):
-                resp = self._instance_start_remote(
-                    placement, instance_uuid, namespace)
-                if placed_on or resp.status_code != 507:
-                    return resp
-                placement = None
-            else:
-                return self._instance_start_local(instance_uuid, instance, network, namespace)
-
-        # Give up for real
-        db.add_event('instance', instance_uuid,
-                     'schedule', 'failed', None, 'insufficient resources after retries')
-        db.enqueue_delete(config.get.parsed(
-            'NODE_NAME'), instance_uuid, 'error')
-        return error(507, 'insufficient capacity after retries')
-
-    def _instance_start_remote(self, placed_on, instance_uuid, namespace):
-        body = flask_get_post_body()
-        body['placed_on'] = placed_on
-        body['instance_uuid'] = instance_uuid
-        body['namespace'] = namespace
-
-        # NOTE(mikal): the user of the system namespace is deliberate here. The
-        # namespace to create the instance in is specified above, but we need to
-        # make this call as system because we have specified an instance UUID.
-        token = util.get_api_token(
-            'http://%s:%d' % (placed_on, config.parsed.get('API_PORT')),
-            namespace='system')
-        r = requests.request('POST',
-                             'http://%s:%d/instances'
-                             % (placed_on,
-                                config.parsed.get('API_PORT')),
-                             data=json.dumps(body),
-                             headers={'Authorization': token,
-                                      'User-Agent': util.get_user_agent()})
-
-        LOG.info('Returning proxied request: %d, %s'
-                 % (r.status_code, r.text))
-        resp = flask.Response(r.text,
-                              mimetype='application/json')
-        resp.status_code = r.status_code
-        return resp
-
-    def _instance_start_local(self, instance_uuid, instance, network, namespace):
-        # Collect the networks
-        nets = {}
-        for netdesc in network:
-            if netdesc['network_uuid'] not in nets:
-                n = net.from_db(netdesc['network_uuid'])
-                if not n:
-                    db.enqueue_delete(
-                        config.parsed.get('NODE_NAME'), instance_uuid, 'error')
-                    return error(
-                        404, 'network %s not found' % netdesc['network_uuid'])
-
-                nets[netdesc['network_uuid']] = n
-
-        # Now we can start the instance
-        with db.get_lock('sf/instance/%s' % instance.db_entry['uuid'], ttl=900) as lock:
-            with util.RecordedOperation('ensure networks exist', instance) as _:
-                for network_uuid in nets:
-                    n = nets[network_uuid]
-                    n.create()
-                    n.ensure_mesh()
-                    n.update_dhcp()
-
-            libvirt = util.get_libvirt()
+        # Have we been placed?
+        if not placed_on:
             try:
-                with util.RecordedOperation('instance creation',
-                                            instance) as _:
-                    instance.create(lock=lock)
+                candidates = SCHEDULER.place_instance(instance, network)
 
-            except libvirt.libvirtError as e:
-                code = e.get_error_code()
-                if code in (libvirt.VIR_ERR_CONFIG_UNSUPPORTED,
-                            libvirt.VIR_ERR_XML_ERROR):
-                    db.enqueue_delete(
-                        config.parsed.get('NODE_NAME'), instance_uuid, 'error')
-                    return error(400, e.get_error_message())
-                raise e
+            except scheduler.LowResourceException as e:
+                db.add_event('instance', instance_uuid,
+                             'schedule', 'failed', None,
+                             'insufficient resources: ' + str(e))
+                db.enqueue_delete(config.get.parsed(
+                    'NODE_NAME'), instance_uuid, 'error')
+                return error(507, str(e))
 
-            for iface in db.get_instance_interfaces(instance.db_entry['uuid']):
-                db.update_network_interface_state(iface['uuid'], 'created')
+            placement = candidates[0]
 
-            return db.get_instance(instance_uuid)
+        else:
+            try:
+                candidates = SCHEDULER.place_instance(
+                    instance, network, candidates=[placed_on])
+                placement = placed_on
+
+            except scheduler.LowResourceException as e:
+                db.add_event('instance', instance_uuid,
+                             'schedule', 'failed', None,
+                             'insufficient resources: ' + str(e))
+                db.enqueue_delete(config.get.parsed(
+                    'NODE_NAME'), instance_uuid, 'error')
+                return error(507, str(e))
+
+            except scheduler.CandidateNodeNotFoundException as e:
+                db.enqueue_delete(config.get.parsed(
+                    'NODE_NAME'), instance_uuid, 'error')
+                return error(404, 'node not found: %s' % e)
+
+        # Record placement
+        db.place_instance(instance_uuid, placement)
+        db.add_event('instance', instance_uuid,
+                     'placement', None, None, placement)
+
+        # Create a queue entry for the instance start
+        tasks = [{'type': 'instance_preflight'}]
+        for disk in instance.db_entry['block_devices']['devices']:
+            if 'base' in disk and disk['base']:
+                tasks.append({'type': 'image_fetch', 'url': disk['base']})
+        tasks.append({'type': 'instance_start'})
+
+        db.enqueue(config.parsed.get('NODE_NAME'), {
+            'tasks': tasks,
+            'instance_uuid': instance_uuid,
+            'network': network
+        })
+
+        # Watch for a while and return results if things are fast, give up
+        # after a while and just return the current state
+        start_time = time.time()
+        while time.time() - start_time < config.parsed.get('API_ASYNC_WAIT'):
+            i = db.get_instance(instance_uuid)
+            if i['state'] in ['created', 'deleted', 'error']:
+                return i
+            time.sleep(0.5)
+        return i
 
     @jwt_required
     def delete(self, confirm=False, namespace=None):
