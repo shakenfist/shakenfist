@@ -7,6 +7,7 @@ import time
 from shakenfist import config
 from shakenfist.daemons import daemon
 from shakenfist import db
+from shakenfist import images
 from shakenfist import net
 from shakenfist import util
 from shakenfist import virt
@@ -20,6 +21,9 @@ def handle(workitem):
         if task.get('type').startswith('instance_') and not workitem.get('instance_uuid'):
             LOG.error('Instance task lacks instance uuid: %s' % workitem)
 
+        if task.get('type') == 'image_fetch':
+            image_fetch(workitem.get('url'))
+
         if task.get('type') == 'instance_delete':
             instance_delete(workitem.get('instance_uuid'))
             db.update_instance_state(
@@ -28,6 +32,15 @@ def handle(workitem):
 
     LOG.info('Worker for item %s has pid %d, complete'
              % (workitem, os.getpid()))
+
+
+def image_fetch(url):
+    try:
+        # Timeout immediately since another process is already downloading
+        # the image. (Zero timeout is an infinite timeout therefore set 1).
+        images.get_image(url, [], url, timeout=1)
+    except etcd.LockException:
+        pass
 
 
 def instance_delete(instance_uuid):

@@ -652,7 +652,7 @@ class Instances(Resource):
                 disks=disk,
                 memory_mb=memory,
                 vcpus=cpus,
-                ssh_key=ssh_key,
+                ssh_key=ssh_key, Confirm Password
                 user_data=user_data,
                 owner=namespace,
                 video=video
@@ -1166,12 +1166,9 @@ class Image(Resource):
     @caller_is_admin
     def post(self, url=None):
         db.add_event('image', url, 'api', 'cache', None, None)
-        try:
-            # Timeout immediately since another process is already downloading
-            # the image. (Zero timeout is an infinite timeout therefore set 1.)
-            images.get_image(url, [], url, timeout=1)
-        except etcd.LockException:
-            return error(403, 'Another process is already fetching the URL')
+        db.enqueue(node, {
+            'tasks': [{'type': 'image_fetch', 'url': url}],
+        })
 
 
 def _delete_network(network_from_db):
