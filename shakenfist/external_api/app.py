@@ -652,7 +652,7 @@ class Instances(Resource):
                 disks=disk,
                 memory_mb=memory,
                 vcpus=cpus,
-                ssh_key=ssh_key, Confirm Password
+                ssh_key=ssh_key,
                 user_data=user_data,
                 owner=namespace,
                 video=video
@@ -660,6 +660,41 @@ class Instances(Resource):
 
         # Initialise metadata
         db.persist_metadata('instance', instance_uuid, {})
+
+        # Allocate IP addresses
+        order = 0
+        if network:
+            for netdesc in network:
+                n = net.from_db(netdesc['network_uuid'])
+                if not n:
+                    db.enqueue_delete(
+                        config.parsed.get('NODE_NAME'), instance_uuid, 'error')
+                    return error(
+                        404, 'network %s not found' % netdesc['network_uuid'])
+
+                with db.get_lock('sf/ipmanager/%s' % netdesc['network_uuid'],
+                                 ttl=120) as _:
+                    db.add_event('network', netdesc['network_uuid'], 'allocate address',
+                                 None, None, instance_uuid)
+                    ipm = db.get_ipmanager(netdesc['network_uuid'])
+                    if 'address' not in netdesc or not netdesc['address']:
+                        netdesc['address'] = ipm.get_random_free_address()
+                    else:
+                        if not ipm.reserve(netdesc['address']):
+                            db.enqueue_delete(
+                                config.parsed.get('NODE_NAME'), instance_uuid, 'error')
+                            return error(409, 'address %s in use' %
+                                         netdesc['address'])
+
+                    db.persist_ipmanager(netdesc['network_uuid'], ipm.save())
+
+                if 'model' not in netdesc or not netdesc['model']:
+                    netdesc['model'] = 'virtio'
+
+                db.create_network_interface(
+                    str(uuid.uuid4()), netdesc, instance_uuid, order)
+
+                order += 1
 
         if not SCHEDULER:
             SCHEDULER = scheduler.Scheduler()
@@ -754,63 +789,25 @@ class Instances(Resource):
         return resp
 
     def _instance_start_local(self, instance_uuid, instance, network, namespace):
-        # Check we can get the required IPs
+        # Collect the networks
         nets = {}
-        allocations = {}
+        for netdesc in network:
+            if netdesc['network_uuid'] not in nets:
+                n = net.from_db(netdesc['network_uuid'])
+                if not n:
+                    db.enqueue_delete(
+                        config.parsed.get('NODE_NAME'), instance_uuid, 'error')
+                    return error(
+                        404, 'network %s not found' % netdesc['network_uuid'])
 
-        def error_with_cleanup(status_code, message):
-            for network_uuid in allocations:
-                n = net.from_db(network_uuid)
-                for addr, _ in allocations[network_uuid]:
-                    with db.get_lock('sf/ipmanager/%s' % n.uuid, ttl=120) as _:
-                        ipm = db.get_ipmanager(n.uuid)
-                        ipm.release(addr)
-                        db.persist_ipmanager(n.uuid, ipm.save())
-            return error(status_code, message)
-
-        order = 0
-        if network:
-            for netdesc in network:
-                if 'network_uuid' not in netdesc or not netdesc['network_uuid']:
-                    return error_with_cleanup(404, 'network not specified')
-
-                if netdesc['network_uuid'] not in nets:
-                    n = net.from_db(netdesc['network_uuid'])
-                    if not n:
-                        return error_with_cleanup(
-                            404, 'network %s not found' % netdesc['network_uuid'])
-                    nets[netdesc['network_uuid']] = n
-                    n.create()
-
-                with db.get_lock('sf/ipmanager/%s' % netdesc['network_uuid'],
-                                 ttl=120) as _:
-                    db.add_event('network', netdesc['network_uuid'], 'allocate address',
-                                 None, None, instance_uuid)
-                    allocations.setdefault(netdesc['network_uuid'], [])
-                    ipm = db.get_ipmanager(netdesc['network_uuid'])
-                    if 'address' not in netdesc or not netdesc['address']:
-                        netdesc['address'] = ipm.get_random_free_address()
-                    else:
-                        if not ipm.reserve(netdesc['address']):
-                            return error_with_cleanup(409, 'address %s in use' %
-                                                      netdesc['address'])
-                    db.persist_ipmanager(netdesc['network_uuid'], ipm.save())
-                    allocations[netdesc['network_uuid']].append(
-                        (netdesc['address'], order))
-
-                if 'model' not in netdesc or not netdesc['model']:
-                    netdesc['model'] = 'virtio'
-
-                db.create_network_interface(
-                    str(uuid.uuid4()), netdesc, instance_uuid, order)
-
-                order += 1
+                nets[netdesc['network_uuid']] = n
 
         # Now we can start the instance
         with db.get_lock('sf/instance/%s' % instance.db_entry['uuid'], ttl=900) as lock:
             with util.RecordedOperation('ensure networks exist', instance) as _:
                 for network_uuid in nets:
                     n = nets[network_uuid]
+                    n.create()
                     n.ensure_mesh()
                     n.update_dhcp()
 
@@ -824,7 +821,9 @@ class Instances(Resource):
                 code = e.get_error_code()
                 if code in (libvirt.VIR_ERR_CONFIG_UNSUPPORTED,
                             libvirt.VIR_ERR_XML_ERROR):
-                    return error_with_cleanup(400, e.get_error_message())
+                    db.enqueue_delete(
+                        config.parsed.get('NODE_NAME'), instance_uuid, 'error')
+                    return error(400, e.get_error_message())
                 raise e
 
             for iface in db.get_instance_interfaces(instance.db_entry['uuid']):

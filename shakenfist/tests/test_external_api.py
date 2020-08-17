@@ -543,7 +543,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
                               'name': 'banana',
                               'namespace': 'foo'})
     @mock.patch('shakenfist.db.get_metadata', return_value={'a': 'a', 'b': 'b'})
-    def test_get_network_metadata(self, mock_get_network, mock_md_get):
+    def test_get_network_metadata(self, mock_md_get, mock_get_network):
         resp = self.client.get(
             '/networks/foo/metadata', headers={'Authorization': self.auth_header})
         self.assertEqual({'a': 'a', 'b': 'b'}, resp.get_json())
@@ -932,7 +932,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
 
     @mock.patch('shakenfist.virt.from_db', return_value=FakeInstance(namespace='foo'))
     @mock.patch('shakenfist.db.add_event')
-    def test_post_instance_fails_ownership(self, mock_virt_from_db, mock_event):
+    def test_post_instance_fails_ownership(self, mock_event, mock_virt_from_db):
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'banana', 'key': 'foo'}))
         self.assertEqual(200, resp.status_code)
@@ -965,7 +965,14 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
     @mock.patch('shakenfist.virt.from_db', return_value=None)
     @mock.patch('shakenfist.db.add_event')
     @mock.patch('shakenfist.db.persist_metadata')
-    def test_post_instance(self, mock_start, mock_virt_from_defn, mock_virt_from_db, mock_event, mock_metadata):
+    @mock.patch('shakenfist.net.from_db', return_value={'uuid': 'foo'})
+    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.db.get_ipmanager')
+    @mock.patch('shakenfist.db.persist_ipmanager')
+    @mock.patch('shakenfist.db.create_network_interface')
+    def test_post_instance(self, mock_create_nic, mock_persist_ipmanager, mock_get_ipmanager,
+                           mock_lock, mock_net, mock_md_persist, mock_event,
+                           mock_virt_from_db, mock_virt_from_defn, mock_start):
         resp = self.client.post('/instances',
                                 headers={
                                     'Authorization': self.auth_header},
@@ -985,7 +992,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                                 }))
         self.assertEqual({'out': 'instance start results'}, resp.get_json())
         self.assertEqual(200, resp.status_code)
-        mock_metadata.assert_called()
+        mock_md_persist.assert_called()
 
 
 class ExternalApiNetworkTestCase(ExternalApiTestCase):
