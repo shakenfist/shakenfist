@@ -31,16 +31,11 @@ resolvers = {
 IMAGE_FETCH_LOCK_TIMEOUT = 600   # TODO(andy):Should be linked to HTTP timeout?
 
 
-def _get_image_lock_name(hashed_image_url):
-    return ('sf/images/%s/%s' % (
-        config.parsed.get('NODE_NAME'), hashed_image_url))
-
-
 def get_image(url, locks, op_label, timeout=IMAGE_FETCH_LOCK_TIMEOUT):
     """Fetch image if not downloaded and return image path."""
     hashed_image_url, hashed_image_path = hash_image(url)
-    with db.get_lock(_get_image_lock_name(hashed_image_url),
-                     timeout=timeout) as image_lock:
+    with db.get_lock('image', config.parsed.get('NODE_NAME'),
+                     hashed_image_url, timeout=timeout) as image_lock:
         with util.RecordedOperation('fetch image', op_label) as _:
             image_url = resolve(url)
             info, image_dirty, resp = requires_fetch(image_url)

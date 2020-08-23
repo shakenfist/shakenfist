@@ -50,7 +50,7 @@ class Network(object):
         self.floating_gateway = floating_gateway
         self.namespace = namespace
 
-        with db.get_lock('sf/ipmanager/%s' % self.uuid, ttl=120) as _:
+        with db.get_lock('ipmanager', None, self.uuid, ttl=120) as _:
             ipm = db.get_ipmanager(self.uuid)
 
             self.ipblock = ipm.network_address
@@ -123,7 +123,7 @@ class Network(object):
         LOG.info('%s: net.create() namespace=%s', self, self.namespace)
         subst = self.subst_dict()
 
-        with db.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
+        with db.get_lock('network', None, self.uuid, ttl=120) as _:
             if not util.check_for_interface(subst['vx_interface']):
                 with util.RecordedOperation('create vxlan interface', self) as _:
                     processutils.execute(
@@ -208,7 +208,7 @@ class Network(object):
 
         subst = self.subst_dict()
         if not self.floating_gateway:
-            with db.get_lock('sf/ipmanager/floating', ttl=120) as _:
+            with db.get_lock('ipmanager', None, 'floating', ttl=120) as _:
                 ipm = db.get_ipmanager('floating')
                 self.floating_gateway = ipm.get_random_free_address()
                 db.persist_ipmanager('floating', ipm.save())
@@ -220,7 +220,7 @@ class Network(object):
         subst['floating_gateway'] = self.floating_gateway
         subst['floating_netmask'] = ipm.netmask
 
-        with db.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
+        with db.get_lock('network', None, self.uuid, ttl=120) as _:
             if not subst['floating_gateway'] in list(util.get_interface_addresses(
                     subst['netns'], subst['physical_veth_inner'])):
                 with util.RecordedOperation('enable virtual routing', self) as _:
@@ -256,7 +256,7 @@ class Network(object):
         subst = self.subst_dict()
 
         # Cleanup local node
-        with db.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
+        with db.get_lock('network', None, self.uuid, ttl=120) as _:
             if util.check_for_interface(subst['vx_bridge']):
                 with util.RecordedOperation('delete vxlan bridge', self) as _:
                     processutils.execute('ip link delete %(vx_bridge)s' % subst,
@@ -285,7 +285,7 @@ class Network(object):
                                              shell=True)
 
                 if self.floating_gateway:
-                    with db.get_lock('sf/ipmanager/floating', ttl=120) as _:
+                    with db.get_lock('ipmanager', None, 'floating', ttl=120) as _:
                         ipm = db.get_ipmanager('floating')
                         ipm.release(self.floating_gateway)
                         db.persist_ipmanager('floating', ipm.save())
@@ -309,7 +309,7 @@ class Network(object):
             self.ensure_mesh()
             subst = self.subst_dict()
             with util.RecordedOperation('update dhcp', self) as _:
-                with db.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
+                with db.get_lock('network', None, self.uuid, ttl=120) as _:
                     d = dhcp.DHCP(self.uuid, subst['vx_veth_inner'])
                     d.restart_dhcpd()
         else:
@@ -323,7 +323,7 @@ class Network(object):
         if util.is_network_node():
             subst = self.subst_dict()
             with util.RecordedOperation('remove dhcp', self) as _:
-                with db.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
+                with db.get_lock('network', None, self.uuid, ttl=120) as _:
                     d = dhcp.DHCP(self.uuid, subst['vx_veth_inner'])
                     d.remove_dhcpd()
         else:

@@ -55,7 +55,7 @@ class Monitor(daemon.Daemon):
 
         # Ensure we are on every network we have a host for
         for network in host_networks:
-            with db.get_lock('sf/network/%s' % network, ttl=120) as _:
+            with db.get_lock('network', None, network, ttl=120) as _:
                 n = net.from_db(network)
                 if not n:
                     continue
@@ -81,7 +81,7 @@ class Monitor(daemon.Daemon):
 
             # for extra in extra_vxids:
             #     if extra in vxid_to_uuid:
-            #         with db.get_lock('sf/network/%s' % vxid_to_uuid[extra],
+            #         with db.get_lock('network', None, vxid_to_uuid[extra],
             #                          ttl=120) as _:
             #             n = net.from_db(vxid_to_uuid[extra])
             #             n.delete()

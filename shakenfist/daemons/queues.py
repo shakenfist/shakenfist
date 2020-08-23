@@ -65,7 +65,7 @@ def instance_preflight(instance_uuid):
 
 
 def instance_start(instance_uuid, network):
-    with db.get_lock('sf/instance/%s' % instance_uuid, ttl=900) as lock:
+    with db.get_lock('instance', None, instance_uuid, ttl=900) as lock:
         db.add_event('instance', instance_uuid,
                      'queued', 'create', None, None)
         instance = virt.from_db(instance_uuid)
@@ -110,7 +110,7 @@ def instance_start(instance_uuid, network):
 
 
 def instance_delete(instance_uuid):
-    with db.get_lock('sf/instance/%s' % instance_uuid) as _:
+    with db.get_lock('instance', None, instance_uuid) as _:
         db.add_event('instance', instance_uuid,
                      'queued', 'delete', None, None)
 

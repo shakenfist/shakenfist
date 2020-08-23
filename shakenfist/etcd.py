@@ -48,14 +48,15 @@ class ActualLock(etcd3.Lock):
         raise LockException('Could not acquire lock after retries.')
 
 
-def get_lock(name, ttl=60, timeout=10):
+def get_lock(objecttype, subtype, name, ttl=60, timeout=10):
     """Retrieves an Etcd lock object. It is not locked, to lock use acquire().
 
     The returned lock can be used as a context manager, with the lock being
     acquired on entry and released on exit. Note that the lock acquire process
     will have no timeout.
     """
-    return ActualLock(name, ttl, etcd_client=etcd3.client(), timeout=timeout)
+    path = _construct_key(objecttype, subtype, name)
+    return ActualLock(path, ttl, etcd_client=etcd3.client(), timeout=timeout)
 
 
 def _construct_key(objecttype, subtype, name):
@@ -150,7 +151,7 @@ def delete_all(objecttype, subtype, sort_order=None):
 
 
 def enqueue(queuename, workitem):
-    with get_lock('sf/queue/%s' % queuename) as _:
+    with get_lock('queue', None, queuename) as _:
         i = 0
         entry_time = time.time()
         jobname = '%s-%03d' % (entry_time, i)
@@ -165,7 +166,7 @@ def enqueue(queuename, workitem):
 
 
 def dequeue(queuename):
-    with get_lock('sf/queue/%s' % queuename) as _:
+    with get_lock('queue', None, queuename) as _:
         queue_path = _construct_key('queue', queuename, None)
 
         client = etcd3.client()

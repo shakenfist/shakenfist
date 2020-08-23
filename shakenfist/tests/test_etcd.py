@@ -23,5 +23,5 @@ class ActualLockTestCase(testtools.TestCase):
                 pass
 
     def test_get_lock(self):
-        lock = etcd.get_lock('testname')
+        lock = etcd.get_lock('testtype', 'testsubtype', 'testname')
         self.assertTrue(isinstance(lock, etcd.ActualLock))

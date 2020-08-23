@@ -277,7 +277,7 @@ class Instance(object):
         with util.RecordedOperation('release network addresses', self) as _:
             for ni in db.get_instance_interfaces(self.db_entry['uuid']):
                 db.update_network_interface_state(ni['uuid'], 'deleted')
-                with db.get_lock('sf/ipmanager/%s' % ni['network_uuid'],
+                with db.get_lock('ipmanager', None, ni['network_uuid'],
                                  ttl=120) as _:
                     ipm = db.get_ipmanager(ni['network_uuid'])
                     ipm.release(ni['ipv4'])
