@@ -556,7 +556,6 @@ class Instance(Resource):
     @arg_is_instance_uuid
     @requires_instance_ownership
     def get(self, instance_uuid=None, instance_from_db=None):
-        db.add_event('instance', instance_uuid, 'api', 'get', None, None)
         return instance_from_db
 
     @jwt_required
@@ -812,8 +811,6 @@ class InstanceInterfaces(Resource):
     @arg_is_instance_uuid
     @requires_instance_ownership
     def get(self, instance_uuid=None, instance_from_db=None):
-        db.add_event('instance', instance_uuid,
-                     'api', 'get interfaces', None, None)
         return list(db.get_instance_interfaces(instance_uuid))
 
 
@@ -822,8 +819,6 @@ class InstanceEvents(Resource):
     @arg_is_instance_uuid
     @requires_instance_ownership
     def get(self, instance_uuid=None, instance_from_db=None):
-        db.add_event('instance', instance_uuid,
-                     'api', 'get events', None, None)
         return list(db.get_events('instance', instance_uuid))
 
 
@@ -846,8 +841,6 @@ class InstanceSnapshot(Resource):
     @arg_is_instance_uuid
     @requires_instance_ownership
     def get(self, instance_uuid=None, instance_from_db=None):
-        db.add_event('instance', instance_uuid,
-                     'api', 'get', None, None)
         out = []
         for snap in db.get_instance_snapshots(instance_uuid):
             snap['created'] = snap['created']
@@ -1124,7 +1117,6 @@ class Network(Resource):
     @arg_is_network_uuid
     @requires_network_ownership
     def get(self, network_uuid=None, network_from_db=None):
-        db.add_event('network', network_uuid, 'api', 'get', None, None)
         if network_from_db is not None and 'ipmanager' in network_from_db:
             del network_from_db['ipmanager']
         return network_from_db
@@ -1249,8 +1241,6 @@ class NetworkEvents(Resource):
     @arg_is_network_uuid
     @requires_network_ownership
     def get(self, network_uuid=None, network_from_db=None):
-        db.add_event('network', network_uuid,
-                     'api', 'get events', None, None)
         return list(db.get_events('network', network_uuid))
 
 
@@ -1259,8 +1249,6 @@ class NetworkInterfaces(Resource):
     @arg_is_network_uuid
     @requires_network_ownership
     def get(self, network_uuid=None, network_from_db=None):
-        db.add_event('network', network_uuid,
-                     'api', 'get interfaces', None, None)
         return list(db.get_network_interfaces(network_uuid))
 
 
