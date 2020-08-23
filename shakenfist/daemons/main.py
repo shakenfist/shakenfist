@@ -168,3 +168,5 @@ def main():
         if wpid != 0:
             LOG.warning('Subprocess %d (%s) died'
                         % (wpid, procnames.get(wpid, 'unknown')))
+
+        db.see_this_node()
