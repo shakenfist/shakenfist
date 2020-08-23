@@ -20,7 +20,7 @@ LOG = logging.getLogger(__name__)
 def handle(jobname, workitem):
     LOG.info('Worker for workitem %s has pid %d' % (jobname, os.getpid()))
     setproctitle.setproctitle(
-        '%s-%s' % (daemon.process_name('triggers'), jobname))
+        '%s-%s' % (daemon.process_name('queues'), jobname))
 
     try:
         for task in workitem.get('tasks', []):

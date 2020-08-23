@@ -1106,18 +1106,17 @@ def _delete_network(network_from_db):
     network_uuid = network_from_db['uuid']
     db.add_event('network', network_uuid, 'api', 'delete', None, None)
 
-    with db.get_lock('network', None, network_uuid, ttl=900) as _:
-        n = net.from_db(network_uuid)
-        n.remove_dhcp()
-        n.delete()
+    n = net.from_db(network_uuid)
+    n.remove_dhcp()
+    n.delete()
 
-        if n.floating_gateway:
-            with db.get_lock('ipmanager', None, 'floating', ttl=120) as _:
-                ipm = db.get_ipmanager('floating')
-                ipm.release(n.floating_gateway)
-                db.persist_ipmanager('floating', ipm.save())
+    if n.floating_gateway:
+        with db.get_lock('ipmanager', None, 'floating', ttl=120) as _:
+            ipm = db.get_ipmanager('floating')
+            ipm.release(n.floating_gateway)
+            db.persist_ipmanager('floating', ipm.save())
 
-        db.update_network_state(network_uuid, 'deleted')
+    db.update_network_state(network_uuid, 'deleted')
 
 
 class Network(Resource):
