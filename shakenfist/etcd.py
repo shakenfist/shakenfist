@@ -151,40 +151,63 @@ def delete_all(objecttype, subtype, sort_order=None):
 
 
 def enqueue(queuename, workitem):
-    with get_lock('queue', None, queuename) as _:
-        i = 0
-        entry_time = time.time()
-        jobname = '%s-%03d' % (entry_time, i)
+    for attempt in range(ETCD_ATTEMPTS):
+        try:
+            with get_lock('queue', None, queuename) as _:
+                i = 0
+                entry_time = time.time()
+                jobname = '%s-%03d' % (entry_time, i)
 
-        while get('queue', queuename, jobname):
-            i += 1
-            jobname = '%s-%03d' % (entry_time, i)
+                while get('queue', queuename, jobname):
+                    i += 1
+                    jobname = '%s-%03d' % (entry_time, i)
 
-        put('queue', queuename, jobname, workitem)
-        LOG.info('Enqueued workitem %s for queue %s with work %s'
-                 % (jobname, queuename, workitem))
+                put('queue', queuename, jobname, workitem)
+                LOG.info('Enqueued workitem %s for queue %s with work %s'
+                         % (jobname, queuename, workitem))
+                return
+
+        except Exception as e:
+            LOG.info('Failed to enqueue for %s, attempt %d: %s'
+                     % (queuename, attempt, e))
+            time.sleep(ETCD_ATTEMPT_DELAY)
 
 
 def dequeue(queuename):
-    with get_lock('queue', None, queuename) as _:
-        queue_path = _construct_key('queue', queuename, None)
+    for attempt in range(ETCD_ATTEMPTS):
+        try:
+            with get_lock('queue', None, queuename) as _:
+                queue_path = _construct_key('queue', queuename, None)
 
-        client = etcd3.client()
-        for data, metadata in client.get_prefix(queue_path, sort_order='ascend'):
-            jobname = str(metadata.key).split('/')[-1]
-            workitem = json.loads(data)
+                client = etcd3.client()
+                for data, metadata in client.get_prefix(queue_path, sort_order='ascend'):
+                    jobname = str(metadata.key).split('/')[-1]
+                    workitem = json.loads(data)
 
-            put('processing', queuename, jobname, workitem)
-            client.delete(metadata.key)
-            LOG.info('Moved workitem %s from queue to processing for %s with work %s'
-                     % (jobname, queuename, workitem))
+                    put('processing', queuename, jobname, workitem)
+                    client.delete(metadata.key)
+                    LOG.info('Moved workitem %s from queue to processing for %s with work %s'
+                             % (jobname, queuename, workitem))
 
-            return jobname, workitem
+                    return jobname, workitem
 
-    return None, None
+                return None, None
+
+        except Exception as e:
+            LOG.info('Failed to dequeue for %s, attempt %d: %s'
+                     % (queuename, attempt, e))
+            time.sleep(ETCD_ATTEMPT_DELAY)
 
 
 def resolve(queuename, jobname):
-    delete('processing', queuename, jobname)
-    LOG.info('Resolved workitem %s for queue %s'
-             % (jobname, queuename))
+    for attempt in range(ETCD_ATTEMPTS):
+        try:
+            delete('processing', queuename, jobname)
+            LOG.info('Resolved workitem %s for queue %s'
+                     % (jobname, queuename))
+            return
+
+        except Exception as e:
+            LOG.info('Failed to resolve workitem %s for %s, attempt %d: %s'
+                     % (jobname, queuename, attempt, e))
+            time.sleep(ETCD_ATTEMPT_DELAY)
