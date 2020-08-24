@@ -55,16 +55,16 @@ class Monitor(daemon.Daemon):
 
         # Ensure we are on every network we have a host for
         for network in host_networks:
-            with db.get_lock('network', None, network, ttl=120) as _:
-                n = net.from_db(network)
-                if not n:
-                    continue
+            n = net.from_db(network)
+            if not n:
+                continue
 
-                if not n.is_okay():
-                    LOG.info('%s: Network not okay - recreating', n)
-                    n.create()
-                n.ensure_mesh()
-                seen_vxids.append(n.vxlan_id)
+            if not n.is_okay():
+                LOG.info('%s: Network not okay - recreating', n)
+                n.create()
+
+            n.ensure_mesh()
+            seen_vxids.append(n.vxlan_id)
 
         # Determine if there are any extra vxids
         extra_vxids = set(vxid_to_mac.keys()) - set(seen_vxids)
