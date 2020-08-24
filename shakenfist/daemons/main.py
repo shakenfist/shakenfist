@@ -63,7 +63,25 @@ def restore_instances():
                     config.parsed.get('NODE_NAME'), instance, 'error')
 
 
+DAEMON_IMPLEMENTATIONS = {
+    'api': external_api_daemon,
+    'cleaner': cleaner_daemon,
+    'net': net_daemon,
+    'queues': queues_daemon,
+    'resources': resource_daemon,
+    'triggers': trigger_daemon
+}
+
+
+DAEMONS = {}
+
+
 def main():
+    global DAEMON_IMPLEMENTATIONS
+    global DAEMONS
+
+    setproctitle.setproctitle(daemon.process_name('main'))
+
     # Log configuration on startup
     for key in config.parsed.config:
         LOG.info('Configuration item %s = %s' % (key, config.parsed.get(key)))
@@ -75,10 +93,12 @@ def main():
 
     # Resource usage publisher, we need this early because scheduling decisions
     # might happen quite early on.
-    resource_pid = os.fork()
-    if resource_pid == 0:
+    pid = os.fork()
+    if pid == 0:
         LOG.removeHandler(handler)
-        resource_daemon.Monitor('resources').run()
+        DAEMON_IMPLEMENTATIONS['resources'].Monitor('resources').run()
+    DAEMONS['resources'] = pid
+    LOG.info('resources pid is %d' % pid)
 
     # If I am the network node, I need some setup
     if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
@@ -124,60 +144,27 @@ def main():
                     'iptables -t nat -A POSTROUTING -o %(physical_nic)s -j MASQUERADE' % subst,
                     shell=True)
 
-    # Network mesh maintenance
-    net_pid = os.fork()
-    if net_pid == 0:
-        LOG.removeHandler(handler)
-        net_daemon.Monitor('net').run()
+    def _start_daemon(d):
+        pid = os.fork()
+        if pid == 0:
+            LOG.removeHandler(handler)
+            DAEMON_IMPLEMENTATIONS[d].Monitor(d).run()
+        DAEMONS[d] = pid
+        LOG.info('%s pid is %d' % (d, pid))
 
-    # Old object deleter
-    cleaner_pid = os.fork()
-    if cleaner_pid == 0:
-        LOG.removeHandler(handler)
-        cleaner_daemon.Monitor('cleaner').run()
-
-    # REST API
-    external_api_pid = os.fork()
-    if external_api_pid == 0:
-        LOG.removeHandler(handler)
-        external_api_daemon.Monitor('api').run()
-
-    # Triggers
-    trigger_pid = os.fork()
-    if trigger_pid == 0:
-        LOG.removeHandler(handler)
-        trigger_daemon.Monitor('triggers').run()
-
-    # Queues
-    queues_pid = os.fork()
-    if queues_pid == 0:
-        LOG.removeHandler(handler)
-        queues_daemon.Monitor('queues').run()
-
-    setproctitle.setproctitle(daemon.process_name('main'))
-    LOG.info('network monitor pid is %d' % net_pid)
-    LOG.info('external api pid is %d' % external_api_pid)
-    LOG.info('resources monitor pid is %d' % resource_pid)
-    LOG.info('cleaner pid is %d' % cleaner_pid)
-    LOG.info('trigger pid is %d' % trigger_pid)
-    LOG.info('queues pid is %d' % queues_pid)
+    # Start other daemons
+    for d in ['api', 'cleaner', 'net', 'queues', 'triggers']:
+        _start_daemon(d)
 
     restore_instances()
-
-    procnames = {
-        external_api_pid: 'external api',
-        net_pid: 'network monitor',
-        resource_pid: 'resource monitor',
-        cleaner_pid: 'cleaner',
-        trigger_pid: 'trigger',
-        queues_pid: 'queues'
-    }
 
     while True:
         time.sleep(10)
         wpid, _ = os.waitpid(-1, os.WNOHANG)
         if wpid != 0:
-            LOG.warning('Subprocess %d (%s) died'
-                        % (wpid, procnames.get(wpid, 'unknown')))
+            d = DAEMONS.get(wpid, 'unknown')
+            LOG.warning('%s died (pid %d)' % (d, wpid))
+            if d != 'unknown':
+                _start_daemon(d)
 
         db.see_this_node()
