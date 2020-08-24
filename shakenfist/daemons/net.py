@@ -102,12 +102,13 @@ class Monitor(daemon.Daemon):
             return
 
         if 'network_uuid' not in workitem:
+            LOG.warn('Network workitem %s lacks network uuid.' % workitem)
             return
 
         n = net.from_db(workitem.get('network_uuid'))
         if not n:
             LOG.warn(
-                'Received work item for non-existant network: %s' % workitem)
+                'Received workitem for non-existant network: %s' % workitem)
             return
 
         # NOTE(mikal): there's really nothing stopping us from processing a bunch

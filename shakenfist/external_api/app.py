@@ -1264,29 +1264,18 @@ class Networks(Resource):
                      'api', 'create', None, None)
 
         # Networks should immediately appear on the network node
-        with db.get_lock('sf/network/%s' % network['uuid'], ttl=900) as _:
-            if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
-                n = net.from_db(network['uuid'])
-                if not n:
-                    LOG.info('network(%s): network not found or deleted'
-                             % network['uuid'])
-                    return error(404, 'network not found')
+        db.enqueue('networknode',
+                   {
+                       'type': 'deploy',
+                       'network_uuid': network['uuid']
+                   })
 
-                n.create()
-                n.ensure_mesh()
-            else:
-                db.enqueue('networknode',
-                           {
-                               'type': 'deploy',
-                               'network_uuid': network['uuid']
-                           })
+        db.add_event('network', network['uuid'],
+                     'api', 'created', None, None)
+        db.update_network_state(network['uuid'], 'created')
 
-            db.add_event('network', network['uuid'],
-                         'api', 'created', None, None)
-            db.update_network_state(network['uuid'], 'created')
-
-            # Initialise metadata
-            db.persist_metadata('network', network['uuid'], {})
+        # Initialise metadata
+        db.persist_metadata('network', network['uuid'], {})
 
         return network
 
