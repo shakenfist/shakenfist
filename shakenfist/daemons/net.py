@@ -1,3 +1,4 @@
+import etcd3
 import logging
 import time
 
@@ -94,12 +95,58 @@ class Monitor(daemon.Daemon):
         db.persist_node_vxid_mapping(
             config.parsed.get('NODE_NAME'), vxid_to_mac)
 
+    def _process_network_node_workitems(self):
+        workitem = db.dequeue('networknode')
+        if not workitem:
+            time.sleep(0.2)
+            return
+
+        if 'network_uuid' not in workitem:
+            LOG.warn('Network workitem %s lacks network uuid.' % workitem)
+            return
+
+        n = net.from_db(workitem.get('network_uuid'))
+        if not n:
+            LOG.warn(
+                'Received workitem for non-existant network: %s' % workitem)
+            return
+
+        # NOTE(mikal): there's really nothing stopping us from processing a bunch
+        # of these jobs in parallel with a pool of workers, but I am not sure its
+        # worth the complexity right now. Are we really going to be changing
+        # networks that much?
+        if workitem.get('type') == 'deploy':
+            n.create()
+            n.ensure_mesh()
+            db.add_event('network', workitem['network_uuid'],
+                         'network node', 'deploy', None, None)
+
+        elif workitem.get('type') == 'update_dhcp':
+            n.update_dhcp()
+            db.add_event('network', workitem['network_uuid'],
+                         'network node', 'update dhcp', None, None)
+
+        elif workitem.get('type') == 'remove_dhcp':
+            n.remove_dhcp()
+            db.add_event('network', workitem['network_uuid'],
+                         'network node', 'remove dhcp', None, None)
+
     def run(self):
         LOG.info('Starting')
-        while True:
-            time.sleep(30)
+        last_management = 0
 
+        while True:
             try:
-                self._maintain_networks()
-            except Exception as e:
-                util.ignore_exception('network monitor', e)
+                if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
+                    self._process_network_node_workitems()
+
+                if time.time() - last_management > 30:
+                    self._maintain_networks()
+                    last_management = time.time()
+
+            except etcd3.exceptions.ConnectionFailedError:
+                LOG.info('Failed to connect to etcd.')
+                time.sleep(1)
+
+            except AttributeError as e:
+                LOG.error('Attribute error: %s' % e)

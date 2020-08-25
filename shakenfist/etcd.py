@@ -140,3 +140,28 @@ def delete_all(objecttype, subtype, sort_order=None):
             LOG.debug('Deleted etcd range "%s"' % path)
 
     raise WriteException('Cannot delete all "%s"' % path)
+
+
+def enqueue(queuename, data):
+    with get_lock('/sf/queue/%s' % queuename) as _:
+        i = 0
+        entry_time = time.time()
+        entry_name = '%s-%03d' % (entry_time, i)
+
+        while get('queue', queuename, entry_name):
+            i += 1
+            entry_name = '%s-%03d' % (entry_time, i)
+
+        put('queue', queuename, entry_name, data)
+
+
+def dequeue(queuename):
+    with get_lock('/sf/queue/%s' % queuename) as _:
+        path = _construct_key('queue', queuename, None)
+
+        client = etcd3.client()
+        for data, metadata in client.get_prefix(path, sort_order='ascend'):
+            client.delete(metadata.key)
+            return json.loads(data)
+
+    return None

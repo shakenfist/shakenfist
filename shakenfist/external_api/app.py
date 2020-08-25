@@ -1264,36 +1264,18 @@ class Networks(Resource):
                      'api', 'create', None, None)
 
         # Networks should immediately appear on the network node
-        with db.get_lock('sf/network/%s' % network['uuid'], ttl=900) as _:
-            if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
-                n = net.from_db(network['uuid'])
-                if not n:
-                    LOG.info('network(%s): network not found or deleted'
-                             % network['uuid'])
-                    return error(404, 'network not found')
+        db.enqueue('networknode',
+                   {
+                       'type': 'deploy',
+                       'network_uuid': network['uuid']
+                   })
 
-                n.create()
-                n.ensure_mesh()
-            else:
-                admin_token = util.get_api_token(
-                    'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
-                                      config.parsed.get('API_PORT')),
-                    namespace=namespace)
-                requests.request(
-                    'put',
-                    ('http://%s:%d/deploy_network_node'
-                     % (config.parsed.get('NETWORK_NODE_IP'),
-                        config.parsed.get('API_PORT'))),
-                    data=json.dumps({'uuid': network['uuid']}),
-                    headers={'Authorization': admin_token,
-                             'User-Agent': util.get_user_agent()})
+        db.add_event('network', network['uuid'],
+                     'api', 'created', None, None)
+        db.update_network_state(network['uuid'], 'created')
 
-            db.add_event('network', network['uuid'],
-                         'api', 'created', None, None)
-            db.update_network_state(network['uuid'], 'created')
-
-            # Initialise metadata
-            db.persist_metadata('network', network['uuid'], {})
+        # Initialise metadata
+        db.persist_metadata('network', network['uuid'], {})
 
         return network
 
@@ -1414,58 +1396,6 @@ class Nodes(Resource):
         return list(db.get_nodes())
 
 
-# Internal APIs
-
-
-class DeployNetworkNode(Resource):
-    @jwt_required
-    @caller_is_admin
-    @redirect_to_network_node
-    def put(self, passed_uuid=None):
-        db.add_event('network', passed_uuid,
-                     'network node', 'deploy', None, None)
-        n = net.from_db(passed_uuid)
-        if not n:
-            LOG.info('network(%s): network not found or deleted'
-                     % passed_uuid)
-            return error(404, 'network not found')
-
-        n.create()
-        n.ensure_mesh()
-
-
-class UpdateDHCP(Resource):
-    @jwt_required
-    @caller_is_admin
-    @redirect_to_network_node
-    def put(self, passed_uuid=None):
-        db.add_event('network', passed_uuid,
-                     'network node', 'update dhcp', None, None)
-        n = net.from_db(passed_uuid)
-        if not n:
-            LOG.info('network(%s): network not found or deleted'
-                     % passed_uuid)
-            return error(404, 'network not found')
-
-        n.update_dhcp()
-
-
-class RemoveDHCP(Resource):
-    @jwt_required
-    @caller_is_admin
-    @redirect_to_network_node
-    def put(self, passed_uuid=None):
-        db.add_event('network', passed_uuid,
-                     'network node', 'remove dhcp', None, None)
-        n = net.from_db(passed_uuid)
-        if not n:
-            LOG.info('network(%s): network not found or deleted'
-                     % passed_uuid)
-            return error(404, 'network not found')
-
-        n.remove_dhcp()
-
-
 api.add_resource(Root, '/')
 
 api.add_resource(Auth, '/auth')
@@ -1510,7 +1440,3 @@ api.add_resource(NetworkMetadata,
                  '/networks/<network_uuid>/metadata/<key>')
 
 api.add_resource(Nodes, '/nodes')
-
-api.add_resource(DeployNetworkNode, '/deploy_network_node')
-api.add_resource(UpdateDHCP, '/update_dhcp')
-api.add_resource(RemoveDHCP, '/remove_dhcp')
