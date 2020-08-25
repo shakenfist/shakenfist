@@ -695,8 +695,6 @@ class Instances(Resource):
                 db.create_network_interface(
                     str(uuid.uuid4()), netdesc, instance_uuid, order)
 
-                nets[netdesc['network_uuid']] = n
-
         if not SCHEDULER:
             SCHEDULER = scheduler.Scheduler()
 
