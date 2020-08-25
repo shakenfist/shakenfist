@@ -1088,7 +1088,7 @@ class Image(Resource):
     @caller_is_admin
     def post(self, url=None):
         db.add_event('image', url, 'api', 'cache', None, None)
-        db.enqueue(node, {
+        db.enqueue(config.parsed.get('NODE_NAME'), {
             'tasks': [{'type': 'image_fetch', 'url': url}],
         })
 
