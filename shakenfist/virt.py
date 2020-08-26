@@ -513,7 +513,7 @@ class Instance(object):
             LOG.error('%s: Failed to delete domain: %s' % (self, e))
 
         db.add_event(
-            'instance', self.db_entry['uuid'], 'poweron', 'complete', None, None)
+            'instance', self.db_entry['uuid'], 'poweroff', 'complete', None, None)
 
     def _snapshot_device(self, source, destination):
         images.snapshot(source, destination)
