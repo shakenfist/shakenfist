@@ -172,6 +172,8 @@ def enqueue(queuename, workitem):
                      % (queuename, attempt, e))
             time.sleep(ETCD_ATTEMPT_DELAY)
 
+    return None, None
+
 
 def dequeue(queuename):
     for attempt in range(ETCD_ATTEMPTS):
@@ -197,6 +199,8 @@ def dequeue(queuename):
             LOG.info('Failed to dequeue for %s, attempt %d: %s'
                      % (queuename, attempt, e))
             time.sleep(ETCD_ATTEMPT_DELAY)
+
+    return None, None
 
 
 def resolve(queuename, jobname):
