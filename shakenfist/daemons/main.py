@@ -59,7 +59,8 @@ def restore_instances():
                 i.create()
             except Exception as e:
                 util.ignore_exception('restore instance %s' % instance, e)
-                db.enqueue_delete(node, instance, 'error')
+                db.enqueue_delete(
+                    config.parsed.get('NODE_NAME'), instance, 'error')
 
 
 def main():
