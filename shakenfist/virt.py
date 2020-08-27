@@ -270,7 +270,8 @@ class Instance(object):
 
         with util.RecordedOperation('delete disks', self) as _:
             try:
-                shutil.rmtree(self.instance_path)
+                if os.path.exists(self.instance_path):
+                    shutil.rmtree(self.instance_path)
             except Exception as e:
                 util.ignore_exception('instance delete', e)
 
