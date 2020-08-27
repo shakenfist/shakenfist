@@ -435,11 +435,6 @@ class AuthNamespace(Resource):
         if len(networks) > 0:
             return error(400, 'you cannot delete a namespace with networks')
 
-        for instance_uuid in deleted_instances:
-            db.hard_delete_instance(instance_uuid)
-        for network_uuid in deleted_networks:
-            db.hard_delete_network(network_uuid)
-
         db.delete_namespace(namespace)
         db.delete_metadata('namespace', namespace)
 

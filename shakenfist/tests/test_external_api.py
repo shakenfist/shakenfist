@@ -349,25 +349,6 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
             },
             resp.get_json())
 
-    @mock.patch('shakenfist.db.get_instances',
-                return_value=[{'uuid': '123', 'state': 'deleted'}])
-    @mock.patch('shakenfist.db.get_networks',
-                return_value=[{'uuid': '123', 'state': 'deleted'}])
-    @mock.patch('shakenfist.db.hard_delete_instance')
-    @mock.patch('shakenfist.db.hard_delete_network')
-    @mock.patch('shakenfist.etcd.delete')
-    @mock.patch('shakenfist.db.get_lock')
-    def test_delete_namespace_with_deleted(self, mock_lock, mock_etcd_delete,
-                                           mock_hd_network, mock_hd_instance,
-                                           mock_get_networks, mock_get_instances):
-        resp = self.client.delete('/auth/namespaces/foo',
-                                  headers={'Authorization': self.auth_header})
-        self.assertEqual(None, resp.get_json())
-        self.assertEqual(200, resp.status_code)
-        mock_hd_instance.assert_called()
-        mock_hd_network.assert_called()
-        mock_etcd_delete.assert_called()
-
     def test_delete_namespace_key_missing_args(self):
         resp = self.client.delete('/auth/namespaces/system/',
                                   headers={'Authorization': self.auth_header})
