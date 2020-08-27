@@ -65,6 +65,7 @@ class Monitor(daemon.Daemon):
             all_observers = list(observers.keys())
             for instance_uuid in all_observers:
                 if not observers[instance_uuid].is_alive():
+                    # Reap process
                     observers[instance_uuid].join(1)
                     LOG.info('Trigger observer for instance %s has terminated'
                              % instance_uuid)
