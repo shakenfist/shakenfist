@@ -749,6 +749,8 @@ class Instances(Resource):
             'instance_uuid': instance_uuid,
             'network': network
         })
+        db.add_event('instance', instance_uuid,
+                     'create', 'enqueued', None, None)
 
         # Watch for a while and return results if things are fast, give up
         # after a while and just return the current state
@@ -1180,6 +1182,8 @@ class Networks(Resource):
                        'network_uuid': network['uuid']
                    })
 
+        db.add_event('network', network['uuid'],
+                     'deploy', 'enqueued', None, None)
         db.add_event('network', network['uuid'],
                      'api', 'created', None, None)
         db.update_network_state(network['uuid'], 'created')

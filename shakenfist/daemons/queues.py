@@ -22,34 +22,41 @@ def handle(jobname, workitem):
     setproctitle.setproctitle(
         '%s-%s' % (daemon.process_name('queues'), jobname))
 
+    instance_uuid = None
     try:
         for task in workitem.get('tasks', []):
             if task.get('type').startswith('instance_') and not workitem.get('instance_uuid'):
                 LOG.error('Instance task lacks instance uuid: %s' % workitem)
+                return
+
+            if task.get('type').startswith('instance_'):
+                instance_uuid = workitem.get('instance_uuid')
+                db.add_event('instance', instance_uuid,
+                             task.get('type').replace('_', ' '), 'dequeued', None, None)
 
             if task.get('type') == 'image_fetch':
                 image_fetch(task.get('url'))
 
             if task.get('type') == 'instance_preflight':
-                instance_preflight(workitem.get('instance_uuid'))
+                instance_preflight(instance_uuid)
 
             if task.get('type') == 'instance_start':
-                instance_start(workitem.get('instance_uuid'),
-                               workitem.get('network'))
-                db.update_instance_state(
-                    workitem.get('instance_uuid'), 'created')
+                instance_start(instance_uuid, workitem.get('network'))
+                db.update_instance_state(instance_uuid, 'created')
 
             if task.get('type') == 'instance_delete':
-                instance_delete(workitem.get('instance_uuid'))
-                db.update_instance_state(
-                    workitem.get('instance_uuid'),
-                    task.get('next_state', 'unknown'))
+                instance_delete(instance_uuid)
+                db.update_instance_state(instance_uuid,
+                                         task.get('next_state', 'unknown'))
 
         LOG.info('Worker for workitem %s has pid %d, complete'
                  % (jobname, os.getpid()))
 
     finally:
         db.resolve(config.parsed.get('NODE_NAME'), jobname)
+        if instance_uuid:
+            db.add_event('instance', instance_uuid,
+                         'tasks complete', 'dequeued', None, None)
 
 
 def image_fetch(url):

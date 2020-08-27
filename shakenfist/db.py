@@ -500,6 +500,7 @@ def enqueue_delete(node, instance_uuid, next_state):
         'tasks': [{'type': 'instance_delete', 'next_state': next_state}],
         'instance_uuid': instance_uuid
     })
+    add_event('instance', instance_uuid, 'delete', 'enqueued', None, None)
 
 
 def dequeue(queuename):

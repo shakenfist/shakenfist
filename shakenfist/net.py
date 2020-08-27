@@ -201,6 +201,8 @@ class Network(object):
                            'type': 'deploy',
                            'network_uuid': self.uuid
                        })
+            db.add_event('network', self.uuid, 'deploy',
+                         'enqueued', None, None)
 
     def deploy_nat(self):
         if not self.provide_nat:
@@ -318,6 +320,8 @@ class Network(object):
                            'type': 'update_dhcp',
                            'network_uuid': self.uuid
                        })
+            db.add_event('network', self.uuid, 'update dhcp',
+                         'enqueued', None, None)
 
     def remove_dhcp(self):
         if util.is_network_node():
@@ -332,6 +336,8 @@ class Network(object):
                            'type': 'remove_dhcp',
                            'network_uuid': self.uuid
                        })
+            db.add_event('network', self.uuid, 'remove dhcp',
+                         'enqueued', None, None)
 
     def discover_mesh(self):
         mesh_re = re.compile(r'00:00:00:00:00:00 dst (.*) self permanent')
