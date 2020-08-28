@@ -3,6 +3,9 @@ import json
 import logging
 import time
 
+from shakenfist import config
+from shakenfist import db
+
 ####################################################################
 # Please do not call this file directly, but instead call it via   #
 # the db.py abstraction.                                           #
@@ -56,7 +59,15 @@ def get_lock(objecttype, subtype, name, ttl=60, timeout=10):
     will have no timeout.
     """
     path = _construct_key(objecttype, subtype, name)
-    return ActualLock(path, ttl, etcd_client=etcd3.client(), timeout=timeout)
+    start_time = time.time()
+    try:
+        return ActualLock(path, ttl, etcd_client=etcd3.client(), timeout=timeout)
+
+    finally:
+        duration = time.time() - start_time
+        if duration > config.parsed.get('SLOW_LOCK_THRESHOLD'):
+            db.add_event(objecttype, name, 'acquire lock', 'slow', duration,
+                         'Timeout was %d' % timeout)
 
 
 def _construct_key(objecttype, subtype, name):

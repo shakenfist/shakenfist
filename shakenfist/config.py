@@ -99,6 +99,7 @@ CONFIG_DEFAULTS = {
 
     # LOGGING
     # -------
+    'SLOW_LOCK_THRESHOLD': 5.0,
     'LOGLEVEL_API': 'info',
     'LOGLEVEL_CLEANER': 'info',
     'LOGLEVEL_MAIN': 'info',
