@@ -33,8 +33,6 @@ import uuid
 
 from shakenfist import config
 from shakenfist import db
-from shakenfist import etcd
-from shakenfist import images
 from shakenfist import net
 from shakenfist import scheduler
 from shakenfist import util
