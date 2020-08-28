@@ -15,7 +15,6 @@ from oslo_concurrency import processutils
 
 from shakenfist import config
 from shakenfist import db
-from shakenfist import etcd
 from shakenfist import images
 from shakenfist import net
 from shakenfist import util
@@ -168,12 +167,13 @@ class Instance(object):
                     hashed_image_path = images.get_image(
                         disk['base'], [lock], 'create')
 
-                    try:
-                        cd = pycdlib.PyCdlib()
-                        cd.open(hashed_image_path)
-                        disk['present_as'] = 'cdrom'
-                    except Exception:
-                        pass
+                    with util.RecordedOperation('detect cdrom images', self) as _:
+                        try:
+                            cd = pycdlib.PyCdlib()
+                            cd.open(hashed_image_path)
+                            disk['present_as'] = 'cdrom'
+                        except Exception:
+                            pass
 
                     if disk.get('present_as', 'cdrom') == 'cdrom':
                         # There is no point in resizing or COW'ing a cdrom
