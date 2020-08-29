@@ -81,8 +81,6 @@ class Monitor(daemon.Daemon):
                     extra_instances.remove(inst['uuid'])
 
                 if inst['state'] != 'created':
-                    LOG.info('Instance not created %s == %s' %
-                             (inst['uuid'], inst['state']))
                     continue
 
                 if inst['uuid'] not in observers:

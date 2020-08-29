@@ -194,7 +194,7 @@ def dequeue(queuename):
 
                 client = etcd3.client()
                 for data, metadata in client.get_prefix(queue_path, sort_order='ascend'):
-                    jobname = str(metadata.key).split('/')[-1]
+                    jobname = str(metadata.key).split('/')[-1].rstrip("'")
                     workitem = json.loads(data)
 
                     put('processing', queuename, jobname, workitem)

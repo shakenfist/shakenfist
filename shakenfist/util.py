@@ -52,9 +52,9 @@ def setup_logging(id):
 
 
 class RecordedOperation():
-    def __init__(self, operation, object):
+    def __init__(self, operation, relatedobject):
         self.operation = operation
-        self.object = object
+        self.object = relatedobject
 
     def __enter__(self):
         self.start_time = time.time()

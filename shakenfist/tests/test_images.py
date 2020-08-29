@@ -134,9 +134,9 @@ class ImagesTestCase(testtools.TestCase):
                 })
     @mock.patch('os.makedirs')
     def test_does_not_require_fetch(self, mock_mkdirs, mock_read_info, mock_request_head):
-        info, image_dirty, _ = images.requires_fetch('http://example.com')
+        info, dirty_fields, _ = images.requires_fetch('http://example.com')
         self.assertEqual(0, info['version'])
-        self.assertEqual(False, image_dirty)
+        self.assertEqual([], dirty_fields)
 
     @mock.patch('requests.get',
                 return_value=FakeResponse(
@@ -152,9 +152,9 @@ class ImagesTestCase(testtools.TestCase):
                 })
     @mock.patch('os.makedirs')
     def test_requires_fetch(self, mock_mkdirs, mock_read_info, mock_request_head):
-        info, image_dirty, _ = images.requires_fetch('http://example.com')
+        info, dirty_fields, _ = images.requires_fetch('http://example.com')
         self.assertEqual(0, info['version'])
-        self.assertEqual(True, image_dirty)
+        self.assertEqual(['Last-Modified'], dirty_fields)
 
     @mock.patch('shakenfist.config.parsed.get', return_value='/a/b/c')
     @mock.patch('os.path.exists', return_value=False)
@@ -166,8 +166,8 @@ class ImagesTestCase(testtools.TestCase):
                              'Content-Length': 200000}))
     def test_fetch_image_new(self, mock_get, mock_makedirs,
                              mock_exists, mock_config):
-        _, image_dirty, _ = images.requires_fetch('http://example.com')
-        self.assertEqual(True, image_dirty)
+        _, dirty_fields, _ = images.requires_fetch('http://example.com')
+        self.assertEqual(['Last-Modified', 'Content-Length'], dirty_fields)
 
     @mock.patch('shakenfist.config.parsed.get', return_value='/a/b/c')
     @mock.patch('os.path.exists', return_value=True)
@@ -186,8 +186,8 @@ class ImagesTestCase(testtools.TestCase):
         mock_open = mock.mock_open()
         with mock.patch.object(six.moves.builtins, 'open',
                                new=mock_open):
-            _, image_dirty, _ = images.requires_fetch('http://example.com')
-        self.assertEqual(False, image_dirty)
+            _, dirty_fields, _ = images.requires_fetch('http://example.com')
+        self.assertEqual([], dirty_fields)
 
     @mock.patch('shakenfist.config.parsed.get', return_value='/a/b/c')
     @mock.patch('os.path.exists', side_effect=[True, True, False])
@@ -202,7 +202,7 @@ class ImagesTestCase(testtools.TestCase):
     def test_fetch_image_changed(self, mock_execute, mock_read_info, mock_makedirs,
                                  mock_exists, mock_config):
         _, image_dirty, _ = images.requires_fetch('http://example.com')
-        self.assertEqual(True, image_dirty)
+        self.assertEqual(['Last-Modified', 'Content-Length'], image_dirty)
 
     @mock.patch('oslo_concurrency.processutils.execute',
                 return_value=(None, None))

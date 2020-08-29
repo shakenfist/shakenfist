@@ -22,20 +22,19 @@ def handle(jobname, workitem):
     setproctitle.setproctitle(
         '%s-%s' % (daemon.process_name('queues'), jobname))
 
-    instance_uuid = None
+    instance_uuid = workitem.get('instance_uuid')
     try:
         for task in workitem.get('tasks', []):
-            if task.get('type').startswith('instance_') and not workitem.get('instance_uuid'):
+            if task.get('type').startswith('instance_') and not instance_uuid:
                 LOG.error('Instance task lacks instance uuid: %s' % workitem)
                 return
 
-            if task.get('type').startswith('instance_'):
-                instance_uuid = workitem.get('instance_uuid')
-                db.add_event('instance', instance_uuid,
-                             task.get('type').replace('_', ' '), 'dequeued', None, None)
+            if instance_uuid:
+                db.add_event('instance', instance_uuid, task.get('type').replace('_', ' '),
+                             'dequeued', None, 'Work item %s' % jobname)
 
             if task.get('type') == 'image_fetch':
-                image_fetch(task.get('url'))
+                image_fetch(task.get('url'), instance_uuid)
 
             if task.get('type') == 'instance_preflight':
                 instance_preflight(instance_uuid)
@@ -49,32 +48,33 @@ def handle(jobname, workitem):
                 db.update_instance_state(instance_uuid,
                                          task.get('next_state', 'unknown'))
 
-        LOG.info('Worker for workitem %s has pid %d, complete'
-                 % (jobname, os.getpid()))
-
     finally:
         db.resolve(config.parsed.get('NODE_NAME'), jobname)
         if instance_uuid:
-            db.add_event('instance', instance_uuid,
-                         'tasks complete', 'dequeued', None, None)
+            db.add_event('instance', instance_uuid, 'tasks complete',
+                         'dequeued', None, 'Work item %s' % jobname)
+        LOG.info('Worker for workitem %s has pid %d, complete'
+                 % (jobname, os.getpid()))
 
 
-def image_fetch(url):
+def image_fetch(url, instance_uuid):
     try:
-        images.get_image(url, [], url, timeout=images.IMAGE_FETCH_LOCK_TIMEOUT)
+        instance = None
+        if instance_uuid:
+            instance = virt.from_db(instance_uuid)
+        images.get_image(url, [], instance,
+                         timeout=images.IMAGE_FETCH_LOCK_TIMEOUT)
     except etcd.LockException:
         pass
 
 
 def instance_preflight(instance_uuid):
     # TODO(mikal): preflight with retries etc
-    pass
+    db.update_instance_state(instance_uuid, 'preflight')
 
 
 def instance_start(instance_uuid, network):
     with db.get_lock('instance', None, instance_uuid, ttl=900) as lock:
-        db.add_event('instance', instance_uuid,
-                     'queued', 'create', None, None)
         instance = virt.from_db(instance_uuid)
 
         # Collect the networks
