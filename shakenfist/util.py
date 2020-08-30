@@ -52,9 +52,9 @@ def setup_logging(id):
 
 
 class RecordedOperation():
-    def __init__(self, operation, object):
+    def __init__(self, operation, relatedobject):
         self.operation = operation
-        self.object = object
+        self.object = relatedobject
 
     def __enter__(self):
         self.start_time = time.time()
@@ -176,7 +176,7 @@ def extract_power_state(libvirt, domain):
 
 
 def get_api_token(base_url, namespace='system'):
-    with db.get_lock('sf/namespace/%s' % namespace) as _:
+    with db.get_lock('namespace', None, namespace):
         auth_url = base_url + '/auth'
         LOG.info('Fetching %s auth token from %s' % (namespace, auth_url))
         ns = db.get_namespace(namespace)

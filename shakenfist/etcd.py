@@ -3,6 +3,9 @@ import json
 import logging
 import time
 
+from shakenfist import config
+from shakenfist import db
+
 ####################################################################
 # Please do not call this file directly, but instead call it via   #
 # the db.py abstraction.                                           #
@@ -34,21 +37,37 @@ class ActualLock(etcd3.Lock):
         self.timeout = timeout
 
     def __enter__(self):
-        LOG.debug('ActualLock.__enter__() timeout=%s name=%s',
+        LOG.debug('Lock attempt: timeout=%s name=%s',
                   self.timeout, self.name)
-        if not self.acquire(timeout=self.timeout):
-            raise LockException('Cannot acquire lock: %s' % self.name)
-        return self
+        for attempt in range(ETCD_ATTEMPTS):
+            try:
+                if not self.acquire(timeout=self.timeout):
+                    raise LockException('Cannot acquire lock: %s' % self.name)
+                return self
+
+            except etcd3.exceptions.ConnectionFailedError:
+                time.sleep(ETCD_ATTEMPT_DELAY)
+
+        raise LockException('Could not acquire lock after retries.')
 
 
-def get_lock(name, ttl=60, timeout=10):
+def get_lock(objecttype, subtype, name, ttl=60, timeout=10):
     """Retrieves an Etcd lock object. It is not locked, to lock use acquire().
 
     The returned lock can be used as a context manager, with the lock being
     acquired on entry and released on exit. Note that the lock acquire process
     will have no timeout.
     """
-    return ActualLock(name, ttl, etcd_client=etcd3.client(), timeout=timeout)
+    path = _construct_key(objecttype, subtype, name)
+    start_time = time.time()
+    try:
+        return ActualLock(path, ttl, etcd_client=etcd3.client(), timeout=timeout)
+
+    finally:
+        duration = time.time() - start_time
+        if duration > config.parsed.get('SLOW_LOCK_THRESHOLD'):
+            db.add_event(objecttype, name, 'acquire lock', 'slow', duration,
+                         'Timeout was %d' % timeout)
 
 
 def _construct_key(objecttype, subtype, name):
@@ -142,26 +161,68 @@ def delete_all(objecttype, subtype, sort_order=None):
     raise WriteException('Cannot delete all "%s"' % path)
 
 
-def enqueue(queuename, data):
-    with get_lock('/sf/queue/%s' % queuename) as _:
-        i = 0
-        entry_time = time.time()
-        entry_name = '%s-%03d' % (entry_time, i)
+def enqueue(queuename, workitem):
+    for attempt in range(ETCD_ATTEMPTS):
+        try:
+            with get_lock('queue', None, queuename):
+                i = 0
+                entry_time = time.time()
+                jobname = '%s-%03d' % (entry_time, i)
 
-        while get('queue', queuename, entry_name):
-            i += 1
-            entry_name = '%s-%03d' % (entry_time, i)
+                while get('queue', queuename, jobname):
+                    i += 1
+                    jobname = '%s-%03d' % (entry_time, i)
 
-        put('queue', queuename, entry_name, data)
+                put('queue', queuename, jobname, workitem)
+                LOG.info('Enqueued workitem %s for queue %s with work %s'
+                         % (jobname, queuename, workitem))
+                return
+
+        except Exception as e:
+            LOG.info('Failed to enqueue for %s, attempt %d: %s'
+                     % (queuename, attempt, e))
+            time.sleep(ETCD_ATTEMPT_DELAY)
+
+    return None, None
 
 
 def dequeue(queuename):
-    with get_lock('/sf/queue/%s' % queuename) as _:
-        path = _construct_key('queue', queuename, None)
+    for attempt in range(ETCD_ATTEMPTS):
+        try:
+            with get_lock('queue', None, queuename):
+                queue_path = _construct_key('queue', queuename, None)
 
-        client = etcd3.client()
-        for data, metadata in client.get_prefix(path, sort_order='ascend'):
-            client.delete(metadata.key)
-            return json.loads(data)
+                client = etcd3.client()
+                for data, metadata in client.get_prefix(queue_path, sort_order='ascend'):
+                    jobname = str(metadata.key).split('/')[-1].rstrip("'")
+                    workitem = json.loads(data)
 
-    return None
+                    put('processing', queuename, jobname, workitem)
+                    client.delete(metadata.key)
+                    LOG.info('Moved workitem %s from queue to processing for %s with work %s'
+                             % (jobname, queuename, workitem))
+
+                    return jobname, workitem
+
+                return None, None
+
+        except Exception as e:
+            LOG.info('Failed to dequeue for %s, attempt %d: %s'
+                     % (queuename, attempt, e))
+            time.sleep(ETCD_ATTEMPT_DELAY)
+
+    return None, None
+
+
+def resolve(queuename, jobname):
+    for attempt in range(ETCD_ATTEMPTS):
+        try:
+            delete('processing', queuename, jobname)
+            LOG.info('Resolved workitem %s for queue %s'
+                     % (jobname, queuename))
+            return
+
+        except Exception as e:
+            LOG.info('Failed to resolve workitem %s for %s, attempt %d: %s'
+                     % (jobname, queuename, attempt, e))
+            time.sleep(ETCD_ATTEMPT_DELAY)

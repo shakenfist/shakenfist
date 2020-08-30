@@ -33,8 +33,8 @@ def see_this_node():
         ttl=120)
 
 
-def get_lock(name, ttl=60, timeout=ETCD_ATTEMPT_TIMEOUT):
-    return etcd.get_lock(name, ttl=ttl, timeout=timeout)
+def get_lock(objecttype, subtype, name, ttl=60, timeout=ETCD_ATTEMPT_TIMEOUT):
+    return etcd.get_lock(objecttype, subtype, name, ttl=ttl, timeout=timeout)
 
 
 def get_node_ips():
@@ -80,7 +80,7 @@ def allocate_network(netblock, provide_dhcp=True, provide_nat=False, name=None,
     ipm = ipmanager.NetBlock(netblock)
     etcd.put('ipmanager', None, netid, ipm.save())
 
-    with etcd.get_lock('sf/vxlan') as _:
+    with etcd.get_lock('vxlan', None, 'all'):
         vxid = 1
         while etcd.get('vxlan', None, vxid):
             vxid += 1
@@ -216,7 +216,8 @@ def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key,
         'state_updated': time.time(),
         'namespace': namespace,
         'power_state': 'initial',
-        'video': video
+        'video': video,
+        'node_history': []
     }
     etcd.put('instance', None, instance_uuid, d)
     return d
@@ -290,7 +291,7 @@ def get_stale_instances(delay):
 
 def create_network_interface(interface_uuid, netdesc, instance_uuid, order):
     if 'macaddress' not in netdesc or not netdesc['macaddress']:
-        with etcd.get_lock('sf/macaddress', ttl=120) as _:
+        with etcd.get_lock('macaddress', None, 'all', ttl=120):
             possible_mac = str(randmac.RandMac(
                 '00:00:00:00:00:00', False)).lstrip('\'').rstrip('\'')
             while etcd.get('macaddress', None, possible_mac):
@@ -432,7 +433,7 @@ def get_metrics(fqdn):
 
 def allocate_console_port(instance_uuid):
     node = config.parsed.get('NODE_NAME')
-    with etcd.get_lock('sf/console/%s' % node) as _:
+    with etcd.get_lock('console', None, node):
         consumed = []
         for value in etcd.get_all('console', node):
             consumed.append(value['port'])
@@ -490,9 +491,26 @@ def get_node_vxid_mapping(node):
     etcd.get('vxid_mapping', None, node)
 
 
-def enqueue(queuename, item):
-    etcd.enqueue(queuename, item)
+def enqueue(queuename, workitem):
+    etcd.enqueue(queuename, workitem)
+
+
+def enqueue_delete(node, instance_uuid, next_state):
+    enqueue(node, {
+        'tasks': [{'type': 'instance_delete', 'next_state': next_state}],
+        'instance_uuid': instance_uuid
+    })
+    add_event('instance', instance_uuid, 'delete', 'enqueued', None, None)
 
 
 def dequeue(queuename):
-    return etcd.dequeue(queuename)
+    try:
+        return etcd.dequeue(queuename)
+    except etcd.LockException:
+        # We didn't acquire the lock, we should just try again later. This probably
+        # indicates congestion.
+        return None, None
+
+
+def resolve(queuename, jobname):
+    etcd.resolve(queuename, jobname)

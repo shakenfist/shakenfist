@@ -50,7 +50,7 @@ class Network(object):
         self.floating_gateway = floating_gateway
         self.namespace = namespace
 
-        with db.get_lock('sf/ipmanager/%s' % self.uuid, ttl=120) as _:
+        with db.get_lock('ipmanager', None, self.uuid, ttl=120):
             ipm = db.get_ipmanager(self.uuid)
 
             self.ipblock = ipm.network_address
@@ -123,9 +123,9 @@ class Network(object):
         LOG.info('%s: net.create() namespace=%s', self, self.namespace)
         subst = self.subst_dict()
 
-        with db.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
+        with db.get_lock('network', None, self.uuid, ttl=120):
             if not util.check_for_interface(subst['vx_interface']):
-                with util.RecordedOperation('create vxlan interface', self) as _:
+                with util.RecordedOperation('create vxlan interface', self):
                     processutils.execute(
                         'ip link add %(vx_interface)s type vxlan id %(vx_id)s '
                         'dev %(physical_interface)s dstport 0'
@@ -135,7 +135,7 @@ class Network(object):
                         shell=True)
 
             if not util.check_for_interface(subst['vx_bridge']):
-                with util.RecordedOperation('create vxlan bridge', self) as _:
+                with util.RecordedOperation('create vxlan bridge', self):
                     processutils.execute(
                         'ip link add %(vx_bridge)s type bridge' % subst, shell=True)
                     processutils.execute(
@@ -157,12 +157,12 @@ class Network(object):
 
         if util.is_network_node():
             if not os.path.exists('/var/run/netns/%(netns)s' % subst):
-                with util.RecordedOperation('create netns', self) as _:
+                with util.RecordedOperation('create netns', self):
                     processutils.execute(
                         'ip netns add %(netns)s' % subst, shell=True)
 
             if not util.check_for_interface(subst['vx_veth_outer']):
-                with util.RecordedOperation('create router veth', self) as _:
+                with util.RecordedOperation('create router veth', self):
                     processutils.execute(
                         'ip link add %(vx_veth_outer)s type veth peer name %(vx_veth_inner)s' % subst,
                         shell=True)
@@ -179,7 +179,7 @@ class Network(object):
                         shell=True)
 
             if not util.check_for_interface(subst['physical_veth_outer']):
-                with util.RecordedOperation('create physical veth', self) as _:
+                with util.RecordedOperation('create physical veth', self):
                     processutils.execute(
                         'ip link add %(physical_veth_outer)s type veth peer name '
                         '%(physical_veth_inner)s' % subst,
@@ -201,6 +201,8 @@ class Network(object):
                            'type': 'deploy',
                            'network_uuid': self.uuid
                        })
+            db.add_event('network', self.uuid, 'deploy',
+                         'enqueued', None, None)
 
     def deploy_nat(self):
         if not self.provide_nat:
@@ -208,7 +210,7 @@ class Network(object):
 
         subst = self.subst_dict()
         if not self.floating_gateway:
-            with db.get_lock('sf/ipmanager/floating', ttl=120) as _:
+            with db.get_lock('ipmanager', None, 'floating', ttl=120):
                 ipm = db.get_ipmanager('floating')
                 self.floating_gateway = ipm.get_random_free_address()
                 db.persist_ipmanager('floating', ipm.save())
@@ -220,10 +222,10 @@ class Network(object):
         subst['floating_gateway'] = self.floating_gateway
         subst['floating_netmask'] = ipm.netmask
 
-        with db.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
+        with db.get_lock('network', None, self.uuid, ttl=120):
             if not subst['floating_gateway'] in list(util.get_interface_addresses(
                     subst['netns'], subst['physical_veth_inner'])):
-                with util.RecordedOperation('enable virtual routing', self) as _:
+                with util.RecordedOperation('enable virtual routing', self):
                     processutils.execute(
                         '%(in_netns)s ip addr add %(floating_gateway)s/%(floating_netmask)s '
                         'dev %(physical_veth_inner)s' % subst,
@@ -235,7 +237,7 @@ class Network(object):
                         shell=True)
 
             if not util.nat_rules_for_ipblock(self.network_address):
-                with util.RecordedOperation('enable nat', self) as _:
+                with util.RecordedOperation('enable nat', self):
                     processutils.execute(
                         'echo 1 > /proc/sys/net/ipv4/ip_forward', shell=True)
                     processutils.execute(
@@ -256,36 +258,36 @@ class Network(object):
         subst = self.subst_dict()
 
         # Cleanup local node
-        with db.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
+        with db.get_lock('network', None, self.uuid, ttl=120):
             if util.check_for_interface(subst['vx_bridge']):
-                with util.RecordedOperation('delete vxlan bridge', self) as _:
+                with util.RecordedOperation('delete vxlan bridge', self):
                     processutils.execute('ip link delete %(vx_bridge)s' % subst,
                                          shell=True)
 
             if util.check_for_interface(subst['vx_interface']):
-                with util.RecordedOperation('delete vxlan interface', self) as _:
+                with util.RecordedOperation('delete vxlan interface', self):
                     processutils.execute('ip link delete %(vx_interface)s' % subst,
                                          shell=True)
 
             # If this is the network node do additional cleanup
             if util.is_network_node():
                 if util.check_for_interface(subst['vx_veth_outer']):
-                    with util.RecordedOperation('delete router veth', self) as _:
+                    with util.RecordedOperation('delete router veth', self):
                         processutils.execute('ip link delete %(vx_veth_outer)s' % subst,
                                              shell=True)
 
                 if util.check_for_interface(subst['physical_veth_outer']):
-                    with util.RecordedOperation('delete physical veth', self) as _:
+                    with util.RecordedOperation('delete physical veth', self):
                         processutils.execute('ip link delete %(physical_veth_outer)s' % subst,
                                              shell=True)
 
                 if os.path.exists('/var/run/netns/%(netns)s' % subst):
-                    with util.RecordedOperation('delete netns', self) as _:
+                    with util.RecordedOperation('delete netns', self):
                         processutils.execute('ip netns del %(netns)s' % subst,
                                              shell=True)
 
                 if self.floating_gateway:
-                    with db.get_lock('sf/ipmanager/floating', ttl=120) as _:
+                    with db.get_lock('ipmanager', None, 'floating', ttl=120):
                         ipm = db.get_ipmanager('floating')
                         ipm.release(self.floating_gateway)
                         db.persist_ipmanager('floating', ipm.save())
@@ -308,8 +310,8 @@ class Network(object):
         if util.is_network_node():
             self.ensure_mesh()
             subst = self.subst_dict()
-            with util.RecordedOperation('update dhcp', self) as _:
-                with db.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
+            with util.RecordedOperation('update dhcp', self):
+                with db.get_lock('network', None, self.uuid, ttl=120):
                     d = dhcp.DHCP(self.uuid, subst['vx_veth_inner'])
                     d.restart_dhcpd()
         else:
@@ -318,12 +320,14 @@ class Network(object):
                            'type': 'update_dhcp',
                            'network_uuid': self.uuid
                        })
+            db.add_event('network', self.uuid, 'update dhcp',
+                         'enqueued', None, None)
 
     def remove_dhcp(self):
         if util.is_network_node():
             subst = self.subst_dict()
-            with util.RecordedOperation('remove dhcp', self) as _:
-                with db.get_lock('sf/net/%s' % self.uuid, ttl=120) as _:
+            with util.RecordedOperation('remove dhcp', self):
+                with db.get_lock('network', None, self.uuid, ttl=120):
                     d = dhcp.DHCP(self.uuid, subst['vx_veth_inner'])
                     d.remove_dhcpd()
         else:
@@ -332,6 +336,8 @@ class Network(object):
                            'type': 'remove_dhcp',
                            'network_uuid': self.uuid
                        })
+            db.add_event('network', self.uuid, 'remove dhcp',
+                         'enqueued', None, None)
 
     def discover_mesh(self):
         mesh_re = re.compile(r'00:00:00:00:00:00 dst (.*) self permanent')
@@ -346,53 +352,54 @@ class Network(object):
                 yield m.group(1)
 
     def ensure_mesh(self):
-        removed = []
-        added = []
+        with db.get_lock('network', None, self.uuid, ttl=120):
+            removed = []
+            added = []
 
-        instances = []
-        for iface in db.get_network_interfaces(self.uuid):
-            if not iface['instance_uuid'] in instances:
-                instances.append(iface['instance_uuid'])
+            instances = []
+            for iface in db.get_network_interfaces(self.uuid):
+                if not iface['instance_uuid'] in instances:
+                    instances.append(iface['instance_uuid'])
 
-        node_fqdns = []
-        for inst in instances:
-            i = db.get_instance(inst)
-            if not i:
-                continue
-            if not i['node']:
-                continue
+            node_fqdns = []
+            for inst in instances:
+                i = db.get_instance(inst)
+                if not i:
+                    continue
+                if not i['node']:
+                    continue
 
-            if not i['node'] in node_fqdns:
-                node_fqdns.append(i['node'])
+                if not i['node'] in node_fqdns:
+                    node_fqdns.append(i['node'])
 
-        # NOTE(mikal): why not use DNS here? Well, DNS might be outside
-        # the control of the deployer if we're running in a public cloud
-        # as an overlay cloud...
-        node_ips = [config.parsed.get('NETWORK_NODE_IP')]
-        for fqdn in node_fqdns:
-            ip = db.get_node(fqdn)['ip']
-            if ip not in node_ips:
-                node_ips.append(ip)
+            # NOTE(mikal): why not use DNS here? Well, DNS might be outside
+            # the control of the deployer if we're running in a public cloud
+            # as an overlay cloud...
+            node_ips = [config.parsed.get('NETWORK_NODE_IP')]
+            for fqdn in node_fqdns:
+                ip = db.get_node(fqdn)['ip']
+                if ip not in node_ips:
+                    node_ips.append(ip)
 
-        discovered = list(self.discover_mesh())
-        LOG.debug('%s: Discovered mesh elements %s' % (self, discovered))
-        for node in discovered:
-            if node in node_ips:
-                node_ips.remove(node)
-            else:
-                self._remove_mesh_element(node)
-                removed.append(node)
+            discovered = list(self.discover_mesh())
+            LOG.debug('%s: Discovered mesh elements %s' % (self, discovered))
+            for node in discovered:
+                if node in node_ips:
+                    node_ips.remove(node)
+                else:
+                    self._remove_mesh_element(node)
+                    removed.append(node)
 
-        for node in node_ips:
-            self._add_mesh_element(node)
-            added.append(node)
+            for node in node_ips:
+                self._add_mesh_element(node)
+                added.append(node)
 
-        if removed:
-            db.add_event('network', self.uuid, 'remove mesh elements',
-                         None, None, ' '.join(removed))
-        if added:
-            db.add_event('network', self.uuid, 'add mesh elements',
-                         None, None, ' '.join(added))
+            if removed:
+                db.add_event('network', self.uuid, 'remove mesh elements',
+                             None, None, ' '.join(removed))
+            if added:
+                db.add_event('network', self.uuid, 'add mesh elements',
+                             None, None, ' '.join(added))
 
     def _add_mesh_element(self, node):
         LOG.info('%s: Adding new mesh element %s' % (self, node))

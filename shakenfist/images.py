@@ -31,28 +31,47 @@ resolvers = {
 IMAGE_FETCH_LOCK_TIMEOUT = 600   # TODO(andy):Should be linked to HTTP timeout?
 
 
-def get_image(url, locks, op_label, timeout=IMAGE_FETCH_LOCK_TIMEOUT):
+def get_image(url, locks, related_object, timeout=IMAGE_FETCH_LOCK_TIMEOUT):
     """Fetch image if not downloaded and return image path."""
-    hashed = hash_image_url(url)
-    image_lock_name = 'sf/images/%s/%s' % (
-        config.parsed.get('NODE_NAME'), hashed)
-
-    with db.get_lock(image_lock_name,
-                     timeout=timeout) as image_lock:
-        with util.RecordedOperation('fetch image', op_label) as _:
+    hashed_image_url, hashed_image_path = hash_image(url)
+    with db.get_lock('image', config.parsed.get('NODE_NAME'),
+                     hashed_image_url, timeout=timeout) as image_lock:
+        with util.RecordedOperation('fetch image', related_object):
             image_url = resolve(url)
-            hashed_image_path, info, image_dirty, resp = \
-                requires_fetch(image_url)
+            info, dirty_fields, resp = requires_fetch(image_url)
 
-            if image_dirty:
-                LOG.info('get_image() starting fetch of %s', image_url)
+            if dirty_fields:
+                LOG.info(
+                    'get_image starting fetch of %s due to dirty fields %s', image_url, dirty_fields)
+                if related_object:
+                    t, u = related_object.get_describing_tuple()
+                    db.add_event(t, u, 'image requires fetch',
+                                 None, None, dirty_fields)
                 hashed_image_path = fetch(hashed_image_path, info,
                                           resp, locks=locks.append(image_lock))
             else:
                 hashed_image_path = '%s.v%03d' % (
                     hashed_image_path, info['version'])
 
+        _transcode(hashed_image_path, related_object)
+
     return hashed_image_path
+
+
+def _transcode(hashed_image_path, related_object, ):
+    with util.RecordedOperation('transcode image', related_object):
+        if os.path.exists(hashed_image_path + '.qcow2'):
+            return
+
+        current_format = identify(hashed_image_path).get('file format')
+        if current_format == 'qcow2':
+            os.link(hashed_image_path, hashed_image_path + '.qcow2')
+            return
+
+        processutils.execute(
+            'qemu-img convert -t none -O qcow2 %s %s.qcow2'
+            % (hashed_image_path, hashed_image_path),
+            shell=True)
 
 
 def resolve(name):
@@ -71,12 +90,13 @@ def _get_cache_path():
     return image_cache_path
 
 
-def hash_image_url(image_url):
+def hash_image(image_url):
     h = hashlib.sha256()
     h.update(image_url.encode('utf-8'))
     hashed_image_url = h.hexdigest()
+    hashed_image_path = os.path.join(_get_cache_path(), hashed_image_url)
     LOG.debug('Image %s hashes to %s' % (image_url, hashed_image_url))
-    return hashed_image_url
+    return hashed_image_url, hashed_image_path
 
 
 VALIDATED_IMAGE_FIELDS = ['Last-Modified', 'Content-Length']
@@ -97,8 +117,7 @@ def _read_info(image_url, hashed_image_url, hashed_image_path):
 
 
 def requires_fetch(image_url):
-    hashed_image_url = hash_image_url(image_url)
-    hashed_image_path = os.path.join(_get_cache_path(), hashed_image_url)
+    hashed_image_url, hashed_image_path = hash_image(image_url)
     info = _read_info(image_url, hashed_image_url, hashed_image_path)
 
     resp = requests.get(image_url, allow_redirects=True, stream=True,
@@ -108,12 +127,15 @@ def requires_fetch(image_url):
             'Failed to fetch HEAD of %s (status code %d)'
             % (image_url, resp.status_code))
 
-    image_dirty = False
+    dirty_fields = {}
     for field in VALIDATED_IMAGE_FIELDS:
         if info.get(field) != resp.headers.get(field):
-            image_dirty = True
+            dirty_fields[field] = {
+                'before': info.get(field),
+                'after': resp.headers.get(field)
+            }
 
-    return hashed_image_path, info, image_dirty, resp
+    return info, dirty_fields, resp
 
 
 def fetch(hashed_image_path, info, resp, locks=None):
@@ -159,23 +181,6 @@ def fetch(hashed_image_path, info, resp, locks=None):
         return '%s.v%03d.orig' % (hashed_image_path, info['version'])
 
     return '%s.v%03d' % (hashed_image_path, info['version'])
-
-
-def transcode(hashed_image_path):
-    """Convert the image to qcow2."""
-
-    if os.path.exists(hashed_image_path + '.qcow2'):
-        return
-
-    current_format = identify(hashed_image_path).get('file format')
-    if current_format == 'qcow2':
-        os.link(hashed_image_path, hashed_image_path + '.qcow2')
-        return
-
-    processutils.execute(
-        'qemu-img convert -t none -O qcow2 %s %s.qcow2'
-        % (hashed_image_path, hashed_image_path),
-        shell=True)
 
 
 def resize(hashed_image_path, size):

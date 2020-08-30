@@ -25,12 +25,18 @@ CONFIG_DEFAULTS = {
 
     # API options
     #  - api_port: the port for the REST API
+    #  - api_timeout: how long gunicorn processes can use for a single request
+    #  - api_async_wait: how long we wait for an async operation to complete
+    #    before returning to the user
     #  - include_tracebacks: if tracebacks should be included where relevant
     #    in API responses. Do not enable for untrusted clients!
     #  - prometheus_metrics_port: where to expose internal metrics. Do not
     #    allow access from untrusted clients!
+    #  - auth_secret_seed: a random string to see auth secrets with
+    #  - api_command_line: the gunicorn command line to use
     'API_PORT': 13000,
     'API_TIMEOUT': 900,
+    'API_ASYNC_WAIT': 30,
     'INCLUDE_TRACEBACKS': '1',
     'PROMETHEUS_METRICS_PORT': 13001,
     'AUTH_SECRET_SEED': 'foo',
@@ -93,6 +99,7 @@ CONFIG_DEFAULTS = {
 
     # LOGGING
     # -------
+    'SLOW_LOCK_THRESHOLD': 5.0,
     'LOGLEVEL_API': 'info',
     'LOGLEVEL_CLEANER': 'info',
     'LOGLEVEL_MAIN': 'info',

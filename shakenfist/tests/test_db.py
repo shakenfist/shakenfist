@@ -37,7 +37,8 @@ class DBTestCase(testtools.TestCase):
                  'state': 'initial',
                  'namespace': 'namespace',
                  'power_state': 'initial',
-                 'video': {'memory': 16384, 'model': 'cirrus'}
+                 'video': {'memory': 16384, 'model': 'cirrus'},
+                 'node_history': []
              }),
             etcd_write)
 
