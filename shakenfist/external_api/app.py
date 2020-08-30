@@ -416,7 +416,7 @@ class AuthNamespace(Resource):
         instances = []
         deleted_instances = []
         for i in db.get_instances(all=True, namespace=namespace):
-            if i['state'] == 'deleted':
+            if i['state'] in ['deleted', 'error']:
                 deleted_instances.append(i['uuid'])
             else:
                 instances.append(i['uuid'])
@@ -426,7 +426,7 @@ class AuthNamespace(Resource):
         networks = []
         deleted_networks = []
         for n in db.get_networks(all=True, namespace=namespace):
-            if n['state'] == 'deleted':
+            if n['state'] in ['deleted', 'error']:
                 deleted_networks.append(n['uuid'])
             else:
                 networks.append(n['uuid'])
