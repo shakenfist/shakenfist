@@ -165,7 +165,7 @@ class Instance(object):
             for disk in self.db_entry['block_devices']['devices']:
                 if disk.get('base'):
                     hashed_image_path = images.get_image(
-                        disk['base'], [lock], 'create')
+                        disk['base'], [lock], self)
 
                     with util.RecordedOperation('detect cdrom images', self):
                         try:

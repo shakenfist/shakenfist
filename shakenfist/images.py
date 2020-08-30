@@ -127,10 +127,13 @@ def requires_fetch(image_url):
             'Failed to fetch HEAD of %s (status code %d)'
             % (image_url, resp.status_code))
 
-    dirty_fields = []
+    dirty_fields = {}
     for field in VALIDATED_IMAGE_FIELDS:
         if info.get(field) != resp.headers.get(field):
-            dirty_fields.append(field)
+            dirty_fields[field] = {
+                'before': info.get(field),
+                'after': resp.headers.get(field)
+            }
 
     return info, dirty_fields, resp
 
