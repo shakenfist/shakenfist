@@ -34,7 +34,7 @@ def restore_instances():
                 networks.append(iface['network_uuid'])
         instances.append(inst['uuid'])
 
-    with util.RecordedOperation('restore networks', None) as _:
+    with util.RecordedOperation('restore networks', None):
         for network in networks:
             try:
                 n = net.from_db(network)
@@ -45,7 +45,7 @@ def restore_instances():
             except Exception as e:
                 util.ignore_exception('restore network %s' % network, e)
 
-    with util.RecordedOperation('restore instances', None) as _:
+    with util.RecordedOperation('restore instances', None):
         for instance in instances:
             try:
                 i = virt.from_db(instance)
@@ -120,7 +120,7 @@ def main():
             # do is create a bridge if it doesn't exist and the wire everything up
             # to it. We can do egress NAT in that state, even if floating IPs
             # don't work.
-            with util.RecordedOperation('create physical bridge', 'startup') as _:
+            with util.RecordedOperation('create physical bridge', 'startup'):
                 # No locking as read only
                 ipm = db.get_ipmanager('floating')
                 subst['master_float'] = ipm.get_address_at_index(1)
@@ -153,8 +153,9 @@ def main():
         LOG.info('%s pid is %d' % (d, pid))
 
     # Start other daemons
-    for d in ['api', 'cleaner', 'net', 'queues', 'triggers']:
-        _start_daemon(d)
+    for d in DAEMON_IMPLEMENTATIONS:
+        if d not in DAEMONS:
+            _start_daemon(d)
 
     restore_instances()
 

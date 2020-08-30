@@ -36,7 +36,7 @@ def get_image(url, locks, related_object, timeout=IMAGE_FETCH_LOCK_TIMEOUT):
     hashed_image_url, hashed_image_path = hash_image(url)
     with db.get_lock('image', config.parsed.get('NODE_NAME'),
                      hashed_image_url, timeout=timeout) as image_lock:
-        with util.RecordedOperation('fetch image', related_object) as _:
+        with util.RecordedOperation('fetch image', related_object):
             image_url = resolve(url)
             info, dirty_fields, resp = requires_fetch(image_url)
 
@@ -59,7 +59,7 @@ def get_image(url, locks, related_object, timeout=IMAGE_FETCH_LOCK_TIMEOUT):
 
 
 def _transcode(hashed_image_path, related_object, ):
-    with util.RecordedOperation('transcode image', related_object) as _:
+    with util.RecordedOperation('transcode image', related_object):
         if os.path.exists(hashed_image_path + '.qcow2'):
             return
 

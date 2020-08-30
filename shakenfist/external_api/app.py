@@ -293,7 +293,7 @@ def _metadata_putpost(meta_type, owner, key, value):
     if not value:
         return error(400, 'no value specified')
 
-    with db.get_lock('metadata', meta_type, owner) as _:
+    with db.get_lock('metadata', meta_type, owner):
         md = db.get_metadata(meta_type, owner)
         if md is None:
             md = {}
@@ -366,7 +366,7 @@ class AuthNamespaces(Resource):
         if not namespace:
             return error(400, 'no namespace specified')
 
-        with db.get_lock('namespace', None, 'all') as _:
+        with db.get_lock('namespace', None, 'all'):
             rec = db.get_namespace(namespace)
             if not rec:
                 rec = {
@@ -447,7 +447,7 @@ def _namespace_keys_putpost(namespace=None, key_name=None, key=None):
     if key_name == 'service_key':
         return error(403, 'illegal key name')
 
-    with db.get_lock('namespace', None, 'all') as _:
+    with db.get_lock('namespace', None, 'all'):
         rec = db.get_namespace(namespace)
         if not rec:
             return error(404, 'namespace does not exist')
@@ -500,7 +500,7 @@ class AuthNamespaceKey(Resource):
         if not key_name:
             return error(400, 'no key name specified')
 
-        with db.get_lock('namespace', None, namespace) as _:
+        with db.get_lock('namespace', None, namespace):
             ns = db.get_namespace(namespace)
             if ns.get('keys') and key_name in ns['keys']:
                 del ns['keys'][key_name]
@@ -536,7 +536,7 @@ class AuthMetadata(Resource):
         if not key:
             return error(400, 'no key specified')
 
-        with db.get_lock('metadata', 'namespace', namespace) as _:
+        with db.get_lock('metadata', 'namespace', namespace):
             md = db.get_metadata('namespace', namespace)
             if md is None or key not in md:
                 return error(404, 'key not found')
@@ -667,7 +667,7 @@ class Instances(Resource):
                         404, 'network %s not found' % netdesc['network_uuid'])
 
                 with db.get_lock('ipmanager', None,  netdesc['network_uuid'],
-                                 ttl=120) as _:
+                                 ttl=120):
                     db.add_event('network', netdesc['network_uuid'], 'allocate address',
                                  None, None, instance_uuid)
                     ipm = db.get_ipmanager(netdesc['network_uuid'])
@@ -790,7 +790,7 @@ class Instances(Resource):
 
         waiting_for = copy.copy(instances_del)
         start_time = time.time()
-        while (len(waiting_for) > 0 and (time.time() - start_time < config.parsed.get('API_ASYNC_WAIT'))):
+        while (waiting_for and (time.time() - start_time < config.parsed.get('API_ASYNC_WAIT'))):
             for instance_uuid in copy.copy(waiting_for):
                 i = db.get_instance(instance_uuid)
                 if i['state'] == 'deleted':
@@ -970,7 +970,7 @@ class InterfaceFloat(Resource):
 
         db.add_event('interface', interface_uuid,
                      'api', 'float', None, None)
-        with db.get_lock('ipmanager', None, 'floating', ttl=120) as _:
+        with db.get_lock('ipmanager', None, 'floating', ttl=120):
             ipm = db.get_ipmanager('floating')
             addr = ipm.get_random_free_address()
             db.persist_ipmanager('floating', ipm.save())
@@ -1011,7 +1011,7 @@ class InterfaceDefloat(Resource):
 
         db.add_event('interface', interface_uuid,
                      'api', 'defloat', None, None)
-        with db.get_lock('ipmanager', None, 'floating', ttl=120) as _:
+        with db.get_lock('ipmanager', None, 'floating', ttl=120):
             ipm = db.get_ipmanager('floating')
             ipm.release(ni['floating'])
             db.persist_ipmanager('floating', ipm.save())
@@ -1051,7 +1051,7 @@ class InstanceMetadata(Resource):
         if not key:
             return error(400, 'no key specified')
 
-        with db.get_lock('metadata', 'instance', instance_uuid) as _:
+        with db.get_lock('metadata', 'instance', instance_uuid):
             md = db.get_metadata('instance', instance_uuid)
             if md is None or key not in md:
                 return error(404, 'key not found')
@@ -1097,7 +1097,7 @@ def _delete_network(network_from_db):
     n.delete()
 
     if n.floating_gateway:
-        with db.get_lock('ipmanager', None, 'floating', ttl=120) as _:
+        with db.get_lock('ipmanager', None, 'floating', ttl=120):
             ipm = db.get_ipmanager('floating')
             ipm.release(n.floating_gateway)
             db.persist_ipmanager('floating', ipm.save())
@@ -1278,7 +1278,7 @@ class NetworkMetadata(Resource):
         if not key:
             return error(400, 'no key specified')
 
-        with db.get_lock('metadata', 'network', network_uuid) as _:
+        with db.get_lock('metadata', 'network', network_uuid):
             md = db.get_metadata('network', network_uuid)
             if md is None or key not in md:
                 return error(404, 'key not found')

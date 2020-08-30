@@ -155,7 +155,7 @@ class Instance(object):
             os.makedirs(self.instance_path)
 
         # Generate a config drive
-        with util.RecordedOperation('make config drive', self) as _:
+        with util.RecordedOperation('make config drive', self):
             self._make_config_drive(os.path.join(
                 self.instance_path, self.db_entry['block_devices']['devices'][1]['path']))
 
@@ -167,7 +167,7 @@ class Instance(object):
                     hashed_image_path = images.get_image(
                         disk['base'], [lock], 'create')
 
-                    with util.RecordedOperation('detect cdrom images', self) as _:
+                    with util.RecordedOperation('detect cdrom images', self):
                         try:
                             cd = pycdlib.PyCdlib()
                             cd.open(hashed_image_path)
@@ -197,7 +197,7 @@ class Instance(object):
                         disk['device'] = 'hd%s' % disk['device'][-1]
                         disk['bus'] = 'ide'
                     else:
-                        with util.RecordedOperation('resize image', self) as _:
+                        with util.RecordedOperation('resize image', self):
                             if lock:
                                 lock.refresh()
 
@@ -205,7 +205,7 @@ class Instance(object):
                                 hashed_image_path, disk['size'])
 
                         if config.parsed.get('DISK_FORMAT') == 'qcow':
-                            with util.RecordedOperation('create copy on write layer', self) as _:
+                            with util.RecordedOperation('create copy on write layer', self):
                                 if lock:
                                     lock.refresh
 
@@ -219,7 +219,7 @@ class Instance(object):
                                                '      </backingStore>' % resized_image_path)
 
                         elif config.parsed.get('DISK_FORMAT') == 'qcow_flat':
-                            with util.RecordedOperation('create flat layer', self) as _:
+                            with util.RecordedOperation('create flat layer', self):
                                 if lock:
                                     lock.refresh
 
@@ -227,7 +227,7 @@ class Instance(object):
                                     resized_image_path, disk['path'])
 
                         elif config.parsed.get('DISK_FORMAT') == 'flat':
-                            with util.RecordedOperation('create raw disk', self) as _:
+                            with util.RecordedOperation('create raw disk', self):
                                 if lock:
                                     lock.refresh
 
@@ -251,15 +251,15 @@ class Instance(object):
             self.db_entry['uuid'], self.db_entry['block_devices'])
 
         # Create the actual instance
-        with util.RecordedOperation('create domain XML', self) as _:
+        with util.RecordedOperation('create domain XML', self):
             self._create_domain_xml()
-        with util.RecordedOperation('create domain', self) as _:
+        with util.RecordedOperation('create domain', self):
             self.power_on()
 
         db.update_instance_state(self.db_entry['uuid'], 'created')
 
     def delete(self):
-        with util.RecordedOperation('delete domain', self) as _:
+        with util.RecordedOperation('delete domain', self):
             try:
                 self.power_off()
 
@@ -268,18 +268,18 @@ class Instance(object):
             except Exception as e:
                 util.ignore_exception('instance delete', e)
 
-        with util.RecordedOperation('delete disks', self) as _:
+        with util.RecordedOperation('delete disks', self):
             try:
                 if os.path.exists(self.instance_path):
                     shutil.rmtree(self.instance_path)
             except Exception as e:
                 util.ignore_exception('instance delete', e)
 
-        with util.RecordedOperation('release network addresses', self) as _:
+        with util.RecordedOperation('release network addresses', self):
             for ni in db.get_instance_interfaces(self.db_entry['uuid']):
                 db.update_network_interface_state(ni['uuid'], 'deleted')
                 with db.get_lock('ipmanager', None, ni['network_uuid'],
-                                 ttl=120) as _:
+                                 ttl=120):
                     ipm = db.get_ipmanager(ni['network_uuid'])
                     ipm.release(ni['ipv4'])
                     db.persist_ipmanager(ni['network_uuid'], ipm.save())
@@ -536,7 +536,7 @@ class Instance(object):
             if d['type'] != 'qcow2':
                 continue
 
-            with util.RecordedOperation('snapshot %s' % d['device'], self) as _:
+            with util.RecordedOperation('snapshot %s' % d['device'], self):
                 self._snapshot_device(
                     d['path'], os.path.join(snappath, d['device']))
                 db.create_snapshot(snapshot_uuid, d['device'], self.db_entry['uuid'],

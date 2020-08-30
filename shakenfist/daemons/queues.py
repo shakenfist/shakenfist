@@ -90,7 +90,7 @@ def instance_start(instance_uuid, network):
                 nets[netdesc['network_uuid']] = n
 
         # Create the networks
-        with util.RecordedOperation('ensure networks exist', instance) as _:
+        with util.RecordedOperation('ensure networks exist', instance):
             for network_uuid in nets:
                 n = nets[network_uuid]
                 n.create()
@@ -101,7 +101,7 @@ def instance_start(instance_uuid, network):
         libvirt = util.get_libvirt()
         try:
             with util.RecordedOperation('instance creation',
-                                        instance) as _:
+                                        instance):
                 instance.create(lock=lock)
 
         except libvirt.libvirtError as e:
@@ -117,7 +117,7 @@ def instance_start(instance_uuid, network):
 
 
 def instance_delete(instance_uuid):
-    with db.get_lock('instance', None, instance_uuid) as _:
+    with db.get_lock('instance', None, instance_uuid):
         db.add_event('instance', instance_uuid,
                      'queued', 'delete', None, None)
 
@@ -147,11 +147,11 @@ def instance_delete(instance_uuid):
                 # If network used by another instance, only update
                 if network in host_networks:
                     with util.RecordedOperation('deallocate ip address',
-                                                instance_from_db_virt) as _:
+                                                instance_from_db_virt):
                         n.update_dhcp()
                 else:
                     # Network not used by any other instance therefore delete
-                    with util.RecordedOperation('remove network', n) as _:
+                    with util.RecordedOperation('remove network', n):
                         n.delete()
 
 

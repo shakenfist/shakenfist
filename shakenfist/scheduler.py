@@ -139,7 +139,7 @@ class Scheduler(object):
         return candidates_by_image_matches[max_matches]
 
     def place_instance(self, instance, network, candidates=None):
-        with util.RecordedOperation('schedule', instance) as _:
+        with util.RecordedOperation('schedule', instance):
             diff = time.time() - self.metrics_updated
             if diff > config.parsed.get('SCHEDULER_CACHE_TIMEOUT'):
                 self.refresh_metrics()

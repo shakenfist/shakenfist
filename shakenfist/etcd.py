@@ -46,7 +46,7 @@ class ActualLock(etcd3.Lock):
                 return self
 
             except etcd3.exceptions.ConnectionFailedError:
-                time.sleep(ETCD_ATTEMPTS)
+                time.sleep(ETCD_ATTEMPT_DELAY)
 
         raise LockException('Could not acquire lock after retries.')
 
@@ -164,7 +164,7 @@ def delete_all(objecttype, subtype, sort_order=None):
 def enqueue(queuename, workitem):
     for attempt in range(ETCD_ATTEMPTS):
         try:
-            with get_lock('queue', None, queuename) as _:
+            with get_lock('queue', None, queuename):
                 i = 0
                 entry_time = time.time()
                 jobname = '%s-%03d' % (entry_time, i)
@@ -189,7 +189,7 @@ def enqueue(queuename, workitem):
 def dequeue(queuename):
     for attempt in range(ETCD_ATTEMPTS):
         try:
-            with get_lock('queue', None, queuename) as _:
+            with get_lock('queue', None, queuename):
                 queue_path = _construct_key('queue', queuename, None)
 
                 client = etcd3.client()
