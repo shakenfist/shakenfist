@@ -48,6 +48,11 @@ def handle(jobname, workitem):
                 db.update_instance_state(instance_uuid,
                                          task.get('next_state', 'unknown'))
 
+    except:
+        if instance_uuid:
+            db.enqueue_delete(config.get.parsed('NODE_NAME'),
+                              instance_uuid, 'error')
+
     finally:
         db.resolve(config.parsed.get('NODE_NAME'), jobname)
         if instance_uuid:

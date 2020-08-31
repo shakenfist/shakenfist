@@ -45,8 +45,13 @@ def get_image(url, locks, related_object, timeout=IMAGE_FETCH_LOCK_TIMEOUT):
                     'get_image starting fetch of %s due to dirty fields %s', image_url, dirty_fields)
                 if related_object:
                     t, u = related_object.get_describing_tuple()
+                    dirty_fields_pretty = []
+                    for field in dirty_fields:
+                        dirty_fields_pretty.append(
+                            '%s: %s -> %s' % (field, dirty_fields[field]['before'],
+                                              dirty_fields[field]['after']))
                     db.add_event(t, u, 'image requires fetch',
-                                 None, None, dirty_fields)
+                                 None, None, '\n'.join(dirty_fields_pretty))
                 hashed_image_path = fetch(hashed_image_path, info,
                                           resp, locks=locks.append(image_lock))
             else:
@@ -104,6 +109,8 @@ VALIDATED_IMAGE_FIELDS = ['Last-Modified', 'Content-Length']
 
 def _read_info(image_url, hashed_image_url, hashed_image_path):
     if not os.path.exists(hashed_image_path + '.info'):
+        LOG.info('No info in cache for %s hashed image path %s'
+                 % (image_url, hashed_image_path))
         info = {
             'url': image_url,
             'hash': hashed_image_url,
