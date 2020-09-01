@@ -144,6 +144,9 @@ class Monitor(daemon.Daemon):
             try:
                 if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
                     self._process_network_node_workitems()
+                else:
+                    management_age = time.time() - last_management
+                    time.sleep(max(0, 30 - management_age))
 
                 if time.time() - last_management > 30:
                     self._maintain_networks()
