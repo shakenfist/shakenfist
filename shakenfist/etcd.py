@@ -246,12 +246,12 @@ def _restart_queue(queuename):
         try:
             with get_lock('queue', None, queuename):
                 client = etcd3.client()
-                queue_path = _construct_key('queue', queuename, None)
+                queue_path = _construct_key('processing', queuename, None)
                 for data, metadata in client.get_prefix(queue_path, sort_order='ascend'):
                     jobname = str(metadata.key).split('/')[-1].rstrip("'")
                     workitem = json.loads(data)
                     put('queue', queuename, jobname, workitem)
-                    delete('queue', queuename, jobname)
+                    delete('processing', queuename, jobname)
                     LOG.warning('Reset %s workitem %s' % (queuename, jobname))
 
         except Exception as e:
