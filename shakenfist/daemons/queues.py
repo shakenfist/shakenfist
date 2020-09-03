@@ -173,6 +173,10 @@ class Monitor(daemon.Daemon):
         workers = []
         LOG.info('Starting')
 
+        libvirt = util.get_libvirt()
+        conn = libvirt.open(None)
+        present_cpus, _, _ = conn.getCPUMap()
+
         while True:
             try:
                 for w in copy.copy(workers):
@@ -180,7 +184,12 @@ class Monitor(daemon.Daemon):
                         w.join(1)
                         workers.remove(w)
 
-                jobname, workitem = db.dequeue(config.parsed.get('NODE_NAME'))
+                if len(workers) < present_cpus / 2:
+                    jobname, workitem = db.dequeue(
+                        config.parsed.get('NODE_NAME'))
+                else:
+                    workitem = None
+
                 if not workitem:
                     time.sleep(0.2)
                     continue
