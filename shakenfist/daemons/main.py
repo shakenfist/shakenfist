@@ -3,6 +3,7 @@
 import setproctitle
 import time
 import os
+import psutil
 
 from oslo_concurrency import processutils
 
@@ -73,12 +74,12 @@ DAEMON_IMPLEMENTATIONS = {
 }
 
 
-DAEMONS = {}
+DAEMON_PIDS = {}
 
 
 def main():
     global DAEMON_IMPLEMENTATIONS
-    global DAEMONS
+    global DAEMON_PIDS
 
     setproctitle.setproctitle(daemon.process_name('main'))
 
@@ -88,8 +89,9 @@ def main():
 
     util.log_setlevel(LOG, 'main')
 
-    # Check in early and often
+    # Check in early and often, also reset processing queue items
     db.see_this_node()
+    db.restart_queues()
 
     # Resource usage publisher, we need this early because scheduling decisions
     # might happen quite early on.
@@ -97,7 +99,7 @@ def main():
     if pid == 0:
         LOG.removeHandler(handler)
         DAEMON_IMPLEMENTATIONS['resources'].Monitor('resources').run()
-    DAEMONS['resources'] = pid
+    DAEMON_PIDS[pid] = 'resources'
     LOG.info('resources pid is %d' % pid)
 
     # If I am the network node, I need some setup
@@ -149,23 +151,36 @@ def main():
         if pid == 0:
             LOG.removeHandler(handler)
             DAEMON_IMPLEMENTATIONS[d].Monitor(d).run()
-        DAEMONS[d] = pid
+        DAEMON_PIDS[pid] = d
         LOG.info('%s pid is %d' % (d, pid))
 
-    # Start other daemons
-    for d in DAEMON_IMPLEMENTATIONS:
-        if d not in DAEMONS:
-            _start_daemon(d)
+    def _audit_daemons():
+        running_daemons = []
+        for pid in DAEMON_PIDS:
+            running_daemons.append(DAEMON_PIDS[pid])
+        LOG.info('Daemons running: %s' % ', '.join(sorted(running_daemons)))
 
+        for d in DAEMON_IMPLEMENTATIONS:
+            if d not in running_daemons:
+                _start_daemon(d)
+
+        for d in DAEMON_PIDS:
+            if not psutil.pid_exists(d):
+                LOG.warning('%s pid is missing, restarting' % DAEMON_PIDS[d])
+                _start_daemon(DAEMON_PIDS[d])
+
+    _audit_daemons()
     restore_instances()
 
     while True:
         time.sleep(10)
-        wpid, _ = os.waitpid(-1, os.WNOHANG)
-        if wpid != 0:
-            d = DAEMONS.get(wpid, 'unknown')
-            LOG.warning('%s died (pid %d)' % (d, wpid))
-            if d != 'unknown':
-                _start_daemon(d)
 
+        wpid, _ = os.waitpid(-1, os.WNOHANG)
+        while wpid != 0:
+            LOG.warning('%s died (pid %d)'
+                        % (DAEMON_PIDS.get(wpid, 'unknown'), wpid))
+            wpid, _ = os.waitpid(-1, os.WNOHANG)
+            del DAEMON_PIDS[wpid]
+
+        _audit_daemons()
         db.see_this_node()

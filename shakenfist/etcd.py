@@ -239,3 +239,30 @@ def get_queue_length(queuename):
             LOG.info('Failed to calculate queue length for %s, attempt %d: %s'
                      % (queuename, attempt, e))
             time.sleep(ETCD_ATTEMPT_DELAY)
+
+
+def _restart_queue(queuename):
+    for attempt in range(ETCD_ATTEMPTS):
+        try:
+            with get_lock('queue', None, queuename):
+                client = etcd3.client()
+                queue_path = _construct_key('queue', queuename, None)
+                for data, metadata in client.get_prefix(queue_path, sort_order='ascend'):
+                    jobname = str(metadata.key).split('/')[-1].rstrip("'")
+                    workitem = json.loads(data)
+                    put('queue', queuename, jobname, workitem)
+                    delete('queue', queuename, jobname)
+                    LOG.warning('Reset %s workitem %s' % (queuename, jobname))
+
+        except Exception as e:
+            LOG.info('Failed to reset queue %s, attempt %d: %s'
+                     % (queuename, attempt, e))
+            time.sleep(ETCD_ATTEMPT_DELAY)
+
+
+def restart_queues():
+    # Move things which were in processing back to the queue because
+    # we didn't complete them before crashing.
+    if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
+        _restart_queue('networknode')
+    _restart_queue(config.parsed.get('NODE_NAME'))
