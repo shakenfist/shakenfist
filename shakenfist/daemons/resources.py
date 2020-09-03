@@ -157,24 +157,27 @@ class Monitor(daemon.Daemon):
                 if metric not in gauges:
                     gauges[metric] = Gauge(metric, '')
                 gauges[metric].set(stats[metric])
-            db.update_metrics_bulk(stats)
 
+            db.update_metrics_bulk(stats)
             LOG.info('Updated metrics')
             gauges['updated_at'].set_to_current_time()
-            last_metrics = time.time()
 
         while True:
             try:
                 jobname, _ = db.dequeue(
                     '%s-metrics' % config.parsed.get('NODE_NAME'))
                 if jobname:
-                    update_metrics()
+                    if time.time() - last_metrics > 2:
+                        update_metrics()
+                        last_metrics = time.time()
                     db.resolve('%s-metrics' % config.parsed.get('NODE_NAME'),
                                jobname)
-                elif time.time() - last_metrics > config.parsed.get('SCHEDULER_CACHE_TIMEOUT'):
-                    update_metrics()
                 else:
                     time.sleep(0.2)
+
+                if time.time() - last_metrics > config.parsed.get('SCHEDULER_CACHE_TIMEOUT'):
+                    update_metrics()
+                    last_metrics = time.time()
 
             except Exception as e:
                 util.ignore_exception('resource statistics', e)
