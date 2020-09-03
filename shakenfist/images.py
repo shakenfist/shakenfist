@@ -38,11 +38,13 @@ def get_image(url, locks, related_object, timeout=IMAGE_FETCH_LOCK_TIMEOUT):
                      hashed_image_url, timeout=timeout) as image_lock:
         with util.RecordedOperation('fetch image', related_object):
             image_url = resolve(url)
-            info, dirty_fields, resp = requires_fetch(image_url)
+            info, dirty_fields, resp = requires_fetch(image_url,
+                                                      hashed_image_url,
+                                                      hashed_image_path)
 
             if dirty_fields:
-                LOG.info(
-                    'get_image starting fetch of %s due to dirty fields %s', image_url, dirty_fields)
+                LOG.info('get_image starting fetch of %s due to dirty fields %s',
+                         image_url, dirty_fields)
                 if related_object:
                     t, u = related_object.get_describing_tuple()
                     dirty_fields_pretty = []
@@ -123,8 +125,7 @@ def _read_info(image_url, hashed_image_url, hashed_image_path):
     return info
 
 
-def requires_fetch(image_url):
-    hashed_image_url, hashed_image_path = hash_image(image_url)
+def requires_fetch(image_url, hashed_image_url, hashed_image_path):
     info = _read_info(image_url, hashed_image_url, hashed_image_path)
 
     resp = requests.get(image_url, allow_redirects=True, stream=True,
