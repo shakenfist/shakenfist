@@ -226,3 +226,16 @@ def resolve(queuename, jobname):
             LOG.info('Failed to resolve workitem %s for %s, attempt %d: %s'
                      % (jobname, queuename, attempt, e))
             time.sleep(ETCD_ATTEMPT_DELAY)
+
+
+def get_queue_length(queuename):
+    for attempt in range(ETCD_ATTEMPTS):
+        try:
+            queued = len(list(get_all('queue', queuename)))
+            processing = len(list(get_all('processing', queuename)))
+            return processing, queued
+
+        except Exception as e:
+            LOG.info('Failed to calculate queue length for %s, attempt %d: %s'
+                     % (queuename, attempt, e))
+            time.sleep(ETCD_ATTEMPT_DELAY)

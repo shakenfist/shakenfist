@@ -28,7 +28,7 @@ def _get_stats():
 
     retval['cpu_max_per_instance'] = conn.getMaxVcpus(None)
 
-    # This is disable as data we don't currently use
+    # This is disabled as data we don't currently use
     # for i in range(present_cpus):
     #    per_cpu_stats = conn.getCPUStats(i)
     #    for key in per_cpu_stats:
@@ -104,6 +104,10 @@ def _get_stats():
             total_instance_vcpus += cpus
             total_instance_cpu_time += cpu_time
 
+    # Queue health statistics
+    node_queue_processing, node_queue_waiting = db.get_queue_length(
+        config.parsed.get('NODE_NAME'))
+
     retval.update({
         'cpu_total_instance_vcpus': total_instance_vcpus,
         'cpu_total_instance_cpu_time': total_instance_cpu_time,
@@ -111,7 +115,19 @@ def _get_stats():
         'memory_total_instance_actual': total_instance_actual_memory // 1024,
         'instances_total': total_instances,
         'instances_active': total_active_instances,
+        'node_queue_processing': node_queue_processing,
+        'node_queue_waiting': node_queue_waiting,
     })
+
+    if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
+        network_queue_processing, network_queue_waiting = db.get_queue_length(
+            config.parsed.get('networknode')
+        )
+
+        retval.update({
+            'network_queue_processing': network_queue_processing,
+            'network_queue_waiting': network_queue_waiting,
+        })
 
     return retval
 

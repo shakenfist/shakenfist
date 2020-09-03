@@ -514,3 +514,7 @@ def dequeue(queuename):
 
 def resolve(queuename, jobname):
     etcd.resolve(queuename, jobname)
+
+
+def get_queue_length(queuename):
+    return etcd.get_queue_length(queuename)
