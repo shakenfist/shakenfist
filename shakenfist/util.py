@@ -61,8 +61,9 @@ class RecordedOperation():
         LOG.debug('%s: Start %s' % (self.object, self.operation))
 
         object_type, object_uuid = self.get_describing_tuple()
-        db.add_event(object_type, object_uuid,
-                     self.operation, 'start', None, None)
+        if object_type and object_uuid:
+            db.add_event(object_type, object_uuid,
+                         self.operation, 'start', None, None)
         return self
 
     def __exit__(self, *args):
@@ -72,19 +73,20 @@ class RecordedOperation():
                     duration))
 
         object_type, object_uuid = self.get_describing_tuple()
-        db.add_event(object_type, object_uuid,
-                     self.operation, 'finish', duration, None)
+        if object_type and object_uuid:
+            db.add_event(object_type, object_uuid,
+                         self.operation, 'finish', duration, None)
 
     def get_describing_tuple(self):
         if self.object:
             if isinstance(self.object, str):
-                object_type = 'null'
+                object_type = None
                 object_uuid = self.object
             else:
                 object_type, object_uuid = self.object.get_describing_tuple()
         else:
-            object_type = 'null'
-            object_uuid = 'null'
+            object_type = None
+            object_uuid = None
 
         return object_type, object_uuid
 
