@@ -42,11 +42,13 @@ def handle(jobname, workitem):
             if task.get('type') == 'instance_start':
                 instance_start(instance_uuid, workitem.get('network'))
                 db.update_instance_state(instance_uuid, 'created')
+                db.enqueue('%s-metrics' % config.parsed.get('NODE_NAME'), {})
 
             if task.get('type') == 'instance_delete':
                 instance_delete(instance_uuid)
                 db.update_instance_state(instance_uuid,
                                          task.get('next_state', 'unknown'))
+                db.enqueue('%s-metrics' % config.parsed.get('NODE_NAME'), {})
 
     except:
         if instance_uuid:

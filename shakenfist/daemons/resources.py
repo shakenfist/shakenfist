@@ -93,7 +93,11 @@ def _get_stats():
     total_instance_cpu_time = 0
 
     for guest in conn.listAllDomains():
-        active = guest.isActive() == 1
+        try:
+            active = guest.isActive() == 1
+        except:
+            active = False
+
         _, maxmem, mem, cpus, cpu_time = guest.info()
 
         if active:
@@ -139,21 +143,38 @@ class Monitor(daemon.Daemon):
 
     def run(self):
         LOG.info('Starting')
-        gauges = {'updated_at': Gauge(
-            'updated_at', 'The last time metrics were updated')}
+        gauges = {
+            'updated_at': Gauge('updated_at', 'The last time metrics were updated')
+        }
+
+        last_metrics = 0
+
+        def update_metrics():
+            global last_metrics
+
+            stats = _get_stats()
+            for metric in stats:
+                if metric not in gauges:
+                    gauges[metric] = Gauge(metric, '')
+                gauges[metric].set(stats[metric])
+            db.update_metrics_bulk(stats)
+
+            LOG.info('Updated metrics')
+            gauges['updated_at'].set_to_current_time()
+            last_metrics = time.time()
 
         while True:
             try:
-                stats = _get_stats()
-                for metric in stats:
-                    if metric not in gauges:
-                        gauges[metric] = Gauge(metric, '')
-                    gauges[metric].set(stats[metric])
-                db.update_metrics_bulk(stats)
-
-                gauges['updated_at'].set_to_current_time()
+                jobname, _ = db.dequeue(
+                    '%s-metrics' % config.parsed.get('NODE_NAME'))
+                if jobname:
+                    update_metrics()
+                    db.resolve('%s-metrics' % config.parsed.get('NODE_NAME'),
+                               jobname)
+                elif time.time() - last_metrics > config.parsed.get('SCHEDULER_CACHE_TIMEOUT'):
+                    update_metrics()
+                else:
+                    time.sleep(0.2)
 
             except Exception as e:
                 util.ignore_exception('resource statistics', e)
-
-            time.sleep(config.parsed.get('SCHEDULER_CACHE_TIMEOUT'))

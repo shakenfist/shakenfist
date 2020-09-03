@@ -464,6 +464,10 @@ class Instance(object):
             return None
 
     def power_on(self):
+        if not os.path.exists(self.xml_file):
+            db.enqueue_delete(
+                config.parsed.get('NODE_NAME'), self.db_entry['uuid'], 'error')
+
         libvirt = util.get_libvirt()
         with open(self.xml_file) as f:
             xml = f.read()
@@ -489,17 +493,9 @@ class Instance(object):
             'instance', self.db_entry['uuid'], 'poweron', 'complete', None, None)
 
     def power_off(self):
-        libvirt = util.get_libvirt()
-        with open(self.xml_file) as f:
-            xml = f.read()
-
         instance = self._get_domain()
         if not instance:
-            conn = libvirt.open(None)
-            instance = conn.defineXML(xml)
-            if not instance:
-                LOG.error('%s: Failed to create libvirt domain' % self)
-                return
+            return
 
         try:
             instance.destroy()

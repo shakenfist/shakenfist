@@ -179,8 +179,8 @@ def main():
         while wpid != 0:
             LOG.warning('%s died (pid %d)'
                         % (DAEMON_PIDS.get(wpid, 'unknown'), wpid))
-            wpid, _ = os.waitpid(-1, os.WNOHANG)
             del DAEMON_PIDS[wpid]
+            wpid, _ = os.waitpid(-1, os.WNOHANG)
 
         _audit_daemons()
         db.see_this_node()
