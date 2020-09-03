@@ -61,7 +61,8 @@ def restore_instances():
             except Exception as e:
                 util.ignore_exception('restore instance %s' % instance, e)
                 db.enqueue_delete(
-                    config.parsed.get('NODE_NAME'), instance, 'error')
+                    config.parsed.get('NODE_NAME'), instance, 'error',
+                    'exception while restoring instance on daemon restart')
 
 
 DAEMON_IMPLEMENTATIONS = {

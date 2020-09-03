@@ -466,7 +466,8 @@ class Instance(object):
     def power_on(self):
         if not os.path.exists(self.xml_file):
             db.enqueue_delete(
-                config.parsed.get('NODE_NAME'), self.db_entry['uuid'], 'error')
+                config.parsed.get('NODE_NAME'), self.db_entry['uuid'], 'error',
+                'missing domain file in power on')
 
         libvirt = util.get_libvirt()
         with open(self.xml_file) as f:
@@ -493,6 +494,7 @@ class Instance(object):
             'instance', self.db_entry['uuid'], 'poweron', 'complete', None, None)
 
     def power_off(self):
+        libvirt = util.get_libvirt()
         instance = self._get_domain()
         if not instance:
             return

@@ -48,12 +48,16 @@ def handle(jobname, workitem):
                 instance_delete(instance_uuid)
                 db.update_instance_state(instance_uuid,
                                          task.get('next_state', 'unknown'))
+                if task.get('next_state_message'):
+                    db.update_instance_error_message(
+                        instance_uuid, task.get('next_state_message'))
                 db.enqueue('%s-metrics' % config.parsed.get('NODE_NAME'), {})
 
     except:
         if instance_uuid:
             db.enqueue_delete(config.parsed.get('NODE_NAME'),
-                              instance_uuid, 'error')
+                              instance_uuid, 'error',
+                              'failed queue task')
 
     finally:
         db.resolve(config.parsed.get('NODE_NAME'), jobname)
@@ -91,7 +95,8 @@ def instance_start(instance_uuid, network):
                 n = net.from_db(netdesc['network_uuid'])
                 if not n:
                     db.enqueue_delete(
-                        config.parsed.get('NODE_NAME'), instance_uuid, 'error')
+                        config.parsed.get('NODE_NAME'), instance_uuid, 'error',
+                        'missing network')
                     return
 
                 nets[netdesc['network_uuid']] = n
@@ -116,7 +121,8 @@ def instance_start(instance_uuid, network):
             if code in (libvirt.VIR_ERR_CONFIG_UNSUPPORTED,
                         libvirt.VIR_ERR_XML_ERROR):
                 db.enqueue_delete(
-                    config.parsed.get('NODE_NAME'), instance_uuid, 'error')
+                    config.parsed.get('NODE_NAME'), instance_uuid, 'error',
+                    'instance failed to start')
                 return
 
         for iface in db.get_instance_interfaces(instance.db_entry['uuid']):

@@ -38,7 +38,8 @@ class DBTestCase(testtools.TestCase):
                  'namespace': 'namespace',
                  'power_state': 'initial',
                  'video': {'memory': 16384, 'model': 'cirrus'},
-                 'node_history': []
+                 'node_history': [],
+                 'error_message': None,
              }),
             etcd_write)
 
@@ -57,7 +58,8 @@ class DBTestCase(testtools.TestCase):
             {
                 'state': 'created',
                 'uuid': 'uuid42',
-                'video': {'memory': 16384, 'model': 'cirrus'}
+                'video': {'memory': 16384, 'model': 'cirrus'},
+                'error_message': None,
             },
             etcd_write[3])
 
@@ -85,7 +87,8 @@ class DBTestCase(testtools.TestCase):
                 'power_state': 'off',
                 'power_state_previous': 'on',
                 'uuid': 'uuid42',
-                'video': {'memory': 16384, 'model': 'cirrus'}
+                'video': {'memory': 16384, 'model': 'cirrus'},
+                'error_message': None,
             },
             etcd_write[3])
 
@@ -131,6 +134,7 @@ class DBTestCase(testtools.TestCase):
                 'power_state': 'on',
                 'power_state_previous': 'transition-to-off',
                 'uuid': 'uuid42',
-                'video': {'memory': 16384, 'model': 'cirrus'}
+                'video': {'memory': 16384, 'model': 'cirrus'},
+                'error_message': None,
             },
             etcd_write[3])

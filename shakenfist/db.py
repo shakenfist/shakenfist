@@ -172,6 +172,8 @@ def get_instance(instance_uuid):
 
     if 'video' not in i:
         i['video'] = {'model': 'cirrus', 'memory': 16384}
+    if 'error_message' not in i:
+        i['error_message'] = None
     return i
 
 
@@ -188,6 +190,8 @@ def get_instances(only_node=None, all=False, namespace=None):
 
         if 'video' not in i:
             i['video'] = {'model': 'cirrus', 'memory': 16384}
+        if 'error_message' not in i:
+            i['error_message'] = None
 
         yield i
 
@@ -217,7 +221,8 @@ def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key,
         'namespace': namespace,
         'power_state': 'initial',
         'video': video,
-        'node_history': []
+        'node_history': [],
+        'error_message': None
     }
     etcd.put('instance', None, instance_uuid, d)
     return d
@@ -274,6 +279,15 @@ def update_instance_power_state(instance_uuid, state):
     i['power_state'] = state
     i['power_state_updated'] = time.time()
     etcd.put('instance', None, instance_uuid, i)
+
+
+def update_instance_error_message(instance_uuid, error_message):
+    i = get_instance(instance_uuid)
+    i['error_message'] = error_message
+    etcd.put('instance', None, instance_uuid, i)
+
+    add_event('instance', instance_uuid, 'error message',
+              error_message, None, None)
 
 
 def hard_delete_instance(instance_uuid):
@@ -495,9 +509,13 @@ def enqueue(queuename, workitem):
     etcd.enqueue(queuename, workitem)
 
 
-def enqueue_delete(node, instance_uuid, next_state):
+def enqueue_delete(node, instance_uuid, next_state, next_state_message):
     enqueue(node, {
-        'tasks': [{'type': 'instance_delete', 'next_state': next_state}],
+        'tasks': [{
+            'type': 'instance_delete',
+            'next_state': next_state,
+            'next_state_message': next_state_message
+        }],
         'instance_uuid': instance_uuid
     })
     add_event('instance', instance_uuid, 'delete', 'enqueued', None, None)
