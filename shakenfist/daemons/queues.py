@@ -50,7 +50,7 @@ def handle(jobname, workitem):
 
     except:
         if instance_uuid:
-            db.enqueue_delete(config.get.parsed('NODE_NAME'),
+            db.enqueue_delete(config.parsed.get('NODE_NAME'),
                               instance_uuid, 'error')
 
     finally:

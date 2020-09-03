@@ -5,6 +5,7 @@ import time
 from shakenfist import config
 from shakenfist.daemons import daemon
 from shakenfist import db
+from shakenfist import etcd
 from shakenfist import net
 from shakenfist import util
 
