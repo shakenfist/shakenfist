@@ -55,9 +55,9 @@ def handle(jobname, workitem):
 
     except Exception as e:
         if instance_uuid:
-            db.enqueue_delete(config.parsed.get('NODE_NAME'),
-                              instance_uuid, 'error',
-                              'failed queue task: %s' % e)
+            db.enqueue_instance_delete(config.parsed.get('NODE_NAME'),
+                                       instance_uuid, 'error',
+                                       'failed queue task: %s' % e)
 
     finally:
         db.resolve(config.parsed.get('NODE_NAME'), jobname)
@@ -94,7 +94,7 @@ def instance_start(instance_uuid, network):
             if netdesc['network_uuid'] not in nets:
                 n = net.from_db(netdesc['network_uuid'])
                 if not n:
-                    db.enqueue_delete(
+                    db.enqueue_instance_delete(
                         config.parsed.get('NODE_NAME'), instance_uuid, 'error',
                         'missing network')
                     return
@@ -120,7 +120,7 @@ def instance_start(instance_uuid, network):
             code = e.get_error_code()
             if code in (libvirt.VIR_ERR_CONFIG_UNSUPPORTED,
                         libvirt.VIR_ERR_XML_ERROR):
-                db.enqueue_delete(
+                db.enqueue_instance_delete(
                     config.parsed.get('NODE_NAME'), instance_uuid, 'error',
                     'instance failed to start')
                 return

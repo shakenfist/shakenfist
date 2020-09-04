@@ -465,7 +465,7 @@ class Instance(object):
 
     def power_on(self):
         if not os.path.exists(self.xml_file):
-            db.enqueue_delete(
+            db.enqueue_instance_delete(
                 config.parsed.get('NODE_NAME'), self.db_entry['uuid'], 'error',
                 'missing domain file in power on')
 

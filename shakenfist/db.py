@@ -510,7 +510,7 @@ def enqueue(queuename, workitem):
     etcd.enqueue(queuename, workitem)
 
 
-def enqueue_delete(node, instance_uuid, next_state, next_state_message):
+def enqueue_instance_delete(node, instance_uuid, next_state, next_state_message):
     enqueue(node, {
         'tasks': [{
             'type': 'instance_delete',
@@ -519,7 +519,6 @@ def enqueue_delete(node, instance_uuid, next_state, next_state_message):
         }],
         'instance_uuid': instance_uuid
     })
-    add_event('instance', instance_uuid, 'delete', 'enqueued', None, None)
 
 
 def dequeue(queuename):
