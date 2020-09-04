@@ -18,6 +18,10 @@ class LowResourceException(SchedulerException):
     pass
 
 
+class AbortInstanceStartException(SchedulerException):
+    pass
+
+
 class DatabaseException(Exception):
     pass
 

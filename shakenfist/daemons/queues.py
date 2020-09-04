@@ -11,6 +11,7 @@ from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import images
 from shakenfist import net
+from shakenfist import scheduler
 from shakenfist import util
 from shakenfist import virt
 
@@ -39,10 +40,15 @@ def handle(jobname, workitem):
                 image_fetch(task.get('url'), instance_uuid)
 
             if task.get('type') == 'instance_preflight':
-                instance_preflight(instance_uuid)
+                redirect_to = instance_preflight(
+                    instance_uuid, task.get('network'))
+                if redirect_to:
+                    db.place_instance(instance_uuid, redirect_to)
+                    db.enqueue(redirect_to, workitem)
+                    return
 
             if task.get('type') == 'instance_start':
-                instance_start(instance_uuid, workitem.get('network'))
+                instance_start(instance_uuid, task.get('network'))
                 db.update_instance_state(instance_uuid, 'created')
                 db.enqueue('%s-metrics' % config.parsed.get('NODE_NAME'), {})
 
@@ -81,9 +87,31 @@ def image_fetch(url, instance_uuid):
         pass
 
 
-def instance_preflight(instance_uuid):
-    # TODO(mikal): preflight with retries etc
+def instance_preflight(instance_uuid, network):
     db.update_instance_state(instance_uuid, 'preflight')
+
+    s = scheduler.Scheduler()
+
+    try:
+        s.place_instance(
+            instance_uuid, network, candidates=[config.parsed.get('NODE_NAME')])
+        return None
+
+    except exceptions.LowResourceException as e:
+        db.add_event('instance', instance_uuid,
+                     'schedule', 'retry', None,
+                     'insufficient resources: ' + str(e))
+
+    try:
+        candidates = s.place_instance(instance_uuid, network)
+        return candidates[0]
+
+    except exceptions.LowResourceException as e:
+        db.add_event('instance', instance_uuid,
+                     'schedule', 'failed', None,
+                     'insufficient resources: ' + str(e))
+        # This raise implies delete above
+        raise exceptions.AbortInstanceStartException()
 
 
 def instance_start(instance_uuid, network):

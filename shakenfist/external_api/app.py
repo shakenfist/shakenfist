@@ -714,7 +714,7 @@ class Instances(Resource):
 
         else:
             try:
-                candidates = SCHEDULER.place_instance(
+                SCHEDULER.place_instance(
                     instance, network, candidates=[placed_on])
                 placement = placed_on
 
@@ -740,18 +740,17 @@ class Instances(Resource):
 
         # Create a queue entry for the instance start
         tasks = [{'type': 'instance_preflight',
-                  'instance_uuid': instance_uuid}]
+                  'instance_uuid': instance_uuid,
+                  'network': network}]
         for disk in instance.db_entry['block_devices']['devices']:
             if 'base' in disk and disk['base']:
                 tasks.append(
                     {'type': 'image_fetch', 'instance_uuid': instance_uuid, 'url': disk['base']})
         tasks.append({'type': 'instance_start',
-                      'instance_uuid': instance_uuid})
+                      'instance_uuid': instance_uuid,
+                      'network': network})
 
-        db.enqueue(config.parsed.get('NODE_NAME'), {
-            'tasks': tasks,
-            'network': network
-        })
+        db.enqueue(config.parsed.get('NODE_NAME'), {'tasks': tasks})
         db.add_event('instance', instance_uuid,
                      'create', 'enqueued', None, None)
 
