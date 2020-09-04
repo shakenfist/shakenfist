@@ -514,10 +514,10 @@ def enqueue_instance_delete(node, instance_uuid, next_state, next_state_message)
     enqueue(node, {
         'tasks': [{
             'type': 'instance_delete',
+            'instance_uuid': instance_uuid,
             'next_state': next_state,
             'next_state_message': next_state_message
         }],
-        'instance_uuid': instance_uuid
     })
 
 

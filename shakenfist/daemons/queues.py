@@ -22,9 +22,11 @@ def handle(jobname, workitem):
     setproctitle.setproctitle(
         '%s-%s' % (daemon.process_name('queues'), jobname))
 
-    instance_uuid = workitem.get('instance_uuid')
+    instance_uuid = None
     try:
         for task in workitem.get('tasks', []):
+            instance_uuid = task.get('instance_uuid')
+
             if task.get('type').startswith('instance_') and not instance_uuid:
                 LOG.error('Instance task lacks instance uuid: %s' % workitem)
                 return

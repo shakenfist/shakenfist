@@ -739,15 +739,17 @@ class Instances(Resource):
                      'placement', None, None, placement)
 
         # Create a queue entry for the instance start
-        tasks = [{'type': 'instance_preflight'}]
+        tasks = [{'type': 'instance_preflight',
+                  'instance_uuid': instance_uuid}]
         for disk in instance.db_entry['block_devices']['devices']:
             if 'base' in disk and disk['base']:
-                tasks.append({'type': 'image_fetch', 'url': disk['base']})
-        tasks.append({'type': 'instance_start'})
+                tasks.append(
+                    {'type': 'image_fetch', 'instance_uuid': instance_uuid, 'url': disk['base']})
+        tasks.append({'type': 'instance_start',
+                      'instance_uuid': instance_uuid})
 
         db.enqueue(config.parsed.get('NODE_NAME'), {
             'tasks': tasks,
-            'instance_uuid': instance_uuid,
             'network': network
         })
         db.add_event('instance', instance_uuid,
