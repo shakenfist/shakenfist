@@ -785,6 +785,7 @@ class Instances(Resource):
             namespace = get_jwt_identity()
 
         instances_del = []
+        tasks_by_node = {}
         for instance in list(db.get_instances(all=all, namespace=namespace)):
             if instance['state'] in ['deleted', 'error']:
                 continue
@@ -795,8 +796,17 @@ class Instances(Resource):
             else:
                 node = instance['node']
 
-            db.enqueue_instance_delete(node, instance['uuid'], 'deleted', None)
+            tasks_by_node.setdefault(node, [])
+            tasks_by_node[node].append({
+                'type': 'instance_delete',
+                'instance_uuid': instance['uuid'],
+                'next_state': 'deleted',
+                'next_state_message': None
+            })
             instances_del.append(instance['uuid'])
+
+        for node in tasks_by_node:
+            db.enqueue(node, {'tasks': tasks_by_node[node]})
 
         waiting_for = copy.copy(instances_del)
         start_time = time.time()
