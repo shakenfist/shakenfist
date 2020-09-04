@@ -9,6 +9,7 @@ import uuid
 
 from shakenfist import config
 from shakenfist import etcd
+from shakenfist import exceptions
 from shakenfist import ipmanager
 from shakenfist import util
 
@@ -524,7 +525,7 @@ def enqueue_delete(node, instance_uuid, next_state, next_state_message):
 def dequeue(queuename):
     try:
         return etcd.dequeue(queuename)
-    except etcd.LockException:
+    except exceptions.LockException:
         # We didn't acquire the lock, we should just try again later. This probably
         # indicates congestion.
         return None, None

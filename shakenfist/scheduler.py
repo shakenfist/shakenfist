@@ -7,22 +7,10 @@ import time
 
 from shakenfist import config
 from shakenfist import db
-from shakenfist import etcd
+from shakenfist import exceptions
 from shakenfist import util
 
 LOG = logging.getLogger(__name__)
-
-
-class SchedulerException(Exception):
-    pass
-
-
-class CandidateNodeNotFoundException(SchedulerException):
-    pass
-
-
-class LowResourceException(SchedulerException):
-    pass
 
 
 class Scheduler(object):
@@ -36,7 +24,7 @@ class Scheduler(object):
             node_name = node['fqdn']
             try:
                 metrics[node_name] = db.get_metrics(node_name)
-            except etcd.ReadException:
+            except exceptions.ReadException:
                 pass
 
         self.metrics = metrics
@@ -151,7 +139,7 @@ class Scheduler(object):
                              'Forced candidates', None, str(candidates))
                 for node in candidates:
                     if node not in self.metrics:
-                        raise CandidateNodeNotFoundException(node)
+                        raise exceptions.CandidateNodeNotFoundException(node)
             else:
                 candidates = []
                 for node in self.metrics.keys():
@@ -161,7 +149,7 @@ class Scheduler(object):
             db.add_event('instance', instance.db_entry['uuid'], 'schedule',
                          'Initial candidates', None, str(candidates))
             if not candidates:
-                raise LowResourceException('No nodes with metrics')
+                raise exceptions.LowResourceException('No nodes with metrics')
 
             # Can we host that many vCPUs?
             for node in copy.copy(candidates):
@@ -173,7 +161,7 @@ class Scheduler(object):
             db.add_event('instance', instance.db_entry['uuid'], 'schedule',
                          'Have enough actual CPU', None, str(candidates))
             if not candidates:
-                raise LowResourceException(
+                raise exceptions.LowResourceException(
                     'Requested vCPUs exceeds vCPU limit')
 
             # Do we have enough idle CPU?
@@ -186,7 +174,8 @@ class Scheduler(object):
             db.add_event('instance', instance.db_entry['uuid'], 'schedule',
                          'Have enough idle CPU', None, str(candidates))
             if not candidates:
-                raise LowResourceException('No nodes with enough idle CPU')
+                raise exceptions.LowResourceException(
+                    'No nodes with enough idle CPU')
 
             # Do we have enough idle RAM?
             for node in copy.copy(candidates):
@@ -198,7 +187,8 @@ class Scheduler(object):
             db.add_event('instance', instance.db_entry['uuid'], 'schedule',
                          'Have enough idle RAM', None, str(candidates))
             if not candidates:
-                raise LowResourceException('No nodes with enough idle RAM')
+                raise exceptions.LowResourceException(
+                    'No nodes with enough idle RAM')
 
             # Do we have enough idle disk?
             for node in copy.copy(candidates):
@@ -209,7 +199,8 @@ class Scheduler(object):
             db.add_event('instance', instance.db_entry['uuid'], 'schedule',
                          'Have enough idle disk', None, str(candidates))
             if not candidates:
-                raise LowResourceException('No nodes with enough disk space')
+                raise exceptions.LowResourceException(
+                    'No nodes with enough disk space')
 
             # What nodes have the highest number of networks already present?
             if network:

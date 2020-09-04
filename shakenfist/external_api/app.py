@@ -33,6 +33,7 @@ import uuid
 
 from shakenfist import config
 from shakenfist import db
+from shakenfist import exceptions
 from shakenfist import net
 from shakenfist import scheduler
 from shakenfist import util
@@ -699,7 +700,7 @@ class Instances(Resource):
             try:
                 candidates = SCHEDULER.place_instance(instance, network)
 
-            except scheduler.LowResourceException as e:
+            except exceptions.LowResourceException as e:
                 db.add_event('instance', instance_uuid,
                              'schedule', 'failed', None,
                              'insufficient resources: ' + str(e))
@@ -716,7 +717,7 @@ class Instances(Resource):
                     instance, network, candidates=[placed_on])
                 placement = placed_on
 
-            except scheduler.LowResourceException as e:
+            except exceptions.LowResourceException as e:
                 db.add_event('instance', instance_uuid,
                              'schedule', 'failed', None,
                              'insufficient resources: ' + str(e))
@@ -725,7 +726,7 @@ class Instances(Resource):
                     'scheduling failed')
                 return error(507, str(e))
 
-            except scheduler.CandidateNodeNotFoundException as e:
+            except exceptions.CandidateNodeNotFoundException as e:
                 db.enqueue_delete(config.get.parsed(
                     'NODE_NAME'), instance_uuid, 'error',
                     'scheduling failed')

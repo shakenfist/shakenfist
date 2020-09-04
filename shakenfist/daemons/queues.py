@@ -8,7 +8,7 @@ import time
 from shakenfist import config
 from shakenfist.daemons import daemon
 from shakenfist import db
-from shakenfist import etcd
+from shakenfist import exceptions
 from shakenfist import images
 from shakenfist import net
 from shakenfist import util
@@ -75,7 +75,7 @@ def image_fetch(url, instance_uuid):
             instance = virt.from_db(instance_uuid)
         images.get_image(url, [], instance,
                          timeout=images.IMAGE_FETCH_LOCK_TIMEOUT)
-    except etcd.LockException:
+    except exceptions.LockException:
         pass
 
 

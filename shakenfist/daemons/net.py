@@ -1,11 +1,10 @@
-import etcd3
 import logging
 import time
 
 from shakenfist import config
 from shakenfist.daemons import daemon
 from shakenfist import db
-from shakenfist import etcd
+from shakenfist import exceptions
 from shakenfist import net
 from shakenfist import util
 
@@ -68,7 +67,7 @@ class Monitor(daemon.Daemon):
                 n.ensure_mesh()
                 seen_vxids.append(n.vxlan_id)
 
-            except etcd.LockException as e:
+            except exceptions.LockException as e:
                 LOG.info(
                     'Failed to acquire lock while maintaining networks: %s' % e)
 
@@ -158,7 +157,7 @@ class Monitor(daemon.Daemon):
                     self._maintain_networks()
                     last_management = time.time()
 
-            except etcd3.exceptions.ConnectionFailedError:
+            except exceptions.ConnectionFailedError:
                 LOG.info('Failed to connect to etcd.')
                 time.sleep(1)
 

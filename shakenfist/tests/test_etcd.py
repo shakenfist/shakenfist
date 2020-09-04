@@ -2,6 +2,7 @@ import mock
 import testtools
 
 from shakenfist import etcd
+from shakenfist import exceptions
 
 
 class ActualLockTestCase(testtools.TestCase):
@@ -18,7 +19,7 @@ class ActualLockTestCase(testtools.TestCase):
     @mock.patch('etcd3.Lock.acquire', return_value=False)
     @mock.patch('etcd3.Lock.__exit__')  # Avoids confounding error on test fail
     def test_context_exception(self, mock_exit, mock_acquire):
-        with testtools.ExpectedException(etcd.LockException):
+        with testtools.ExpectedException(exceptions.LockException):
             with etcd.ActualLock(name='testname'):
                 pass
 

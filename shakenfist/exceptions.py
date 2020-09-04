@@ -4,3 +4,31 @@ class HTTPError(Exception):
 
 class VersionSpecificationError(Exception):
     pass
+
+
+class SchedulerException(Exception):
+    pass
+
+
+class CandidateNodeNotFoundException(SchedulerException):
+    pass
+
+
+class LowResourceException(SchedulerException):
+    pass
+
+
+class DatabaseException(Exception):
+    pass
+
+
+class LockException(DatabaseException):
+    pass
+
+
+class WriteException(DatabaseException):
+    pass
+
+
+class ReadException(DatabaseException):
+    pass
