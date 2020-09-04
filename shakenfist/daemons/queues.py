@@ -53,11 +53,11 @@ def handle(jobname, workitem):
                         instance_uuid, task.get('next_state_message'))
                 db.enqueue('%s-metrics' % config.parsed.get('NODE_NAME'), {})
 
-    except:
+    except Exception as e:
         if instance_uuid:
             db.enqueue_delete(config.parsed.get('NODE_NAME'),
                               instance_uuid, 'error',
-                              'failed queue task')
+                              'failed queue task: %s' % e)
 
     finally:
         db.resolve(config.parsed.get('NODE_NAME'), jobname)

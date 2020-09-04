@@ -95,7 +95,7 @@ def _get_stats():
     for guest in conn.listAllDomains():
         try:
             active = guest.isActive() == 1
-        except:
+        except Exception:
             active = False
 
         _, maxmem, mem, cpus, cpu_time = guest.info()
