@@ -157,7 +157,7 @@ class LowResourceTestCase(SchedulerTestCase):
                                {'size': 21, 'base': 'some-os'}
                            ]})
 
-        exc = self.assertRaises(scheduler.LowResourceException,
+        exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().place_instance,
                                 fake_inst,
                                 [])
@@ -179,7 +179,7 @@ class LowResourceTestCase(SchedulerTestCase):
                                {'size': 21, 'base': 'some-os'}
                            ]})
 
-        exc = self.assertRaises(scheduler.LowResourceException,
+        exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().place_instance,
                                 fake_inst,
                                 [])
@@ -200,7 +200,7 @@ class LowResourceTestCase(SchedulerTestCase):
                                {'size': 21, 'base': 'some-os'}
                            ]})
 
-        exc = self.assertRaises(scheduler.LowResourceException,
+        exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().place_instance,
                                 fake_inst,
                                 [])
