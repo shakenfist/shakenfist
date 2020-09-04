@@ -104,7 +104,13 @@ def instance_preflight(instance_uuid, network):
                      'insufficient resources: ' + str(e))
 
     try:
-        candidates = s.place_instance(instance, network)
+        if instance.db_entry.get('requested_placement'):
+            candidates = [instance.db_entry.get('requested_placement')]
+        else:
+            candidates = None
+
+        candidates = s.place_instance(instance, network,
+                                      candidates=candidates)
         return candidates[0]
 
     except exceptions.LowResourceException as e:

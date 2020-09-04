@@ -204,7 +204,7 @@ def persist_block_devices(instance_uuid, block_devices):
 
 
 def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key,
-                    user_data, namespace, video):
+                    user_data, namespace, video, requested_placement):
     d = {
         'uuid': instance_uuid,
         'name': name,
@@ -223,7 +223,8 @@ def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key,
         'power_state': 'initial',
         'video': video,
         'node_history': [],
-        'error_message': None
+        'error_message': None,
+        'requested_placement': None,
     }
     etcd.put('instance', None, instance_uuid, d)
     return d

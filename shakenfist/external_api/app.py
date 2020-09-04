@@ -651,7 +651,8 @@ class Instances(Resource):
                 ssh_key=ssh_key,
                 user_data=user_data,
                 owner=namespace,
-                video=video
+                video=video,
+                requested_placement=placed_on
             )
 
         # Initialise metadata
