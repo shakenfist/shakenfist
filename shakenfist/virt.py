@@ -264,7 +264,8 @@ class Instance(object):
                 self.power_off()
 
                 instance = self._get_domain()
-                instance.undefine()
+                if instance:
+                    instance.undefine()
             except Exception as e:
                 util.ignore_exception('instance delete', e)
 
