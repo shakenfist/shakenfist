@@ -573,7 +573,7 @@ class Instance(Resource):
         start_time = time.time()
         while time.time() - start_time < config.parsed.get('API_ASYNC_WAIT'):
             i = db.get_instance(instance_uuid)
-            if i['state'] == 'deleted':
+            if i['state'] in ['deleted', 'error']:
                 return
 
             time.sleep(0.5)
@@ -786,7 +786,7 @@ class Instances(Resource):
 
         instances_del = []
         for instance in list(db.get_instances(all=all, namespace=namespace)):
-            if instance['state'] == 'deleted':
+            if instance['state'] in ['deleted', 'error']:
                 continue
 
             # If this instance is not on a node, just do the DB cleanup locally
@@ -803,7 +803,7 @@ class Instances(Resource):
         while (waiting_for and (time.time() - start_time < config.parsed.get('API_ASYNC_WAIT'))):
             for instance_uuid in copy.copy(waiting_for):
                 i = db.get_instance(instance_uuid)
-                if i['state'] == 'deleted':
+                if i['state'] in ['deleted', 'error']:
                     waiting_for.remove(instance_uuid)
 
         return instances_del
@@ -1137,7 +1137,7 @@ class Network(Resource):
             return error(403, 'you cannot delete an in use network')
 
         # Check if network has already been deleted
-        if network_from_db['state'] == 'deleted':
+        if network_from_db['state'] in 'deleted':
             return error(404, 'network not found')
 
         _delete_network(network_from_db)
