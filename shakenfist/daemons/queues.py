@@ -91,10 +91,11 @@ def instance_preflight(instance_uuid, network):
     db.update_instance_state(instance_uuid, 'preflight')
 
     s = scheduler.Scheduler()
+    instance = virt.from_db(instance_uuid)
 
     try:
         s.place_instance(
-            instance_uuid, network, candidates=[config.parsed.get('NODE_NAME')])
+            instance, network, candidates=[config.parsed.get('NODE_NAME')])
         return None
 
     except exceptions.LowResourceException as e:
@@ -103,7 +104,7 @@ def instance_preflight(instance_uuid, network):
                      'insufficient resources: ' + str(e))
 
     try:
-        candidates = s.place_instance(instance_uuid, network)
+        candidates = s.place_instance(instance, network)
         return candidates[0]
 
     except exceptions.LowResourceException as e:
