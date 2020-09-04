@@ -155,7 +155,7 @@ def instance_start(instance_uuid, network):
                     'instance failed to start')
                 return
 
-        for iface in db.get_instance_interfaces(instance.db_entry['uuid']):
+        for iface in db.get_instance_interfaces(instance_uuid):
             db.update_network_interface_state(iface['uuid'], 'created')
 
 
