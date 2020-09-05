@@ -14,7 +14,25 @@ on:
       - v*-devel
 
 jobs:
-  build:
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code with two commits
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          sudo apt-get install -y -q tox
+
+      - name: Lint with flake8
+        run: |
+          tox -eflake8
+          
+  build37:
     runs-on: ubuntu-latest
 
     steps:
@@ -33,10 +51,6 @@ jobs:
           python -m pip install --upgrade pip
           sudo apt-get install -y -q tox
 
-      - name: Lint with flake8
-        run: |
-          tox -eflake8
-
       - name: Test with python 3.7
         run: |
           tox -epy37
@@ -48,3 +62,34 @@ jobs:
       - name: Test with python 3.7 again again
         run: |
           tox -epy37
+          
+  build38:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code with two commits
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
+
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          sudo apt-get install -y -q tox
+
+      - name: Test with python 3.8
+        run: |
+          tox -epy38
+
+      - name: Test with python 3.8 again
+        run: |
+          tox -epy38
+
+      - name: Test with python 3.8 again again
+        run: |
+          tox -epy38
