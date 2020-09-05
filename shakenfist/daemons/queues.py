@@ -103,6 +103,10 @@ def instance_preflight(instance_uuid, network):
                      'schedule', 'retry', None,
                      'insufficient resources: ' + str(e))
 
+    if instance.db_entry.get('placement_attempts') > 3:
+        raise exceptions.AbortInstanceStartException(
+            'Too many start attempts.')
+
     try:
         if instance.db_entry.get('requested_placement'):
             candidates = [instance.db_entry.get('requested_placement')]
@@ -118,7 +122,8 @@ def instance_preflight(instance_uuid, network):
                      'schedule', 'failed', None,
                      'insufficient resources: ' + str(e))
         # This raise implies delete above
-        raise exceptions.AbortInstanceStartException()
+        raise exceptions.AbortInstanceStartException(
+            'Unable to find suitable node')
 
 
 def instance_start(instance_uuid, network):

@@ -41,6 +41,7 @@ class DBTestCase(testtools.TestCase):
                  'node_history': [],
                  'error_message': None,
                  'requested_placement': None,
+                 'placement_attempts': 0,
              }),
             etcd_write)
 

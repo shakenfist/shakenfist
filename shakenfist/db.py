@@ -225,6 +225,7 @@ def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key,
         'node_history': [],
         'error_message': None,
         'requested_placement': None,
+        'placement_attempts': 0,
     }
     etcd.put('instance', None, instance_uuid, d)
     return d
@@ -238,6 +239,7 @@ def place_instance(instance_uuid, node):
         return
 
     i['node'] = node
+    i['placement_attempts'] = i.get('placement_attempts', 0) + 1
     etcd.put('instance', None, instance_uuid, i)
 
 
