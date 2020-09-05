@@ -84,12 +84,12 @@ jobs:
 
       - name: Test with python 3.8
         run: |
-          tox -epy38
+          tox -epy3
 
       - name: Test with python 3.8 again
         run: |
-          tox -epy38
+          tox -epy3
 
       - name: Test with python 3.8 again again
         run: |
-          tox -epy38
+          tox -epy3
