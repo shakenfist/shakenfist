@@ -52,7 +52,7 @@ CONFIG_DEFAULTS = {
     #    Kernel Shared Memory (KSM) is enabled, how much to overcommit memory
     #    because of shared pages.
     #  - ram_system_reservation: how much RAM is reserved for the OS
-    'SCHEDULER_CACHE_TIMEOUT': 30,
+    'SCHEDULER_CACHE_TIMEOUT': 5,
     'CPU_OVERCOMMIT_RATIO': 16,
     'RAM_OVERCOMMIT_RATIO': 1.5,
     'RAM_SYSTEM_RESERVATION': 5.0,

@@ -25,9 +25,9 @@ LOG = logging.getLogger(__name__)
 
 def from_definition(uuid=None, name=None, disks=None, memory_mb=None,
                     vcpus=None, ssh_key=None, user_data=None, owner=None,
-                    video=None):
+                    video=None, requested_placement=None):
     db_entry = db.create_instance(uuid, name, vcpus, memory_mb, disks,
-                                  ssh_key, user_data, owner, video)
+                                  ssh_key, user_data, owner, video, requested_placement)
     return Instance(db_entry)
 
 
@@ -264,7 +264,8 @@ class Instance(object):
                 self.power_off()
 
                 instance = self._get_domain()
-                instance.undefine()
+                if instance:
+                    instance.undefine()
             except Exception as e:
                 util.ignore_exception('instance delete', e)
 
@@ -464,6 +465,11 @@ class Instance(object):
             return None
 
     def power_on(self):
+        if not os.path.exists(self.xml_file):
+            db.enqueue_instance_delete(
+                config.parsed.get('NODE_NAME'), self.db_entry['uuid'], 'error',
+                'missing domain file in power on')
+
         libvirt = util.get_libvirt()
         with open(self.xml_file) as f:
             xml = f.read()
@@ -490,16 +496,9 @@ class Instance(object):
 
     def power_off(self):
         libvirt = util.get_libvirt()
-        with open(self.xml_file) as f:
-            xml = f.read()
-
         instance = self._get_domain()
         if not instance:
-            conn = libvirt.open(None)
-            instance = conn.defineXML(xml)
-            if not instance:
-                LOG.error('%s: Failed to create libvirt domain' % self)
-                return
+            return
 
         try:
             instance.destroy()

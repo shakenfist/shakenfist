@@ -123,7 +123,8 @@ class CleanerTestCase(testtools.TestCase):
                               'power_state_previous': 'unknown',
                               'power_state': 'on',
                               'power_state_updated': 7,
-                              'video': {'memory': 16384, 'model': 'cirrus'}
+                              'video': {'memory': 16384, 'model': 'cirrus'},
+                              'error_message': None,
                           }),
                 mock.call('instance', None, 'shutoff',
                           {
@@ -132,7 +133,8 @@ class CleanerTestCase(testtools.TestCase):
                               'power_state_previous': 'unknown',
                               'power_state': 'off',
                               'power_state_updated': 7,
-                              'video': {'memory': 16384, 'model': 'cirrus'}
+                              'video': {'memory': 16384, 'model': 'cirrus'},
+                              'error_message': None,
                           }),
                 mock.call('instance', None, 'crashed',
                           {
@@ -143,7 +145,8 @@ class CleanerTestCase(testtools.TestCase):
                               'power_state_updated': 7,
                               'state': 'error',
                               'state_updated': 7,
-                              'video': {'memory': 16384, 'model': 'cirrus'}
+                              'video': {'memory': 16384, 'model': 'cirrus'},
+                              'error_message': None,
                           }),
                 mock.call('instance', None, 'crashed',
                           {
@@ -154,7 +157,8 @@ class CleanerTestCase(testtools.TestCase):
                               'power_state_updated': 7,
                               'state': 'error',
                               'state_updated': 7,
-                              'video': {'memory': 16384, 'model': 'cirrus'}
+                              'video': {'memory': 16384, 'model': 'cirrus'},
+                              'error_message': None,
                           }),
                 mock.call('instance', None, 'paused',
                           {
@@ -163,7 +167,8 @@ class CleanerTestCase(testtools.TestCase):
                               'power_state_previous': 'unknown',
                               'power_state': 'paused',
                               'power_state_updated': 7,
-                              'video': {'memory': 16384, 'model': 'cirrus'}
+                              'video': {'memory': 16384, 'model': 'cirrus'},
+                              'error_message': None,
                           }),
                 mock.call('instance', None, 'suspended',
                           {
@@ -172,7 +177,8 @@ class CleanerTestCase(testtools.TestCase):
                               'power_state_previous': 'unknown',
                               'power_state': 'paused',
                               'power_state_updated': 7,
-                              'video': {'memory': 16384, 'model': 'cirrus'}
+                              'video': {'memory': 16384, 'model': 'cirrus'},
+                              'error_message': None,
                           }),
                 mock.call('instance', None, 'foo',
                           {
@@ -181,7 +187,8 @@ class CleanerTestCase(testtools.TestCase):
                               'power_state_previous': 'unknown',
                               'power_state': 'off',
                               'power_state_updated': 7,
-                              'video': {'memory': 16384, 'model': 'cirrus'}
+                              'video': {'memory': 16384, 'model': 'cirrus'},
+                              'error_message': None,
                           }),
                 mock.call('instance', None, 'bar',
                           {
@@ -190,7 +197,8 @@ class CleanerTestCase(testtools.TestCase):
                               'power_state_previous': 'unknown',
                               'power_state': 'off',
                               'power_state_updated': 7,
-                              'video': {'memory': 16384, 'model': 'cirrus'}
+                              'video': {'memory': 16384, 'model': 'cirrus'},
+                              'error_message': None,
                           }),
                 mock.call('instance', None, 'nofiles',
                           {
@@ -198,7 +206,8 @@ class CleanerTestCase(testtools.TestCase):
                               'node': 'abigcomputer',
                               'state': 'error',
                               'state_updated': 7,
-                              'video': {'memory': 16384, 'model': 'cirrus'}
+                              'video': {'memory': 16384, 'model': 'cirrus'},
+                              'error_message': None,
                           })
             ],
             mock_put.mock_calls)

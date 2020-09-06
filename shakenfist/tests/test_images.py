@@ -135,7 +135,8 @@ class ImagesTestCase(testtools.TestCase):
                 })
     @mock.patch('os.makedirs')
     def test_does_not_require_fetch(self, mock_mkdirs, mock_read_info, mock_request_head):
-        info, dirty_fields, _ = images.requires_fetch('http://example.com')
+        info, dirty_fields, _ = images.requires_fetch(
+            'http://example.com', 'hashed1', 'hashed2')
         self.assertEqual(0, info['version'])
         self.assertEqual({}, dirty_fields)
 
@@ -153,7 +154,8 @@ class ImagesTestCase(testtools.TestCase):
                 })
     @mock.patch('os.makedirs')
     def test_requires_fetch(self, mock_mkdirs, mock_read_info, mock_request_head):
-        info, dirty_fields, _ = images.requires_fetch('http://example.com')
+        info, dirty_fields, _ = images.requires_fetch(
+            'http://example.com', 'hashed1', 'hashed2')
         self.assertEqual(0, info['version'])
         self.assertEqual({
             'Last-Modified': {'after': 'Tue, 10 Sep 2019 07:24:40 GMT',
@@ -170,7 +172,8 @@ class ImagesTestCase(testtools.TestCase):
                              'Content-Length': 200000}))
     def test_fetch_image_new(self, mock_get, mock_makedirs,
                              mock_exists, mock_config):
-        _, dirty_fields, _ = images.requires_fetch('http://example.com')
+        _, dirty_fields, _ = images.requires_fetch(
+            'http://example.com', 'hashed1', 'hashed2')
         self.assertEqual({
             'Content-Length': {'after': 200000, 'before': None},
             'Last-Modified': {'after': 'Tue, 10 Sep 2019 07:24:40 GMT', 'before': None}
@@ -193,7 +196,8 @@ class ImagesTestCase(testtools.TestCase):
         mock_open = mock.mock_open()
         with mock.patch.object(six.moves.builtins, 'open',
                                new=mock_open):
-            _, dirty_fields, _ = images.requires_fetch('http://example.com')
+            _, dirty_fields, _ = images.requires_fetch(
+                'http://example.com', 'hashed1', 'hashed2')
         self.assertEqual({}, dirty_fields)
 
     @mock.patch('shakenfist.config.parsed.get', return_value='/a/b/c')
@@ -208,7 +212,8 @@ class ImagesTestCase(testtools.TestCase):
                 return_value=(None, None))
     def test_fetch_image_changed(self, mock_execute, mock_read_info, mock_makedirs,
                                  mock_exists, mock_config):
-        _, image_dirty, _ = images.requires_fetch('http://example.com')
+        _, image_dirty, _ = images.requires_fetch(
+            'http://example.com', 'hashed1', 'hashed2')
         self.assertEqual({
             'Content-Length': {'after': '648', 'before': 100000},
             'Last-Modified': {'after': 'Thu, 17 Oct 2019 07:18:26 GMT',

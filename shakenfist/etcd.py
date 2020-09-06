@@ -5,6 +5,7 @@ import time
 
 from shakenfist import config
 from shakenfist import db
+from shakenfist import exceptions
 
 ####################################################################
 # Please do not call this file directly, but instead call it via   #
@@ -19,18 +20,6 @@ ETCD_ATTEMPTS = 5
 ETCD_ATTEMPT_DELAY = 0.5
 
 
-class LockException(Exception):
-    pass
-
-
-class WriteException(Exception):
-    pass
-
-
-class ReadException(Exception):
-    pass
-
-
 class ActualLock(etcd3.Lock):
     def __init__(self, name, ttl=60, etcd_client=None, timeout=10):
         super(ActualLock, self).__init__(name, ttl, etcd_client)
@@ -42,13 +31,14 @@ class ActualLock(etcd3.Lock):
         for attempt in range(ETCD_ATTEMPTS):
             try:
                 if not self.acquire(timeout=self.timeout):
-                    raise LockException('Cannot acquire lock: %s' % self.name)
+                    raise exceptions.LockException(
+                        'Cannot acquire lock: %s' % self.name)
                 return self
 
             except etcd3.exceptions.ConnectionFailedError:
                 time.sleep(ETCD_ATTEMPT_DELAY)
 
-        raise LockException('Could not acquire lock after retries.')
+        raise exceptions.LockException('Could not acquire lock after retries.')
 
 
 def get_lock(objecttype, subtype, name, ttl=60, timeout=10):
@@ -92,7 +82,7 @@ def put(objecttype, subtype, name, data, ttl=None):
         finally:
             LOG.debug('Wrote etcd key "%s"' % path)
 
-    raise WriteException('Cannot write "%s"' % path)
+    raise exceptions.WriteException('Cannot write "%s"' % path)
 
 
 def get(objecttype, subtype, name):
@@ -109,7 +99,7 @@ def get(objecttype, subtype, name):
         finally:
             LOG.debug('Read etcd key "%s"' % path)
 
-    raise ReadException('Cannot read "%s"' % path)
+    raise exceptions.ReadException('Cannot read "%s"' % path)
 
 
 def get_all(objecttype, subtype, sort_order=None):
@@ -126,7 +116,7 @@ def get_all(objecttype, subtype, sort_order=None):
         finally:
             LOG.debug('Searched etcd range "%s"' % path)
 
-    raise ReadException('Cannot fetch all "%s"' % path)
+    raise exceptions.ReadException('Cannot fetch all "%s"' % path)
 
 
 def delete(objecttype, subtype, name):
@@ -142,7 +132,7 @@ def delete(objecttype, subtype, name):
         finally:
             LOG.debug('Deleted etcd key "%s"' % path)
 
-    raise WriteException('Cannot delete "%s"' % path)
+    raise exceptions.WriteException('Cannot delete "%s"' % path)
 
 
 def delete_all(objecttype, subtype, sort_order=None):
@@ -158,7 +148,7 @@ def delete_all(objecttype, subtype, sort_order=None):
         finally:
             LOG.debug('Deleted etcd range "%s"' % path)
 
-    raise WriteException('Cannot delete all "%s"' % path)
+    raise exceptions.WriteException('Cannot delete all "%s"' % path)
 
 
 def enqueue(queuename, workitem):
@@ -226,3 +216,43 @@ def resolve(queuename, jobname):
             LOG.info('Failed to resolve workitem %s for %s, attempt %d: %s'
                      % (jobname, queuename, attempt, e))
             time.sleep(ETCD_ATTEMPT_DELAY)
+
+
+def get_queue_length(queuename):
+    for attempt in range(ETCD_ATTEMPTS):
+        try:
+            queued = len(list(get_all('queue', queuename)))
+            processing = len(list(get_all('processing', queuename)))
+            return processing, queued
+
+        except Exception as e:
+            LOG.info('Failed to calculate queue length for %s, attempt %d: %s'
+                     % (queuename, attempt, e))
+            time.sleep(ETCD_ATTEMPT_DELAY)
+
+
+def _restart_queue(queuename):
+    for attempt in range(ETCD_ATTEMPTS):
+        try:
+            with get_lock('queue', None, queuename):
+                client = etcd3.client()
+                queue_path = _construct_key('processing', queuename, None)
+                for data, metadata in client.get_prefix(queue_path, sort_order='ascend'):
+                    jobname = str(metadata.key).split('/')[-1].rstrip("'")
+                    workitem = json.loads(data)
+                    put('queue', queuename, jobname, workitem)
+                    delete('processing', queuename, jobname)
+                    LOG.warning('Reset %s workitem %s' % (queuename, jobname))
+
+        except Exception as e:
+            LOG.info('Failed to reset queue %s, attempt %d: %s'
+                     % (queuename, attempt, e))
+            time.sleep(ETCD_ATTEMPT_DELAY)
+
+
+def restart_queues():
+    # Move things which were in processing back to the queue because
+    # we didn't complete them before crashing.
+    if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
+        _restart_queue('networknode')
+    _restart_queue(config.parsed.get('NODE_NAME'))

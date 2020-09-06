@@ -8,9 +8,10 @@ import time
 from shakenfist import config
 from shakenfist.daemons import daemon
 from shakenfist import db
-from shakenfist import etcd
+from shakenfist import exceptions
 from shakenfist import images
 from shakenfist import net
+from shakenfist import scheduler
 from shakenfist import util
 from shakenfist import virt
 
@@ -22,9 +23,11 @@ def handle(jobname, workitem):
     setproctitle.setproctitle(
         '%s-%s' % (daemon.process_name('queues'), jobname))
 
-    instance_uuid = workitem.get('instance_uuid')
+    instance_uuid = None
     try:
         for task in workitem.get('tasks', []):
+            instance_uuid = task.get('instance_uuid')
+
             if task.get('type').startswith('instance_') and not instance_uuid:
                 LOG.error('Instance task lacks instance uuid: %s' % workitem)
                 return
@@ -37,16 +40,32 @@ def handle(jobname, workitem):
                 image_fetch(task.get('url'), instance_uuid)
 
             if task.get('type') == 'instance_preflight':
-                instance_preflight(instance_uuid)
+                redirect_to = instance_preflight(
+                    instance_uuid, task.get('network'))
+                if redirect_to:
+                    db.place_instance(instance_uuid, redirect_to)
+                    db.enqueue(redirect_to, workitem)
+                    return
 
             if task.get('type') == 'instance_start':
-                instance_start(instance_uuid, workitem.get('network'))
+                instance_start(instance_uuid, task.get('network'))
                 db.update_instance_state(instance_uuid, 'created')
+                db.enqueue('%s-metrics' % config.parsed.get('NODE_NAME'), {})
 
             if task.get('type') == 'instance_delete':
                 instance_delete(instance_uuid)
                 db.update_instance_state(instance_uuid,
                                          task.get('next_state', 'unknown'))
+                if task.get('next_state_message'):
+                    db.update_instance_error_message(
+                        instance_uuid, task.get('next_state_message'))
+                db.enqueue('%s-metrics' % config.parsed.get('NODE_NAME'), {})
+
+    except Exception as e:
+        if instance_uuid:
+            db.enqueue_instance_delete(config.parsed.get('NODE_NAME'),
+                                       instance_uuid, 'error',
+                                       'failed queue task: %s' % e)
 
     finally:
         db.resolve(config.parsed.get('NODE_NAME'), jobname)
@@ -64,13 +83,42 @@ def image_fetch(url, instance_uuid):
             instance = virt.from_db(instance_uuid)
         images.get_image(url, [], instance,
                          timeout=images.IMAGE_FETCH_LOCK_TIMEOUT)
-    except etcd.LockException:
+    except exceptions.LockException:
         pass
 
 
-def instance_preflight(instance_uuid):
-    # TODO(mikal): preflight with retries etc
+def instance_preflight(instance_uuid, network):
     db.update_instance_state(instance_uuid, 'preflight')
+
+    s = scheduler.Scheduler()
+    instance = virt.from_db(instance_uuid)
+
+    try:
+        s.place_instance(
+            instance, network, candidates=[config.parsed.get('NODE_NAME')])
+        return None
+
+    except exceptions.LowResourceException as e:
+        db.add_event('instance', instance_uuid,
+                     'schedule', 'retry', None,
+                     'insufficient resources: ' + str(e))
+
+    try:
+        if instance.db_entry.get('requested_placement'):
+            candidates = [instance.db_entry.get('requested_placement')]
+        else:
+            candidates = None
+
+        candidates = s.place_instance(instance, network,
+                                      candidates=candidates)
+        return candidates[0]
+
+    except exceptions.LowResourceException as e:
+        db.add_event('instance', instance_uuid,
+                     'schedule', 'failed', None,
+                     'insufficient resources: ' + str(e))
+        # This raise implies delete above
+        raise exceptions.AbortInstanceStartException()
 
 
 def instance_start(instance_uuid, network):
@@ -83,8 +131,9 @@ def instance_start(instance_uuid, network):
             if netdesc['network_uuid'] not in nets:
                 n = net.from_db(netdesc['network_uuid'])
                 if not n:
-                    db.enqueue_delete(
-                        config.parsed.get('NODE_NAME'), instance_uuid, 'error')
+                    db.enqueue_instance_delete(
+                        config.parsed.get('NODE_NAME'), instance_uuid, 'error',
+                        'missing network')
                     return
 
                 nets[netdesc['network_uuid']] = n
@@ -108,11 +157,12 @@ def instance_start(instance_uuid, network):
             code = e.get_error_code()
             if code in (libvirt.VIR_ERR_CONFIG_UNSUPPORTED,
                         libvirt.VIR_ERR_XML_ERROR):
-                db.enqueue_delete(
-                    config.parsed.get('NODE_NAME'), instance_uuid, 'error')
+                db.enqueue_instance_delete(
+                    config.parsed.get('NODE_NAME'), instance_uuid, 'error',
+                    'instance failed to start')
                 return
 
-        for iface in db.get_instance_interfaces(instance.db_entry['uuid']):
+        for iface in db.get_instance_interfaces(instance_uuid):
             db.update_network_interface_state(iface['uuid'], 'created')
 
 
@@ -160,6 +210,10 @@ class Monitor(daemon.Daemon):
         workers = []
         LOG.info('Starting')
 
+        libvirt = util.get_libvirt()
+        conn = libvirt.open(None)
+        present_cpus, _, _ = conn.getCPUMap()
+
         while True:
             try:
                 for w in copy.copy(workers):
@@ -167,7 +221,12 @@ class Monitor(daemon.Daemon):
                         w.join(1)
                         workers.remove(w)
 
-                jobname, workitem = db.dequeue(config.parsed.get('NODE_NAME'))
+                if len(workers) < present_cpus / 2:
+                    jobname, workitem = db.dequeue(
+                        config.parsed.get('NODE_NAME'))
+                else:
+                    workitem = None
+
                 if not workitem:
                     time.sleep(0.2)
                     continue

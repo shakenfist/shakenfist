@@ -33,6 +33,7 @@ import uuid
 
 from shakenfist import config
 from shakenfist import db
+from shakenfist import exceptions
 from shakenfist import net
 from shakenfist import scheduler
 from shakenfist import util
@@ -566,12 +567,13 @@ class Instance(Resource):
         else:
             node = instance_from_db['node']
 
-        db.enqueue_delete(node, instance_from_db['uuid'], 'deleted')
+        db.enqueue_instance_delete(
+            node, instance_from_db['uuid'], 'deleted', None)
 
         start_time = time.time()
         while time.time() - start_time < config.parsed.get('API_ASYNC_WAIT'):
             i = db.get_instance(instance_uuid)
-            if i['state'] == 'deleted':
+            if i['state'] in ['deleted', 'error']:
                 return
 
             time.sleep(0.5)
@@ -649,7 +651,8 @@ class Instances(Resource):
                 ssh_key=ssh_key,
                 user_data=user_data,
                 owner=namespace,
-                video=video
+                video=video,
+                requested_placement=placed_on
             )
 
         # Initialise metadata
@@ -661,8 +664,9 @@ class Instances(Resource):
             for netdesc in network:
                 n = net.from_db(netdesc['network_uuid'])
                 if not n:
-                    db.enqueue_delete(
-                        config.parsed.get('NODE_NAME'), instance_uuid, 'error')
+                    db.enqueue_instance_delete(
+                        config.parsed.get('NODE_NAME'), instance_uuid, 'error',
+                        'missing network %s during IP allocation phase' % netdesc['network_uuid'])
                     return error(
                         404, 'network %s not found' % netdesc['network_uuid'])
 
@@ -675,8 +679,10 @@ class Instances(Resource):
                         netdesc['address'] = ipm.get_random_free_address()
                     else:
                         if not ipm.reserve(netdesc['address']):
-                            db.enqueue_delete(
-                                config.parsed.get('NODE_NAME'), instance_uuid, 'error')
+                            db.enqueue_instance_delete(
+                                config.parsed.get(
+                                    'NODE_NAME'), instance_uuid, 'error',
+                                'failed to reserve an IP on network %s' % netdesc['network_uuid'])
                             return error(409, 'address %s in use' %
                                          netdesc['address'])
 
@@ -696,33 +702,36 @@ class Instances(Resource):
             try:
                 candidates = SCHEDULER.place_instance(instance, network)
 
-            except scheduler.LowResourceException as e:
+            except exceptions.LowResourceException as e:
                 db.add_event('instance', instance_uuid,
                              'schedule', 'failed', None,
                              'insufficient resources: ' + str(e))
-                db.enqueue_delete(config.get.parsed(
-                    'NODE_NAME'), instance_uuid, 'error')
+                db.enqueue_instance_delete(config.get.parsed('NODE_NAME'),
+                                           instance_uuid, 'error',
+                                           'scheduling failed')
                 return error(507, str(e))
 
             placement = candidates[0]
 
         else:
             try:
-                candidates = SCHEDULER.place_instance(
+                SCHEDULER.place_instance(
                     instance, network, candidates=[placed_on])
                 placement = placed_on
 
-            except scheduler.LowResourceException as e:
+            except exceptions.LowResourceException as e:
                 db.add_event('instance', instance_uuid,
                              'schedule', 'failed', None,
                              'insufficient resources: ' + str(e))
-                db.enqueue_delete(config.get.parsed(
-                    'NODE_NAME'), instance_uuid, 'error')
+                db.enqueue_instance_delete(config.get.parsed(
+                    'NODE_NAME'), instance_uuid, 'error',
+                    'scheduling failed')
                 return error(507, str(e))
 
-            except scheduler.CandidateNodeNotFoundException as e:
-                db.enqueue_delete(config.get.parsed(
-                    'NODE_NAME'), instance_uuid, 'error')
+            except exceptions.CandidateNodeNotFoundException as e:
+                db.enqueue_instance_delete(config.get.parsed(
+                    'NODE_NAME'), instance_uuid, 'error',
+                    'scheduling failed')
                 return error(404, 'node not found: %s' % e)
 
         # Record placement
@@ -731,17 +740,18 @@ class Instances(Resource):
                      'placement', None, None, placement)
 
         # Create a queue entry for the instance start
-        tasks = [{'type': 'instance_preflight'}]
+        tasks = [{'type': 'instance_preflight',
+                  'instance_uuid': instance_uuid,
+                  'network': network}]
         for disk in instance.db_entry['block_devices']['devices']:
             if 'base' in disk and disk['base']:
-                tasks.append({'type': 'image_fetch', 'url': disk['base']})
-        tasks.append({'type': 'instance_start'})
+                tasks.append(
+                    {'type': 'image_fetch', 'instance_uuid': instance_uuid, 'url': disk['base']})
+        tasks.append({'type': 'instance_start',
+                      'instance_uuid': instance_uuid,
+                      'network': network})
 
-        db.enqueue(config.parsed.get('NODE_NAME'), {
-            'tasks': tasks,
-            'instance_uuid': instance_uuid,
-            'network': network
-        })
+        db.enqueue(config.parsed.get('NODE_NAME'), {'tasks': tasks})
         db.add_event('instance', instance_uuid,
                      'create', 'enqueued', None, None)
 
@@ -775,8 +785,9 @@ class Instances(Resource):
             namespace = get_jwt_identity()
 
         instances_del = []
+        tasks_by_node = {}
         for instance in list(db.get_instances(all=all, namespace=namespace)):
-            if instance['state'] == 'deleted':
+            if instance['state'] in ['deleted', 'error']:
                 continue
 
             # If this instance is not on a node, just do the DB cleanup locally
@@ -785,15 +796,24 @@ class Instances(Resource):
             else:
                 node = instance['node']
 
-            db.enqueue_delete(node, instance['uuid'], 'deleted')
+            tasks_by_node.setdefault(node, [])
+            tasks_by_node[node].append({
+                'type': 'instance_delete',
+                'instance_uuid': instance['uuid'],
+                'next_state': 'deleted',
+                'next_state_message': None
+            })
             instances_del.append(instance['uuid'])
+
+        for node in tasks_by_node:
+            db.enqueue(node, {'tasks': tasks_by_node[node]})
 
         waiting_for = copy.copy(instances_del)
         start_time = time.time()
         while (waiting_for and (time.time() - start_time < config.parsed.get('API_ASYNC_WAIT'))):
             for instance_uuid in copy.copy(waiting_for):
                 i = db.get_instance(instance_uuid)
-                if i['state'] == 'deleted':
+                if i['state'] in ['deleted', 'error']:
                     waiting_for.remove(instance_uuid)
 
         return instances_del
@@ -1127,7 +1147,7 @@ class Network(Resource):
             return error(403, 'you cannot delete an in use network')
 
         # Check if network has already been deleted
-        if network_from_db['state'] == 'deleted':
+        if network_from_db['state'] in 'deleted':
             return error(404, 'network not found')
 
         _delete_network(network_from_db)

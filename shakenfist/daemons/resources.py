@@ -28,7 +28,7 @@ def _get_stats():
 
     retval['cpu_max_per_instance'] = conn.getMaxVcpus(None)
 
-    # This is disable as data we don't currently use
+    # This is disabled as data we don't currently use
     # for i in range(present_cpus):
     #    per_cpu_stats = conn.getCPUStats(i)
     #    for key in per_cpu_stats:
@@ -93,7 +93,11 @@ def _get_stats():
     total_instance_cpu_time = 0
 
     for guest in conn.listAllDomains():
-        active = guest.isActive() == 1
+        try:
+            active = guest.isActive() == 1
+        except Exception:
+            active = False
+
         _, maxmem, mem, cpus, cpu_time = guest.info()
 
         if active:
@@ -104,6 +108,10 @@ def _get_stats():
             total_instance_vcpus += cpus
             total_instance_cpu_time += cpu_time
 
+    # Queue health statistics
+    node_queue_processing, node_queue_waiting = db.get_queue_length(
+        config.parsed.get('NODE_NAME'))
+
     retval.update({
         'cpu_total_instance_vcpus': total_instance_vcpus,
         'cpu_total_instance_cpu_time': total_instance_cpu_time,
@@ -111,7 +119,19 @@ def _get_stats():
         'memory_total_instance_actual': total_instance_actual_memory // 1024,
         'instances_total': total_instances,
         'instances_active': total_active_instances,
+        'node_queue_processing': node_queue_processing,
+        'node_queue_waiting': node_queue_waiting,
     })
+
+    if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
+        network_queue_processing, network_queue_waiting = db.get_queue_length(
+            config.parsed.get('networknode')
+        )
+
+        retval.update({
+            'network_queue_processing': network_queue_processing,
+            'network_queue_waiting': network_queue_waiting,
+        })
 
     return retval
 
@@ -123,21 +143,41 @@ class Monitor(daemon.Daemon):
 
     def run(self):
         LOG.info('Starting')
-        gauges = {'updated_at': Gauge(
-            'updated_at', 'The last time metrics were updated')}
+        gauges = {
+            'updated_at': Gauge('updated_at', 'The last time metrics were updated')
+        }
+
+        last_metrics = 0
+
+        def update_metrics():
+            global last_metrics
+
+            stats = _get_stats()
+            for metric in stats:
+                if metric not in gauges:
+                    gauges[metric] = Gauge(metric, '')
+                gauges[metric].set(stats[metric])
+
+            db.update_metrics_bulk(stats)
+            LOG.info('Updated metrics')
+            gauges['updated_at'].set_to_current_time()
 
         while True:
             try:
-                stats = _get_stats()
-                for metric in stats:
-                    if metric not in gauges:
-                        gauges[metric] = Gauge(metric, '')
-                    gauges[metric].set(stats[metric])
-                db.update_metrics_bulk(stats)
+                jobname, _ = db.dequeue(
+                    '%s-metrics' % config.parsed.get('NODE_NAME'))
+                if jobname:
+                    if time.time() - last_metrics > 2:
+                        update_metrics()
+                        last_metrics = time.time()
+                    db.resolve('%s-metrics' % config.parsed.get('NODE_NAME'),
+                               jobname)
+                else:
+                    time.sleep(0.2)
 
-                gauges['updated_at'].set_to_current_time()
+                if time.time() - last_metrics > config.parsed.get('SCHEDULER_CACHE_TIMEOUT'):
+                    update_metrics()
+                    last_metrics = time.time()
 
             except Exception as e:
                 util.ignore_exception('resource statistics', e)
-
-            time.sleep(config.parsed.get('SCHEDULER_CACHE_TIMEOUT'))

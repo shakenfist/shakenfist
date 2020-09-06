@@ -1,10 +1,10 @@
-import etcd3
 import logging
 import time
 
 from shakenfist import config
 from shakenfist.daemons import daemon
 from shakenfist import db
+from shakenfist import exceptions
 from shakenfist import net
 from shakenfist import util
 
@@ -55,16 +55,21 @@ class Monitor(daemon.Daemon):
 
         # Ensure we are on every network we have a host for
         for network in host_networks:
-            n = net.from_db(network)
-            if not n:
-                continue
+            try:
+                n = net.from_db(network)
+                if not n:
+                    continue
 
-            if not n.is_okay():
-                LOG.info('%s: Network not okay - recreating', n)
-                n.create()
+                if not n.is_okay():
+                    LOG.info('%s: Network not okay - recreating', n)
+                    n.create()
 
-            n.ensure_mesh()
-            seen_vxids.append(n.vxlan_id)
+                n.ensure_mesh()
+                seen_vxids.append(n.vxlan_id)
+
+            except exceptions.LockException as e:
+                LOG.info(
+                    'Failed to acquire lock while maintaining networks: %s' % e)
 
         # Determine if there are any extra vxids
         extra_vxids = set(vxid_to_mac.keys()) - set(seen_vxids)
@@ -144,12 +149,15 @@ class Monitor(daemon.Daemon):
             try:
                 if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
                     self._process_network_node_workitems()
+                else:
+                    management_age = time.time() - last_management
+                    time.sleep(max(0, 30 - management_age))
 
                 if time.time() - last_management > 30:
                     self._maintain_networks()
                     last_management = time.time()
 
-            except etcd3.exceptions.ConnectionFailedError:
+            except exceptions.ConnectionFailedError:
                 LOG.info('Failed to connect to etcd.')
                 time.sleep(1)
 
