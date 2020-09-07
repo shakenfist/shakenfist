@@ -24,6 +24,7 @@ def handle(jobname, workitem):
         '%s-%s' % (daemon.process_name('queues'), jobname))
 
     instance_uuid = None
+    task = None
     try:
         for task in workitem.get('tasks', []):
             instance_uuid = task.get('instance_uuid')
@@ -53,13 +54,17 @@ def handle(jobname, workitem):
                 db.enqueue('%s-metrics' % config.parsed.get('NODE_NAME'), {})
 
             if task.get('type') == 'instance_delete':
-                instance_delete(instance_uuid)
-                db.update_instance_state(instance_uuid,
-                                         task.get('next_state', 'unknown'))
-                if task.get('next_state_message'):
-                    db.update_instance_error_message(
-                        instance_uuid, task.get('next_state_message'))
-                db.enqueue('%s-metrics' % config.parsed.get('NODE_NAME'), {})
+                try:
+                    instance_delete(instance_uuid)
+                    db.update_instance_state(instance_uuid,
+                                             task.get('next_state', 'unknown'))
+                    if task.get('next_state_message'):
+                        db.update_instance_error_message(
+                            instance_uuid, task.get('next_state_message'))
+                    db.enqueue('%s-metrics' %
+                               config.parsed.get('NODE_NAME'), {})
+                except Exception as e:
+                    util.ignore_exception(daemon.process_name('queues'), e)
 
     except Exception as e:
         if instance_uuid:
