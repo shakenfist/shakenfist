@@ -697,42 +697,30 @@ class Instances(Resource):
         if not SCHEDULER:
             SCHEDULER = scheduler.Scheduler()
 
-        # Have we been placed?
-        if not placed_on:
-            try:
+        try:
+            # Have we been placed?
+            if not placed_on:
                 candidates = SCHEDULER.place_instance(instance, network)
+                placement = candidates[0]
 
-            except exceptions.LowResourceException as e:
-                db.add_event('instance', instance_uuid,
-                             'schedule', 'failed', None,
-                             'insufficient resources: ' + str(e))
-                db.enqueue_instance_delete(config.get.parsed('NODE_NAME'),
-                                           instance_uuid, 'error',
-                                           'scheduling failed')
-                return error(507, str(e))
-
-            placement = candidates[0]
-
-        else:
-            try:
-                SCHEDULER.place_instance(
-                    instance, network, candidates=[placed_on])
+            else:
+                SCHEDULER.place_instance(instance, network,
+                                         candidates=[placed_on])
                 placement = placed_on
 
-            except exceptions.LowResourceException as e:
-                db.add_event('instance', instance_uuid,
-                             'schedule', 'failed', None,
-                             'insufficient resources: ' + str(e))
-                db.enqueue_instance_delete(config.get.parsed(
-                    'NODE_NAME'), instance_uuid, 'error',
-                    'scheduling failed')
-                return error(507, str(e))
+        except exceptions.LowResourceException as e:
+            db.add_event('instance', instance_uuid, 'schedule', 'failed', None,
+                         'insufficient resources: ' + str(e))
+            db.enqueue_instance_delete(config.get.parsed('NODE_NAME'),
+                                       instance_uuid, 'error', 'scheduling failed')
+            return error(507, str(e))
 
-            except exceptions.CandidateNodeNotFoundException as e:
-                db.enqueue_instance_delete(config.get.parsed(
-                    'NODE_NAME'), instance_uuid, 'error',
-                    'scheduling failed')
-                return error(404, 'node not found: %s' % e)
+        except exceptions.CandidateNodeNotFoundException as e:
+            db.add_event('instance', instance_uuid, 'schedule', 'failed', None,
+                         'candidate node not found: ' + str(e))
+            db.enqueue_instance_delete(config.get.parsed('NODE_NAME'),
+                                       instance_uuid, 'error', 'scheduling failed')
+            return error(404, 'node not found: %s' % e)
 
         # Record placement
         db.place_instance(instance_uuid, placement)
@@ -745,13 +733,15 @@ class Instances(Resource):
                   'network': network}]
         for disk in instance.db_entry['block_devices']['devices']:
             if 'base' in disk and disk['base']:
-                tasks.append(
-                    {'type': 'image_fetch', 'instance_uuid': instance_uuid, 'url': disk['base']})
+                tasks.append({'type': 'image_fetch',
+                              'instance_uuid': instance_uuid,
+                              'url': disk['base']})
         tasks.append({'type': 'instance_start',
                       'instance_uuid': instance_uuid,
                       'network': network})
 
-        db.enqueue(config.parsed.get('NODE_NAME'), {'tasks': tasks})
+        # Enqueue creation tasks on desired node task queue
+        db.enqueue(placement, {'tasks': tasks})
         db.add_event('instance', instance_uuid,
                      'create', 'enqueued', None, None)
 
