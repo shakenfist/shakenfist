@@ -58,6 +58,8 @@ def get_lock(objecttype, subtype, name, ttl=60, timeout=10):
         if duration > config.parsed.get('SLOW_LOCK_THRESHOLD'):
             db.add_event(objecttype, name, 'acquire lock', 'slow', duration,
                          'Timeout was %d' % timeout)
+            LOG.info('Acquiring a lock on %s was slow: %.02f. Timeout was %.02f.'
+                     % (path, duration, timeout))
 
 
 def _construct_key(objecttype, subtype, name):

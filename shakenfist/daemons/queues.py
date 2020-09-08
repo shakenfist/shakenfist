@@ -86,8 +86,9 @@ def image_fetch(url, instance_uuid):
         instance = None
         if instance_uuid:
             instance = virt.from_db(instance_uuid)
-        images.get_image(url, [], instance,
-                         timeout=images.IMAGE_FETCH_LOCK_TIMEOUT)
+
+        img = images.Image(url)
+        img.get([], instance)
     except exceptions.LockException:
         pass
 
