@@ -117,7 +117,10 @@ def instance_preflight(instance_uuid, network):
         if instance.db_entry.get('requested_placement'):
             candidates = [instance.db_entry.get('requested_placement')]
         else:
-            candidates = None
+            candidates = []
+            for node in s.metrics.keys():
+                if node != config.parsed.get('NODE_NAME'):
+                    candidates.append(node)
 
         candidates = s.place_instance(instance, network,
                                       candidates=candidates)
