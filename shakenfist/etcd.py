@@ -185,11 +185,10 @@ def enqueue(queuename, workitem):
 
 
 def dequeue(queuename):
+    queue_path = _construct_key('queue', queuename, None)
     for attempt in range(ETCD_ATTEMPTS):
         try:
             with get_lock('queue', None, queuename):
-                queue_path = _construct_key('queue', queuename, None)
-
                 client = etcd3.client()
                 for data, metadata in client.get_prefix(queue_path, sort_order='ascend'):
                     jobname = str(metadata.key).split('/')[-1].rstrip("'")
@@ -240,11 +239,11 @@ def get_queue_length(queuename):
 
 
 def _restart_queue(queuename):
+    queue_path = _construct_key('processing', queuename, None)
     for attempt in range(ETCD_ATTEMPTS):
         try:
             with get_lock('queue', None, queuename):
                 client = etcd3.client()
-                queue_path = _construct_key('processing', queuename, None)
                 for data, metadata in client.get_prefix(queue_path, sort_order='ascend'):
                     jobname = str(metadata.key).split('/')[-1].rstrip("'")
                     workitem = json.loads(data)
