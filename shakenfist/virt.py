@@ -186,12 +186,12 @@ class Instance(object):
                         except OSError:
                             # Different filesystems
                             if lock:
-                                lock.refresh()
+                                db.refresh_lock(lock)
 
                             shutil.copyfile(hashed_image_path, disk['path'])
 
                             if lock:
-                                lock.refresh()
+                                db.refresh_lock(lock)
 
                         # Due to limitations in some installers, cdroms are always on IDE
                         disk['device'] = 'hd%s' % disk['device'][-1]
@@ -199,7 +199,7 @@ class Instance(object):
                     else:
                         with util.RecordedOperation('resize image', self):
                             if lock:
-                                lock.refresh()
+                                db.refresh_lock(lock)
 
                             resized_image_path = images.resize(
                                 hashed_image_path, disk['size'])
@@ -207,7 +207,7 @@ class Instance(object):
                         if config.parsed.get('DISK_FORMAT') == 'qcow':
                             with util.RecordedOperation('create copy on write layer', self):
                                 if lock:
-                                    lock.refresh
+                                    db.refresh_lock(lock)
 
                                 images.create_cow(
                                     resized_image_path, disk['path'])
@@ -221,7 +221,7 @@ class Instance(object):
                         elif config.parsed.get('DISK_FORMAT') == 'qcow_flat':
                             with util.RecordedOperation('create flat layer', self):
                                 if lock:
-                                    lock.refresh
+                                    db.refresh_lock(lock)
 
                                 images.create_flat(
                                     resized_image_path, disk['path'])
@@ -229,7 +229,7 @@ class Instance(object):
                         elif config.parsed.get('DISK_FORMAT') == 'flat':
                             with util.RecordedOperation('create raw disk', self):
                                 if lock:
-                                    lock.refresh
+                                    db.refresh_lock(lock)
 
                                 images.create_raw(
                                     resized_image_path, disk['path'])

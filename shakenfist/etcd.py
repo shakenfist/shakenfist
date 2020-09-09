@@ -62,6 +62,12 @@ def get_lock(objecttype, subtype, name, ttl=60, timeout=10):
                      % (path, duration, timeout))
 
 
+def refresh_lock(l):
+    LOG.info('Refreshing lock %s' % l.name)
+    l.refresh()
+    LOG.info('Refreshed lock %s' % l.name)
+
+
 def _construct_key(objecttype, subtype, name):
     if subtype and name:
         return '/sf/%s/%s/%s' % (objecttype, subtype, name)

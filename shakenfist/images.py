@@ -134,7 +134,7 @@ class Image(object):
             if locks:
                 for lock in locks:
                     if lock:
-                        lock.refresh()
+                        db.refresh_lock(lock)
 
         fetched = 0
         self.info['version'] += 1
