@@ -35,7 +35,7 @@ class ActualLock(etcd3.Lock):
                         'Cannot acquire lock: %s' % self.name)
                 return self
 
-            except etcd3.exceptions.ConnectionFailedError:
+            except (etcd3.exceptions.ConnectionFailedError, exceptions.LockException):
                 time.sleep(ETCD_ATTEMPT_DELAY)
 
         raise exceptions.LockException('Could not acquire lock after retries.')

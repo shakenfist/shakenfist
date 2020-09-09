@@ -81,6 +81,29 @@ class Image(object):
             f.write(json.dumps(self.info, indent=4, sort_keys=True))
 
     def get(self, locks, related_object):
+        """Wrap some lock retries around the get."""
+
+        # NOTE(mikal): this deliberately retries the lock for a long time
+        # because the other option is failing instance start and fetching
+        # an image can take an extremely long time. This still means that
+        # for very large images you should probably pre-cache before
+        # attempting a start.
+        exc = None
+        for _ in range(30):
+            if locks:
+                for lock in locks:
+                    db.refresh_lock(lock)
+
+            try:
+                return self._get(locks, related_object)
+            except exceptions.LockException as e:
+                time.sleep(10)
+                exc = e
+
+        raise exceptions.LockException(
+            'Failed to acquire image fetch lock after retries: %s' % exc)
+
+    def _get(self, locks, related_object):
         """Fetch image if not downloaded and return image path."""
         with db.get_lock('image', config.parsed.get('NODE_NAME'),
                          self.hashed_image_url) as image_lock:
