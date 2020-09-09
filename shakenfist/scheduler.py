@@ -71,30 +71,44 @@ class Scheduler(object):
         return True
 
     def _find_most_matching_networks(self, requested_networks, candidates):
+        if not candidates:
+            return []
+
+        # Find number of matching networks on each node
         candidates_network_matches = {}
         for node in candidates:
             candidates_network_matches[node] = 0
 
+            # Make a list of networks for the node
             present_networks = []
             for inst in list(db.get_instances(only_node=node)):
                 for iface in db.get_instance_interfaces(inst['uuid']):
                     if not iface['network_uuid'] in present_networks:
                         present_networks.append(iface['network_uuid'])
 
+            # Count the requested networks present on this node
             for network in present_networks:
                 if network in requested_networks:
                     candidates_network_matches[node] += 1
 
+        # Store candidate nodes keyed by number of matches
         candidates_by_network_matches = {}
         for node in candidates:
             matches = candidates_network_matches[node]
-            candidates_by_network_matches.setdefault(matches, [])
-            candidates_by_network_matches[matches].append(node)
+            candidates_by_network_matches.setdefault(matches, []).append(node)
 
-        if len(candidates_by_network_matches) == 0:
+        # Find maximum matches of networks on a node
+        max_matches = max(candidates_by_network_matches.keys())
+
+        # Check that the maximum is not just the network node.
+        # (Network node always has every network.)
+        net_node = db.get_network_node()['fqdn']
+        if (max_matches == 1 and
+                candidates_by_network_matches[max_matches][0] == net_node):
+            # No preference, all candidates are a reasonable choice
             return candidates
 
-        max_matches = max(candidates_by_network_matches.keys())
+        # Return list of candidates that has maximum networks
         return candidates_by_network_matches[max_matches]
 
     def _find_most_matching_images(self, requested_images, candidates):

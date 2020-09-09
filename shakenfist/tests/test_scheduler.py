@@ -16,10 +16,12 @@ class FakeInstance(object):
             self.db_entry[k] = kwargs[k]
 
 
-class FakeDBMetrics(object):
-    def __init__(self, nodes):
+class FakeDB(object):
+    def __init__(self, nodes, instances=None, interfaces=None):
         self.metrics = {}
         self.nodes = nodes
+        self.instances = instances
+        self.interfaces = interfaces
 
     def set_node_metrics_same(self, metrics):
         for n in self.nodes:
@@ -32,6 +34,19 @@ class FakeDBMetrics(object):
             n = self.nodes[i]
             node_data.append({'fqdn': n, 'ip': '10.0.0.'+str(i+1)})
         return node_data
+
+    def get_instances(self, only_node=None):
+        if only_node:
+            if only_node in self.instances:
+                return self.instances[only_node]
+            return []
+        ret = []
+        for i in self.instances.keys():
+            ret += self.instances[i]
+        return ret
+
+    def get_instance_interfaces(self, inst_uuid):
+        return self.interfaces[inst_uuid]
 
     def get_metrics(self, node_name):
         if node_name not in self.metrics:
@@ -83,7 +98,7 @@ class LowResourceTestCase(SchedulerTestCase):
     def setUp(self):
         super(LowResourceTestCase, self).setUp()
 
-        self.fake_db = FakeDBMetrics(['node1_net', 'node2', 'node3', 'node4'])
+        self.fake_db = FakeDB(['node1_net', 'node2', 'node3', 'node4'])
 
         mock_db_get_nodes = mock.patch('shakenfist.db.get_nodes',
                                        side_effect=self.fake_db.get_nodes)
@@ -224,3 +239,82 @@ class LowResourceTestCase(SchedulerTestCase):
         nodes = scheduler.Scheduler().place_instance(fake_inst, [])
         self.assertSetEqual(set(self.fake_db.nodes)-{'node1_net', },
                             set(nodes))
+
+
+class CorrectAllocationTestCase(SchedulerTestCase):
+    """Test correct node allocation"""
+
+    def setUp(self):
+        super(CorrectAllocationTestCase, self).setUp()
+
+        self.fake_db = FakeDB(['node1_net', 'node2', 'node3', 'node4'],
+                              {'node3': [{'uuid': 'inst-1',
+                                          'node': 'node3',
+                                          'block_devices': [],
+                                          },
+                                         ],
+                               },
+                              {'inst-1': [{'network_uuid': 'uuid-net1'},
+                                          ],
+                               })
+
+        mock_db_get_nodes = mock.patch('shakenfist.db.get_nodes',
+                                       side_effect=self.fake_db.get_nodes)
+        mock_db_get_nodes.start()
+        self.addCleanup(mock_db_get_nodes.stop)
+
+        mock_db_get_metrics = mock.patch('shakenfist.db.get_metrics',
+                                         side_effect=self.fake_db.get_metrics)
+        mock_db_get_metrics.start()
+        self.addCleanup(mock_db_get_metrics.stop)
+
+        self.mock_get_instances = mock.patch('shakenfist.db.get_instances',
+                                             side_effect=self.fake_db.get_instances)
+        self.mock_get_instances.start()
+        self.addCleanup(self.mock_get_instances.stop)
+
+        self.mock_get_instances = mock.patch('shakenfist.db.get_instance_interfaces',
+                                             side_effect=self.fake_db.get_instance_interfaces)
+        self.mock_get_instances.start()
+        self.addCleanup(self.mock_get_instances.stop)
+
+    def test_any_node_but_not_network_node(self):
+        self.fake_db.set_node_metrics_same({
+            'cpu_max_per_instance': 16,
+            'cpu_max': 4,
+            'memory_available': 22000,
+            'memory_max': 24000,
+            'disk_free': 2000*1024*1024*1024
+        })
+
+        fake_inst = FakeInstance()
+        fake_inst.db_setup(cpus=1, memory=1024,
+                           block_devices={'devices': [
+                               {'size': 8, 'base': 'some-os'}
+                           ]},
+                           )
+        nets = [{'network_uuid': 'uuid-net2'}]
+
+        nodes = scheduler.Scheduler().place_instance(fake_inst, nets)
+        self.assertSetEqual(set(self.fake_db.nodes)-{'node1_net', },
+                            set(nodes))
+
+    def test_single_node_that_has_network(self):
+        self.fake_db.set_node_metrics_same({
+            'cpu_max_per_instance': 16,
+            'cpu_max': 4,
+            'memory_available': 22000,
+            'memory_max': 24000,
+            'disk_free': 2000*1024*1024*1024
+        })
+
+        fake_inst = FakeInstance()
+        fake_inst.db_setup(cpus=1, memory=1024,
+                           block_devices={'devices': [
+                               {'size': 8, 'base': 'some-os'}
+                           ]},
+                           )
+        nets = [{'network_uuid': 'uuid-net1'}]
+
+        nodes = scheduler.Scheduler().place_instance(fake_inst, nets)
+        self.assertSetEqual(set(['node3']), set(nodes))
