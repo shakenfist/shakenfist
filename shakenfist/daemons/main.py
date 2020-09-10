@@ -16,13 +16,13 @@ from shakenfist.daemons import net as net_daemon
 from shakenfist.daemons import resources as resource_daemon
 from shakenfist.daemons import triggers as trigger_daemon
 from shakenfist import db
-
+from shakenfist import logutil
 from shakenfist import net
 from shakenfist import util
 from shakenfist import virt
 
 
-LOG, handler = util.setup_logging('main')
+LOG, HANDLER = logutil.setup('main')
 
 
 def restore_instances():
@@ -88,7 +88,7 @@ def main():
     for key in config.parsed.config:
         LOG.info('Configuration item %s = %s' % (key, config.parsed.get(key)))
 
-    util.log_setlevel(LOG, 'main')
+    daemon.set_log_level(LOG, 'main')
 
     # Check in early and often, also reset processing queue items
     db.see_this_node()
@@ -98,7 +98,7 @@ def main():
     # might happen quite early on.
     pid = os.fork()
     if pid == 0:
-        LOG.removeHandler(handler)
+        LOG.removeHandler(HANDLER)
         DAEMON_IMPLEMENTATIONS['resources'].Monitor('resources').run()
     DAEMON_PIDS[pid] = 'resources'
     LOG.info('resources pid is %d' % pid)
@@ -150,7 +150,7 @@ def main():
     def _start_daemon(d):
         pid = os.fork()
         if pid == 0:
-            LOG.removeHandler(handler)
+            LOG.removeHandler(HANDLER)
             DAEMON_IMPLEMENTATIONS[d].Monitor(d).run()
         DAEMON_PIDS[pid] = d
         LOG.info('%s pid is %d' % (d, pid))

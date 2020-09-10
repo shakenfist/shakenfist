@@ -3,7 +3,7 @@
 import importlib
 import json
 import logging
-from logging import handlers as logging_handlers
+import os
 from pbr.version import VersionInfo
 import random
 import re
@@ -21,34 +21,6 @@ from shakenfist import config
 
 
 LOG = logging.getLogger(__name__)
-
-
-def log_setlevel(log, id):
-    # Check that id is a valid name
-    _ = daemon.process_name(id)
-
-    # Check for configuration override
-    label = 'LOGLEVEL_' + id.upper()
-    level = config.parsed.get(label)
-    if level:
-        numeric_level = getattr(logging, level.upper(), None)
-        if not isinstance(numeric_level, int):
-            raise ValueError('Invalid log level: %s' % level)
-    else:
-        numeric_level = logging.INFO
-
-    log.setLevel(numeric_level)
-
-
-def setup_logging(id):
-    log = logging.getLogger()
-    handler = logging_handlers.SysLogHandler(address='/dev/log')
-    handler.setFormatter(logging.Formatter(
-        daemon.process_name(id) + ': %(levelname)s %(message)s'))
-    log.addHandler(handler)
-    log_setlevel(log, id)
-
-    return log, handler
 
 
 class RecordedOperation():

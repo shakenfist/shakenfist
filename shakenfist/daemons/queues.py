@@ -1,5 +1,4 @@
 import copy
-import logging
 import multiprocessing
 import os
 import setproctitle
@@ -10,16 +9,24 @@ from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import images
+from shakenfist import logutil
 from shakenfist import net
 from shakenfist import scheduler
 from shakenfist import util
 from shakenfist import virt
 
-LOG = logging.getLogger(__name__)
+
+class JobName(object):
+    def __init__(self, name):
+        self.name = name
+
+    def get_describing_tuple(self):
+        return 'workitem', self.name
 
 
 def handle(jobname, workitem):
-    LOG.info('Worker for workitem %s has pid %d' % (jobname, os.getpid()))
+    j = JobName(jobname)
+    logutil.info([j], 'Processing workitem')
     setproctitle.setproctitle(
         '%s-%s' % (daemon.process_name('queues'), jobname))
 
@@ -27,16 +34,22 @@ def handle(jobname, workitem):
     task = None
     try:
         for task in workitem.get('tasks', []):
+            ro = [j]
             instance_uuid = task.get('instance_uuid')
+            if instance_uuid:
+                i = virt.from_db(instance_uuid)
+                ro.append(i)
 
             if task.get('type').startswith('instance_') and not instance_uuid:
-                LOG.error('Instance task lacks instance uuid: %s' % workitem)
+                logutil.error(ro, 'Instance task lacks instance uuid')
                 return
 
             if instance_uuid:
                 db.add_event('instance', instance_uuid, task.get('type').replace('_', ' '),
                              'dequeued', None, 'Work item %s' % jobname)
 
+            logutil.info(ro, 'Executing task %s' %
+                         task.get('type', 'unknown'))
             if task.get('type') == 'image_fetch':
                 image_fetch(task.get('url'), instance_uuid)
 
@@ -44,6 +57,8 @@ def handle(jobname, workitem):
                 redirect_to = instance_preflight(
                     instance_uuid, task.get('network'))
                 if redirect_to:
+                    util.log(
+                        'info', ro, 'Redirecting instance start to %s' % redirect_to)
                     db.place_instance(instance_uuid, redirect_to)
                     db.enqueue(redirect_to, workitem)
                     return
@@ -77,8 +92,7 @@ def handle(jobname, workitem):
         if instance_uuid:
             db.add_event('instance', instance_uuid, 'tasks complete',
                          'dequeued', None, 'Work item %s' % jobname)
-        LOG.info('Worker for workitem %s has pid %d, complete'
-                 % (jobname, os.getpid()))
+        logutil.info([j], 'Completed workitem')
 
 
 def image_fetch(url, instance_uuid):
@@ -111,7 +125,7 @@ def instance_preflight(instance_uuid, network):
 
     if instance.db_entry.get('placement_attempts') > 3:
         raise exceptions.AbortInstanceStartException(
-            'Too many start attempts.')
+            'Too many start attempts')
 
     try:
         if instance.db_entry.get('requested_placement'):
@@ -222,7 +236,7 @@ def instance_delete(instance_uuid):
 class Monitor(daemon.Daemon):
     def run(self):
         workers = []
-        LOG.info('Starting')
+        logutil.info(None, 'Starting')
 
         libvirt = util.get_libvirt()
         conn = libvirt.open(None)

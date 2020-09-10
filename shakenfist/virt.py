@@ -2,9 +2,9 @@
 
 import base64
 import jinja2
-import logging
 import io
 import json
+import logging
 import os
 import pycdlib
 import shutil

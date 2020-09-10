@@ -1,5 +1,8 @@
+import logging
 import setproctitle
 
+from shakenfist import config
+from shakenfist import logutil
 from shakenfist import util
 
 
@@ -14,13 +17,31 @@ DAEMON_NAMES = {
 }
 
 
-def process_name(id):
-    if id not in DAEMON_NAMES:
-        raise Exception('Code Error: Bad process name: %s' % id)
-    return DAEMON_NAMES[id]
+def process_name(name):
+    if name not in DAEMON_NAMES:
+        raise Exception('Code Error: Bad process name: %s' % name)
+    return DAEMON_NAMES[name]
+
+
+def set_log_level(log, name):
+    # Check that id is a valid name
+    process_name(name)
+
+    # Check for configuration override
+    label = 'LOGLEVEL_' + name.upper()
+    level = config.parsed.get(label)
+    if level:
+        numeric_level = getattr(logging, level.upper(), None)
+        if not isinstance(numeric_level, int):
+            raise ValueError('Invalid log level: %s' % level)
+    else:
+        numeric_level = logging.INFO
+
+    log.setLevel(numeric_level)
 
 
 class Daemon(object):
-    def __init__(self, id):
-        setproctitle.setproctitle(process_name(id))
-        self.log, self.handler = util.setup_logging(id)
+    def __init__(self, name):
+        setproctitle.setproctitle(process_name(name))
+        log, handler = logutil.setup(name)
+        set_log_level(log, name)
