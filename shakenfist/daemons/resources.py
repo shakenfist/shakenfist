@@ -125,8 +125,7 @@ def _get_stats():
 
     if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
         network_queue_processing, network_queue_waiting = db.get_queue_length(
-            config.parsed.get('networknode')
-        )
+            'networknode')
 
         retval.update({
             'network_queue_processing': network_queue_processing,

@@ -34,13 +34,14 @@ import uuid
 from shakenfist import config
 from shakenfist import db
 from shakenfist import exceptions
+from shakenfist import logutil
 from shakenfist import net
 from shakenfist import scheduler
 from shakenfist import util
 from shakenfist import virt
 
 
-LOG, log_handler = util.setup_logging('api')
+LOG, HANDLER = logutil.setup('api')
 
 
 TESTING = False
@@ -308,7 +309,7 @@ app.config['JWT_SECRET_KEY'] = config.parsed.get('AUTH_SECRET_SEED')
 jwt = JWTManager(app)
 
 # Use our handler to get SF log format (instead of gunicorn's handlers)
-app.logger.handlers = [log_handler]
+app.logger.handlers = [HANDLER]
 
 
 @app.before_request

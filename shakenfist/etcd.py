@@ -35,7 +35,7 @@ class ActualLock(etcd3.Lock):
                         'Cannot acquire lock: %s' % self.name)
                 return self
 
-            except etcd3.exceptions.ConnectionFailedError:
+            except (etcd3.exceptions.ConnectionFailedError, exceptions.LockException):
                 time.sleep(ETCD_ATTEMPT_DELAY)
 
         raise exceptions.LockException('Could not acquire lock after retries.')
@@ -58,6 +58,14 @@ def get_lock(objecttype, subtype, name, ttl=60, timeout=10):
         if duration > config.parsed.get('SLOW_LOCK_THRESHOLD'):
             db.add_event(objecttype, name, 'acquire lock', 'slow', duration,
                          'Timeout was %d' % timeout)
+            LOG.info('Acquiring a lock on %s was slow: %.02f. Timeout was %.02f.'
+                     % (path, duration, timeout))
+
+
+def refresh_lock(lock):
+    LOG.info('Refreshing lock %s' % lock.name)
+    lock.refresh()
+    LOG.info('Refreshed lock %s' % lock.name)
 
 
 def _construct_key(objecttype, subtype, name):
@@ -177,11 +185,10 @@ def enqueue(queuename, workitem):
 
 
 def dequeue(queuename):
+    queue_path = _construct_key('queue', queuename, None)
     for attempt in range(ETCD_ATTEMPTS):
         try:
             with get_lock('queue', None, queuename):
-                queue_path = _construct_key('queue', queuename, None)
-
                 client = etcd3.client()
                 for data, metadata in client.get_prefix(queue_path, sort_order='ascend'):
                     jobname = str(metadata.key).split('/')[-1].rstrip("'")
@@ -232,11 +239,11 @@ def get_queue_length(queuename):
 
 
 def _restart_queue(queuename):
+    queue_path = _construct_key('processing', queuename, None)
     for attempt in range(ETCD_ATTEMPTS):
         try:
             with get_lock('queue', None, queuename):
                 client = etcd3.client()
-                queue_path = _construct_key('processing', queuename, None)
                 for data, metadata in client.get_prefix(queue_path, sort_order='ascend'):
                     jobname = str(metadata.key).split('/')[-1].rstrip("'")
                     workitem = json.loads(data)

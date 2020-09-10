@@ -38,6 +38,10 @@ def get_lock(objecttype, subtype, name, ttl=60, timeout=ETCD_ATTEMPT_TIMEOUT):
     return etcd.get_lock(objecttype, subtype, name, ttl=ttl, timeout=timeout)
 
 
+def refresh_lock(lock):
+    etcd.refresh_lock(lock)
+
+
 def get_node_ips():
     for value in etcd.get_all('node', None):
         yield value['ip']
@@ -225,6 +229,7 @@ def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key,
         'node_history': [],
         'error_message': None,
         'requested_placement': None,
+        'placement_attempts': 0,
     }
     etcd.put('instance', None, instance_uuid, d)
     return d
@@ -238,6 +243,7 @@ def place_instance(instance_uuid, node):
         return
 
     i['node'] = node
+    i['placement_attempts'] = i.get('placement_attempts', 0) + 1
     etcd.put('instance', None, instance_uuid, i)
 
 

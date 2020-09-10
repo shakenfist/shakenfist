@@ -28,64 +28,8 @@ resolvers = {
     'ubuntu': image_resolver_ubuntu
 }
 
-IMAGE_FETCH_LOCK_TIMEOUT = 600   # TODO(andy):Should be linked to HTTP timeout?
-
-
-def get_image(url, locks, related_object, timeout=IMAGE_FETCH_LOCK_TIMEOUT):
-    """Fetch image if not downloaded and return image path."""
-    hashed_image_url, hashed_image_path = hash_image(url)
-    with db.get_lock('image', config.parsed.get('NODE_NAME'),
-                     hashed_image_url, timeout=timeout) as image_lock:
-        with util.RecordedOperation('fetch image', related_object):
-            image_url = resolve(url)
-            info, dirty_fields, resp = requires_fetch(image_url,
-                                                      hashed_image_url,
-                                                      hashed_image_path)
-
-            if dirty_fields:
-                LOG.info('get_image starting fetch of %s due to dirty fields %s',
-                         image_url, dirty_fields)
-                if related_object:
-                    t, u = related_object.get_describing_tuple()
-                    dirty_fields_pretty = []
-                    for field in dirty_fields:
-                        dirty_fields_pretty.append(
-                            '%s: %s -> %s' % (field, dirty_fields[field]['before'],
-                                              dirty_fields[field]['after']))
-                    db.add_event(t, u, 'image requires fetch',
-                                 None, None, '\n'.join(dirty_fields_pretty))
-                hashed_image_path = fetch(hashed_image_path, info,
-                                          resp, locks=locks.append(image_lock))
-            else:
-                hashed_image_path = '%s.v%03d' % (
-                    hashed_image_path, info['version'])
-
-        _transcode(hashed_image_path, related_object)
-
-    return hashed_image_path
-
-
-def _transcode(hashed_image_path, related_object, ):
-    with util.RecordedOperation('transcode image', related_object):
-        if os.path.exists(hashed_image_path + '.qcow2'):
-            return
-
-        current_format = identify(hashed_image_path).get('file format')
-        if current_format == 'qcow2':
-            os.link(hashed_image_path, hashed_image_path + '.qcow2')
-            return
-
-        processutils.execute(
-            'qemu-img convert -t none -O qcow2 %s %s.qcow2'
-            % (hashed_image_path, hashed_image_path),
-            shell=True)
-
-
-def resolve(name):
-    for resolver in resolvers:
-        if name.startswith(resolver):
-            return resolvers[resolver].resolve(name)
-    return name
+# The HTTP fields we use to decide if an image is out of date in the cache
+VALIDATED_IMAGE_FIELDS = ['Last-Modified', 'Content-Length']
 
 
 def _get_cache_path():
@@ -97,98 +41,172 @@ def _get_cache_path():
     return image_cache_path
 
 
-def hash_image(image_url):
-    h = hashlib.sha256()
-    h.update(image_url.encode('utf-8'))
-    hashed_image_url = h.hexdigest()
-    hashed_image_path = os.path.join(_get_cache_path(), hashed_image_url)
-    LOG.debug('Image %s hashes to %s' % (image_url, hashed_image_url))
-    return hashed_image_url, hashed_image_path
+class Image(object):
+    def __init__(self, url):
+        self.url = self._resolve(url)
+        self.orig_url = url
 
+        self._hash()
+        self.info = self._read_local_info()
 
-VALIDATED_IMAGE_FIELDS = ['Last-Modified', 'Content-Length']
+    def _resolve(self, url):
+        for resolver in resolvers:
+            if url.startswith(resolver):
+                return resolvers[resolver].resolve(url)
+        return url
 
+    def _hash(self):
+        h = hashlib.sha256()
+        h.update(self.url.encode('utf-8'))
+        self.hashed_image_url = h.hexdigest()
+        self.hashed_image_path = os.path.join(
+            _get_cache_path(), self.hashed_image_url)
+        LOG.debug('Image %s hashes to %s' % (self.url, self.hashed_image_url))
 
-def _read_info(image_url, hashed_image_url, hashed_image_path):
-    if not os.path.exists(hashed_image_path + '.info'):
-        LOG.info('No info in cache for %s hashed image path %s'
-                 % (image_url, hashed_image_path))
-        info = {
-            'url': image_url,
-            'hash': hashed_image_url,
-            'version': 0
-        }
-    else:
-        with open(hashed_image_path + '.info') as f:
-            info = json.loads(f.read())
-
-    return info
-
-
-def requires_fetch(image_url, hashed_image_url, hashed_image_path):
-    info = _read_info(image_url, hashed_image_url, hashed_image_path)
-
-    resp = requests.get(image_url, allow_redirects=True, stream=True,
-                        headers={'User-Agent': util.get_user_agent()})
-    if resp.status_code != 200:
-        raise exceptions.HTTPError(
-            'Failed to fetch HEAD of %s (status code %d)'
-            % (image_url, resp.status_code))
-
-    dirty_fields = {}
-    for field in VALIDATED_IMAGE_FIELDS:
-        if info.get(field) != resp.headers.get(field):
-            dirty_fields[field] = {
-                'before': info.get(field),
-                'after': resp.headers.get(field)
+    def _read_local_info(self):
+        if not os.path.exists(self.hashed_image_path + '.info'):
+            LOG.info('No info in cache for %s hashed image path %s'
+                     % (self.url, self.hashed_image_path))
+            return {
+                'url': self.url,
+                'hash': self.hashed_image_url,
+                'version': 0
             }
+        else:
+            with open(self.hashed_image_path + '.info') as f:
+                return json.loads(f.read())
 
-    return info, dirty_fields, resp
+    def _persist_info(self):
+        with open(self.hashed_image_path + '.info', 'w') as f:
+            f.write(json.dumps(self.info, indent=4, sort_keys=True))
 
+    def get(self, locks, related_object):
+        """Wrap some lock retries around the get."""
 
-def fetch(hashed_image_path, info, resp, locks=None):
-    """Download the image if we don't already have the latest version in cache."""
+        # NOTE(mikal): this deliberately retries the lock for a long time
+        # because the other option is failing instance start and fetching
+        # an image can take an extremely long time. This still means that
+        # for very large images you should probably pre-cache before
+        # attempting a start.
+        exc = None
+        for _ in range(30):
+            if locks:
+                for lock in locks:
+                    db.refresh_lock(lock)
 
-    def bump_locks(locks):
-        if locks:
-            for lock in locks:
-                if lock:
-                    lock.refresh()
+            try:
+                return self._get(locks, related_object)
+            except exceptions.LockException as e:
+                time.sleep(10)
+                exc = e
 
-    fetched = 0
-    info['version'] += 1
-    info['fetched_at'] = email.utils.formatdate()
-    for field in VALIDATED_IMAGE_FIELDS:
-        info[field] = resp.headers.get(field)
+        raise exceptions.LockException(
+            'Failed to acquire image fetch lock after retries: %s' % exc)
 
-    last_lock_refresh = 0
-    with open(hashed_image_path + '.v%03d' % info['version'], 'wb') as f:
-        for chunk in resp.iter_content(chunk_size=8192):
-            fetched += len(chunk)
-            f.write(chunk)
-            if (time.time() - last_lock_refresh > 10):
+    def _get(self, locks, related_object):
+        """Fetch image if not downloaded and return image path."""
+        with db.get_lock('image', config.parsed.get('NODE_NAME'),
+                         self.hashed_image_url) as image_lock:
+            with util.RecordedOperation('fetch image', related_object):
+                dirty_fields, resp = self._requires_fetch()
+
+                if dirty_fields:
+                    LOG.info('starting fetch of %s due to dirty fields %s',
+                             self.url, dirty_fields)
+                    if related_object:
+                        t, u = related_object.get_describing_tuple()
+                        dirty_fields_pretty = []
+                        for field in dirty_fields:
+                            dirty_fields_pretty.append(
+                                '%s: %s -> %s' % (field, dirty_fields[field]['before'],
+                                                  dirty_fields[field]['after']))
+                        db.add_event(t, u, 'image requires fetch',
+                                     None, None, '\n'.join(dirty_fields_pretty))
+                    actual_image = self._fetch(
+                        resp, locks=locks.append(image_lock))
+                else:
+                    actual_image = '%s.v%03d' % (
+                        self.hashed_image_path, self.info['version'])
+
+            _transcode(actual_image, related_object)
+
+        return actual_image
+
+    def _requires_fetch(self):
+        resp = requests.get(self.url, allow_redirects=True, stream=True,
+                            headers={'User-Agent': util.get_user_agent()})
+        if resp.status_code != 200:
+            raise exceptions.HTTPError(
+                'Failed to fetch HEAD of %s (status code %d)'
+                % (self.url, resp.status_code))
+
+        dirty_fields = {}
+        for field in VALIDATED_IMAGE_FIELDS:
+            if self.info.get(field) != resp.headers.get(field):
+                dirty_fields[field] = {
+                    'before': self.info.get(field),
+                    'after': resp.headers.get(field)
+                }
+
+        return dirty_fields, resp
+
+    def _fetch(self, resp, locks=None):
+        """Download the image if we don't already have the latest version in cache."""
+
+        def bump_locks(locks):
+            if locks:
+                for lock in locks:
+                    if lock:
+                        db.refresh_lock(lock)
+
+        fetched = 0
+        self.info['version'] += 1
+        self.info['fetched_at'] = email.utils.formatdate()
+        for field in VALIDATED_IMAGE_FIELDS:
+            self.info[field] = resp.headers.get(field)
+
+        last_lock_refresh = 0
+        with open(self.hashed_image_path + '.v%03d' % self.info['version'], 'wb') as f:
+            for chunk in resp.iter_content(chunk_size=8192):
+                fetched += len(chunk)
+                f.write(chunk)
+                if (time.time() - last_lock_refresh > 10):
+                    bump_locks(locks)
+                    last_lock_refresh = time.time()
+
+        if fetched > 0:
+            self._persist_info()
+            LOG.info('Fetching image %s complete (%d bytes)'
+                     % (self.info['url'], fetched))
+
+        # Decompress if required
+        if self.info['url'].endswith('.gz'):
+            if not os.path.exists(self.hashed_image_path + '.v%03d.orig' % self.info['version']):
                 bump_locks(locks)
-                last_lock_refresh = time.time()
 
-    if fetched > 0:
-        with open(hashed_image_path + '.info', 'w') as f:
-            f.write(json.dumps(info, indent=4, sort_keys=True))
+                processutils.execute(
+                    'gunzip -k -q -c %(img)s > %(img)s.orig' % {
+                        'img': self.hashed_image_path + '.v%03d' % self.info['version']},
+                    shell=True)
+            return '%s.v%03d.orig' % (self.hashed_image_path, self.info['version'])
 
-        LOG.info('Fetching image %s complete (%d bytes)' %
-                 (info['url'], fetched))
+        return '%s.v%03d' % (self.hashed_image_path, self.info['version'])
 
-    # Decompress if required
-    if info['url'].endswith('.gz'):
-        if not os.path.exists(hashed_image_path + '.v%03d.orig' % info['version']):
-            bump_locks(locks)
 
-            processutils.execute(
-                'gunzip -k -q -c %(img)s > %(img)s.orig' % {
-                    'img': hashed_image_path + '.v%03d' % info['version']},
-                shell=True)
-        return '%s.v%03d.orig' % (hashed_image_path, info['version'])
+def _transcode(actual_image, related_object):
+    with util.RecordedOperation('transcode image', related_object):
+        if os.path.exists(actual_image + '.qcow2'):
+            return
 
-    return '%s.v%03d' % (hashed_image_path, info['version'])
+        current_format = identify(actual_image).get('file format')
+        if current_format == 'qcow2':
+            os.link(actual_image, actual_image + '.qcow2')
+            return
+
+        processutils.execute(
+            'qemu-img convert -t none -O qcow2 %s %s.qcow2'
+            % (actual_image, actual_image),
+            shell=True)
 
 
 def resize(hashed_image_path, size):
