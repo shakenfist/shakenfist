@@ -21,21 +21,24 @@ def setup(name):
 
 
 LOG, _ = setup('main')
-METHOD_RE = re.compile('.* in (.*)')
+FILENAME_RE = re.compile('.*/dist-packages/shakenfist/(.*)')
 
 
 def _log(level, relatedobjects, message):
     # Determine the name of the calling method
-    f = traceback.format_stack()[-3]
-    fm = METHOD_RE.match(f)
-    if fm:
-        f = fm.group(1)
+    filename = traceback.extract_stack()[-3].filename
+    fmatch = FILENAME_RE.match(filename)
+    if fmatch:
+        filename = fmatch.group(1)
+    caller = '%s:%s:%s()' % (filename,
+                             traceback.extract_stack()[-3].lineno,
+                             traceback.extract_stack()[-3].name)
 
     # Build a structured log line
     log_ctx = LOG.withPrefix(
         '%s[%s]' % (setproctitle.getproctitle(), os.getpid()))
 
-    fields = {'method': f}
+    fields = {'method': caller}
     generic_counter = 1
 
     if relatedobjects:
