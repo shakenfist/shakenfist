@@ -38,8 +38,8 @@ def get_lock(objecttype, subtype, name, ttl=60, timeout=ETCD_ATTEMPT_TIMEOUT):
     return etcd.get_lock(objecttype, subtype, name, ttl=ttl, timeout=timeout)
 
 
-def refresh_lock(l):
-    etcd.refresh_lock(l)
+def refresh_lock(lock):
+    etcd.refresh_lock(lock)
 
 
 def get_node_ips():

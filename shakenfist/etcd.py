@@ -62,10 +62,10 @@ def get_lock(objecttype, subtype, name, ttl=60, timeout=10):
                      % (path, duration, timeout))
 
 
-def refresh_lock(l):
-    LOG.info('Refreshing lock %s' % l.name)
-    l.refresh()
-    LOG.info('Refreshed lock %s' % l.name)
+def refresh_lock(lock):
+    LOG.info('Refreshing lock %s' % lock.name)
+    lock.refresh()
+    LOG.info('Refreshed lock %s' % lock.name)
 
 
 def _construct_key(objecttype, subtype, name):

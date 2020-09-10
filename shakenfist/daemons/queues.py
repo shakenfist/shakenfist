@@ -1,6 +1,5 @@
 import copy
 import multiprocessing
-import os
 import setproctitle
 import time
 

@@ -3,7 +3,6 @@ import setproctitle
 
 from shakenfist import config
 from shakenfist import logutil
-from shakenfist import util
 
 
 DAEMON_NAMES = {

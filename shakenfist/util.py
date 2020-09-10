@@ -3,7 +3,6 @@
 import importlib
 import json
 import logging
-import os
 from pbr.version import VersionInfo
 import random
 import re
@@ -15,7 +14,6 @@ import traceback
 
 from oslo_concurrency import processutils
 
-from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import config
 
