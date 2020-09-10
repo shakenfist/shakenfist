@@ -48,8 +48,8 @@ def handle(jobname, workitem):
                 db.add_event('instance', instance_uuid, task.get('type').replace('_', ' '),
                              'dequeued', None, 'Work item %s' % jobname)
 
-            logutil.info(ro, 'Executing task %s' %
-                         task.get('type', 'unknown'))
+            logutil.info(ro, 'Executing task %s: %s'
+                         % (task.get('type', 'unknown'), task))
             if task.get('type') == 'image_fetch':
                 image_fetch(task.get('url'), instance_uuid)
 
