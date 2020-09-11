@@ -34,12 +34,14 @@ def see_this_node():
         ttl=120)
 
 
-def get_lock(objecttype, subtype, name, ttl=60, timeout=ETCD_ATTEMPT_TIMEOUT):
-    return etcd.get_lock(objecttype, subtype, name, ttl=ttl, timeout=timeout)
+def get_lock(objecttype, subtype, name, ttl=60, timeout=ETCD_ATTEMPT_TIMEOUT,
+             relatedobjects=None):
+    return etcd.get_lock(objecttype, subtype, name, ttl=ttl, timeout=timeout,
+                         relatedobjects=relatedobjects)
 
 
-def refresh_lock(lock):
-    etcd.refresh_lock(lock)
+def refresh_lock(lock, relatedobjects=None):
+    etcd.refresh_lock(lock, relatedobjects=relatedobjects)
 
 
 def get_node_ips():

@@ -16,11 +16,9 @@ from oslo_concurrency import processutils
 from shakenfist import config
 from shakenfist import db
 from shakenfist import images
+from shakenfist import logutil
 from shakenfist import net
 from shakenfist import util
-
-
-LOG = logging.getLogger(__name__)
 
 
 def from_definition(uuid=None, name=None, disks=None, memory_mb=None,
@@ -85,8 +83,7 @@ class Instance(object):
         disk_spec = self.db_entry['disk_spec']
         if not disk_spec:
             # This should not occur since the API will filter for zero disks.
-            LOG.error('_populate_block_devices(): Found disk spec empty: %s' %
-                      self.db_entry)
+            logutil.error([self], 'Found disk spec empty: %s' % self.db_entry)
 
             # Stop continuous crashing by falsely claiming disks are configured.
             self.db_entry['block_devices'] = {'finalized': True}
@@ -150,8 +147,8 @@ class Instance(object):
 
         # Ensure we have state on disk
         if not os.path.exists(self.instance_path):
-            LOG.debug('%s: Creating instance storage at %s' %
-                      (self, self.instance_path))
+            logutil.debug(
+                [self], 'Creating instance storage at %s' % self.instance_path)
             os.makedirs(self.instance_path)
 
         # Generate a config drive
@@ -461,7 +458,6 @@ class Instance(object):
             return conn.lookupByName('sf:' + self.db_entry['uuid'])
 
         except libvirt.libvirtError:
-            LOG.error('%s: Failed to lookup domain' % self)
             return None
 
     def power_on(self):
@@ -479,8 +475,11 @@ class Instance(object):
             conn = libvirt.open(None)
             instance = conn.defineXML(xml)
             if not instance:
-                LOG.error('%s: Failed to create libvirt domain' % self)
-                return
+                db.enqueue_instance_delete(
+                    config.parsed.get('NODE_NAME'),
+                    self.db_entry['uuid'], 'error',
+                    'power on failed to create domain')
+                raise exceptions.NoDomainException()
 
         try:
             instance.create()
@@ -503,7 +502,7 @@ class Instance(object):
         try:
             instance.destroy()
         except libvirt.libvirtError as e:
-            LOG.error('%s: Failed to delete domain: %s' % (self, e))
+            logutil.error([self], 'Failed to delete domain: %s' % e)
 
         db.add_event(
             'instance', self.db_entry['uuid'], 'poweroff', 'complete', None, None)
@@ -519,8 +518,7 @@ class Instance(object):
         snapshot_uuid = str(uuid.uuid4())
         snappath = os.path.join(self.snapshot_path, snapshot_uuid)
         if not os.path.exists(snappath):
-            LOG.debug('%s: Creating snapshot storage at %s' %
-                      (self, snappath))
+            logutil.debug([self], 'Creating snapshot storage at %s' % snappath)
             os.makedirs(snappath)
             with open(os.path.join(self.snapshot_path, 'index.html'), 'w') as f:
                 f.write('<html></html>')

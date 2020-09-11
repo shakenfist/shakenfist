@@ -36,3 +36,11 @@ class WriteException(DatabaseException):
 
 class ReadException(DatabaseException):
     pass
+
+
+class VirtException(Exception):
+    pass
+
+
+class NoDomainException(VirtException):
+    pass

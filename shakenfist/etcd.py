@@ -6,6 +6,7 @@ import time
 from shakenfist import config
 from shakenfist import db
 from shakenfist import exceptions
+from shakenfist import logutil
 
 ####################################################################
 # Please do not call this file directly, but instead call it via   #
@@ -26,9 +27,7 @@ class ActualLock(etcd3.Lock):
         self.timeout = timeout
 
     def __enter__(self):
-        LOG.debug('Lock attempt: timeout=%s name=%s',
-                  self.timeout, self.name)
-        for attempt in range(ETCD_ATTEMPTS):
+        for _ in range(ETCD_ATTEMPTS):
             try:
                 if not self.acquire(timeout=self.timeout):
                     raise exceptions.LockException(
@@ -41,7 +40,7 @@ class ActualLock(etcd3.Lock):
         raise exceptions.LockException('Could not acquire lock after retries.')
 
 
-def get_lock(objecttype, subtype, name, ttl=60, timeout=10):
+def get_lock(objecttype, subtype, name, ttl=60, timeout=10, relatedobjects=None):
     """Retrieves an Etcd lock object. It is not locked, to lock use acquire().
 
     The returned lock can be used as a context manager, with the lock being
@@ -58,14 +57,15 @@ def get_lock(objecttype, subtype, name, ttl=60, timeout=10):
         if duration > config.parsed.get('SLOW_LOCK_THRESHOLD'):
             db.add_event(objecttype, name, 'acquire lock', 'slow', duration,
                          'Timeout was %d' % timeout)
-            LOG.info('Acquiring a lock on %s was slow: %.02f. Timeout was %.02f.'
-                     % (path, duration, timeout))
+            logutil.info(relatedobjects,
+                         'Acquiring a lock on %s was slow: %.02f. Timeout was %.02f.'
+                         % (path, duration, timeout))
 
 
-def refresh_lock(lock):
-    LOG.info('Refreshing lock %s' % lock.name)
+def refresh_lock(lock, relatedobjects=None):
+    logutil.info(relatedobjects, 'Refreshing lock %s' % lock.name)
     lock.refresh()
-    LOG.info('Refreshed lock %s' % lock.name)
+    logutil.info(relatedobjects, 'Refreshed lock %s' % lock.name)
 
 
 def _construct_key(objecttype, subtype, name):
