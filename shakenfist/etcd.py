@@ -29,14 +29,16 @@ class ActualLock(Lock):
         self.timeout = min(timeout, 1000000000)
 
         # We override the UUID of the lock with something more helpful to debugging
-        self._uuid = ('pid %d on %s.'
-                      % (os.getpid(), config.parsed.get('NODE_NAME')))
+        self._uuid = json.dumps({'node': config.parsed.get('NODE_NAME'),
+                                 'pid': os.getpid()},
+                                indent=4, sort_keys=True)
 
     def get_holder(self):
         value = Etcd3Client().get(self.key, metadata=True)
         if value is None or len(value) == 0:
             return None
-        return str(value[0][0])
+        d = json.loads(value[0][0])
+        return d['node'], d['pid']
 
     def __enter__(self):
         start_time = time.time()
@@ -54,10 +56,12 @@ class ActualLock(Lock):
                     db.add_event(self.objecttype, self.objectname,
                                  'lock', 'acquire', None,
                                  'Waiting for lock more than threshold')
+
+                    node, pid = self.get_holder()
                     logutil.info(self.relatedobjects,
                                  'Waiting for lock on %s: %.02f seconds, threshold '
-                                 '%d seconds. Holder is %s.'
-                                 % (self.path, duration, threshold, self.get_holder()))
+                                 '%d seconds. Holder is pid %s on %s.'
+                                 % (self.path, duration, threshold, pid, node))
                     slow_warned = True
 
                 time.sleep(1)
@@ -66,9 +70,11 @@ class ActualLock(Lock):
             db.add_event(self.objecttype, self.objectname,
                          'lock', 'failed', None,
                          'Failed to acquire lock after %.02f seconds' % duration)
+
+            node, pid = self.get_holder()
             logutil.info(self.relatedobjects,
-                         'Failed to acquire lock %s after %.02f seconds. Holder is %s.'
-                         % (self.path, duration, self.get_holder()))
+                         'Failed to acquire lock %s after %.02f seconds. Holder is pid %s on %s.'
+                         % (self.path, duration, pid, node))
             raise exceptions.LockException(
                 'Cannot acquire lock %s, timed out after %.02f seconds'
                 % (self.name, duration))
