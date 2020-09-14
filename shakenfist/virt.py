@@ -584,3 +584,14 @@ class Instance(object):
         with open(console_path) as f:
             f.seek(offset)
             return f.read()
+
+
+class ThinInstance(object):
+    def __init__(self, instance_uuid):
+        self.uuid = instance_uuid
+
+    def __str__(self):
+        return 'instance(%s)' % self.uuid
+
+    def get_describing_tuple(self):
+        return ('instance', self.uuid)

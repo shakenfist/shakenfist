@@ -11,10 +11,8 @@ from oslo_concurrency import processutils
 from shakenfist import config
 from shakenfist import db
 from shakenfist import dhcp
+from shakenfist import logutil
 from shakenfist import util
-
-
-LOG = logging.getLogger(__name__)
 
 
 def from_db(uuid):
@@ -22,18 +20,20 @@ def from_db(uuid):
     if not dbnet:
         return None
 
+    n = Network(uuid=dbnet['uuid'],
+                vxlan_id=dbnet['vxid'],
+                provide_dhcp=dbnet['provide_dhcp'],
+                provide_nat=dbnet['provide_nat'],
+                ipblock=dbnet['netblock'],
+                physical_nic=config.parsed.get('NODE_EGRESS_NIC'),
+                floating_gateway=dbnet['floating_gateway'],
+                namespace=dbnet['namespace'])
+
     if dbnet['state'] == 'deleted':
-        LOG.info('%s: net.from_db() network is state=deleted', uuid)
+        logutil.info([n], 'Netowrk is deleted, returning None.')
         return None
 
-    return Network(uuid=dbnet['uuid'],
-                   vxlan_id=dbnet['vxid'],
-                   provide_dhcp=dbnet['provide_dhcp'],
-                   provide_nat=dbnet['provide_nat'],
-                   ipblock=dbnet['netblock'],
-                   physical_nic=config.parsed.get('NODE_EGRESS_NIC'),
-                   floating_gateway=dbnet['floating_gateway'],
-                   namespace=dbnet['namespace'])
+    return n
 
 
 class Network(object):
@@ -113,14 +113,12 @@ class Network(object):
 
         subst = self.subst_dict()
         if not util.check_for_interface(subst['vx_bridge'], up=True):
-            LOG.warning('%s: is_created() %s is not up',
-                        self, subst['vx_bridge'])
+            logutil.warning([self], '%s is not up' % subst['vx_bridge'])
             return False
 
         return True
 
     def create(self):
-        LOG.info('%s: net.create() namespace=%s', self, self.namespace)
         subst = self.subst_dict()
 
         with db.get_lock('network', None, self.uuid, ttl=120):
@@ -300,7 +298,7 @@ class Network(object):
         if pid and psutil.pid_exists(pid):
             return True
 
-        LOG.warning('%s: is_dnsmasq_running() it is not!', self)
+        logutil.warning([self], 'dnsmasq is not running')
         return False
 
     def update_dhcp(self):
@@ -382,7 +380,7 @@ class Network(object):
                     node_ips.append(ip)
 
             discovered = list(self.discover_mesh())
-            LOG.debug('%s: Discovered mesh elements %s' % (self, discovered))
+            logutil.debug([self], 'Discovered mesh elements %s' % discovered)
             for node in discovered:
                 if node in node_ips:
                     node_ips.remove(node)
@@ -402,7 +400,7 @@ class Network(object):
                              None, None, ' '.join(added))
 
     def _add_mesh_element(self, node):
-        LOG.info('%s: Adding new mesh element %s' % (self, node))
+        logutil.info([self], 'Adding new mesh element %s' % node)
         subst = self.subst_dict()
         subst['node'] = node
         processutils.execute(
@@ -411,7 +409,7 @@ class Network(object):
             shell=True)
 
     def _remove_mesh_element(self, node):
-        LOG.info('%s: Removing excess mesh element %s' % (self, node))
+        logutil.info([self], 'Removing excess mesh element %s' % node)
         subst = self.subst_dict()
         subst['node'] = node
         processutils.execute(
@@ -420,8 +418,8 @@ class Network(object):
             shell=True)
 
     def add_floating_ip(self, floating_address, inner_address):
-        LOG.info('%s: Adding floating ip %s -> %s'
-                 % (self, floating_address, inner_address))
+        logutil.info([self], 'Adding floating ip %s -> %s'
+                     % (floating_address, inner_address))
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
         subst['inner_address'] = inner_address
@@ -436,8 +434,8 @@ class Network(object):
             shell=True)
 
     def remove_floating_ip(self, floating_address, inner_address):
-        LOG.info('%s: Removing floating ip %s -> %s'
-                 % (self, floating_address, inner_address))
+        logutil.info([self], 'Removing floating ip %s -> %s'
+                     % (floating_address, inner_address))
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
         subst['inner_address'] = inner_address
@@ -450,3 +448,25 @@ class Network(object):
             '%(in_netns)s iptables -t nat -D PREROUTING '
             '-d %(floating_address)s -j DNAT --to-destination %(inner_address)s' % subst,
             shell=True)
+
+
+class ThinNetwork(object):
+    def __init__(self, network_uuid):
+        self.uuid = network_uuid
+
+    def __str__(self):
+        return 'network(%s)' % (self.uuid)
+
+    def get_describing_tuple(self):
+        return ('network', self.uuid)
+
+
+class ThinNetworkInterface(object):
+    def __init__(self, ni_uuid):
+        self.uuid = ni_uuid
+
+    def __str__(self):
+        return 'networkinterface(%s)' % (self.uuid)
+
+    def get_describing_tuple(self):
+        return ('networkinterface', self.uuid)

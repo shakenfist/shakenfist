@@ -9,6 +9,8 @@ from oslo_concurrency import processutils
 from shakenfist import config
 from shakenfist.daemons import daemon
 from shakenfist import db
+from shakenfist import logutil
+from shakenfist import net
 from shakenfist import util
 from shakenfist import virt
 
@@ -34,8 +36,8 @@ class Monitor(daemon.Daemon):
                 instance = db.get_instance(instance_uuid)
                 if not instance:
                     # Instance is SF but not in database. Kill to reduce load.
-                    LOG.warning('Destroying unknown instance, domain_id=%s' % (
-                        instance_uuid, ))
+                    logutil.warning([virt.ThinInstance(instance_uuid)],
+                                    'Destroying unknown instance')
                     processutils.execute(
                         'virsh destroy "sf:%s"' % instance_uuid, shell=True)
                     continue
@@ -53,13 +55,11 @@ class Monitor(daemon.Daemon):
 
                     db.instance_enforced_deletes_increment(instance_uuid)
                     attempts = instance.get('enforced_deletes', 0)
-                    LOG.warning('Deleting stray instance %s (attempt %d)'
-                                % (instance_uuid, attempts))
 
                     if attempts > 5:
                         # Sometimes we just can't delete the VM. Try the big hammer instead.
-                        LOG.warning('Attempting alternate delete method for instance %s'
-                                    % instance_uuid)
+                        logutil.warning([virt.ThinInstance(instance_uuid)],
+                                        'Attempting alternate delete method for instance')
                         processutils.execute(
                             'virsh destroy "sf:%s"' % instance_uuid, shell=True)
 
@@ -69,6 +69,10 @@ class Monitor(daemon.Daemon):
                         i = virt.from_db(instance_uuid)
                         i.delete()
                         i.update_instance_state('deleted')
+
+                    logutil.warning(
+                        [virt.ThinInstance(instance_uuid)],
+                        'Deleting stray instance (attempt %d)' % attempts)
 
                     continue
 
@@ -96,8 +100,8 @@ class Monitor(daemon.Daemon):
 
                         domain = conn.lookupByName(domain_name)
                         domain.undefine()
-                        LOG.info('Detected stray instance %s'
-                                 % instance_uuid)
+                        logutil.info(
+                            [virt.ThinInstance(instance_uuid)], 'Detected stray instance')
                         db.add_event('instance', instance_uuid,
                                      'deleted stray', 'complete', None, None)
                         continue
@@ -111,19 +115,19 @@ class Monitor(daemon.Daemon):
                     if not os.path.exists(instance_path):
                         # If we're inactive and our files aren't on disk,
                         # we have a problem.
-                        LOG.info('Detected error state for instance %s'
-                                 % instance_uuid)
+                        logutil.info([virt.ThinInstance(instance_uuid)],
+                                     'Detected error state for instance')
                         db.update_instance_state(instance_uuid, 'error')
                     elif instance.get('power_state') != 'off':
-                        LOG.info('Detected power off for instance %s'
-                                 % instance_uuid)
+                        logutil.info([virt.ThinInstance(instance_uuid)],
+                                     'Detected power off for instance')
                         db.update_instance_power_state(
                             instance_uuid, 'off')
                         db.add_event('instance', instance_uuid,
                                      'detected poweroff', 'complete', None, None)
 
         except libvirt.libvirtError as e:
-            LOG.error('Failed to lookup all domains: %s' % e)
+            logutil.error(None, 'Failed to lookup all domains: %s' % e)
 
     def _compact_etcd(self):
         try:
@@ -138,38 +142,41 @@ class Monitor(daemon.Daemon):
             _, kv = c.get('/sf/compact')
             c.compact(kv.mod_revision, physical=True)
             c.defragment()
-            LOG.info('Compacted etcd')
+            logutil.info(None, 'Compacted etcd')
 
         except Exception as e:
             util.ignore_exception('etcd compaction', e)
 
     def run(self):
-        LOG.info('Starting')
+        logutil.info(None, 'Starting')
         last_compaction = 0
 
         while True:
             # Update power state of all instances on this hypervisor
-            LOG.info('Updating power states')
+            logutil.info(None, 'Updating power states')
             self._update_power_states()
 
             # Cleanup soft deleted instances and networks
             delay = config.parsed.get('CLEANER_DELAY')
 
             for i in db.get_stale_instances(delay):
-                LOG.info('Hard deleting instance %s' % i['uuid'])
+                logutil.info([virt.ThinInstance(i['uuid'])],
+                             'Hard deleting instance')
                 db.hard_delete_instance(i['uuid'])
 
             for n in db.get_stale_networks(delay):
-                LOG.info('Hard deleting network %s' % n['uuid'])
+                logutil.info([net.ThinNetwork(n['uuid'])],
+                             'Hard deleting network')
                 db.hard_delete_network(n['uuid'])
 
             for ni in db.get_stale_network_interfaces(delay):
-                LOG.info('Hard deleting network interface %s' % ni['uuid'])
+                logutil.info([net.ThinNetworkInterface(ni['uuid'])],
+                             'Hard deleting network interface')
                 db.hard_delete_network_interface(ni['uuid'])
 
             # Perform etcd maintenance
             if time.time() - last_compaction > 1800:
-                LOG.info('Compacting etcd')
+                logutil.info(None, 'Compacting etcd')
                 self._compact_etcd()
                 last_compaction = time.time()
 

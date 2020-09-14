@@ -8,9 +8,8 @@ import time
 from shakenfist import config
 from shakenfist import db
 from shakenfist import exceptions
+from shakenfist import logutil
 from shakenfist import util
-
-LOG = logging.getLogger(__name__)
 
 
 class Scheduler(object):
@@ -147,8 +146,8 @@ class Scheduler(object):
                 self.refresh_metrics()
 
             if candidates:
-                LOG.info('Scheduling %s, %s forced as candidates' %
-                         (instance, candidates))
+                logutil.info(None, 'Scheduling %s, %s forced as candidates' %
+                             (instance, candidates))
                 db.add_event('instance', instance.db_entry['uuid'], 'schedule',
                              'Forced candidates', None, str(candidates))
                 for node in candidates:
@@ -158,8 +157,8 @@ class Scheduler(object):
                 candidates = []
                 for node in self.metrics.keys():
                     candidates.append(node)
-            LOG.info('Scheduling %s, %s start as candidates' %
-                     (instance, candidates))
+            logutil.info(None, 'Scheduling %s, %s start as candidates' %
+                         (instance, candidates))
             db.add_event('instance', instance.db_entry['uuid'], 'schedule',
                          'Initial candidates', None, str(candidates))
             if not candidates:
@@ -170,8 +169,8 @@ class Scheduler(object):
                 max_cpu = self.metrics[node].get('cpu_max_per_instance', 0)
                 if instance.db_entry['cpus'] > max_cpu:
                     candidates.remove(node)
-            LOG.info('Scheduling %s, %s have enough actual CPU' %
-                     (instance, candidates))
+            logutil.info(None, 'Scheduling %s, %s have enough actual CPU' %
+                         (instance, candidates))
             db.add_event('instance', instance.db_entry['uuid'], 'schedule',
                          'Have enough actual CPU', None, str(candidates))
             if not candidates:
@@ -183,8 +182,8 @@ class Scheduler(object):
                 if not self._has_sufficient_cpu(
                         instance.db_entry['cpus'], node):
                     candidates.remove(node)
-            LOG.info('Scheduling %s, %s have enough idle CPU' %
-                     (instance, candidates))
+            logutil.info(None, 'Scheduling %s, %s have enough idle CPU' %
+                         (instance, candidates))
             db.add_event('instance', instance.db_entry['uuid'], 'schedule',
                          'Have enough idle CPU', None, str(candidates))
             if not candidates:
@@ -196,8 +195,8 @@ class Scheduler(object):
                 if not self._has_sufficient_ram(
                         instance.db_entry['memory'], node):
                     candidates.remove(node)
-            LOG.info('Scheduling %s, %s have enough idle RAM' %
-                     (instance, candidates))
+            logutil.info(None, 'Scheduling %s, %s have enough idle RAM' %
+                         (instance, candidates))
             db.add_event('instance', instance.db_entry['uuid'], 'schedule',
                          'Have enough idle RAM', None, str(candidates))
             if not candidates:
@@ -208,8 +207,8 @@ class Scheduler(object):
             for node in copy.copy(candidates):
                 if not self._has_sufficient_disk(instance, node):
                     candidates.remove(node)
-            LOG.info('Scheduling %s, %s have enough idle disk' %
-                     (instance, candidates))
+            logutil.info(None, 'Scheduling %s, %s have enough idle disk' %
+                         (instance, candidates))
             db.add_event('instance', instance.db_entry['uuid'], 'schedule',
                          'Have enough idle disk', None, str(candidates))
             if not candidates:
@@ -226,8 +225,8 @@ class Scheduler(object):
 
                 candidates = self._find_most_matching_networks(
                     requested_networks, candidates)
-                LOG.info('Scheduling %s, %s have most matching networks'
-                         % (instance, candidates))
+                logutil.info(None, 'Scheduling %s, %s have most matching networks'
+                             % (instance, candidates))
                 db.add_event('instance', instance.db_entry['uuid'], 'schedule',
                              'Have most matching networks', None,
                              str(candidates))
@@ -240,8 +239,8 @@ class Scheduler(object):
 
             candidates = self._find_most_matching_images(
                 requested_images, candidates)
-            LOG.info('Scheduling %s, %s have most matching images'
-                     % (instance, candidates))
+            logutil.info(None, 'Scheduling %s, %s have most matching images'
+                         % (instance, candidates))
             db.add_event('instance', instance.db_entry['uuid'], 'schedule',
                          'Have most matching images', None, str(candidates))
 
@@ -249,8 +248,8 @@ class Scheduler(object):
             net_node = db.get_network_node()
             if len(candidates) > 1 and net_node['fqdn'] in candidates:
                 candidates.remove(net_node['fqdn'])
-                LOG.info('Scheduling %s, %s are non-network nodes'
-                         % (instance, candidates))
+                logutil.info(None, 'Scheduling %s, %s are non-network nodes'
+                             % (instance, candidates))
                 db.add_event('instance', instance.db_entry['uuid'], 'schedule',
                              'Are non-network nodes', None, str(candidates))
 

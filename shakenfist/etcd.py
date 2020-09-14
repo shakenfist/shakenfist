@@ -36,7 +36,7 @@ class ActualLock(Lock):
         value = Etcd3Client().get(self.key, metadata=True)
         if value is None or len(value) == 0:
             return None
-        return value[0][0]
+        return str(value[0][0])
 
     def __enter__(self):
         start_time = time.time()
@@ -65,12 +65,12 @@ class ActualLock(Lock):
             duration = time.time() - start_time
             db.add_event(self.objecttype, self.objectname,
                          'lock', 'failed', None,
-                         'Failed to acquire lock after %f seconds' % duration)
+                         'Failed to acquire lock after %.02f seconds' % duration)
             logutil.info(self.relatedobjects,
-                         'Failed to acquire lock %s after %f seconds. Holder is %s.'
+                         'Failed to acquire lock %s after %.02f seconds. Holder is %s.'
                          % (self.path, duration, self.get_holder()))
             raise exceptions.LockException(
-                'Cannot acquire lock, timed out after %d seconds: %s'
+                'Cannot acquire lock %s, timed out after %.02f seconds'
                 % (self.name, duration))
 
         finally:

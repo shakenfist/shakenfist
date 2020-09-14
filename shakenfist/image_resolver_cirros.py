@@ -4,10 +4,8 @@ import requests
 
 from shakenfist import config
 from shakenfist import exceptions
+from shakenfist import logutil
 from shakenfist import util
-
-
-LOG = logging.getLogger(__name__)
 
 CIRROS_URL = 'http://download.cirros-cloud.net/'
 
@@ -27,7 +25,7 @@ def resolve(name):
             m = dir_re.match(line)
             if m:
                 versions.append(m.group(1))
-        LOG.info('Found cirros versions: %s' % versions)
+        logutil.info(None, 'Found cirros versions: %s' % versions)
         vernum = versions[-1]
     else:
         try:

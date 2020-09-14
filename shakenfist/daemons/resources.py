@@ -9,9 +9,8 @@ from prometheus_client import start_http_server
 from shakenfist.daemons import daemon
 from shakenfist import config
 from shakenfist import db
+from shakenfist import logutil
 from shakenfist import util
-
-LOG = logging.getLogger(__name__)
 
 
 def _get_stats():
@@ -141,7 +140,7 @@ class Monitor(daemon.Daemon):
         start_http_server(config.parsed.get('PROMETHEUS_METRICS_PORT'))
 
     def run(self):
-        LOG.info('Starting')
+        logutil.info(None, 'Starting')
         gauges = {
             'updated_at': Gauge('updated_at', 'The last time metrics were updated')
         }
@@ -158,7 +157,7 @@ class Monitor(daemon.Daemon):
                 gauges[metric].set(stats[metric])
 
             db.update_metrics_bulk(stats)
-            LOG.info('Updated metrics')
+            logutil.info(None, 'Updated metrics')
             gauges['updated_at'].set_to_current_time()
 
         while True:

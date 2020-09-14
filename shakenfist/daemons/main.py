@@ -39,7 +39,7 @@ def restore_instances():
         for network in networks:
             try:
                 n = net.from_db(network)
-                LOG.info('%s Restoring network' % n)
+                logutil.info([n], 'Restoring network')
                 n.create()
                 n.ensure_mesh()
                 n.update_dhcp()
@@ -56,7 +56,7 @@ def restore_instances():
                                                                     'initial', 'unknown']:
                     continue
 
-                LOG.info('%s Restoring instance' % i)
+                logutil.info([i], 'Restoring instance')
                 i.create()
             except Exception as e:
                 util.ignore_exception('restore instance %s' % instance, e)
@@ -86,7 +86,8 @@ def main():
 
     # Log configuration on startup
     for key in config.parsed.config:
-        LOG.info('Configuration item %s = %s' % (key, config.parsed.get(key)))
+        logutil.info(None, 'Configuration item %s = %s' %
+                     (key, config.parsed.get(key)))
 
     daemon.set_log_level(LOG, 'main')
 
@@ -101,7 +102,7 @@ def main():
         LOG.removeHandler(HANDLER)
         DAEMON_IMPLEMENTATIONS['resources'].Monitor('resources').run()
     DAEMON_PIDS[pid] = 'resources'
-    LOG.info('resources pid is %d' % pid)
+    logutil.info(None, 'resources pid is %d' % pid)
 
     # If I am the network node, I need some setup
     if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
@@ -153,13 +154,14 @@ def main():
             LOG.removeHandler(HANDLER)
             DAEMON_IMPLEMENTATIONS[d].Monitor(d).run()
         DAEMON_PIDS[pid] = d
-        LOG.info('%s pid is %d' % (d, pid))
+        logutil.info(None, '%s pid is %d' % (d, pid))
 
     def _audit_daemons():
         running_daemons = []
         for pid in DAEMON_PIDS:
             running_daemons.append(DAEMON_PIDS[pid])
-        LOG.info('Daemons running: %s' % ', '.join(sorted(running_daemons)))
+        logutil.info(None, 'Daemons running: %s' %
+                     ', '.join(sorted(running_daemons)))
 
         for d in DAEMON_IMPLEMENTATIONS:
             if d not in running_daemons:
@@ -167,7 +169,8 @@ def main():
 
         for d in DAEMON_PIDS:
             if not psutil.pid_exists(d):
-                LOG.warning('%s pid is missing, restarting' % DAEMON_PIDS[d])
+                logutil.warning(
+                    None, '%s pid is missing, restarting' % DAEMON_PIDS[d])
                 _start_daemon(DAEMON_PIDS[d])
 
     _audit_daemons()
@@ -178,8 +181,8 @@ def main():
 
         wpid, _ = os.waitpid(-1, os.WNOHANG)
         while wpid != 0:
-            LOG.warning('%s died (pid %d)'
-                        % (DAEMON_PIDS.get(wpid, 'unknown'), wpid))
+            logutil.warning(None, '%s died (pid %d)'
+                            % (DAEMON_PIDS.get(wpid, 'unknown'), wpid))
             del DAEMON_PIDS[wpid]
             wpid, _ = os.waitpid(-1, os.WNOHANG)
 
