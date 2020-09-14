@@ -41,7 +41,14 @@ def get_lock(objecttype, subtype, name, ttl=60, timeout=ETCD_ATTEMPT_TIMEOUT,
 
 
 def refresh_lock(lock, relatedobjects=None):
-    etcd.refresh_lock(lock, relatedobjects=relatedobjects)
+    if lock:
+        etcd.refresh_lock(lock, relatedobjects=relatedobjects)
+
+
+def refresh_locks(locks, relatedobjects=None):
+    if locks:
+        for l in locks:
+            refresh_lock(l, relatedobjects=relatedobjects)
 
 
 def get_node_ips():

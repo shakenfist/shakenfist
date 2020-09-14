@@ -129,7 +129,9 @@ class Monitor(daemon.Daemon):
         try:
             # We need to determine what revision to compact to, so we keep a
             # key which stores when we last compacted and we use it's latest
-            # revision number as the revision to compact to.
+            # revision number as the revision to compact to. Note that we use
+            # a different library for compaction as our primary library does
+            # not support it.
             c = etcd3.client()
             c.put('/sf/compact',
                   json.dumps({'compacted_at': time.time()}))

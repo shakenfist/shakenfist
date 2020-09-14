@@ -16,9 +16,7 @@ from oslo_concurrency import processutils
 
 from shakenfist import db
 from shakenfist import config
-
-
-LOG = logging.getLogger(__name__)
+from shakenfist import logutil
 
 
 class RecordedOperation():
@@ -28,8 +26,6 @@ class RecordedOperation():
 
     def __enter__(self):
         self.start_time = time.time()
-        LOG.debug('%s: Start %s' % (self.object, self.operation))
-
         object_type, object_uuid = self.get_describing_tuple()
         if object_type and object_uuid:
             db.add_event(object_type, object_uuid,
@@ -38,9 +34,8 @@ class RecordedOperation():
 
     def __exit__(self, *args):
         duration = time.time() - self.start_time
-        LOG.info('%s: Finish %s, duration %.02f seconds'
-                 % (self.object, self.operation,
-                    duration))
+        logutil.info([self.object], 'Finish %s, duration %.02f seconds'
+                     % (self.operation, duration))
 
         object_type, object_uuid = self.get_describing_tuple()
         if object_type and object_uuid:
@@ -150,7 +145,8 @@ def extract_power_state(libvirt, domain):
 def get_api_token(base_url, namespace='system'):
     with db.get_lock('namespace', None, namespace):
         auth_url = base_url + '/auth'
-        LOG.info('Fetching %s auth token from %s' % (namespace, auth_url))
+        logutil.info(None, 'Fetching %s auth token from %s'
+                     % (namespace, auth_url))
         ns = db.get_namespace(namespace)
         if 'service_key' in ns:
             key = ns['service_key']
@@ -229,4 +225,4 @@ def ignore_exception(processname, e):
     if tb:
         msg += '\n%s' % traceback.format_exc()
 
-    LOG.error(msg)
+    logutil.error(None, msg)

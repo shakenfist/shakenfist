@@ -91,7 +91,8 @@ class Image(object):
         for _ in range(30):
             if locks:
                 for lock in locks:
-                    db.refresh_lock(lock)
+                    if lock:
+                        db.refresh_lock(lock)
 
             try:
                 return self._get(locks, related_object)
