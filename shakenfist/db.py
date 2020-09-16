@@ -1,8 +1,8 @@
 # Copyright 2020 Michael Still
 
-import logging
 import randmac
 import random
+import socket
 import time
 import uuid
 
@@ -12,9 +12,6 @@ from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import ipmanager
 from shakenfist import util
-
-
-LOG = logging.getLogger(__name__)
 
 
 # TODO(andy): Change back to 5 once network bugs fixed
@@ -47,8 +44,12 @@ def refresh_lock(lock, relatedobjects=None):
 
 def refresh_locks(locks, relatedobjects=None):
     if locks:
-        for l in locks:
-            refresh_lock(l, relatedobjects=relatedobjects)
+        for lock in locks:
+            refresh_lock(lock, relatedobjects=relatedobjects)
+
+
+def clear_stale_locks():
+    etcd.clear_stale_locks()
 
 
 def get_node_ips():
@@ -462,6 +463,14 @@ def get_metrics(fqdn):
     return d.get('metrics', {})
 
 
+def _port_free(port):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        return s.connect_ex(('127.0.0.1', port)) == 0
+    finally:
+        s.close()
+
+
 def allocate_console_port(instance_uuid):
     node = config.parsed.get('NODE_NAME')
     with etcd.get_lock('console', None, node):
@@ -470,7 +479,7 @@ def allocate_console_port(instance_uuid):
             consumed.append(value['port'])
 
         port = random.randint(30000, 50000)
-        while port in consumed:
+        while port in consumed or not _port_free(port):
             port = random.randint(30000, 50000)
 
         etcd.put(

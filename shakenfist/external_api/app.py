@@ -926,32 +926,34 @@ class InstanceUnpause(Resource):
 def _safe_get_network_interface(interface_uuid):
     ni = db.get_interface(interface_uuid)
     if not ni:
-        return None, error(404, 'interface not found')
+        return None, None, error(404, 'interface not found')
 
     n = net.from_db(ni['network_uuid'])
     if not n:
         logutil.info([net.ThinNetwork(ni['network_uuid']),
                       net.ThinNetworkInterface(ni['uuid'])],
                      'Network not found or deleted')
-        return None, error(404, 'interface network not found')
+        return None, None, error(404, 'interface network not found')
 
     if get_jwt_identity() not in [n.namespace, 'system']:
         logutil.info([n, net.ThinNetworkInterface(ni['uuid'])],
                      'Interface not found, ownership test')
-        return None, error(404, 'interface not found')
+        return None, None, error(404, 'interface not found')
 
     i = virt.from_db(ni['instance_uuid'])
     if get_jwt_identity() not in [i.db_entry['namespace'], 'system']:
         logutil.info([n, i, net.ThinNetworkInterface(ni['uuid'])],
                      'Instance not found, ownership test')
-        return None, error(404, 'interface not found')
+        return None, None, error(404, 'interface not found')
+
+    return ni, n, None
 
 
 class Interface(Resource):
     @jwt_required
     @redirect_to_network_node
     def get(self, interface_uuid=None):
-        ni, err = _safe_get_network_interface(interface_uuid)
+        ni, _, err = _safe_get_network_interface(interface_uuid)
         if err:
             return err
         return ni
@@ -961,7 +963,7 @@ class InterfaceFloat(Resource):
     @jwt_required
     @redirect_to_network_node
     def post(self, interface_uuid=None):
-        ni, err = _safe_get_network_interface(interface_uuid)
+        ni, n, err = _safe_get_network_interface(interface_uuid)
         if err:
             return err
 
@@ -984,7 +986,7 @@ class InterfaceDefloat(Resource):
     @jwt_required
     @redirect_to_network_node
     def post(self, interface_uuid=None):
-        ni, err = _safe_get_network_interface(interface_uuid)
+        ni, n, err = _safe_get_network_interface(interface_uuid)
         if err:
             return err
 

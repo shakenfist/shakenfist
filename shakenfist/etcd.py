@@ -1,10 +1,9 @@
 import json
-import logging
 import os
+import psutil
 import time
 
 from etcd3gw.client import Etcd3Client
-from etcd3gw import exceptions as etcd_exceptions
 from etcd3gw.lock import Lock
 
 from shakenfist import config
@@ -29,14 +28,24 @@ class ActualLock(Lock):
         self.timeout = min(timeout, 1000000000)
 
         # We override the UUID of the lock with something more helpful to debugging
-        self._uuid = json.dumps({'node': config.parsed.get('NODE_NAME'),
-                                 'pid': os.getpid()},
-                                indent=4, sort_keys=True)
+        self._uuid = json.dumps(
+            {
+                'node': config.parsed.get('NODE_NAME'),
+                'pid': os.getpid()
+            },
+            indent=4, sort_keys=True)
+
+        # We also override the location of the lock so that we're in our own spot
+        self.key = '/sflocks%s' % self.path
 
     def get_holder(self):
         value = Etcd3Client().get(self.key, metadata=True)
         if value is None or len(value) == 0:
-            return None
+            return None, NotImplementedError
+
+        if not value[0][0]:
+            return None, None
+
         d = json.loads(value[0][0])
         return d['node'], d['pid']
 
@@ -111,6 +120,24 @@ def refresh_lock(lock, relatedobjects=None):
     logutil.info(relatedobjects, 'Refreshing lock %s' % lock.name)
     lock.refresh()
     logutil.info(relatedobjects, 'Refreshed lock %s' % lock.name)
+
+
+def clear_stale_locks():
+    # Remove all locks held by former processes on this node. This is required
+    # after an unclean restart, otherwise we need to wait for these locks to
+    # timeout and that can take a long time.
+    client = Etcd3Client()
+
+    for data, metadata in client.get_prefix('/sflocks/', sort_order='ascend', sort_target='key'):
+        lockname = str(metadata['key']).replace('/sflocks/', '')
+        holder = json.loads(data)
+        node = holder['node']
+        pid = int(holder['pid'])
+
+        if node == config.parsed.get('NODE_NAME') and not psutil.pid_exists(pid):
+            client.delete(metadata['key'])
+            logutil.warning(None, 'Removed stale lock for %s, previously held by pid %s on %s'
+                            % (lockname, pid, node))
 
 
 def _construct_key(objecttype, subtype, name):

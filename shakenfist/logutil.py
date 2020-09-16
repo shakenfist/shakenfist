@@ -12,6 +12,11 @@ def setup(name):
     logging.setLoggerClass(PyLogrus)
     log = logging.getLogger(__name__)
 
+    # Remove old / default handlers
+    while log.hasHandlers():
+        log.removeHandler(log.handlers[0])
+
+    # Add our handler
     handler = logging_handlers.SysLogHandler(address='/dev/log')
     handler.setFormatter(TextFormatter(
         fmt='%(levelname)s %(message)s', colorize=False))

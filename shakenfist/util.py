@@ -2,7 +2,6 @@
 
 import importlib
 import json
-import logging
 from pbr.version import VersionInfo
 import random
 import re

@@ -1,6 +1,5 @@
 import etcd3
 import json
-import logging
 import os
 import time
 
@@ -13,9 +12,6 @@ from shakenfist import logutil
 from shakenfist import net
 from shakenfist import util
 from shakenfist import virt
-
-
-LOG = logging.getLogger(__name__)
 
 
 class Monitor(daemon.Daemon):

@@ -1,7 +1,6 @@
 # Copyright 2020 Michael Still
 
 import jinja2
-import logging
 import os
 import psutil
 import shutil
@@ -12,8 +11,6 @@ from oslo_concurrency import processutils
 from shakenfist import config
 from shakenfist import db
 from shakenfist import net
-
-LOG = logging.getLogger(__name__)
 
 
 class DHCP(object):

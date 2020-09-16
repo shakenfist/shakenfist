@@ -1,14 +1,10 @@
 # Copyright 2019 Michael Still
 
 import copy
-import logging
 import os
 import socket
 
 from shakenfist import util
-
-
-LOG = logging.getLogger(__name__)
 
 
 node_name = socket.getfqdn()

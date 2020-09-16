@@ -4,7 +4,6 @@ import base64
 import jinja2
 import io
 import json
-import logging
 import os
 import pycdlib
 import shutil
@@ -15,6 +14,7 @@ from oslo_concurrency import processutils
 
 from shakenfist import config
 from shakenfist import db
+from shakenfist import exceptions
 from shakenfist import images
 from shakenfist import logutil
 from shakenfist import net
@@ -250,9 +250,22 @@ class Instance(object):
         # Create the actual instance
         with util.RecordedOperation('create domain XML', self):
             self._create_domain_xml()
-        with util.RecordedOperation('create domain', self):
-            self.power_on()
 
+        # Sometimes on Ubuntu 20.04 we need to wait for port binding to work.
+        # Revisiting this is tracked by issue 320 on github.
+        with util.RecordedOperation('create domain', self):
+            if not self.power_on():
+                attempts = 0
+                while not self.power_on() and attempts < 100:
+                    logutil.warning(
+                        [self], 'Instance required an additional attempt to power on')
+                    time.sleep(5)
+                    attempts += 1
+
+        if self.is_powered_on():
+            logutil.info([self], 'Instance now powered on')
+        else:
+            logutil.info([self], 'Instance failed to power on')
         db.update_instance_state(self.db_entry['uuid'], 'created')
 
     def delete(self):
@@ -460,6 +473,14 @@ class Instance(object):
         except libvirt.libvirtError:
             return None
 
+    def is_powered_on(self):
+        instance = self._get_domain()
+        if not instance:
+            return 'off'
+
+        libvirt = util.get_libvirt()
+        return util.extract_power_state(libvirt, instance)
+
     def power_on(self):
         if not os.path.exists(self.xml_file):
             db.enqueue_instance_delete(
@@ -483,8 +504,10 @@ class Instance(object):
 
         try:
             instance.create()
-        except libvirt.libvirtError:
-            pass
+        except libvirt.libvirtError as e:
+            if not str(e).startswith('Requested operation is not valid: domain is already running'):
+                logutil.warning([self], 'Instance start error: %s' % e)
+                return False
 
         instance.setAutostart(1)
         db.update_instance_power_state(
@@ -492,6 +515,7 @@ class Instance(object):
             util.extract_power_state(libvirt, instance))
         db.add_event(
             'instance', self.db_entry['uuid'], 'poweron', 'complete', None, None)
+        return True
 
     def power_off(self):
         libvirt = util.get_libvirt()

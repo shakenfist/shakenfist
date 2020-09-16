@@ -1,7 +1,6 @@
 # Make scheduling decisions
 
 import copy
-import logging
 import random
 import time
 

@@ -92,6 +92,7 @@ def main():
     daemon.set_log_level(LOG, 'main')
 
     # Check in early and often, also reset processing queue items
+    db.clear_stale_locks()
     db.see_this_node()
     db.restart_queues()
 

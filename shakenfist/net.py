@@ -1,6 +1,5 @@
 # Copyright 2020 Michael Still
 
-import logging
 import os
 import psutil
 import re
