@@ -468,7 +468,7 @@ def _port_free(port):
     try:
         s.bind(('0.0.0.0', port))
         return True
-    except socket.error as e:
+    except socket.error:
         return False
     finally:
         s.close()
