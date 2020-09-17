@@ -466,7 +466,7 @@ def get_metrics(fqdn):
 def _port_free(port):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
-        s.bind(('0.0.0.0', port))
+        s.bind(('0.0.0.0', port))  # lgtm[@tag:security]
         return True
     except socket.error:
         return False
