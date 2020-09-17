@@ -82,6 +82,7 @@ def handle(jobname, workitem):
 
     except Exception as e:
         if instance_uuid:
+            util.ignore_exception(daemon.process_name('queues'), e)
             db.enqueue_instance_delete(config.parsed.get('NODE_NAME'),
                                        instance_uuid, 'error',
                                        'failed queue task: %s' % e)
