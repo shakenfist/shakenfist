@@ -3,7 +3,6 @@
 import email.utils
 import hashlib
 import json
-import logging
 import os
 import re
 import requests
@@ -17,10 +16,8 @@ from shakenfist import config
 from shakenfist import exceptions
 from shakenfist import image_resolver_cirros
 from shakenfist import image_resolver_ubuntu
+from shakenfist import logutil
 from shakenfist import util
-
-
-LOG = logging.getLogger(__name__)
 
 
 resolvers = {
@@ -36,7 +33,7 @@ def _get_cache_path():
     image_cache_path = os.path.join(
         config.parsed.get('STORAGE_PATH'), 'image_cache')
     if not os.path.exists(image_cache_path):
-        LOG.debug('Creating image cache at %s' % image_cache_path)
+        logutil.debug(None, 'Creating image cache at %s' % image_cache_path)
         os.makedirs(image_cache_path)
     return image_cache_path
 
@@ -48,6 +45,9 @@ class Image(object):
 
         self._hash()
         self.info = self._read_local_info()
+
+    def get_describing_tuple(self):
+        return ('image', self.hashed_image_url)
 
     def _resolve(self, url):
         for resolver in resolvers:
@@ -61,12 +61,10 @@ class Image(object):
         self.hashed_image_url = h.hexdigest()
         self.hashed_image_path = os.path.join(
             _get_cache_path(), self.hashed_image_url)
-        LOG.debug('Image %s hashes to %s' % (self.url, self.hashed_image_url))
 
     def _read_local_info(self):
         if not os.path.exists(self.hashed_image_path + '.info'):
-            LOG.info('No info in cache for %s hashed image path %s'
-                     % (self.url, self.hashed_image_path))
+            logutil.info([self], 'No info in cache for this image')
             return {
                 'url': self.url,
                 'hash': self.hashed_image_url,
@@ -92,7 +90,8 @@ class Image(object):
         for _ in range(30):
             if locks:
                 for lock in locks:
-                    db.refresh_lock(lock)
+                    if lock:
+                        db.refresh_lock(lock)
 
             try:
                 return self._get(locks, related_object)
@@ -111,8 +110,8 @@ class Image(object):
                 dirty_fields, resp = self._requires_fetch()
 
                 if dirty_fields:
-                    LOG.info('starting fetch of %s due to dirty fields %s',
-                             self.url, dirty_fields)
+                    logutil.info(
+                        [self], 'Starting fetch due to dirty fields %s' % dirty_fields)
                     if related_object:
                         t, u = related_object.get_describing_tuple()
                         dirty_fields_pretty = []
@@ -176,8 +175,7 @@ class Image(object):
 
         if fetched > 0:
             self._persist_info()
-            LOG.info('Fetching image %s complete (%d bytes)'
-                     % (self.info['url'], fetched))
+            logutil.info([self], 'Fetch complete (%d bytes)' % fetched)
 
         # Decompress if required
         if self.info['url'].endswith('.gz'):

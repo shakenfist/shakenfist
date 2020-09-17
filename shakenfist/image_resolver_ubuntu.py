@@ -1,13 +1,10 @@
-import logging
 import re
 import requests
 
 from shakenfist import config
 from shakenfist import exceptions
+from shakenfist import logutil
 from shakenfist import util
-
-
-LOG = logging.getLogger(__name__)
 
 # The official Ubuntu download URL 'https://cloud-images.ubuntu.com' is unreliable.
 # We try it first, but then try an alternative location on failure.
@@ -30,7 +27,7 @@ def resolve(name):
         if m:
             num_to_name[m.group(2)] = m.group(1)
             name_to_num[m.group(1)] = m.group(2)
-    LOG.info('Found ubuntu versions: %s' % num_to_name)
+    logutil.info(None, 'Found ubuntu versions: %s' % num_to_name)
 
     vernum = None
     vername = None

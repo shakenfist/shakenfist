@@ -4,7 +4,6 @@ import base64
 import jinja2
 import io
 import json
-import logging
 import os
 import pycdlib
 import shutil
@@ -15,12 +14,11 @@ from oslo_concurrency import processutils
 
 from shakenfist import config
 from shakenfist import db
+from shakenfist import exceptions
 from shakenfist import images
+from shakenfist import logutil
 from shakenfist import net
 from shakenfist import util
-
-
-LOG = logging.getLogger(__name__)
 
 
 def from_definition(uuid=None, name=None, disks=None, memory_mb=None,
@@ -85,8 +83,7 @@ class Instance(object):
         disk_spec = self.db_entry['disk_spec']
         if not disk_spec:
             # This should not occur since the API will filter for zero disks.
-            LOG.error('_populate_block_devices(): Found disk spec empty: %s' %
-                      self.db_entry)
+            logutil.error([self], 'Found disk spec empty: %s' % self.db_entry)
 
             # Stop continuous crashing by falsely claiming disks are configured.
             self.db_entry['block_devices'] = {'finalized': True}
@@ -150,8 +147,8 @@ class Instance(object):
 
         # Ensure we have state on disk
         if not os.path.exists(self.instance_path):
-            LOG.debug('%s: Creating instance storage at %s' %
-                      (self, self.instance_path))
+            logutil.debug(
+                [self], 'Creating instance storage at %s' % self.instance_path)
             os.makedirs(self.instance_path)
 
         # Generate a config drive
@@ -253,9 +250,22 @@ class Instance(object):
         # Create the actual instance
         with util.RecordedOperation('create domain XML', self):
             self._create_domain_xml()
-        with util.RecordedOperation('create domain', self):
-            self.power_on()
 
+        # Sometimes on Ubuntu 20.04 we need to wait for port binding to work.
+        # Revisiting this is tracked by issue 320 on github.
+        with util.RecordedOperation('create domain', self):
+            if not self.power_on():
+                attempts = 0
+                while not self.power_on() and attempts < 100:
+                    logutil.warning(
+                        [self], 'Instance required an additional attempt to power on')
+                    time.sleep(5)
+                    attempts += 1
+
+        if self.is_powered_on():
+            logutil.info([self], 'Instance now powered on')
+        else:
+            logutil.info([self], 'Instance failed to power on')
         db.update_instance_state(self.db_entry['uuid'], 'created')
 
     def delete(self):
@@ -461,8 +471,15 @@ class Instance(object):
             return conn.lookupByName('sf:' + self.db_entry['uuid'])
 
         except libvirt.libvirtError:
-            LOG.error('%s: Failed to lookup domain' % self)
             return None
+
+    def is_powered_on(self):
+        instance = self._get_domain()
+        if not instance:
+            return 'off'
+
+        libvirt = util.get_libvirt()
+        return util.extract_power_state(libvirt, instance)
 
     def power_on(self):
         if not os.path.exists(self.xml_file):
@@ -479,13 +496,18 @@ class Instance(object):
             conn = libvirt.open(None)
             instance = conn.defineXML(xml)
             if not instance:
-                LOG.error('%s: Failed to create libvirt domain' % self)
-                return
+                db.enqueue_instance_delete(
+                    config.parsed.get('NODE_NAME'),
+                    self.db_entry['uuid'], 'error',
+                    'power on failed to create domain')
+                raise exceptions.NoDomainException()
 
         try:
             instance.create()
-        except libvirt.libvirtError:
-            pass
+        except libvirt.libvirtError as e:
+            if not str(e).startswith('Requested operation is not valid: domain is already running'):
+                logutil.warning([self], 'Instance start error: %s' % e)
+                return False
 
         instance.setAutostart(1)
         db.update_instance_power_state(
@@ -493,6 +515,7 @@ class Instance(object):
             util.extract_power_state(libvirt, instance))
         db.add_event(
             'instance', self.db_entry['uuid'], 'poweron', 'complete', None, None)
+        return True
 
     def power_off(self):
         libvirt = util.get_libvirt()
@@ -503,7 +526,7 @@ class Instance(object):
         try:
             instance.destroy()
         except libvirt.libvirtError as e:
-            LOG.error('%s: Failed to delete domain: %s' % (self, e))
+            logutil.error([self], 'Failed to delete domain: %s' % e)
 
         db.add_event(
             'instance', self.db_entry['uuid'], 'poweroff', 'complete', None, None)
@@ -519,8 +542,7 @@ class Instance(object):
         snapshot_uuid = str(uuid.uuid4())
         snappath = os.path.join(self.snapshot_path, snapshot_uuid)
         if not os.path.exists(snappath):
-            LOG.debug('%s: Creating snapshot storage at %s' %
-                      (self, snappath))
+            logutil.debug([self], 'Creating snapshot storage at %s' % snappath)
             os.makedirs(snappath)
             with open(os.path.join(self.snapshot_path, 'index.html'), 'w') as f:
                 f.write('<html></html>')
@@ -586,3 +608,14 @@ class Instance(object):
         with open(console_path) as f:
             f.seek(offset)
             return f.read()
+
+
+class ThinInstance(object):
+    def __init__(self, instance_uuid):
+        self.uuid = instance_uuid
+
+    def __str__(self):
+        return 'instance(%s)' % self.uuid
+
+    def get_describing_tuple(self):
+        return ('instance', self.uuid)

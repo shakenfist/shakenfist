@@ -42,5 +42,5 @@ def set_log_level(log, name):
 class Daemon(object):
     def __init__(self, name):
         setproctitle.setproctitle(process_name(name))
-        log, handler = logutil.setup(name)
+        log, _ = logutil.setup(name)
         set_log_level(log, name)
