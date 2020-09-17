@@ -466,7 +466,10 @@ def get_metrics(fqdn):
 def _port_free(port):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
-        return s.connect_ex(('127.0.0.1', port)) == 0
+        s.bind(('0.0.0.0', port))  # lgtm[@tag:security]
+        return True
+    except socket.error:
+        return False
     finally:
         s.close()
 

@@ -712,7 +712,7 @@ class Instances(Resource):
         except exceptions.LowResourceException as e:
             db.add_event('instance', instance_uuid, 'schedule', 'failed', None,
                          'insufficient resources: ' + str(e))
-            db.enqueue_instance_delete(config.get.parsed('NODE_NAME'),
+            db.enqueue_instance_delete(config.parsed.get('NODE_NAME'),
                                        instance_uuid, 'error', 'scheduling failed')
             return error(507, str(e))
 
