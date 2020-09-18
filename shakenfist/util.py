@@ -2,6 +2,7 @@
 
 import importlib
 import json
+import multiprocessing
 from pbr.version import VersionInfo
 import random
 import re
@@ -61,8 +62,8 @@ def is_network_node():
 
 
 def check_for_interface(name, up=False):
-    stdout, stderr = processutils.execute(
-        'ip link show %s' % name, check_exit_code=[0, 1], shell=True)
+    stdout, stderr = execute(None,
+                             'ip link show %s' % name, check_exit_code=[0, 1])
 
     if stderr.rstrip('\n').endswith(' does not exist.'):
         return False
@@ -78,13 +79,13 @@ def get_interface_addresses(namespace, name):
     if namespace:
         in_namespace = 'ip netns exec %s ' % namespace
 
-    stdout, _ = processutils.execute(
-        '%(in_namespace)sip addr show %(name)s'
-        % {
-            'in_namespace': in_namespace,
-            'name': name
-        },
-        check_exit_code=[0, 1], shell=True)
+    stdout, _ = execute(None,
+                        '%(in_namespace)sip addr show %(name)s'
+                        % {
+                            'in_namespace': in_namespace,
+                            'name': name
+                        },
+                        check_exit_code=[0, 1])
     if not stdout:
         return
 
@@ -98,8 +99,7 @@ def get_interface_addresses(namespace, name):
 
 
 def nat_rules_for_ipblock(ipblock):
-    out, _ = processutils.execute(
-        'iptables -t nat -L POSTROUTING -n -v', shell=True)
+    out, _ = execute(None, 'iptables -t nat -L POSTROUTING -n -v')
     # Output looks like this:
     # Chain POSTROUTING (policy ACCEPT 199 packets, 18189 bytes)
     # pkts bytes target     prot opt in     out     source               destination
@@ -195,8 +195,7 @@ def discover_interfaces():
     link_ether = None
     link_ether_re = re.compile('^    link/ether (.*) brd .*')
 
-    stdout, _ = processutils.execute(
-        'ip addr list', shell=True)
+    stdout, _ = execute(None, 'ip addr list')
     for line in stdout.split('\n'):
         line = line.rstrip()
 
@@ -225,3 +224,29 @@ def ignore_exception(processname, e):
         msg += '\n%s' % traceback.format_exc()
 
     logutil.error(None, msg)
+
+
+def _lock_refresher(locks):
+    while True:
+        db.refresh_locks(locks)
+        time.sleep(10)
+
+
+def execute(locks, command, check_exit_code=[0], env_variables=None):
+    if not locks:
+        return processutils.execute(
+            command, check_exit_code=check_exit_code,
+            env_variables=env_variables, shell=True)
+
+    else:
+        p = multiprocessing.Process(
+            target=_lock_refresher, args=(locks,))
+        p.start()
+
+        try:
+            return processutils.execute(
+                command, check_exit_code=check_exit_code,
+                env_variables=env_variables, shell=True)
+        finally:
+            p.terminate()
+            p.join()

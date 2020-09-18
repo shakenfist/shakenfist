@@ -6,10 +6,7 @@ import json
 import os
 import re
 import requests
-import shutil
 import time
-
-from oslo_concurrency import processutils
 
 from shakenfist import db
 from shakenfist import config
@@ -88,10 +85,7 @@ class Image(object):
         # attempting a start.
         exc = None
         for _ in range(30):
-            if locks:
-                for lock in locks:
-                    if lock:
-                        db.refresh_lock(lock)
+            db.refresh_locks(locks)
 
             try:
                 return self._get(locks, related_object)
@@ -127,7 +121,7 @@ class Image(object):
                     actual_image = '%s.v%03d' % (
                         self.hashed_image_path, self.info['version'])
 
-            _transcode(actual_image, related_object)
+            _transcode(locks, actual_image, related_object)
 
         return actual_image
 
@@ -152,26 +146,21 @@ class Image(object):
     def _fetch(self, resp, locks=None):
         """Download the image if we don't already have the latest version in cache."""
 
-        def bump_locks(locks):
-            if locks:
-                for lock in locks:
-                    if lock:
-                        db.refresh_lock(lock)
-
+        # Do the fetch
         fetched = 0
         self.info['version'] += 1
         self.info['fetched_at'] = email.utils.formatdate()
         for field in VALIDATED_IMAGE_FIELDS:
             self.info[field] = resp.headers.get(field)
 
-        last_lock_refresh = 0
+        last_refresh = 0
         with open(self.hashed_image_path + '.v%03d' % self.info['version'], 'wb') as f:
             for chunk in resp.iter_content(chunk_size=8192):
                 fetched += len(chunk)
                 f.write(chunk)
-                if (time.time() - last_lock_refresh > 10):
-                    bump_locks(locks)
-                    last_lock_refresh = time.time()
+
+                if time.time() - last_refresh > 10:
+                    db.refresh_locks(locks)
 
         if fetched > 0:
             self._persist_info()
@@ -180,18 +169,15 @@ class Image(object):
         # Decompress if required
         if self.info['url'].endswith('.gz'):
             if not os.path.exists(self.hashed_image_path + '.v%03d.orig' % self.info['version']):
-                bump_locks(locks)
-
-                processutils.execute(
-                    'gunzip -k -q -c %(img)s > %(img)s.orig' % {
-                        'img': self.hashed_image_path + '.v%03d' % self.info['version']},
-                    shell=True)
+                util.execute(locks,
+                             'gunzip -k -q -c %(img)s > %(img)s.orig' % {
+                                 'img': self.hashed_image_path + '.v%03d' % self.info['version']})
             return '%s.v%03d.orig' % (self.hashed_image_path, self.info['version'])
 
         return '%s.v%03d' % (self.hashed_image_path, self.info['version'])
 
 
-def _transcode(actual_image, related_object):
+def _transcode(locks, actual_image, related_object):
     with util.RecordedOperation('transcode image', related_object):
         if os.path.exists(actual_image + '.qcow2'):
             return
@@ -201,13 +187,12 @@ def _transcode(actual_image, related_object):
             os.link(actual_image, actual_image + '.qcow2')
             return
 
-        processutils.execute(
-            'qemu-img convert -t none -O qcow2 %s %s.qcow2'
-            % (actual_image, actual_image),
-            shell=True)
+        util.execute(locks,
+                     'qemu-img convert -t none -O qcow2 %s %s.qcow2'
+                     % (actual_image, actual_image))
 
 
-def resize(hashed_image_path, size):
+def resize(locks, hashed_image_path, size):
     """Resize the image to the specified size."""
 
     backing_file = hashed_image_path + '.qcow2' + '.' + str(size) + 'G'
@@ -221,10 +206,10 @@ def resize(hashed_image_path, size):
         os.link(hashed_image_path, backing_file)
         return backing_file
 
-    shutil.copyfile(hashed_image_path + '.qcow2', backing_file)
-    processutils.execute(
-        'qemu-img resize %s %sG' % (backing_file, size),
-        shell=True)
+    util.execute(locks,
+                 'cp %s %s' % (hashed_image_path + '.qcow2', backing_file))
+    util.execute(locks,
+                 'qemu-img resize %s %sG' % (backing_file, size))
 
     return backing_file
 
@@ -238,8 +223,8 @@ def identify(path):
     if not os.path.exists(path):
         return {}
 
-    out, _ = processutils.execute(
-        'qemu-img info %s' % path, shell=True)
+    out, _ = util.execute(None,
+                          'qemu-img info %s' % path)
 
     data = {}
     for line in out.split('\n'):
@@ -270,42 +255,40 @@ def identify(path):
     return data
 
 
-def create_cow(cache_file, disk_file):
+def create_cow(locks, cache_file, disk_file):
     """Create a COW layer on top of the image cache."""
 
     if os.path.exists(disk_file):
         return
 
-    processutils.execute(
-        'qemu-img create -b %s -f qcow2 %s' % (cache_file, disk_file),
-        shell=True)
+    util.execute(locks,
+                 'qemu-img create -b %s -f qcow2 %s' % (
+                     cache_file, disk_file))
 
 
-def create_flat(cache_file, disk_file):
+def create_flat(locks, cache_file, disk_file):
     """Make a flat copy of the disk from the image cache."""
 
     if os.path.exists(disk_file):
         return
 
-    shutil.copyfile(cache_file, disk_file)
+    util.execute(locks, 'cp %s %s' % (cache_file, disk_file))
 
 
-def create_raw(cache_file, disk_file):
+def create_raw(locks, cache_file, disk_file):
     """Make a raw copy of the disk from the image cache."""
 
     if os.path.exists(disk_file):
         return
 
-    processutils.execute(
-        'qemu-img convert -t none -O raw %s %s'
-        % (cache_file, disk_file),
-        shell=True)
+    util.execute(locks,
+                 'qemu-img convert -t none -O raw %s %s'
+                 % (cache_file, disk_file))
 
 
-def snapshot(source, destination):
+def snapshot(locks, source, destination):
     """Convert a possibly COW layered disk file into a snapshot."""
 
-    processutils.execute(
-        'qemu-img convert --force-share -O qcow2 %s %s'
-        % (source, destination),
-        shell=True)
+    util.execute(locks,
+                 'qemu-img convert --force-share -O qcow2 %s %s'
+                 % (source, destination))

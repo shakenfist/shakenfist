@@ -204,12 +204,11 @@ class DHCPTestCase(testtools.TestCase):
     @mock.patch('shakenfist.dhcp.DHCP._send_signal', return_value=False)
     @mock.patch('shakenfist.dhcp.DHCP._make_config')
     @mock.patch('shakenfist.dhcp.DHCP._make_hosts')
-    @mock.patch('oslo_concurrency.processutils.execute')
+    @mock.patch('shakenfist.util.execute')
     def test_restart_dhcpd(self, mock_execute, mock_hosts, mock_config,
                            mock_signal):
         d = dhcp.DHCP('notauuid', 'eth0')
         d.restart_dhcpd()
         mock_signal.assert_called_with(signal.SIGHUP)
         mock_execute.assert_called_with(
-            'ip netns exec notauuid dnsmasq --conf-file=/a/b/c/dhcp/notauuid/config',
-            shell=True)
+            None, 'ip netns exec notauuid dnsmasq --conf-file=/a/b/c/dhcp/notauuid/config')
