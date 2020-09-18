@@ -219,7 +219,7 @@ class ImageObjectTestCase(testtools.TestCase):
                     'Last-Modified': 'Tue, 10 Sep 2018 07:24:40 GMT',
                     'Content-Length': 100000,
                     'version': 0})
-    @mock.patch('oslo_concurrency.processutils.execute',
+    @mock.patch('shakenfist.util.execute',
                 return_value=(None, None))
     def test_fetch_image_changed(self, mock_execute, mock_read_local_info, mock_makedirs,
                                  mock_exists, mock_config):
@@ -231,7 +231,7 @@ class ImageObjectTestCase(testtools.TestCase):
                               'before': 'Tue, 10 Sep 2018 07:24:40 GMT'}
         }, image_dirty)
 
-    @mock.patch('oslo_concurrency.processutils.execute',
+    @mock.patch('shakenfist.util.execute',
                 return_value=(None, None))
     @mock.patch('os.path.exists', return_value=True)
     @mock.patch('shakenfist.db.get_lock')
@@ -240,7 +240,7 @@ class ImageObjectTestCase(testtools.TestCase):
         images._transcode('/a/b/c/hash', 'foo')
         mock_execute.assert_not_called()
 
-    @mock.patch('oslo_concurrency.processutils.execute',
+    @mock.patch('shakenfist.util.execute',
                 return_value=(None, None))
     @mock.patch('os.path.exists', return_value=False)
     @mock.patch('shakenfist.images.identify',
@@ -254,7 +254,7 @@ class ImageObjectTestCase(testtools.TestCase):
         mock_link.assert_called_with('/a/b/c/hash', '/a/b/c/hash.qcow2')
         mock_execute.assert_not_called()
 
-    @mock.patch('oslo_concurrency.processutils.execute',
+    @mock.patch('shakenfist.util.execute',
                 return_value=(None, None))
     @mock.patch('os.path.exists', return_value=False)
     @mock.patch('shakenfist.images.identify',
@@ -267,12 +267,10 @@ class ImageObjectTestCase(testtools.TestCase):
         images._transcode('/a/b/c/hash', 'foo')
         mock_link.assert_not_called()
         mock_execute.assert_called_with(
-            'qemu-img convert -t none -O qcow2 /a/b/c/hash /a/b/c/hash.qcow2',
-            shell=True
-        )
+            None, 'qemu-img convert -t none -O qcow2 /a/b/c/hash /a/b/c/hash.qcow2')
 
     @mock.patch('shutil.copyfile')
-    @mock.patch('oslo_concurrency.processutils.execute',
+    @mock.patch('shakenfist.util.execute',
                 return_value=(None, None))
     @mock.patch('os.path.exists', return_value=True)
     @mock.patch('shakenfist.images.identify',
@@ -286,7 +284,7 @@ class ImageObjectTestCase(testtools.TestCase):
         mock_copyfile.assert_not_called()
 
     @mock.patch('shutil.copyfile')
-    @mock.patch('oslo_concurrency.processutils.execute',
+    @mock.patch('shakenfist.util.execute',
                 return_value=(None, None))
     @mock.patch('os.path.exists', return_value=False)
     @mock.patch('shakenfist.images.identify',
@@ -300,7 +298,7 @@ class ImageObjectTestCase(testtools.TestCase):
         mock_copyfile.assert_not_called()
 
     @mock.patch('shutil.copyfile')
-    @mock.patch('oslo_concurrency.processutils.execute',
+    @mock.patch('shakenfist.util.execute',
                 return_value=(None, None))
     @mock.patch('os.path.exists', return_value=False)
     @mock.patch('shakenfist.images.identify',
@@ -311,12 +309,12 @@ class ImageObjectTestCase(testtools.TestCase):
         images.resize('/a/b/c/hash', 8)
         mock_link.assert_not_called()
         mock_execute.assert_called_with(
-            'qemu-img resize /a/b/c/hash.qcow2.8G 8G', shell=True)
+            None, 'qemu-img resize /a/b/c/hash.qcow2.8G 8G')
         mock_copyfile.assert_called_with(
             '/a/b/c/hash.qcow2', '/a/b/c/hash.qcow2.8G'
         )
 
-    @mock.patch('oslo_concurrency.processutils.execute',
+    @mock.patch('shakenfist.util.execute',
                 return_value=(QEMU_IMG_OUT, None))
     @mock.patch('os.path.exists', return_value=True)
     def test_identify_image(self, mock_exists, mock_execute):
@@ -333,18 +331,17 @@ class ImageObjectTestCase(testtools.TestCase):
             'virtual size': 117440512.0
         }, d)
 
-    @mock.patch('oslo_concurrency.processutils.execute',
+    @mock.patch('shakenfist.util.execute',
                 return_value=(None, None))
     @mock.patch('os.path.exists', return_value=False)
     def test_create_cow(self, mock_exists, mock_execute):
         images.create_cow('/a/b/c/base', '/a/b/c/cow')
         mock_execute.assert_called_with(
-            'qemu-img create -b /a/b/c/base -f qcow2 /a/b/c/cow', shell=True)
+            None, 'qemu-img create -b /a/b/c/base -f qcow2 /a/b/c/cow')
 
-    @mock.patch('oslo_concurrency.processutils.execute',
+    @mock.patch('shakenfist.util.execute',
                 return_value=(None, None))
     def test_snapshot(self, mock_execute):
         images.snapshot('/a/b/c/base', '/a/b/c/snap')
         mock_execute.assert_called_with(
-            'qemu-img convert --force-share -O qcow2 /a/b/c/base /a/b/c/snap',
-            shell=True)
+            None, 'qemu-img convert --force-share -O qcow2 /a/b/c/base /a/b/c/snap')

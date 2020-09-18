@@ -10,8 +10,6 @@ import shutil
 import time
 import uuid
 
-from oslo_concurrency import processutils
-
 from shakenfist import config
 from shakenfist import db
 from shakenfist import exceptions
@@ -235,9 +233,8 @@ class Instance(object):
                             raise Exception('Unknown disk format')
 
                 elif not os.path.exists(disk['path']):
-                    processutils.execute('qemu-img create -f qcow2 %s %sG'
-                                         % (disk['path'], disk['size']),
-                                         shell=True)
+                    util.execute(None, 'qemu-img create -f qcow2 %s %sG'
+                                 % (disk['path'], disk['size']))
 
                 modified_disks.append(disk)
 

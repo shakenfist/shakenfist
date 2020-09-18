@@ -6,11 +6,10 @@ import psutil
 import shutil
 import signal
 
-from oslo_concurrency import processutils
-
 from shakenfist import config
 from shakenfist import db
 from shakenfist import net
+from shakenfist import util
 
 
 class DHCP(object):
@@ -110,6 +109,5 @@ class DHCP(object):
         self._make_config()
         self._make_hosts()
         if not self._send_signal(signal.SIGHUP):
-            processutils.execute(
-                '%(in_netns)s dnsmasq --conf-file=%(config_dir)s/config' % self.subst,
-                shell=True)
+            util.execute(None,
+                         '%(in_netns)s dnsmasq --conf-file=%(config_dir)s/config' % self.subst)

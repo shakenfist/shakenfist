@@ -9,8 +9,6 @@ import requests
 import shutil
 import time
 
-from oslo_concurrency import processutils
-
 from shakenfist import db
 from shakenfist import config
 from shakenfist import exceptions
@@ -182,10 +180,9 @@ class Image(object):
             if not os.path.exists(self.hashed_image_path + '.v%03d.orig' % self.info['version']):
                 bump_locks(locks)
 
-                processutils.execute(
-                    'gunzip -k -q -c %(img)s > %(img)s.orig' % {
-                        'img': self.hashed_image_path + '.v%03d' % self.info['version']},
-                    shell=True)
+                util.execute(None,
+                             'gunzip -k -q -c %(img)s > %(img)s.orig' % {
+                                 'img': self.hashed_image_path + '.v%03d' % self.info['version']})
             return '%s.v%03d.orig' % (self.hashed_image_path, self.info['version'])
 
         return '%s.v%03d' % (self.hashed_image_path, self.info['version'])
@@ -201,10 +198,9 @@ def _transcode(actual_image, related_object):
             os.link(actual_image, actual_image + '.qcow2')
             return
 
-        processutils.execute(
-            'qemu-img convert -t none -O qcow2 %s %s.qcow2'
-            % (actual_image, actual_image),
-            shell=True)
+        util.execute(None,
+                     'qemu-img convert -t none -O qcow2 %s %s.qcow2'
+                     % (actual_image, actual_image))
 
 
 def resize(hashed_image_path, size):
@@ -222,9 +218,8 @@ def resize(hashed_image_path, size):
         return backing_file
 
     shutil.copyfile(hashed_image_path + '.qcow2', backing_file)
-    processutils.execute(
-        'qemu-img resize %s %sG' % (backing_file, size),
-        shell=True)
+    util.execute(None,
+                 'qemu-img resize %s %sG' % (backing_file, size))
 
     return backing_file
 
@@ -238,8 +233,8 @@ def identify(path):
     if not os.path.exists(path):
         return {}
 
-    out, _ = processutils.execute(
-        'qemu-img info %s' % path, shell=True)
+    out, _ = util.execute(None,
+                          'qemu-img info %s' % path)
 
     data = {}
     for line in out.split('\n'):
@@ -276,9 +271,9 @@ def create_cow(cache_file, disk_file):
     if os.path.exists(disk_file):
         return
 
-    processutils.execute(
-        'qemu-img create -b %s -f qcow2 %s' % (cache_file, disk_file),
-        shell=True)
+    util.execute(None,
+                 'qemu-img create -b %s -f qcow2 %s' % (
+                     cache_file, disk_file))
 
 
 def create_flat(cache_file, disk_file):
@@ -296,16 +291,14 @@ def create_raw(cache_file, disk_file):
     if os.path.exists(disk_file):
         return
 
-    processutils.execute(
-        'qemu-img convert -t none -O raw %s %s'
-        % (cache_file, disk_file),
-        shell=True)
+    util.execute(None,
+                 'qemu-img convert -t none -O raw %s %s'
+                 % (cache_file, disk_file))
 
 
 def snapshot(source, destination):
     """Convert a possibly COW layered disk file into a snapshot."""
 
-    processutils.execute(
-        'qemu-img convert --force-share -O qcow2 %s %s'
-        % (source, destination),
-        shell=True)
+    util.execute(None,
+                 'qemu-img convert --force-share -O qcow2 %s %s'
+                 % (source, destination))

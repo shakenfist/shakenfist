@@ -133,7 +133,7 @@ class NetworkNetNodeTestCase(NetworkTestCase):
 link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
 ''')
 
-    @mock.patch('oslo_concurrency.processutils.execute',
+    @mock.patch('shakenfist.util.execute',
                 return_value=(pgrep, ''))
     def test_is_created_yes(self, mock_execute):
         n = net.Network(uuid='8abbc9a6-d923-4441-b498-4f8e3c166804',
@@ -147,7 +147,7 @@ link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
 link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
 ''')
 
-    @mock.patch('oslo_concurrency.processutils.execute',
+    @mock.patch('shakenfist.util.execute',
                 return_value=(pgrep, ''))
     def test_is_created_no(self, mock_execute):
         n = net.Network(uuid='1111111-d923-4441-b498-4f8e3c166804',
@@ -158,7 +158,7 @@ link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
 
     pgrep = 'Device "br-vxlan-45" does not exist.'
 
-    @mock.patch('oslo_concurrency.processutils.execute',
+    @mock.patch('shakenfist.util.execute',
                 return_value=(pgrep, ''))
     def test_is_created_no_bridge(self, mock_execute):
         n = net.Network(uuid='1111111-d923-4441-b498-4f8e3c166804',

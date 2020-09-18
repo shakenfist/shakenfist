@@ -131,23 +131,19 @@ def main():
                 subst['master_float'] = ipm.get_address_at_index(1)
                 subst['netmask'] = ipm.netmask
 
-                processutils.execute(
-                    'ip link add %(physical_bridge)s type bridge' % subst, shell=True)
-                processutils.execute(
-                    'ip link set %(physical_bridge)s up' % subst, shell=True)
-                processutils.execute(
-                    'ip addr add %(master_float)s/%(netmask)s dev %(physical_bridge)s' % subst,
-                    shell=True)
+                util.execute(None,
+                             'ip link add %(physical_bridge)s type bridge' % subst)
+                util.execute(None,
+                             'ip link set %(physical_bridge)s up' % subst)
+                util.execute(None,
+                             'ip addr add %(master_float)s/%(netmask)s dev %(physical_bridge)s' % subst)
 
-                processutils.execute(
-                    'iptables -A FORWARD -o %(physical_nic)s -i %(physical_bridge)s -j ACCEPT' % subst,
-                    shell=True)
-                processutils.execute(
-                    'iptables -A FORWARD -i %(physical_nic)s -o %(physical_bridge)s -j ACCEPT' % subst,
-                    shell=True)
-                processutils.execute(
-                    'iptables -t nat -A POSTROUTING -o %(physical_nic)s -j MASQUERADE' % subst,
-                    shell=True)
+                util.execute(None,
+                             'iptables -A FORWARD -o %(physical_nic)s -i %(physical_bridge)s -j ACCEPT' % subst)
+                util.execute(None,
+                             'iptables -A FORWARD -i %(physical_nic)s -o %(physical_bridge)s -j ACCEPT' % subst)
+                util.execute(None,
+                             'iptables -t nat -A POSTROUTING -o %(physical_nic)s -j MASQUERADE' % subst)
 
     def _start_daemon(d):
         pid = os.fork()

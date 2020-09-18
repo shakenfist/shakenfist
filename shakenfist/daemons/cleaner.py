@@ -3,8 +3,6 @@ import json
 import os
 import time
 
-from oslo_concurrency import processutils
-
 from shakenfist import config
 from shakenfist.daemons import daemon
 from shakenfist import db
@@ -34,8 +32,8 @@ class Monitor(daemon.Daemon):
                     # Instance is SF but not in database. Kill to reduce load.
                     logutil.warning([virt.ThinInstance(instance_uuid)],
                                     'Destroying unknown instance')
-                    processutils.execute(
-                        'virsh destroy "sf:%s"' % instance_uuid, shell=True)
+                    util.execute(None,
+                                 'virsh destroy "sf:%s"' % instance_uuid)
                     continue
 
                 db.place_instance(
@@ -56,8 +54,8 @@ class Monitor(daemon.Daemon):
                         # Sometimes we just can't delete the VM. Try the big hammer instead.
                         logutil.warning([virt.ThinInstance(instance_uuid)],
                                         'Attempting alternate delete method for instance')
-                        processutils.execute(
-                            'virsh destroy "sf:%s"' % instance_uuid, shell=True)
+                        util.execute(None,
+                                     'virsh destroy "sf:%s"' % instance_uuid)
 
                         db.add_event('instance', instance_uuid,
                                      'enforced delete', 'complete', None, None)
