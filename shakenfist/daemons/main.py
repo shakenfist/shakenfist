@@ -106,7 +106,7 @@ def main():
     logutil.info(None, 'resources pid is %d' % pid)
 
     # If I am the network node, I need some setup
-    if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
+    if util.is_network_node():
         # Bootstrap the floating network in the Networks table
         floating_network = db.get_network('floating')
         if not floating_network:

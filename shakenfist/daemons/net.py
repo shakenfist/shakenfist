@@ -137,7 +137,7 @@ class Monitor(daemon.Daemon):
         last_management = 0
 
         while True:
-            if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
+            if util.is_network_node():
                 self._process_network_node_workitems()
             else:
                 management_age = time.time() - last_management

@@ -10,6 +10,7 @@ from shakenfist import config
 from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import logutil
+from shakenfist import util
 
 ####################################################################
 # Please do not call this file directly, but instead call it via   #
@@ -117,7 +118,10 @@ def get_lock(objecttype, subtype, name, ttl=60, timeout=10, relatedobjects=None)
 
 
 def refresh_lock(lock, relatedobjects=None):
-    logutil.info(relatedobjects, 'Refreshing lock %s' % lock.name)
+    if not lock.is_acquired():
+        raise exceptions.LockException(
+            'The lock on %s has expired.' % lock.path)
+
     lock.refresh()
     logutil.info(relatedobjects, 'Refreshed lock %s' % lock.name)
 
@@ -243,6 +247,6 @@ def _restart_queue(queuename):
 def restart_queues():
     # Move things which were in processing back to the queue because
     # we didn't complete them before crashing.
-    if config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP'):
+    if util.is_network_node():
         _restart_queue('networknode')
     _restart_queue(config.parsed.get('NODE_NAME'))
