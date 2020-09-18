@@ -180,32 +180,21 @@ class Instance(object):
                             os.link(hashed_image_path, disk['path'])
                         except OSError:
                             # Different filesystems
-                            if lock:
-                                db.refresh_lock(lock)
-
-                            shutil.copyfile(hashed_image_path, disk['path'])
-
-                            if lock:
-                                db.refresh_lock(lock)
+                            util.execute(
+                                [lock], 'cp %s %s' % (hashed_image_path, disk['path']))
 
                         # Due to limitations in some installers, cdroms are always on IDE
                         disk['device'] = 'hd%s' % disk['device'][-1]
                         disk['bus'] = 'ide'
                     else:
                         with util.RecordedOperation('resize image', self):
-                            if lock:
-                                db.refresh_lock(lock)
-
                             resized_image_path = images.resize(
-                                hashed_image_path, disk['size'])
+                                [lock], hashed_image_path, disk['size'])
 
                         if config.parsed.get('DISK_FORMAT') == 'qcow':
                             with util.RecordedOperation('create copy on write layer', self):
-                                if lock:
-                                    db.refresh_lock(lock)
-
                                 images.create_cow(
-                                    resized_image_path, disk['path'])
+                                    [lock], resized_image_path, disk['path'])
 
                             # Record the backing store for modern libvirts
                             disk['backing'] = ('<backingStore type=\'file\'>\n'
@@ -215,19 +204,13 @@ class Instance(object):
 
                         elif config.parsed.get('DISK_FORMAT') == 'qcow_flat':
                             with util.RecordedOperation('create flat layer', self):
-                                if lock:
-                                    db.refresh_lock(lock)
-
                                 images.create_flat(
-                                    resized_image_path, disk['path'])
+                                    [lock], resized_image_path, disk['path'])
 
                         elif config.parsed.get('DISK_FORMAT') == 'flat':
                             with util.RecordedOperation('create raw disk', self):
-                                if lock:
-                                    db.refresh_lock(lock)
-
                                 images.create_raw(
-                                    resized_image_path, disk['path'])
+                                    [lock], resized_image_path, disk['path'])
 
                         else:
                             raise Exception('Unknown disk format')
@@ -529,7 +512,7 @@ class Instance(object):
             'instance', self.db_entry['uuid'], 'poweroff', 'complete', None, None)
 
     def _snapshot_device(self, source, destination):
-        images.snapshot(source, destination)
+        images.snapshot(None, source, destination)
 
     def snapshot(self, all=False):
         disks = self.db_entry['block_devices']['devices']

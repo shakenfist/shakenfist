@@ -237,7 +237,7 @@ class ImageObjectTestCase(testtools.TestCase):
     @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.db.add_event')
     def test_transcode_image_noop(self, mock_event, mock_lock, mock_exists, mock_execute):
-        images._transcode('/a/b/c/hash', 'foo')
+        images._transcode(None, '/a/b/c/hash', 'foo')
         mock_execute.assert_not_called()
 
     @mock.patch('shakenfist.util.execute',
@@ -250,7 +250,7 @@ class ImageObjectTestCase(testtools.TestCase):
     @mock.patch('shakenfist.db.add_event')
     def test_transcode_image_link(self, mock_event, mock_lock, mock_link, mock_identify, mock_exists,
                                   mock_execute):
-        images._transcode('/a/b/c/hash', 'foo')
+        images._transcode(None, '/a/b/c/hash', 'foo')
         mock_link.assert_called_with('/a/b/c/hash', '/a/b/c/hash.qcow2')
         mock_execute.assert_not_called()
 
@@ -264,12 +264,11 @@ class ImageObjectTestCase(testtools.TestCase):
     @mock.patch('shakenfist.db.add_event')
     def test_transcode_image_convert(self, mock_event, mock_lock, mock_link, mock_identify, mock_exists,
                                      mock_execute):
-        images._transcode('/a/b/c/hash', 'foo')
+        images._transcode(None, '/a/b/c/hash', 'foo')
         mock_link.assert_not_called()
         mock_execute.assert_called_with(
             None, 'qemu-img convert -t none -O qcow2 /a/b/c/hash /a/b/c/hash.qcow2')
 
-    @mock.patch('shutil.copyfile')
     @mock.patch('shakenfist.util.execute',
                 return_value=(None, None))
     @mock.patch('os.path.exists', return_value=True)
@@ -277,13 +276,11 @@ class ImageObjectTestCase(testtools.TestCase):
                 return_value={'virtual size': 8 * 1024 * 1024 * 1024})
     @mock.patch('os.link')
     def test_resize_image_noop(self, mock_link, mock_identify, mock_exists,
-                               mock_execute, mock_copyfile):
-        images.resize('/a/b/c/hash', 8)
+                               mock_execute):
+        images.resize(None, '/a/b/c/hash', 8)
         mock_link.assert_not_called()
         mock_execute.assert_not_called()
-        mock_copyfile.assert_not_called()
 
-    @mock.patch('shutil.copyfile')
     @mock.patch('shakenfist.util.execute',
                 return_value=(None, None))
     @mock.patch('os.path.exists', return_value=False)
@@ -291,13 +288,11 @@ class ImageObjectTestCase(testtools.TestCase):
                 return_value={'virtual size': 8 * 1024 * 1024 * 1024})
     @mock.patch('os.link')
     def test_resize_image_link(self, mock_link, mock_identify, mock_exists,
-                               mock_execute, mock_copyfile):
-        images.resize('/a/b/c/hash', 8)
+                               mock_execute):
+        images.resize(None, '/a/b/c/hash', 8)
         mock_link.assert_called_with('/a/b/c/hash', '/a/b/c/hash.qcow2.8G')
         mock_execute.assert_not_called()
-        mock_copyfile.assert_not_called()
 
-    @mock.patch('shutil.copyfile')
     @mock.patch('shakenfist.util.execute',
                 return_value=(None, None))
     @mock.patch('os.path.exists', return_value=False)
@@ -305,13 +300,12 @@ class ImageObjectTestCase(testtools.TestCase):
                 return_value={'virtual size': 4 * 1024 * 1024 * 1024})
     @mock.patch('os.link')
     def test_resize_image_resize(self, mock_link, mock_identify, mock_exists,
-                                 mock_execute, mock_copyfile):
-        images.resize('/a/b/c/hash', 8)
+                                 mock_execute):
+        images.resize(None, '/a/b/c/hash', 8)
         mock_link.assert_not_called()
-        mock_execute.assert_called_with(
-            None, 'qemu-img resize /a/b/c/hash.qcow2.8G 8G')
-        mock_copyfile.assert_called_with(
-            '/a/b/c/hash.qcow2', '/a/b/c/hash.qcow2.8G'
+        mock_execute.assert_has_calls(
+            [mock.call(None, 'cp /a/b/c/hash.qcow2 /a/b/c/hash.qcow2.8G'),
+             mock.call(None, 'qemu-img resize /a/b/c/hash.qcow2.8G 8G')]
         )
 
     @mock.patch('shakenfist.util.execute',
@@ -335,13 +329,13 @@ class ImageObjectTestCase(testtools.TestCase):
                 return_value=(None, None))
     @mock.patch('os.path.exists', return_value=False)
     def test_create_cow(self, mock_exists, mock_execute):
-        images.create_cow('/a/b/c/base', '/a/b/c/cow')
+        images.create_cow(None, '/a/b/c/base', '/a/b/c/cow')
         mock_execute.assert_called_with(
             None, 'qemu-img create -b /a/b/c/base -f qcow2 /a/b/c/cow')
 
     @mock.patch('shakenfist.util.execute',
                 return_value=(None, None))
     def test_snapshot(self, mock_execute):
-        images.snapshot('/a/b/c/base', '/a/b/c/snap')
+        images.snapshot(None, '/a/b/c/base', '/a/b/c/snap')
         mock_execute.assert_called_with(
             None, 'qemu-img convert --force-share -O qcow2 /a/b/c/base /a/b/c/snap')

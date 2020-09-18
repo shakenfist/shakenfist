@@ -228,9 +228,7 @@ def ignore_exception(processname, e):
 
 def _lock_refresher(locks):
     while True:
-        for lock in locks:
-            if lock.is_acquired():
-                lock.refresh()
+        db.refresh_locks(locks)
         time.sleep(10)
 
 
