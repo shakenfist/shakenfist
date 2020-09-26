@@ -4,16 +4,14 @@ import copy
 import os
 import socket
 
+from shakenfist import exceptions
 from shakenfist import util
 
 
-node_name = socket.getfqdn()
-try:
-    node_ip = socket.gethostbyname(node_name)
-except Exception as e:
-    # Only for localhost development environments
-    node_ip = '127.0.0.1'
-    util.ignore_exception('config parser', e)
+# NOTE(mikal): Dear future developer. Thanks ftheor dropping by! Remember that the type
+# of values in this set of defaults matters, as we use it to decide how to parse
+# override values from the user. Your current options are strings (the default), integers,
+# and floats. Integers and floats differ in that a float has values after a decimal point.
 
 CONFIG_DEFAULTS = {
     # Deployment wide options
@@ -58,7 +56,7 @@ CONFIG_DEFAULTS = {
     #    floating IPs
     #  - network_node_ip: the IP of a node which will egress all traffic
     'FLOATING_NETWORK': '192.168.20.0/24',
-    'NETWORK_NODE_IP': node_ip,
+    'NETWORK_NODE_IP': None,
 
     # Database options:
     #  - cleaner_delay: how long to wait before removing old data from the
@@ -85,9 +83,9 @@ CONFIG_DEFAULTS = {
     # qcow_flat (just qcow2, no COW), and flat (just raw disk).
     'DISK_FORMAT': 'qcow',
 
-    # The IP of this node
-    'NODE_IP': node_ip,
-    'NODE_NAME': node_name,
+    # The IP of this node, populated by parse()
+    'NODE_IP': None,
+    'NODE_NAME': None,
     'NODE_EGRESS_NIC': 'eth0',
 
     # Where on disk instances are stored
@@ -107,13 +105,45 @@ CONFIG_DEFAULTS = {
 
 class Config(object):
     def __init__(self):
+        self.config = None
+
+    def parse(self):
+        global CONFIG_DEFAULTS
+
+        node_name = socket.getfqdn()
+        try:
+            node_ip = socket.gethostbyname(node_name)
+        except Exception as e:
+            # Only for localhost development environments
+            node_ip = '127.0.0.1'
+            util.ignore_exception('config parser', e)
+
+        CONFIG_DEFAULTS['NODE_NAME'] = node_name
+        CONFIG_DEFAULTS['NODE_IP'] = node_ip
+        CONFIG_DEFAULTS['NETWORK_NODE_IP'] = node_ip
+
         self.config = copy.copy(CONFIG_DEFAULTS)
         for var in os.environ:
             if var.startswith('SHAKENFIST_'):
                 flag = var.replace('SHAKENFIST_', '')
-                self.config[flag] = os.environ[var]
+                value = os.environ[var]
+
+                # We use the type of the default value to determine
+                # what type we should force the value provided by an
+                # environment variable into.
+                if isinstance(CONFIG_DEFAULTS[flag], int):
+                    value = int(value)
+                elif isinstance(CONFIG_DEFAULTS[flag], float):
+                    value = float(value)
+                elif not isinstance(CONFIG_DEFAULTS[flag], str):
+                    raise exceptions.FlagException(
+                        'Flag %s has unknown type.' % flag)
+
+                self.config[flag] = value
 
     def get(self, var):
+        if not self.config:
+            self.parse()
         return self.config.get(var)
 
 

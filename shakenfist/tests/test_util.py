@@ -7,18 +7,18 @@ from shakenfist import config
 
 
 class UtilTestCase(testtools.TestCase):
+    @mock.patch.dict('os.environ',
+                     {'SHAKENFIST_NODE_IP': '1.1.1.1',
+                      'SHAKENFIST_NETWORK_NODE_IP': '1.1.1.1'})
     def test_is_network_node_yes(self):
-        config.CONFIG_DEFAULTS['NODE_IP'] = '1.1.1.1'
-        config.CONFIG_DEFAULTS['NETWORK_NODE_IP'] = '1.1.1.1'
-        config.parsed = config.Config()
-
+        config.parsed.parse()
         self.assertTrue(util.is_network_node())
 
+    @mock.patch.dict('os.environ',
+                     {'SHAKENFIST_NODE_IP': '1.1.1.1',
+                      'SHAKENFIST_NETWORK_NODE_IP': '1.1.1.2'})
     def test_is_network_node_no(self):
-        config.CONFIG_DEFAULTS['NODE_IP'] = '1.1.1.1'
-        config.CONFIG_DEFAULTS['NETWORK_NODE_IP'] = '2.2.2.2'
-        config.parsed = config.Config()
-
+        config.parsed.parse()
         self.assertFalse(util.is_network_node())
 
     @mock.patch('shakenfist.util.execute',

@@ -44,3 +44,7 @@ class VirtException(Exception):
 
 class NoDomainException(VirtException):
     pass
+
+
+class FlagException(Exception):
+    pass
