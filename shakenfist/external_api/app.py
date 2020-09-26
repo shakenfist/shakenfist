@@ -603,7 +603,7 @@ class Instance(Resource):
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def delete(self, instance_uuid=None,
-                instance_from_db=None, instance_from_db_virt=None):
+               instance_from_db=None, instance_from_db_virt=None):
 
         # Check if instance has already been deleted
         if instance_from_db['state'] == 'deleted':
@@ -875,6 +875,7 @@ class Instances(Resource):
             instances_del.append(instance['uuid'])
 
         return instances_del
+
 
 class InstanceInterfaces(Resource):
     @jwt_required
@@ -1513,7 +1514,7 @@ class monitor(object):
 
     def run(self):
         processutils.execute(
-            ('gunicorn3 --workers 10 --bind 0.0.0.0:%d '
+            ('gunicorn --workers 10 --bind 0.0.0.0:%d '
              '--log-syslog --log-syslog-prefix sf '
              '--timeout 600 --name "sf api" '
              'shakenfist.external_api.app:app'
