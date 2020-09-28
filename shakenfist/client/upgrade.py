@@ -55,7 +55,9 @@ def main():
     print()
 
     min_version = None
-    if 'unknown' in versions:
+    if len(versions) == 0:
+        min_version = '0.2'
+    elif 'unknown' in versions:
         min_version = '0.2'
     else:
         min_version = sorted(versions)[0]
