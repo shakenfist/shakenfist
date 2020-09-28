@@ -1,6 +1,3 @@
----
-title: Workflow
----
 # Development Workflow
 
 ### Short Lesson

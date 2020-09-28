@@ -1,4 +1,4 @@
-# Updating Web Docs
+# Updating These Docs
 
 Built using MkDocs: https://www.mkdocs.org/  
 Theme: https://squidfunk.github.io/mkdocs-material/customization/  
@@ -25,3 +25,7 @@ Build and deploy with
 mkdocs gh-deploy
 ```
 This will push to the `gh-pages` branch of the current git remote.
+
+## Navigation Bar
+
+The navigation bar is configured via the `mkdocs.yml` file in the repository root.

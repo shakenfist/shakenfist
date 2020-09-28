@@ -13,7 +13,7 @@ I’d taken a bit of trouble with each feature in Shaken Fist to think through w
 
 I think Shaken Fist is useful to others. Its apache2 licensed, and available on github if you’re interested.
 
-## I'd like to subscribe to your newsletter
+## "I'd like to subscribe to your newsletter"
 
 First off, we don't have a newsletter. That said, updates will be announced here as they happen. What we do have is useful links:
 
