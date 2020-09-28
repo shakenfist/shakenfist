@@ -1,8 +1,7 @@
 import logging
 from logging import handlers as logging_handlers
 import os
-from pylogrus import PyLogrus
-from pylogrus import TextFormatter
+from pylogrus import PyLogrus, TextFormatter
 import re
 import setproctitle
 import traceback
@@ -10,17 +9,19 @@ import traceback
 
 def setup(name):
     logging.setLoggerClass(PyLogrus)
-    log = logging.getLogger(__name__)
 
-    # Remove old / default handlers
-    while log.hasHandlers():
-        log.removeHandler(log.handlers[0])
+    # Set root log level - higher handlers can set their own filter level
+    logging.root.setLevel(logging.DEBUG)
+    log = logging.getLogger(name)
 
-    # Add our handler
-    handler = logging_handlers.SysLogHandler(address='/dev/log')
-    handler.setFormatter(TextFormatter(
-        fmt='%(levelname)s %(message)s', colorize=False))
-    log.addHandler(handler)
+    if log.hasHandlers():
+        handler = log.handlers[0]
+    else:
+        # Add our handler
+        handler = logging_handlers.SysLogHandler(address='/dev/log')
+        handler.setFormatter(TextFormatter(
+            fmt='%(levelname)s %(message)s', colorize=False))
+        log.addHandler(handler)
 
     return log, handler
 
