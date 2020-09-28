@@ -1,6 +1,6 @@
 # Networking Explained - Single Node
 
-This page is [part of a series explaining how Shaken Fist networking works](networking_explained.md). You might want to check out the other pages as well.
+This page is [part of a series explaining how Shaken Fist networking works](overview.md). You might want to check out the other pages as well.
 
 ## The simplest case: a virtual network with no DHCP and no NAT, and a single remote instance
 

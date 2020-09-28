@@ -56,5 +56,5 @@ There is some limited API documentation, its definitely a known gap.
 * [The power states an instance can be in](power_states.md)
 
 ## Documentation for developers of Shaken Fist
-* We have [release documentation](release_process.md). We found this mildly surprising too.
-* Everyone is confused by the networking, so we wrote some [networking documentation](networking_explained.md). Hopefully it helps.
+* We have [release documentation](development/release_process.md). We found this mildly surprising too.
+* Everyone is confused by the networking, so we wrote some [networking documentation](networking/overview.md). Hopefully it helps.

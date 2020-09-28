@@ -25,9 +25,11 @@ sudo apt-get -y install ansible tox pwgen build-essential python3-dev python3-wh
 ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform andrewrothstein.go
 ```
 
-## A local developer installation
+## Local Development
 
-Shaken Fist uses ansible as its installer, with terraform to bring up cloud resources. Because we're going to install Shaken Fist on localhost, there isn't much terraform in this example. Installation is run by a simple wrapper called "deployandtest.sh". This wrapper checks out required git repositories, runs ansible plays, and then performs CI testing of the installation. It should be noted that CI testing is currently destructive (don't run it against production!), and not supported for installs with fewer than three machines. It is therefore skipped for a localhost install.
+Shaken Fist uses ansible as its installer, with terraform to bring up cloud resources. Because we're going to install Shaken Fist on localhost, there isn't much terraform in this example.Installation is run by a simple wrapper called "deployandtest.sh". This wrapper checks out required git repositories, runs ansible plays, and then performs CI testing of the installation.
+!!! warning
+    CI testing is currently destructive (don't run it against production!), and not supported for installs with fewer than three machines. It is skipped for a localhost install.
 
 We also make the assumption that developer laptops move around more than servers. In a traditional install we detect the primary NIC of the machine and then use that to build VXLAN meshes. For localhost single node deploys we instead create a bridge called "brsf" and then use that as our primary NIC. This means your machine can move around and have different routes to the internet over time, but it also means its fiddly to convert a localhost install into a real production cluster. Please only use localhost installs for development purposes.
 
@@ -39,29 +41,36 @@ CLOUD=localhost ./deployandtest.sh
 
 If you want to install a specific release, you can set the RELEASE environment variable. Possible options are:
 
-* Any valid pypi release version number.
+* Any [valid pypi release](https://pypi.org/project/shakenfist/#history) version number.
 * "git:master" for the current master branch of each repository.
 * "git:branch" for a specific branch. If that branch does not exist in a given repository, master is used instead.
 
-## Starting your first instance
+## Your first instance
 
 Before you can start your first instance you'll need to authenticate to Shaken Fist, and create a network. Shaken Fist's python api client (as used by the command line client) looks for authentication details in the following locations:
 
-* command line flags
-* environment variables
-* ~/.shakenfist, a JSON formatted configuration file
-* /etc/sf/shakenfist.json, the same file as above, but global
+* Command line flags
+* Environment variables (prefixed with **SHAKENFIST_**)
+* **~/.shakenfist**, a JSON formatted configuration file
+* **/etc/sf/shakenfist.json**, the same file as above, but global
 
-By default the installer creates /etc/sf/sfrc, which is an example of how to use environment variables to authenticate. It is customized per installation, but sets the following variables:
+By default the installer creates **/etc/sf/sfrc**, which sets the required environment variables to authenticate.  
+It is customized per installation, setting the following variables:
 
-* SHAKENFIST_NAMESPACE, the namespace to create resources in
-* SHAKENFIST_KEY, an authentication key for that namespace
-* SHAKENFIST_API_URL, a URL to the Shaken Fist API server
+* **SHAKENFIST_NAMESPACE**, the namespace to create resources in
+* **SHAKENFIST_KEY**, an authentication key for that namespace
+* **SHAKENFIST_API_URL**, a URL to the Shaken Fist API server
 
-So, to interact with Shaken Fist, we need to source that rc file. We will then create a simple first network:
+Before interacting with Shaken Fist, we need to source the rc file.  
 
 ```bash
 . /etc/sf/sfrc
+```
+
+Instances must be launched attached to a network.
+
+Create your first network:
+```bash
 sf-client network create 192.168.42.0/24 mynet
 ```
 

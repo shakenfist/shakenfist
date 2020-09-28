@@ -1,3 +1,7 @@
+---
+title: Namespace Authentication
+---
+
 Namespace Context and Authentication
 ====================================
 

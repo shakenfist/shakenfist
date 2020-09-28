@@ -15,4 +15,4 @@ _A quick disclaimer... The virtual mesh manages itself and changes state over ti
 
 For this document, we will assume there are three Shaken Fist nodes, named sf-1, sf-2, and sf-3. Its a total coincidence that this is the default size for the installer ansible at the time of writing and the exact size of all of the production clusters we are aware of. sf-1 is configured as the "network node", which is just a hypervisor like every other node, except that it is also where packets to and from the virtual networks route in and out of the mesh.
 
-* [First, off let's start with a simple network with one instance and no DHCP or NAT](networking_explained_single_instance.md).
+* [First, off let's start with a simple network with one instance and no DHCP or NAT](single_instance.md).

@@ -5,10 +5,10 @@ Shaken Fist version 0.2.1 introduced power states for instances. Before this, yo
 
 The following power states are implemented:
 
-* on: the instance is running
-* off: the instance is not running
-* paused: the instance is paused
-* crashed: the instance is crashed according to the hypervisor. Instances in this power state will also be in an instance state of "error".
+* **on**: the instance is running
+* **off**: the instance is not running
+* **paused**: the instance is paused
+* **crashed**: the instance is crashed according to the hypervisor. Instances in this power state will also be in an instance state of "error".
 
 There are additionally a set of "transition states" which are used to indicate that you have requested a change of state that might not yet have completed. These are:
 
