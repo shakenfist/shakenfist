@@ -3,7 +3,6 @@ import testtools
 
 from shakenfist import net
 from shakenfist import config
-from shakenfist import util
 
 
 class NetworkTestCase(testtools.TestCase):
