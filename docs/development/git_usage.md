@@ -1,7 +1,11 @@
-# Development Work Flow
+---
+title: Workflow
+---
+# Development Workflow
 
 ### Short Lesson
 The majority of teams using git have a work flow that looks similar to the four well known work flows:
+
 * [Git Flow](https://datasift.github.io/gitflow/IntroducingGitFlow.html)
 * [GitHub Flow](https://guides.github.com/introduction/flow/)
 * [GitLab Flow](https://about.gitlab.com/blog/2014/09/29/gitlab-flow/)
