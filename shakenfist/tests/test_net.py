@@ -3,7 +3,6 @@ import testtools
 
 from shakenfist import net
 from shakenfist import config
-from shakenfist import util
 
 
 class NetworkTestCase(testtools.TestCase):
@@ -41,12 +40,6 @@ class NetworkGeneralTestCase(NetworkTestCase):
                         ipblock='192.168.1.0/24')
         self.assertEqual('network(notauuid, vxid 42)', str(n))
 
-        config.CONFIG_DEFAULTS['NODE_IP'] = '1.1.1.1'
-        config.CONFIG_DEFAULTS['NETWORK_NODE_IP'] = '2.2.2.2'
-        config.parsed = config.Config()
-
-        self.assertFalse(util.is_network_node())
-
 
 class NetworkNormalNodeTestCase(NetworkTestCase):
     def setUp(self):
@@ -76,6 +69,9 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
 
     @mock.patch('shakenfist.net.Network.is_created', return_value=True)
     @mock.patch('shakenfist.net.Network.is_dnsmasq_running', return_value=False)
+    @mock.patch.dict('os.environ',
+                     {'SHAKENFIST_NODE_IP': '1.1.1.1',
+                      'SHAKENFIST_NETWORK_NODE_IP': '1.1.1.2'})
     def test_is_okay_no_dns(self, mock_is_dnsmasq, mock_is_created):
         n = net.Network(uuid='actualuuid', vxlan_id=42, provide_dhcp=True,
                         provide_nat=True, physical_nic='eth0',
