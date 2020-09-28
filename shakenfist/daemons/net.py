@@ -66,8 +66,8 @@ class Monitor(daemon.Daemon):
 
         # Delete "deleted" SF networks and log unknown vxlans
         if extra_vxids:
-            logutil.warn(None, 'Extra vxlans present! IDs are: %s'
-                         % extra_vxids)
+            logutil.warning(None, 'Extra vxlans present! IDs are: %s'
+                            % extra_vxids)
 
             # Determine the network uuids for those vxids
             # vxid_to_uuid = {}
