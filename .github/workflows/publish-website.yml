@@ -10,7 +10,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with:
-          submodules: "recursive" 
           fetch-depth: 0
       - name: Setup Python
         uses: actions/setup-python@v1
