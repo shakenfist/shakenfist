@@ -1,7 +1,8 @@
-# Development Work Flow
+# Development Workflow
 
 ### Short Lesson
 The majority of teams using git have a work flow that looks similar to the four well known work flows:
+
 * [Git Flow](https://datasift.github.io/gitflow/IntroducingGitFlow.html)
 * [GitHub Flow](https://guides.github.com/introduction/flow/)
 * [GitLab Flow](https://about.gitlab.com/blog/2014/09/29/gitlab-flow/)
@@ -26,7 +27,8 @@ The Shaken Fist developers have chosen **Trunk Based Development.**
     - It is not expected that many commits are made to this branch.
     - If many commits are required to a release branch then this indicates the need for another release.
 
-One day the project might desire a `develop` branch to ensure that `master` is always production ready. This can be useful when adding and maturing multiple inter-dependant features. At this stage, it is not required and would lead to more complexity. At this of project maturity, that complexity would be extra effort with the possibility of errors without a significant return.
+!!! attention
+    One day the project might desire a `develop` branch to ensure that `master` is always production ready. This can be useful when adding and maturing multiple inter-dependant features. At this stage, it is not required and would lead to more complexity. At this of project maturity, that complexity would be extra effort with the possibility of errors without a significant return.
 
 ## Process
 

@@ -1,0 +1,28 @@
+site_name: Shaken Fist
+site_url: https://shakenfist.com
+repo_url: https://github.com/shakenfist/shakenfist
+site_description: A minimal cloud aimed at small and edge deployments
+theme:
+  name: material
+markdown_extensions:
+  - admonition
+  - pymdownx.magiclink:
+      repo_url_shorthand: true
+      user: shakenfist
+nav:
+  - Introduction: index.md
+  - Installation: installation.md
+  - Developer Guide:
+      - "Workflow": development/git_usage.md
+      - "Standards": development/standards.md
+      - "Namespace Authentication": development/namespace_auth.md
+      - "Releases": development/release_process.md
+      - "Website": development/updating_docs.md
+  - Operator Guide:
+      - "Networking Explained":
+          - "Overview": "networking/overview.md"
+          - "Single Instance": "networking/single_instance.md"
+      - "Power States": "power_states.md"
+  - Change Log:
+      - v0.3: "changelog/changelog_v03.md"
+      - v0.2: "changelog/changelog_v02.md"
