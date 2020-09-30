@@ -55,7 +55,7 @@ def main():
     print()
 
     min_version = None
-    if len(versions) == 0:
+    if not versions:
         min_version = '0.2'
     elif 'unknown' in versions:
         min_version = '0.2'
