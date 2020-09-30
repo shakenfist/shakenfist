@@ -34,14 +34,14 @@ Shaken Fist uses ansible as its installer, with terraform to bring up cloud reso
 We also make the assumption that developer laptops move around more than servers. In a traditional install we detect the primary NIC of the machine and then use that to build VXLAN meshes. For localhost single node deploys we instead create a bridge called "brsf" and then use that as our primary NIC. This means your machine can move around and have different routes to the internet over time, but it also means its fiddly to convert a localhost install into a real production cluster. Please only use localhost installs for development purposes.
 
 ```bash 
-CLOUD=localhost ./deployandtest.sh
+CLOUD=localhost RELEASE="git:master" ./deployandtest.sh
 ```
 
 <aside>The deployer clones a number of git repositories that it needs to build a working Shaken Fist installation. As a developer, you might want to move these out of shakenfist/deploy/gitrepos to somewhere more obvious once the installer has finished running. You can just symlink the repositories to the location that the deployer users and things will work as expected. Note that the deloyer does not clone all repositories, just those it needs, so you might still need to clone other repositories.</aside>
 
 If you want to install a specific release, you can set the RELEASE environment variable. Possible options are:
 
-* Any [valid pypi release](https://pypi.org/project/shakenfist/#history) version number.
+* Any [valid pypi release](https://pypi.org/project/shakenfist/#history) version number. This is the default and you get the most recent pypi release if you do not specify a value.
 * "git:master" for the current master branch of each repository.
 * "git:branch" for a specific branch. If that branch does not exist in a given repository, master is used instead.
 
