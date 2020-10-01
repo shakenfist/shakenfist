@@ -99,9 +99,14 @@ def generic_wrapper(func):
             for header in flask.request.headers:
                 formatted_headers.append(str(header))
 
+            # Ensure key does not appear in logs
+            kwargs_log = copy.copy(kwargs)
+            if 'key' in kwargs_log:
+                kwargs_log['key'] = '*****'
+
             msg = 'API request: %s %s' % (
                 flask.request.method, flask.request.url)
-            msg += '\n    Args: %s\n    KWargs: %s' % (args, kwargs)
+            msg += '\n    Args: %s\n    KWargs: %s' % (args, kwargs_log)
 
             if re.match(r'http(|s)://0.0.0.0:\d+/$', flask.request.url):
                 logutil.debug(None, msg)
