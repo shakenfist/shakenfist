@@ -15,17 +15,13 @@ from shakenfist import util
 from shakenfist import virt
 
 
-class JobName(object):
-    def __init__(self, name):
-        self.name = name
-
-    def get_describing_tuple(self):
-        return 'workitem', self.name
+LOG, _ = logutil.setup(__name__)
 
 
 def handle(jobname, workitem):
-    j = JobName(jobname)
-    logutil.info([j], 'Processing workitem')
+    log = LOG.withFields({'workitem': jobname})
+    log.info('Processing workitem')
+
     setproctitle.setproctitle(
         '%s-%s' % (daemon.process_name('queues'), jobname))
 
@@ -33,22 +29,20 @@ def handle(jobname, workitem):
     task = None
     try:
         for task in workitem.get('tasks', []):
-            ro = [j]
             instance_uuid = task.get('instance_uuid')
-            if instance_uuid:
-                i = virt.from_db(instance_uuid)
-                ro.append(i)
+            log_i = log.withInstance(instance_uuid)
+            log_i.info("Starting task")
 
             if task.get('type').startswith('instance_') and not instance_uuid:
-                logutil.error(ro, 'Instance task lacks instance uuid')
+                log_i.error('Instance task lacks instance uuid')
                 return
 
             if instance_uuid:
                 db.add_event('instance', instance_uuid, task.get('type').replace('_', ' '),
                              'dequeued', None, 'Work item %s' % jobname)
 
-            logutil.info(ro, 'Executing task %s: %s'
-                         % (task.get('type', 'unknown'), task))
+            log_i.info('Executing task %s: %s'
+                       % (task.get('type', 'unknown'), task))
             if task.get('type') == 'image_fetch':
                 image_fetch(task.get('url'), instance_uuid)
 
@@ -56,8 +50,7 @@ def handle(jobname, workitem):
                 redirect_to = instance_preflight(
                     instance_uuid, task.get('network'))
                 if redirect_to:
-                    util.log(
-                        'info', ro, 'Redirecting instance start to %s' % redirect_to)
+                    log_i.info('Redirecting instance start to %s' % redirect_to)
                     db.place_instance(instance_uuid, redirect_to)
                     db.enqueue(redirect_to, workitem)
                     return
@@ -80,6 +73,8 @@ def handle(jobname, workitem):
                 except Exception as e:
                     util.ignore_exception(daemon.process_name('queues'), e)
 
+            log_i.info("Task complete")
+
     except Exception as e:
         if instance_uuid:
             util.ignore_exception(daemon.process_name('queues'), e)
@@ -92,7 +87,7 @@ def handle(jobname, workitem):
         if instance_uuid:
             db.add_event('instance', instance_uuid, 'tasks complete',
                          'dequeued', None, 'Work item %s' % jobname)
-        logutil.info([j], 'Completed workitem')
+        log.info('Completed workitem')
 
 
 def image_fetch(url, instance_uuid):
@@ -236,7 +231,7 @@ def instance_delete(instance_uuid):
 class Monitor(daemon.Daemon):
     def run(self):
         workers = []
-        logutil.info(None, 'Starting')
+        LOG.info('Starting Queues')
 
         libvirt = util.get_libvirt()
         conn = libvirt.open(None)

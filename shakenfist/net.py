@@ -63,8 +63,12 @@ class Network(object):
     def __str__(self):
         return 'network(%s, vxid %s)' % (self.uuid, self.vxlan_id)
 
+    # TODO(andy) del
     def get_describing_tuple(self):
         return ('network', self.uuid)
+
+    def label(self):
+        return ({'network': self.uuid})
 
     def subst_dict(self):
         retval = {

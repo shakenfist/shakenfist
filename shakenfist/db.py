@@ -11,11 +11,15 @@ from shakenfist import config
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import ipmanager
+from shakenfist import logutil
 from shakenfist import util
 
 
 # TODO(andy): Change back to 5 once network bugs fixed
 ETCD_ATTEMPT_TIMEOUT = 15
+
+
+LOG, _ = logutil.setup(__name__)
 
 
 def see_this_node():
@@ -32,20 +36,20 @@ def see_this_node():
 
 
 def get_lock(objecttype, subtype, name, ttl=60, timeout=ETCD_ATTEMPT_TIMEOUT,
-             relatedobjects=None):
+             relatedobjects=None, log_ctx=LOG):
     return etcd.get_lock(objecttype, subtype, name, ttl=ttl, timeout=timeout,
-                         relatedobjects=relatedobjects)
+                         log_ctx=log_ctx)
 
 
-def refresh_lock(lock, relatedobjects=None):
+def refresh_lock(lock, relatedobjects=None, log_ctx=LOG):
     if lock:
-        etcd.refresh_lock(lock, relatedobjects=relatedobjects)
+        etcd.refresh_lock(lock, log_ctx=log_ctx)
 
 
-def refresh_locks(locks, relatedobjects=None):
+def refresh_locks(locks, relatedobjects=None, log_ctx=LOG):
     if locks:
         for lock in locks:
-            refresh_lock(lock, relatedobjects=relatedobjects)
+            refresh_lock(lock, log_ctx=log_ctx)
 
 
 def clear_stale_locks():

@@ -18,15 +18,20 @@ from shakenfist import util
 ####################################################################
 
 
+LOG, _ = logutil.setup(__name__)
+
+
 class ActualLock(Lock):
-    def __init__(self, objecttype, subtype, name, ttl=120, client=None, relatedobjects=None, timeout=None):
+    def __init__(self, objecttype, subtype, name, ttl=120,
+                 client=None, timeout=None, log_ctx=LOG):
+
         self.path = _construct_key(objecttype, subtype, name)
         super(ActualLock, self).__init__(self.path, ttl=ttl, client=client)
 
         self.objecttype = objecttype
         self.objectname = name
-        self.relatedobjects = relatedobjects
         self.timeout = min(timeout, 1000000000)
+        self.log_ctx = log_ctx.withFields({'path': self.path})
 
         # We override the UUID of the lock with something more helpful to debugging
         self._uuid = json.dumps(
@@ -68,10 +73,11 @@ class ActualLock(Lock):
                                  'Waiting for lock more than threshold')
 
                     node, pid = self.get_holder()
-                    logutil.info(self.relatedobjects,
-                                 'Waiting for lock on %s: %.02f seconds, threshold '
-                                 '%d seconds. Holder is pid %s on %s.'
-                                 % (self.path, duration, threshold, pid, node))
+                    self.log_ctx.withFields({'duration': duration,
+                                             'threshold': threshold,
+                                             'holder-pid': pid,
+                                             'holder-node': node,
+                                             }).info('Waiting for lock')
                     slow_warned = True
 
                 time.sleep(1)
@@ -82,9 +88,11 @@ class ActualLock(Lock):
                          'Failed to acquire lock after %.02f seconds' % duration)
 
             node, pid = self.get_holder()
-            logutil.info(self.relatedobjects,
-                         'Failed to acquire lock %s after %.02f seconds. Holder is pid %s on %s.'
-                         % (self.path, duration, pid, node))
+            self.log_ctx.withFields({'duration': duration,
+                                     'holder-pid': pid,
+                                     'holder-node': node,
+                                     }).info('Failed to acquire lock')
+
             raise exceptions.LockException(
                 'Cannot acquire lock %s, timed out after %.02f seconds'
                 % (self.name, duration))
@@ -95,9 +103,8 @@ class ActualLock(Lock):
                 db.add_event(self.objecttype, self.objectname,
                              'lock', 'acquired', None,
                              'Waited %d seconds for lock' % duration)
-                logutil.info(self.relatedobjects,
-                             'Acquiring a lock on %s was slow: %.02f seconds'
-                             % (self.path, duration))
+                self.log_ctx.withFields({'duration': duration,
+                                         }).info('Acquiring a lock was slow')
 
     def __exit__(self, _exception_type, _exception_value, _traceback):
         if not self.release():
@@ -106,7 +113,7 @@ class ActualLock(Lock):
         return self
 
 
-def get_lock(objecttype, subtype, name, ttl=60, timeout=10, relatedobjects=None):
+def get_lock(objecttype, subtype, name, ttl=60, timeout=10, log_ctx=LOG):
     """Retrieves an etcd lock object. It is not locked, to lock use acquire().
 
     The returned lock can be used as a context manager, with the lock being
@@ -114,16 +121,16 @@ def get_lock(objecttype, subtype, name, ttl=60, timeout=10, relatedobjects=None)
     will have no timeout.
     """
     return ActualLock(objecttype, subtype, name, ttl=ttl, client=Etcd3Client(),
-                      relatedobjects=relatedobjects, timeout=timeout)
+                      log_ctx=log_ctx, timeout=timeout)
 
 
-def refresh_lock(lock, relatedobjects=None):
+def refresh_lock(lock, log_ctx=LOG):
     if not lock.is_acquired():
         raise exceptions.LockException(
             'The lock on %s has expired.' % lock.path)
 
     lock.refresh()
-    logutil.info(relatedobjects, 'Refreshed lock %s' % lock.name)
+    log_ctx.withFields({'lock': lock.name}).info('Refreshed lock')
 
 
 def clear_stale_locks():
@@ -140,8 +147,10 @@ def clear_stale_locks():
 
         if node == config.parsed.get('NODE_NAME') and not psutil.pid_exists(pid):
             client.delete(metadata['key'])
-            logutil.warning(None, 'Removed stale lock for %s, previously held by pid %s on %s'
-                            % (lockname, pid, node))
+            LOG.withFields({'lock': lockname,
+                            'old-pid': pid,
+                            'old-node': node,
+                            }).warning('Removed stale lock')
 
 
 def _construct_key(objecttype, subtype, name):
@@ -195,8 +204,10 @@ def enqueue(queuename, workitem):
             jobname = '%s-%03d' % (entry_time, i)
 
         put('queue', queuename, jobname, workitem)
-        logutil.info(None, 'Enqueued workitem %s for queue %s with work %s'
-                     % (jobname, queuename, workitem))
+        LOG.withFields({'jobname': jobname,
+                        'queuename': queuename,
+                        'workitem': workitem,
+                        }).info('Enqueued workitem')
 
 
 def dequeue(queuename):
@@ -210,8 +221,10 @@ def dequeue(queuename):
 
             put('processing', queuename, jobname, workitem)
             client.delete(metadata['key'])
-            logutil.info(None, 'Moved workitem %s from queue to processing for %s with work %s'
-                         % (jobname, queuename, workitem))
+            LOG.withFields({'jobname': jobname,
+                            'queuename': queuename,
+                            'workitem': workitem,
+                            }).info('Moved workitem from queue to processing')
 
             return jobname, workitem
 
@@ -221,8 +234,9 @@ def dequeue(queuename):
 def resolve(queuename, jobname):
     with get_lock('queue', None, queuename):
         delete('processing', queuename, jobname)
-        logutil.info(None, 'Resolved workitem %s for queue %s'
-                     % (jobname, queuename))
+        LOG.withFields({'jobname': jobname,
+                        'queuename': queuename,
+                        }).info('Resolved workitem')
 
 
 def get_queue_length(queuename):
@@ -240,8 +254,9 @@ def _restart_queue(queuename):
             workitem = json.loads(data)
             put('queue', queuename, jobname, workitem)
             delete('processing', queuename, jobname)
-            logutil.warning(None, 'Reset %s workitem %s' %
-                            (queuename, jobname))
+            LOG.withFields({'jobname': jobname,
+                            'queuename': queuename,
+                            }).warning('Reset workitem')
 
 
 def restart_queues():

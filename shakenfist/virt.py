@@ -19,6 +19,9 @@ from shakenfist import net
 from shakenfist import util
 
 
+LOG, _ = logutil.setup(__name__)
+
+
 def from_definition(uuid=None, name=None, disks=None, memory_mb=None,
                     vcpus=None, ssh_key=None, user_data=None, owner=None,
                     video=None, requested_placement=None):
@@ -81,7 +84,7 @@ class Instance(object):
         disk_spec = self.db_entry['disk_spec']
         if not disk_spec:
             # This should not occur since the API will filter for zero disks.
-            logutil.error([self], 'Found disk spec empty: %s' % self.db_entry)
+            LOG.withInstance(self).error('Found disk spec empty: %s' % self.db_entry)
 
             # Stop continuous crashing by falsely claiming disks are configured.
             self.db_entry['block_devices'] = {'finalized': True}
@@ -145,8 +148,8 @@ class Instance(object):
 
         # Ensure we have state on disk
         if not os.path.exists(self.instance_path):
-            logutil.debug(
-                [self], 'Creating instance storage at %s' % self.instance_path)
+            LOG.withInstance(self).debug(
+                'Creating instance storage at %s' % self.instance_path)
             os.makedirs(self.instance_path)
 
         # Generate a config drive
@@ -243,9 +246,9 @@ class Instance(object):
                     attempts += 1
 
         if self.is_powered_on():
-            logutil.info([self], 'Instance now powered on')
+            LOG.withInstance(self).info('Instance now powered on')
         else:
-            logutil.info([self], 'Instance failed to power on')
+            LOG.withInstance(self).info('Instance failed to power on')
         db.update_instance_state(self.db_entry['uuid'], 'created')
 
     def delete(self):
@@ -486,7 +489,7 @@ class Instance(object):
             instance.create()
         except libvirt.libvirtError as e:
             if not str(e).startswith('Requested operation is not valid: domain is already running'):
-                logutil.warning([self], 'Instance start error: %s' % e)
+                LOG.withInstance(self).warning('Instance start error: %s' % e)
                 return False
 
         instance.setAutostart(1)
@@ -506,7 +509,7 @@ class Instance(object):
         try:
             instance.destroy()
         except libvirt.libvirtError as e:
-            logutil.error([self], 'Failed to delete domain: %s' % e)
+            LOG.withInstance(self).error('Failed to delete domain: %s' % e)
 
         db.add_event(
             'instance', self.db_entry['uuid'], 'poweroff', 'complete', None, None)
@@ -522,7 +525,7 @@ class Instance(object):
         snapshot_uuid = str(uuid.uuid4())
         snappath = os.path.join(self.snapshot_path, snapshot_uuid)
         if not os.path.exists(snappath):
-            logutil.debug([self], 'Creating snapshot storage at %s' % snappath)
+            LOG.withInstance(self).debug('Creating snapshot storage at %s' % snappath)
             os.makedirs(snappath)
             with open(os.path.join(self.snapshot_path, 'index.html'), 'w') as f:
                 f.write('<html></html>')

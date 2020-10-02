@@ -99,7 +99,6 @@ def main():
     # might happen quite early on.
     pid = os.fork()
     if pid == 0:
-        LOG.removeHandler(HANDLER)
         DAEMON_IMPLEMENTATIONS['resources'].Monitor('resources').run()
     DAEMON_PIDS[pid] = 'resources'
     logutil.info(None, 'resources pid is %d' % pid)
@@ -147,7 +146,6 @@ def main():
     def _start_daemon(d):
         pid = os.fork()
         if pid == 0:
-            LOG.removeHandler(HANDLER)
             DAEMON_IMPLEMENTATIONS[d].Monitor(d).run()
         DAEMON_PIDS[pid] = d
         logutil.info(None, '%s pid is %d' % (d, pid))
