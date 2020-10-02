@@ -87,6 +87,13 @@ class Monitor(daemon.Daemon):
                     log_ctx = LOG.withInstance(instance_uuid)
                     instance = db.get_instance(instance_uuid)
 
+                    if not instance:
+                        # Instance is SF but not in database. Kill because unknown.
+                        log_ctx.warning('Removing unknown inactive instance')
+                        domain = conn.lookupByName(domain_name)
+                        domain.undefine()
+                        continue
+
                     if instance.get('state') == 'deleted':
                         # NOTE(mikal): a delete might be in-flight in the queue.
                         # We only worry about instances which should have gone
@@ -168,7 +175,7 @@ class Monitor(daemon.Daemon):
 
             # Perform etcd maintenance
             if time.time() - last_compaction > 1800:
-                LOG.info(None, 'Compacting etcd')
+                LOG.info('Compacting etcd')
                 self._compact_etcd()
                 last_compaction = time.time()
 
