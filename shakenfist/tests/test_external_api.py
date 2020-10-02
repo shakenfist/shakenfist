@@ -29,6 +29,9 @@ class FakeInstance(object):
     def __init__(self, namespace=None):
         self.db_entry = {'namespace': namespace}
 
+    def unique_label(self):
+        return ('instance', self.db_entry['uuid'])
+
 
 def _encode_key(key):
     return bcrypt.hashpw(key.encode('utf-8'), bcrypt.gensalt())
@@ -679,6 +682,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         def fake_config_instance(key):
             fc = {
                 'API_ASYNC_WAIT': 1,
+                'LOG_METHOD_TRACE': 1,
             }
             if key in fc:
                 return fc[key]
@@ -950,6 +954,7 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
                 'NODE_NAME': 'seriously',
                 'NODE_IP': '127.0.0.1',
                 'NETWORK_NODE_IP': '127.0.0.1',
+                'LOG_METHOD_TRACE': 1,
             }
             if key in fc:
                 return fc[key]

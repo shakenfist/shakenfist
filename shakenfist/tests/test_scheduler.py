@@ -15,6 +15,9 @@ class FakeInstance(object):
         for k in kwargs:
             self.db_entry[k] = kwargs[k]
 
+    def unique_label(self):
+        return ('instance', self.db_entry['uuid'])
+
 
 class FakeDB(object):
     def __init__(self, nodes, instances=None, interfaces=None):
@@ -72,6 +75,7 @@ class SchedulerTestCase(testtools.TestCase):
                 'RAM_OVERCOMMIT_RATIO': 1.5,
                 'RAM_SYSTEM_RESERVATION': 5.0,
                 'NETWORK_NODE_IP': '10.0.0.1',
+                'LOG_METHOD_TRACE': 1,
             }
 
             if key not in data:

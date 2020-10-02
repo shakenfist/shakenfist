@@ -37,6 +37,14 @@ class FakeResponse(object):
         pass
 
 
+class FakeImage(object):
+    def __init__(self, url='http://somewhere'):
+        self.url = url
+
+    def unique_label(self):
+        return ('image', self.url)
+
+
 class ImageUtilsTestCase(testtools.TestCase):
     @mock.patch('shakenfist.config.parsed.get', return_value='/a/b/c')
     @mock.patch('os.path.exists', return_value=True)
@@ -237,7 +245,7 @@ class ImageObjectTestCase(testtools.TestCase):
     @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.db.add_event')
     def test_transcode_image_noop(self, mock_event, mock_lock, mock_exists, mock_execute):
-        images._transcode(None, '/a/b/c/hash', 'foo')
+        images._transcode(None, '/a/b/c/hash', FakeImage())
         mock_execute.assert_not_called()
 
     @mock.patch('shakenfist.util.execute',
@@ -250,7 +258,7 @@ class ImageObjectTestCase(testtools.TestCase):
     @mock.patch('shakenfist.db.add_event')
     def test_transcode_image_link(self, mock_event, mock_lock, mock_link, mock_identify, mock_exists,
                                   mock_execute):
-        images._transcode(None, '/a/b/c/hash', 'foo')
+        images._transcode(None, '/a/b/c/hash', FakeImage())
         mock_link.assert_called_with('/a/b/c/hash', '/a/b/c/hash.qcow2')
         mock_execute.assert_not_called()
 
@@ -264,7 +272,7 @@ class ImageObjectTestCase(testtools.TestCase):
     @mock.patch('shakenfist.db.add_event')
     def test_transcode_image_convert(self, mock_event, mock_lock, mock_link, mock_identify, mock_exists,
                                      mock_execute):
-        images._transcode(None, '/a/b/c/hash', 'foo')
+        images._transcode(None, '/a/b/c/hash', FakeImage())
         mock_link.assert_not_called()
         mock_execute.assert_called_with(
             None, 'qemu-img convert -t none -O qcow2 /a/b/c/hash /a/b/c/hash.qcow2')

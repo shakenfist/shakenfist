@@ -62,6 +62,7 @@ def fake_config(key):
         'NODE_NAME': 'abigcomputer',
         'STORAGE_PATH': '/srv/shakenfist',
         'LOGLEVEL_CLEANER': 'debug',
+        'LOG_METHOD_TRACE': 1,
     }
 
     if key in fc:
