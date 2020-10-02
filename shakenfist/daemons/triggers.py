@@ -26,7 +26,7 @@ def observe(path, instance_uuid):
     fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
 
     log_ctx = LOG.withInstance(instance_uuid)
-    log_ctx.withFields({'path': path}).info('Monitoring path for triggers')
+    log_ctx.withField('path', path).info('Monitoring path for triggers')
     db.add_event('instance', instance_uuid, 'trigger monitor',
                  'detected console log', None, None)
     os.lseek(fd, 0, os.SEEK_END)
@@ -44,8 +44,8 @@ def observe(path, instance_uuid):
                     for trigger in regexps:
                         m = regexps[trigger][1].match(line)
                         if m:
-                            log_ctx.withFields({'trigger': trigger,
-                                                }).info('Trigger matched')
+                            log_ctx.withField('trigger', trigger,
+                                              ).info('Trigger matched')
                             db.add_event('instance', instance_uuid, 'trigger',
                                          None, None, trigger)
 

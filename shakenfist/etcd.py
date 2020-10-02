@@ -31,7 +31,7 @@ class ActualLock(Lock):
         self.objecttype = objecttype
         self.objectname = name
         self.timeout = min(timeout, 1000000000)
-        self.log_ctx = log_ctx.withFields({'path': self.path})
+        self.log_ctx = log_ctx.withField('path', self.path)
 
         # We override the UUID of the lock with something more helpful to debugging
         self._uuid = json.dumps(
@@ -130,7 +130,7 @@ def refresh_lock(lock, log_ctx=LOG):
             'The lock on %s has expired.' % lock.path)
 
     lock.refresh()
-    log_ctx.withFields({'lock': lock.name}).info('Refreshed lock')
+    log_ctx.withField('lock', lock.name).info('Refreshed lock')
 
 
 def clear_stale_locks():

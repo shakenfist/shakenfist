@@ -113,7 +113,7 @@ class Image(object):
                             'Starting fetch due to dirty fields')
 
                     if related_object:
-                        t, u = related_object.label()
+                        t, u = related_object.unique_label()
                         dirty_fields_pretty = []
                         for field in dirty_fields:
                             dirty_fields_pretty.append(

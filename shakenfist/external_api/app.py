@@ -177,7 +177,7 @@ def arg_is_instance_uuid_as_virt(func):
                 kwargs['instance_uuid']
             )
         if not kwargs.get('instance_from_db_virt'):
-            LOG.withFields({'instance': kwargs['instance_uuid']}).info(
+            LOG.withField('instance', kwargs['instance_uuid']).info(
                            'Instance not found, genuinely missing')
             return error(404, 'instance not found')
 
@@ -219,13 +219,13 @@ def requires_instance_ownership(func):
     # Requires that @arg_is_instance_uuid has already run
     def wrapper(*args, **kwargs):
         if not kwargs.get('instance_from_db'):
-            LOG.withFields({'instance': kwargs['instance_uuid']}).info(
-                           'Instance not found, kwarg missing')
+            LOG.withField('instance', kwargs['instance_uuid']).info(
+                          'Instance not found, kwarg missing')
             return error(404, 'instance not found')
 
         if get_jwt_identity() not in [kwargs['instance_from_db']['namespace'], 'system']:
-            LOG.withFields({'instance': kwargs['instance_uuid']}).info(
-                           'Instance not found, ownership test in decorator')
+            LOG.withField('instance', kwargs['instance_uuid']).info(
+                          'Instance not found, ownership test in decorator')
             return error(404, 'instance not found')
 
         return func(*args, **kwargs)
@@ -239,8 +239,8 @@ def arg_is_network_uuid(func):
             kwargs['network_from_db'] = db.get_network(
                 kwargs['network_uuid'])
         if not kwargs.get('network_from_db'):
-            LOG.withFields({'network': kwargs['network_uuid']}).info(
-                           'Network not found, missing or deleted')
+            LOG.withField('network', kwargs['network_uuid']).info(
+                          'Network not found, missing or deleted')
             return error(404, 'network not found')
 
         return func(*args, **kwargs)
@@ -279,7 +279,7 @@ def redirect_to_network_node(func):
 def requires_network_ownership(func):
     # Requires that @arg_is_network_uuid has already run
     def wrapper(*args, **kwargs):
-        log = LOG.withFields({'network': kwargs['network_uuid']})
+        log = LOG.withField('network', kwargs['network_uuid'])
 
         if not kwargs.get('network_from_db'):
             log.info('Network not found, kwarg missing')
@@ -642,8 +642,8 @@ class Instances(Resource):
         instance = virt.from_db(instance_uuid)
         if instance:
             if get_jwt_identity() not in [instance.db_entry['namespace'], 'system']:
-                LOG.withFields({'instance': instance_uuid}).info(
-                               'Instance not found, ownership test')
+                LOG.withField('instance', instance_uuid).info(
+                              'Instance not found, ownership test')
                 return error(404, 'instance not found')
 
         if not instance:

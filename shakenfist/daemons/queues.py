@@ -19,7 +19,7 @@ LOG, _ = logutil.setup(__name__)
 
 
 def handle(jobname, workitem):
-    log = LOG.withFields({'workitem': jobname})
+    log = LOG.withField('workitem', jobname)
     log.info('Processing workitem')
 
     setproctitle.setproctitle(

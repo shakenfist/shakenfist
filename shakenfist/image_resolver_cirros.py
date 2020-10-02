@@ -27,7 +27,7 @@ def resolve(name):
             m = dir_re.match(line)
             if m:
                 versions.append(m.group(1))
-        LOG.withFields({'versions': versions}).info('Found cirros versions')
+        LOG.withField('versions', versions).info('Found cirros versions')
         vernum = versions[-1]
     else:
         try:
