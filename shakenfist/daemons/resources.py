@@ -12,6 +12,9 @@ from shakenfist import logutil
 from shakenfist import util
 
 
+LOG, _ = logutil.setup(__name__)
+
+
 def _get_stats():
     libvirt = util.get_libvirt()
     retval = {}
@@ -139,7 +142,7 @@ class Monitor(daemon.Daemon):
         start_http_server(config.parsed.get('PROMETHEUS_METRICS_PORT'))
 
     def run(self):
-        logutil.info(None, 'Starting')
+        LOG.info(None, 'Starting')
         gauges = {
             'updated_at': Gauge('updated_at', 'The last time metrics were updated')
         }
@@ -156,7 +159,7 @@ class Monitor(daemon.Daemon):
                 gauges[metric].set(stats[metric])
 
             db.update_metrics_bulk(stats)
-            logutil.info(None, 'Updated metrics')
+            LOG.info('Updated metrics')
             gauges['updated_at'].set_to_current_time()
 
         while True:

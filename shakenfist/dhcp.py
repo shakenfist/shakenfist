@@ -34,7 +34,7 @@ class DHCP(object):
     def __str__(self):
         return 'dhcp(%s)' % self.network_uuid
 
-    def get_describing_tuple(self):
+    def unique_label(self):
         return ('dhcp', self.network_uuid)
 
     def _read_template(self, template):

@@ -8,6 +8,8 @@ import re
 import setproctitle
 import traceback
 
+from shakenfist import config
+
 
 # These classes are extensions of the work in https://github.com/vmig/pylogrus
 class SFPyLogrus(logging.Logger, PyLogrusBase):
@@ -23,10 +25,44 @@ class SFPyLogrus(logging.Logger, PyLogrusBase):
     def withFields(self, fields=None):
         return SFCustomAdapter(self, fields)
 
+    def withField(self, key, value):
+        return SFCustomAdapter(self, {key: value})
+
+    #
+    # Convenience methods
+    #
+    def withObj(self, object):
+        if not object:
+            return SFCustomAdapter(self, {})
+        try:
+            label, value = object.unique_label()
+        except Exception:
+            raise Exception('Bad object - no unique_label() function')
+        return SFCustomAdapter(self, {label: value})
+
+    #
+    # Use labelled convenience methods when ID is a string (not object)
+    # Note: the helper method still handles objects
+    #
     def withInstance(self, inst):
         if not isinstance(inst, str):
             inst = inst.db_entry['uuid']
         return SFCustomAdapter(self, {'instance': inst})
+
+    def withNetwork(self, inst):
+        if not isinstance(inst, str):
+            inst = inst.uuid
+        return SFCustomAdapter(self, {'network': inst})
+
+    def withNetworkInterface(self, inst):
+        if not isinstance(inst, str):
+            inst = inst.uuid
+        return SFCustomAdapter(self, {'networkinterface': inst})
+
+    def withImage(self, inst):
+        if not isinstance(inst, str):
+            inst = inst.hashed_image_url
+        return SFCustomAdapter(self, {'image': inst})
 
 
 class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
@@ -56,19 +92,76 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
         extra.update(self._normalize(fields))
         return SFCustomAdapter(self._logger, extra, self._prefix)
 
+    def withField(self, key, value):
+        extra = copy.deepcopy(self._extra)
+        extra.update(self._normalize({key: value}))
+        return SFCustomAdapter(self._logger, extra, self._prefix)
+
     def withPrefix(self, prefix=None):
         return self if prefix is None else SFCustomAdapter(self._logger, self._extra, prefix)
 
+    FILENAME_RE = re.compile('.*/dist-packages/shakenfist/(.*)')
+
     def process(self, msg, kwargs):
-        kwargs["extra"] = self.extra
         msg = '%s[%s] %s' % (setproctitle.getproctitle(), os.getpid(), msg)
+        kwargs["extra"] = self.extra
+
+        if config.parsed.get('LOG_METHOD_TRACE'):
+            # Determine the name of the calling method
+            filename = traceback.extract_stack()[-4].filename
+            f_match = self.FILENAME_RE.match(filename)
+            if f_match:
+                filename = f_match.group(1)
+            caller = '%s:%s:%s()' % (filename,
+                                     traceback.extract_stack()[-4].lineno,
+                                     traceback.extract_stack()[-4].name)
+            self._extra['method'] = caller
+
         return msg, kwargs
 
+    #
+    # Convenience methods
+    #
+    def withObj(self, object):
+        extra = copy.deepcopy(self._extra)
+        if object:
+            try:
+                label, value = object.unique_label()
+            except Exception:
+                raise Exception('Bad object - no unique_label() function')
+            extra.update({label: value})
+        return SFCustomAdapter(self._logger, extra, self._prefix)
+
+    #
+    # Use labelled convenience methods when ID is a string (not object)
+    # Note: the helper method still handles objects
+    #
     def withInstance(self, inst):
         extra = copy.deepcopy(self._extra)
         if not isinstance(inst, str):
             inst = inst.db_entry['uuid']
         extra.update({'instance': inst})
+        return SFCustomAdapter(self._logger, extra, self._prefix)
+
+    def withNetwork(self, inst):
+        extra = copy.deepcopy(self._extra)
+        if not isinstance(inst, str):
+            inst = inst.uuid
+        extra.update({'network': inst})
+        return SFCustomAdapter(self._logger, extra, self._prefix)
+
+    def withNetworkInterface(self, inst):
+        extra = copy.deepcopy(self._extra)
+        if not isinstance(inst, str):
+            inst = inst.uuid
+        extra.update({'networkinterface': inst})
+        return SFCustomAdapter(self._logger, extra, self._prefix)
+
+    def withImage(self, inst):
+        extra = copy.deepcopy(self._extra)
+        if not isinstance(inst, str):
+            inst = inst.hashed_image_url
+        extra.update({'image': inst})
         return SFCustomAdapter(self._logger, extra, self._prefix)
 
 
@@ -89,57 +182,3 @@ def setup(name):
         log.addHandler(handler)
 
     return log.withPrefix(), handler
-
-
-LOG, _ = setup('main')
-FILENAME_RE = re.compile('.*/dist-packages/shakenfist/(.*)')
-
-
-def _log(level, relatedobjects, message):
-    # Determine the name of the calling method
-    filename = traceback.extract_stack()[-3].filename
-    fmatch = FILENAME_RE.match(filename)
-    if fmatch:
-        filename = fmatch.group(1)
-    caller = '%s:%s:%s()' % (filename,
-                             traceback.extract_stack()[-3].lineno,
-                             traceback.extract_stack()[-3].name)
-
-    # Build a structured log line
-    log_ctx = LOG.withPrefix(
-        '**OLD** %s[%s]' % (setproctitle.getproctitle(), os.getpid()))
-
-    fields = {'method': caller}
-    generic_counter = 1
-
-    if relatedobjects:
-        for obj in relatedobjects:
-            try:
-                n, v = obj.get_describing_tuple()
-                fields[n] = v
-            except Exception:
-                fields['generic-%s' % generic_counter] = str(obj)
-                generic_counter += 1
-
-    # Actually log
-    log_ctx.withFields(fields).__getattribute__(level)(message)
-
-
-def debug(relatedobjects, message):
-    _log('debug', relatedobjects, message)
-
-
-def info(relatedobjects, message):
-    _log('info', relatedobjects, message)
-
-
-def warning(relatedobjects, message):
-    _log('warning', relatedobjects, message)
-
-
-def error(relatedobjects, message):
-    _log('error', relatedobjects, message)
-
-
-def fatal(relatedobjects, message):
-    _log('fatal', relatedobjects, message)

@@ -17,6 +17,9 @@ from shakenfist import logutil
 from shakenfist import util
 
 
+LOG, _ = logutil.setup(__name__)
+
+
 resolvers = {
     'cirros': image_resolver_cirros,
     'ubuntu': image_resolver_ubuntu
@@ -30,7 +33,8 @@ def _get_cache_path():
     image_cache_path = os.path.join(
         config.parsed.get('STORAGE_PATH'), 'image_cache')
     if not os.path.exists(image_cache_path):
-        logutil.debug(None, 'Creating image cache at %s' % image_cache_path)
+        LOG.withField('image_cache_path',
+                      image_cache_path).debug('Creating image cache')
         os.makedirs(image_cache_path)
     return image_cache_path
 
@@ -43,7 +47,7 @@ class Image(object):
         self._hash()
         self.info = self._read_local_info()
 
-    def get_describing_tuple(self):
+    def unique_label(self):
         return ('image', self.hashed_image_url)
 
     def _resolve(self, url):
@@ -61,7 +65,7 @@ class Image(object):
 
     def _read_local_info(self):
         if not os.path.exists(self.hashed_image_path + '.info'):
-            logutil.info([self], 'No info in cache for this image')
+            LOG.withImage(self).info('No info in cache for this image')
             return {
                 'url': self.url,
                 'hash': self.hashed_image_url,
@@ -104,10 +108,12 @@ class Image(object):
                 dirty_fields, resp = self._requires_fetch()
 
                 if dirty_fields:
-                    logutil.info(
-                        [self], 'Starting fetch due to dirty fields %s' % dirty_fields)
+                    LOG.withImage(self).withField(
+                        'dirty_fields', dirty_fields).info(
+                            'Starting fetch due to dirty fields')
+
                     if related_object:
-                        t, u = related_object.get_describing_tuple()
+                        t, u = related_object.label()
                         dirty_fields_pretty = []
                         for field in dirty_fields:
                             dirty_fields_pretty.append(
@@ -164,7 +170,8 @@ class Image(object):
 
         if fetched > 0:
             self._persist_info()
-            logutil.info([self], 'Fetch complete (%d bytes)' % fetched)
+            LOG.withImage(self).withField('bytes_fetched',
+                                          fetched).info('Fetch complete')
 
         # Decompress if required
         if self.info['url'].endswith('.gz'):

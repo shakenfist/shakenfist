@@ -11,6 +11,9 @@ from shakenfist import util
 UBUNTU_URL = 'https://cloud-images.ubuntu.com'
 
 
+LOG, _ = logutil.setup(__name__)
+
+
 def resolve(name):
     resp = requests.get(UBUNTU_URL,
                         headers={'User-Agent': util.get_user_agent()})
@@ -27,7 +30,7 @@ def resolve(name):
         if m:
             num_to_name[m.group(2)] = m.group(1)
             name_to_num[m.group(1)] = m.group(2)
-    logutil.info(None, 'Found ubuntu versions: %s' % num_to_name)
+    LOG.withField('versions', num_to_name).info('Found ubuntu versions')
 
     vernum = None
     vername = None

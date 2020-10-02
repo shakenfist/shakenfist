@@ -941,13 +941,12 @@ def _safe_get_network_interface(interface_uuid):
         return None, None, error(404, 'interface network not found')
 
     if get_jwt_identity() not in [n.namespace, 'system']:
-        log.info('Interface not found, ownership test')
+        log.info('Interface not found, failed ownership test')
         return None, None, error(404, 'interface not found')
 
     i = virt.from_db(ni['instance_uuid'])
     if get_jwt_identity() not in [i.db_entry['namespace'], 'system']:
-        log.withInstance(i.db_entry['uuid']).info(
-                         'Instance not found, ownership test')
+        log.withObj(i).info('Instance not found, failed ownership test')
         return None, None, error(404, 'interface not found')
 
     return ni, n, None
@@ -1202,7 +1201,7 @@ class Networks(Resource):
                 continue
 
             if len(list(db.get_network_interfaces(n['uuid']))) > 0:
-                LOG.withFields(n.label()).warning(
+                LOG.withObj(n).warning(
                     'Network in use, cannot be deleted by delete-all')
                 networks_unable.append(n['uuid'])
                 continue

@@ -143,7 +143,7 @@ class Scheduler(object):
 
     def place_instance(self, instance, network, candidates=None):
         with util.RecordedOperation('schedule', instance):
-            log_ctx = LOG.withInstance(instance)
+            log_ctx = LOG.withObj(instance)
 
             diff = time.time() - self.metrics_updated
             if diff > config.parsed.get('SCHEDULER_CACHE_TIMEOUT'):
