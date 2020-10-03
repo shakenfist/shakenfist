@@ -7,12 +7,14 @@ from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist import net
 from shakenfist import util
-from shakenfist import virt
+
+
+LOG, _ = logutil.setup(__name__)
 
 
 class Monitor(daemon.Daemon):
     def _maintain_networks(self):
-        logutil.info(None, 'Maintaining networks')
+        LOG.info('Maintaining networks')
 
         # Discover what networks are present
         _, _, vxid_to_mac = util.discover_interfaces()
@@ -39,9 +41,9 @@ class Monitor(daemon.Daemon):
                     if (not inst
                             or inst.get('state', 'unknown') in ['deleted', 'error', 'unknown']):
                         db.hard_delete_network_interface(ni['uuid'])
-                        logutil.info([net.ThinNetworkInterface(ni['uuid']),
-                                      virt.ThinInstance(ni['instance_uuid'])],
-                                     'Hard deleted stray network interface')
+                        LOG.withInstance(
+                            ni['instance_uuid']).withNetworkInterface(
+                            ni['uuid']).info('Hard deleted stray network interface')
 
         # Ensure we are on every network we have a host for
         for network in host_networks:
@@ -51,23 +53,21 @@ class Monitor(daemon.Daemon):
                     continue
 
                 if not n.is_okay():
-                    logutil.info([n], 'Recreating not okay network')
+                    LOG.withObj(n).info('Recreating not okay network')
                     n.create()
 
                 n.ensure_mesh()
                 seen_vxids.append(n.vxlan_id)
 
             except exceptions.LockException as e:
-                logutil.info(None,
-                             'Failed to acquire lock while maintaining networks: %s' % e)
+                LOG.warning('Failed to acquire lock while maintaining networks: %s' % e)
 
         # Determine if there are any extra vxids
         extra_vxids = set(vxid_to_mac.keys()) - set(seen_vxids)
 
         # Delete "deleted" SF networks and log unknown vxlans
         if extra_vxids:
-            logutil.warning(None, 'Extra vxlans present! IDs are: %s'
-                            % extra_vxids)
+            LOG.withField('vxids', extra_vxids).warning('Extra vxlans present!')
 
             # Determine the network uuids for those vxids
             # vxid_to_uuid = {}
@@ -80,10 +80,10 @@ class Monitor(daemon.Daemon):
             #                          ttl=120):
             #             n = net.from_db(vxid_to_uuid[extra])
             #             n.delete()
-            #             logutil.info(None, 'Extra vxlan %s (network %s) removed.'
+            #             LOG.info('Extra vxlan %s (network %s) removed.'
             #                      % (extra, vxid_to_uuid[extra]))
             #     else:
-            #         logutil.error(None, 'Extra vxlan %s does not map to any network.'
+            #         LOG.error('Extra vxlan %s does not map to any network.'
             #                   % extra)
 
         # And record vxids in the database
@@ -97,15 +97,15 @@ class Monitor(daemon.Daemon):
                 time.sleep(0.2)
                 return
 
+            log_ctx = LOG.withField('workitem', workitem)
             if 'network_uuid' not in workitem:
-                logutil.warning(
-                    None, 'Network workitem %s lacks network uuid.' % workitem)
+                log_ctx.warning('Network workitem lacks network uuid')
                 return
 
             n = net.from_db(workitem.get('network_uuid'))
             if not n:
-                logutil.warning([net.ThinNetwork(workitem.get('network_uuid'))],
-                                'Received work item for non-existant network: %s' % workitem)
+                log_ctx.withNetwork(workitem.get('network_uuid')).warning(
+                    'Received work item for non-existant network')
                 return
 
             # NOTE(mikal): there's really nothing stopping us from processing a bunch
@@ -133,7 +133,7 @@ class Monitor(daemon.Daemon):
                 db.resolve('networknode', jobname)
 
     def run(self):
-        logutil.info(None, 'Starting')
+        LOG.info('Starting')
         last_management = 0
 
         while True:

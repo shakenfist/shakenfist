@@ -23,7 +23,6 @@ from flask_restful import marshal_with
 import ipaddress
 import json
 from jwt.exceptions import DecodeError, PyJWTError
-import logging
 import re
 import requests
 import sys
@@ -39,9 +38,11 @@ from shakenfist import net
 from shakenfist import scheduler
 from shakenfist import util
 from shakenfist import virt
+from shakenfist.daemons import daemon
 
 
-LOG, HANDLER = logutil.setup('api')
+LOG, HANDLER = logutil.setup(__name__)
+daemon.set_log_level(LOG, 'api')
 
 
 TESTING = False
@@ -64,8 +65,8 @@ def error(status_code, message):
     resp = flask.Response(json.dumps(body),
                           mimetype='application/json')
     resp.status_code = status_code
-    logutil.error(None, 'Returning API error: %d, %s\n    %s'
-                  % (status_code, message, '\n    '.join(body.get('traceback', '').split('\n'))))
+    LOG.error('Returning API error: %d, %s\n    %s'
+              % (status_code, message, '\n    '.join(body.get('traceback', '').split('\n'))))
     return resp
 
 
@@ -109,9 +110,9 @@ def generic_wrapper(func):
             msg += '\n    Args: %s\n    KWargs: %s' % (args, kwargs_log)
 
             if re.match(r'http(|s)://0.0.0.0:\d+/$', flask.request.url):
-                logutil.debug(None, msg)
+                LOG.debug(msg)
             else:
-                logutil.info(None, msg)
+                LOG.info(msg)
 
             return func(*args, **kwargs)
 
@@ -160,8 +161,8 @@ def arg_is_instance_uuid(func):
             kwargs['instance_from_db'] = db.get_instance(
                 kwargs['instance_uuid'])
         if not kwargs.get('instance_from_db'):
-            logutil.info([virt.ThinInstance(kwargs['instance_uuid'])],
-                         'Instance not found, genuinely missing')
+            LOG.withInstance(kwargs['instance_uuid']).info(
+                             'Instance not found, genuinely missing')
             return error(404, 'instance not found')
 
         return func(*args, **kwargs)
@@ -176,8 +177,8 @@ def arg_is_instance_uuid_as_virt(func):
                 kwargs['instance_uuid']
             )
         if not kwargs.get('instance_from_db_virt'):
-            logutil.info([virt.ThinInstance(kwargs['instance_uuid'])],
-                         'Instance not found, genuinely missing')
+            LOG.withField('instance', kwargs['instance_uuid']).info(
+                           'Instance not found, genuinely missing')
             return error(404, 'instance not found')
 
         return func(*args, **kwargs)
@@ -202,9 +203,9 @@ def redirect_instance_request(func):
                 headers={'Authorization': api_token,
                          'User-Agent': util.get_user_agent()})
 
-            logutil.info(None, 'Proxied %s %s returns: %d, %s'
-                         % (flask.request.environ['REQUEST_METHOD'], url,
-                            r.status_code, r.text))
+            LOG.info('Proxied %s %s returns: %d, %s' % (
+                     flask.request.environ['REQUEST_METHOD'], url,
+                     r.status_code, r.text))
             resp = flask.Response(r.text,
                                   mimetype='application/json')
             resp.status_code = r.status_code
@@ -218,13 +219,13 @@ def requires_instance_ownership(func):
     # Requires that @arg_is_instance_uuid has already run
     def wrapper(*args, **kwargs):
         if not kwargs.get('instance_from_db'):
-            logutil.info([virt.ThinInstance(kwargs['instance_uuid'])],
-                         'Instance not found, kwarg missing')
+            LOG.withField('instance', kwargs['instance_uuid']).info(
+                          'Instance not found, kwarg missing')
             return error(404, 'instance not found')
 
         if get_jwt_identity() not in [kwargs['instance_from_db']['namespace'], 'system']:
-            logutil.info([virt.ThinInstance(kwargs['instance_uuid'])],
-                         'Instance not found, ownership test in decorator')
+            LOG.withField('instance', kwargs['instance_uuid']).info(
+                          'Instance not found, ownership test in decorator')
             return error(404, 'instance not found')
 
         return func(*args, **kwargs)
@@ -238,8 +239,8 @@ def arg_is_network_uuid(func):
             kwargs['network_from_db'] = db.get_network(
                 kwargs['network_uuid'])
         if not kwargs.get('network_from_db'):
-            logutil.info([net.ThinNetwork(kwargs['network_uuid'])],
-                         'Network not found, missing or deleted')
+            LOG.withField('network', kwargs['network_uuid']).info(
+                          'Network not found, missing or deleted')
             return error(404, 'network not found')
 
         return func(*args, **kwargs)
@@ -264,8 +265,8 @@ def redirect_to_network_node(func):
                 headers={'Authorization': admin_token,
                          'User-Agent': util.get_user_agent()})
 
-            logutil.info(None, 'Returning proxied request: %d, %s'
-                         % (r.status_code, r.text))
+            LOG.info('Returning proxied request: %d, %s'
+                     % (r.status_code, r.text))
             resp = flask.Response(r.text,
                                   mimetype='application/json')
             resp.status_code = r.status_code
@@ -278,14 +279,14 @@ def redirect_to_network_node(func):
 def requires_network_ownership(func):
     # Requires that @arg_is_network_uuid has already run
     def wrapper(*args, **kwargs):
+        log = LOG.withField('network', kwargs['network_uuid'])
+
         if not kwargs.get('network_from_db'):
-            logutil.info([net.ThinNetwork(kwargs['network_uuid'])],
-                         'Network not found, kwarg missing')
+            log.info('Network not found, kwarg missing')
             return error(404, 'network not found')
 
         if get_jwt_identity() not in [kwargs['network_from_db']['namespace'], 'system']:
-            logutil.info([net.ThinNetwork(kwargs['network_uuid'])],
-                         'Network not found, ownership test in decorator')
+            log.info('Network not found, ownership test in decorator')
             return error(404, 'network not found')
 
         return func(*args, **kwargs)
@@ -319,12 +320,10 @@ app.logger.handlers = [HANDLER]
 
 @app.before_request
 def log_request_info():
-    if LOG.level == logging.DEBUG:
-        output = 'API request headers:\n'
-        for header, value in flask.request.headers:
-            output += '    %s: %s\n' % (header, value)
-        output += 'API request body: %s' % flask.request.get_data()
-        logutil.debug(None, output)
+    LOG.debug(
+        'API request headers:\n' +
+        ''.join(['    %s: %s\n' % (h, v) for h, v in flask.request.headers]) +
+        'API request body: %s' % flask.request.get_data())
 
 
 class Root(Resource):
@@ -643,8 +642,8 @@ class Instances(Resource):
         instance = virt.from_db(instance_uuid)
         if instance:
             if get_jwt_identity() not in [instance.db_entry['namespace'], 'system']:
-                logutil.info([virt.ThinInstance(instance_uuid)],
-                             'Instance not found, ownership test')
+                LOG.withField('instance', instance_uuid).info(
+                              'Instance not found, ownership test')
                 return error(404, 'instance not found')
 
         if not instance:
@@ -933,22 +932,21 @@ def _safe_get_network_interface(interface_uuid):
     if not ni:
         return None, None, error(404, 'interface not found')
 
+    log = LOG.withFields({'network': ni['network_uuid'],
+                          'networkinterface': ni['uuid']})
+
     n = net.from_db(ni['network_uuid'])
     if not n:
-        logutil.info([net.ThinNetwork(ni['network_uuid']),
-                      net.ThinNetworkInterface(ni['uuid'])],
-                     'Network not found or deleted')
+        log.info('Network not found or deleted')
         return None, None, error(404, 'interface network not found')
 
     if get_jwt_identity() not in [n.namespace, 'system']:
-        logutil.info([n, net.ThinNetworkInterface(ni['uuid'])],
-                     'Interface not found, ownership test')
+        log.info('Interface not found, failed ownership test')
         return None, None, error(404, 'interface not found')
 
     i = virt.from_db(ni['instance_uuid'])
     if get_jwt_identity() not in [i.db_entry['namespace'], 'system']:
-        logutil.info([n, i, net.ThinNetworkInterface(ni['uuid'])],
-                     'Instance not found, ownership test')
+        log.withObj(i).info('Instance not found, failed ownership test')
         return None, None, error(404, 'interface not found')
 
     return ni, n, None
@@ -1203,8 +1201,8 @@ class Networks(Resource):
                 continue
 
             if len(list(db.get_network_interfaces(n['uuid']))) > 0:
-                logutil.info(
-                    [n], 'Network in use, cannot be deleted by delete-all')
+                LOG.withObj(n).warning(
+                    'Network in use, cannot be deleted by delete-all')
                 networks_unable.append(n['uuid'])
                 continue
 

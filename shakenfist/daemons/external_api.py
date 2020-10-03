@@ -6,9 +6,12 @@ from shakenfist import logutil
 from shakenfist import util
 
 
+LOG, _ = logutil.setup(__name__)
+
+
 class Monitor(daemon.Daemon):
     def run(self):
-        logutil.info(None, 'Starting')
+        LOG.info('Starting')
         util.execute(None,
                      (config.parsed.get('API_COMMAND_LINE')
                       % {

@@ -7,9 +7,11 @@ from shakenfist import config
 from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import logutil
-from shakenfist import net
 from shakenfist import util
 from shakenfist import virt
+
+
+LOG, _ = logutil.setup(__name__)
 
 
 class Monitor(daemon.Daemon):
@@ -27,11 +29,12 @@ class Monitor(daemon.Daemon):
                     continue
 
                 instance_uuid = domain.name().split(':')[1]
+                log_ctx = LOG.withInstance(instance_uuid)
+
                 instance = db.get_instance(instance_uuid)
                 if not instance:
                     # Instance is SF but not in database. Kill to reduce load.
-                    logutil.warning([virt.ThinInstance(instance_uuid)],
-                                    'Destroying unknown instance')
+                    log_ctx.warning('Destroying unknown instance')
                     util.execute(None,
                                  'virsh destroy "sf:%s"' % instance_uuid)
                     continue
@@ -52,8 +55,7 @@ class Monitor(daemon.Daemon):
 
                     if attempts > 5:
                         # Sometimes we just can't delete the VM. Try the big hammer instead.
-                        logutil.warning([virt.ThinInstance(instance_uuid)],
-                                        'Attempting alternate delete method for instance')
+                        log_ctx.warning('Attempting alternate delete method for instance')
                         util.execute(None,
                                      'virsh destroy "sf:%s"' % instance_uuid)
 
@@ -64,9 +66,8 @@ class Monitor(daemon.Daemon):
                         i.delete()
                         i.update_instance_state('deleted')
 
-                    logutil.warning(
-                        [virt.ThinInstance(instance_uuid)],
-                        'Deleting stray instance (attempt %d)' % attempts)
+                    log_ctx.withField('attempt', attempts).warning(
+                        'Deleting stray instance')
 
                     continue
 
@@ -83,7 +84,15 @@ class Monitor(daemon.Daemon):
 
                 if domain_name not in seen:
                     instance_uuid = domain_name.split(':')[1]
+                    log_ctx = LOG.withInstance(instance_uuid)
                     instance = db.get_instance(instance_uuid)
+
+                    if not instance:
+                        # Instance is SF but not in database. Kill because unknown.
+                        log_ctx.warning('Removing unknown inactive instance')
+                        domain = conn.lookupByName(domain_name)
+                        domain.undefine()
+                        continue
 
                     if instance.get('state') == 'deleted':
                         # NOTE(mikal): a delete might be in-flight in the queue.
@@ -94,8 +103,7 @@ class Monitor(daemon.Daemon):
 
                         domain = conn.lookupByName(domain_name)
                         domain.undefine()
-                        logutil.info(
-                            [virt.ThinInstance(instance_uuid)], 'Detected stray instance')
+                        log_ctx.info('Detected stray instance')
                         db.add_event('instance', instance_uuid,
                                      'deleted stray', 'complete', None, None)
                         continue
@@ -109,19 +117,18 @@ class Monitor(daemon.Daemon):
                     if not os.path.exists(instance_path):
                         # If we're inactive and our files aren't on disk,
                         # we have a problem.
-                        logutil.info([virt.ThinInstance(instance_uuid)],
-                                     'Detected error state for instance')
+                        log_ctx.info('Detected error state for instance')
                         db.update_instance_state(instance_uuid, 'error')
+
                     elif instance.get('power_state') != 'off':
-                        logutil.info([virt.ThinInstance(instance_uuid)],
-                                     'Detected power off for instance')
+                        log_ctx.info('Detected power off for instance')
                         db.update_instance_power_state(
                             instance_uuid, 'off')
                         db.add_event('instance', instance_uuid,
                                      'detected poweroff', 'complete', None, None)
 
         except libvirt.libvirtError as e:
-            logutil.error(None, 'Failed to lookup all domains: %s' % e)
+            LOG.error('Failed to lookup all domains: %s' % e)
 
     def _compact_etcd(self):
         try:
@@ -136,41 +143,39 @@ class Monitor(daemon.Daemon):
             _, kv = c.get('/sf/compact')
             c.compact(kv.mod_revision, physical=True)
             c.defragment()
-            logutil.info(None, 'Compacted etcd')
+            LOG.info('Compacted etcd')
 
         except Exception as e:
             util.ignore_exception('etcd compaction', e)
 
     def run(self):
-        logutil.info(None, 'Starting')
+        LOG.info('Starting')
         last_compaction = 0
 
         while True:
             # Update power state of all instances on this hypervisor
-            logutil.info(None, 'Updating power states')
+            LOG.info('Updating power states')
             self._update_power_states()
 
             # Cleanup soft deleted instances and networks
             delay = config.parsed.get('CLEANER_DELAY')
 
             for i in db.get_stale_instances(delay):
-                logutil.info([virt.ThinInstance(i['uuid'])],
-                             'Hard deleting instance')
+                LOG.withInstance(i['uuid']).info('Hard deleting instance')
                 db.hard_delete_instance(i['uuid'])
 
             for n in db.get_stale_networks(delay):
-                logutil.info([net.ThinNetwork(n['uuid'])],
-                             'Hard deleting network')
+                LOG.withNetwork(n['uuid']).info('Hard deleting network')
                 db.hard_delete_network(n['uuid'])
 
             for ni in db.get_stale_network_interfaces(delay):
-                logutil.info([net.ThinNetworkInterface(ni['uuid'])],
-                             'Hard deleting network interface')
+                LOG.withNetworkInterface(
+                    ni['uuid']).info('Hard deleting network interface')
                 db.hard_delete_network_interface(ni['uuid'])
 
             # Perform etcd maintenance
             if time.time() - last_compaction > 1800:
-                logutil.info(None, 'Compacting etcd')
+                LOG.info('Compacting etcd')
                 self._compact_etcd()
                 last_compaction = time.time()
 

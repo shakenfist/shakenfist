@@ -9,6 +9,9 @@ from shakenfist import util
 CIRROS_URL = 'http://download.cirros-cloud.net/'
 
 
+LOG, _ = logutil.setup(__name__)
+
+
 def resolve(name):
     resp = requests.get(CIRROS_URL,
                         headers={'User-Agent': util.get_user_agent()})
@@ -24,7 +27,7 @@ def resolve(name):
             m = dir_re.match(line)
             if m:
                 versions.append(m.group(1))
-        logutil.info(None, 'Found cirros versions: %s' % versions)
+        LOG.withField('versions', versions).info('Found cirros versions')
         vernum = versions[-1]
     else:
         try:

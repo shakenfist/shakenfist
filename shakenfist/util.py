@@ -19,6 +19,9 @@ from shakenfist import config
 from shakenfist import logutil
 
 
+LOG, _ = logutil.setup(__name__)
+
+
 class RecordedOperation():
     def __init__(self, operation, relatedobject):
         self.operation = operation
@@ -26,7 +29,7 @@ class RecordedOperation():
 
     def __enter__(self):
         self.start_time = time.time()
-        object_type, object_uuid = self.get_describing_tuple()
+        object_type, object_uuid = self.unique_label()
         if object_type and object_uuid:
             db.add_event(object_type, object_uuid,
                          self.operation, 'start', None, None)
@@ -34,21 +37,21 @@ class RecordedOperation():
 
     def __exit__(self, *args):
         duration = time.time() - self.start_time
-        logutil.info([self.object], 'Finish %s, duration %.02f seconds'
-                     % (self.operation, duration))
+        LOG.withObj(self.object).info(
+            'Finish %s, duration %.02f seconds' % (self.operation, duration))
 
-        object_type, object_uuid = self.get_describing_tuple()
+        object_type, object_uuid = self.unique_label()
         if object_type and object_uuid:
             db.add_event(object_type, object_uuid,
                          self.operation, 'finish', duration, None)
 
-    def get_describing_tuple(self):
+    def unique_label(self):
         if self.object:
             if isinstance(self.object, str):
                 object_type = None
                 object_uuid = self.object
             else:
-                object_type, object_uuid = self.object.get_describing_tuple()
+                object_type, object_uuid = self.object.unique_label()
         else:
             object_type = None
             object_uuid = None
@@ -144,8 +147,7 @@ def extract_power_state(libvirt, domain):
 def get_api_token(base_url, namespace='system'):
     with db.get_lock('namespace', None, namespace):
         auth_url = base_url + '/auth'
-        logutil.info(None, 'Fetching %s auth token from %s'
-                     % (namespace, auth_url))
+        LOG.info('Fetching %s auth token from %s' % (namespace, auth_url))
         ns = db.get_namespace(namespace)
         if 'service_key' in ns:
             key = ns['service_key']
@@ -223,7 +225,7 @@ def ignore_exception(processname, e):
     if tb:
         msg += '\n%s' % traceback.format_exc()
 
-    logutil.error(None, msg)
+    LOG.error(msg)
 
 
 def _lock_refresher(locks):

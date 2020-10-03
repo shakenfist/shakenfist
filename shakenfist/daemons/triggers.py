@@ -9,7 +9,9 @@ from shakenfist import config
 from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import logutil
-from shakenfist import virt
+
+
+LOG, _ = logutil.setup(__name__)
 
 
 def observe(path, instance_uuid):
@@ -23,8 +25,8 @@ def observe(path, instance_uuid):
         time.sleep(1)
     fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
 
-    logutil.info([virt.ThinInstance(instance_uuid)],
-                 'Monitoring %s for triggers' % path)
+    log_ctx = LOG.withInstance(instance_uuid)
+    log_ctx.withField('path', path).info('Monitoring path for triggers')
     db.add_event('instance', instance_uuid, 'trigger monitor',
                  'detected console log', None, None)
     os.lseek(fd, 0, os.SEEK_END)
@@ -42,8 +44,8 @@ def observe(path, instance_uuid):
                     for trigger in regexps:
                         m = regexps[trigger][1].match(line)
                         if m:
-                            logutil.info([virt.ThinInstance(instance_uuid)],
-                                         'Trigger %s matched' % trigger)
+                            log_ctx.withField('trigger', trigger,
+                                              ).info('Trigger matched')
                             db.add_event('instance', instance_uuid, 'trigger',
                                          None, None, trigger)
 
@@ -52,7 +54,7 @@ def observe(path, instance_uuid):
 
 class Monitor(daemon.Daemon):
     def run(self):
-        logutil.info(None, 'Starting')
+        LOG.info('Starting Monitor Daemon')
         observers = {}
 
         while True:
@@ -62,8 +64,8 @@ class Monitor(daemon.Daemon):
                 if not observers[instance_uuid].is_alive():
                     # Reap process
                     observers[instance_uuid].join(1)
-                    logutil.info([virt.ThinInstance(instance_uuid)],
-                                 'Trigger observer has terminated')
+                    LOG.withInstance(instance_uuid
+                                     ).info('Trigger observer has terminated')
                     db.add_event(
                         'instance', instance_uuid, 'trigger monitor', 'crashed', None, None)
                     del observers[instance_uuid]
@@ -88,8 +90,7 @@ class Monitor(daemon.Daemon):
                     p.start()
 
                     observers[inst['uuid']] = p
-                    logutil.info([virt.ThinInstance(inst['uuid'])],
-                                 'Started trigger observer')
+                    LOG.withInstance(inst['uuid']).info('Started trigger observer')
                     db.add_event(
                         'instance', inst['uuid'], 'trigger monitor', 'started', None, None)
 
@@ -102,8 +103,7 @@ class Monitor(daemon.Daemon):
                     pass
 
                 del observers[instance_uuid]
-                logutil.info([virt.ThinInstance(instance_uuid)],
-                             'Finished trigger observer')
+                LOG.withInstance(instance_uuid).info('Finished trigger observer')
                 db.add_event(
                     'instance', instance_uuid, 'trigger monitor', 'finished', None, None)
 

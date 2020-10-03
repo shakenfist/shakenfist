@@ -48,3 +48,20 @@ class NoDomainException(VirtException):
 
 class FlagException(Exception):
     pass
+
+
+# Tasks
+class QueueTaskException(Exception):
+    pass
+
+
+class TaskUnknownTypeException(QueueTaskException):
+    pass
+
+
+class TaskImageFetchNoURLException(QueueTaskException):
+    pass
+
+
+class TaskNoInstanceException(QueueTaskException):
+    pass

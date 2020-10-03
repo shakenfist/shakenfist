@@ -12,6 +12,9 @@ from shakenfist import logutil
 from shakenfist import util
 
 
+LOG, _ = logutil.setup(__name__)
+
+
 def from_db(uuid):
     dbnet = db.get_network(uuid)
     if not dbnet:
@@ -27,7 +30,7 @@ def from_db(uuid):
                 namespace=dbnet['namespace'])
 
     if dbnet['state'] == 'deleted':
-        logutil.info([n], 'Netowrk is deleted, returning None.')
+        LOG.withObj(n).info('Network is deleted, returning None.')
         return None
 
     return n
@@ -63,7 +66,7 @@ class Network(object):
     def __str__(self):
         return 'network(%s, vxid %s)' % (self.uuid, self.vxlan_id)
 
-    def get_describing_tuple(self):
+    def unique_label(self):
         return ('network', self.uuid)
 
     def subst_dict(self):
@@ -110,7 +113,7 @@ class Network(object):
 
         subst = self.subst_dict()
         if not util.check_for_interface(subst['vx_bridge'], up=True):
-            logutil.warning([self], '%s is not up' % subst['vx_bridge'])
+            LOG.withObj(self).warning('%s is not up' % subst['vx_bridge'])
             return False
 
         return True
@@ -279,7 +282,7 @@ class Network(object):
         if pid and psutil.pid_exists(pid):
             return True
 
-        logutil.warning([self], 'dnsmasq is not running')
+        LOG.withObj(self).warning('dnsmasq is not running')
         return False
 
     def update_dhcp(self):
@@ -360,7 +363,9 @@ class Network(object):
                     node_ips.append(ip)
 
             discovered = list(self.discover_mesh())
-            logutil.debug([self], 'Discovered mesh elements %s' % discovered)
+            LOG.withObj(self).withField(
+                'discovered', discovered).debug('Discovered mesh elements')
+
             for node in discovered:
                 if node in node_ips:
                     node_ips.remove(node)
@@ -380,7 +385,7 @@ class Network(object):
                              None, None, ' '.join(added))
 
     def _add_mesh_element(self, node):
-        logutil.info([self], 'Adding new mesh element %s' % node)
+        LOG.withObj(self).info('Adding new mesh element %s' % node)
         subst = self.subst_dict()
         subst['node'] = node
         util.execute(None,
@@ -388,7 +393,7 @@ class Network(object):
                      % subst)
 
     def _remove_mesh_element(self, node):
-        logutil.info([self], 'Removing excess mesh element %s' % node)
+        LOG.withObj(self).info('Removing excess mesh element %s' % node)
         subst = self.subst_dict()
         subst['node'] = node
         util.execute(None,
@@ -396,8 +401,8 @@ class Network(object):
                      % subst)
 
     def add_floating_ip(self, floating_address, inner_address):
-        logutil.info([self], 'Adding floating ip %s -> %s'
-                     % (floating_address, inner_address))
+        LOG.withObj(self).info('Adding floating ip %s -> %s'
+                               % (floating_address, inner_address))
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
         subst['inner_address'] = inner_address
@@ -410,8 +415,8 @@ class Network(object):
                      '-d %(floating_address)s -j DNAT --to-destination %(inner_address)s' % subst)
 
     def remove_floating_ip(self, floating_address, inner_address):
-        logutil.info([self], 'Removing floating ip %s -> %s'
-                     % (floating_address, inner_address))
+        LOG.withObj(self).info('Removing floating ip %s -> %s'
+                               % (floating_address, inner_address))
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
         subst['inner_address'] = inner_address
@@ -422,25 +427,3 @@ class Network(object):
         util.execute(None,
                      '%(in_netns)s iptables -t nat -D PREROUTING '
                      '-d %(floating_address)s -j DNAT --to-destination %(inner_address)s' % subst)
-
-
-class ThinNetwork(object):
-    def __init__(self, network_uuid):
-        self.uuid = network_uuid
-
-    def __str__(self):
-        return 'network(%s)' % (self.uuid)
-
-    def get_describing_tuple(self):
-        return ('network', self.uuid)
-
-
-class ThinNetworkInterface(object):
-    def __init__(self, ni_uuid):
-        self.uuid = ni_uuid
-
-    def __str__(self):
-        return 'networkinterface(%s)' % (self.uuid)
-
-    def get_describing_tuple(self):
-        return ('networkinterface', self.uuid)

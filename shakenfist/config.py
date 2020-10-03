@@ -100,6 +100,8 @@ CONFIG_DEFAULTS = {
     'LOGLEVEL_NET': 'info',
     'LOGLEVEL_RESOURCES': 'info',
     'LOGLEVEL_TRIGGERS': 'info',
+    # Add method name and module line number to log messages
+    'LOG_METHOD_TRACE': 0,
 }
 
 
