@@ -36,6 +36,10 @@ We also have a few "more internal" repositories:
 
 * [The reproducibles repository](http://github.com/shakenfist/reproducables) contains simple test cases for reproducing strange behaviours we have seen while developing Shaken Fist.
 
+## What is Shaken Fist? Can I help?
+
+[Shaken Fist Manifesto](manifesto.md)
+
 ## New user guides
 
 We need more of these. For now, we have the following:
