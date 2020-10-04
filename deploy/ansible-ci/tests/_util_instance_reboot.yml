@@ -1,0 +1,30 @@
+- name: Count how many times the instance has booted
+  shell: |
+    grep -c "\[    0.000000\] Linux version" /srv/shakenfist/instances/{{uuid}}/console.log
+  register: boots_before_complex
+
+- name: Extract boot count
+  set_fact:
+    boots_before: "{{boots_before_complex.stdout}}"
+
+- name: Reboot the instance
+  shell: |
+    sf-client instance reboot --{{type}} {{uuid}}
+
+- name: Wait
+  pause:
+    seconds: 30
+
+- name: Count how many times the instance has booted
+  shell: |
+    grep -c "\[    0.000000\] Linux version" /srv/shakenfist/instances/{{uuid}}/console.log
+  register: boots_after_complex
+
+- name: Extract boot count
+  set_fact:
+    boots_after: "{{boots_after_complex.stdout}}"
+
+- name: Make sure we rebooted
+  fail:
+    msg: Instance did not reboot.
+  when: boots_before == boots_after

@@ -1,0 +1,62 @@
+#########################################
+# Import inventory from terraform
+#########################################
+
+- hosts: localhost
+  gather_facts: yes
+  connection: ssh
+
+  tasks:
+    - include: ../terraform/{{cloud}}/terraform.yml
+
+#########################################
+# Scenario: an empty cloud should be empty
+#########################################
+
+- hosts: sf-1
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - name: Delete instances and networks, and validate
+      copy:
+        content: |
+          #!/bin/bash -e
+
+          for instance in `sf-client --simple instance list | grep -v uuid | cut -f 1 -d ","`
+          do
+            sf-client --simple instance delete $instance
+          done
+
+          for network in `sf-client --simple network list | grep -v uuid | cut -f 1 -d ","`
+          do
+            sf-client --simple network delete $network
+          done
+
+          [ `sf-client --simple instance list | grep -v uuid | wc -l` -eq 0 ]
+          [ `virsh list | grep running | wc -l` -eq 0 ]
+        dest: /tmp/shell_script
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx
+
+    - name: Execute
+      shell: /tmp/shell_script
+
+#########################################
+# Scenario: the final checkening
+#########################################
+
+- hosts: hypervisors
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - name: We should not have any VXLAN interfaces left
+      shell: |
+        [ `ifconfig | grep -c vxlan` -eq 0 ]

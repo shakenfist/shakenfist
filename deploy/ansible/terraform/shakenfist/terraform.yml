@@ -1,0 +1,59 @@
+- name: Deploy infrastructure
+  terraform:
+    project_path: "{{ansible_root}}/terraform/shakenfist"
+    state: present
+    force_init: true
+    variables:
+      uniqifier: "{{uniqifier}}"
+      system_key: "{{system_key}}"
+      ssh_key: "{{ssh_key}}"
+  register: terraform_out
+
+- name: Add sf-1 to ansible
+  add_host:
+    hostname: sf-1
+    ansible_ssh_host: "{{terraform_out.outputs.sf_1_external.value}}"
+    ansible_ssh_user: "ubuntu"
+    groups: hypervisors, primary, etcd_master
+
+- name: Add sf-1 node_ip
+  set_fact:
+    node_name: "sf-1"
+    node_ip: "{{terraform_out.outputs.sf_1_internal.value}}"
+  delegate_to: sf-1
+  delegate_facts: true
+
+- name: Add sf-2 to ansible
+  add_host:
+    hostname: sf-2
+    ansible_ssh_host: "{{terraform_out.outputs.sf_2_external.value}}"
+    ansible_ssh_user: "ubuntu"
+    groups: hypervisors, etcd_master
+
+- name: Add sf-2 node_ip
+  set_fact:
+    node_name: "sf-2"
+    node_ip: "{{terraform_out.outputs.sf_2_internal.value}}"
+  delegate_to: sf-2
+  delegate_facts: true
+
+- name: Add sf-3 to ansible
+  add_host:
+    hostname: sf-3
+    ansible_ssh_host: "{{terraform_out.outputs.sf_3_external.value}}"
+    ansible_ssh_user: "ubuntu"
+    groups: hypervisors, etcd_master
+
+- name: Add sf-3 node_ip
+  set_fact:
+    node_name: "sf-3"
+    node_ip: "{{terraform_out.outputs.sf_3_internal.value}}"
+  delegate_to: sf-3
+  delegate_facts: true
+
+- name: Log terraform hosts
+  debug:
+    msg:
+      - "sf-1: {{hostvars['sf-1']['ansible_ssh_host']}}, {{hostvars['sf-1']['node_ip']}}"
+      - "sf-2: {{hostvars['sf-2']['ansible_ssh_host']}}, {{hostvars['sf-2']['node_ip']}}"
+      - "sf-3: {{hostvars['sf-3']['ansible_ssh_host']}}, {{hostvars['sf-3']['node_ip']}}"

@@ -1,0 +1,29 @@
+---
+- name: Ensure unit tests pass
+  shell:
+    cmd: tox -epy3
+    chdir: "{{repo_path}}"
+  tags: unittest
+
+- name: Clear out old wheels
+  file:
+    path: "{{repo_path}}/dist"
+    state: absent
+
+- name: Ensure we have a local dist directory
+  file:
+    path: "{{repo_path}}/dist"
+    state: directory
+
+- name: Build a wheel for {{package}}
+  shell:
+    cmd: python3 setup.py sdist bdist_wheel
+    chdir: "{{repo_path}}"
+
+- name: Find the most recent wheel for {{package}}
+  shell: ls -rt {{repo_path}}/dist/{{package}}-*.whl | tail -1 | sed 's/.*\/dist\///'
+  register: wheel_complex
+
+- name: Extract wheel filename
+  set_fact:
+    "{{package}}_wheel_path": "{{wheel_complex.stdout}}"

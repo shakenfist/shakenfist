@@ -7,12 +7,12 @@ This guide will assume that you want to install Shaken Fist on a single local ma
 
 Shaken Fist only supports Ubuntu 18.04 or later, so if you're running on localhost that implies that you must be running a recent Ubuntu on your development machine. Note as well that the deployer installs software and changes the configuration of your networking, so be careful when running it on machines you are fond of.
 
-Create a directory for Shaken Fist, and then checkout the deployer git repository there:
+Create a directory for Shaken Fist, and then checkout the Shaken Fist git repository there:
 
 ```bash
 mkdir shakenfist
 cd shakenfist
-git clone https://github.com/shakenfist/deploy
+git clone https://github.com/shakenfist/shakenfist
 cd deploy/ansible
 ```
 

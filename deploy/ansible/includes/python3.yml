@@ -1,0 +1,31 @@
+# Setup python3
+- name: Install python3-setuptools
+  apt:
+    name: "python3-dev"
+    state: latest
+
+# Upgrade to a new pip3
+- name: Test if we have any pip3
+  shell: pip3 help
+  ignore_errors: True
+  register: has_pip
+
+- name: Install python3-pip
+  apt:
+    name: python3-pip
+    state: latest
+  when: has_pip is failed
+
+- name: pip3 self-upgrade
+  command: pip3 install -U pip
+
+- name: Remove python3-pip
+  apt:
+    name: python3-pip
+    state: absent
+
+- name: Update setuptools
+  shell: pip3 install -U setuptools wheel
+
+- name: Install gunicorn
+  shell: pip3 install -U gunicorn

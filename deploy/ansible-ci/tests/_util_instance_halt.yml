@@ -1,0 +1,15 @@
+- name: Halt instance
+  shell: |
+    sf-client instance {{action_one}} {{uuid}}
+
+- name: We should have no VMs running
+  shell: |
+    [ `virsh list | grep running | wc -l` -eq 0 ]
+
+- name: Start instance
+  shell: |
+    sf-client instance {{action_two}} {{uuid}}
+
+- name: Wait
+  pause:
+    seconds: 30

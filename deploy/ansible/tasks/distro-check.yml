@@ -1,0 +1,6 @@
+---
+- name: Warn if unsupported distro
+  pause:
+    prompt: "\nWARNING: Only Ubuntu is supported at present ({{ ansible_distribution }} detected), this will probably fail"
+    seconds: 30
+  when: ansible_distribution.split(' ', 1)[0] | lower != "ubuntu"

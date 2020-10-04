@@ -1,0 +1,19 @@
+- name: Create a network
+  sf_network:
+    netblock: "{{netblock}}"
+    name: "{{name}}"
+    state: present
+  register: network_create_out
+  run_once: true
+
+- name: Log result
+  debug:
+    msg: "{{network_create_out}}"
+
+- name: Determine network uuid
+  set_fact:
+    "{{name}}_uuid": "{{network_create_out.meta.uuid}}"
+
+- name: Log network details
+  debug:
+    msg: Network {{name}} has uuid {{vars[name + '_uuid']}}.

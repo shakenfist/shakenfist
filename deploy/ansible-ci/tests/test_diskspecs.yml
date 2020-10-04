@@ -1,0 +1,73 @@
+#########################################
+# Import inventory from terraform
+#########################################
+
+- hosts: localhost
+  gather_facts: yes
+  connection: ssh
+
+  tasks:
+    - include: ../terraform/{{cloud}}/terraform.yml
+
+#########################################
+# Scenario: try other ways to specify disks
+#########################################
+
+- hosts: sf-1
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - name: Try more detailed disk specifications
+      sf_instance:
+        name: "cirros_diskspec"
+        cpu: 1
+        ram: 1
+        diskspecs:
+          - size=8,base=cirros,bus=ide,type=disk
+          - size=16,type=disk
+          - base=http://archive.ubuntu.com/ubuntu/dists/focal/main/installer-amd64/current/legacy-images/netboot/mini.iso,type=cdrom
+        networks:
+        ssh_key: ""
+        user_data: ""
+        placement: "{{inventory_hostname}}"
+      register: instance_create_out
+
+    - name: Log instance details
+      debug:
+        msg: "{{instance_create_out}}"
+
+    - name: Extract instance uuid
+      set_fact:
+        "cirros_diskspec_uuid": "{{instance_create_out.meta.uuid}}"
+
+    - name: Validate
+      copy:
+        content: |
+          #!/bin/bash -e
+
+          [ `grep -c "<target dev='hda' bus='ide'/>" /srv/shakenfist/instances/{{cirros_diskspec_uuid}}/libvirt.xml` -eq 1 ]
+          [ `grep -c "<target dev='hdb' bus='ide'/>" /srv/shakenfist/instances/{{cirros_diskspec_uuid}}/libvirt.xml` -eq 1 ]
+          [ `grep -c "<target dev='vdc' bus='virtio'/>" /srv/shakenfist/instances/{{cirros_diskspec_uuid}}/libvirt.xml` -eq 1 ]
+          [ `grep -c "<target dev='hda' bus='ide'/>" /srv/shakenfist/instances/{{cirros_diskspec_uuid}}/libvirt.xml` -eq 1 ]
+
+          [ `grep -c "<disk type='file' device='disk'>" /srv/shakenfist/instances/{{cirros_diskspec_uuid}}/libvirt.xml` -eq 3 ]
+          [ `grep -c "<disk type='file' device='cdrom'>" /srv/shakenfist/instances/{{cirros_diskspec_uuid}}/libvirt.xml` -eq 1 ]
+
+          [ `grep -c "<driver name='qemu' type='qcow2'/>" /srv/shakenfist/instances/{{cirros_diskspec_uuid}}/libvirt.xml` -eq 2 ]
+          [ `grep -c "<driver name='qemu' type='raw'/>" /srv/shakenfist/instances/{{cirros_diskspec_uuid}}/libvirt.xml` -eq 2 ]
+        dest: /tmp/shell_script
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx
+
+    - name: Execute
+      shell: /tmp/shell_script
+
+    - name: Delete instance
+      sf_instance:
+        uuid: "{{cirros_diskspec_uuid}}"
+        state: absent

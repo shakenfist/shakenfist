@@ -1,0 +1,29 @@
+- hosts: localhost
+  gather_facts: yes
+  connection: ssh
+
+  tasks:
+    - include: terraform/{{cloud}}/terraform.yml
+
+- hosts: sf-1
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - name: Remove old copies of the test suite
+      file:
+        path: /srv/shakenfist/deploy
+        state: absent
+
+    - name: Sync our test suite to the remote node
+      synchronize:
+        src: ../../deploy
+        dest: /srv/shakenfist/
+
+    - name: Execute the suite on the remote node
+      shell:
+        cmd: tox --recreate -epy3
+        chdir: /srv/shakenfist/deploy/

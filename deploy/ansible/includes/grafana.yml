@@ -1,0 +1,17 @@
+- name: Install Grafana prerequisites
+  apt:
+    name: ["apt-transport-https", "software-properties-common"]
+    update_cache: yes
+    state: latest
+
+- name: Add Grafana GPG key
+  apt_key: url=https://packages.grafana.com/gpg.key
+
+- name: Add Grafana APT repository
+  apt_repository:
+    repo: deb [arch=amd64] https://packages.grafana.com/oss/deb stable main
+
+- name: Install Grafana
+  apt:
+    name: ["grafana"]
+    update_cache: yes

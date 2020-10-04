@@ -1,0 +1,19 @@
+[local]
+localhost ansible_connection=local
+
+[primary]
+
+[hypervisors]
+
+[allsf:children]
+  primary
+  hypervisors
+
+[allsf:vars]
+  ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+  ansible_python_interpreter='/usr/bin/python3'
+
+[etcd:children]
+  allsf
+
+[etcd_master]

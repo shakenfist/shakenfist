@@ -1,0 +1,17 @@
+# Update a debian machine
+- name: apt-get dist-upgrade
+  apt:
+    update_cache: yes
+    upgrade: dist
+    autoremove: yes
+
+- name: Install dependencies
+  apt:
+    name: "{{ shakenfist_deps }}"
+    state: latest
+
+- name: Disable dnsmasq
+  service:
+    name: dnsmasq
+    enabled: no
+    state: stopped

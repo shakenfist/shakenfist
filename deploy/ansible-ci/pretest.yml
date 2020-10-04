@@ -1,0 +1,50 @@
+#########################################
+# Import inventory from terraform
+#########################################
+
+- hosts: localhost
+  gather_facts: yes
+  connection: ssh
+
+  tasks:
+    - include: terraform/{{cloud}}/terraform.yml
+
+- hosts: hypervisors
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - name: Create telnet console helper
+      copy:
+        src: tests/files/telnet_client.py
+        dest: /opt/telnet_client.py
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx
+
+    - name: Copy sample userdata
+      copy:
+        src: tests/files/userdata
+        dest: /opt/userdata
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
+
+    - name: Copy sample ssh public key
+      copy:
+        src: tests/files/id_rsa.pub
+        dest: /opt/id_rsa.pub
+        owner: root
+        group: root
+        mode: u=r
+
+    - name: Copy sample ssh private key
+      copy:
+        src: tests/files/id_rsa
+        dest: /opt/id_rsa
+        owner: root
+        group: root
+        mode: u=rx

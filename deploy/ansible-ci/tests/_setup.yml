@@ -1,0 +1,92 @@
+- name: Clear out old instances, networks, and namespaces
+  shell: |
+    for inst in `sf-client --simple instance list | grep -v uuid | cut -f 1 -d ","`
+    do
+      sf-client --simple instance delete $inst
+    done
+
+    attempts=0
+    while [ `sf-client --simple instance list | grep -v uuid | wc -l` -gt 0 ]
+    do
+      attempts=$(( $attempts + 1))
+      sleep 10
+      if [ $attempts -gt 10 ]
+      then
+        echo "Failing after instance deletes did not complete"
+        exit 1
+      fi
+    done
+
+    for net in `sf-client --simple network list | grep -v uuid | cut -f 1 -d ","`
+    do
+      sf-client --simple network delete $net
+    done
+
+    attempts=0
+    while [ `sf-client --simple network list | grep -v uuid | wc -l` -gt 0 ]
+    do
+      attempts=$(( $attempts + 1))
+      sleep 10
+      if [ $attempts -gt 10 ]
+      then
+        echo "Failing after network deletes did not complete"
+        exit 1
+      fi
+    done
+
+    for namespace in `sf-client --simple namespace list | grep -v uuid | grep -v system`
+    do
+      sf-client --simple namespace delete $namespace
+    done
+  run_once: true
+
+- name: Quick scrub and sanity checks
+  copy:
+    content: |
+      #!/bin/bash -e
+
+      . /etc/sf/sfrc
+
+      for vm in `virsh list --all | tr -s " " | grep "sf:" | cut -f 3 -d " "`
+      do
+          virsh destroy $vm
+          virsh undefine $vm
+      done
+
+      rm -rf /srv/shakenfist/instances
+      rm -rf /srv/shakenfist/snapshots
+      rm -rf /srv/shakenfist/dhcp
+      rm -rf /srv/shakenfist/image_cache/*.qcow2.*G
+
+      for i in `seq 100`
+      do
+        ip link del br-vxlan-$i || true
+        ip link del vxlan-$i || true
+        ip link del phy-$i-o || true
+        ip link del veth-$i-o || true
+      done
+
+      if [ -e /var/run/netns ]
+      then
+        for ns in `ls /var/run/netns`
+        do
+          ip netns del $ns
+        done
+      fi
+
+      [ `virsh list | grep running | wc -l` -eq 0 ]
+      [ `ifconfig | grep -c br-vxlan` -eq 0 ]
+
+      systemctl restart sf
+      sleep 30
+    dest: /tmp/shell_script
+    owner: root
+    group: root
+    mode: u=rx,g=rx,o=rx
+
+- name: Execute
+  shell: /tmp/shell_script
+
+- include: _util_network_create.yml
+    netblock="192.168.242.0/24"
+    name="net_one"
