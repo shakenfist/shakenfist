@@ -6,15 +6,7 @@ pipeline {
 
   }
   stages {
-    stage('Setup three nodes') {
-      steps {
-        node(label: 'sf-ci-image')
-        node(label: 'sf-ci-image')
-        node(label: 'sf-ci-image')
-      }
-    }
-
-    stage('Log node names') {
+    stage('Simple hello world') {
       steps {
         sh 'echo "Hello world"'
       }
