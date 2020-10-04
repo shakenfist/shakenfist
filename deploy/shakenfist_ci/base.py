@@ -1,6 +1,5 @@
 import random
 import string
-import sys
 import testtools
 import telnetlib
 import time

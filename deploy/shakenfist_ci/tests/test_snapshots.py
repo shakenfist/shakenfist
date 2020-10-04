@@ -1,5 +1,3 @@
-from shakenfist.client import apiclient
-
 from shakenfist_ci import base
 
 
