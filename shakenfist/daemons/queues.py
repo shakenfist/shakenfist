@@ -13,6 +13,12 @@ from shakenfist import net
 from shakenfist import scheduler
 from shakenfist import util
 from shakenfist import virt
+from shakenfist.tasks import (DeleteInstanceTask,
+                              FetchImageTask,
+                              InstanceTask,
+                              PreflightInstanceTask,
+                              StartInstanceTask,
+                              )
 
 
 LOG, _ = logutil.setup(__name__)
@@ -29,49 +35,62 @@ def handle(jobname, workitem):
     task = None
     try:
         for task in workitem.get('tasks', []):
-            instance_uuid = task.get('instance_uuid')
-            log_i = log.withInstance(instance_uuid)
-            log_i.info("Starting task")
+            if InstanceTask.__subclasscheck__(type(task)):
+                instance_uuid = task.instance_uuid()
+                log_i = log.withInstance(instance_uuid)
+            else:
+                instance_uuid = None
+                log_i = log
 
-            if task.get('type').startswith('instance_') and not instance_uuid:
-                log_i.error('Instance task lacks instance uuid')
-                return
+            log_i.withField('task_name', task.name()).info("Starting task")
+
+            # TODO(andy) Should network events also come through here eventually?
+            # Then this can be generalised to record events on networks/instances
+
+            # TODO(andy) This event should be recorded when it is recorded as
+            # dequeued in the DB. Currently it's reporting action on the item
+            # and calling it 'dequeue'.
 
             if instance_uuid:
-                db.add_event('instance', instance_uuid, task.get('type').replace('_', ' '),
+                # TODO(andy) move to QueueTask
+                db.add_event('instance', instance_uuid, task.pretty_task_name(),
                              'dequeued', None, 'Work item %s' % jobname)
 
-            log_i.info('Executing task %s: %s'
-                       % (task.get('type', 'unknown'), task))
-            if task.get('type') == 'image_fetch':
-                image_fetch(task.get('url'), instance_uuid)
+            if isinstance(task, FetchImageTask):
+                image_fetch(task.url(), instance_uuid)
 
-            if task.get('type') == 'instance_preflight':
-                redirect_to = instance_preflight(
-                    instance_uuid, task.get('network'))
+            elif isinstance(task, PreflightInstanceTask):
+                redirect_to = instance_preflight(instance_uuid, task.network())
                 if redirect_to:
                     log_i.info('Redirecting instance start to %s' % redirect_to)
                     db.place_instance(instance_uuid, redirect_to)
                     db.enqueue(redirect_to, workitem)
                     return
 
-            if task.get('type') == 'instance_start':
-                instance_start(instance_uuid, task.get('network'))
+            elif isinstance(task, StartInstanceTask):
+                instance_start(instance_uuid, task.network())
                 db.update_instance_state(instance_uuid, 'created')
                 db.enqueue('%s-metrics' % config.parsed.get('NODE_NAME'), {})
 
-            if task.get('type') == 'instance_delete':
+            elif isinstance(task, DeleteInstanceTask):
                 try:
                     instance_delete(instance_uuid)
-                    db.update_instance_state(instance_uuid,
-                                             task.get('next_state', 'unknown'))
-                    if task.get('next_state_message'):
+                    db.update_instance_state(instance_uuid, task.next_state())
+
+                    # TODO(andy): This code used to task.get('next_state', 'unknown')
+                    # Is this a hangover from dicts used as tasks?
+                    # ie. had to gracefully handle poorly constructed tasks?
+
+                    if task.next_state_message():
                         db.update_instance_error_message(
-                            instance_uuid, task.get('next_state_message'))
+                            instance_uuid, task.next_state_message())
                     db.enqueue('%s-metrics' %
                                config.parsed.get('NODE_NAME'), {})
                 except Exception as e:
                     util.ignore_exception(daemon.process_name('queues'), e)
+
+            else:
+                log_i.withField('task', task).error("Unhandled task - dropped")
 
             log_i.info("Task complete")
 

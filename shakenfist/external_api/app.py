@@ -39,6 +39,11 @@ from shakenfist import scheduler
 from shakenfist import util
 from shakenfist import virt
 from shakenfist.daemons import daemon
+from shakenfist.tasks import (DeleteInstanceTask,
+                              FetchImageTask,
+                              PreflightInstanceTask,
+                              StartInstanceTask,
+                              )
 
 
 LOG, HANDLER = logutil.setup(__name__)
@@ -733,17 +738,11 @@ class Instances(Resource):
                      'placement', None, None, placement)
 
         # Create a queue entry for the instance start
-        tasks = [{'type': 'instance_preflight',
-                  'instance_uuid': instance_uuid,
-                  'network': network}]
+        tasks = [PreflightInstanceTask(instance_uuid, network)]
         for disk in instance.db_entry['block_devices']['devices']:
             if 'base' in disk and disk['base']:
-                tasks.append({'type': 'image_fetch',
-                              'instance_uuid': instance_uuid,
-                              'url': disk['base']})
-        tasks.append({'type': 'instance_start',
-                      'instance_uuid': instance_uuid,
-                      'network': network})
+                tasks.append(FetchImageTask(disk['base'], instance_uuid))
+        tasks.append(StartInstanceTask(instance_uuid, network))
 
         # Enqueue creation tasks on desired node task queue
         db.enqueue(placement, {'tasks': tasks})
@@ -792,12 +791,8 @@ class Instances(Resource):
                 node = instance['node']
 
             tasks_by_node.setdefault(node, [])
-            tasks_by_node[node].append({
-                'type': 'instance_delete',
-                'instance_uuid': instance['uuid'],
-                'next_state': 'deleted',
-                'next_state_message': None
-            })
+            tasks_by_node[node].append(
+                DeleteInstanceTask(instance['uuid'], 'deleted'))
             instances_del.append(instance['uuid'])
 
         for node in tasks_by_node:

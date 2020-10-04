@@ -11,6 +11,8 @@ from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist import util
+from shakenfist.tasks import QueueTask
+
 
 ####################################################################
 # Please do not call this file directly, but instead call it via   #
@@ -163,10 +165,21 @@ def _construct_key(objecttype, subtype, name):
     return '/sf/%s/' % objecttype
 
 
+class JSONEncoderTasks(json.JSONEncoder):
+    def default(self, obj):
+        if QueueTask.__subclasscheck__(type(obj)):
+            return obj.json_dump()
+        return json.JSONEncoder.default(self, obj)
+
+
 def put(objecttype, subtype, name, data, ttl=None):
-    path = _construct_key(objecttype, subtype, name)
-    encoded = json.dumps(data, indent=4, sort_keys=True)
-    Etcd3Client().put(path, encoded, lease=None)
+    # TODO(andy) Until we fix exception logging in this module
+    try:
+        path = _construct_key(objecttype, subtype, name)
+        encoded = json.dumps(data, indent=4, sort_keys=True, cls=JSONEncoderTasks)
+        Etcd3Client().put(path, encoded, lease=None)
+    except Exception:
+        LOG.exception('etcd.put()')
 
 
 def get(objecttype, subtype, name):
@@ -210,14 +223,43 @@ def enqueue(queuename, workitem):
                         }).info('Enqueued workitem')
 
 
+def decodeTasks(json_dict):
+    if 'tasks' not in json_dict:
+        return json_dict
+
+    def _all_subclasses(cls):
+        all = cls.__subclasses__()
+        for sc in cls.__subclasses__():
+            all += _all_subclasses(sc)
+        return all
+
+    task_list = []
+    for task_item in json_dict['tasks']:
+        item = task_item
+        for task_class in _all_subclasses(QueueTask):
+            if task_class.name() and task_item.get('task') == task_class.name():
+                del task_item['task']
+                item = task_class(**task_item)
+                break
+        task_list.append(item)
+
+    return {'tasks': task_list}
+
+
 def dequeue(queuename):
+    # TODO(andy) why are exception in here not logged?? logging works but exceptions evaporate
+
     queue_path = _construct_key('queue', queuename, None)
     client = Etcd3Client()
 
     with get_lock('queue', None, queuename):
         for data, metadata in client.get_prefix(queue_path, sort_order='ascend', sort_target='key'):
             jobname = str(metadata['key']).split('/')[-1].rstrip("'")
-            workitem = json.loads(data)
+            # TODO(andy) Until we fix exception logging in this module
+            try:
+                workitem = json.loads(data, object_hook=decodeTasks)
+            except Exception:
+                LOG.exception('etcd.dequeue()')
 
             put('processing', queuename, jobname, workitem)
             client.delete(metadata['key'])
