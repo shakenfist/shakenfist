@@ -19,6 +19,10 @@ pipeline {
 
                 # This is a terrible hack to get around https://github.com/shakenfist/deploy/issues/75
                 CLOUD=localhost RELEASE="git:master" ./deployandtest.sh
+
+                # Run the nextgen CI (the old CI wont work on single node deployments)
+                cd ..
+                tox -epy3
         '''
       }
     }
