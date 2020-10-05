@@ -42,7 +42,7 @@ def handle(jobname, workitem):
                 instance_uuid = None
                 log_i = log
 
-            log_i.withField('task_name', task.name()).info("Starting task")
+            log_i.withField('task_name', task.name()).info('Starting task')
 
             # TODO(andy) Should network events also come through here eventually?
             # Then this can be generalised to record events on networks/instances
@@ -90,9 +90,9 @@ def handle(jobname, workitem):
                     util.ignore_exception(daemon.process_name('queues'), e)
 
             else:
-                log_i.withField('task', task).error("Unhandled task - dropped")
+                log_i.withField('task', task).error('Unhandled task - dropped')
 
-            log_i.info("Task complete")
+            log_i.info('Task complete')
 
     except Exception as e:
         util.ignore_exception(daemon.process_name('queues'), e)
