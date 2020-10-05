@@ -221,15 +221,16 @@
         mode: "0755"
       when: mode == "deploy"
 
-# Install etcd on all nodes, with members of etcd-master being voting nodes
+# Install etcd
 - hosts: etcd
   roles:
     - role: andrewrothstein.etcd-cluster
-      etcd_secure: False
-      etcd_cluster_name: shakenfist
-      etcd_enable_v2: False
-      etcd_master_group_name: etcd_master
       when: mode == "deploy"
+      vars:
+        etcd_secure: False
+        etcd_cluster_name: shakenfist
+        etcd_enable_v2: False
+        etcd_master_group_name: etcd_master
 
 - hosts: allsf
   any_errors_fatal: true
@@ -556,8 +557,9 @@
 - hosts: primary
   roles:
     - role: andrewrothstein.terraform
-      terraform_binary_dir: /usr/local/bin/terraform_install
       when: mode == "deploy"
+      vars:
+        terraform_binary_dir: /usr/local/bin/terraform_install
 
     - role: andrewrothstein.go
       when: mode == "deploy"

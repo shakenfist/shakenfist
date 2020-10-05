@@ -5,14 +5,14 @@
   register: hostname_complex
   ignore_errors: True
 
-- name: Extract hostanme
+- name: Add localhost to the right groups
+  add_host:
+    hostname: localhost
+    groups: hypervisors, primary, etcd_master
+
+- name: Extract hostname
   set_fact:
     "node_name": "{{hostname_complex.stdout}}"
     "node_ip": "127.0.0.1"
   delegate_to: localhost
   delegate_facts: true
-
-- name: Add localhost to ansible
-  add_host:
-    hostname: "localhost"
-    groups: hypervisors, primary, etcd_master
