@@ -3,8 +3,8 @@ pipeline {
     node {
       label 'sf-ci-image'
     }
-
   }
+
   stages {
     stage('Localhost deployment') {
       steps {
@@ -28,6 +28,14 @@ pipeline {
         '''
       }
     }
-
   }
-}
+
+  post {
+    always {
+      sh '''  # Make /var/log/syslog archivable
+              ln -s /var/log/syslog syslog
+        '''
+      archiveArtifacts artifacts: 'syslog', followSymlinks: false
+      }
+    }
+  }
