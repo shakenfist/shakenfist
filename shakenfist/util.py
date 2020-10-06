@@ -37,13 +37,16 @@ class RecordedOperation():
 
     def __exit__(self, *args):
         duration = time.time() - self.start_time
-        LOG.withObj(self.object).info(
-            'Finish %s, duration %.02f seconds' % (self.operation, duration))
-
+        log = LOG
         object_type, object_uuid = self.unique_label()
-        if object_type and object_uuid:
-            db.add_event(object_type, object_uuid,
-                         self.operation, 'finish', duration, None)
+        if object_uuid:
+            if object_type:
+                db.add_event(object_type, object_uuid,
+                             self.operation, 'finish', duration, None)
+                log = LOG.withObj(self.object)
+            else:
+                log = LOG.withField({'label', self.object})
+        log.withField('duration', duration).info('Finish %s', self.operation)
 
     def unique_label(self):
         if self.object:
