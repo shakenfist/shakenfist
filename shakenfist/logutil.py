@@ -36,8 +36,8 @@ class SFPyLogrus(logging.Logger, PyLogrusBase):
             return SFCustomAdapter(self, {})
         try:
             label, value = object.unique_label()
-        except Exception:
-            raise Exception('Bad object - no unique_label() function')
+        except Exception as e:
+            raise Exception('Bad object - no unique_label() function: %s' % e)
         return SFCustomAdapter(self, {label: value})
 
     #
@@ -127,8 +127,9 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
         if object:
             try:
                 label, value = object.unique_label()
-            except Exception:
-                raise Exception('Bad object - no unique_label() function')
+            except Exception as e:
+                raise Exception(
+                    'Bad object - no unique_label() function: %s' % e)
             extra.update({label: value})
         return SFCustomAdapter(self._logger, extra, self._prefix)
 
