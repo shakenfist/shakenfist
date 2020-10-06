@@ -1,3 +1,6 @@
+---
+title: Manifesto
+---
 # Shaken Fist Manifesto
 
 This document attempts to list Shaken Fist's defining features, give guidance on what type of features should be added to the project, how they should be implemented and how we work together.
