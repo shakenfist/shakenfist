@@ -1,3 +1,5 @@
+import socket
+
 from shakenfist_ci import base
 
 
@@ -19,7 +21,26 @@ class TestPlacement(base.BaseTestCase):
         self.test_client.delete_network(self.net['uuid'])
         self._remove_namespace(self.namespace)
 
-    def test_placement_works(self):
+    def test_no_such_node(self):
+        # Make sure we get an except for a missing node
+        self.assertRaises(
+            shakenfist_client.apiclient.ResourceNotFoundException,
+            self.test_client.create_instance,
+            'cirros', 1, 1024,
+            [
+                {
+                    'network_uuid': self.net['uuid']
+                }
+            ],
+            [
+                {
+                    'size': 8,
+                    'base': 'ubuntu:18.04',
+                    'type': 'disk'
+                }
+            ], None, None, force_placement='sf-nosuchnode')
+
+    def test_local_placement_works(self):
         # Create an instance, force it to be on the name node as us.
         inst = self.test_client.create_instance(
             'cirros', 1, 1024,
@@ -34,7 +55,7 @@ class TestPlacement(base.BaseTestCase):
                     'base': 'ubuntu:18.04',
                     'type': 'disk'
                 }
-            ], None, None, force_placement='sf-1')
+            ], None, None, force_placement=socket.getfqdn())
 
         self._await_login_prompt(inst['uuid'])
 
@@ -51,7 +72,12 @@ class TestPlacement(base.BaseTestCase):
             inst_uuids.append(i['uuid'])
         self.assertNotIn(inst['uuid'], inst_uuids)
 
+    def test_remote_placement_works(self):
         # Create another instance, force it to be on a remote node.
+        nodes = list(self.test_client.get_nodes())
+        if len(nodes) < 2:
+            self.skip('Insufficient nodes for test')
+
         inst = self.test_client.create_instance(
             'cirros', 1, 1024,
             [
