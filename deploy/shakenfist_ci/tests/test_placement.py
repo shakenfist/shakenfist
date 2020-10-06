@@ -1,5 +1,7 @@
 import socket
 
+from shakenfist_client import apiclient
+
 from shakenfist_ci import base
 
 
@@ -24,7 +26,7 @@ class TestPlacement(base.BaseTestCase):
     def test_no_such_node(self):
         # Make sure we get an except for a missing node
         self.assertRaises(
-            shakenfist_client.apiclient.ResourceNotFoundException,
+            apiclient.ResourceNotFoundException,
             self.test_client.create_instance,
             'cirros', 1, 1024,
             [
