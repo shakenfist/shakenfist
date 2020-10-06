@@ -606,6 +606,10 @@ class Instances(Resource):
         if name != re.sub(r'([^a-zA-Z0-9_\-])', '', name) or len(name) > 63:
             return error(400, 'instance name must be useable as a DNS host name')
 
+        # If we are placed, make sure that node exists
+        if placed_on and not db.get_node(placed_on):
+            return error(404, 'Specified node does not exist')
+
         # Sanity check
         if not disk:
             return error(400, 'instance must specify at least one disk')
