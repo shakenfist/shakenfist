@@ -6,9 +6,9 @@ This document attempts to list Shaken Fist's defining features, give guidance on
 
 * Shaken Fist is smaller, simpler cloud.
 * It is designed for relatively small environments with minimum management overhead.
-* It's features are highly opinionated. This means that the maintainers have chosen the best (in their opinion) features to support.
+* Its features are highly opinionated. This means that the maintainers have chosen the best (in their opinion) features to support.
 * Opinionated features do not handle every single possible use case. This reduces the code base size thus increasing long-term maintainability.
-* The code base aims to be understandable in it's entirety by a single developer.
+* The code base is understandable in its entirety by a single developer.
 * A Shaken Fist cluster does not need a team of engineers to install or operate.
 * A Shaken Fist cluster should be simple to set up. We define 'simple' as "a person with no knowledge of the project can build a reasonable cluster in an evening".
 
@@ -17,7 +17,7 @@ This document attempts to list Shaken Fist's defining features, give guidance on
 
 * Allow simple management of virtual machine instances without complexity.
 * Support networking between those machines and also facilitate access to external networks.
-* Avoid re-inventing the wheel (Utilise other open source projects when appropriate).
+* Avoid re-inventing the wheel (utilise other open source projects when appropriate).
 
 
 ## Feature Guidelines
@@ -43,5 +43,5 @@ This document attempts to list Shaken Fist's defining features, give guidance on
 * Always polite
 * Always generous
 * Being opinionated is encouraged (but gently)
-* Updating the documentation is just important as the code change itself
+* Updating the documentation is just as important as the code change itself
 * Developers who write tests are the most highly prized of all the developers
