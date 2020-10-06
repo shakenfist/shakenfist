@@ -23,9 +23,9 @@ pipeline {
    stage('Run CI tests') {
      steps {
         sh '''  # Run the nextgen CI (the old CI wont work on single node deployments)
-                cd $WORKSPACE/deploy
-                sudo chmod ugo+rx /etc/sf/shakenfist.json
-                tox -epy3
+                #cd $WORKSPACE/deploy
+                #sudo chmod ugo+rx /etc/sf/shakenfist.json
+                #tox -epy3
           '''
       }
     }
