@@ -65,3 +65,11 @@ class NoURLImageFetchTaskException(TaskException):
 
 class NoInstanceTaskException(TaskException):
     pass
+
+
+class NetworkNotListTaskException(TaskException):
+    pass
+
+
+class NoNextStateTaskException(TaskException):
+    pass
