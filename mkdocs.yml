@@ -12,6 +12,7 @@ markdown_extensions:
 nav:
   - Introduction: index.md
   - Installation: installation.md
+  - Manifesto: manifesto.md
   - Developer Guide:
       - "Workflow": development/git_usage.md
       - "Standards": development/standards.md
