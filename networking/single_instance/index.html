@@ -535,7 +535,6 @@ state           : initial
 
 Metadata:
 </code></pre>
-
 <p>So in this case we were allocated VXLAN id 2, and have a network UUID of b41b067a-44b7-40c5-9ab8-7abdcf5fdc61. The state of the network is "initial" as it has not been created anywhere yet. If you wait a few seconds, you'll see it transition to a "created" state. You can see the new state with a show command:</p>
 <pre><code>sf-1 # sf-client network show b41b067a-44b7-40c5-9ab8-7abdcf5fdc61
 uuid            : b41b067a-44b7-40c5-9ab8-7abdcf5fdc61
@@ -550,7 +549,6 @@ state           : created
 
 Metadata:
 </code></pre>
-
 <p>And you can see the steps we went through to create the network in the events listing:</p>
 <pre><code>sf-1 # sf-client network events b41b067a-44b7-40c5-9ab8-7abdcf5fdc61
 +----------------------------+------+------------------------+------------+----------------------+-----------+
@@ -573,7 +571,6 @@ Metadata:
 | 2020-08-01 06:50:07.554738 | sf-1 |          api           | get events |         None         |    None   |
 +----------------------------+------+------------------------+------------+----------------------+-----------+
 </code></pre>
-
 <p>You can see here that the network node (sf-1) has created some network elements, and an IP (10.2.1.11) has been added to the mesh. That IP is sf-1, and its part of the network node being joined to the mesh. If we look on sf-1, we should now have a VXLAN interface, a bridge, and one end of a veth.</p>
 <pre><code>sf-1 # ip addr show vxlan-2
 287: vxlan-2: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 8950 qdisc noqueue master br-vxlan-2 state UNKNOWN group default qlen 1000
@@ -593,7 +590,6 @@ sf-1 # ip addr show veth-2-o
     inet6 fe80::bcc1:1bff:fe20:b8f7/64 scope link 
        valid_lft forever preferred_lft forever
 </code></pre>
-
 <p>The vxlan-2 interface is the VXLAN mesh, and the br-vxlan-2 bridge is how VMs and veths will connect to the mesh on this local machine. Its important to note that MTU matters here. The MTU for the mesh network is 1500 bytes, and most client VMs will default to that as well. Therefore the underlying network needs to have a MTU greater than that. We default to an MTU of 9000 bytes in our installs, but 1550 would in fact be sufficient in this case. You can see this in the MTU for vxlan-2, which is our 9000 byte underlying MTU, with 50 bytes deducted for the VXLAN encapsulation.</p>
 <p>We can also ask the mesh for its current state:</p>
 <pre><code>sf-1 # bridge fdb show brport vxlan-2
@@ -604,7 +600,6 @@ de:c4:ab:3d:79:fb dst 127.0.0.1 self
 be:c1:1b:20:b8:f7 dst 127.0.0.1 self 
 e2:2d:32:6d:95:70 dst 127.0.0.1 self
 </code></pre>
-
 <p>The current members of the mesh are:</p>
 <ul>
 <li>de:c4:ab:3d:79:fb: this is the mac address for vxlan-2.</li>
@@ -625,7 +620,6 @@ e2:2d:32:6d:95:70 dst 127.0.0.1 self
 291: phy-2-i@if292: &lt;BROADCAST,MULTICAST&gt; mtu 1500 qdisc noop state DOWN group default qlen 1000
     link/ether fe:18:8e:f8:d1:5c brd ff:ff:ff:ff:ff:ff link-netnsid 0
 </code></pre>
-
 <p>The veth between the VXLAN mesh and this namespace is named veth-2-i (the interface inside the network namespace) and veth-2-o (the interface outside the network namespace). There is another veth named phy-2-i and phy-2-o, which is a link between the namespace and the outside world, but we'll talk about that more when we enable NAT. For those who are new to veths, think of them like patch cables -- so what we have here is a VXLAN mesh, which is patched into a network namespace, which is in turn patched into the outside world.</p>
 <p>We also do some things with iptables, especially around NAT. Here's the current state of iptables in the network namespace:</p>
 <pre><code>sf-1 # ip netns exec b41b067a-44b7-40c5-9ab8-7abdcf5fdc61 iptables -L -t nat
@@ -641,7 +635,6 @@ target     prot opt source               destination
 Chain POSTROUTING (policy ACCEPT)
 target     prot opt source               destination 
 </code></pre>
-
 <p>That's empty for now because we're not doing any NAT yet, but watch this space. Next let's now start an instance on sf-2. This instance can't use DHCP to get an address because we have that disabled for this network.</p>
 <pre><code>sf-1 # sf-client instance create inst-on-sf-2 1 1024 -d 20@ubuntu:18.04 -n b41b067a-44b7-40c5-9ab8-7abdcf5fdc61 -p sf-2
 uuid        : d53b345f-9d5d-493c-a1a3-7e7d6513cfa2
@@ -672,7 +665,6 @@ Interfaces:
     floating: None
     model   : virtio
 </code></pre>
-
 <p>You can see that our instance (inst-on-sf-2) has been placed on sf-2 because we asked nicely (the -p is a placement option to the command), and has been allocated an IP (192.168.0.3). The virtual network still allocates IPs, even if DHCP is disabled. It has also been allocated a MAC address (00:00:00:34:8d:90). What is the state of the mesh on the network node now?</p>
 <pre><code>sf-1 # bridge fdb show brport vxlan-2
 de:c4:ab:3d:79:fb master br-vxlan-2 permanent
@@ -684,12 +676,10 @@ be:c1:1b:20:b8:f7 dst 127.0.0.1 self
 00:00:00:34:8d:90 dst 10.2.1.12 self 
 e2:2d:32:6d:95:70 dst 127.0.0.1 self
 </code></pre>
-
 <p>The following entries there are new:</p>
 <pre><code>0a:ce:c4:f7:cb:dc dst 10.2.1.12 self 
 00:00:00:34:8d:90 dst 10.2.1.12 self 
 </code></pre>
-
 <p>These new entries:</p>
 <ul>
 <li>Add our new instance to the mesh (00:00:00:34:8d:90)</li>
@@ -708,7 +698,6 @@ sf-2 # ip addr show br-vxlan-2
     inet6 fe80::8ce:c4ff:fef7:cbdc/64 scope link 
        valid_lft forever preferred_lft forever
 </code></pre>
-
 <p>And the mesh looks like this:</p>
 <pre><code>sf-2 # bridge fdb show brport vxlan-2
 0a:ce:c4:f7:cb:dc master br-vxlan-2 permanent
@@ -719,12 +708,10 @@ sf-2 # ip addr show br-vxlan-2
 00:00:00:34:8d:90 dst 127.0.0.1 self 
 e2:2d:32:6d:95:70 dst 10.2.1.11 self
 </code></pre>
-
 <p>There is no network namespace on sf-2:</p>
 <pre><code>sf-2 # ls /var/run/netns
 ls: cannot access '/var/run/netns': No such file or directory
 </code></pre>
-
 <p>If we grep the console log of the instance on sf-2, we can see what cloud-init thought about the networking:</p>
 <pre><code>sf-1 # grep ci-info /srv/shakenfist/instances/d53b345f-9d5d-493c-a1a3-7e7d6513cfa2/console.log 
 [    9.851378] cloud-init[643]: ci-info: +++++++++++++++++++++++++++++++++++++Net device info++++++++++++++++++++++++++++++++++++++
@@ -754,7 +741,6 @@ ls: cannot access '/var/run/netns': No such file or directory
 ci-info: no authorized SSH keys fingerprints found for user ubuntu.
 [   69.743452] cloud-init[970]: ci-info: no authorized SSH keys fingerprints found for user ubuntu.
 </code></pre>
-
 <p>Here you can see that instance has an interface named eth0, which has the IP address that Shaken Fist allocated earlier. How did it get an IP address without DHCP? Well, Shaken Fist always attaches a config drive to the instance, and this contains a JSON file with the IP address in it. cloud-init running on boot of Ubuntu has used this to configure the interface. Before we poke more at this instance, let's start another instance on sf-3 so we can do some more testing...</p>
                 
               

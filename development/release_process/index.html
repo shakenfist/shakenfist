@@ -615,12 +615,10 @@ twine check dist/*
 git push origin v0.1
 twine upload dist/*
 </code></pre>
-
 <p>Create the branch for cherry picks and minor releases:</p>
 <pre><code>git checkout -b v0.1-devel
 git push origin v0.1-devel
 </code></pre>
-
 <h2 id="step-3-shakenfistclient-python">Step 3: <code>shakenfist/client-python</code></h2>
 <p>Test that pypi will accept Markdown formatted README.</p>
 <p>In the shakenfist/client-python repo:</p>
@@ -633,7 +631,6 @@ twine check dist/*
 git push origin v0.1
 twine upload dist/*
 </code></pre>
-
 <h2 id="step-4-shakenfistclient-go">Step 4: <code>shakenfist/client-go</code></h2>
 <p>Tag and release as per shakenfist/shakenfist - include the patch number eg. v0.1.0</p>
 <p>Golang modules require an "annotated git tag" (not a lightweight git tag). Therefore use the sign option (<code>-s</code>) as above, or use the annotate option (<code>-a</code>) of <code>git tag</code>.</p>
