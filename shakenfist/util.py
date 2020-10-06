@@ -104,6 +104,20 @@ def get_interface_addresses(namespace, name):
     return
 
 
+def create_interface(interface, interface_type, extra):
+    if len(interface) > 15:
+        orig_interface = interface
+        interface = interface[:15]
+        LOG.warn('Interface name truncated from %s to %s'
+                 % (orig_interface, interface))
+
+    execute(None,
+            'ip link add %(interface)s type %(interface_type)s %(extra)s'
+            % {'interface': interface,
+               'interface_type': interface_type,
+               'extra': extra})
+
+
 def nat_rules_for_ipblock(ipblock):
     out, _ = execute(None, 'iptables -t nat -L POSTROUTING -n -v')
     # Output looks like this:
