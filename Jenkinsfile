@@ -32,10 +32,7 @@ pipeline {
 
   post {
     always {
-      sh '''  # Make /var/log/syslog archivable
-              ln -s /var/log/syslog syslog
-        '''
-      archiveArtifacts artifacts: 'syslog', followSymlinks: false
+      sh '''  cat /var/log/syslog'''
       }
     }
   }
