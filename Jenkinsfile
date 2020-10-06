@@ -18,10 +18,13 @@ pipeline {
                 cd deploy/ansible
 
                 # This is a terrible hack to get around https://github.com/shakenfist/deploy/issues/75
+                CLOUD=localhost RELEASE="git:master" ./deployandtest.sh || true
                 CLOUD=localhost RELEASE="git:master" ./deployandtest.sh
 
                 # Run the nextgen CI (the old CI wont work on single node deployments)
                 cd ..
+                sudo chmod ugo+rx /etc/sf/sfrc
+                . /etc/sf/sfrc
                 tox -epy3
         '''
       }
