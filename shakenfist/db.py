@@ -13,7 +13,7 @@ from shakenfist import exceptions
 from shakenfist import ipmanager
 from shakenfist import logutil
 from shakenfist import util
-
+from shakenfist.tasks import DeleteInstanceTask
 
 # TODO(andy): Change back to 5 once network bugs fixed
 ETCD_ATTEMPT_TIMEOUT = 15
@@ -95,9 +95,9 @@ def get_networks(all=False, namespace=None):
 def allocate_network(netblock, provide_dhcp=True, provide_nat=False, name=None,
                      namespace=None):
 
-    netid = str(uuid.uuid4())
+    net_id = str(uuid.uuid4())
     ipm = ipmanager.NetBlock(netblock)
-    etcd.put('ipmanager', None, netid, ipm.save())
+    etcd.put('ipmanager', None, net_id, ipm.save())
 
     with etcd.get_lock('vxlan', None, 'all'):
         vxid = 1
@@ -106,11 +106,11 @@ def allocate_network(netblock, provide_dhcp=True, provide_nat=False, name=None,
 
         etcd.put('vxlan', None, vxid,
                  {
-                     'network_uuid': netid
+                     'network_uuid': net_id
                  })
 
     d = {
-        'uuid': netid,
+        'uuid': net_id,
         'vxid': vxid,
         'netblock': netblock,
         'provide_dhcp': provide_dhcp,
@@ -121,7 +121,7 @@ def allocate_network(netblock, provide_dhcp=True, provide_nat=False, name=None,
         'state': 'initial',
         'state_updated': time.time()
     }
-    etcd.put('network', None, netid, d)
+    etcd.put('network', None, net_id, d)
     return d
 
 
@@ -470,7 +470,7 @@ def get_metrics(fqdn):
 def _port_free(port):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
-        s.bind(('0.0.0.0', port))  # lgtm[@tag:security]
+        s.bind(('0.0.0.0', port))  # lgtm
         return True
     except socket.error:
         return False
@@ -542,14 +542,13 @@ def enqueue(queuename, workitem):
     etcd.enqueue(queuename, workitem)
 
 
+# TODO(andy): make this a general enqueue now that the task has enforced formatting
+# can also move the NODE_NAME to this function
 def enqueue_instance_delete(node, instance_uuid, next_state, next_state_message):
     enqueue(node, {
-        'tasks': [{
-            'type': 'instance_delete',
-            'instance_uuid': instance_uuid,
-            'next_state': next_state,
-            'next_state_message': next_state_message
-        }],
+        'tasks': [
+            DeleteInstanceTask(instance_uuid, next_state, next_state_message)
+            ],
     })
 
 

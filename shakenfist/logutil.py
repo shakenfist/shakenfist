@@ -173,7 +173,11 @@ def setup(name):
     log = logging.getLogger(name)
 
     if log.hasHandlers():
-        handler = log.handlers[0]
+        # The parent logger might have the handler, not this lower logger
+        if len(log.handlers) > 0:
+            # TODO(andy): Remove necessity to return handler or
+            # correctly obtain the handler without causing an exception
+            handler = log.handlers[0]
     else:
         # Add our handler
         handler = logging_handlers.SysLogHandler(address='/dev/log')

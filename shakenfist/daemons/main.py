@@ -99,7 +99,7 @@ def main():
         if pid == 0:
             DAEMON_IMPLEMENTATIONS[d].Monitor(d).run()
         DAEMON_PIDS[pid] = d
-        LOG.withField('pid', pid).info('%s pid' % d)
+        LOG.withField('pid', pid).info('Started %s' % d)
 
     # Resource usage publisher, we need this early because scheduling decisions
     # might happen quite early on.

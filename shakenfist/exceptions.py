@@ -51,17 +51,25 @@ class FlagException(Exception):
 
 
 # Tasks
-class QueueTaskException(Exception):
+class TaskException(Exception):
     pass
 
 
-class TaskUnknownTypeException(QueueTaskException):
+class UnknownTaskException(TaskException):
     pass
 
 
-class TaskImageFetchNoURLException(QueueTaskException):
+class NoURLImageFetchTaskException(TaskException):
     pass
 
 
-class TaskNoInstanceException(QueueTaskException):
+class NoInstanceTaskException(TaskException):
+    pass
+
+
+class NetworkNotListTaskException(TaskException):
+    pass
+
+
+class NoNextStateTaskException(TaskException):
     pass
