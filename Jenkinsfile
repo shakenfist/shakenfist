@@ -15,17 +15,21 @@ pipeline {
                 ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform andrewrothstein.go
 
                 echo "Deploying on localhost"
-                cd deploy/ansible
+                cd $WORKSPACE/deploy/ansible
 
                 # This is a terrible hack to get around https://github.com/shakenfist/deploy/issues/75
                 CLOUD=localhost RELEASE="git:master" ./deployandtest.sh || true
                 CLOUD=localhost RELEASE="git:master" ./deployandtest.sh
-
-                # Run the nextgen CI (the old CI wont work on single node deployments)
-                cd ..
+          '''
+        }
+      }
+   stage('Run CI tests') {
+     steps {
+        sh '''  # Run the nextgen CI (the old CI wont work on single node deployments)
+                cd $WORKSPACE/deploy
                 sudo chmod ugo+rx /etc/sf/shakenfist.json
                 tox -epy3
-        '''
+          '''
       }
     }
   }
