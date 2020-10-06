@@ -16,9 +16,6 @@ pipeline {
 
                 echo "Deploying on localhost"
                 cd $WORKSPACE/deploy/ansible
-
-                # This is a terrible hack to get around https://github.com/shakenfist/deploy/issues/75
-                CLOUD=localhost RELEASE="git:master" ./deployandtest.sh || true
                 CLOUD=localhost RELEASE="git:master" ./deployandtest.sh
           '''
         }
