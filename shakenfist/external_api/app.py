@@ -167,7 +167,7 @@ def arg_is_instance_uuid(func):
                 kwargs['instance_uuid'])
         if not kwargs.get('instance_from_db'):
             LOG.withInstance(kwargs['instance_uuid']).info(
-                             'Instance not found, genuinely missing')
+                'Instance not found, genuinely missing')
             return error(404, 'instance not found')
 
         return func(*args, **kwargs)
@@ -183,7 +183,7 @@ def arg_is_instance_uuid_as_virt(func):
             )
         if not kwargs.get('instance_from_db_virt'):
             LOG.withField('instance', kwargs['instance_uuid']).info(
-                           'Instance not found, genuinely missing')
+                'Instance not found, genuinely missing')
             return error(404, 'instance not found')
 
         return func(*args, **kwargs)
@@ -225,12 +225,12 @@ def requires_instance_ownership(func):
     def wrapper(*args, **kwargs):
         if not kwargs.get('instance_from_db'):
             LOG.withField('instance', kwargs['instance_uuid']).info(
-                          'Instance not found, kwarg missing')
+                'Instance not found, kwarg missing')
             return error(404, 'instance not found')
 
         if get_jwt_identity() not in [kwargs['instance_from_db']['namespace'], 'system']:
             LOG.withField('instance', kwargs['instance_uuid']).info(
-                          'Instance not found, ownership test in decorator')
+                'Instance not found, ownership test in decorator')
             return error(404, 'instance not found')
 
         return func(*args, **kwargs)
@@ -245,7 +245,7 @@ def arg_is_network_uuid(func):
                 kwargs['network_uuid'])
         if not kwargs.get('network_from_db'):
             LOG.withField('network', kwargs['network_uuid']).info(
-                          'Network not found, missing or deleted')
+                'Network not found, missing or deleted')
             return error(404, 'network not found')
 
         return func(*args, **kwargs)
@@ -648,7 +648,7 @@ class Instances(Resource):
         if instance:
             if get_jwt_identity() not in [instance.db_entry['namespace'], 'system']:
                 LOG.withField('instance', instance_uuid).info(
-                              'Instance not found, ownership test')
+                    'Instance not found, ownership test')
                 return error(404, 'instance not found')
 
         if not instance:
@@ -728,7 +728,7 @@ class Instances(Resource):
         except exceptions.CandidateNodeNotFoundException as e:
             db.add_event('instance', instance_uuid, 'schedule', 'failed', None,
                          'candidate node not found: ' + str(e))
-            db.enqueue_instance_delete(config.get.parsed('NODE_NAME'),
+            db.enqueue_instance_delete(config.parsed.get('NODE_NAME'),
                                        instance_uuid, 'error', 'scheduling failed')
             return error(404, 'node not found: %s' % e)
 
