@@ -23,8 +23,7 @@ pipeline {
 
                 # Run the nextgen CI (the old CI wont work on single node deployments)
                 cd ..
-                sudo chmod ugo+rx /etc/sf/sfrc
-                . /etc/sf/sfrc
+                sudo chmod ugo+rx /etc/sf/shakenfist.json
                 tox -epy3
         '''
       }
