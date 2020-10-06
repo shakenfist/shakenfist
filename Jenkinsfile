@@ -32,6 +32,24 @@ pipeline {
           '''
       }
     }
+    stage('Assert that the logs look sensible') {
+      steps {
+        sh '''  # Ensure we don't have any tracebacks
+                if [ `grep -c "Traceback (most recent call last):" /var/log/syslog` -gt 0 ]
+                then
+                  echo "We have tracebacks in the logs!"
+                  exit 1
+                fi
+
+                # Ensure nothing died
+                if [ `grep -c "died"` -gt 0 ]
+                then
+                  echo "A process died!"
+                  exit 1
+                fi
+          '''
+      }
+    }
   }
 
   post {
