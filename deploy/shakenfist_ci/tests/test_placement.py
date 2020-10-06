@@ -76,24 +76,24 @@ class TestPlacement(base.BaseTestCase):
 
     def test_remote_placement_works(self):
         # Create another instance, force it to be on a remote node.
-        nodes = list(self.test_client.get_nodes())
-        if len(nodes) < 2:
-            self.skip('Insufficient nodes for test')
-
-        inst = self.test_client.create_instance(
-            'cirros', 1, 1024,
-            [
-                {
-                    'network_uuid': self.net['uuid']
-                }
-            ],
-            [
-                {
-                    'size': 8,
-                    'base': 'ubuntu:18.04',
-                    'type': 'disk'
-                }
-            ], None, None, force_placement='sf-2')
+        try:
+            inst = self.test_client.create_instance(
+                'cirros', 1, 1024,
+                [
+                    {
+                        'network_uuid': self.net['uuid']
+                    }
+                ],
+                [
+                    {
+                        'size': 8,
+                        'base': 'ubuntu:18.04',
+                        'type': 'disk'
+                    }
+                ], None, None, force_placement='sf-2')
+        except apiclient.ResourceNotFoundException as e:
+            self.skip('Target node does not exist. %s' % e)
+            return
 
         self._await_login_prompt(inst['uuid'])
 
