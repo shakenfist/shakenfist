@@ -596,6 +596,13 @@
         chdir: /srv/shakenfist/terraform-provider-shakenfist
       when: mode == "deploy"
 
+    - name: Make /srv/shakenfist/
+      file:
+        path: /usr/local/bin/terraform_install/
+        state: directory
+        mode: "0755"
+      when: mode == "deploy"
+
     - name: Install terraform provider
       copy:
         src: /srv/shakenfist/terraform-provider-shakenfist/terraform-provider-shakenfist
