@@ -57,7 +57,7 @@ class BaseTestCase(testtools.TestCase):
 
     def _test_ping(self, network_uuid, ip, expected):
         out, err = processutils.execute(
-            'ip netns exec %s ping -c 1 %s' % (network_uuid, ip),
+            'sudo ip netns exec %s ping -c 1 %s' % (network_uuid, ip),
             shell=True, check_exit_code=[0, 1])
 
         actual = out.find(' 0% packet loss') != -1
