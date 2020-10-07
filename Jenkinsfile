@@ -42,6 +42,13 @@ pipeline {
                   exit 1
                 fi
 
+                # Ensure we didn't log any errors
+                if [ `grep -c "ERROR"` -gt 0 ]
+                then
+                  echo "Errors were logged!"
+                  exit 1
+                fi
+
                 # Ensure nothing died
                 if [ `grep -c "died"` -gt 0 ]
                 then
