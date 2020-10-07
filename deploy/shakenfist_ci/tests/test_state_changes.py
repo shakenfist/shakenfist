@@ -68,7 +68,6 @@ class TestStateChanges(base.BaseTestCase):
         this_prompt = self._await_login_prompt(inst['uuid'], after=last_prompt)
         self.assertNotEqual(last_prompt, this_prompt)
         last_prompt = this_prompt
-        time.sleep(20)
         self._test_ping(self.net['uuid'], ip, True)
 
         # Hard reboot
@@ -77,7 +76,6 @@ class TestStateChanges(base.BaseTestCase):
         this_prompt = self._await_login_prompt(inst['uuid'], after=last_prompt)
         self.assertNotEqual(last_prompt, this_prompt)
         last_prompt = this_prompt
-        time.sleep(20)
         self._test_ping(self.net['uuid'], ip, True)
 
         # Power off
@@ -91,7 +89,6 @@ class TestStateChanges(base.BaseTestCase):
         this_prompt = self._await_login_prompt(inst['uuid'], after=last_prompt)
         self.assertNotEqual(last_prompt, this_prompt)
         last_prompt = this_prompt
-        time.sleep(20)
         self._test_ping(self.net['uuid'], ip, True)
 
         # Pause
@@ -105,5 +102,4 @@ class TestStateChanges(base.BaseTestCase):
         this_prompt = self._await_login_prompt(inst['uuid'], after=last_prompt)
         self.assertNotEqual(last_prompt, this_prompt)
         last_prompt = this_prompt
-        time.sleep(20)
         self._test_ping(self.net['uuid'], ip, True)
