@@ -114,7 +114,8 @@ def main():
             floating_network = net.from_db('floating')
 
         subst = {
-            'physical_bridge': 'phy-br-%s' % config.parsed.get('NODE_EGRESS_NIC'),
+            'physical_bridge': util.get_safe_interface_name(
+                'phy-br-%s' % config.parsed.get('NODE_EGRESS_NIC')),
             'physical_nic': config.parsed.get('NODE_EGRESS_NIC')
         }
 
@@ -131,8 +132,7 @@ def main():
                 subst['master_float'] = ipm.get_address_at_index(1)
                 subst['netmask'] = ipm.netmask
 
-                util.execute(None,
-                             'ip link add %(physical_bridge)s type bridge' % subst)
+                util.create_interface(subst['physical_bridge'], 'bridge', '')
                 util.execute(None,
                              'ip link set %(physical_bridge)s up' % subst)
                 util.execute(None,

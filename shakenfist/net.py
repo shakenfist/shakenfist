@@ -124,17 +124,15 @@ class Network(object):
         with db.get_lock('network', None, self.uuid, ttl=120):
             if not util.check_for_interface(subst['vx_interface']):
                 with util.RecordedOperation('create vxlan interface', self):
-                    util.execute(None,
-                                 'ip link add %(vx_interface)s type vxlan id %(vx_id)s '
-                                 'dev %(physical_interface)s dstport 0'
-                                 % subst)
+                    util.create_interface(
+                        subst['vx_interface'], 'vxlan',
+                        'id %(vx_id)s dev %(physical_interface)s dstport 0' % subst)
                     util.execute(None,
                                  'sysctl -w net.ipv4.conf.%(vx_interface)s.arp_notify=1' % subst)
 
             if not util.check_for_interface(subst['vx_bridge']):
                 with util.RecordedOperation('create vxlan bridge', self):
-                    util.execute(None,
-                                 'ip link add %(vx_bridge)s type bridge' % subst)
+                    util.create_interface(subst['vx_bridge'], 'bridge', '')
                     util.execute(None,
                                  'ip link set %(vx_interface)s master %(vx_bridge)s' % subst)
                     util.execute(None,
@@ -158,8 +156,9 @@ class Network(object):
 
             if not util.check_for_interface(subst['vx_veth_outer']):
                 with util.RecordedOperation('create router veth', self):
-                    util.execute(None,
-                                 'ip link add %(vx_veth_outer)s type veth peer name %(vx_veth_inner)s' % subst)
+                    util.create_interface(
+                        subst['vx_veth_outer'], 'veth',
+                        'peer name %(vx_veth_inner)s' % subst)
                     util.execute(None,
                                  'ip link set %(vx_veth_inner)s netns %(netns)s' % subst)
                     util.execute(None,
@@ -173,9 +172,9 @@ class Network(object):
 
             if not util.check_for_interface(subst['physical_veth_outer']):
                 with util.RecordedOperation('create physical veth', self):
-                    util.execute(None,
-                                 'ip link add %(physical_veth_outer)s type veth peer name '
-                                 '%(physical_veth_inner)s' % subst)
+                    util.create_interface(
+                        subst['physical_veth_outer'], 'veth',
+                        'peer name %(physical_veth_inner)s' % subst)
                     util.execute(None,
                                  'brctl addif %(physical_bridge)s %(physical_veth_outer)s' % subst)
                     util.execute(None,
