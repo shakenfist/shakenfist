@@ -41,7 +41,7 @@ class TestUbuntu(base.BaseTestCase):
         # cloud image. This is ok though, because we should be using the config drive
         # style interface information anyway.
         ip = self.test_client.get_instance_interfaces(inst['uuid'])[0]['ipv4']
-        self._test_ping(self.net['uuid'], ip, True)
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
 
         self.test_client.delete_instance(inst['uuid'])
         inst_uuids = []

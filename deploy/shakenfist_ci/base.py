@@ -1,3 +1,4 @@
+import datetime
 import random
 import string
 import testtools
@@ -64,13 +65,19 @@ class BaseTestCase(testtools.TestCase):
         raise TimeoutException(
             'Instance %s never triggered a login prompt after %s' % (instance_uuid, after))
 
-    def _test_ping(self, network_uuid, ip, expected):
+    def _test_ping(self, instance_uuid, network_uuid, ip, expected):
         out, err = processutils.execute(
             'sudo ip netns exec %s ping -c 1 %s' % (network_uuid, ip),
             shell=True, check_exit_code=[0, 1])
 
         actual = out.find(' 0% packet loss') != -1
         if expected != actual:
+            # Log the console of the instance so that we can debug
+            print('------------------------------------------------------------------')
+            for line in self.system_client.get_console_data(instance_uuid).split('\n'):
+                print('Instance console: %s' % line)
+            print('------------------------------------------------------------------')
+
             self.fail('Ping test failed. Expected %s != actual %s.\nout: %s\nerr: %s\n'
                       % (expected, actual, out, err))
 

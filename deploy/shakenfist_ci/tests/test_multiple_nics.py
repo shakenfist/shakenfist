@@ -59,4 +59,5 @@ sudo /etc/init.d/S40network restart"""
         self.assertEqual(2, len(ifaces))
 
         for iface in ifaces:
-            self._test_ping(iface['network_uuid'], iface['ipv4'], True)
+            self._test_ping(
+                inst['uuid'], iface['network_uuid'], iface['ipv4'], True)
