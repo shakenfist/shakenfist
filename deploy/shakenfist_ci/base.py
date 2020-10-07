@@ -41,7 +41,7 @@ class BaseTestCase(testtools.TestCase):
 
         while time.time() - start_time < 300:
             for event in self.system_client.get_instance_events(instance_uuid):
-                if after and event['timestamp'] < after:
+                if after and event['timestamp'] <= after:
                     continue
 
                 if (event['operation'] == 'trigger' and
