@@ -114,7 +114,8 @@ def main():
             floating_network = net.from_db('floating')
 
         subst = {
-            'physical_bridge': 'phy-br-%s' % config.parsed.get('NODE_EGRESS_NIC'),
+            'physical_bridge': util.get_safe_interface_name(
+                'phy-br-%s' % config.parsed.get('NODE_EGRESS_NIC')),
             'physical_nic': config.parsed.get('NODE_EGRESS_NIC')
         }
 
