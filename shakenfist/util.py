@@ -111,6 +111,9 @@ def create_interface(interface, interface_type, extra):
         LOG.warn('Interface name truncated from %s to %s'
                  % (orig_interface, interface))
 
+    if check_for_interface(interface):
+        return
+
     execute(None,
             'ip link add %(interface)s type %(interface_type)s %(extra)s'
             % {'interface': interface,

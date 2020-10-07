@@ -89,24 +89,34 @@ class UtilTestCase(testtools.TestCase):
             check_exit_code=[0, 1])
 
     @mock.patch('shakenfist.util.execute')
-    def test_create_interface_bridge(self, mock_execute):
+    @mock.patch('shakenfist.util.check_for_interface', return_value=False)
+    def test_create_interface_bridge(self, mock_check, mock_execute):
         util.create_interface('eth0', 'bridge', '')
         mock_execute.assert_called_with(None, 'ip link add eth0 type bridge ')
 
     @mock.patch('shakenfist.util.execute')
-    def test_create_interface_bridge_truncates(self, mock_execute):
+    @mock.patch('shakenfist.util.check_for_interface', return_value=True)
+    def test_create_interface_bridge_exists(self, mock_check, mock_execute):
+        util.create_interface('eth0', 'bridge', '')
+        mock_execute.assert_not_called()
+
+    @mock.patch('shakenfist.util.execute')
+    @mock.patch('shakenfist.util.check_for_interface', return_value=False)
+    def test_create_interface_bridge_truncates(self, mock_check, mock_execute):
         util.create_interface('eth0rjkghjkfshgjksfhdjkghfdsjkg', 'bridge', '')
         mock_execute.assert_called_with(
             None, 'ip link add eth0rjkghjkfshg type bridge ')
 
     @mock.patch('shakenfist.util.execute')
-    def test_create_interface_vxlan(self, mock_execute):
+    @mock.patch('shakenfist.util.check_for_interface', return_value=False)
+    def test_create_interface_vxlan(self, mock_check, mock_execute):
         util.create_interface('vxlan1', 'vxlan', 'id 123 dev eth0 dstport 0')
         mock_execute.assert_called_with(
             None, 'ip link add vxlan1 type vxlan id 123 dev eth0 dstport 0')
 
     @mock.patch('shakenfist.util.execute')
-    def test_create_interface_veth(self, mock_execute):
+    @mock.patch('shakenfist.util.check_for_interface', return_value=False)
+    def test_create_interface_veth(self, mock_check, mock_execute):
         util.create_interface('veth-foo-o', 'veth', 'peer name veth-foo-i')
         mock_execute.assert_called_with(
             None, 'ip link add veth-foo-o type veth peer name veth-foo-i')
