@@ -66,7 +66,7 @@ class TestStateChanges(base.BaseTestCase):
         self.test_client.reboot_instance(inst['uuid'])
         time.sleep(1)
         this_prompt = self._await_login_prompt(inst['uuid'], after=last_prompt)
-        self.assertNotEqual(last_prompt, this_prompt)
+        self.assertGreater(last_prompt, this_prompt)
         last_prompt = this_prompt
         self._test_ping(self.net['uuid'], ip, True)
 
@@ -74,7 +74,7 @@ class TestStateChanges(base.BaseTestCase):
         self.test_client.reboot_instance(inst['uuid'], hard=True)
         time.sleep(1)
         this_prompt = self._await_login_prompt(inst['uuid'], after=last_prompt)
-        self.assertNotEqual(last_prompt, this_prompt)
+        self.assertGreater(last_prompt, this_prompt)
         last_prompt = this_prompt
         self._test_ping(self.net['uuid'], ip, True)
 
@@ -87,7 +87,7 @@ class TestStateChanges(base.BaseTestCase):
         self.test_client.power_on_instance(inst['uuid'])
         time.sleep(1)
         this_prompt = self._await_login_prompt(inst['uuid'], after=last_prompt)
-        self.assertNotEqual(last_prompt, this_prompt)
+        self.assertGreater(last_prompt, this_prompt)
         last_prompt = this_prompt
         self._test_ping(self.net['uuid'], ip, True)
 
@@ -100,6 +100,6 @@ class TestStateChanges(base.BaseTestCase):
         self.test_client.unpause_instance(inst['uuid'])
         time.sleep(1)
         this_prompt = self._await_login_prompt(inst['uuid'], after=last_prompt)
-        self.assertNotEqual(last_prompt, this_prompt)
+        self.assertGreater(last_prompt, this_prompt)
         last_prompt = this_prompt
         self._test_ping(self.net['uuid'], ip, True)
