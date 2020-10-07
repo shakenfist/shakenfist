@@ -5,6 +5,7 @@ import telnetlib
 import time
 
 from oslo_concurrency import processutils
+from prettytable import PrettyTable
 from shakenfist_client import apiclient
 
 
@@ -50,8 +51,16 @@ class BaseTestCase(testtools.TestCase):
 
             time.sleep(5)
 
-        for event in self.system_client.get_instance_events(instance_uuid):
-            print(event)
+        # If we've failed, log all events and then raise an exception
+        x = PrettyTable()
+        x.field_names = ['timestamp', 'node',
+                         'operation', 'phase', 'duration', 'message']
+        for e in self.system_client.get_instance_events(instance_uuid):
+            e['timestamp'] = datetime.datetime.fromtimestamp(e['timestamp'])
+            x.add_row([e['timestamp'], e['fqdn'], e['operation'], e['phase'],
+                       e['duration'], e['message']])
+        print(x)
+
         raise TimeoutException(
             'Instance %s never triggered a login prompt after %s' % (instance_uuid, after))
 
