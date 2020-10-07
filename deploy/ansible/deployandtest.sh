@@ -177,7 +177,7 @@ then
       cd ../gitrepos/$repo
       git fetch
     fi
-    cd $cwd
+    cd "$cwd"
   done
 
   branch=`echo $RELEASE | cut -f 2 -d ":"`
@@ -194,7 +194,7 @@ then
       git checkout $branch
       git pull
     fi
-    cd $cwd
+    cd "$cwd"
   done
 
   RELEASE="git"
@@ -213,7 +213,7 @@ else
       git checkout master
       git pull
     fi
-    cd $cwd
+    cd "$cwd"
   done
 fi
 VARIABLES="$VARIABLES release=$RELEASE"
@@ -237,7 +237,7 @@ TERRAFORM_VARS="$TERRAFORM_VARS -var=uniqifier=$UNIQIFIER"
 
 ANSIBLE_VARS="$ANSIBLE_VARS cloud=$CLOUD"
 ANSIBLE_VARS="$ANSIBLE_VARS bootdelay=$BOOTDELAY"
-ANSIBLE_VARS="$ANSIBLE_VARS ansible_root=$cwd"
+ANSIBLE_VARS="$ANSIBLE_VARS ansible_root=\"$cwd\""
 ANSIBLE_VARS="$ANSIBLE_VARS uniqifier=$UNIQIFIER"
 ANSIBLE_VARS="$ANSIBLE_VARS admin_password=$ADMIN_PASSWORD"
 ANSIBLE_VARS="$ANSIBLE_VARS floating_network_ipblock=$FLOATING_IP_BLOCK"
