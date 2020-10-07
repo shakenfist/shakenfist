@@ -35,7 +35,7 @@ def handle(jobname, workitem):
     task = None
     try:
         for task in workitem.get('tasks', []):
-            if isinstance(task, dict):
+            if not QueueTask.__subclasscheck__(type(task)):
                 raise exceptions.UnknownTaskException(
                     'Task was not decoded: %s' % task)
 
