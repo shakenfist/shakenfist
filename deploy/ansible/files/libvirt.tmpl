@@ -1,0 +1,101 @@
+<domain type='kvm'>
+  <name>sf:{{uuid}}</name>
+  <uuid>{{uuid}}</uuid>
+  <memory unit='KiB'>{{memory}}</memory>
+  <currentMemory unit='KiB'>{{memory}}</currentMemory>
+  <vcpu placement='static'>{{vcpus}}</vcpu>
+  <os>
+    <type arch='x86_64' machine='pc-i440fx-2.8'>hvm</type>
+    <boot dev='hd'/>
+    <boot dev='cdrom'/>
+    <bootmenu enable='yes' timeout='3000'/>
+  </os>
+  <features>
+    <acpi/>
+    <apic/>
+  </features>
+  <cpu mode='host-passthrough'>
+  </cpu>
+  <clock offset='utc'>
+    <timer name='rtc' tickpolicy='catchup'/>
+    <timer name='pit' tickpolicy='delay'/>
+    <timer name='hpet' present='no'/>
+  </clock>
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <on_crash>restart</on_crash>
+  <pm>
+    <suspend-to-mem enabled='no'/>
+    <suspend-to-disk enabled='no'/>
+  </pm>
+  <devices>
+    <emulator>/usr/bin/kvm</emulator>
+
+    {% for disk in disks %}
+    <disk type='file' device='{{disk.present_as}}'>
+      <driver name='qemu' type='{{disk.type}}'/>
+      <source file='{{disk.path}}'/>
+      {{disk.backing}}
+      <target dev='{{disk.device}}' bus='{{disk.bus}}'/>
+    </disk>
+    {% endfor %}
+
+    <controller type='usb' index='0' model='ich9-ehci1'>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x04' function='0x7'/>
+    </controller>
+    <controller type='usb' index='0' model='ich9-uhci1'>
+      <master startport='0'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x04' function='0x0' multifunction='on'/>
+    </controller>
+    <controller type='usb' index='0' model='ich9-uhci2'>
+      <master startport='2'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x04' function='0x1'/>
+    </controller>
+    <controller type='usb' index='0' model='ich9-uhci3'>
+      <master startport='4'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x04' function='0x2'/>
+    </controller>
+    <controller type='pci' index='0' model='pci-root'/>
+    <controller type='ide' index='0'>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x01' function='0x1'/>
+    </controller>
+
+    {% for net in networks %}
+    <interface type='bridge'>
+      <mac address='{{net.macaddr}}'/>
+      <source bridge='{{net.bridge}}'/>
+      <model type='{{net.model}}'/>
+    </interface>
+    {% endfor %}
+
+    <!-- NOTE(mikal): we use "console" here not "serial" because on Ubuntu 20.04
+         we had issues with qemu using incorrect ports and not binding to them
+         without significant retries. We wrote a test case for that at
+         https://github.com/shakenfist/reproducables/tree/master/sniffles
+         if you're interested. -->
+    <console type='tcp'>
+      <source mode='bind' host='0.0.0.0' service='{{console_port}}'/>
+      <log file='{{instance_path}}/console.log' append='on'/>
+      <protocol type='telnet'/>
+      <target port='1'/>
+    </console>
+
+    <graphics type='vnc' port='{{vdi_port}}' listen='0.0.0.0'>
+      <listen type='address' address='0.0.0.0'/>
+    </graphics>
+
+    <!-- NOTE(mikal): we use this sound device because the default resulted in
+         very poor performance on Windows 10. -->
+    <sound model='ich6'/>
+
+    <input type='mouse' bus='ps2'/>
+    <input type='keyboard' bus='ps2'/>
+    <video>
+      <model type='{{video_model}}' vram='{{video_memory}}' heads='1' primary='yes'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x0'/>
+    </video>
+    <memballoon model='virtio'>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x06' function='0x0'/>
+    </memballoon>
+  </devices>
+</domain>

@@ -1,0 +1,58 @@
+#########################################
+# Import inventory from terraform
+#########################################
+
+- hosts: localhost
+  gather_facts: yes
+  connection: ssh
+
+  tasks:
+    - include: ../terraform/{{cloud}}/terraform.yml
+
+#########################################
+# Scenario: user data and ssh keys
+#########################################
+
+- hosts: sf-2
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - include: _setup.yml
+    - include: _util_instance_start.yml
+        name="cirros_with_extras"
+        distro=cirros
+        network="{{net_one_uuid}}"
+        sshkey="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCuGJ47be0/3EH/q1b/2AYdhvTG/5L84QnKm3MhTO+cQGYfxw2AhPk6AOdHYPIp+t2wV/noc1eKCHN8n//T424usEIQ/ODg9o2BeAhUU8S4qd6XSW5ihOknBZRnoQrYmAM6gUUvF4hLJ62Tzf/h2Hi9Wl774DRDs/Il5pBJnt+AdAgLcnVgJJG8KtX3JnynwnBOTlbKnyIWmEnHZL+RH2+lIftsVXelLwq/bpzBWsg0JjjGvtuuKMMge0y3ZfsBA8/vLytaEV/vQk/osilJeAbYa7Ul1K65S5eC2G2Yx4rNKdx0nn4lK2o/2keN52pDhrJbmK4907B50mWqtCFjsNULnfT5paInHRPgasKl007E0ZNNxhfXWieiVCUu/5zFiMPcWyB9YN60gp4lZSKB19GaURxtbKWlajfEakn3mTm9JQH5eU48XIaCh+LcptKYd6lDBWeoicQzECQLMfnKuGpfoZsKbOTTeCzS0/q6guKLNgfXijpRf5uaZaTqQa18t8s= mikal@marvin"
+        userdata="IyEvYmluL3NoCgplY2hvICJIZWxsbyBXb3JsZC4gIFRoZSB0aW1lIGlzIG5vdyAkKGRhdGUgLVIpISIgPiAvaG9tZS9jaXJyb3Mvb3V0cHV0LnR4dApjaG93biBjaXJyb3MuY2lycm9zIC9ob21lL2NpcnJvcy9vdXRwdXQudHh0"
+
+    # The test value is two here because we also get a copy of the shell script that the
+    # helper runs
+    - name: Ensure user data ran and ssh keys were setup, then cleanup
+      copy:
+        content: |
+          #!/bin/bash -e
+
+          while [ `sf-client instance events {{cirros_with_extras_uuid}} | grep -c "login prompt"` -lt 1 ]
+          do
+            echo "Waiting for login prompt..."
+            sleep 10
+          done
+
+          [ `/opt/telnet_client.py {{cirros_with_extras_console_port}} exists /home/cirros/output.txt | grep -c "File exists"` -eq 2 ]
+          [ `/opt/telnet_client.py {{cirros_with_extras_console_port}} exists /home/cirros/.ssh/authorized_keys | grep -c "File exists"` -eq 2 ]
+        dest: /tmp/shell_script
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx
+
+    - name: Execute
+      shell: /tmp/shell_script
+
+    - name: Delete instance
+      sf_instance:
+        uuid: "{{cirros_with_extras_uuid}}"
+        state: absent

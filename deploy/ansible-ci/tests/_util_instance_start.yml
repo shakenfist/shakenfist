@@ -1,0 +1,60 @@
+- name: Count the number of VMs before
+  virt:
+    command: list_vms
+    state: running
+  register: instance_start_count_before
+
+- name: Start a {{distro}} instance on {{inventory_hostname}}
+  sf_instance:
+    name: "{{name}}"
+    cpu: 1
+    ram: 1
+    disks:
+      - "8@{{distro}}"
+      - "8"
+    networks:
+      - "{{network}}"
+    ssh_key: "{{sshkey}}"
+    user_data: "{{userdata}}"
+    placement: "{{inventory_hostname}}"
+  register: instance_create_out
+
+- name: Log instance details
+  debug:
+    msg: "{{instance_create_out}}"
+
+- name: Wait for instance to boot
+  pause:
+    minutes: 2
+
+- name: Count the number of VMs after
+  virt:
+    command: list_vms
+    state: running
+  register: instance_start_count_after
+
+- name: Make sure we have one more VM
+  fail:
+    msg: We failed to start a VM on {{inventory_hostname}}.
+  when: instance_start_count_before == instance_start_count_after
+
+- name: Extract instance uuid
+  set_fact:
+    "{{name}}_uuid": "{{instance_create_out.meta.uuid}}"
+
+- name: Extract console port
+  set_fact:
+    "{{name}}_console_port": "{{instance_create_out.meta.console_port}}"
+
+- name: Extract instance IP
+  set_fact:
+    "{{name}}_ip": "{{instance_create_out.meta.network_interfaces[0].ipv4}}"
+
+- name: Log instance details
+  debug:
+    msg: Instance {{name}} has uuid {{vars[name + '_uuid']}}, console port {{vars[name + '_console_port']}}, and IPv4 {{vars[name + '_ip']}}.
+
+# This needs to be so long because DHCP failures take a fair while to happen
+- name: Wait for instance to boot
+  pause:
+    minutes: 2

@@ -1,0 +1,13 @@
+apiVersion: 1
+
+providers:
+  - name: "git configured dashboards"
+    orgId: 1
+    folder: "git"
+    folderUid: ""
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 60
+    options:
+      path: /etc/grafana/provisioning/dashboards

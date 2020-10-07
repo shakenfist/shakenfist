@@ -1,0 +1,11 @@
+- name: Determine network node
+  set_fact:
+    network_node_ip: "{{hostvars['localhost']['node_ip']}}"
+  delegate_to: localhost
+  delegate_facts: true
+
+- name: Determine primary node
+  set_fact:
+    primary_node_ip: "{{hostvars['localhost']['node_ip']}}"
+  delegate_to: localhost
+  delegate_facts: true

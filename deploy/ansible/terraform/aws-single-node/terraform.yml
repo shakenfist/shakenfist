@@ -1,0 +1,31 @@
+- name: Deploy infrastructure
+  terraform:
+    project_path: "{{ansible_root}}/terraform/aws-single-node"
+    state: present
+    force_init: true
+    variables:
+      vpc_id: "{{vpc_id}}"
+      region: "{{region}}"
+      availability_zone: "{{availability_zone}}"
+      ssh_key_name: "{{ssh_key_name}}"
+  register: terraform_out
+
+- name: Add sf-single to ansible
+  add_host:
+    hostname: sf-single
+    ansible_ssh_host: "{{terraform_out.outputs.sf_single_external.value}}"
+    ansible_user: "ubuntu"
+    ansible_ssh_private_key_file: "~/.ssh/{{ssh_key_name}}.pem"
+    groups: hypervisors, primary, etcd_master
+
+- name: Add sf-single node_ip
+  set_fact:
+    node_name: "sf-single"
+    node_ip: "{{terraform_out.outputs.sf_single_internal.value}}"
+  delegate_to: sf-single
+  delegate_facts: true
+
+- name: Log terraform hosts
+  debug:
+    msg:
+      - "sf-single: {{hostvars['sf-single']['ansible_ssh_host']}}, {{hostvars['sf-single']['node_ip']}}"

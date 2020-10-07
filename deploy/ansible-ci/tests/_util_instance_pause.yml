@@ -1,0 +1,42 @@
+- name: Count how many times the instance has booted
+  shell: |
+    grep -c "\[    0.000000\] Linux version" /srv/shakenfist/instances/{{uuid}}/console.log
+  register: boots_before_complex
+
+- name: Extract boot count
+  set_fact:
+    boots_before: "{{boots_before_complex.stdout}}"
+
+- name: Pause instance
+  shell: |
+    sf-client instance {{action_one}} {{uuid}}
+
+- name: We should still have a VM on sf-2
+  shell: |
+    [ `virsh list | grep -c paused` -eq 1 ]
+
+- name: Paused instance should not respond
+  shell: |
+    [ `ping -c 3 "{{ip}}" | grep -c " 100% packet loss"` -eq 1 ]
+
+- name: Start instance
+  shell: |
+    sf-client instance {{action_two}} {{uuid}}
+
+- name: Wait
+  pause:
+    seconds: 20
+
+- name: Count how many times the instance has booted
+  shell: |
+    grep -c "\[    0.000000\] Linux version" /srv/shakenfist/instances/{{uuid}}/console.log
+  register: boots_after_complex
+
+- name: Extract boot count
+  set_fact:
+    boots_after: "{{boots_after_complex.stdout}}"
+
+- name: Make sure we haven't rebooted
+  fail:
+    msg: Instance rebooted
+  when: boots_before < boots_after

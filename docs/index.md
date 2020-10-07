@@ -17,9 +17,7 @@ I think Shaken Fist is useful to others. Its Apache-2.0 licensed, and available 
 
 First off, we don't have a newsletter. That said, updates will be announced here as they happen. What we do have is useful links:
 
-* [The deploy repository](http://github.com/shakenfist/deploy) is the installer code for Shaken Fist, and probably a good place to start, especially if you just want to use Shaken Fist and not contribute code to it.
-
-* [The Shaken Fist repository](http://github.com/shakenfist/shakenfist) is where the code for the server is.
+* [The Shaken Fist repository](http://github.com/shakenfist/shakenfist) is where the code for the server is, including the deployer. Its a good place to start.
 
 * There are a series of client repositories as well:
     * [The python client repository](http://github.com/shakenfist/client-python) contains the python API client, as well as the command line client that users and shell scripts use to interact with Shaken Fist.

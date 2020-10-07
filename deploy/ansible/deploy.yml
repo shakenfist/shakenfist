@@ -1,0 +1,615 @@
+--- # Install shakenfist on a series of Ubuntu machines
+- hosts: localhost
+  gather_facts: yes
+  connection: ssh
+  vars:
+    release: git
+    mode: deploy
+    ram_system_reservation: 5.0
+
+  tasks:
+    - name: Set RAM reservation as a var
+      set_fact:
+        "ram_system_reservation": "{{ram_system_reservation}}"
+      delegate_to: localhost
+      delegate_facts: true
+
+    - include_tasks: tasks/distro-check.yml
+      when: mode == "deploy"
+
+    - name: Load default vars
+      include_vars: main.yml
+
+    - include: tasks/build-wheel.yml
+        repo_path="../.."
+        package="shakenfist"
+      when: release == "git"
+
+    - include: tasks/build-wheel.yml
+        repo_path="../gitrepos/client-python"
+        package="shakenfist_client"
+      when: release == "git"
+
+    - name: Log wheel details
+      debug:
+        msg:
+          - "Shakenfist wheel is: {{hostvars['localhost']['shakenfist_wheel_path']}}"
+          - "Shakenfist client wheel is: {{hostvars['localhost']['shakenfist_client_wheel_path']}}"
+      when: release == "git"
+
+    - name: Generate a random auth secret
+      set_fact:
+        auth_secret: "{{ lookup('password', '/dev/null length=30 chars=ascii_letters') }}"
+      when: mode == "deploy"
+
+    - include: terraform/{{cloud}}/terraform.yml
+      when: mode == "deploy" or cloud == "metal"
+
+    - name: Wait for instances to boot
+      pause:
+        minutes: "{{bootdelay}}"
+      when: mode == "deploy" and cloud != "localhost"
+
+- hosts: hypervisors
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars:
+    release: git
+    mode: deploy
+
+  tasks:
+    - include: terraform/{{cloud}}/postboot.yml
+
+- hosts: primary
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars:
+    release: git
+    mode: deploy
+
+  tasks:
+    - name: Write syslog file
+      template:
+        src: files/rsyslog-server-01-sf.conf
+        dest: /etc/rsyslog.d/01-sf.conf
+        owner: root
+        group: sudo
+        mode: u=r,g=r,o=
+      when: mode == "deploy"
+
+    - name: Restart syslog
+      service:
+        name: rsyslog
+        enabled: yes
+        state: restarted
+      when: mode == "deploy"
+
+- hosts: allsf
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: yes
+  connection: ssh
+
+  tasks:
+    - name: Configure KSM to run on boot
+      copy:
+        content: |
+          w /sys/kernel/mm/ksm/run - - - - 1
+          w /sys/kernel/mm/ksm/pages_to_scan - - - - 1000000
+          w /sys/kernel/mm/ksm/merge_across_nodes - - - - 0
+        dest: /etc/tmpfiles.d/sf-ksm.conf
+        owner: root
+        mode: u=r,g=r,o=r
+      when: ksm_enabled == "1"
+
+    # merge_across_nodes requires a reboot, so is skipped below
+    - name: Configure KSM to run now
+      shell: |
+        echo "1" > /sys/kernel/mm/ksm/run
+        echo "100000" > /sys/kernel/mm/ksm/pages_to_scan
+      ignore_errors: True
+      when: ksm_enabled == "1"
+
+    - name: Configure KSM to not run on boot
+      copy:
+        content: |
+          w /sys/kernel/mm/ksm/run - - - - 0
+          w /sys/kernel/mm/ksm/pages_to_scan - - - - 0
+          w /sys/kernel/mm/ksm/merge_across_nodes - - - - 0
+        dest: /etc/tmpfiles.d/sf-ksm.conf
+        owner: root
+        mode: u=r,g=r,o=r
+      when: ksm_enabled != "1"
+
+    # merge_across_nodes requires a reboot, so is skipped below
+    - name: Configure KSM to not run now
+      shell: |
+        echo "0" > /sys/kernel/mm/ksm/run
+        echo "0" > /sys/kernel/mm/ksm/pages_to_scan
+      ignore_errors: True
+      when: ksm_enabled != "1"
+
+    - name: Configure IPv6 to be disabled on boot
+      copy:
+        content: |
+          net.ipv6.conf.all.disable_ipv6 = 1
+          net.ipv6.conf.default.disable_ipv6 = 1
+        dest: /etc/sysctl.d/10-sf-ipv6.conf
+        owner: root
+        mode: u=r,g=r,o=r
+
+    - name: Configure IPv6 to be disabled now
+      shell: |
+        sysctl -w net.ipv6.conf.all.disable_ipv6=1
+        sysctl -w net.ipv6.conf.default.disable_ipv6=1
+      ignore_errors: True
+
+    - name: Syslog server is the primary server
+      set_fact:
+        syslog: "{{hostvars['localhost']['primary_node_ip']}}"
+      when: mode == "deploy"
+
+    - name: Send syslog to the primary server, unless I am the primary server
+      template:
+        src: files/rsyslog-client-01-sf.conf
+        dest: /etc/rsyslog.d/01-sf.conf
+        owner: root
+        group: sudo
+        mode: u=r,g=r,o=
+      when: hostvars['localhost']['primary_node_ip'] != node_ip and mode == "deploy"
+
+    - name: Restart syslog
+      service:
+        name: rsyslog
+        enabled: yes
+        state: restarted
+      when: hostvars['localhost']['primary_node_ip'] != node_ip and mode == "deploy"
+
+    - name: Load default vars
+      include_vars: main.yml
+
+    - include: includes/debian.yml
+      when: mode == "deploy"
+
+    - name: Check that we can run KVM
+      shell: kvm-ok
+      when: mode == "deploy"
+
+    # NOTE(mikal): this might not be right if egress and meshes are on different
+    # interfaces.
+    - name: Determine default interface
+      shell: ip route list default | head -1 | cut -f 5 -d " "
+      register: node_egress_nic_complex
+      when: node_egress_nic is not defined
+
+    - name: Extract node default interface
+      set_fact:
+        node_egress_nic: "{{node_egress_nic_complex.stdout}}"
+      when: node_egress_nic is not defined
+
+    - name: Determine default interface MTU
+      shell: ip link show {{node_egress_nic}} | grep mtu | sed -e 's/.*mtu //' -e 's/ .*//'
+      register: node_mtu_complex
+      when: mode == "deploy"
+
+    - name: Extract default interface MTU
+      set_fact:
+        node_mtu: "{{node_mtu_complex.stdout}}"
+      when: mode == "deploy"
+
+    - name: Log node MTU
+      debug:
+        msg: "Node MTU is {{node_mtu}}"
+      when: mode == "deploy"
+
+    - name: Abort if default interface MTU is too low
+      fail:
+        msg: "Node MTU is too low."
+      when: mode == "deploy" and cloud != "gcp"  and cloud != "localhost" and node_mtu|int < 2000
+
+    - name: Make /srv/shakenfist/
+      file:
+        path: /srv/shakenfist
+        state: directory
+        mode: "0755"
+      when: mode == "deploy"
+
+# Install etcd
+- hosts: etcd
+  roles:
+    - role: andrewrothstein.etcd-cluster
+      when: mode == "deploy"
+      vars:
+        etcd_secure: False
+        etcd_cluster_name: shakenfist
+        etcd_enable_v2: False
+        etcd_master_group_name: etcd_master
+
+- hosts: allsf
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: yes
+  connection: ssh
+  vars:
+    release: git
+    mode: deploy
+
+  tasks:
+    - include: includes/python3.yml
+      when: mode == "deploy"
+
+    - name: Ensure the source directory is absent
+      file:
+        path: /srv/shakenfist/src/
+        state: absent
+      when: mode == "deploy"
+
+    - name: Remove old wheels
+      file:
+        path: /srv/shakenfist/shakenfist*-py3-none-any.whl
+        state: absent
+
+    - name: Copy shakenfist
+      synchronize:
+        src: ../../dist/{{hostvars['localhost']['shakenfist_wheel_path']}}
+        dest: /srv/shakenfist/
+      when: release == "git"
+
+    - name: Copy shakenfist client
+      synchronize:
+        src: ../gitrepos/client-python/dist/{{hostvars['localhost']['shakenfist_client_wheel_path']}}
+        dest: /srv/shakenfist/
+      when: release == "git"
+
+    - name: Uninstall shakenfist, if present
+      command: pip3 uninstall -y shakenfist shakenfist-client
+      ignore_errors: True
+
+    - name: Install shakenfist
+      command: pip3 install {{hostvars['localhost']['shakenfist_wheel_path']}}
+      args:
+        chdir: /srv/shakenfist/
+      when: release == "git"
+
+    - name: Install shakenfist client
+      command: pip3 install {{hostvars['localhost']['shakenfist_client_wheel_path']}}
+      args:
+        chdir: /srv/shakenfist/
+      when: release == "git"
+
+    - name: Install shakenfist from pypi
+      command: pip3 install shakenfist=={{release}}
+      when: release != "git"
+
+    - name: Install shakenfist client from pypi
+      command: pip3 install shakenfist-client=={{release}}
+      when: release != "git"
+
+    - name: Create config directory
+      file:
+        path: /etc/sf
+        state: directory
+        mode: "0755"
+      when: mode == "deploy"
+
+    - name: Set system key from extra-vars
+      set_fact:
+        system_key: "{{admin_password}}"
+      when: mode == "deploy"
+
+    - name: Use Hashicorp Vault for "system" namespace key (if enabled)
+      block:
+        - set_fact:
+            system_key: "{{lookup('hashivault', '{{vault_system_key_path}}', 'key')}}"
+          when: vault_system_key_path is defined and mode == "deploy"
+
+      rescue:
+        - fail:
+            msg: "Ensure that you have installed ansible-modules-hashivault ie. pip install ansible-modules-hashivault"
+
+    - name: Write sfrc file
+      template:
+        src: files/sfrc
+        dest: /etc/sf/sfrc
+        owner: root
+        group: sudo
+        mode: u=r,g=r,o=
+      when: mode == "deploy"
+
+    - name: Install sfrc for root user
+      lineinfile:
+        path: /root/.bashrc
+        create: yes
+        regexp: ". /etc/sf/sfrc"
+        line: ". /etc/sf/sfrc"
+      when: mode == "deploy"
+
+    - name: Write a global auth file
+      template:
+        src: files/shakenfist.json
+        dest: /etc/sf/shakenfist.json
+        owner: root
+        group: sudo
+        mode: u=r,g=r,o=
+      when: mode == "deploy"
+
+- hosts: primary
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars:
+    release: git
+    mode: deploy
+
+  tasks:
+    - name: Install prometheus
+      apt:
+        name: prometheus
+        state: latest
+      when: mode == "deploy"
+
+    - name: Read local prometheus customizations
+      set_fact:
+        prom_additional: "{{lookup('file', 'terraform/{{cloud}}/prometheus.yml') }}"
+      when: mode == "deploy"
+
+    - name: Write prometheus configuration file
+      copy:
+        content: |
+          global:
+            external_labels:
+              monitor: 'shakenfist'
+
+          scrape_configs:
+            #- job_name: 'node'
+            #  static_configs:
+            #    - targets: [
+            #          {% for svr in groups.allsf %}
+            #            '{{hostvars[svr]['node_ip']}}:9100',
+            #          {% endfor %}
+            #        ]
+            - job_name: 'shakenfist'
+              static_configs:
+                - targets: [
+                      {% for svr in groups.hypervisors %}
+                        '{{hostvars[svr]['node_ip']}}:13001',
+                      {% endfor %}
+                    ]
+              metric_relabel_configs:
+                - source_labels: [__name__]
+                  regex: '(python\w*|process_\w*)'
+                  action: drop
+            - job_name: 'etcd'
+              static_configs:
+                - targets: [
+                      {% for svr in groups.allsf %}
+                        '{{hostvars[svr]['node_ip']}}:2379',
+                      {% endfor %}
+                    ]
+              metric_relabel_configs:
+                - source_labels: [__name__]
+                  regex: (?i)(etcd_mvcc_db_total_size_in_bytes|etcd_network_client_grpc_received_bytes_total|etcd_network_client_grpc_sent_bytes_total)
+                  action: keep
+          {{prom_additional}}
+        dest: /etc/prometheus/prometheus.yml
+        owner: root
+        mode: u=rw,g=r,o=r
+      when: mode == "deploy"
+
+    - name: Restart prometheus
+      service:
+        name: prometheus
+        enabled: yes
+        state: restarted
+      when: mode == "deploy"
+
+    - include: includes/grafana.yml
+      when: mode == "deploy"
+
+    - name: Write grafana config
+      template:
+        src: files/grafana/grafana.ini
+        dest: /etc/grafana/grafana.ini
+        owner: root
+        mode: u=rw,g=r,o=r
+      when: mode == "deploy"
+
+    - name: Write grafana dashboard
+      copy:
+        src: files/grafana/provisioning/dashboards/shakenfist.json
+        dest: /etc/grafana/provisioning/dashboards/shakenfist.json
+        owner: root
+        mode: u=rw,g=r,o=r
+      when: mode == "deploy"
+
+    - name: Write grafana dashboard config
+      copy:
+        src: files/grafana/provisioning/dashboards/dashboards.yaml
+        dest: /etc/grafana/provisioning/dashboards/dashboards.yaml
+        owner: root
+        mode: u=rw,g=r,o=r
+      when: mode == "deploy"
+
+    - name: Write prometheus grafana configuration file
+      copy:
+        content: |
+          apiVersion: 1
+
+          datasources:
+          - name: Prometheus
+            type: prometheus
+            orgId: 1
+            url: http://{{node_ip}}:9090
+            isDefault: true
+            version: 1
+            editable: false
+            access: proxy
+            jsonData:
+              tlsSkipVerify: true
+        dest: /etc/grafana/provisioning/datasources/prometheus.yml
+        owner: root
+        mode: u=rwx,g=r,o=r
+      when: mode == "deploy"
+
+    - name: Restart grafana
+      service:
+        name: grafana-server
+        enabled: yes
+        state: restarted
+      when: mode == "deploy"
+
+    - name: Create an admin namespace called "system" with one key configured
+      shell: sf-passwd deploy "{{system_key}}"
+      when: mode == "deploy"
+
+- hosts: hypervisors
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars:
+    release: git
+    mode: deploy
+
+  tasks:
+    - name: Create storage directory
+      file:
+        path: /srv/shakenfist
+        state: directory
+        mode: "0755"
+      when: mode == "deploy"
+
+    - name: Copy libvirt template
+      copy:
+        src: files/libvirt.tmpl
+        dest: /srv/shakenfist/libvirt.tmpl
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Turn off default libvirt networking
+      shell: |
+        virsh net-destroy default
+      ignore_errors: True
+      when: mode == "deploy"
+
+    - name: Copy dhcp config template
+      copy:
+        src: files/dhcp.tmpl
+        dest: /srv/shakenfist/dhcp.tmpl
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Copy dhcp hosts template
+      copy:
+        src: files/dhcphosts.tmpl
+        dest: /srv/shakenfist/dhcphosts.tmpl
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Determine node IP
+      shell: /usr/bin/dig @resolver1.opendns.com ANY myip.opendns.com +short
+      register: node_ip_complex
+      when: node_ip is not defined
+
+    - name: Extract node IP
+      set_fact:
+        node_ip: "{{node_ip_complex.stdout}}"
+      when: node_ip is not defined
+
+    - name: Write systemd unit
+      template:
+        src: files/sf.service
+        dest: /lib/systemd/system
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
+      when: mode != 'hotfix'
+
+    - name: Rotate logs and remove old logs
+      shell: |
+        journalctl --rotate
+        journalctl --vacuum-time=2d
+        /usr/sbin/logrotate -f /etc/logrotate.conf
+      ignore_errors: True
+      when: mode == "deploy"
+
+    - name: Start the SF daemon
+      service:
+        name: sf
+        enabled: yes
+        state: restarted
+        daemon_reload: yes
+
+- hosts: primary
+  roles:
+    - role: andrewrothstein.terraform
+      when: mode == "deploy"
+      vars:
+        terraform_binary_dir: /usr/local/bin/terraform_install
+
+    - role: andrewrothstein.go
+      when: mode == "deploy"
+
+- hosts: primary
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars:
+    release: git
+    mode: deploy
+
+  tasks:
+    - include: includes/ansible.yml
+      when: mode == "deploy"
+
+    - name: Clear out old terraform providers
+      file:
+        path: /srv/shakenfist/terraform-provider-shakenfist
+        state: absent
+      when: mode == "deploy"
+
+    - name: Clone the terraform provider
+      git:
+        repo: https://github.com/shakenfist/terraform-provider-shakenfist
+        dest: /srv/shakenfist/terraform-provider-shakenfist
+      when: mode == "deploy"
+
+    - name: Build terraform provider
+      shell:
+        cmd: /usr/local/go/bin/go build
+        chdir: /srv/shakenfist/terraform-provider-shakenfist
+      when: mode == "deploy"
+
+    - name: Make /srv/shakenfist/
+      file:
+        path: /usr/local/bin/terraform_install/
+        state: directory
+        mode: "0755"
+      when: mode == "deploy"
+
+    - name: Install terraform provider
+      copy:
+        src: /srv/shakenfist/terraform-provider-shakenfist/terraform-provider-shakenfist
+        dest: /usr/local/bin/terraform_install/terraform-provider-shakenfist
+        remote_src: yes
+        mode: u+rx,g+rx,o+rx
+      when: mode == "deploy"
+
+    - name: Run any upgrade steps
+      shell: sf-upgrade

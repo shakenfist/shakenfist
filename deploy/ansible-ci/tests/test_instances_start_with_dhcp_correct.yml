@@ -1,0 +1,124 @@
+#########################################
+# Import inventory from terraform
+#########################################
+
+- hosts: localhost
+  gather_facts: yes
+  connection: ssh
+
+  tasks:
+    - include: ../terraform/{{cloud}}/terraform.yml
+
+#########################################
+# Scenario: we can start cirros VMs
+#########################################
+
+- hosts: hypervisors
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - include: _setup.yml
+    - include: _util_instance_start.yml
+        name="cirros"
+        distro=cirros
+        network="{{net_one_uuid}}"
+        sshkey=""
+        userdata=""
+
+    - name: Validate
+      copy:
+        content: |
+          #!/bin/bash -e
+
+          [ `sf-client --simple instance list | grep sf-1 | wc -l` -eq 1 ]
+          [ `sf-client --simple instance list | grep sf-2 | wc -l` -eq 1 ]
+        dest: /tmp/shell_script
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx
+
+    - name: Execute
+      shell: /tmp/shell_script
+
+#########################################
+# Scenario: the network node DHCP is correct
+#########################################
+
+- hosts: sf-1
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - name: Ensure that the instances appear in the dhcp config on the network node
+      copy:
+        content: |
+          #!/bin/bash -e
+
+          [ `egrep -c "{{hostvars['sf-1']['cirros_ip']}}$" /srv/shakenfist/dhcp/{{net_one_uuid}}/hosts` -eq 1 ]
+          [ `egrep -c "{{hostvars['sf-2']['cirros_ip']}}$" /srv/shakenfist/dhcp/{{net_one_uuid}}/hosts` -eq 1 ]
+        dest: /tmp/shell_script
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx
+
+    - name: Execute
+      shell: /tmp/shell_script
+
+- hosts: sf-2
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - name: Ensure that dhcp is not configured on a non-network-node
+      copy:
+        content: |
+          #!/bin/bash -e
+
+          [ ! -e /srv/shakenfist/dhcp/{{net_one_uuid}}/config ]
+          [ `ifconfig | grep -c 192.168.242.1` -eq 0 ]
+        dest: /tmp/shell_script
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx
+
+    - name: Execute
+      shell: /tmp/shell_script
+
+#########################################
+# Scenario: verify networking on our cirros instances
+#########################################
+
+- hosts: hypervisors
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - include: _util_network_cirros_validate.yml
+        console_port="{{cirros_console_port}}"
+        uuid="{{cirros_uuid}}"
+        netblock_octets="192.168.242"
+
+- hosts: sf-1
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - name: The instance on sf-1 should be able to ping the instance on sf-2
+      shell: |
+        [ `/opt/telnet_client.py {{cirros_console_port}} ping {{hostvars['sf-2']['cirros_ip']}} | grep -c " 0% packet loss"` -eq 1 ]

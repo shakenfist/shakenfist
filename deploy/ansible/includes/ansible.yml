@@ -1,0 +1,15 @@
+- name: Install ansible prerequisites
+  apt:
+    name: ["apt-transport-https", "software-properties-common"]
+    update_cache: yes
+    state: latest
+
+- name: Add ansible PPA repository
+  apt_repository:
+    repo: "ppa:ansible/ansible"
+  when: ansible_distribution_version < '20.04'
+
+- name: Install ansible
+  apt:
+    name: ["ansible"]
+    update_cache: yes

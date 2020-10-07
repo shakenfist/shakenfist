@@ -1,0 +1,345 @@
+#########################################
+# Import inventory from terraform
+#########################################
+
+- hosts: localhost
+  gather_facts: yes
+  connection: ssh
+
+  tasks:
+    - include: ../terraform/{{cloud}}/terraform.yml
+
+- hosts: hypervisors
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - include: _setup.yml
+    - include: _util_instance_start.yml
+        name="cirros"
+        distro=cirros
+        network="{{net_one_uuid}}"
+        sshkey=""
+        userdata=""
+
+    - name: Validate
+      copy:
+        content: |
+          #!/bin/bash -e
+
+          [ `sf-client --simple instance list | grep sf-1 | wc -l` -eq 1 ]
+          [ `sf-client --simple instance list | grep sf-2 | wc -l` -eq 1 ]
+        dest: /tmp/shell_script
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx
+
+    - name: Execute
+      shell: /tmp/shell_script
+
+#########################################
+# Scenario: we can create an instance with no networking configured
+#########################################
+
+- hosts: sf-1
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - name: Start a cirros instance on sf-1
+      sf_instance:
+        name: "cirros_no_network"
+        cpu: 1
+        ram: 1
+        disks:
+          - "8@cirros"
+        networks:
+        ssh_key: ""
+        user_data: ""
+        placement: "{{inventory_hostname}}"
+      register: instance_create_out
+
+    - name: Log instance details
+      debug:
+        msg: "{{instance_create_out}}"
+
+    - name: Extract instance uuid
+      set_fact:
+        "cirros_no_network_uuid": "{{instance_create_out.meta.uuid}}"
+
+    - name: Delete instance
+      sf_instance:
+        uuid: "{{cirros_no_network_uuid}}"
+        state: absent
+
+#########################################
+# Scenario: we can start an Ubuntu instance too
+#########################################
+
+- hosts: sf-2
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - include: _util_instance_start.yml
+        name="ubuntu"
+        distro=ubuntu:18.04
+        network="{{net_one_uuid}}"
+        sshkey=""
+        userdata=""
+
+- hosts: sf-1
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    # NOTE(mikal): Ubuntu 18.04 has a bug where DHCP doesn't always work in the
+    # cloud image. This is ok though, because we should be using the config drive
+    # style interface information anyway.
+
+    - name: Instance is pingable from inside the network namespace
+      shell: |
+        [ `ip netns exec {{net_one_uuid}} ping -c 1 {{hostvars['sf-2']['ubuntu_ip']}} | grep -c " 0% packet loss"` -eq 1 ]
+
+#########################################
+# Scenario: a second network shouldn't be able to see the first network
+#########################################
+
+- hosts: sf-1
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - include: _util_network_create.yml
+        netblock="192.168.240.0/24"
+        name="net_two"
+
+    - include: _util_instance_start.yml
+        name="cirros_net_two"
+        distro=cirros
+        network="{{net_two_uuid}}"
+        sshkey=""
+        userdata=""
+
+    - include: _util_network_cirros_validate.yml
+        console_port="{{cirros_net_two_console_port}}"
+        uuid="{{cirros_net_two_uuid}}"
+        netblock_octets="192.168.240"
+
+    - name: Check we can't talk to the other virtual network
+      shell: |
+        [ `/opt/telnet_client.py {{cirros_net_two_console_port}} ping {{cirros_ip}} | grep -c " 100% packet loss"` -eq 1 ]
+
+    - name: Delete instance
+      sf_instance:
+        uuid: "{{cirros_net_two_uuid}}"
+        state: absent
+
+    - name: Delete network
+      sf_network:
+        uuid: "{{net_two_uuid}}"
+        state: absent
+
+#########################################
+# Scenario: a network with an overlapping IP range should not be able to see the other virtual network
+#########################################
+
+- hosts: sf-1
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - include: _util_network_create.yml
+        netblock="192.168.242.0/24"
+        name="net_three"
+
+    - include: _util_instance_start.yml
+        name="cirros_net_three"
+        distro=cirros
+        network="{{net_three_uuid}}"
+        sshkey=""
+        userdata=""
+
+    - include: _util_network_cirros_validate.yml
+        console_port="{{cirros_net_three_console_port}}"
+        uuid="{{cirros_net_three_uuid}}"
+        netblock_octets="192.168.242"
+
+    - name: Check we can't talk to the other virtual network
+      shell: |
+        [ `/opt/telnet_client.py {{cirros_net_three_console_port}} ping {{cirros_ip}} | grep -c " 100% packet loss"` -eq 1 ]
+
+    - name: Delete instance
+      sf_instance:
+        uuid: "{{cirros_net_three_uuid}}"
+        state: absent
+
+    - name: Delete network
+      sf_network:
+        uuid: "{{net_three_uuid}}"
+        state: absent
+
+#########################################
+# Scenario: requesting a specific IP address should work
+#########################################
+
+- hosts: sf-1
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - include: _util_network_create.yml
+        netblock="192.168.242.0/24"
+        name="net_four"
+
+    - include: _util_instance_start.yml
+        name="cirros_net_four"
+        distro=cirros
+        network="{{net_four_uuid}}@192.168.242.42"
+        sshkey=""
+        userdata=""
+
+    - name: Make sure we get the IP we requested
+      fail:
+        msg: "We did not get the IP we requested: {{cirros_net_four_ip}} != 192.168.242.42"
+      when: cirros_net_four_ip != "192.168.242.42"
+
+    - name: Delete instance
+      sf_instance:
+        uuid: "{{cirros_net_four_uuid}}"
+        state: absent
+
+#########################################
+# Scenario: a floating IP on the non-network node should work
+#########################################
+
+- hosts: sf-2
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - include: _util_instance_start.yml
+        name="cirros_floating"
+        distro=cirros
+        network="{{hostvars['sf-1']['net_four_uuid']}}"
+        sshkey=""
+        userdata=""
+
+    - name: Determine network interface uuid
+      shell: sf-client --simple instance show {{cirros_floating_uuid}} | grep iface | grep -v "interface uuid" | cut -f 2 -d ","
+      register: cirros_floating_interface_uuid_complex
+
+    - name: Extract network interface uuid
+      set_fact:
+        cirros_floating_interface_uuid: "{{cirros_floating_interface_uuid_complex.stdout}}"
+
+    - name: Assign a floating IP
+      shell: |
+        sf-client --simple interface float {{cirros_floating_interface_uuid}}
+
+    - name: Determine floating IP
+      shell: sf-client --simple instance show {{cirros_floating_uuid}} | grep iface | grep -v "interface uuid" | cut -f 7 -d ","
+      register: cirros_floating_external_ip_complex
+
+    - name: Extract the floating IP
+      set_fact:
+        cirros_floating_external_ip: "{{cirros_floating_external_ip_complex.stdout}}"
+
+- hosts: sf-1
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - name: Network node outer namespace can ping floating IP
+      shell: |
+        [ `ping -c 3 -w 4 {{hostvars['sf-2']['cirros_floating_external_ip']}} | grep -c " 0% packet loss"` -eq 1 ]
+
+    - name: Delete instance
+      sf_instance:
+        uuid: "{{hostvars['sf-2']['cirros_floating_uuid']}}"
+        state: absent
+
+    - name: Delete network
+      sf_network:
+        uuid: "{{net_four_uuid}}"
+        state: absent
+
+#########################################
+# Scenario: try other ways to specify networks
+#########################################
+
+- hosts: sf-1
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - name: Try more detailed network specifications
+      sf_instance:
+        name: "cirros_netspec"
+        cpu: 1
+        ram: 1
+        diskspecs:
+          - size=8,base=cirros
+        networkspecs:
+          - network_uuid={{net_one_uuid}},address=192.168.242.66,macaddress=02:42:4d:0a:86:fe
+        ssh_key: ""
+        user_data: ""
+        placement: "{{inventory_hostname}}"
+      register: instance_create_out
+
+    - name: Log instance details
+      debug:
+        msg: "{{instance_create_out}}"
+
+    - name: Extract instance uuid
+      set_fact:
+        "cirros_netspec_uuid": "{{instance_create_out.meta.uuid}}"
+
+    - name: Validate
+      copy:
+        content: |
+          #!/bin/bash -e
+          [ `grep -c "<mac address='02:42:4d:0a:86:fe'/>" /srv/shakenfist/instances/{{cirros_netspec_uuid}}/libvirt.xml` -eq 1 ]
+          [ `grep -c "<source bridge='br-vxlan-" /srv/shakenfist/instances/{{cirros_netspec_uuid}}/libvirt.xml` -eq 1 ]
+        dest: /tmp/shell_script
+        owner: root
+        group: root
+        mode: u=rx,g=rx,o=rx
+
+    - name: Execute
+      shell: /tmp/shell_script
+
+    - name: Delete instance
+      sf_instance:
+        uuid: "{{cirros_netspec_uuid}}"
+        state: absent

@@ -1,0 +1,27 @@
+- name: Wait for console port to answer
+  wait_for:
+    port: "{{console_port | int}}"
+
+- name: Validate networking
+  copy:
+    content: |
+      #!/bin/bash -e
+
+      while [ `sf-client instance events {{uuid}} | grep -c "login prompt"` -lt 1 ]
+      do
+        echo "Waiting for login prompt..."
+        sleep 10
+      done
+
+      [ `/opt/telnet_client.py {{console_port}} ifconfig eth0 | grep -c "{{netblock_octets}}"` -eq 1 ]
+      [ `/opt/telnet_client.py {{console_port}} cat /etc/resolv.conf | grep -c "8.8.8.8"` -eq 1 ]
+      [ `/opt/telnet_client.py {{console_port}} netstat -rn | grep -c "{{netblock_octets}}.1"` -eq 1 ]
+      [ `/opt/telnet_client.py {{console_port}} ping {{netblock_octets}}.1 | grep -c " 0% packet loss"` -eq 1 ]
+      [ `/opt/telnet_client.py {{console_port}} ping 8.8.8.8 | grep -c " 0% packet loss"` -eq 1 ]
+    dest: /tmp/shell_script
+    owner: root
+    group: root
+    mode: u=rx,g=rx,o=rx
+
+- name: Execute
+  shell: /tmp/shell_script

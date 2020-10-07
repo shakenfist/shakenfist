@@ -1,0 +1,24 @@
+domain-needed    # Do not forward DNS lookups for unqualified names
+bogus-priv       # Do not forward DNS lookups for RFC1918 blocks
+no-hosts         # Do not use /etc/hosts
+no-resolv        # Do not use /etc/resolv.conf
+filterwin2k      # Filter weird windows 2000 queries
+
+# Disable DNS
+port=0
+
+pid-file={{config_dir}}/pid
+dhcp-leasefile={{config_dir}}/leases
+
+interface={{interface}}
+listen-address={{router}}
+
+domain={{zone}}
+local=/{{zone}}/
+
+dhcp-range={{interface}},{{dhcp_start}},static,{{netmask}},{{broadcast}},1h
+dhcp-option={{interface}},1,{{netmask}}
+dhcp-option={{interface}},3,{{router}}
+dhcp-option={{interface}},6,8.8.8.8
+dhcp-option={{interface}},15,{{zone}}
+dhcp-hostsfile={{config_dir}}/hosts

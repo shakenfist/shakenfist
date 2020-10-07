@@ -1,0 +1,2 @@
+testtools           # mit
+stestr              # apache2

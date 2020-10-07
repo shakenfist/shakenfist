@@ -125,7 +125,7 @@ def main():
             # do is create a bridge if it doesn't exist and the wire everything up
             # to it. We can do egress NAT in that state, even if floating IPs
             # don't work.
-            with util.RecordedOperation('create physical bridge', 'startup'):
+            with util.RecordedOperation('create physical bridge', None):
                 # No locking as read only
                 ipm = db.get_ipmanager('floating')
                 subst['master_float'] = ipm.get_address_at_index(1)

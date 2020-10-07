@@ -1,0 +1,55 @@
+- name: Setup /srv as a raid device on NVME disks
+  shell: |
+    if [ `grep -c md0 /proc/mdstat` -gt 0 ]
+    then
+      echo "Already setup"
+      exit 0
+    fi
+
+    available_nvme=""
+    for nvme in /dev/nvme[0-9]
+    do
+      if [ `ls ${nvme}n1p[0-9] | wc -l` -eq 0 ]
+      then
+        echo "$nvme is free"
+        available_nvme="$nvme,$available_nvme"
+      fi
+    done
+    echo "Available NVME devices: $available_nvme"
+
+    mdadm --create /dev/md0 --level=0 --raid-devices=2 `echo $available_nvme | cut -f 1 -d ","`n1 `echo $available_nvme | cut -f 2 -d ","`n1
+    mkfs.ext4 /dev/md0
+    mount /dev/md0 /srv
+
+- name: Setup /etc/hosts
+  copy:
+    content: |
+      127.0.0.1 localhost
+
+      # The following lines are desirable for IPv6 capable hosts
+      ::1 ip6-localhost ip6-loopback
+      fe00::0 ip6-localnet
+      ff00::0 ip6-mcastprefix
+      ff02::1 ip6-allnodes
+      ff02::2 ip6-allrouters
+      ff02::3 ip6-allhosts
+
+      {% for svr in groups.allsf %}
+      {{hostvars[svr]['node_ip']}}  {{svr}}
+      {% endfor %}
+    dest: /etc/hosts
+    owner: root
+    group: root
+    mode: u=r,g=r,o=r
+
+- name: Determine network node
+  set_fact:
+    network_node_ip: "{{hostvars['sf-1']['node_ip']}}"
+  delegate_to: localhost
+  delegate_facts: true
+
+- name: Determine primary node
+  set_fact:
+    primary_node_ip: "{{hostvars['sf-1']['node_ip']}}"
+  delegate_to: localhost
+  delegate_facts: true

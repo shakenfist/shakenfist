@@ -1,0 +1,10 @@
+# Command line hinting
+eval "$(_SF_CLIENT_COMPLETE=source sf-client)"
+
+# Use the v3 etcd API
+export ETCDCTL_API=3
+
+# Client auth
+export SHAKENFIST_NAMESPACE="system"
+export SHAKENFIST_KEY="{{system_key}}"
+export SHAKENFIST_API_URL="http://localhost:13000"
