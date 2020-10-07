@@ -102,6 +102,9 @@ class Image(object):
 
     def _get(self, locks, related_object):
         """Fetch image if not downloaded and return image path."""
+        actual_image = '%s.v%03d' % (
+            self.hashed_image_path, self.info['version'])
+
         with db.get_lock('image', config.parsed.get('NODE_NAME'),
                          self.hashed_image_url) as image_lock:
             with util.RecordedOperation('fetch image', related_object):
@@ -123,9 +126,6 @@ class Image(object):
                                      None, None, '\n'.join(dirty_fields_pretty))
                     actual_image = self._fetch(
                         resp, locks=locks.append(image_lock))
-                else:
-                    actual_image = '%s.v%03d' % (
-                        self.hashed_image_path, self.info['version'])
 
             _transcode(locks, actual_image, related_object)
 
