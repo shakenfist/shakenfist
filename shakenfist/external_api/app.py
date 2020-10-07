@@ -1071,7 +1071,7 @@ class Image(Resource):
     def post(self, url=None):
         db.add_event('image', url, 'api', 'cache', None, None)
         db.enqueue(config.parsed.get('NODE_NAME'), {
-            'tasks': [{'type': 'image_fetch', 'url': url}],
+            'tasks': [FetchImageTask(url)],
         })
 
 
