@@ -23,6 +23,7 @@ class TestStateChanges(base.BaseTestCase):
         self._remove_namespace(self.namespace)
 
     def test_lifecycle_events(self):
+        # Start out test instance
         inst = self.test_client.create_instance(
             'cirros', 1, 1024,
             [
@@ -39,6 +40,24 @@ class TestStateChanges(base.BaseTestCase):
             ], None, None)
         ip = self.test_client.get_instance_interfaces(inst['uuid'])[0]['ipv4']
 
+        # We need to start a second instance on the same node / network so that
+        # the network doesn't get torn down during any of the tests.
+        self.test_client.create_instance(
+            'cirros', 1, 1024,
+            [
+                {
+                    'network_uuid': self.net['uuid']
+                },
+            ],
+            [
+                {
+                    'size': 8,
+                    'base': 'cirros',
+                    'type': 'disk'
+                }
+            ], None, None, force_placement=inst['node'])
+
+        # Wait for our test instance to boot
         self.assertIsNotNone(inst['uuid'])
         last_prompt = self._await_login_prompt(inst['uuid'])
         self._test_ping(self.net['uuid'], ip, True)
