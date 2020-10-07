@@ -14,6 +14,10 @@ pipeline {
                 sudo apt-get -y install tox ansible pwgen build-essential python3-dev python3-wheel python3-pip curl
                 ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform andrewrothstein.go
 
+                # We create a RAM disk for etcd to work around poor performance on cloud instances
+                sudo mkdir -p /var/lib/etcd
+                sudo mount -t tmpfs -o size=2g tmpfs /var/lib/etcd
+
                 echo "Deploying on localhost"
                 cd $WORKSPACE/deploy/ansible
                 CLOUD=localhost RELEASE="git:master" ./deployandtest.sh
