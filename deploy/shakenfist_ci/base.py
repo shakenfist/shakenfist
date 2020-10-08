@@ -1,6 +1,7 @@
 import datetime
 import random
 import string
+import sys
 import testtools
 import telnetlib
 import time
@@ -38,6 +39,36 @@ class BaseTestCase(testtools.TestCase):
     def _uniquifier(self):
         return ''.join(random.choice(string.ascii_lowercase) for i in range(8))
 
+    def _log_console(self, instance_uuid):
+        """ Log the console of the instance so that we can debug. """
+        sys.stderr.write(
+            '----------------------- start %s console -----------------------\n'
+            % instance_uuid)
+        for line in self.system_client.get_console_data(instance_uuid).split('\n'):
+            sys.stderr.write('Instance console: %s\n' % line)
+        sys.stderr.write(
+            '----------------------- end %s console -----------------------\n'
+            % instance_uuid)
+
+    def _log_instance_events(self, instance_uuid):
+        # If we've failed, log all events and then raise an exception
+        x = PrettyTable()
+        x.field_names = ['timestamp', 'node',
+                         'operation', 'phase', 'duration', 'message']
+        for e in self.system_client.get_instance_events(instance_uuid):
+            e['timestamp'] = datetime.datetime.fromtimestamp(e['timestamp'])
+            x.add_row([e['timestamp'], e['fqdn'], e['operation'], e['phase'],
+                       e['duration'], e['message']])
+
+        sys.stderr.write(
+            '----------------------- start %s events -----------------------\n'
+            % instance_uuid)
+        sys.stderr.write(str(x))
+        sys.stderr.write('\n')
+        sys.stderr.write(
+            '----------------------- end %s events -----------------------\n'
+            % instance_uuid)
+
     def _await_login_prompt(self, instance_uuid, after=None):
         start_time = time.time()
 
@@ -52,16 +83,8 @@ class BaseTestCase(testtools.TestCase):
 
             time.sleep(5)
 
-        # If we've failed, log all events and then raise an exception
-        x = PrettyTable()
-        x.field_names = ['timestamp', 'node',
-                         'operation', 'phase', 'duration', 'message']
-        for e in self.system_client.get_instance_events(instance_uuid):
-            e['timestamp'] = datetime.datetime.fromtimestamp(e['timestamp'])
-            x.add_row([e['timestamp'], e['fqdn'], e['operation'], e['phase'],
-                       e['duration'], e['message']])
-        print(x)
-
+        self._log_console(instance_uuid)
+        self._log_instance_events(instance_uuid)
         raise TimeoutException(
             'Instance %s never triggered a login prompt after %s' % (instance_uuid, after))
 
@@ -72,12 +95,8 @@ class BaseTestCase(testtools.TestCase):
 
         actual = out.find(' 0% packet loss') != -1
         if expected != actual:
-            # Log the console of the instance so that we can debug
-            print('------------------------------------------------------------------')
-            for line in self.system_client.get_console_data(instance_uuid).split('\n'):
-                print('Instance console: %s' % line)
-            print('------------------------------------------------------------------')
-
+            self._log_console(instance_uuid)
+            self._log_instance_events(instance_uuid)
             self.fail('Ping test failed. Expected %s != actual %s.\nout: %s\nerr: %s\n'
                       % (expected, actual, out, err))
 
