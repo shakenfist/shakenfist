@@ -15,7 +15,8 @@ class TaskEncodingETCDtestCase(testtools.TestCase):
         encoded = '''{
     "instance_uuid": "fake_uuid",
     "network": null,
-    "task": "instance_preflight"
+    "task": "instance_preflight",
+    "version": 1
 }'''
         mock_put.assert_called_with(path, encoded, lease=None)
 
@@ -30,7 +31,8 @@ class TaskEncodingETCDtestCase(testtools.TestCase):
     "network": [
         "net_uuid"
     ],
-    "task": "instance_start"
+    "task": "instance_start",
+    "version": 1
 }'''
         mock_put.assert_called_with(path, encoded, lease=None)
 
@@ -42,9 +44,11 @@ class TaskEncodingETCDtestCase(testtools.TestCase):
         path = '/sf/objecttype/subtype/name'
         encoded = '''{
     "instance_uuid": "fake_uuid",
+    "network": null,
     "next_state": "next_state",
     "next_state_message": "dunno",
-    "task": "instance_delete"
+    "task": "instance_delete",
+    "version": 1
 }'''
         mock_put.assert_called_with(path, encoded, lease=None)
 
@@ -57,7 +61,8 @@ class TaskEncodingETCDtestCase(testtools.TestCase):
         encoded = '''{
     "instance_uuid": null,
     "task": "image_fetch",
-    "url": "http://server/image"
+    "url": "http://server/image",
+    "version": 1
 }'''
         mock_put.assert_called_with(path, encoded, lease=None)
 
@@ -69,7 +74,8 @@ class TaskEncodingETCDtestCase(testtools.TestCase):
         encoded = '''{
     "instance_uuid": "fake_uuid",
     "task": "image_fetch",
-    "url": "http://server/image"
+    "url": "http://server/image",
+    "version": 1
 }'''
         mock_put.assert_called_with(path, encoded, lease=None)
 
@@ -89,6 +95,7 @@ class TaskDecodingETCDtestCase(testtools.TestCase):
                 'instance_uuid': 'fake_uuid',
                 'network': None,
                 'task': 'instance_preflight',
+                'version': 1,
              }
             ]})
 
@@ -102,11 +109,13 @@ class TaskDecodingETCDtestCase(testtools.TestCase):
                 'instance_uuid': 'fake_uuid',
                 'network': None,
                 'task': 'instance_preflight',
+                'version': 1,
             },
             {
                 'instance_uuid': 'fake_uuid',
                 'task': 'image_fetch',
-                'url': 'http://whoknows'
+                'url': 'http://whoknows',
+                'version': 1,
             }]})
 
         self.assertItemsEqual(
@@ -126,7 +135,8 @@ class TaskDequeueTestCase(testtools.TestCase):
             "tasks": [
                         {
                             "instance_uuid": "diff_uuid",
-                            "task": "instance_preflight"
+                            "task": "instance_preflight",
+                            "version": 1
                         }
                      ]
             }
@@ -152,7 +162,8 @@ class TaskDequeueTestCase(testtools.TestCase):
             "tasks": [
                         {
                             "instance_uuid": "fake_uuid",
-                            "task": "instance_start"
+                            "task": "instance_start",
+                            "version": 1
                         }
                      ]
             }
@@ -179,7 +190,8 @@ class TaskDequeueTestCase(testtools.TestCase):
                         {
                             "instance_uuid": "fake_uuid",
                             "task": "instance_delete",
-                            "next_state": "where_to"
+                            "next_state": "where_to",
+                            "version": 1
                         }
                     ]
             }
@@ -205,16 +217,19 @@ class TaskDequeueTestCase(testtools.TestCase):
             "tasks": [
                         {
                             "instance_uuid": "diff_uuid",
-                            "task": "instance_preflight"
+                            "task": "instance_preflight",
+                            "version": 1
                         },
                         {
                             "instance_uuid": "fake_uuid",
-                            "task": "instance_start"
+                            "task": "instance_start",
+                            "version": 1
                         },
                         {
                             "instance_uuid": "fake_uuid",
                             "task": "instance_delete",
-                            "next_state": "where_to"
+                            "next_state": "where_to",
+                            "version": 1
                         }
                     ]
             }
@@ -243,7 +258,8 @@ class TaskDequeueTestCase(testtools.TestCase):
                         {
                             "instance_uuid": "fake_uuid",
                             "task": "image_fetch",
-                            "url": "http://whoknows"
+                            "url": "http://whoknows",
+                            "version": 1
                         }
                     ]
             }

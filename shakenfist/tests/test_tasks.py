@@ -26,13 +26,22 @@ class TasksEqTestCase(testtools.TestCase):
                          tasks.DeleteInstanceTask('abcd', 'somestate'))
 
         self.assertNotEqual(tasks.DeleteInstanceTask('abcd', 'somestate'),
-                            tasks.DeleteInstanceTask('abcd', 'somestat'))
+                            tasks.DeleteInstanceTask('abcd', 'something'))
 
         self.assertEqual(tasks.DeleteInstanceTask('abcd', 'somestate', 'dunno'),
                          tasks.DeleteInstanceTask('abcd', 'somestate', 'dunno'))
 
         self.assertEqual(tasks.ImageTask('http://someurl'),
                          tasks.ImageTask('http://someurl'))
+
+        self.assertNotEqual(tasks.ImageTask('http://someurl'),
+                            tasks.ImageTask('http://someur'))
+
+        self.assertEqual(tasks.FetchImageTask('http://someurl', 'fake_uuid'),
+                         tasks.FetchImageTask('http://someurl', 'fake_uuid'))
+
+        self.assertNotEqual(tasks.FetchImageTask('http://someurl'),
+                            tasks.FetchImageTask('http://someurl', 'fake_uuid'))
 
 
 class InstanceTasksTestCase(testtools.TestCase):

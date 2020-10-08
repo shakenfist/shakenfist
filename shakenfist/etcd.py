@@ -239,6 +239,8 @@ def decodeTasks(json_dict):
         for task_class in _all_subclasses(QueueTask):
             if task_class.name() and task_item.get('task') == task_class.name():
                 del task_item['task']
+                # This is where new QueueTask subclass versions should be handled
+                del task_item['version']
                 item = task_class(**task_item)
                 break
         task_list.append(item)

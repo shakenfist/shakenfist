@@ -9,6 +9,7 @@ class QueueTask(object):
     '''QueueTask defines a validated task placed on the job queue.
     '''
     _name = None
+    _version = 1  # Enable future upgrades to existing tasks
 
     @classmethod
     def name(self):
@@ -28,7 +29,11 @@ class QueueTask(object):
         return self.__hash__() == other.__hash__()
 
     def __hash__(self):
-        return hash(self._name)
+        return hash((self._name, self._version))
+
+    def json_dump(self):
+        return {'task': self._name,
+                'version': self._version}
 
 
 #
@@ -47,9 +52,9 @@ class InstanceTask(QueueTask):
             raise NetworkNotListTaskException()
 
     def __hash__(self):
-        return hash((self._instance_uuid,
-                     hash(''.join(self._network) if self._network else ''),
-                     super(InstanceTask, self).__hash__()))
+        return hash((super(InstanceTask, self).__hash__(),
+                     self._instance_uuid,
+                     hash(''.join(self._network) if self._network else '')))
 
     def instance_uuid(self):
         return self._instance_uuid
@@ -58,7 +63,7 @@ class InstanceTask(QueueTask):
         return self._network
 
     def json_dump(self):
-        return {'task': self._name,
+        return {**super(InstanceTask, self).json_dump(),
                 'instance_uuid': self._instance_uuid,
                 'network': self._network}
 
@@ -86,13 +91,12 @@ class DeleteInstanceTask(InstanceTask):
         self._next_state_message = next_state_message
 
     def __hash__(self):
-        return hash((self._next_state,
-                     self._next_state_message,
-                     super(DeleteInstanceTask, self).__hash__()))
+        return hash((super(DeleteInstanceTask, self).__hash__(),
+                     self._next_state,
+                     self._next_state_message))
 
     def json_dump(self):
-        return {'task': self._name,
-                'instance_uuid': self._instance_uuid,
+        return {**super(DeleteInstanceTask, self).json_dump(),
                 'next_state': self._next_state,
                 'next_state_message': self._next_state_message}
 
@@ -115,11 +119,11 @@ class ImageTask(QueueTask):
             raise NoURLImageFetchTaskException
 
     def __hash__(self):
-        return hash((self._url,
-                    super(ImageTask, self).__hash__()))
+        return hash((super(ImageTask, self).__hash__(),
+                     self._url))
 
     def json_dump(self):
-        return {'task': self._name,
+        return {**super(ImageTask, self).json_dump(),
                 'url': self._url,
                 'instance_uuid': self._instance_uuid}
 
@@ -136,8 +140,8 @@ class FetchImageTask(ImageTask):
         self._instance_uuid = instance_uuid
 
     def __hash__(self):
-        return hash((self._instance_uuid,
-                     super(FetchImageTask, self).__hash__()))
+        return hash((super(FetchImageTask, self).__hash__(),
+                     self._instance_uuid))
 
     # Data methods
     def instance_uuid(self):
