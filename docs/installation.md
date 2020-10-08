@@ -3,7 +3,7 @@ title: Installation
 ---
 # Installing Shaken Fist
 
-This guide will assume that you want to install Shaken Fist on a single local machine (that is, the one you're going to run ansible on). This is by no means the only installation option, but is the most simple to get people started. There is additional detail in the README.md file of the deploy repository if you need more help.
+This guide will assume that you want to install Shaken Fist on a single local machine (that is, the one you're going to run ansible on). This is by no means the only installation option, but is the most simple to get people started.
 
 Shaken Fist only supports Ubuntu 18.04 or later, so if you're running on localhost that implies that you must be running a recent Ubuntu on your development machine. Note as well that the deployer installs software and changes the configuration of your networking, so be careful when running it on machines you are fond of.
 
@@ -19,7 +19,7 @@ And install some dependancies:
 ```bash
 sudo apt-get update
 sudo apt-get -y dist-upgrade
-sudo apt-get -y install ansible tox pwgen build-essential python3-dev python3-wheel curl
+sudo apt-get -y install ansible tox pwgen build-essential python3-dev python3-wheel python3-pip curl
 ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform andrewrothstein.go
 ```
 
