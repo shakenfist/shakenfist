@@ -84,7 +84,8 @@ class Instance(object):
         disk_spec = self.db_entry['disk_spec']
         if not disk_spec:
             # This should not occur since the API will filter for zero disks.
-            LOG.withObj(self).error('Found disk spec empty: %s' % self.db_entry)
+            LOG.withObj(self).error(
+                'Found disk spec empty: %s' % self.db_entry)
 
             # Stop continuous crashing by falsely claiming disks are configured.
             self.db_entry['block_devices'] = {'finalized': True}
@@ -525,7 +526,8 @@ class Instance(object):
         snapshot_uuid = str(uuid.uuid4())
         snappath = os.path.join(self.snapshot_path, snapshot_uuid)
         if not os.path.exists(snappath):
-            LOG.withObj(self).debug('Creating snapshot storage at %s' % snappath)
+            LOG.withObj(self).debug(
+                'Creating snapshot storage at %s' % snappath)
             os.makedirs(snappath)
             with open(os.path.join(self.snapshot_path, 'index.html'), 'w') as f:
                 f.write('<html></html>')
@@ -586,8 +588,8 @@ class Instance(object):
         if not os.path.exists(console_path):
             return ''
 
-        offset = max(0, os.stat(console_path).st_size - length)
-
         with open(console_path) as f:
-            f.seek(offset)
+            if length != -1:
+                offset = max(0, os.stat(console_path).st_size - length)
+                f.seek(offset)
             return f.read()

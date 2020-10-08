@@ -13,7 +13,8 @@ from shakenfist import net
 from shakenfist import scheduler
 from shakenfist import util
 from shakenfist import virt
-from shakenfist.tasks import (DeleteInstanceTask,
+from shakenfist.tasks import (QueueTask,
+                              DeleteInstanceTask,
                               FetchImageTask,
                               InstanceTask,
                               PreflightInstanceTask,
@@ -35,6 +36,10 @@ def handle(jobname, workitem):
     task = None
     try:
         for task in workitem.get('tasks', []):
+            if not QueueTask.__subclasscheck__(type(task)):
+                raise exceptions.UnknownTaskException(
+                    'Task was not decoded: %s' % task)
+
             if InstanceTask.__subclasscheck__(type(task)):
                 instance_uuid = task.instance_uuid()
                 log_i = log.withInstance(instance_uuid)
@@ -62,7 +67,8 @@ def handle(jobname, workitem):
             elif isinstance(task, PreflightInstanceTask):
                 redirect_to = instance_preflight(instance_uuid, task.network())
                 if redirect_to:
-                    log_i.info('Redirecting instance start to %s' % redirect_to)
+                    log_i.info('Redirecting instance start to %s'
+                               % redirect_to)
                     db.place_instance(instance_uuid, redirect_to)
                     db.enqueue(redirect_to, workitem)
                     return

@@ -1053,10 +1053,13 @@ class InstanceConsoleData(Resource):
     @requires_instance_ownership
     @redirect_instance_request
     def get(self, instance_uuid=None, length=None, instance_from_db=None, instance_from_db_virt=None):
-        try:
-            length = int(length)
-        except Exception:
-            return error(400, 'length is not an integer')
+        if not length:
+            length = -1
+        else:
+            try:
+                length = int(length)
+            except Exception:
+                return error(400, 'length is not an integer')
 
         resp = flask.Response(
             instance_from_db_virt.get_console_data(length),

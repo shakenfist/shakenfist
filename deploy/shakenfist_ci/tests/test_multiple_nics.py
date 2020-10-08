@@ -3,26 +3,17 @@ import base64
 from shakenfist_ci import base
 
 
-class TestMultipleNics(base.BaseTestCase):
+class TestMultipleNics(base.BaseNamespacedTestCase):
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'multinic'
+        super(TestMultipleNics, self).__init__(*args, **kwargs)
+
     def setUp(self):
         super(TestMultipleNics, self).setUp()
-
-        self.namespace = 'ci-multinic-%s' % self._uniquifier()
-        self.namespace_key = self._uniquifier()
-        self.test_client = self._make_namespace(
-            self.namespace, self.namespace_key)
         self.net_one = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net-one' % self.namespace)
         self.net_two = self.test_client.allocate_network(
             '192.168.243.0/24', True, True, '%s-net-two' % self.namespace)
-
-    def tearDown(self):
-        super(TestMultipleNics, self).tearDown()
-        for inst in self.test_client.get_instances():
-            self.test_client.delete_instance(inst['uuid'])
-        for net in self.test_client.get_networks():
-            self.test_client.delete_network(net['uuid'])
-        self._remove_namespace(self.namespace)
 
     def test_simple(self):
         ud = """#!/bin/sh
@@ -59,4 +50,5 @@ sudo /etc/init.d/S40network restart"""
         self.assertEqual(2, len(ifaces))
 
         for iface in ifaces:
-            self._test_ping(iface['network_uuid'], iface['ipv4'], True)
+            self._test_ping(
+                inst['uuid'], iface['network_uuid'], iface['ipv4'], True)

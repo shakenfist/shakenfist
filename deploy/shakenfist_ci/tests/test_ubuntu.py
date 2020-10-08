@@ -1,23 +1,15 @@
 from shakenfist_ci import base
 
 
-class TestUbuntu(base.BaseTestCase):
+class TestUbuntu(base.BaseNamespacedTestCase):
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'ubuntu'
+        super(TestUbuntu, self).__init__(*args, **kwargs)
+
     def setUp(self):
         super(TestUbuntu, self).setUp()
-
-        self.namespace = 'ci-state-%s' % self._uniquifier()
-        self.namespace_key = self._uniquifier()
-        self.test_client = self._make_namespace(
-            self.namespace, self.namespace_key)
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net' % self.namespace)
-
-    def tearDown(self):
-        super(TestUbuntu, self).tearDown()
-        for inst in self.test_client.get_instances():
-            self.test_client.delete_instance(inst['uuid'])
-        self.test_client.delete_network(self.net['uuid'])
-        self._remove_namespace(self.namespace)
 
     def test_ubuntu_pings(self):
         inst = self.test_client.create_instance(
@@ -41,7 +33,7 @@ class TestUbuntu(base.BaseTestCase):
         # cloud image. This is ok though, because we should be using the config drive
         # style interface information anyway.
         ip = self.test_client.get_instance_interfaces(inst['uuid'])[0]['ipv4']
-        self._test_ping(self.net['uuid'], ip, True)
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
 
         self.test_client.delete_instance(inst['uuid'])
         inst_uuids = []
