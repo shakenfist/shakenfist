@@ -7,7 +7,7 @@ class TestStateChanges(base.BaseTestCase):
     def setUp(self):
         super(TestStateChanges, self).setUp()
 
-        self.namespace = 'ci-multinic-%s' % self._uniquifier()
+        self.namespace = 'ci-statechanges-%s' % self._uniquifier()
         self.namespace_key = self._uniquifier()
         self.test_client = self._make_namespace(
             self.namespace, self.namespace_key)
@@ -23,7 +23,7 @@ class TestStateChanges(base.BaseTestCase):
         self._remove_namespace(self.namespace)
 
     def test_lifecycle_events(self):
-        # Start out test instance
+        # Start our test instance
         inst = self.test_client.create_instance(
             'cirros', 1, 1024,
             [

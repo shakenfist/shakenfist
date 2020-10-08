@@ -44,7 +44,7 @@ class BaseTestCase(testtools.TestCase):
         sys.stderr.write(
             '----------------------- start %s console -----------------------\n'
             % instance_uuid)
-        for line in self.system_client.get_console_data(instance_uuid).split('\n'):
+        for line in self.system_client.get_console_data(instance_uuid, -1).split('\n'):
             sys.stderr.write('Instance console: %s\n' % line)
         sys.stderr.write(
             '----------------------- end %s console -----------------------\n'

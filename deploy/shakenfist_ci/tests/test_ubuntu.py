@@ -5,7 +5,7 @@ class TestUbuntu(base.BaseTestCase):
     def setUp(self):
         super(TestUbuntu, self).setUp()
 
-        self.namespace = 'ci-state-%s' % self._uniquifier()
+        self.namespace = 'ci-ubuntu-%s' % self._uniquifier()
         self.namespace_key = self._uniquifier()
         self.test_client = self._make_namespace(
             self.namespace, self.namespace_key)
