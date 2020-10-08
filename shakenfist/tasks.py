@@ -79,7 +79,8 @@ class StartInstanceTask(InstanceTask):
 class DeleteInstanceTask(InstanceTask):
     _name = 'instance_delete'
 
-    def __init__(self, instance_uuid, next_state, next_state_message=None):
+    def __init__(self, instance_uuid, next_state, next_state_message=None,
+                 network=None):
         super(DeleteInstanceTask, self).__init__(instance_uuid)
 
         if not next_state:
