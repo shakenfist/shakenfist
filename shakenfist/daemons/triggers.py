@@ -29,7 +29,11 @@ def observe(path, instance_uuid):
     log_ctx.withField('path', path).info('Monitoring path for triggers')
     db.add_event('instance', instance_uuid, 'trigger monitor',
                  'detected console log', None, None)
-    os.lseek(fd, 0, os.SEEK_END)
+
+    # Sometimes the trigger process is slow to start, so rewind 4KB to ensure
+    # that the last few log lines are not missed. (4KB since Cloud-Init can be
+    # noisy after the login prompt.)
+    os.lseek(fd, max(0, os.fstat(fd).st_size - 4096), os.SEEK_SET)
 
     buffer = ''
     while True:
@@ -41,6 +45,7 @@ def observe(path, instance_uuid):
 
             for line in lines:
                 if line:
+                    log_ctx.withField('line', line).info('Trigger check')
                     for trigger in regexps:
                         m = regexps[trigger][1].match(line)
                         if m:
@@ -48,8 +53,9 @@ def observe(path, instance_uuid):
                                               ).info('Trigger matched')
                             db.add_event('instance', instance_uuid, 'trigger',
                                          None, None, trigger)
-
-        time.sleep(1)
+        else:
+            # Only pause if there was no data to read
+            time.sleep(1)
 
 
 class Monitor(daemon.Daemon):
