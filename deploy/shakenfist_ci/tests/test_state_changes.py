@@ -64,7 +64,7 @@ class TestStateChanges(base.BaseTestCase):
 
         # Soft reboot
         self.test_client.reboot_instance(inst['uuid'])
-        time.sleep(1)
+        time.sleep(20)
         this_prompt = self._await_login_prompt(inst['uuid'], after=last_prompt)
         self.assertNotEqual(last_prompt, this_prompt)
         last_prompt = this_prompt
@@ -72,7 +72,7 @@ class TestStateChanges(base.BaseTestCase):
 
         # Hard reboot
         self.test_client.reboot_instance(inst['uuid'], hard=True)
-        time.sleep(1)
+        time.sleep(20)
         this_prompt = self._await_login_prompt(inst['uuid'], after=last_prompt)
         self.assertNotEqual(last_prompt, this_prompt)
         last_prompt = this_prompt
