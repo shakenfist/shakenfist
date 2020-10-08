@@ -1,5 +1,11 @@
 # Shaken Fist: Opinionated to the point of being impolite
 ![Python application](https://github.com/shakenfist/shakenfist/workflows/Python%20application/badge.svg)
+<a href="https://pypi.org/project/shakenfist" target="_blank">
+    <img src="https://img.shields.io/pypi/v/shakenfist?color=%2334D058&label=pypi%20package" alt="Package version">
+</a>
+
+**Documentation:** https://shakenfist.com/  
+**Source Code:** https://github.com/shakenfist/shakenfist  
 
 ## What is this?
 
@@ -13,7 +19,7 @@ If there is an existing library which does a thing, we use it. OpenStack suffere
 
 ## Deployment choices
 
-libvirt is the only supported hypervisor. Instances are specified to libvirt with simple templated XML. If your local requirements are different to what's in the template, you're welcome to change the template to meet your needs. If your template changes break things, you're also welcome to debug what went wrong for yourself. We provide a sample Ansible based deployer in a [separate github repository](http://github.com/shakenfist/deploy).
+libvirt is the only supported hypervisor. Instances are specified to libvirt with simple templated XML. If your local requirements are different to what's in the template, you're welcome to change the template to meet your needs. If your template changes break things, you're also welcome to debug what went wrong for yourself. We provide a sample Ansible based deployer in the `deploy` directory.
 
 # Usage guide
 
