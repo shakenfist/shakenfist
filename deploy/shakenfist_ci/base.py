@@ -70,8 +70,23 @@ class BaseTestCase(testtools.TestCase):
             % instance_uuid)
 
     def _await_login_prompt(self, instance_uuid, after=None):
+        # Wait up to two minutes for the instance to be created.
         start_time = time.time()
+        created = False
+        while time.time() - start_time < 120:
+            i = self.system_client.get_instance(instance_uuid)
+            if i['state'] == 'created':
+                created = True
+                break
+            time.sleep(5)
 
+        if not created:
+            raise TimeoutException(
+                'Instance %s was not created in a reasonable time'
+                % instance_uuid)
+
+        # Once created, we shouldn't need more than five minutes for boot.
+        start_time = time.time()
         while time.time() - start_time < 300:
             for event in self.system_client.get_instance_events(instance_uuid):
                 if after and event['timestamp'] <= after:
@@ -99,6 +114,37 @@ class BaseTestCase(testtools.TestCase):
             self._log_instance_events(instance_uuid)
             self.fail('Ping test failed. Expected %s != actual %s.\nout: %s\nerr: %s\n'
                       % (expected, actual, out, err))
+
+
+class BaseNamespacedTestCase(BaseTestCase):
+    def __init__(self, *args, **kwargs):
+        namespace_prefix = kwargs.get('namespace_prefix')
+        del kwargs['namespace_prefix']
+        self.namespace = 'ci-%s-%s' % (namespace_prefix,
+                                       self._uniquifier())
+        self.namespace_key = self._uniquifier()
+
+        super(BaseNamespacedTestCase, self).__init__(*args, **kwargs)
+
+    def setUp(self):
+        super(BaseNamespacedTestCase, self).setUp()
+        self.test_client = self._make_namespace(
+            self.namespace, self.namespace_key)
+
+    def tearDown(self):
+        super(BaseNamespacedTestCase, self).tearDown()
+        for inst in self.test_client.get_instances():
+            self.test_client.delete_instance(inst['uuid'])
+
+        start_time = time.time()
+        while time.time() - start_time < 300:
+            if not list(self.test_client.get_instances()):
+                break
+            time.sleep(5)
+
+        for net in self.test_client.get_networks():
+            self.test_client.delete_network(net['uuid'])
+        self._remove_namespace(self.namespace)
 
 
 class LoggingSocket(object):

@@ -3,24 +3,15 @@ import time
 from shakenfist_ci import base
 
 
-class TestStateChanges(base.BaseTestCase):
+class TestStateChanges(base.BaseNamespacedTestCase):
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'statechanges'
+        super(TestStateChanges, self).__init__(*args, **kwargs)
+
     def setUp(self):
         super(TestStateChanges, self).setUp()
-
-        self.namespace = 'ci-statechanges-%s' % self._uniquifier()
-        self.namespace_key = self._uniquifier()
-        self.test_client = self._make_namespace(
-            self.namespace, self.namespace_key)
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net-one' % self.namespace)
-
-    def tearDown(self):
-        super(TestStateChanges, self).tearDown()
-        for inst in self.test_client.get_instances():
-            self.test_client.delete_instance(inst['uuid'])
-        for net in self.test_client.get_networks():
-            self.test_client.delete_network(net['uuid'])
-        self._remove_namespace(self.namespace)
 
     def test_lifecycle_events(self):
         # Start our test instance
