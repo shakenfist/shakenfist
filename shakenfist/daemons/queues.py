@@ -13,7 +13,8 @@ from shakenfist import net
 from shakenfist import scheduler
 from shakenfist import util
 from shakenfist import virt
-from shakenfist.tasks import (DeleteInstanceTask,
+from shakenfist.tasks import (QueueTask,
+                              DeleteInstanceTask,
                               FetchImageTask,
                               InstanceTask,
                               PreflightInstanceTask,
