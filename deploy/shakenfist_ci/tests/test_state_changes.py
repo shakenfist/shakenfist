@@ -1,6 +1,11 @@
+import logging
 import time
 
 from shakenfist_ci import base
+
+
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+LOG = logging.getLogger()
 
 
 class TestStateChanges(base.BaseNamespacedTestCase):
@@ -30,6 +35,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
                 }
             ], None, None)
         ip = self.test_client.get_instance_interfaces(inst['uuid'])[0]['ipv4']
+        LOG.info('Started test instance %s', inst['uuid'])
 
         # We need to start a second instance on the same node / network so that
         # the network doesn't get torn down during any of the tests.
@@ -47,50 +53,55 @@ class TestStateChanges(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 }
             ], None, None, force_placement=inst['node'])
+        LOG.info('Started keep network alive instance')
 
         # Wait for our test instance to boot
         self.assertIsNotNone(inst['uuid'])
-        last_prompt = self._await_login_prompt(inst['uuid'])
-        self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
+        self._await_login_prompt(inst['uuid'])
+        LOG.info('  ping test...')
+        # The network can be slow to start and may not be available after the
+        # instance "login prompt" event. We are willing to forgive a few fails
+        # while the network starts.
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, True, 10)
 
         # Soft reboot
+        LOG.info('Instance Soft reboot')
         self.test_client.reboot_instance(inst['uuid'])
-        time.sleep(20)
-        this_prompt = self._await_login_prompt(inst['uuid'], after=last_prompt)
-        self.assertNotEqual(last_prompt, this_prompt)
-        last_prompt = this_prompt
-        self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
+        self._await_login_prompt(inst['uuid'], after=time.time())
+        LOG.info('  ping test...')
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, True, 10)
 
         # Hard reboot
+        LOG.info('Instance Hard reboot')
         self.test_client.reboot_instance(inst['uuid'], hard=True)
-        time.sleep(20)
-        this_prompt = self._await_login_prompt(inst['uuid'], after=last_prompt)
-        self.assertNotEqual(last_prompt, this_prompt)
-        last_prompt = this_prompt
-        self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
+        self._await_login_prompt(inst['uuid'], after=time.time())
+        LOG.info('  ping test...')
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, True, 10)
 
         # Power off
+        LOG.info('Power off')
         self.test_client.power_off_instance(inst['uuid'])
-        time.sleep(10)
-        self._test_ping(inst['uuid'], self.net['uuid'], ip, False)
+        # No need to sleep, we just forgive a few failed test_ping()s
+        LOG.info('  ping test...')
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, False, 10)
 
         # Power on
+        LOG.info('Instance Power on')
         self.test_client.power_on_instance(inst['uuid'])
-        time.sleep(1)
-        this_prompt = self._await_login_prompt(inst['uuid'], after=last_prompt)
-        self.assertNotEqual(last_prompt, this_prompt)
-        last_prompt = this_prompt
-        self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
+        self._await_login_prompt(inst['uuid'], after=time.time())
+        LOG.info('  ping test...')
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, True, 10)
 
         # Pause
+        LOG.info('Instance Pause')
         self.test_client.pause_instance(inst['uuid'])
-        time.sleep(10)
-        self._test_ping(inst['uuid'], self.net['uuid'], ip, False)
+        LOG.info('  ping test...')
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, False, 10)
 
         # Unpause
+        LOG.info('Instance Unpause')
         self.test_client.unpause_instance(inst['uuid'])
-        time.sleep(1)
-        this_prompt = self._await_login_prompt(inst['uuid'], after=last_prompt)
-        self.assertNotEqual(last_prompt, this_prompt)
-        last_prompt = this_prompt
-        self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
+        # No new login prompt after unpause, so just forgive a few fails while
+        # the instance is un-paused.
+        LOG.info('  ping test...')
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, True, 10)
