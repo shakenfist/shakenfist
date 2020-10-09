@@ -589,10 +589,10 @@ class Instance(object):
             return ''
 
         d = None
-        l = os.stat(console_path).st_size
+        file_length = os.stat(console_path).st_size
         with open(console_path, 'rb') as f:
             if length != -1:
-                offset = max(0, l - length)
+                offset = max(0, file_length - length)
                 f.seek(offset)
             d = f.read()
 
