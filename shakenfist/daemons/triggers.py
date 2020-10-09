@@ -37,7 +37,7 @@ def observe(path, instance_uuid):
 
     buffer = ''
     while True:
-        d = os.read(fd, 1024).decode('utf-8')
+        d = os.read(fd, 1024).decode('utf-8', errors='ignore')
         if d:
             buffer += d
             lines = buffer.split('\n')
@@ -95,7 +95,8 @@ class Monitor(daemon.Daemon):
                     p.start()
 
                     observers[inst['uuid']] = p
-                    LOG.withInstance(inst['uuid']).info('Started trigger observer')
+                    LOG.withInstance(inst['uuid']).info(
+                        'Started trigger observer')
                     db.add_event(
                         'instance', inst['uuid'], 'trigger monitor', 'started', None, None)
 
@@ -108,7 +109,8 @@ class Monitor(daemon.Daemon):
                     pass
 
                 del observers[instance_uuid]
-                LOG.withInstance(instance_uuid).info('Finished trigger observer')
+                LOG.withInstance(instance_uuid).info(
+                    'Finished trigger observer')
                 db.add_event(
                     'instance', instance_uuid, 'trigger monitor', 'finished', None, None)
 
