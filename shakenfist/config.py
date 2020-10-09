@@ -31,7 +31,7 @@ CONFIG_DEFAULTS = {
     'API_PORT': 13000,
     'API_TIMEOUT': 900,
     'API_ASYNC_WAIT': 30,
-    'INCLUDE_TRACEBACKS': '1',
+    'INCLUDE_TRACEBACKS': False,
     'PROMETHEUS_METRICS_PORT': 13001,
     'AUTH_SECRET_SEED': 'foo',
     'API_COMMAND_LINE': ('gunicorn --workers 10 --bind 0.0.0.0:%(port)d '
@@ -137,6 +137,8 @@ class Config(object):
                     value = int(value)
                 elif isinstance(CONFIG_DEFAULTS[flag], float):
                     value = float(value)
+                elif isinstance(CONFIG_DEFAULTS[flag], bool):
+                    value = (value == 'true')
                 elif not isinstance(CONFIG_DEFAULTS[flag], str):
                     raise exceptions.FlagException(
                         'Flag %s has unknown type.' % flag)
