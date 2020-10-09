@@ -32,13 +32,13 @@ class TestConsoleLog(base.BaseNamespacedTestCase):
         self.assertIsNotNone(inst['uuid'])
         self._await_login_prompt(inst['uuid'])
 
-        # Get 2000 bytes of console log
-        c = self.test_client.get_console_data(inst['uuid'], 2000)
-        self.assertGreaterEqual(len(c), 2000)
-
         # Get 1000 bytes of console log
         c = self.test_client.get_console_data(inst['uuid'], 1000)
         self.assertGreaterEqual(len(c), 1000)
+
+        # Get 2000 bytes of console log
+        c = self.test_client.get_console_data(inst['uuid'], 2000)
+        self.assertGreaterEqual(len(c), 2000)
 
         # Get the default amount of the console log
         c = self.test_client.get_console_data(inst['uuid'])
