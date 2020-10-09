@@ -45,7 +45,6 @@ def observe(path, instance_uuid):
 
             for line in lines:
                 if line:
-                    log_ctx.withField('line', line).info('Trigger check')
                     for trigger in regexps:
                         m = regexps[trigger][1].match(line)
                         if m:
