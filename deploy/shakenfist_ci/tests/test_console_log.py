@@ -1,3 +1,5 @@
+from shakenfist_client import apiclient
+
 from shakenfist_ci import base
 
 
@@ -49,4 +51,6 @@ class TestConsoleLog(base.BaseNamespacedTestCase):
         self.assertGreaterEqual(len(c), 11000)
 
         # Check we handle non-numbers reasonably
-        c = self.test_client.get_console_data(inst['uuid'], 'banana')
+        self.assertRaises(
+            apiclient.RequestMalformedException,
+            self.test_client.get_console_data, inst['uuid'], 'banana')
