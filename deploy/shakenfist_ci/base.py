@@ -69,7 +69,15 @@ class BaseTestCase(testtools.TestCase):
             '----------------------- end %s events -----------------------\n'
             % instance_uuid)
 
+    def _await_power_off(self, instance_uuid, after=None):
+        return self._await_event(
+            instance_uuid, 'detected poweroff', after=after)
+
     def _await_login_prompt(self, instance_uuid, after=None):
+        return self._await_event(
+            instance_uuid, 'trigger', 'login prompt', after)
+
+    def _await_event(self, instance_uuid, operation, message=None, after=None):
         # Wait up to two minutes for the instance to be created.
         start_time = time.time()
         created = False
@@ -92,8 +100,8 @@ class BaseTestCase(testtools.TestCase):
                 if after and event['timestamp'] <= after:
                     continue
 
-                if (event['operation'] == 'trigger' and
-                        event['message'] == 'login prompt'):
+                if (event['operation'] == operation and
+                        (not message or event['message'] == message)):
                     return event['timestamp']
 
             time.sleep(5)
