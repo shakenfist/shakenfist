@@ -1,6 +1,7 @@
 # Copyright 2019 Michael Still
 
 import copy
+from distutils.util import strtobool
 import os
 import socket
 
@@ -138,7 +139,7 @@ class Config(object):
                 elif isinstance(CONFIG_DEFAULTS[flag], float):
                     value = float(value)
                 elif isinstance(CONFIG_DEFAULTS[flag], bool):
-                    value = (value == 'true')
+                    value = strtobool(value)
                 elif not isinstance(CONFIG_DEFAULTS[flag], str):
                     raise exceptions.FlagException(
                         'Flag %s has unknown type.' % flag)
