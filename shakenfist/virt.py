@@ -588,8 +588,15 @@ class Instance(object):
         if not os.path.exists(console_path):
             return ''
 
-        with open(console_path) as f:
+        d = None
+        file_length = os.stat(console_path).st_size
+        with open(console_path, 'rb') as f:
             if length != -1:
-                offset = max(0, os.stat(console_path).st_size - length)
+                offset = max(0, file_length - length)
                 f.seek(offset)
-            return f.read()
+            d = f.read()
+
+        LOG.withObj(self).info(
+            'Client requested %d bytes of console log, returning %d bytes'
+            % (length, len(d)))
+        return d

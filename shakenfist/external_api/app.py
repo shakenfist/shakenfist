@@ -1058,7 +1058,7 @@ class InstanceConsoleData(Resource):
         else:
             try:
                 length = int(length)
-            except Exception:
+            except ValueError:
                 return error(400, 'length is not an integer')
 
         resp = flask.Response(
