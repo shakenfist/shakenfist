@@ -81,9 +81,9 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         # Power off
         LOG.info('Power off')
         self.test_client.power_off_instance(inst['uuid'])
-        # No need to sleep, we just forgive a few failed test_ping()s
+        self._await_power_off(inst['uuid'])
         LOG.info('  ping test...')
-        self._test_ping(inst['uuid'], self.net['uuid'], ip, False, 10)
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, False)
 
         # Power on
         LOG.info('Instance Power on')
