@@ -6,6 +6,12 @@ variable "uniqifier" {
   description = "A unique string to prefix hostnames with"
 }
 
+variable "ssh_keys" {
+  description = "An optional set of ssh keys for instance authentication"
+  default     = {}
+  type        = map
+}
+
 provider "google" {
   project = var.project
 }
@@ -25,6 +31,9 @@ resource "google_compute_instance" "sf_1" {
     access_config {}
     network = "default"
   }
+  metadata = {
+    ssh-keys = join("\n", [for user, pubkey in var.ssh_keys : "${user}:${pubkey}"])
+  }
 }
 
 resource "google_compute_instance" "sf_2" {
@@ -41,6 +50,9 @@ resource "google_compute_instance" "sf_2" {
   network_interface {
     access_config {}
     network = "default"
+  }
+  metadata = {
+    ssh-keys = join("\n", [for user, pubkey in var.ssh_keys : "${user}:${pubkey}"])
   }
 }
 
@@ -59,10 +71,17 @@ resource "google_compute_instance" "sf_3" {
     access_config {}
     network = "default"
   }
+  metadata = {
+    ssh-keys = join("\n", [for user, pubkey in var.ssh_keys : "${user}:${pubkey}"])
+  }
 }
 
 output "sf_1_external" {
   value = google_compute_instance.sf_1.*.network_interface.0.access_config.0.nat_ip
+}
+
+output "sf_1_ssh_keys" {
+  value = google_compute_instance.sf_1.metadata
 }
 
 output "sf_2_external" {
