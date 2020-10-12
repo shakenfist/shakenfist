@@ -52,6 +52,12 @@ then
     exit 1
   fi
   VARIABLES="$VARIABLES project=$GCP_PROJECT"
+
+  if [ -n "$GCP_SSH_KEY" ]
+  then
+    d=`cat $GCP_SSH_KEY`
+    TERRAFORM_VARS="$TERRAFORM_VARS -var=ssh_keys='{\"$GCP_SSH_USER\": \"$d\"}'"
+  fi
 fi
 
 #### Openstack
