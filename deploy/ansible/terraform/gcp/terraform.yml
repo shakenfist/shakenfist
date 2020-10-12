@@ -8,11 +8,20 @@
       uniqifier: "{{uniqifier}}"
   register: terraform_out
 
-- name: Add sf-1 to ansible
+- name: Add sf-1 to ansible with a ssh key
+  add_host:
+    hostname: sf-1
+    ansible_ssh_host: "{{terraform_out.outputs.sf_1_external.value[0]}}"
+    ansible_ssh_private_key_file: "{{ssh_key_filename}}"
+    groups: hypervisors, primary, etcd_master
+  when: ssh_key_filename != ""
+
+- name: Add sf-1 to ansible with no ssh key
   add_host:
     hostname: sf-1
     ansible_ssh_host: "{{terraform_out.outputs.sf_1_external.value[0]}}"
     groups: hypervisors, primary, etcd_master
+  when: ssh_key_filename == ""
 
 - name: Add sf-1 node_ip
   set_fact:
@@ -21,11 +30,20 @@
   delegate_to: sf-1
   delegate_facts: true
 
-- name: Add sf-2 to ansible
+- name: Add sf-2 to ansible with a ssh key
   add_host:
     hostname: sf-2
     ansible_ssh_host: "{{terraform_out.outputs.sf_2_external.value[0]}}"
-    groups: hypervisors, etcd_master
+    ansible_ssh_private_key_file: "{{ssh_key_filename}}"
+    groups: hypervisors, primary, etcd_master
+  when: ssh_key_filename != ""
+
+- name: Add sf-2 to ansible with no ssh key
+  add_host:
+    hostname: sf-2
+    ansible_ssh_host: "{{terraform_out.outputs.sf_2_external.value[0]}}"
+    groups: hypervisors, primary, etcd_master
+  when: ssh_key_filename == ""
 
 - name: Add sf-2 node_ip
   set_fact:
@@ -34,11 +52,20 @@
   delegate_to: sf-2
   delegate_facts: true
 
-- name: Add sf-3 to ansible
+- name: Add sf-3 to ansible with a ssh key
   add_host:
     hostname: sf-3
     ansible_ssh_host: "{{terraform_out.outputs.sf_3_external.value[0]}}"
-    groups: hypervisors, etcd_master
+    ansible_ssh_private_key_file: "{{ssh_key_filename}}"
+    groups: hypervisors, primary, etcd_master
+  when: ssh_key_filename != ""
+
+- name: Add sf-3 to ansible with no ssh key
+  add_host:
+    hostname: sf-3
+    ansible_ssh_host: "{{terraform_out.outputs.sf_3_external.value[0]}}"
+    groups: hypervisors, primary, etcd_master
+  when: ssh_key_filename == ""
 
 - name: Add sf-3 node_ip
   set_fact:
