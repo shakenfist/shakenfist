@@ -31,18 +31,11 @@ In the shakenfist/shakenfist repo:
 pip install --upgrade readme-renderer
 pip install --upgrade twine
 rm -f dist/*
-git tag -s v0.1 -m "Release v0.1"
+git tag -s v0.1.0 -m "Release v0.1.0"
 python3 setup.py sdist bdist_wheel
 twine check dist/*
-git push origin v0.1
+git push origin v0.1.0
 twine upload dist/*
-```
-
-Create the branch for cherry picks and minor releases:
-
-```
-git checkout -b v0.1-devel
-git push origin v0.1-devel
 ```
 
 ## Step 3: ```shakenfist/client-python```
@@ -55,15 +48,20 @@ In the shakenfist/client-python repo:
 pip install --upgrade readme-renderer
 pip install --upgrade twine
 rm -f dist/*
-git tag -s v0.1 -m "Release v0.1"
+git tag -s v0.1.0 -m "Release v0.1.0"
 python3 setup.py sdist bdist_wheel
 twine check dist/*
-git push origin v0.1
+git push origin v0.1.0
 twine upload dist/*
 ```
 
 ## Step 4: ```shakenfist/client-go```
 Tag and release as per shakenfist/shakenfist - include the patch number eg. v0.1.0
+
+```
+git tag -s v0.1.0 -m "Release v0.1.0"
+git push origin v0.1.0
+```
 
 Golang modules require an "annotated git tag" (not a lightweight git tag). Therefore use the sign option (```-s```) as above, or use the annotate option (```-a```) of ```git tag```.
 
