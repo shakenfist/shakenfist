@@ -53,9 +53,9 @@ then
   fi
   VARIABLES="$VARIABLES project=$GCP_PROJECT"
 
-  if [ -n "$GCP_SSH_KEY" ]
+  if [ -n "$GCP_SSH_KEY_FILENAME" ]
   then
-    d=`cat $GCP_SSH_KEY`
+    d=`cat $GCP_SSH_KEY_FILENAME`
     TERRAFORM_VARS="$TERRAFORM_VARS -var=ssh_keys='{\"$GCP_SSH_USER\": \"$d\"}'"
   fi
 fi
