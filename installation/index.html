@@ -882,12 +882,12 @@ with real users.</p>
 <tr>
 <td>GCP_SSH_KEY_FILENAME</td>
 <td>gcp</td>
-<td>The path to a ssh public key file to use for authentication (optional, only required if not using gcloud).</td>
+<td>The path to a ssh private key file to use for authentication. It is assumed that the public key is at <code>${GCP_SSH_KEY_FILENAME}.pub</code>. (optional, only required if not using gcloud).</td>
 </tr>
 <tr>
 <td>GCP_SSH_USER</td>
 <td>gcp</td>
-<td>The username to add the GCP_SSH_KEY to.</td>
+<td>The username to add the GCP_SSH_KEY to. (optional, only used if GCPSSH_KEY_FILENAME is set).</td>
 </tr>
 <tr>
 <td>OS_SSH_KEY_NAME</td>
