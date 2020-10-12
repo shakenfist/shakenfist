@@ -7,8 +7,8 @@ process.
 
 ## Step 1: Testing
 
-Before release, you should ensure that all of the clouds currently supported in the deploy
-repository work. These are important to new users and testers, so we should keep them working.
+Before release, you should ensure that all of the clouds currently supported by the deployer
+work. These are important to new users and testers, so we should keep them working.
 For reference, they are at ```deploy/ansible/terraform```. At the time of writing those are:
 
 * aws
@@ -71,11 +71,7 @@ Golang modules require an "annotated git tag" (not a lightweight git tag). There
 
 <b>IMPORTANT:</b> Golang modules require the full X.Y.Z sermver version eg. v0.2.0 (Otherwise go will attach the wrong version numbers to fetches and update go.mod incorrectly.)
 
-## Step 5: ```shakenfist/deploy```
-
-Tag and release as per shakenfist/shakenfist.
-
-## Step 6: ```shakenfist/terraform-provider-shakenfist```
+## Step 5: ```shakenfist/terraform-provider-shakenfist```
 
 * Bump dependency in go.mod
 * Tag and release
