@@ -340,15 +340,8 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-5-shakenfistdeploy" class="md-nav__link">
-    Step 5: shakenfist/deploy
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#step-6-shakenfistterraform-provider-shakenfist" class="md-nav__link">
-    Step 6: shakenfist/terraform-provider-shakenfist
+  <a href="#step-5-shakenfistterraform-provider-shakenfist" class="md-nav__link">
+    Step 5: shakenfist/terraform-provider-shakenfist
   </a>
   
 </li>
@@ -567,15 +560,8 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-5-shakenfistdeploy" class="md-nav__link">
-    Step 5: shakenfist/deploy
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#step-6-shakenfistterraform-provider-shakenfist" class="md-nav__link">
-    Step 6: shakenfist/terraform-provider-shakenfist
+  <a href="#step-5-shakenfistterraform-provider-shakenfist" class="md-nav__link">
+    Step 5: shakenfist/terraform-provider-shakenfist
   </a>
   
 </li>
@@ -602,8 +588,8 @@
 Unfortunately, that complicated the release process. This page documents the current release
 process.</p>
 <h2 id="step-1-testing">Step 1: Testing</h2>
-<p>Before release, you should ensure that all of the clouds currently supported in the deploy
-repository work. These are important to new users and testers, so we should keep them working.
+<p>Before release, you should ensure that all of the clouds currently supported by the deployer
+work. These are important to new users and testers, so we should keep them working.
 For reference, they are at <code>deploy/ansible/terraform</code>. At the time of writing those are:</p>
 <ul>
 <li>aws</li>
@@ -648,9 +634,7 @@ twine upload dist/*
 <p>Golang modules require an "annotated git tag" (not a lightweight git tag). Therefore use the sign option (<code>-s</code>) as above, or use the annotate option (<code>-a</code>) of <code>git tag</code>.</p>
 <p><b>Note</b> that the Github website interface will create lightweight tags. Therefore tag locally and push to Github.</p>
 <p><b>IMPORTANT:</b> Golang modules require the full X.Y.Z sermver version eg. v0.2.0 (Otherwise go will attach the wrong version numbers to fetches and update go.mod incorrectly.)</p>
-<h2 id="step-5-shakenfistdeploy">Step 5: <code>shakenfist/deploy</code></h2>
-<p>Tag and release as per shakenfist/shakenfist.</p>
-<h2 id="step-6-shakenfistterraform-provider-shakenfist">Step 6: <code>shakenfist/terraform-provider-shakenfist</code></h2>
+<h2 id="step-5-shakenfistterraform-provider-shakenfist">Step 5: <code>shakenfist/terraform-provider-shakenfist</code></h2>
 <ul>
 <li>Bump dependency in go.mod</li>
 <li>Tag and release</li>
