@@ -62,7 +62,11 @@ pipeline {
 
   post {
     always {
-      sh '''  cat /var/log/syslog'''
+      sh '''  echo "=============================="
+              virsh list --all
+
+              echo "=============================="
+              cat /var/log/syslog'''
       }
     }
   }

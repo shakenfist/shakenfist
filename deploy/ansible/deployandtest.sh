@@ -55,8 +55,11 @@ then
 
   if [ -n "$GCP_SSH_KEY_FILENAME" ]
   then
-    d=`cat $GCP_SSH_KEY_FILENAME`
+    d=`cat $GCP_SSH_KEY_FILENAME.pub`
     TERRAFORM_VARS="$TERRAFORM_VARS -var=ssh_keys='{\"$GCP_SSH_USER\": \"$d\"}'"
+    VARIABLES="$VARIABLES ssh_key_filename=$GCP_SSH_KEY_FILENAME"
+  else
+    VARIABLES="$VARIABLES ssh_key_filename=''"
   fi
 fi
 
