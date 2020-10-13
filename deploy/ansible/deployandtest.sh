@@ -43,7 +43,7 @@ then
 fi
 
 #### Google Cloud
-if [ "$CLOUD" == "gcp" ]
+if [ "$CLOUD" == "gcp" ] || [ "$CLOUD" == "gcp-xl" ]
 then
   if [ -z "$GCP_PROJECT" ]
   then
