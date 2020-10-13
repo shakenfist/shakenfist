@@ -11,8 +11,10 @@ markdown_extensions:
       user: shakenfist
 nav:
   - Introduction: index.md
-  - Installation: installation.md
   - Manifesto: manifesto.md
+  - User Guide:
+      - "Installation": installation.md
+      - "Usage": usage.md
   - Developer Guide:
       - "Workflow": development/git_usage.md
       - "Standards": development/standards.md
