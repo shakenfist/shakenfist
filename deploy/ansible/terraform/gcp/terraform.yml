@@ -6,6 +6,8 @@
     variables:
       project: "{{project}}"
       uniqifier: "{{uniqifier}}"
+      ssh_user: "{{ssh_user}}"
+      ssh_key: "{{ssh_key}}"
   register: terraform_out
 
 - name: Add sf-1 to ansible with a ssh key
