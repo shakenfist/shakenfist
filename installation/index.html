@@ -810,6 +810,7 @@ gcloud compute images create sf-image \
   --source-disk sf-source-disk --source-disk-zone us-central1-b \
   --licenses &quot;https://compute.googleapis.com/compute/v1/projects/vm-options/global/licenses/enable-vmx&quot;
 </code></pre>
+<p>Please note that the gcp-xl cloud is a special definition used for larger scale CI testing. You're welcome to use it, but it does assume that the node performing the deployment is a Google cloud instance.</p>
 <h3 id="vmware-esxi-additional-first-steps">VMWare ESXi additional first steps</h3>
 <p>The "metal" installation option can be used to create a test cluster on VMWare ESXi hypervisors.</p>
 <p>Virtual machines hosted under ESXi need two CPU options enabled.</p>
@@ -916,17 +917,17 @@ with real users.</p>
 </tr>
 <tr>
 <td>GCP_PROJECT</td>
-<td>gcp</td>
+<td>gcp, gcp-xl</td>
 <td>The GCP project id to deploy in</td>
 </tr>
 <tr>
 <td>GCP_SSH_KEY_FILENAME</td>
-<td>gcp</td>
+<td>gcp, gcp-xl</td>
 <td>The path to a ssh private key file to use for authentication. It is assumed that the public key is at <code>${GCP_SSH_KEY_FILENAME}.pub</code>. (optional, only required if not using gcloud).</td>
 </tr>
 <tr>
 <td>GCP_SSH_USER</td>
-<td>gcp</td>
+<td>gcp, gcp-xl</td>
 <td>The username to add the GCP_SSH_KEY to. (optional, only used if GCPSSH_KEY_FILENAME is set).</td>
 </tr>
 <tr>
