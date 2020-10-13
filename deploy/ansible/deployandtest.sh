@@ -7,8 +7,7 @@
 #
 
 #### Required settings
-TERRAFORM_VARS=""
-ANSIBLE_VARS=""
+VARIABLES=""
 VERBOSE="-v"
 
 #### AWS
@@ -19,47 +18,47 @@ then
     echo ===== Must specify AWS region in \$AWS_REGION
     exit 1
   fi
-  VARIABLES="$VARIABLES region=$AWS_REGION"
+  VARIABLES="$VARIABLES,region=$AWS_REGION"
 
   if [ -z "$AWS_AVAILABILITY_ZONE" ]
   then
     echo ===== Must specify AWS availability zone in \$AWS_AVAILABILITY_ZONE
     exit 1
   fi
-  VARIABLES="$VARIABLES availability_zone=$AWS_REGION"
+  VARIABLES="$VARIABLES,availability_zone=$AWS_REGION"
 
   if [ -z "$AWS_VPC_ID" ]
   then
     echo ===== Must specify AWS VPC ID in \$AWS_VPC_ID
     exit 1
   fi
-  VARIABLES="$VARIABLES vpc_id=$AWS_VPC_ID"
+  VARIABLES="$VARIABLES,vpc_id=$AWS_VPC_ID"
 
   if [ -z "$AWS_SSH_KEY_NAME" ]
   then
     echo ===== Must specify AWS Instance SSH key name in \$AWS_SSH_KEY_NAME
     exit 1
   fi
-  VARIABLES="$VARIABLES ssh_key_name=$AWS_SSH_KEY_NAME"
+  VARIABLES="$VARIABLES,ssh_key_name=$AWS_SSH_KEY_NAME"
 fi
 
 #### Google Cloud
-if [ "$CLOUD" == "gcp" ]
+if [ "$CLOUD" == "gcp" ] || [ "$CLOUD" == "gcp-xl" ]
 then
   if [ -z "$GCP_PROJECT" ]
   then
     echo ===== Must specify GCP project in \$GCP_PROJECT
     exit 1
   fi
-  VARIABLES="$VARIABLES project=$GCP_PROJECT"
+  VARIABLES="$VARIABLES,project=$GCP_PROJECT"
 
   if [ -n "$GCP_SSH_KEY_FILENAME" ]
   then
     d=`cat $GCP_SSH_KEY_FILENAME.pub`
-    TERRAFORM_VARS="$TERRAFORM_VARS -var=ssh_keys='{\"$GCP_SSH_USER\": \"$d\"}'"
-    VARIABLES="$VARIABLES ssh_key_filename=$GCP_SSH_KEY_FILENAME"
+    VARIABLES="$VARIABLES,ssh_key_filename=$GCP_SSH_KEY_FILENAME"
+    VARIABLES="$VARIABLES,ssh_key=\"$d\" ssh_user=$GCP_SSH_USER"
   else
-    VARIABLES="$VARIABLES ssh_key_filename=''"
+    VARIABLES="$VARIABLES,ssh_key_filename='' ssh_key='' ssh_user=''"
   fi
 fi
 
@@ -71,21 +70,21 @@ then
     echo ===== Must specify Openstack SSH key name in \$OS_SSH_KEY_NAME
     exit 1
   fi
-  VARIABLES="$VARIABLES ssh_key_name=$OS_SSH_KEY_NAME"
+  VARIABLES="$VARIABLES,ssh_key_name=$OS_SSH_KEY_NAME"
 
   if [ -z "$OS_FLAVOR_NAME" ]
   then
     echo ===== Must specify Openstack instance flavor name in \$OS_FLAVOR_NAME
     exit 1
   fi
-  VARIABLES="$VARIABLES os_flavor=$OS_FLAVOR_NAME"
+  VARIABLES="$VARIABLES,os_flavor=$OS_FLAVOR_NAME"
 
   if [ -z "$OS_EXTERNAL_NET_NAME" ]
   then
     echo ===== Must specify Openstack External network name in \$OS_EXTERNAL_NET_NAME
     exit 1
   fi
-  VARIABLES="$VARIABLES os_external_net_name=$OS_EXTERNAL_NET_NAME"
+  VARIABLES="$VARIABLES,os_external_net_name=$OS_EXTERNAL_NET_NAME"
 fi
 
 #### Metal
@@ -96,21 +95,21 @@ then
     echo ===== Must specify the Node 1 machine IP in \$METAL_IP_SF1
     exit 1
   fi
-  VARIABLES="$VARIABLES metal_ip_sf1=$METAL_IP_SF1"
+  VARIABLES="$VARIABLES,metal_ip_sf1=$METAL_IP_SF1"
 
   if [ -z "$METAL_IP_SF2" ]
   then
     echo ===== Must specify the Node 2 machine IP in \$METAL_IP_SF2
     exit 1
   fi
-  VARIABLES="$VARIABLES metal_ip_sf2=$METAL_IP_SF2"
+  VARIABLES="$VARIABLES,metal_ip_sf2=$METAL_IP_SF2"
 
   if [ -z "$METAL_IP_SF3" ]
   then
     echo ===== Must specify the Node 3 machine IP in \$METAL_IP_SF3
     exit 1
   fi
-  VARIABLES="$VARIABLES metal_ip_sf3=$METAL_IP_SF3"
+  VARIABLES="$VARIABLES,metal_ip_sf3=$METAL_IP_SF3"
 fi
 
 ### Localhost
@@ -118,7 +117,7 @@ if [ "$CLOUD" == "localhost" ]
 then
   # CI is not supported on single node deploys
   SKIP_SF_TESTS=1
-  ANSIBLE_VARS="$ANSIBLE_VARS ram_system_reservation=1.0"
+  VARIABLES="$VARIABLES,ram_system_reservation=1.0"
 fi
 
 #### Shakenfist
@@ -129,18 +128,17 @@ then
     echo ===== Must specify the Shaken Fist system key to use in \$SHAKENFIST_KEY
     exit 1
   fi
-  VARIABLES="$VARIABLES system_key=$SHAKENFIST_KEY"
+  VARIABLES="$VARIABLES,system_key=$SHAKENFIST_KEY"
 
   if [ -z "$SHAKENFIST_SSH_KEY" ]
   then
     echo ===== Must specify a SSH public key\'s text in \$SHAKENFIST_SSH_KEY
   fi
-  TERRAFORM_VARS="$TERRAFORM_VARS -var=ssh_key=\"$SHAKENFIST_SSH_KEY\""
-  ANSIBLE_VARS="$ANSIBLE_VARS ssh_key=\"$SHAKENFIST_SSH_KEY\""
+  VARIABLES="$VARIABLES,ssh_key=\"$SHAKENFIST_SSH_KEY\""
 fi
 
 #### Check that a valid cloud was specified
-if [ -z "$VARIABLES" ]
+if [ -z "$CLOUD" ]
 then
 {
   echo ====
@@ -161,7 +159,7 @@ then
     exit 1
   fi
 
-  ANSIBLE_VARS="$ANSIBLE_VARS vault_system_key_path=$VAULT_SYSTEM_KEY_PATH"
+  VARIABLES="$VARIABLES,vault_system_key_path=$VAULT_SYSTEM_KEY_PATH"
 fi
 
 set -x
@@ -225,7 +223,7 @@ else
     cd "$cwd"
   done
 fi
-VARIABLES="$VARIABLES release=$RELEASE"
+VARIABLES="$VARIABLES,release=$RELEASE"
 
 #### Mode selection, deploy or hotfix at this time
 if [ -z "$MODE" ]
@@ -244,18 +242,22 @@ KSM_ENABLED="${KSM_ENABLED:-1}"
 cwd=`pwd`
 TERRAFORM_VARS="$TERRAFORM_VARS -var=uniqifier=$UNIQIFIER"
 
-ANSIBLE_VARS="$ANSIBLE_VARS cloud=$CLOUD"
-ANSIBLE_VARS="$ANSIBLE_VARS bootdelay=$BOOTDELAY"
-ANSIBLE_VARS="$ANSIBLE_VARS ansible_root=\"$cwd\""
-ANSIBLE_VARS="$ANSIBLE_VARS uniqifier=$UNIQIFIER"
-ANSIBLE_VARS="$ANSIBLE_VARS admin_password=$ADMIN_PASSWORD"
-ANSIBLE_VARS="$ANSIBLE_VARS floating_network_ipblock=$FLOATING_IP_BLOCK"
-ANSIBLE_VARS="$ANSIBLE_VARS mode=$MODE"
-ANSIBLE_VARS="$ANSIBLE_VARS ksm_enabled=$KSM_ENABLED"
+VARIABLES="$VARIABLES,cloud=$CLOUD"
+VARIABLES="$VARIABLES,bootdelay=$BOOTDELAY"
+VARIABLES="$VARIABLES,ansible_root=\"$cwd\""
+VARIABLES="$VARIABLES,uniqifier=$UNIQIFIER"
+VARIABLES="$VARIABLES,admin_password=$ADMIN_PASSWORD"
+VARIABLES="$VARIABLES,floating_network_ipblock=$FLOATING_IP_BLOCK"
+VARIABLES="$VARIABLES,mode=$MODE"
+VARIABLES="$VARIABLES,ksm_enabled=$KSM_ENABLED"
 
 echo "VARIABLES: $VARIABLES"
+TERRAFORM_VARS=""
+ANSIBLE_VARS=""
 
-for var in $VARIABLES
+VARIABLES=`echo $VARIABLES | sed 's/^,//'`
+IFS=, vars=($(echo "$VARIABLES"))
+for var in "${vars[@]}"
 do
   TERRAFORM_VARS="$TERRAFORM_VARS -var=$var"
   ANSIBLE_VARS="$ANSIBLE_VARS $var"
