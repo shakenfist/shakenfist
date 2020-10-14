@@ -139,8 +139,8 @@ def generic_wrapper(func):
                 ) as e:
             return error(401, str(e))
 
-        except Exception:
-            return error(500, 'server error')
+        except Exception as e:
+            return error(500, 'server error: %s' % repr(e))
 
     return wrapper
 
