@@ -67,6 +67,10 @@ class NoInstanceTaskException(TaskException):
     pass
 
 
+class NoNetworkTaskException(TaskException):
+    pass
+
+
 class NetworkNotListTaskException(TaskException):
     pass
 

@@ -9,6 +9,9 @@ from shakenfist import config
 from shakenfist import db
 from shakenfist import dhcp
 from shakenfist import logutil
+from shakenfist.tasks import (DeployNetworkTask,
+                              UpdateDHCPNetworkTask,
+                              RemoveDHCPNetworkTask)
 from shakenfist import util
 
 
@@ -185,11 +188,7 @@ class Network(object):
             self.deploy_nat()
             self.update_dhcp()
         else:
-            db.enqueue('networknode',
-                       {
-                           'type': 'deploy',
-                           'network_uuid': self.uuid
-                       })
+            db.enqueue('networknode', DeployNetworkTask(self.uuid))
             db.add_event('network', self.uuid, 'deploy',
                          'enqueued', None, None)
 
@@ -296,11 +295,7 @@ class Network(object):
                     d = dhcp.DHCP(self.uuid, subst['vx_veth_inner'])
                     d.restart_dhcpd()
         else:
-            db.enqueue('networknode',
-                       {
-                           'type': 'update_dhcp',
-                           'network_uuid': self.uuid
-                       })
+            db.enqueue('networknode', UpdateDHCPNetworkTask(self.uuid))
             db.add_event('network', self.uuid, 'update dhcp',
                          'enqueued', None, None)
 
@@ -312,11 +307,7 @@ class Network(object):
                     d = dhcp.DHCP(self.uuid, subst['vx_veth_inner'])
                     d.remove_dhcpd()
         else:
-            db.enqueue('networknode',
-                       {
-                           'type': 'remove_dhcp',
-                           'network_uuid': self.uuid
-                       })
+            db.enqueue('networknode', RemoveDHCPNetworkTask(self.uuid))
             db.add_event('network', self.uuid, 'remove dhcp',
                          'enqueued', None, None)
 

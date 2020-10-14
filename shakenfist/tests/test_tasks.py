@@ -46,8 +46,14 @@ class TasksEqTestCase(testtools.TestCase):
 
 class InstanceTasksTestCase(testtools.TestCase):
     def test_InstanceTask(self):
+        i = tasks.InstanceTask('some-uuid')
+        self.assertEqual('some-uuid', i.instance_uuid())
+
         with testtools.ExpectedException(exceptions.NoInstanceTaskException):
             tasks.InstanceTask(None)
+
+        with testtools.ExpectedException(exceptions.NoInstanceTaskException):
+            tasks.InstanceTask({'uuid': 'some-uuid'})
 
         with testtools.ExpectedException(exceptions.NetworkNotListTaskException):
             tasks.InstanceTask('uuid', 'not a list')
@@ -62,3 +68,22 @@ class InstanceTasksTestCase(testtools.TestCase):
 
         with testtools.ExpectedException(exceptions.NoURLImageFetchTaskException):
             tasks.FetchImageTask(1234)
+
+
+class NetworkTasksTestCase(testtools.TestCase):
+    def test_NetworkTask(self):
+        n = tasks.NetworkTask('some-uuid')
+        self.assertEqual('some-uuid', n.network_uuid())
+
+        with testtools.ExpectedException(exceptions.NoNetworkTaskException):
+            tasks.NetworkTask(None)
+
+        with testtools.ExpectedException(exceptions.NoNetworkTaskException):
+            tasks.NetworkTask({'uuid': 'test-uuid'})
+
+    def test_DeployNetworkTask(self):
+        d = tasks.DeployNetworkTask('some-uuid')
+
+        # Test hashing via equality
+        self.assertEqual(d, tasks.DeployNetworkTask('some-uuid'))
+        self.assertNotEqual(d, tasks.DeployNetworkTask('diff-uuid'))

@@ -6,6 +6,10 @@ from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist import net
+from shakenfist.tasks import (DeployNetworkTask,
+                              NetworkTask,
+                              RemoveDHCPNetworkTask,
+                              UpdateDHCPNetworkTask)
 from shakenfist import util
 
 
@@ -98,13 +102,13 @@ class Monitor(daemon.Daemon):
                 return
 
             log_ctx = LOG.withField('workitem', workitem)
-            if 'network_uuid' not in workitem:
-                log_ctx.warning('Network workitem lacks network uuid')
+            if not NetworkTask.__subclasscheck__(type(workitem)):
+                log_ctx.error('Network workitem is not a NetworkTask')
                 return
 
-            n = net.from_db(workitem.get('network_uuid'))
+            n = net.from_db(workitem.network_uuid())
             if not n:
-                log_ctx.withNetwork(workitem.get('network_uuid')).warning(
+                log_ctx.withNetwork(workitem.network_uuid()).warning(
                     'Received work item for non-existant network')
                 return
 
@@ -112,18 +116,18 @@ class Monitor(daemon.Daemon):
             # of these jobs in parallel with a pool of workers, but I am not sure its
             # worth the complexity right now. Are we really going to be changing
             # networks that much?
-            if workitem.get('type') == 'deploy':
+            if isinstance(workitem, DeployNetworkTask):
                 n.create()
                 n.ensure_mesh()
                 db.add_event('network', workitem['network_uuid'],
                              'network node', 'deploy', None, None)
 
-            elif workitem.get('type') == 'update_dhcp':
+            elif isinstance(workitem, UpdateDHCPNetworkTask):
                 n.update_dhcp()
                 db.add_event('network', workitem['network_uuid'],
                              'network node', 'update dhcp', None, None)
 
-            elif workitem.get('type') == 'remove_dhcp':
+            elif isinstance(workitem, RemoveDHCPNetworkTask):
                 n.remove_dhcp()
                 db.add_event('network', workitem['network_uuid'],
                              'network node', 'remove dhcp', None, None)
