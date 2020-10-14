@@ -256,7 +256,12 @@ TERRAFORM_VARS=""
 ANSIBLE_VARS=""
 
 VARIABLES=`echo $VARIABLES | sed 's/^,//'`
-IFS=, vars=($(echo "$VARIABLES"))
+
+OLDIFS=$IFS
+IFS=,
+vars=($(echo "$VARIABLES"))
+IFS=$OLDIFS
+
 for var in "${vars[@]}"
 do
   TERRAFORM_VARS="$TERRAFORM_VARS -var=$var"
