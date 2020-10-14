@@ -279,7 +279,6 @@ class Instance(object):
                     ipm.release(ni['ipv4'])
                     db.persist_ipmanager(ni['network_uuid'], ipm.save())
 
-        db.update_instance_power_state(self.db_entry['uuid'], 'off')
         db.free_console_port(self.db_entry['console_port'])
         db.free_console_port(self.db_entry['vdi_port'])
 
@@ -512,6 +511,7 @@ class Instance(object):
         except libvirt.libvirtError as e:
             LOG.withObj(self).error('Failed to delete domain: %s' % e)
 
+        db.update_instance_power_state(self.db_entry['uuid'], 'off')
         db.add_event(
             'instance', self.db_entry['uuid'], 'poweroff', 'complete', None, None)
 
