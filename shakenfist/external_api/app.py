@@ -40,6 +40,7 @@ from shakenfist import util
 from shakenfist import virt
 from shakenfist.daemons import daemon
 from shakenfist.tasks import (DeleteInstanceTask,
+                              DeployNetworkTask,
                               FetchImageTask,
                               PreflightInstanceTask,
                               StartInstanceTask,
@@ -1159,11 +1160,7 @@ class Networks(Resource):
                      'api', 'create', None, None)
 
         # Networks should immediately appear on the network node
-        db.enqueue('networknode',
-                   {
-                       'type': 'deploy',
-                       'network_uuid': network['uuid']
-                   })
+        db.enqueue('networknode', DeployNetworkTask(network['uuid']))
 
         db.add_event('network', network['uuid'],
                      'deploy', 'enqueued', None, None)

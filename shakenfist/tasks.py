@@ -1,6 +1,7 @@
 from shakenfist.exceptions import (NoURLImageFetchTaskException,
                                    NetworkNotListTaskException,
                                    NoInstanceTaskException,
+                                   NoNetworkTaskException,
                                    NoNextStateTaskException,
                                    )
 
@@ -48,6 +49,8 @@ class InstanceTask(QueueTask):
         # General checks
         if not instance_uuid:
             raise NoInstanceTaskException('No instance specified for InstanceTask')
+        if not isinstance(instance_uuid, str):
+            raise NoInstanceTaskException('Instance UUID is not a string')
         if network and not isinstance(network, list):
             raise NetworkNotListTaskException()
 
@@ -106,6 +109,40 @@ class DeleteInstanceTask(InstanceTask):
 
     def next_state_message(self):
         return self._next_state_message
+
+
+#
+# Network Tasks
+#
+class NetworkTask(QueueTask):
+    def __init__(self, network_uuid):
+        super(NetworkTask, self).__init__()
+        self._network_uuid = network_uuid
+
+        # General checks
+        if not network_uuid:
+            raise NoNetworkTaskException('No network specified for NetworkTask')
+        if not isinstance(network_uuid, str):
+            raise NoNetworkTaskException('Network UUID is not a string')
+
+    def __hash__(self):
+        return hash((super(NetworkTask, self).__hash__(),
+                     self._network_uuid))
+
+    def network_uuid(self):
+        return self._network_uuid
+
+
+class DeployNetworkTask(NetworkTask):
+    _name = 'network_deploy'
+
+
+class UpdateDHCPNetworkTask(NetworkTask):
+    _name = 'network_update_dhcp'
+
+
+class RemoveDHCPNetworkTask(NetworkTask):
+    _name = 'network_remove_dhcp'
 
 
 #
