@@ -69,6 +69,17 @@ class BaseTestCase(testtools.TestCase):
             '----------------------- end %s events -----------------------\n'
             % instance_uuid)
 
+    def _log_netns(self):
+        """ Log the current net namespaces """
+        sys.stderr.write(
+            '----------------------- netns -----------------------\n')
+        out, err = processutils.execute('sudo ip netns', shell=True,
+                                        check_exit_code=[0, 1])
+        for line in out:
+            sys.stderr.write(line)
+        sys.stderr.write(
+            '----------------------- end netns -----------------------\n')
+
     def _await_power_off(self, instance_uuid, after=None):
         return self._await_event(
             instance_uuid, 'detected poweroff', after=after)
@@ -128,6 +139,8 @@ class BaseTestCase(testtools.TestCase):
         if expected != actual:
             self._log_console(instance_uuid)
             self._log_instance_events(instance_uuid)
+            self._log_netns()
+            sys.stderr.write('Current time: '+time.ctime()+'\n')
             self.fail('Ping test failed. Expected %s != actual %s.\nout: %s\nerr: %s\n'
                       % (expected, actual, out, err))
 
