@@ -194,7 +194,7 @@ def instance_start(instance_uuid, network):
                 n.ensure_mesh()
                 n.update_dhcp()
 
-        # Now we can start the isntance
+        # Now we can start the instance
         libvirt = util.get_libvirt()
         try:
             with util.RecordedOperation('instance creation',

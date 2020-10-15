@@ -140,8 +140,8 @@ def generic_wrapper(func):
                 ) as e:
             return error(401, str(e))
 
-        except Exception:
-            return error(500, 'server error')
+        except Exception as e:
+            return error(500, 'server error: %s' % repr(e))
 
     return wrapper
 
@@ -863,9 +863,11 @@ class InstanceRebootSoft(Resource):
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
-        db.add_event('instance', instance_uuid,
-                     'api', 'soft reboot', None, None)
-        return instance_from_db_virt.reboot(hard=False)
+        with db.get_lock(
+                'instance', None, instance_uuid, ttl=120, timeout=120):
+            db.add_event(
+                'instance', instance_uuid, 'api', 'soft reboot', None, None)
+            return instance_from_db_virt.reboot(hard=False)
 
 
 class InstanceRebootHard(Resource):
@@ -875,9 +877,11 @@ class InstanceRebootHard(Resource):
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
-        db.add_event('instance', instance_uuid,
-                     'api', 'hard reboot', None, None)
-        return instance_from_db_virt.reboot(hard=True)
+        with db.get_lock(
+                'instance', None, instance_uuid, ttl=120, timeout=120):
+            db.add_event(
+                'instance', instance_uuid, 'api', 'hard reboot', None, None)
+            return instance_from_db_virt.reboot(hard=True)
 
 
 class InstancePowerOff(Resource):
@@ -887,9 +891,11 @@ class InstancePowerOff(Resource):
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
-        db.add_event('instance', instance_uuid,
-                     'api', 'poweroff', None, None)
-        return instance_from_db_virt.power_off()
+        with db.get_lock(
+                'instance', None, instance_uuid, ttl=120, timeout=120):
+            db.add_event(
+                'instance', instance_uuid, 'api', 'poweroff', None, None)
+            return instance_from_db_virt.power_off()
 
 
 class InstancePowerOn(Resource):
@@ -899,9 +905,11 @@ class InstancePowerOn(Resource):
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
-        db.add_event('instance', instance_uuid,
-                     'api', 'poweron', None, None)
-        return instance_from_db_virt.power_on()
+        with db.get_lock(
+                'instance', None, instance_uuid, ttl=120, timeout=120):
+            db.add_event(
+                'instance', instance_uuid, 'api', 'poweron', None, None)
+            return instance_from_db_virt.power_on()
 
 
 class InstancePause(Resource):
@@ -911,8 +919,10 @@ class InstancePause(Resource):
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
-        db.add_event('instance', instance_uuid, 'api', 'pause', None, None)
-        return instance_from_db_virt.pause()
+        with db.get_lock(
+                'instance', None, instance_uuid, ttl=120, timeout=120):
+            db.add_event('instance', instance_uuid, 'api', 'pause', None, None)
+            return instance_from_db_virt.pause()
 
 
 class InstanceUnpause(Resource):
@@ -922,9 +932,11 @@ class InstanceUnpause(Resource):
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
-        db.add_event('instance', instance_uuid,
-                     'api', 'unpause', None, None)
-        return instance_from_db_virt.unpause()
+        with db.get_lock(
+                'instance', None, instance_uuid, ttl=120, timeout=120):
+            db.add_event(
+                'instance', instance_uuid, 'api', 'unpause', None, None)
+            return instance_from_db_virt.unpause()
 
 
 def _safe_get_network_interface(interface_uuid):
