@@ -69,4 +69,9 @@ pipeline {
               cat /var/log/syslog'''
       }
     }
+    failure {
+      sh '''  echo "Sleep for a long time in case we are debugging"
+              sleep 3600
+              '''
+    }
   }
