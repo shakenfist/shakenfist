@@ -15,6 +15,7 @@ from shakenfist import util
 from shakenfist import virt
 from shakenfist.tasks import (QueueTask,
                               DeleteInstanceTask,
+                              ErrorInstanceTask,
                               FetchImageTask,
                               InstanceTask,
                               PreflightInstanceTask,
@@ -81,15 +82,18 @@ def handle(jobname, workitem):
             elif isinstance(task, DeleteInstanceTask):
                 try:
                     instance_delete(instance_uuid)
-                    db.update_instance_state(instance_uuid, task.next_state())
+                    db.update_instance_state(instance_uuid, 'deleted')
+                except Exception as e:
+                    util.ignore_exception(daemon.process_name('queues'), e)
 
-                    # TODO(andy): This code used to task.get('next_state', 'unknown')
-                    # Is this a hangover from dicts used as tasks?
-                    # ie. had to gracefully handle poorly constructed tasks?
+            elif isinstance(task, ErrorInstanceTask):
+                try:
+                    instance_delete(instance_uuid)
+                    db.update_instance_state(instance_uuid, 'error')
 
-                    if task.next_state_message():
+                    if task.error_msg():
                         db.update_instance_error_message(
-                            instance_uuid, task.next_state_message())
+                            instance_uuid, task.error_msg())
                     db.enqueue('%s-metrics' %
                                config.parsed.get('NODE_NAME'), {})
                 except Exception as e:
@@ -103,8 +107,7 @@ def handle(jobname, workitem):
     except Exception as e:
         util.ignore_exception(daemon.process_name('queues'), e)
         if instance_uuid:
-            db.enqueue_instance_delete(config.parsed.get('NODE_NAME'),
-                                       instance_uuid, 'error',
+            db.enqueue_instance_delete(instance_uuid,
                                        'failed queue task: %s' % e)
 
     finally:
@@ -170,7 +173,8 @@ def instance_preflight(instance_uuid, network):
 
 
 def instance_start(instance_uuid, network):
-    with db.get_lock('instance', None, instance_uuid, ttl=900) as lock:
+    with db.get_lock(
+            'instance', None, instance_uuid, ttl=900, timeout=120) as lock:
         instance = virt.from_db(instance_uuid)
 
         # Collect the networks
@@ -179,9 +183,7 @@ def instance_start(instance_uuid, network):
             if netdesc['network_uuid'] not in nets:
                 n = net.from_db(netdesc['network_uuid'])
                 if not n:
-                    db.enqueue_instance_delete(
-                        config.parsed.get('NODE_NAME'), instance_uuid, 'error',
-                        'missing network')
+                    db.enqueue_instance_error(instance_uuid, 'missing network')
                     return
 
                 nets[netdesc['network_uuid']] = n
@@ -205,9 +207,8 @@ def instance_start(instance_uuid, network):
             code = e.get_error_code()
             if code in (libvirt.VIR_ERR_CONFIG_UNSUPPORTED,
                         libvirt.VIR_ERR_XML_ERROR):
-                db.enqueue_instance_delete(
-                    config.parsed.get('NODE_NAME'), instance_uuid, 'error',
-                    'instance failed to start')
+                db.enqueue_instance_error(instance_uuid,
+                                          'instance failed to start')
                 return
 
         for iface in db.get_instance_interfaces(instance_uuid):
@@ -215,7 +216,7 @@ def instance_start(instance_uuid, network):
 
 
 def instance_delete(instance_uuid):
-    with db.get_lock('instance', None, instance_uuid):
+    with db.get_lock('instance', None, instance_uuid, timeout=120):
         db.add_event('instance', instance_uuid,
                      'queued', 'delete', None, None)
 

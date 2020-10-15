@@ -22,7 +22,7 @@ class QueueTask(object):
 
     def __repr__(self):
         # All subclasses define json_dump()
-        return self.name() + ': ' + str(self.json_dump())
+        return 'QUEUETASK:' + self.name() + ': ' + str(self.json_dump())
 
     def __eq__(self, other):
         if not QueueTask.__subclasscheck__(type(other)):
@@ -131,6 +131,10 @@ class NetworkTask(QueueTask):
 
     def network_uuid(self):
         return self._network_uuid
+
+    def json_dump(self):
+        return {**super(NetworkTask, self).json_dump(),
+                'network_uuid': self._network_uuid}
 
 
 class DeployNetworkTask(NetworkTask):
