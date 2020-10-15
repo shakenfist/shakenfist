@@ -2,7 +2,11 @@ import mock
 import testtools
 
 from shakenfist import etcd
+from shakenfist import logutil
 from shakenfist import tasks
+
+
+LOG, _ = logutil.setup(__name__)
 
 
 class TaskEncodingETCDtestCase(testtools.TestCase):
@@ -39,15 +43,41 @@ class TaskEncodingETCDtestCase(testtools.TestCase):
     @mock.patch('etcd3gw.Etcd3Client.put')
     def test_put_DeleteInstanceTask(self, mock_put):
         etcd.put('objecttype', 'subtype', 'name',
-                 tasks.DeleteInstanceTask('fake_uuid', 'next_state', 'dunno'))
+                 tasks.DeleteInstanceTask('fake_uuid'))
 
         path = '/sf/objecttype/subtype/name'
         encoded = '''{
     "instance_uuid": "fake_uuid",
     "network": null,
-    "next_state": "next_state",
-    "next_state_message": "dunno",
     "task": "instance_delete",
+    "version": 1
+}'''
+        mock_put.assert_called_with(path, encoded, lease=None)
+
+    @mock.patch('etcd3gw.Etcd3Client.put')
+    def test_put_ErrorInstanceTask(self, mock_put):
+        etcd.put('objecttype', 'subtype', 'name',
+                 tasks.ErrorInstanceTask('fake_uuid', 'dunno'))
+
+        path = '/sf/objecttype/subtype/name'
+        encoded = '''{
+    "error_msg": "dunno",
+    "instance_uuid": "fake_uuid",
+    "network": null,
+    "task": "instance_error",
+    "version": 1
+}'''
+        mock_put.assert_called_with(path, encoded, lease=None)
+
+    @mock.patch('etcd3gw.Etcd3Client.put')
+    def test_put_DeployNetworkTask(self, mock_put):
+        etcd.put('objecttype', 'subtype', 'name',
+                 tasks.DeployNetworkTask('fake_uuid'))
+
+        path = '/sf/objecttype/subtype/name'
+        encoded = '''{
+    "network_uuid": "fake_uuid",
+    "task": "network_deploy",
     "version": 1
 }'''
         mock_put.assert_called_with(path, encoded, lease=None)
@@ -155,7 +185,7 @@ class TaskDequeueTestCase(testtools.TestCase):
             tasks.PreflightInstanceTask('diff_uuid'),
         ]
         self.assertCountEqual(expected, workitem['tasks'])
-        self.assertSequenceEqual(set(expected), set(workitem['tasks']))
+        self.assertSequenceEqual(expected, workitem['tasks'])
 
     @mock.patch('etcd3gw.Etcd3Client.get_prefix', return_value=[(
         '''{
@@ -182,15 +212,15 @@ class TaskDequeueTestCase(testtools.TestCase):
             tasks.StartInstanceTask('fake_uuid'),
         ]
         self.assertCountEqual(expected, workitem['tasks'])
-        self.assertSequenceEqual(set(expected), set(workitem['tasks']))
+        self.assertSequenceEqual(expected, workitem['tasks'])
 
     @mock.patch('etcd3gw.Etcd3Client.get_prefix', return_value=[(
         '''{
             "tasks": [
                         {
+                            "network": null,
                             "instance_uuid": "fake_uuid",
-                            "task": "instance_delete",
-                            "next_state": "where_to",
+                            "task": "instance_error",
                             "version": 1
                         }
                     ]
@@ -203,14 +233,14 @@ class TaskDequeueTestCase(testtools.TestCase):
     @mock.patch('shakenfist.etcd.get_lock')
     @mock.patch('shakenfist.etcd.put')
     @mock.patch('etcd3gw.Etcd3Client.delete')
-    def test_dequeue_delete(self, m_delete, m_put, m_get_lock, m_get_prefix):
+    def test_dequeue_error(self, m_delete, m_put, m_get_lock, m_get_prefix):
         jobname, workitem = etcd.dequeue('node01')
         self.assertEqual('somejob', jobname)
         expected = [
-            tasks.DeleteInstanceTask('fake_uuid', 'where_to'),
+            tasks.ErrorInstanceTask('fake_uuid'),
         ]
         self.assertCountEqual(expected, workitem['tasks'])
-        self.assertSequenceEqual(set(expected), set(workitem['tasks']))
+        self.assertSequenceEqual(expected, workitem['tasks'])
 
     @mock.patch('etcd3gw.Etcd3Client.get_prefix', return_value=[(
         '''{
@@ -226,9 +256,9 @@ class TaskDequeueTestCase(testtools.TestCase):
                             "version": 1
                         },
                         {
+                            "network": null,
                             "instance_uuid": "fake_uuid",
-                            "task": "instance_delete",
-                            "next_state": "where_to",
+                            "task": "instance_error",
                             "version": 1
                         }
                     ]
@@ -247,10 +277,38 @@ class TaskDequeueTestCase(testtools.TestCase):
         expected = [
             tasks.PreflightInstanceTask('diff_uuid'),
             tasks.StartInstanceTask('fake_uuid'),
-            tasks.DeleteInstanceTask('fake_uuid', 'where_to'),
+            tasks.ErrorInstanceTask('fake_uuid'),
         ]
         self.assertCountEqual(expected, workitem['tasks'])
-        self.assertSequenceEqual(set(expected), set(workitem['tasks']))
+        self.assertSequenceEqual(expected, workitem['tasks'])
+
+    @mock.patch('etcd3gw.Etcd3Client.get_prefix', return_value=[(
+        '''{
+            "tasks": [
+                        {
+                            "network": null,
+                            "instance_uuid": "fake_uuid",
+                            "task": "instance_delete",
+                            "version": 1
+                        }
+                    ]
+            }
+        ''',
+        {
+            'key': '/somejob'
+        },
+    )])
+    @mock.patch('shakenfist.etcd.get_lock')
+    @mock.patch('shakenfist.etcd.put')
+    @mock.patch('etcd3gw.Etcd3Client.delete')
+    def test_dequeue_delete(self, m_delete, m_put, m_get_lock, m_get_prefix):
+        jobname, workitem = etcd.dequeue('node01')
+        self.assertEqual('somejob', jobname)
+        expected = [
+            tasks.DeleteInstanceTask('fake_uuid'),
+        ]
+        self.assertCountEqual(expected, workitem['tasks'])
+        self.assertSequenceEqual(expected, workitem['tasks'])
 
     @mock.patch('etcd3gw.Etcd3Client.get_prefix', return_value=[(
         '''{
@@ -278,4 +336,4 @@ class TaskDequeueTestCase(testtools.TestCase):
             tasks.FetchImageTask('http://whoknows', 'fake_uuid'),
         ]
         self.assertCountEqual(expected, workitem['tasks'])
-        self.assertSequenceEqual(set(expected), set(workitem['tasks']))
+        self.assertSequenceEqual(expected, workitem['tasks'])

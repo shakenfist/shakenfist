@@ -73,7 +73,3 @@ class NoNetworkTaskException(TaskException):
 
 class NetworkNotListTaskException(TaskException):
     pass
-
-
-class NoNextStateTaskException(TaskException):
-    pass

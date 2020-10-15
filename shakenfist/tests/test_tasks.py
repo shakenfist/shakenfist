@@ -22,14 +22,17 @@ class TasksEqTestCase(testtools.TestCase):
             self.assertEqual(tasks.PreflightInstanceTask('abcd', ['a1', 'b2']),
                              42)
 
-        self.assertEqual(tasks.DeleteInstanceTask('abcd', 'somestate'),
-                         tasks.DeleteInstanceTask('abcd', 'somestate'))
+        self.assertEqual(tasks.DeleteInstanceTask('abcd'),
+                         tasks.DeleteInstanceTask('abcd'))
 
-        self.assertNotEqual(tasks.DeleteInstanceTask('abcd', 'somestate'),
-                            tasks.DeleteInstanceTask('abcd', 'something'))
+        self.assertEqual(tasks.ErrorInstanceTask('abcd', 'someExcuse'),
+                         tasks.ErrorInstanceTask('abcd', 'someExcuse'))
 
-        self.assertEqual(tasks.DeleteInstanceTask('abcd', 'somestate', 'dunno'),
-                         tasks.DeleteInstanceTask('abcd', 'somestate', 'dunno'))
+        self.assertNotEqual(tasks.ErrorInstanceTask('abcd', 'someExcuse'),
+                            tasks.ErrorInstanceTask('abcd', 'something'))
+
+        self.assertEqual(tasks.ErrorInstanceTask('abcd', 'dunno'),
+                         tasks.ErrorInstanceTask('abcd', 'dunno'))
 
         self.assertEqual(tasks.ImageTask('http://someurl'),
                          tasks.ImageTask('http://someurl'))
@@ -58,9 +61,13 @@ class InstanceTasksTestCase(testtools.TestCase):
         with testtools.ExpectedException(exceptions.NetworkNotListTaskException):
             tasks.InstanceTask('uuid', 'not a list')
 
-    def test_DeleteInstanceTask(self):
-        with testtools.ExpectedException(exceptions.NoNextStateTaskException):
-            tasks.DeleteInstanceTask('uuid', None)
+    def test_ErrorInstanceTask(self):
+        self.assertIsNone(
+            tasks.ErrorInstanceTask('uuid', None).error_msg())
+
+        self.assertEqual(
+            'broken',
+            tasks.ErrorInstanceTask('uuid', 'broken').error_msg())
 
     def test_FetchImageTask(self):
         with testtools.ExpectedException(exceptions.NoURLImageFetchTaskException):

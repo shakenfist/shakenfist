@@ -578,8 +578,7 @@ class Instance(Resource):
         else:
             node = instance_from_db['node']
 
-        db.enqueue_instance_delete(
-            node, instance_from_db['uuid'], 'deleted', None)
+        db.enqueue_instance_delete_remote(node, instance_from_db['uuid'])
 
         start_time = time.time()
         while time.time() - start_time < config.parsed.get('API_ASYNC_WAIT'):
@@ -679,9 +678,9 @@ class Instances(Resource):
             for netdesc in network:
                 n = net.from_db(netdesc['network_uuid'])
                 if not n:
-                    db.enqueue_instance_delete(
-                        config.parsed.get('NODE_NAME'), instance_uuid, 'error',
-                        'missing network %s during IP allocation phase' % netdesc['network_uuid'])
+                    m = 'missing network %s during IP allocation phase' % (
+                        netdesc['network_uuid'])
+                    db.enqueue_instance_error(instance_uuid, m)
                     return error(
                         404, 'network %s not found' % netdesc['network_uuid'])
 
@@ -694,10 +693,9 @@ class Instances(Resource):
                         netdesc['address'] = ipm.get_random_free_address()
                     else:
                         if not ipm.reserve(netdesc['address']):
-                            db.enqueue_instance_delete(
-                                config.parsed.get(
-                                    'NODE_NAME'), instance_uuid, 'error',
-                                'failed to reserve an IP on network %s' % netdesc['network_uuid'])
+                            m = 'failed to reserve an IP on network %s' % (
+                                netdesc['network_uuid'])
+                            db.enqueue_instance_error(instance_uuid, m)
                             return error(409, 'address %s in use' %
                                          netdesc['address'])
 
@@ -726,15 +724,13 @@ class Instances(Resource):
         except exceptions.LowResourceException as e:
             db.add_event('instance', instance_uuid, 'schedule', 'failed', None,
                          'insufficient resources: ' + str(e))
-            db.enqueue_instance_delete(config.parsed.get('NODE_NAME'),
-                                       instance_uuid, 'error', 'scheduling failed')
+            db.enqueue_instance_error(instance_uuid, 'scheduling failed')
             return error(507, str(e))
 
         except exceptions.CandidateNodeNotFoundException as e:
             db.add_event('instance', instance_uuid, 'schedule', 'failed', None,
                          'candidate node not found: ' + str(e))
-            db.enqueue_instance_delete(config.parsed.get('NODE_NAME'),
-                                       instance_uuid, 'error', 'scheduling failed')
+            db.enqueue_instance_error(instance_uuid, 'scheduling failed')
             return error(404, 'node not found: %s' % e)
 
         # Record placement
@@ -796,8 +792,7 @@ class Instances(Resource):
                 node = instance['node']
 
             tasks_by_node.setdefault(node, [])
-            tasks_by_node[node].append(
-                DeleteInstanceTask(instance['uuid'], 'deleted'))
+            tasks_by_node[node].append(DeleteInstanceTask(instance['uuid']))
             instances_del.append(instance['uuid'])
 
         for node in tasks_by_node:
