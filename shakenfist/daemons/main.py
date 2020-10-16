@@ -46,9 +46,9 @@ def restore_instances():
 
     with util.RecordedOperation('restore instances', None):
         for instance in instances:
-            with db.get_lock(
-                    'instance', None, instance, ttl=120, timeout=120):
-                try:
+            try:
+                with db.get_lock(
+                        'instance', None, instance, ttl=120, timeout=120):
                     i = virt.from_db(instance)
                     if not i:
                         continue
@@ -58,11 +58,11 @@ def restore_instances():
 
                     LOG.withObj(i).info('Restoring instance')
                     i.create()
-                except Exception as e:
-                    util.ignore_exception('restore instance %s' % instance, e)
-                    db.enqueue_instance_delete(
-                        config.parsed.get('NODE_NAME'), instance, 'error',
-                        'exception while restoring instance on daemon restart')
+            except Exception as e:
+                util.ignore_exception('restore instance %s' % instance, e)
+                db.enqueue_instance_error(
+                    instance,
+                    'exception while restoring instance on daemon restart')
 
 
 DAEMON_IMPLEMENTATIONS = {

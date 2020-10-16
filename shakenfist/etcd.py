@@ -223,29 +223,43 @@ def enqueue(queuename, workitem):
                         }).info('Enqueued workitem')
 
 
-def decodeTasks(json_dict):
-    if 'tasks' not in json_dict:
-        return json_dict
+def _all_subclasses(cls):
+    all = cls.__subclasses__()
+    for sc in cls.__subclasses__():
+        all += _all_subclasses(sc)
+    return all
 
-    def _all_subclasses(cls):
-        all = cls.__subclasses__()
-        for sc in cls.__subclasses__():
-            all += _all_subclasses(sc)
-        return all
 
-    task_list = []
-    for task_item in json_dict['tasks']:
-        item = task_item
-        for task_class in _all_subclasses(QueueTask):
-            if task_class.name() and task_item.get('task') == task_class.name():
-                del task_item['task']
-                # This is where new QueueTask subclass versions should be handled
-                del task_item['version']
-                item = task_class(**task_item)
-                break
-        task_list.append(item)
+def _find_class(task_item):
+    if not isinstance(task_item, dict):
+        return task_item
 
-    return {'tasks': task_list}
+    item = task_item
+    for task_class in _all_subclasses(QueueTask):
+        if task_class.name() and task_item.get('task') == task_class.name():
+            del task_item['task']
+            # This is where new QueueTask subclass versions should be handled
+            del task_item['version']
+            item = task_class(**task_item)
+            break
+
+    return item
+
+
+def decodeTasks(obj):
+    if not isinstance(obj, dict):
+        return obj
+
+    if 'tasks' in obj:
+        task_list = []
+        for task_item in obj['tasks']:
+            task_list.append(_find_class(task_item))
+        return {'tasks': task_list}
+
+    if 'task' in obj:
+        return _find_class(obj)
+
+    return obj
 
 
 def dequeue(queuename):
@@ -262,6 +276,7 @@ def dequeue(queuename):
                 workitem = json.loads(data, object_hook=decodeTasks)
             except Exception:
                 LOG.exception('etcd.dequeue()')
+                return None, None
 
             put('processing', queuename, jobname, workitem)
             client.delete(metadata['key'])

@@ -103,8 +103,8 @@ class Monitor(daemon.Daemon):
 
             log_ctx = LOG.withField('workitem', workitem)
             if not NetworkTask.__subclasscheck__(type(workitem)):
-                log_ctx.error('Network workitem is not a NetworkTask')
-                return
+                raise exceptions.UnknownTaskException(
+                    'Network workitem was not decoded: %s' % workitem)
 
             n = net.from_db(workitem.network_uuid())
             if not n:
@@ -119,17 +119,17 @@ class Monitor(daemon.Daemon):
             if isinstance(workitem, DeployNetworkTask):
                 n.create()
                 n.ensure_mesh()
-                db.add_event('network', workitem['network_uuid'],
+                db.add_event('network', workitem.network_uuid(),
                              'network node', 'deploy', None, None)
 
             elif isinstance(workitem, UpdateDHCPNetworkTask):
                 n.update_dhcp()
-                db.add_event('network', workitem['network_uuid'],
+                db.add_event('network', workitem.network_uuid(),
                              'network node', 'update dhcp', None, None)
 
             elif isinstance(workitem, RemoveDHCPNetworkTask):
                 n.remove_dhcp()
-                db.add_event('network', workitem['network_uuid'],
+                db.add_event('network', workitem.network_uuid(),
                              'network node', 'remove dhcp', None, None)
 
         finally:

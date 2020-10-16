@@ -2,7 +2,6 @@ from shakenfist.exceptions import (NoURLImageFetchTaskException,
                                    NetworkNotListTaskException,
                                    NoInstanceTaskException,
                                    NoNetworkTaskException,
-                                   NoNextStateTaskException,
                                    )
 
 
@@ -22,7 +21,7 @@ class QueueTask(object):
 
     def __repr__(self):
         # All subclasses define json_dump()
-        return self.name() + ': ' + str(self.json_dump())
+        return 'QUEUETASK:' + self.name() + ': ' + str(self.json_dump())
 
     def __eq__(self, other):
         if not QueueTask.__subclasscheck__(type(other)):
@@ -82,33 +81,24 @@ class StartInstanceTask(InstanceTask):
 class DeleteInstanceTask(InstanceTask):
     _name = 'instance_delete'
 
-    def __init__(self, instance_uuid, next_state, next_state_message=None,
-                 network=None):
-        super(DeleteInstanceTask, self).__init__(instance_uuid)
 
-        if not next_state:
-            raise NoNextStateTaskException(
-                'DeleteInstanceTask requires a next_state')
+class ErrorInstanceTask(InstanceTask):
+    _name = 'instance_error'
 
-        # TODO(andy): next_state should be built into current state
-        self._next_state = next_state
-        self._next_state_message = next_state_message
+    def __init__(self, instance_uuid, error_msg=None, network=None):
+        super(ErrorInstanceTask, self).__init__(instance_uuid)
+        self._error_msg = error_msg
 
     def __hash__(self):
-        return hash((super(DeleteInstanceTask, self).__hash__(),
-                     self._next_state,
-                     self._next_state_message))
+        return hash((super(ErrorInstanceTask, self).__hash__(),
+                     self._error_msg))
 
     def json_dump(self):
-        return {**super(DeleteInstanceTask, self).json_dump(),
-                'next_state': self._next_state,
-                'next_state_message': self._next_state_message}
+        return {**super(ErrorInstanceTask, self).json_dump(),
+                'error_msg': self._error_msg}
 
-    def next_state(self):
-        return self._next_state
-
-    def next_state_message(self):
-        return self._next_state_message
+    def error_msg(self):
+        return self._error_msg
 
 
 #
@@ -131,6 +121,10 @@ class NetworkTask(QueueTask):
 
     def network_uuid(self):
         return self._network_uuid
+
+    def json_dump(self):
+        return {**super(NetworkTask, self).json_dump(),
+                'network_uuid': self._network_uuid}
 
 
 class DeployNetworkTask(NetworkTask):

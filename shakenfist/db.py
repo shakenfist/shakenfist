@@ -13,7 +13,7 @@ from shakenfist import exceptions
 from shakenfist import ipmanager
 from shakenfist import logutil
 from shakenfist import util
-from shakenfist.tasks import DeleteInstanceTask
+from shakenfist.tasks import DeleteInstanceTask, ErrorInstanceTask
 
 # TODO(andy): Change back to 5 once network bugs fixed
 ETCD_ATTEMPT_TIMEOUT = 15
@@ -542,12 +542,23 @@ def enqueue(queuename, workitem):
     etcd.enqueue(queuename, workitem)
 
 
-# TODO(andy): make this a general enqueue now that the task has enforced formatting
-# can also move the NODE_NAME to this function
-def enqueue_instance_delete(node, instance_uuid, next_state, next_state_message):
+def enqueue_instance_delete(instance_uuid):
+    enqueue_instance_delete_remote(config.parsed.get('NODE_NAME'),
+                                   instance_uuid)
+
+
+def enqueue_instance_delete_remote(node, instance_uuid):
     enqueue(node, {
         'tasks': [
-            DeleteInstanceTask(instance_uuid, next_state, next_state_message)
+            DeleteInstanceTask(instance_uuid)
+            ],
+    })
+
+
+def enqueue_instance_error(instance_uuid, error_msg):
+    enqueue(config.parsed.get('NODE_NAME'), {
+        'tasks': [
+            ErrorInstanceTask(instance_uuid, error_msg)
             ],
     })
 

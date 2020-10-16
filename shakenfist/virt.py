@@ -466,9 +466,8 @@ class Instance(object):
 
     def power_on(self):
         if not os.path.exists(self.xml_file):
-            db.enqueue_instance_delete(
-                config.parsed.get('NODE_NAME'), self.db_entry['uuid'], 'error',
-                'missing domain file in power on')
+            db.enqueue_instance_error(self.db_entry['uuid'],
+                                      'missing domain file in power on')
 
         libvirt = util.get_libvirt()
         with open(self.xml_file) as f:
@@ -479,10 +478,8 @@ class Instance(object):
             conn = libvirt.open(None)
             instance = conn.defineXML(xml)
             if not instance:
-                db.enqueue_instance_delete(
-                    config.parsed.get('NODE_NAME'),
-                    self.db_entry['uuid'], 'error',
-                    'power on failed to create domain')
+                db.enqueue_instance_error(self.db_entry['uuid'],
+                                          'power on failed to create domain')
                 raise exceptions.NoDomainException()
 
         try:
