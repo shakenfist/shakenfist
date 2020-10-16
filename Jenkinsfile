@@ -76,6 +76,9 @@ pipeline {
               virsh list --all
 
               echo "=============================="
+              pip list
+
+              echo "=============================="
               cat /var/log/syslog'''
       }
     failure {

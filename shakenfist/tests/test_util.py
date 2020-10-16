@@ -124,3 +124,6 @@ class UtilTestCase(testtools.TestCase):
 
         found = util.nat_rules_for_ipblock('10.0.0.0')
         self.assertEqual(False, found)
+
+    def test_random_macaddr(self):
+        self.assertTrue(util.random_macaddr().startswith('02:00:00'))

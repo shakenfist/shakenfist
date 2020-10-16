@@ -328,11 +328,9 @@ def get_stale_instances(delay):
 def create_network_interface(interface_uuid, netdesc, instance_uuid, order):
     if 'macaddress' not in netdesc or not netdesc['macaddress']:
         with etcd.get_lock('macaddress', None, 'all', ttl=120):
-            possible_mac = str(randmac.RandMac(
-                '00:00:00:00:00:00', False)).lstrip('\'').rstrip('\'')
+            possible_mac = util.random_macaddr()
             while etcd.get('macaddress', None, possible_mac):
-                possible_mac = str(randmac.RandMac(
-                    '00:00:00:00:00:00', False)).lstrip('\'').rstrip('\'')
+                possible_mac = util.random_macaddr()
 
             etcd.put('macaddress', None, possible_mac,
                      {
