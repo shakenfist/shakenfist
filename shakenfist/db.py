@@ -1,6 +1,5 @@
 # Copyright 2020 Michael Still
 
-import randmac
 import random
 import socket
 import time
