@@ -428,6 +428,14 @@ def get_instance_snapshots(instance_uuid):
 
 def add_event(object_type, object_uuid, operation, phase, duration, message):
     t = time.time()
+    LOG.withLabel(object_type, object_uuid).withFields(
+        {
+            'fqdn': config.parsed.get('NODE_NAME'),
+            'operation': operation,
+            'phase': phase,
+            'duration': duration,
+            'message': message
+        }).info('Added event')
     etcd.put(
         'event/%s' % object_type, object_uuid, t,
         {
@@ -551,7 +559,7 @@ def enqueue_instance_delete_remote(node, instance_uuid):
     enqueue(node, {
         'tasks': [
             DeleteInstanceTask(instance_uuid)
-            ],
+        ],
     })
 
 
@@ -559,7 +567,7 @@ def enqueue_instance_error(instance_uuid, error_msg):
     enqueue(config.parsed.get('NODE_NAME'), {
         'tasks': [
             ErrorInstanceTask(instance_uuid, error_msg)
-            ],
+        ],
     })
 
 
