@@ -22,6 +22,9 @@ def from_db(uuid):
     dbnet = db.get_network(uuid)
     if not dbnet:
         return None
+    if dbnet['state'] == 'deleted':
+        LOG.withNetwork(uuid).info('Network is deleted, returning None.')
+        return None
 
     n = Network(uuid=dbnet['uuid'],
                 vxlan_id=dbnet['vxid'],
@@ -31,10 +34,6 @@ def from_db(uuid):
                 physical_nic=config.parsed.get('NODE_EGRESS_NIC'),
                 floating_gateway=dbnet['floating_gateway'],
                 namespace=dbnet['namespace'])
-
-    if dbnet['state'] == 'deleted':
-        LOG.withObj(n).info('Network is deleted, returning None.')
-        return None
 
     return n
 
