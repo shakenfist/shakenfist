@@ -112,7 +112,6 @@ class ActualLock(Lock):
         if not self.release():
             raise exceptions.LockException(
                 'Cannot release lock: %s' % self.name)
-        return self
 
 
 def get_lock(objecttype, subtype, name, ttl=60, timeout=10, log_ctx=LOG):
@@ -173,13 +172,9 @@ class JSONEncoderTasks(json.JSONEncoder):
 
 
 def put(objecttype, subtype, name, data, ttl=None):
-    # TODO(andy) Until we fix exception logging in this module
-    try:
-        path = _construct_key(objecttype, subtype, name)
-        encoded = json.dumps(data, indent=4, sort_keys=True, cls=JSONEncoderTasks)
-        Etcd3Client().put(path, encoded, lease=None)
-    except Exception:
-        LOG.exception('etcd.put()')
+    path = _construct_key(objecttype, subtype, name)
+    encoded = json.dumps(data, indent=4, sort_keys=True, cls=JSONEncoderTasks)
+    Etcd3Client().put(path, encoded, lease=None)
 
 
 def get(objecttype, subtype, name):
@@ -263,21 +258,13 @@ def decodeTasks(obj):
 
 
 def dequeue(queuename):
-    # TODO(andy) why are exception in here not logged?? logging works but exceptions evaporate
-
     queue_path = _construct_key('queue', queuename, None)
     client = Etcd3Client()
 
     with get_lock('queue', None, queuename):
         for data, metadata in client.get_prefix(queue_path, sort_order='ascend', sort_target='key'):
             jobname = str(metadata['key']).split('/')[-1].rstrip("'")
-            # TODO(andy) Until we fix exception logging in this module
-            try:
-                workitem = json.loads(data, object_hook=decodeTasks)
-            except Exception:
-                LOG.exception('etcd.dequeue()')
-                return None, None
-
+            workitem = json.loads(data, object_hook=decodeTasks)
             put('processing', queuename, jobname, workitem)
             client.delete(metadata['key'])
             LOG.withFields({'jobname': jobname,
@@ -309,7 +296,7 @@ def _restart_queue(queuename):
     queue_path = _construct_key('processing', queuename, None)
     with get_lock('queue', None, queuename):
         for data, metadata in Etcd3Client().get_prefix(queue_path, sort_order='ascend'):
-            jobname = str(metadata.key).split('/')[-1].rstrip("'")
+            jobname = str(metadata['key']).split('/')[-1].rstrip("'")
             workitem = json.loads(data)
             put('queue', queuename, jobname, workitem)
             delete('processing', queuename, jobname)
