@@ -109,6 +109,7 @@ def handle(jobname, workitem):
         if instance_uuid:
             db.enqueue_instance_delete(instance_uuid,
                                        'failed queue task: %s' % e)
+        # TODO(andy): Further processing of workitem should stop - fix underway
 
     finally:
         db.resolve(config.parsed.get('NODE_NAME'), jobname)
@@ -119,15 +120,12 @@ def handle(jobname, workitem):
 
 
 def image_fetch(url, instance_uuid):
-    try:
-        instance = None
-        if instance_uuid:
-            instance = virt.from_db(instance_uuid)
+    instance = None
+    if instance_uuid:
+        instance = virt.from_db(instance_uuid)
 
-        img = images.Image(url)
-        img.get([], instance)
-    except exceptions.LockException:
-        pass
+    img = images.Image(url)
+    img.get([], instance)
 
 
 def instance_preflight(instance_uuid, network):
