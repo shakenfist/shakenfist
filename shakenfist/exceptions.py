@@ -50,6 +50,11 @@ class FlagException(Exception):
     pass
 
 
+# Images
+class BadCheckSum(Exception):
+    pass
+
+
 # Tasks
 class TaskException(Exception):
     pass

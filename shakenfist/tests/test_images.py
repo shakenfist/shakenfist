@@ -19,6 +19,15 @@ with open('%s/files/qemu-img-info' % TEST_DIR) as f:
 with open('%s/files/cirros-download' % TEST_DIR) as f:
     CIRROS_DOWNLOAD_HTML = f.read()
 
+with open('%s/files/cirros-MD5SUMS-0.3.4' % TEST_DIR) as f:
+    CIRROS_MD5SUM_0_3_4 = f.read()
+
+with open('%s/files/ubuntu-MD5SUMS-bionic' % TEST_DIR) as f:
+    UBUNTU_MD5SUM_BIONIC = f.read()
+
+with open('%s/files/ubuntu-MD5SUMS-groovy' % TEST_DIR) as f:
+    UBUNTU_MD5SUM_GROOVY = f.read()
+
 with open('%s/files/ubuntu-download' % TEST_DIR) as f:
     UBUNTU_DOWNLOAD_HTML = f.read()
 
@@ -64,15 +73,25 @@ class ImageUtilsTestCase(testtools.TestCase):
 
 
 class ImageResolversTestCase(testtools.TestCase):
-    @mock.patch('requests.get', return_value=FakeResponse(200, CIRROS_DOWNLOAD_HTML))
+    @mock.patch('requests.get', side_effect=[
+        FakeResponse(200, CIRROS_DOWNLOAD_HTML),
+        FakeResponse(200, ''),  # Handle no file available
+        FakeResponse(200, CIRROS_DOWNLOAD_HTML),
+        FakeResponse(200, CIRROS_MD5SUM_0_3_4),
+        FakeResponse(200, CIRROS_DOWNLOAD_HTML),
+    ])
     def test_resolve_cirros(self, mock_get):
         u = image_resolver_cirros.resolve('cirros')
         self.assertEqual(
-            'http://download.cirros-cloud.net/0.5.1/cirros-0.5.1-x86_64-disk.img', u)
+            ('http://download.cirros-cloud.net/0.5.1/cirros-0.5.1-x86_64-disk.img',
+             None),
+            u)
 
         u = image_resolver_cirros.resolve('cirros:0.3.4')
         self.assertEqual(
-            'http://download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img', u)
+            ('http://download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img',
+             'ee1eca47dc88f4879d8a229cc70a07c6'),
+            u)
 
         self.assertRaises(exceptions.VersionSpecificationError,
                           image_resolver_cirros.resolve, 'cirros***')
@@ -82,26 +101,37 @@ class ImageResolversTestCase(testtools.TestCase):
         self.assertRaises(exceptions.HTTPError,
                           image_resolver_cirros.resolve, 'cirros')
 
-    @mock.patch('requests.get', return_value=FakeResponse(200, UBUNTU_DOWNLOAD_HTML))
+    @mock.patch('requests.get', side_effect=[
+        FakeResponse(200, UBUNTU_DOWNLOAD_HTML),
+        FakeResponse(200, UBUNTU_MD5SUM_GROOVY),
+        FakeResponse(200, UBUNTU_DOWNLOAD_HTML),
+        FakeResponse(200, UBUNTU_MD5SUM_BIONIC),
+        FakeResponse(200, UBUNTU_DOWNLOAD_HTML),
+        FakeResponse(200, UBUNTU_MD5SUM_BIONIC),
+        FakeResponse(200, UBUNTU_DOWNLOAD_HTML),
+    ])
     @mock.patch('shakenfist.image_resolver_ubuntu.UBUNTU_URL',
                 'https://cloud-images.ubuntu.com')
     def test_resolve_ubuntu(self, mock_get):
         u = image_resolver_ubuntu.resolve('ubuntu')
         self.assertEqual(
             ('https://cloud-images.ubuntu.com/groovy/current/'
-             'groovy-server-cloudimg-amd64.img'),
+             'groovy-server-cloudimg-amd64.img',
+             '1c19b08060b9feb1cd0e7ee28fd463fb'),
             u)
 
         u = image_resolver_ubuntu.resolve('ubuntu:bionic')
         self.assertEqual(
             ('https://cloud-images.ubuntu.com/bionic/current/'
-             'bionic-server-cloudimg-amd64.img'),
+             'bionic-server-cloudimg-amd64.img',
+             'ed44b9745b8d62bcbbc180b5f36c24bb'),
             u)
 
         u = image_resolver_ubuntu.resolve('ubuntu:18.04')
         self.assertEqual(
             ('https://cloud-images.ubuntu.com/bionic/current/'
-             'bionic-server-cloudimg-amd64.img'),
+             'bionic-server-cloudimg-amd64.img',
+             'ed44b9745b8d62bcbbc180b5f36c24bb'),
             u)
 
         self.assertRaises(exceptions.VersionSpecificationError,
@@ -115,9 +145,9 @@ class ImageResolversTestCase(testtools.TestCase):
 
 class ImageObjectTestCase(testtools.TestCase):
     @mock.patch('shakenfist.image_resolver_cirros.resolve',
-                return_value='!!!cirros!!!')
+                return_value=('!!!cirros!!!', '123abc'))
     @mock.patch('shakenfist.image_resolver_ubuntu.resolve',
-                return_value='!!!ubuntu!!!')
+                return_value=('!!!ubuntu!!!', '123abc'))
     @mock.patch('os.path.exists', return_value=False)
     @mock.patch('os.makedirs')
     def test_resolve_image(self, mock_mkdirs, mock_exists, mock_ubuntu, mock_centos):

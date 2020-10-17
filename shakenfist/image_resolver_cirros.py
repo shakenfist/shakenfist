@@ -37,5 +37,30 @@ def resolve(name):
             raise exceptions.VersionSpecificationError(
                 'Cannot parse version: %s' % name)
 
-    return (config.parsed.get('DOWNLOAD_URL_CIRROS')
-            % {'vernum': vernum})
+    url = config.parsed.get('DOWNLOAD_URL_CIRROS') % {'vernum': vernum}
+    log = LOG.withField('url', url)
+
+    # Retrieve check sum file
+    checksum_url = CIRROS_URL + '/' + vernum + '/MD5SUMS'
+    resp = requests.get(checksum_url,
+                        headers={'User-Agent': util.get_user_agent()})
+    log.withField('checksum_url', checksum_url
+                  ).withField('resp', resp).debug("Checksum request response")
+    if resp.status_code != 200:
+        # Cirros does not always have a checksum file available
+        log.warning('Unable to retrieve MD5SUMS')
+        return url, None
+
+    sum_re = re.compile(r'^([0-9a-f]+) .*'+'cirros-'+vernum+'-x86_64-disk.img')
+    checksum = None
+    for line in resp.text.split('\n'):
+        m = sum_re.match(line)
+        if m:
+            checksum = m.group(1)
+            break
+    if not checksum_url:
+        log.warning('Did not find checksum')
+
+    log.withField('checksum', checksum).info('Checksum retrieval')
+
+    return (url, checksum)

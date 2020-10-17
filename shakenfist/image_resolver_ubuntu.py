@@ -52,6 +52,27 @@ def resolve(name):
             raise exceptions.VersionSpecificationError(
                 'Cannot parse version: %s' % name)
 
-    return (config.parsed.get('DOWNLOAD_URL_UBUNTU')
-            % {'vernum': vernum,
-               'vername': vername})
+    url = (config.parsed.get('DOWNLOAD_URL_UBUNTU') % {'vernum': vernum,
+                                                       'vername': vername})
+    log = LOG.withField('url', url)
+
+    # Retrieve check sum file
+    checksum_url = UBUNTU_URL + '/' + vername + '/current/MD5SUMS'
+    resp = requests.get(checksum_url,
+                        headers={'User-Agent': util.get_user_agent()})
+    if resp.status_code != 200:
+        raise exceptions.HTTPError('Failed to fetch %s, status code %d' % (
+                                   checksum_url, resp.status_code))
+
+    sum_re = re.compile(r'^([0-9a-f]+) .*'+vername+'-server-cloudimg-amd64.img')
+    checksum = None
+    for line in resp.text.split('\n'):
+        m = sum_re.match(line)
+        if m:
+            checksum = m.group(1)
+            break
+    if not checksum_url:
+        log.warning('Did not find checksum')
+
+    log.withField('checksum', checksum).info('Checksum check')
+    return (url, checksum)

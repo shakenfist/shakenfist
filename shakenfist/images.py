@@ -40,9 +40,11 @@ def _get_cache_path():
 
 
 class Image(object):
-    def __init__(self, url):
-        self.url = self._resolve(url)
-        self.orig_url = url
+    def __init__(self, url, checksum=None):
+        self.checksum = checksum
+        self.url, resolver_checksum = self._resolve(url)
+        if not self.checksum:
+            self.checksum = resolver_checksum
 
         self._hash()
         self.info = self._read_local_info()
@@ -54,7 +56,7 @@ class Image(object):
         for resolver in resolvers:
             if url.startswith(resolver):
                 return resolvers[resolver].resolve(url)
-        return url
+        return url, None
 
     def _hash(self):
         h = hashlib.sha256()
@@ -127,6 +129,10 @@ class Image(object):
                     actual_image = self._fetch(
                         resp, locks=locks.append(image_lock))
 
+                # Ensure checksum is correct
+                if not self.correct_checksum(actual_image):
+                    raise exceptions.BadCheckSum
+
             _transcode(locks, actual_image, related_object)
 
         return actual_image
@@ -182,6 +188,25 @@ class Image(object):
             return '%s.v%03d.orig' % (self.hashed_image_path, self.info['version'])
 
         return '%s.v%03d' % (self.hashed_image_path, self.info['version'])
+
+    def correct_checksum(self, image_name):
+        log = LOG.withField('image', image_name)
+
+        if not self.checksum:
+            log.info('No checksum comparison available')
+            return True
+
+        # MD5 chosen because cirros 90% of the time has MD5SUMS available...
+        md5_hash = hashlib.md5()
+        with open(image_name, 'rb') as f:
+            for byte_block in iter(lambda: f.read(4096), b''):
+                md5_hash.update(byte_block)
+        log.withField(
+            'checksum', md5_hash.hexdigest()).debug('Calc from image download')
+
+        correct = md5_hash.hexdigest() == self.checksum
+        log.withField('correct', correct).info('Image checksum verification')
+        return correct
 
 
 def _transcode(locks, actual_image, related_object):
