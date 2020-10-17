@@ -107,7 +107,7 @@ def handle(jobname, workitem):
     except Exception as e:
         util.ignore_exception(daemon.process_name('queues'), e)
         if instance_uuid:
-            db.enqueue_instance_delete(instance_uuid,
+            db.enqueue_instance_delete(instance_uuid, 'error',
                                        'failed queue task: %s' % e)
         # TODO(andy): Further processing of workitem should stop - fix underway
 
