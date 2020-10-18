@@ -183,7 +183,7 @@ def setup(name):
         # Add our handler
         handler = logging_handlers.SysLogHandler(address='/dev/log')
         handler.setFormatter(TextFormatter(
-            fmt='%(levelname)s %(message)s', colorize=True))
+            fmt='%(levelname)s %(message)s', colorize=False))
         log.addHandler(handler)
 
     return log.withPrefix(), handler
