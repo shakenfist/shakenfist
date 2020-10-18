@@ -1,5 +1,6 @@
 import copy
 import multiprocessing
+import requests
 import setproctitle
 import time
 from urllib3.exceptions import HTTPError, HTTPWarning
@@ -128,7 +129,7 @@ def image_fetch(url, instance_uuid):
     try:
         img = images.Image(url)
         img.get([], instance)
-    except (HTTPError, HTTPWarning) as e:
+    except (HTTPError, HTTPWarning, requests.exceptions.ConnectionError) as e:
         LOG.withField('image', url).warning('Failed to fetch image')
         if instance_uuid:
             db.enqueue_instance_delete(instance_uuid, 'error',
@@ -218,7 +219,7 @@ def instance_start(instance_uuid, network):
                                           'instance failed to start: %s' % e)
                 return
 
-        except (HTTPError, HTTPWarning) as e:
+        except (HTTPError, HTTPWarning, requests.exceptions.ConnectionError) as e:
             db.enqueue_instance_error(instance_uuid,
                                       'instance failed to fetch image: %s' % e)
             return
