@@ -15,6 +15,7 @@ TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 
 class FakeNetwork(object):
     def __init__(self):
+        self.uuid = 'notauuid'
         self.ipmanager = ipmanager.NetBlock('10.0.0.0/8')
         self.router = self.ipmanager.get_address_at_index(1)
         self.dhcp_start = '10.0.0.2'
@@ -50,11 +51,6 @@ class DHCPTestCase(testtools.TestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
-        self.network = mock.patch('shakenfist.net.from_db',
-                                  return_value=FakeNetwork())
-        self.mock_network = self.network.start()
-        self.addCleanup(self.network.stop)
-
         with open('%s/files/dhcp.tmpl' % TEST_DIR) as f:
             dhcp_tmpl = f.read()
         with open('%s/files/dhcphosts.tmpl' % TEST_DIR) as f:
@@ -73,17 +69,17 @@ class DHCPTestCase(testtools.TestCase):
         self.addCleanup(self.template.stop)
 
     def test_init(self):
-        d = dhcp.DHCP('notauuid', 'eth0')
+        d = dhcp.DHCP(FakeNetwork(), 'eth0')
         self.assertEqual('/a/b/c/dhcp/notauuid', d.subst['config_dir'])
 
     def test_str(self):
-        d = dhcp.DHCP('notauuid', 'eth0')
+        d = dhcp.DHCP(FakeNetwork(), 'eth0')
         s = str(d)
         self.assertEqual('dhcp(notauuid)', s)
 
     @mock.patch('os.path.exists', return_value=True)
     def test_make_config(self, mock_exists):
-        d = dhcp.DHCP('notauuid', 'eth0')
+        d = dhcp.DHCP(FakeNetwork(), 'eth0')
 
         mock_open = mock.mock_open()
         with mock.patch.object(six.moves.builtins, 'open',
@@ -138,7 +134,7 @@ class DHCPTestCase(testtools.TestCase):
                      'name': 'in,,,st2'}
                 ])
     def test_make_hosts(self, mock_instances, mock_interfaces, mock_exists):
-        d = dhcp.DHCP('notauuid', 'eth0')
+        d = dhcp.DHCP(FakeNetwork(), 'eth0')
 
         mock_open = mock.mock_open()
         with mock.patch.object(six.moves.builtins, 'open',
@@ -157,7 +153,7 @@ class DHCPTestCase(testtools.TestCase):
     @mock.patch('os.path.exists', return_value=True)
     @mock.patch('shutil.rmtree')
     def test_remove_config(self, mock_rmtree, mock_exists):
-        d = dhcp.DHCP('notauuid', 'eth0')
+        d = dhcp.DHCP(FakeNetwork(), 'eth0')
         d._remove_config()
         mock_exists.assert_called_with('/a/b/c/dhcp/notauuid')
         mock_rmtree.assert_called_with('/a/b/c/dhcp/notauuid')
@@ -166,7 +162,7 @@ class DHCPTestCase(testtools.TestCase):
     @mock.patch('psutil.pid_exists', return_value=True)
     @mock.patch('os.kill')
     def test_send_signal(self, mock_kill, mock_pid_exists, mock_path_exists):
-        d = dhcp.DHCP('notauuid', 'eth0')
+        d = dhcp.DHCP(FakeNetwork(), 'eth0')
 
         mock_open = mock.mock_open(read_data='424242')
         with mock.patch.object(six.moves.builtins, 'open',
@@ -182,7 +178,7 @@ class DHCPTestCase(testtools.TestCase):
     @mock.patch('os.kill')
     def test_send_signal_no_process(self, mock_kill, mock_pid_exists,
                                     mock_path_exists):
-        d = dhcp.DHCP('notauuid', 'eth0')
+        d = dhcp.DHCP(FakeNetwork(), 'eth0')
 
         mock_open = mock.mock_open(read_data='424242')
         with mock.patch.object(six.moves.builtins, 'open',
@@ -196,7 +192,7 @@ class DHCPTestCase(testtools.TestCase):
     @mock.patch('shakenfist.dhcp.DHCP._send_signal')
     @mock.patch('shakenfist.dhcp.DHCP._remove_config')
     def test_remove_dhcpd(self, mock_remove_config, mock_signal):
-        d = dhcp.DHCP('notauuid', 'eth0')
+        d = dhcp.DHCP(FakeNetwork(), 'eth0')
         d.remove_dhcpd()
         mock_remove_config.assert_called()
         mock_signal.assert_called_with(signal.SIGKILL)
@@ -207,7 +203,7 @@ class DHCPTestCase(testtools.TestCase):
     @mock.patch('shakenfist.util.execute')
     def test_restart_dhcpd(self, mock_execute, mock_hosts, mock_config,
                            mock_signal):
-        d = dhcp.DHCP('notauuid', 'eth0')
+        d = dhcp.DHCP(FakeNetwork(), 'eth0')
         d.restart_dhcpd()
         mock_signal.assert_called_with(signal.SIGHUP)
         mock_execute.assert_called_with(
