@@ -2,6 +2,7 @@ import copy
 import multiprocessing
 import setproctitle
 import time
+from urllib3.exceptions import HTTPError, HTTPWarning
 
 from shakenfist import config
 from shakenfist.daemons import daemon
@@ -124,8 +125,14 @@ def image_fetch(url, instance_uuid):
     if instance_uuid:
         instance = virt.from_db(instance_uuid)
 
-    img = images.Image(url)
-    img.get([], instance)
+    try:
+        img = images.Image(url)
+        img.get([], instance)
+    except (HTTPError, HTTPWarning) as e:
+        LOG.withField('image', url).warning('Failed to fetch image')
+        if instance_uuid:
+            db.enqueue_instance_delete(instance_uuid, 'error',
+                                       'Image fetch failed: %s' % e)
 
 
 def instance_preflight(instance_uuid, network):
