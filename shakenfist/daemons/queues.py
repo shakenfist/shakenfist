@@ -133,6 +133,8 @@ def image_fetch(url, instance_uuid):
         if instance_uuid:
             db.enqueue_instance_delete(instance_uuid, 'error',
                                        'Image fetch failed: %s' % e)
+            raise exceptions.ImageFetchTaskFailedException(
+                'Failed to fetch iamge %s' % url)
 
 
 def instance_preflight(instance_uuid, network):
@@ -213,8 +215,13 @@ def instance_start(instance_uuid, network):
             if code in (libvirt.VIR_ERR_CONFIG_UNSUPPORTED,
                         libvirt.VIR_ERR_XML_ERROR):
                 db.enqueue_instance_error(instance_uuid,
-                                          'instance failed to start')
+                                          'instance failed to start: %s' % e)
                 return
+
+        except (HTTPError, HTTPWarning) as e:
+            db.enqueue_instance_error(instance_uuid,
+                                      'instance failed to fetch image: %s' % e)
+            return
 
         for iface in db.get_instance_interfaces(instance_uuid):
             db.update_network_interface_state(iface['uuid'], 'created')
