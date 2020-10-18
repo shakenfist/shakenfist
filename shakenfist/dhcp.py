@@ -8,7 +8,6 @@ import signal
 
 from shakenfist import config
 from shakenfist import db
-from shakenfist import net
 from shakenfist import util
 
 
