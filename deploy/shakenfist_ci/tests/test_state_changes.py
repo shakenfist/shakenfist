@@ -78,6 +78,8 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         LOG.info('  ping test...')
         self._test_ping(inst['uuid'], self.net['uuid'], ip, True, 10)
 
+        return
+
         # Power off
         LOG.info('Power off')
         self.test_client.power_off_instance(inst['uuid'])

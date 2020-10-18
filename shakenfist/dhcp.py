@@ -8,24 +8,22 @@ import signal
 
 from shakenfist import config
 from shakenfist import db
-from shakenfist import net
 from shakenfist import util
 
 
 class DHCP(object):
-    def __init__(self, network_uuid, interface):
-        self.network_uuid = network_uuid
+    def __init__(self, network, interface):
+        self.network_uuid = network.uuid
 
-        n = net.from_db(self.network_uuid)
         self.subst = {
             'config_dir': os.path.join(
                 config.parsed.get('STORAGE_PATH'), 'dhcp', self.network_uuid),
             'zone': config.parsed.get('ZONE'),
 
-            'router': n.router,
-            'dhcp_start': n.dhcp_start,
-            'netmask': n.netmask,
-            'broadcast': n.broadcast,
+            'router': network.router,
+            'dhcp_start': network.dhcp_start,
+            'netmask': network.netmask,
+            'broadcast': network.broadcast,
 
             'in_netns': 'ip netns exec %s' % self.network_uuid,
             'interface': interface

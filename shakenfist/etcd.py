@@ -127,6 +127,8 @@ def get_lock(objecttype, subtype, name, ttl=60, timeout=10, log_ctx=LOG):
 
 def refresh_lock(lock, log_ctx=LOG):
     if not lock.is_acquired():
+        log_ctx.withField('lock', lock.name).info(
+            'Attempt to refresh an expired lock')
         raise exceptions.LockException(
             'The lock on %s has expired.' % lock.path)
 

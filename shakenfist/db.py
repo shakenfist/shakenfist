@@ -1,6 +1,5 @@
 # Copyright 2020 Michael Still
 
-import randmac
 import random
 import socket
 import time
@@ -328,11 +327,9 @@ def get_stale_instances(delay):
 def create_network_interface(interface_uuid, netdesc, instance_uuid, order):
     if 'macaddress' not in netdesc or not netdesc['macaddress']:
         with etcd.get_lock('macaddress', None, 'all', ttl=120):
-            possible_mac = str(randmac.RandMac(
-                '00:00:00:00:00:00', False)).lstrip('\'').rstrip('\'')
+            possible_mac = util.random_macaddr()
             while etcd.get('macaddress', None, possible_mac):
-                possible_mac = str(randmac.RandMac(
-                    '00:00:00:00:00:00', False)).lstrip('\'').rstrip('\'')
+                possible_mac = util.random_macaddr()
 
             etcd.put('macaddress', None, possible_mac,
                      {
@@ -428,6 +425,14 @@ def get_instance_snapshots(instance_uuid):
 
 def add_event(object_type, object_uuid, operation, phase, duration, message):
     t = time.time()
+    LOG.withLabel(object_type, object_uuid).withFields(
+        {
+            'fqdn': config.parsed.get('NODE_NAME'),
+            'operation': operation,
+            'phase': phase,
+            'duration': duration,
+            'message': message
+        }).info('Added event')
     etcd.put(
         'event/%s' % object_type, object_uuid, t,
         {
@@ -551,7 +556,7 @@ def enqueue_instance_delete_remote(node, instance_uuid):
     enqueue(node, {
         'tasks': [
             DeleteInstanceTask(instance_uuid)
-            ],
+        ],
     })
 
 
@@ -559,7 +564,7 @@ def enqueue_instance_error(instance_uuid, error_msg):
     enqueue(config.parsed.get('NODE_NAME'), {
         'tasks': [
             ErrorInstanceTask(instance_uuid, error_msg)
-            ],
+        ],
     })
 
 

@@ -1,7 +1,9 @@
 import copy
 import multiprocessing
+import requests
 import setproctitle
 import time
+from urllib3.exceptions import HTTPError, HTTPWarning
 
 from shakenfist import config
 from shakenfist.daemons import daemon
@@ -107,7 +109,7 @@ def handle(jobname, workitem):
     except Exception as e:
         util.ignore_exception(daemon.process_name('queues'), e)
         if instance_uuid:
-            db.enqueue_instance_delete(instance_uuid,
+            db.enqueue_instance_delete(instance_uuid, 'error',
                                        'failed queue task: %s' % e)
         # TODO(andy): Further processing of workitem should stop - fix underway
 
@@ -124,8 +126,16 @@ def image_fetch(url, instance_uuid):
     if instance_uuid:
         instance = virt.from_db(instance_uuid)
 
-    img = images.Image(url)
-    img.get([], instance)
+    try:
+        img = images.Image(url)
+        img.get([], instance)
+    except (HTTPError, HTTPWarning, requests.exceptions.ConnectionError) as e:
+        LOG.withField('image', url).warning('Failed to fetch image')
+        if instance_uuid:
+            db.enqueue_instance_delete(instance_uuid, 'error',
+                                       'Image fetch failed: %s' % e)
+            raise exceptions.ImageFetchTaskFailedException(
+                'Failed to fetch iamge %s' % url)
 
 
 def instance_preflight(instance_uuid, network):
@@ -206,8 +216,13 @@ def instance_start(instance_uuid, network):
             if code in (libvirt.VIR_ERR_CONFIG_UNSUPPORTED,
                         libvirt.VIR_ERR_XML_ERROR):
                 db.enqueue_instance_error(instance_uuid,
-                                          'instance failed to start')
+                                          'instance failed to start: %s' % e)
                 return
+
+        except (HTTPError, HTTPWarning, requests.exceptions.ConnectionError) as e:
+            db.enqueue_instance_error(instance_uuid,
+                                      'instance failed to fetch image: %s' % e)
+            return
 
         for iface in db.get_instance_interfaces(instance_uuid):
             db.update_network_interface_state(iface['uuid'], 'created')

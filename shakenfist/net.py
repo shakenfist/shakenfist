@@ -22,6 +22,9 @@ def from_db(uuid):
     dbnet = db.get_network(uuid)
     if not dbnet:
         return None
+    if dbnet['state'] == 'deleted':
+        LOG.withNetwork(uuid).info('Network is deleted, returning None.')
+        return None
 
     n = Network(uuid=dbnet['uuid'],
                 vxlan_id=dbnet['vxid'],
@@ -31,10 +34,6 @@ def from_db(uuid):
                 physical_nic=config.parsed.get('NODE_EGRESS_NIC'),
                 floating_gateway=dbnet['floating_gateway'],
                 namespace=dbnet['namespace'])
-
-    if dbnet['state'] == 'deleted':
-        LOG.withObj(n).info('Network is deleted, returning None.')
-        return None
 
     return n
 
@@ -275,7 +274,7 @@ class Network(object):
     def is_dnsmasq_running(self):
         """Determine if dnsmasq process is running for this network"""
         subst = self.subst_dict()
-        d = dhcp.DHCP(self.uuid, subst['vx_veth_inner'])
+        d = dhcp.DHCP(self, subst['vx_veth_inner'])
         pid = d.get_pid()
         if pid and psutil.pid_exists(pid):
             return True
@@ -292,7 +291,7 @@ class Network(object):
             subst = self.subst_dict()
             with util.RecordedOperation('update dhcp', self):
                 with db.get_lock('network', None, self.uuid, ttl=120):
-                    d = dhcp.DHCP(self.uuid, subst['vx_veth_inner'])
+                    d = dhcp.DHCP(self, subst['vx_veth_inner'])
                     d.restart_dhcpd()
         else:
             db.enqueue('networknode', UpdateDHCPNetworkTask(self.uuid))
@@ -304,7 +303,7 @@ class Network(object):
             subst = self.subst_dict()
             with util.RecordedOperation('remove dhcp', self):
                 with db.get_lock('network', None, self.uuid, ttl=120):
-                    d = dhcp.DHCP(self.uuid, subst['vx_veth_inner'])
+                    d = dhcp.DHCP(self, subst['vx_veth_inner'])
                     d.remove_dhcpd()
         else:
             db.enqueue('networknode', RemoveDHCPNetworkTask(self.uuid))

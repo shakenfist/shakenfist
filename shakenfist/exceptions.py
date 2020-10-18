@@ -68,6 +68,10 @@ class NoURLImageFetchTaskException(TaskException):
     pass
 
 
+class ImageFetchTaskFailedException(TaskException):
+    pass
+
+
 class NoInstanceTaskException(TaskException):
     pass
 

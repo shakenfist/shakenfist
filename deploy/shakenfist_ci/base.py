@@ -15,6 +15,10 @@ class TimeoutException(Exception):
     pass
 
 
+class StartException(Exception):
+    pass
+
+
 class BaseTestCase(testtools.TestCase):
     def setUp(self):
         super(BaseTestCase, self).setUp()
@@ -91,18 +95,23 @@ class BaseTestCase(testtools.TestCase):
     def _await_event(self, instance_uuid, operation, message=None, after=None):
         # Wait up to two minutes for the instance to be created.
         start_time = time.time()
-        created = False
+        final = False
         while time.time() - start_time < 120:
             i = self.system_client.get_instance(instance_uuid)
-            if i['state'] == 'created':
-                created = True
+            if i['state'] in ['created', 'error']:
+                final = True
                 break
             time.sleep(5)
 
-        if not created:
+        if i['state'] == 'error':
+            raise StartException(
+                'Instance %s failed to start (marked as error state, %s)'
+                % (instance_uuid, i))
+
+        if not final:
             raise TimeoutException(
-                'Instance %s was not created in a reasonable time'
-                % instance_uuid)
+                'Instance %s was not created in a reasonable time (%s)'
+                % (instance_uuid, i))
 
         # Once created, we shouldn't need more than five minutes for boot.
         start_time = time.time()
@@ -134,7 +143,8 @@ class BaseTestCase(testtools.TestCase):
             if actual == expected:
                 break
 
-            time.sleep(1)  # Almost unnecessary due to the slowness of execute()
+            # Almost unnecessary due to the slowness of execute()
+            time.sleep(1)
 
         if expected != actual:
             self._log_console(instance_uuid)
