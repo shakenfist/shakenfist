@@ -16,13 +16,13 @@ class TestCacheImage(base.BaseNamespacedTestCase):
         # in the cache via API, so for now we just cache this and
         # see if any errors come back.
         self.system_client.cache_image(
-            'https://stable.release.core-os.net/amd64-usr/'
-            'current/coreos_production_openstack_image.img.bz2')
+            'http://cloud.centos.org/centos/6/images/'
+            'CentOS-6-x86_64-GenericCloud-1604.qcow2.xz')
 
     def test_cache_invalid_image(self):
         self.system_client.cache_image(
-            'https://nosuch.shakenfist.com/amd64-usr/'
-            'current/coreos_production_openstack_image.img.bz2')
+            'https://nosuch.shakenfist.com/centos/6/images/'
+            'CentOS-6-x86_64-GenericCloud-1604.qcow2.xz')
 
     def test_instance_invalid_image(self):
         # Start our test instance
