@@ -1086,6 +1086,13 @@ class Image(Resource):
         })
 
 
+class ImageEvents(Resource):
+    @jwt_required
+    # TODO(andy): Should images be owned? Personalised images should be owned.
+    def get(self, url):
+        return list(db.get_events('image', url))
+
+
 def _delete_network(network_from_db):
     network_uuid = network_from_db['uuid']
     db.add_event('network', network_uuid, 'api', 'delete', None, None)
@@ -1327,6 +1334,7 @@ api.add_resource(InstanceConsoleData, '/instances/<instance_uuid>/consoledata',
                  defaults={'length': 10240})
 
 api.add_resource(Image, '/images')
+api.add_resource(ImageEvents, '/images/events')
 
 api.add_resource(Networks, '/networks')
 api.add_resource(Network, '/networks/<network_uuid>')

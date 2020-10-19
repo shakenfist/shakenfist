@@ -1,9 +1,9 @@
 import copy
 import multiprocessing
+import re
 import requests
 import setproctitle
 import time
-from urllib3.exceptions import HTTPError, HTTPWarning
 
 from shakenfist import config
 from shakenfist.daemons import daemon
@@ -43,11 +43,13 @@ def handle(jobname, workitem):
                 raise exceptions.UnknownTaskException(
                     'Task was not decoded: %s' % task)
 
-            if InstanceTask.__subclasscheck__(type(task)):
+            if (InstanceTask.__subclasscheck__(type(task)) or
+                    isinstance(task, FetchImageTask)):
                 instance_uuid = task.instance_uuid()
+
+            if instance_uuid:
                 log_i = log.withInstance(instance_uuid)
             else:
-                instance_uuid = None
                 log_i = log
 
             log_i.withField('task_name', task.name()).info('Starting task')
@@ -106,12 +108,18 @@ def handle(jobname, workitem):
 
             log_i.info('Task complete')
 
+    except exceptions.ImageFetchTaskFailedException as e:
+        # Usually caused by external issue and not an application error
+        log.info('Fetch Image Error: %s', e)
+        if instance_uuid:
+            db.enqueue_instance_error(instance_uuid,
+                                      'failed queue task: %s' % e)
+
     except Exception as e:
         util.ignore_exception(daemon.process_name('queues'), e)
         if instance_uuid:
-            db.enqueue_instance_delete(instance_uuid, 'error',
-                                       'failed queue task: %s' % e)
-        # TODO(andy): Further processing of workitem should stop - fix underway
+            db.enqueue_instance_error(instance_uuid,
+                                      'failed queue task: %s' % e)
 
     finally:
         db.resolve(config.parsed.get('NODE_NAME'), jobname)
@@ -129,13 +137,24 @@ def image_fetch(url, instance_uuid):
     try:
         img = images.Image(url)
         img.get([], instance)
-    except (HTTPError, HTTPWarning, requests.exceptions.ConnectionError) as e:
+        db.add_event('image', url, 'fetch', None, None, 'success')
+
+    except (exceptions.HTTPError, requests.exceptions.RequestException) as e:
         LOG.withField('image', url).warning('Failed to fetch image')
         if instance_uuid:
-            db.enqueue_instance_delete(instance_uuid, 'error',
-                                       'Image fetch failed: %s' % e)
-            raise exceptions.ImageFetchTaskFailedException(
-                'Failed to fetch iamge %s' % url)
+            db.enqueue_instance_error(instance_uuid,
+                                      'Image fetch failed: %s' % e)
+
+        # Clean common problems to store in events
+        msg = str(e)
+        re_conn_err = re.compile(r'.*NewConnectionError\(\'\<.*\>: (.*)\'')
+        m = re_conn_err.match(msg)
+        if m:
+            msg = m.group(1)
+        db.add_event('image', url, 'fetch', None, None, 'Error: '+msg)
+
+        raise exceptions.ImageFetchTaskFailedException(
+            'Failed to fetch image %s' % url)
 
 
 def instance_preflight(instance_uuid, network):
@@ -218,11 +237,6 @@ def instance_start(instance_uuid, network):
                 db.enqueue_instance_error(instance_uuid,
                                           'instance failed to start: %s' % e)
                 return
-
-        except (HTTPError, HTTPWarning, requests.exceptions.ConnectionError) as e:
-            db.enqueue_instance_error(instance_uuid,
-                                      'instance failed to fetch image: %s' % e)
-            return
 
         for iface in db.get_instance_interfaces(instance_uuid):
             db.update_network_interface_state(iface['uuid'], 'created')
