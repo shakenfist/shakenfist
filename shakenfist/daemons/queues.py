@@ -1,5 +1,6 @@
 import copy
 import multiprocessing
+import re
 import requests
 import setproctitle
 import time
@@ -43,7 +44,8 @@ def handle(jobname, workitem):
                 raise exceptions.UnknownTaskException(
                     'Task was not decoded: %s' % task)
 
-            if InstanceTask.__subclasscheck__(type(task)):
+            if (InstanceTask.__subclasscheck__(type(task)) or
+                    isinstance(task, FetchImageTask)):
                 instance_uuid = task.instance_uuid()
                 log_i = log.withInstance(instance_uuid)
             else:
@@ -129,12 +131,22 @@ def image_fetch(url, instance_uuid):
     try:
         img = images.Image(url)
         img.get([], instance)
+        db.add_event('image', url, 'fetch', None, None, 'success')
+
     except (HTTPError, HTTPWarning, requests.exceptions.ConnectionError) as e:
         LOG.withField('image', url).warning('Failed to fetch image')
         if instance_uuid:
-            db.enqueue_instance_delete(instance_uuid, 'error',
-                                       'Image fetch failed: %s' % e)
-        db.add_event('image', url, 'fetch', 'failed', None, str(e))
+            db.enqueue_instance_error(instance_uuid,
+                                      'Image fetch failed: %s' % e)
+
+        # Clean common problems to store in events
+        msg = str(e)
+        re_conn_err = re.compile(r'.*NewConnectionError\(\'\<.*\>: (.*)\'')
+        m = re_conn_err.match(msg)
+        if m:
+            msg = m.group(1)
+        db.add_event('image', url, 'fetch', None, None, 'Error: '+msg)
+
         raise exceptions.ImageFetchTaskFailedException(
             'Failed to fetch image %s' % url)
 

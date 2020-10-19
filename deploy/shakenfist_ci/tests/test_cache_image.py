@@ -15,14 +15,16 @@ class TestCacheImage(base.BaseNamespacedTestCase):
         # It is currently not possible to check if an image is
         # in the cache via API, so for now we just cache this and
         # see if any errors come back.
-        self.system_client.cache_image(
-            'http://cloud.centos.org/centos/6/images/'
-            'CentOS-6-x86_64-GenericCloud-1604.qcow2.xz')
+        url = ('http://cloud.centos.org/centos/6/images/'
+               'CentOS-6-x86_64-GenericCloud-1604.qcow2.xz')
+        self.system_client.cache_image(url)
+        self._await_image_download_success(url)
 
     def test_cache_invalid_image(self):
-        self.system_client.cache_image(
-            'https://nosuch.shakenfist.com/centos/6/images/'
-            'CentOS-6-x86_64-GenericCloud-1604.qcow2.xz')
+        url = ('https://nosuch.shakenfist.com/centos/6/images/'
+               'CentOS-6-x86_64-GenericCloud-1604.qcow2.xz')
+        self.system_client.cache_image(url)
+        self._await_image_download_error(url)
 
     def test_instance_invalid_image(self):
         # Start our test instance
