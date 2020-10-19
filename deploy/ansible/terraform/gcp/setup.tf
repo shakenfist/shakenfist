@@ -2,8 +2,13 @@ variable "project" {
   description = "The google cloud project id to use"
 }
 
-variable "uniqifier" {
-  description = "A unique string to prefix hostnames with"
+provider "google" {
+  project = var.project
+}
+
+resource "random_pet" "deployment_name" {
+  separator = "-"
+  length = 2
 }
 
 variable "ssh_user" {
@@ -16,14 +21,26 @@ variable "ssh_key" {
   default     = ""
 }
 
-provider "google" {
-  project = var.project
+variable "node_count" {
+  description = "Number of SF nodes to create"
+  default = 3
 }
 
-resource "google_compute_instance" "sf_1" {
-  machine_type     = "n1-standard-4"
-  name             = "${var.uniqifier}sf-1"
-  zone             = "us-central1-b"
+variable "node_zone" {
+  description = "GCP Zone to deploy instances into"
+  default = "us-central1-b"
+}
+
+variable "node_machine_type" {
+  description = "GCP Compute Engine Type of Nodes"
+  default = "n1-standard-4"
+}
+
+resource "google_compute_instance" "sf_nodes" {
+  count            = var.node_count
+  machine_type     = var.node_machine_type
+  name             = "${random_pet.deployment_name.id}-sf-${count.index+1}"
+  zone             = var.node_zone
   min_cpu_platform = "Intel Haswell"
   boot_disk {
     initialize_params {
@@ -40,70 +57,10 @@ resource "google_compute_instance" "sf_1" {
   }
 }
 
-resource "google_compute_instance" "sf_2" {
-  machine_type     = "n1-standard-4"
-  name             = "${var.uniqifier}sf-2"
-  zone             = "us-central1-b"
-  min_cpu_platform = "Intel Haswell"
-  boot_disk {
-    initialize_params {
-      image = "sf-image"
-      size  = 50
-    }
-  }
-  network_interface {
-    access_config {}
-    network = "default"
-  }
-  metadata = {
-    ssh-keys = "${var.ssh_user}:${var.ssh_key}"
-  }
+output "sf_nodes_external_ip" {
+  value = google_compute_instance.sf_nodes.*.network_interface.0.access_config.0.nat_ip
 }
 
-resource "google_compute_instance" "sf_3" {
-  machine_type     = "n1-standard-4"
-  name             = "${var.uniqifier}sf-3"
-  zone             = "us-central1-b"
-  min_cpu_platform = "Intel Haswell"
-  boot_disk {
-    initialize_params {
-      image = "sf-image"
-      size  = 50
-    }
-  }
-  network_interface {
-    access_config {}
-    network = "default"
-  }
-  metadata = {
-    ssh-keys = "${var.ssh_user}:${var.ssh_key}"
-  }
-}
-
-output "sf_1_external" {
-  value = google_compute_instance.sf_1.*.network_interface.0.access_config.0.nat_ip
-}
-
-output "sf_1_ssh_keys" {
-  value = google_compute_instance.sf_1.metadata
-}
-
-output "sf_2_external" {
-  value = google_compute_instance.sf_2.*.network_interface.0.access_config.0.nat_ip
-}
-
-output "sf_3_external" {
-  value = google_compute_instance.sf_3.*.network_interface.0.access_config.0.nat_ip
-}
-
-output "sf_1_internal" {
-  value = google_compute_instance.sf_1.*.network_interface.0.network_ip
-}
-
-output "sf_2_internal" {
-  value = google_compute_instance.sf_2.*.network_interface.0.network_ip
-}
-
-output "sf_3_internal" {
-  value = google_compute_instance.sf_3.*.network_interface.0.network_ip
+output "sf_nodes_internal_ip" {
+  value = google_compute_instance.sf_nodes.*.network_interface.0.network_ip
 }
