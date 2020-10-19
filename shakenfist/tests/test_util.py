@@ -88,6 +88,17 @@ class UtilTestCase(testtools.TestCase):
             None, 'ip netns exec bananarama ip addr show eth0',
             check_exit_code=[0, 1])
 
+    @mock.patch(
+        'shakenfist.util.execute',
+        return_value=('default via 192.168.1.247 dev enx8cae4cf14c31 proto dhcp metric 100\n'
+                      'default via 192.168.1.247 dev wlp2s0 proto dhcp metric 600\n',
+                      ''))
+    def test_get_default_routes(self, mock_execute):
+        found = util.get_default_routes('mynamespace')
+        self.assertEqual(['192.168.1.247'], found)
+        mock_execute.assert_called_with(
+            None, 'ip netns exec mynamespace ip route list default')
+
     @mock.patch('shakenfist.util.execute')
     def test_create_interface_bridge(self, mock_execute):
         util.create_interface('eth0', 'bridge', '')
