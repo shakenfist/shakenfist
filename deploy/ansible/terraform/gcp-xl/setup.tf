@@ -29,7 +29,7 @@ provider "google" {
 resource "google_compute_instance" "sf_nodes" {
   count            = var.node_count
   machine_type     = "n1-standard-4"
-  name             = "${random_pet.deployment_name.id}-sf-${count.index}"
+  name             = "${random_pet.deployment_name.id}-sf-${count.index+1}"
   zone             = "us-central1-b"
   min_cpu_platform = "Intel Haswell"
   boot_disk {
