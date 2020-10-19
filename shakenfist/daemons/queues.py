@@ -238,11 +238,6 @@ def instance_start(instance_uuid, network):
                                           'instance failed to start: %s' % e)
                 return
 
-        except (HTTPError, HTTPWarning, requests.exceptions.ConnectionError) as e:
-            db.enqueue_instance_error(instance_uuid,
-                                      'instance failed to fetch image: %s' % e)
-            return
-
         for iface in db.get_instance_interfaces(instance_uuid):
             db.update_network_interface_state(iface['uuid'], 'created')
 

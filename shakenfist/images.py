@@ -102,10 +102,12 @@ class Image(object):
         raise exceptions.LockException(
             'Failed to acquire image fetch lock after retries: %s' % exc)
 
+    def image_path(self):
+        return '%s.v%03d' % (self.hashed_image_path, self.info['version'])
+
     def _get(self, locks, related_object):
         """Fetch image if not downloaded and return image path."""
-        actual_image = '%s.v%03d' % (
-            self.hashed_image_path, self.info['version'])
+        actual_image = self.image_path()
 
         with db.get_lock('image', config.parsed.get('NODE_NAME'),
                          self.hashed_image_url) as image_lock:
