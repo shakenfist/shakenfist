@@ -5,7 +5,6 @@
     force_init: true
     variables:
       project: "{{project}}"
-      uniqifier: "{{uniqifier}}"
       ssh_user: "{{ssh_user}}"
       ssh_key: "{{ssh_key}}"
   register: terraform_out
