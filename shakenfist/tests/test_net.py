@@ -44,9 +44,7 @@ class NetworkGeneralTestCase(NetworkTestCase):
 class NetworkNormalNodeTestCase(NetworkTestCase):
     def setUp(self):
         super(NetworkNormalNodeTestCase, self).setUp()
-        config.CONFIG_DEFAULTS['NODE_IP'] = '1.1.1.2'
-        config.CONFIG_DEFAULTS['NETWORK_NODE_IP'] = '1.1.1.1'
-        config.parsed = config.Config()
+        config.parsed = config.SfConfig(NODE_IP="1.1.1.2", NETWORK_NODE_IP="1.1.1.2")
 
     #
     #  is_okay()
@@ -82,9 +80,7 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
 class NetworkNetNodeTestCase(NetworkTestCase):
     def setUp(self):
         super(NetworkNetNodeTestCase, self).setUp()
-        config.CONFIG_DEFAULTS['NODE_IP'] = '1.1.1.1'
-        config.CONFIG_DEFAULTS['NETWORK_NODE_IP'] = '1.1.1.1'
-        config.parsed = config.Config()
+        config.parsed = config.SfConfig(NODE_IP="1.1.1.2", NETWORK_NODE_IP="1.1.1.2")
 
     #
     #  is_okay()

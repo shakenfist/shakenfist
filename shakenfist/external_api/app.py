@@ -63,7 +63,7 @@ def error(status_code, message):
         'status': status_code
     }
 
-    if TESTING or config.parsed.get('INCLUDE_TRACEBACKS') == '1':
+    if TESTING or config.parsed.get('INCLUDE_TRACEBACKS'):
         _, _, tb = sys.exc_info()
         if tb:
             body['traceback'] = traceback.format_exc()

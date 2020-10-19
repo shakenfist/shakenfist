@@ -85,9 +85,8 @@ def main():
     setproctitle.setproctitle(daemon.process_name('main'))
 
     # Log configuration on startup
-    config.parsed.parse()
-    for key in config.parsed.config:
-        LOG.info('Configuration item %s = %s' % (key, config.parsed.get(key)))
+    for key, value in config.parsed.items():
+        LOG.info('Configuration item %s = %s' % (key, value))
 
     daemon.set_log_level(LOG, 'main')
 
