@@ -19,6 +19,10 @@ class StartException(Exception):
     pass
 
 
+class WrongEventException(Exception):
+    pass
+
+
 class BaseTestCase(testtools.TestCase):
     def setUp(self):
         super(BaseTestCase, self).setUp()
@@ -140,13 +144,12 @@ class BaseTestCase(testtools.TestCase):
             'After time %s, instance %s had no event "%s:%s" (waited 5 mins)' % (
                 after, instance_uuid, operation, message))
 
-    def _await_image_download_success(self, url):
-        return self._await_image_event(
-            url, 'fetch', 'success')
+    def _await_image_download_success(self, url, after=None):
+        return self._await_image_event(url, 'fetch', 'success', after)
 
-    def _await_image_download_error(self, url):
+    def _await_image_download_error(self, url, after=None):
         return self._await_image_event(
-            url, 'fetch', 'Name or service not known')
+            url, 'fetch', 'Name or service not known', after)
 
     def _await_image_event(
             self, url, operation, message=None, after=None):
@@ -156,16 +159,21 @@ class BaseTestCase(testtools.TestCase):
                 if after and event['timestamp'] <= after:
                     continue
 
-                if (event['operation'] == operation and
-                        (not message or message in str(event['message']))):
-                    return event['timestamp']
+                if event['operation'] == operation:
+                    if message in str(event['message']):
+                        return event['timestamp']
+
+                    self._log_image_events(url)
+                    raise WrongEventException(
+                        'After time %s, image %s expected event "%s:%s" got %s' % (
+                         after, url, operation, message, event['message']))
 
             time.sleep(5)
 
         self._log_image_events(url)
         raise TimeoutException(
-            'After time %s, image %s had no event "%s:%s" (waited 5 mins)' % (
-                after, url, operation, message))
+            'After time %s, image %s had no event type "%s" (waited 5 mins)' % (
+                after, url, operation))
 
     def _test_ping(self, instance_uuid, network_uuid, ip, expected, attempts=1):
         while attempts:

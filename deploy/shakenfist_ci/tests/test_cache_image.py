@@ -1,3 +1,5 @@
+import time
+
 from shakenfist_ci import base
 
 
@@ -18,13 +20,13 @@ class TestCacheImage(base.BaseNamespacedTestCase):
         url = ('http://cloud.centos.org/centos/6/images/'
                'CentOS-6-x86_64-GenericCloud-1604.qcow2.xz')
         self.system_client.cache_image(url)
-        self._await_image_download_success(url)
+        self._await_image_download_success(url, after=time.time())
 
     def test_cache_invalid_image(self):
         url = ('https://nosuch.shakenfist.com/centos/6/images/'
                'CentOS-6-x86_64-GenericCloud-1604.qcow2.xz')
         self.system_client.cache_image(url)
-        self._await_image_download_error(url)
+        self._await_image_download_error(url, after=time.time())
 
     def test_instance_invalid_image(self):
         # Start our test instance

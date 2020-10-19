@@ -4,7 +4,6 @@ import re
 import requests
 import setproctitle
 import time
-from urllib3.exceptions import HTTPError, HTTPWarning
 
 from shakenfist import config
 from shakenfist.daemons import daemon
@@ -47,9 +46,10 @@ def handle(jobname, workitem):
             if (InstanceTask.__subclasscheck__(type(task)) or
                     isinstance(task, FetchImageTask)):
                 instance_uuid = task.instance_uuid()
+
+            if instance_uuid:
                 log_i = log.withInstance(instance_uuid)
             else:
-                instance_uuid = None
                 log_i = log
 
             log_i.withField('task_name', task.name()).info('Starting task')
@@ -108,12 +108,18 @@ def handle(jobname, workitem):
 
             log_i.info('Task complete')
 
+    except exceptions.ImageFetchTaskFailedException as e:
+        # Usually caused by external issue and not an application error
+        log.info('Fetch Image Error: %s', e)
+        if instance_uuid:
+            db.enqueue_instance_error(instance_uuid,
+                                      'failed queue task: %s' % e)
+
     except Exception as e:
         util.ignore_exception(daemon.process_name('queues'), e)
         if instance_uuid:
-            db.enqueue_instance_delete(instance_uuid, 'error',
-                                       'failed queue task: %s' % e)
-        # TODO(andy): Further processing of workitem should stop - fix underway
+            db.enqueue_instance_error(instance_uuid,
+                                      'failed queue task: %s' % e)
 
     finally:
         db.resolve(config.parsed.get('NODE_NAME'), jobname)
@@ -133,7 +139,7 @@ def image_fetch(url, instance_uuid):
         img.get([], instance)
         db.add_event('image', url, 'fetch', None, None, 'success')
 
-    except (HTTPError, HTTPWarning, requests.exceptions.ConnectionError) as e:
+    except (exceptions.HTTPError, requests.exceptions.RequestException) as e:
         LOG.withField('image', url).warning('Failed to fetch image')
         if instance_uuid:
             db.enqueue_instance_error(instance_uuid,
