@@ -23,6 +23,7 @@
 
 - name: Log terraform hosts
   debug:
-    var:
-      - "{{ groups['hypervisors'] }}"
-      -  "{{ groups['hypervisors'] | map('extract', hostvars) | list }}"
+    msg:
+      - "sf-1: {{hostvars['sf-1']['ansible_ssh_host']}}, {{hostvars['sf-1']['node_ip']}}"
+      - "sf-2: {{hostvars['sf-2']['ansible_ssh_host']}}, {{hostvars['sf-2']['node_ip']}}"
+      - "sf-3: {{hostvars['sf-3']['ansible_ssh_host']}}, {{hostvars['sf-3']['node_ip']}}"
