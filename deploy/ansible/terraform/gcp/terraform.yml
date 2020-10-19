@@ -23,4 +23,6 @@
 
 - name: Log terraform hosts
   debug:
-    var: "{{ groups['hypervisors'] | map('extract', hostvars) }}"
+    var:
+      - "{{ groups['hypervisors'] }}"
+      -  "{{ groups['hypervisors'] | map('extract', hostvars) | list }}"
