@@ -27,225 +27,237 @@
   delegate_to: localhost
   delegate_facts: true
 
-- name: Add sf-1 to ansible with a ssh key
+- name: Add sf nodes
   add_host:
-    hostname: sf-1
-    ansible_ssh_host: "{{terraform_out.outputs.sf_1_external.value[0]}}"
-    ansible_ssh_private_key_file: "{{ssh_key_filename}}"
+    hostname: "sf-{{node_idx}}"
+    node_name: "sf-{{node_idx}}"
+    ansible_ssh_host: "{{item}}"
+    ansible_ssh_private_key_file: "{{ssh_key_filename|default(omit)}}"
     groups: hypervisors, etcd_master
-  when: ssh_key_filename != ""
+    node_ip: "{{item}}"
+  loop: "{{terraform_out.outputs.sf_nodes_external_ip}}"
+  loop_control:
+    index_var: node_idx
 
-- name: Add sf-1 to ansible with no ssh key
-  add_host:
-    hostname: sf-1
-    ansible_ssh_host: "{{terraform_out.outputs.sf_1_external.value[0]}}"
-    groups: hypervisors, etcd_master
-  when: ssh_key_filename == ""
-
-- name: Add sf-1 node_ip
-  set_fact:
-    node_name: "sf-1"
-    node_ip: "{{terraform_out.outputs.sf_1_internal.value[0]}}"
-  delegate_to: sf-1
-  delegate_facts: true
-
-- name: Add sf-2 to ansible with a ssh key
-  add_host:
-    hostname: sf-2
-    ansible_ssh_host: "{{terraform_out.outputs.sf_2_external.value[0]}}"
-    ansible_ssh_private_key_file: "{{ssh_key_filename}}"
-    groups: hypervisors, etcd_master
-  when: ssh_key_filename != ""
-
-- name: Add sf-2 to ansible with no ssh key
-  add_host:
-    hostname: sf-2
-    ansible_ssh_host: "{{terraform_out.outputs.sf_2_external.value[0]}}"
-    groups: hypervisors, etcd_master
-  when: ssh_key_filename == ""
-
-- name: Add sf-2 node_ip
-  set_fact:
-    node_name: "sf-2"
-    node_ip: "{{terraform_out.outputs.sf_2_internal.value[0]}}"
-  delegate_to: sf-2
-  delegate_facts: true
-
-- name: Add sf-3 to ansible with a ssh key
-  add_host:
-    hostname: sf-3
-    ansible_ssh_host: "{{terraform_out.outputs.sf_3_external.value[0]}}"
-    ansible_ssh_private_key_file: "{{ssh_key_filename}}"
-    groups: hypervisors, etcd_master
-  when: ssh_key_filename != ""
-
-- name: Add sf-3 to ansible with no ssh key
-  add_host:
-    hostname: sf-3
-    ansible_ssh_host: "{{terraform_out.outputs.sf_3_external.value[0]}}"
-    groups: hypervisors, etcd_master
-  when: ssh_key_filename == ""
-
-- name: Add sf-3 node_ip
-  set_fact:
-    node_name: "sf-3"
-    node_ip: "{{terraform_out.outputs.sf_3_internal.value[0]}}"
-  delegate_to: sf-3
-  delegate_facts: true
-
-- name: Add sf-4 to ansible with a ssh key
-  add_host:
-    hostname: sf-4
-    ansible_ssh_host: "{{terraform_out.outputs.sf_4_external.value[0]}}"
-    ansible_ssh_private_key_file: "{{ssh_key_filename}}"
-    groups: hypervisors
-  when: ssh_key_filename != ""
-
-- name: Add sf-4 to ansible with no ssh key
-  add_host:
-    hostname: sf-4
-    ansible_ssh_host: "{{terraform_out.outputs.sf_4_external.value[0]}}"
-    groups: hypervisors
-  when: ssh_key_filename == ""
-
-- name: Add sf-4 node_ip
-  set_fact:
-    node_name: "sf-4"
-    node_ip: "{{terraform_out.outputs.sf_4_internal.value[0]}}"
-  delegate_to: sf-4
-  delegate_facts: true
-
-- name: Add sf-5 to ansible with a ssh key
-  add_host:
-    hostname: sf-5
-    ansible_ssh_host: "{{terraform_out.outputs.sf_5_external.value[0]}}"
-    ansible_ssh_private_key_file: "{{ssh_key_filename}}"
-    groups: hypervisors
-  when: ssh_key_filename != ""
-
-- name: Add sf-5 to ansible with no ssh key
-  add_host:
-    hostname: sf-5
-    ansible_ssh_host: "{{terraform_out.outputs.sf_5_external.value[0]}}"
-    groups: hypervisors
-  when: ssh_key_filename == ""
-
-- name: Add sf-5 node_ip
-  set_fact:
-    node_name: "sf-5"
-    node_ip: "{{terraform_out.outputs.sf_5_internal.value[0]}}"
-  delegate_to: sf-5
-  delegate_facts: true
-
-- name: Add sf-6 to ansible with a ssh key
-  add_host:
-    hostname: sf-6
-    ansible_ssh_host: "{{terraform_out.outputs.sf_6_external.value[0]}}"
-    ansible_ssh_private_key_file: "{{ssh_key_filename}}"
-    groups: hypervisors
-  when: ssh_key_filename != ""
-
-- name: Add sf-6 to ansible with no ssh key
-  add_host:
-    hostname: sf-6
-    ansible_ssh_host: "{{terraform_out.outputs.sf_6_external.value[0]}}"
-    groups: hypervisors
-  when: ssh_key_filename == ""
-
-- name: Add sf-6 node_ip
-  set_fact:
-    node_name: "sf-6"
-    node_ip: "{{terraform_out.outputs.sf_6_internal.value[0]}}"
-  delegate_to: sf-6
-  delegate_facts: true
-
-- name: Add sf-7 to ansible with a ssh key
-  add_host:
-    hostname: sf-7
-    ansible_ssh_host: "{{terraform_out.outputs.sf_7_external.value[0]}}"
-    ansible_ssh_private_key_file: "{{ssh_key_filename}}"
-    groups: hypervisors
-  when: ssh_key_filename != ""
-
-- name: Add sf-7 to ansible with no ssh key
-  add_host:
-    hostname: sf-7
-    ansible_ssh_host: "{{terraform_out.outputs.sf_7_external.value[0]}}"
-    groups: hypervisors
-  when: ssh_key_filename == ""
-
-- name: Add sf-7 node_ip
-  set_fact:
-    node_name: "sf-7"
-    node_ip: "{{terraform_out.outputs.sf_7_internal.value[0]}}"
-  delegate_to: sf-7
-  delegate_facts: true
-
-- name: Add sf-8 to ansible with a ssh key
-  add_host:
-    hostname: sf-8
-    ansible_ssh_host: "{{terraform_out.outputs.sf_8_external.value[0]}}"
-    ansible_ssh_private_key_file: "{{ssh_key_filename}}"
-    groups: hypervisors
-  when: ssh_key_filename != ""
-
-- name: Add sf-8 to ansible with no ssh key
-  add_host:
-    hostname: sf-8
-    ansible_ssh_host: "{{terraform_out.outputs.sf_8_external.value[0]}}"
-    groups: hypervisors
-  when: ssh_key_filename == ""
-
-- name: Add sf-8 node_ip
-  set_fact:
-    node_name: "sf-8"
-    node_ip: "{{terraform_out.outputs.sf_8_internal.value[0]}}"
-  delegate_to: sf-8
-  delegate_facts: true
-
-- name: Add sf-9 to ansible with a ssh key
-  add_host:
-    hostname: sf-9
-    ansible_ssh_host: "{{terraform_out.outputs.sf_9_external.value[0]}}"
-    ansible_ssh_private_key_file: "{{ssh_key_filename}}"
-    groups: hypervisors
-  when: ssh_key_filename != ""
-
-- name: Add sf-9 to ansible with no ssh key
-  add_host:
-    hostname: sf-9
-    ansible_ssh_host: "{{terraform_out.outputs.sf_9_external.value[0]}}"
-    groups: hypervisors
-  when: ssh_key_filename == ""
-
-- name: Add sf-9 node_ip
-  set_fact:
-    node_name: "sf-9"
-    node_ip: "{{terraform_out.outputs.sf_9_internal.value[0]}}"
-  delegate_to: sf-9
-  delegate_facts: true
-
-- name: Add sf-10 to ansible with a ssh key
-  add_host:
-    hostname: sf-10
-    ansible_ssh_host: "{{terraform_out.outputs.sf_10_external.value[0]}}"
-    ansible_ssh_private_key_file: "{{ssh_key_filename}}"
-    groups: hypervisors
-  when: ssh_key_filename != ""
-
-- name: Add sf-10 to ansible with no ssh key
-  add_host:
-    hostname: sf-10
-    ansible_ssh_host: "{{terraform_out.outputs.sf_10_external.value[0]}}"
-    groups: hypervisors
-  when: ssh_key_filename == ""
-
-- name: Add sf-10 node_ip
-  set_fact:
-    node_name: "sf-10"
-    node_ip: "{{terraform_out.outputs.sf_10_internal.value[0]}}"
-  delegate_to: sf-10
-  delegate_facts: true
+#- name: Add sf-1 to ansible with a ssh key
+#  add_host:
+#    hostname: sf-1
+#    ansible_ssh_host: "{{terraform_out.outputs.sf_1_external.value[0]}}"
+#    ansible_ssh_private_key_file: "{{ssh_key_filename|default(omit)}}"
+#    groups: hypervisors, etcd_master
+#  when: ssh_key_filename != ""
+#
+#- name: Add sf-1 to ansible with no ssh key
+#  add_host:
+#    hostname: sf-1
+#    ansible_ssh_host: "{{terraform_out.outputs.sf_1_external.value[0]}}"
+#    groups: hypervisors, etcd_master
+#  when: ssh_key_filename == ""
+#
+#- name: Add sf-1 node_ip
+#  set_fact:
+#    node_name: "sf-1"
+#    node_ip: "{{terraform_out.outputs.sf_1_internal.value[0]}}"
+#  delegate_to: sf-1
+#  delegate_facts: true
+#
+#- name: Add sf-2 to ansible with a ssh key
+#  add_host:
+#    hostname: sf-2
+#    ansible_ssh_host: "{{terraform_out.outputs.sf_2_external.value[0]}}"
+#    ansible_ssh_private_key_file: "{{ssh_key_filename}}"
+#    groups: hypervisors, etcd_master
+#  when: ssh_key_filename != ""
+#
+#- name: Add sf-2 to ansible with no ssh key
+#  add_host:
+#    hostname: sf-2
+#    ansible_ssh_host: "{{terraform_out.outputs.sf_2_external.value[0]}}"
+#    groups: hypervisors, etcd_master
+#  when: ssh_key_filename == ""
+#
+#- name: Add sf-2 node_ip
+#  set_fact:
+#    node_name: "sf-2"
+#    node_ip: "{{terraform_out.outputs.sf_2_internal.value[0]}}"
+#  delegate_to: sf-2
+#  delegate_facts: true
+#
+#- name: Add sf-3 to ansible with a ssh key
+#  add_host:
+#    hostname: sf-3
+#    ansible_ssh_host: "{{terraform_out.outputs.sf_3_external.value[0]}}"
+#    ansible_ssh_private_key_file: "{{ssh_key_filename}}"
+#    groups: hypervisors, etcd_master
+#  when: ssh_key_filename != ""
+#
+#- name: Add sf-3 to ansible with no ssh key
+#  add_host:
+#    hostname: sf-3
+#    ansible_ssh_host: "{{terraform_out.outputs.sf_3_external.value[0]}}"
+#    groups: hypervisors, etcd_master
+#  when: ssh_key_filename == ""
+#
+#- name: Add sf-3 node_ip
+#  set_fact:
+#    node_name: "sf-3"
+#    node_ip: "{{terraform_out.outputs.sf_3_internal.value[0]}}"
+#  delegate_to: sf-3
+#  delegate_facts: true
+#
+#- name: Add sf-4 to ansible with a ssh key
+#  add_host:
+#    hostname: sf-4
+#    ansible_ssh_host: "{{terraform_out.outputs.sf_4_external.value[0]}}"
+#    ansible_ssh_private_key_file: "{{ssh_key_filename}}"
+#    groups: hypervisors
+#  when: ssh_key_filename != ""
+#
+#- name: Add sf-4 to ansible with no ssh key
+#  add_host:
+#    hostname: sf-4
+#    ansible_ssh_host: "{{terraform_out.outputs.sf_4_external.value[0]}}"
+#    groups: hypervisors
+#  when: ssh_key_filename == ""
+#
+#- name: Add sf-4 node_ip
+#  set_fact:
+#    node_name: "sf-4"
+#    node_ip: "{{terraform_out.outputs.sf_4_internal.value[0]}}"
+#  delegate_to: sf-4
+#  delegate_facts: true
+#
+#- name: Add sf-5 to ansible with a ssh key
+#  add_host:
+#    hostname: sf-5
+#    ansible_ssh_host: "{{terraform_out.outputs.sf_5_external.value[0]}}"
+#    ansible_ssh_private_key_file: "{{ssh_key_filename}}"
+#    groups: hypervisors
+#  when: ssh_key_filename != ""
+#
+#- name: Add sf-5 to ansible with no ssh key
+#  add_host:
+#    hostname: sf-5
+#    ansible_ssh_host: "{{terraform_out.outputs.sf_5_external.value[0]}}"
+#    groups: hypervisors
+#  when: ssh_key_filename == ""
+#
+#- name: Add sf-5 node_ip
+#  set_fact:
+#    node_name: "sf-5"
+#    node_ip: "{{terraform_out.outputs.sf_5_internal.value[0]}}"
+#  delegate_to: sf-5
+#  delegate_facts: true
+#
+#- name: Add sf-6 to ansible with a ssh key
+#  add_host:
+#    hostname: sf-6
+#    ansible_ssh_host: "{{terraform_out.outputs.sf_6_external.value[0]}}"
+#    ansible_ssh_private_key_file: "{{ssh_key_filename}}"
+#    groups: hypervisors
+#  when: ssh_key_filename != ""
+#
+#- name: Add sf-6 to ansible with no ssh key
+#  add_host:
+#    hostname: sf-6
+#    ansible_ssh_host: "{{terraform_out.outputs.sf_6_external.value[0]}}"
+#    groups: hypervisors
+#  when: ssh_key_filename == ""
+#
+#- name: Add sf-6 node_ip
+#  set_fact:
+#    node_name: "sf-6"
+#    node_ip: "{{terraform_out.outputs.sf_6_internal.value[0]}}"
+#  delegate_to: sf-6
+#  delegate_facts: true
+#
+#- name: Add sf-7 to ansible with a ssh key
+#  add_host:
+#    hostname: sf-7
+#    ansible_ssh_host: "{{terraform_out.outputs.sf_7_external.value[0]}}"
+#    ansible_ssh_private_key_file: "{{ssh_key_filename}}"
+#    groups: hypervisors
+#  when: ssh_key_filename != ""
+#
+#- name: Add sf-7 to ansible with no ssh key
+#  add_host:
+#    hostname: sf-7
+#    ansible_ssh_host: "{{terraform_out.outputs.sf_7_external.value[0]}}"
+#    groups: hypervisors
+#  when: ssh_key_filename == ""
+#
+#- name: Add sf-7 node_ip
+#  set_fact:
+#    node_name: "sf-7"
+#    node_ip: "{{terraform_out.outputs.sf_7_internal.value[0]}}"
+#  delegate_to: sf-7
+#  delegate_facts: true
+#
+#- name: Add sf-8 to ansible with a ssh key
+#  add_host:
+#    hostname: sf-8
+#    ansible_ssh_host: "{{terraform_out.outputs.sf_8_external.value[0]}}"
+#    ansible_ssh_private_key_file: "{{ssh_key_filename}}"
+#    groups: hypervisors
+#  when: ssh_key_filename != ""
+#
+#- name: Add sf-8 to ansible with no ssh key
+#  add_host:
+#    hostname: sf-8
+#    ansible_ssh_host: "{{terraform_out.outputs.sf_8_external.value[0]}}"
+#    groups: hypervisors
+#  when: ssh_key_filename == ""
+#
+#- name: Add sf-8 node_ip
+#  set_fact:
+#    node_name: "sf-8"
+#    node_ip: "{{terraform_out.outputs.sf_8_internal.value[0]}}"
+#  delegate_to: sf-8
+#  delegate_facts: true
+#
+#- name: Add sf-9 to ansible with a ssh key
+#  add_host:
+#    hostname: sf-9
+#    ansible_ssh_host: "{{terraform_out.outputs.sf_9_external.value[0]}}"
+#    ansible_ssh_private_key_file: "{{ssh_key_filename}}"
+#    groups: hypervisors
+#  when: ssh_key_filename != ""
+#
+#- name: Add sf-9 to ansible with no ssh key
+#  add_host:
+#    hostname: sf-9
+#    ansible_ssh_host: "{{terraform_out.outputs.sf_9_external.value[0]}}"
+#    groups: hypervisors
+#  when: ssh_key_filename == ""
+#
+#- name: Add sf-9 node_ip
+#  set_fact:
+#    node_name: "sf-9"
+#    node_ip: "{{terraform_out.outputs.sf_9_internal.value[0]}}"
+#  delegate_to: sf-9
+#  delegate_facts: true
+#
+#- name: Add sf-10 to ansible with a ssh key
+#  add_host:
+#    hostname: sf-10
+#    ansible_ssh_host: "{{terraform_out.outputs.sf_10_external.value[0]}}"
+#    ansible_ssh_private_key_file: "{{ssh_key_filename}}"
+#    groups: hypervisors
+#  when: ssh_key_filename != ""
+#
+#- name: Add sf-10 to ansible with no ssh key
+#  add_host:
+#    hostname: sf-10
+#    ansible_ssh_host: "{{terraform_out.outputs.sf_10_external.value[0]}}"
+#    groups: hypervisors
+#  when: ssh_key_filename == ""
+#
+#- name: Add sf-10 node_ip
+#  set_fact:
+#    node_name: "sf-10"
+#    node_ip: "{{terraform_out.outputs.sf_10_internal.value[0]}}"
+#  delegate_to: sf-10
+#  delegate_facts: true
 
 - name: Log terraform hosts
   debug:
@@ -253,10 +265,10 @@
       - "sf-1: {{hostvars['sf-1']['ansible_ssh_host']}}, {{hostvars['sf-1']['node_ip']}}"
       - "sf-2: {{hostvars['sf-2']['ansible_ssh_host']}}, {{hostvars['sf-2']['node_ip']}}"
       - "sf-3: {{hostvars['sf-3']['ansible_ssh_host']}}, {{hostvars['sf-3']['node_ip']}}"
-      - "sf-4: {{hostvars['sf-4']['ansible_ssh_host']}}, {{hostvars['sf-4']['node_ip']}}"
-      - "sf-5: {{hostvars['sf-5']['ansible_ssh_host']}}, {{hostvars['sf-5']['node_ip']}}"
-      - "sf-6: {{hostvars['sf-6']['ansible_ssh_host']}}, {{hostvars['sf-6']['node_ip']}}"
-      - "sf-7: {{hostvars['sf-7']['ansible_ssh_host']}}, {{hostvars['sf-7']['node_ip']}}"
-      - "sf-8: {{hostvars['sf-8']['ansible_ssh_host']}}, {{hostvars['sf-8']['node_ip']}}"
-      - "sf-9: {{hostvars['sf-9']['ansible_ssh_host']}}, {{hostvars['sf-9']['node_ip']}}"
-      - "sf-10: {{hostvars['sf-10']['ansible_ssh_host']}}, {{hostvars['sf-10']['node_ip']}}"
+#      - "sf-4: {{hostvars['sf-4']['ansible_ssh_host']}}, {{hostvars['sf-4']['node_ip']}}"
+#      - "sf-5: {{hostvars['sf-5']['ansible_ssh_host']}}, {{hostvars['sf-5']['node_ip']}}"
+#      - "sf-6: {{hostvars['sf-6']['ansible_ssh_host']}}, {{hostvars['sf-6']['node_ip']}}"
+#      - "sf-7: {{hostvars['sf-7']['ansible_ssh_host']}}, {{hostvars['sf-7']['node_ip']}}"
+#      - "sf-8: {{hostvars['sf-8']['ansible_ssh_host']}}, {{hostvars['sf-8']['node_ip']}}"
+#      - "sf-9: {{hostvars['sf-9']['ansible_ssh_host']}}, {{hostvars['sf-9']['node_ip']}}"
+#      - "sf-10: {{hostvars['sf-10']['ansible_ssh_host']}}, {{hostvars['sf-10']['node_ip']}}"
