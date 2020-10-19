@@ -43,7 +43,7 @@ then
 fi
 
 #### Google Cloud
-if [ "$CLOUD" == "gcp" ] || [ "$CLOUD" == "gcp-xl" ]
+if [ "$CLOUD" == "gcp" ]
 then
   if [ -z "$GCP_PROJECT" ]
   then
@@ -51,6 +51,10 @@ then
     exit 1
   fi
   VARIABLES="$VARIABLES,project=$GCP_PROJECT"
+  if [ -n "$NODE_COUNT" ]
+  then
+    VARIABLES="$VARIABLES,node_count=$NODE_COUNT"
+  fi
 
   if [ -n "$GCP_SSH_KEY_FILENAME" ]
   then

@@ -7,6 +7,7 @@
       project: "{{project}}"
       ssh_user: "{{ssh_user}}"
       ssh_key: "{{ssh_key}}"
+      node_count: "{{node_count|default(3)}}"
   register: terraform_out
 
 - name: Add sf nodes

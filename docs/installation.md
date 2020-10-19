@@ -157,7 +157,6 @@ gcloud compute images create sf-image \
   --licenses "https://compute.googleapis.com/compute/v1/projects/vm-options/global/licenses/enable-vmx"
 ```
 
-Please note that the gcp-xl cloud is a special definition used for larger scale CI testing. You're welcome to use it, but it does assume that the node performing the deployment is a Google cloud instance.
 
 ### VMWare ESXi additional first steps
 
@@ -216,13 +215,14 @@ with real users.
 | BOOTDELAY | All | How long to wait for terraform deployed instances to boot before continuing with install, in minutes |
 | SKIP_SF_TEST | All | Set to 1 to skip running destructive testing of the cloud |
 | KSM_ENABLED | All | Set to 1 to enable KSM, 0 to disable |
+| NODE_COUNT | gcp | Number of SF hypervisor nodes to deploy |
 | AWS_REGION | aws, aws-single-node | The AWS region to deploy in |
 | AWS_AVAILABILITY_ZONE | aws, aws-single-node | The AWS availability zone to deploy in |
 | AWS_VPC_ID | aws, aws-single-node | The AWS VPC to use |
 | AWS_SSH_KEY_NAME | aws, aws-single-node | The name of an SSH key in the AWS region to use for ansible |
-| GCP_PROJECT | gcp, gcp-xl | The GCP project id to deploy in |
-| GCP_SSH_KEY_FILENAME | gcp, gcp-xl | The path to a ssh private key file to use for authentication. It is assumed that the public key is at ```${GCP_SSH_KEY_FILENAME}.pub```. (optional, only required if not using gcloud). |
-| GCP_SSH_USER | gcp, gcp-xl | The username to add the GCP_SSH_KEY to. (optional, only used if GCPSSH_KEY_FILENAME is set). |
+| GCP_PROJECT | gcp | The GCP project id to deploy in |
+| GCP_SSH_KEY_FILENAME | gcp| The path to a ssh private key file to use for authentication. It is assumed that the public key is at ```${GCP_SSH_KEY_FILENAME}.pub```. (optional, only required if not using gcloud). |
+| GCP_SSH_USER | gcp | The username to add the GCP_SSH_KEY to. (optional, only used if GCPSSH_KEY_FILENAME is set). |
 | OS_SSH_KEY_NAME | openstack | The name of a SSH key in the OpenStack cloud to use for ansible |
 | OS_FLAVOR_NAME | openstack | The OpenStack flavor to use for instances |
 | OS_EXTERNAL_NET_NAME | openstack | The UUID of an OpenStack network with internet access |
