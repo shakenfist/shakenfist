@@ -210,14 +210,22 @@ class Network(object):
         subst['floating_netmask'] = ipm.netmask
 
         with db.get_lock('network', None, self.uuid, ttl=120):
-            if not subst['floating_gateway'] in list(util.get_interface_addresses(
-                    subst['netns'], subst['physical_veth_inner'])):
-                with util.RecordedOperation('enable virtual routing', self):
+            with util.RecordedOperation('enable virtual routing', self):
+                if not subst['floating_gateway'] in list(util.get_interface_addresses(
+                        subst['netns'], subst['physical_veth_inner'])):
                     util.execute(None,
                                  '%(in_netns)s ip addr add %(floating_gateway)s/%(floating_netmask)s '
                                  'dev %(physical_veth_inner)s' % subst)
                     util.execute(None,
                                  '%(in_netns)s ip link set %(physical_veth_inner)s up' % subst)
+
+                default_routes = util.get_default_routes(subst['netns'])
+                if default_routes != [subst['floating_router']]:
+                    if default_routes:
+                        for default_route in default_routes:
+                            util.execute(None,
+                                         '%s route del default gw %s' % (subst['in_netns'], default_route))
+
                     util.execute(None,
                                  '%(in_netns)s route add default gw %(floating_router)s' % subst)
 

@@ -104,6 +104,27 @@ def get_interface_addresses(namespace, name):
     return
 
 
+def get_default_routes(namespace):
+    in_namespace = ''
+    if namespace:
+        in_namespace = 'ip netns exec %s ' % namespace
+
+    stdout, _ = execute(None,
+                        '%(in_namespace)sip route list default'
+                        % {
+                            'in_namespace': in_namespace
+                        })
+    if not stdout:
+        return []
+
+    routes = []
+    for line in stdout.split('\n'):
+        elems = line.split(' ')
+        if len(elems) > 3 and elems[2] not in routes:
+            routes.append(elems[2])
+    return routes
+
+
 def get_safe_interface_name(interface):
     if len(interface) > 15:
         orig_interface = interface
