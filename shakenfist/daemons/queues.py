@@ -134,8 +134,9 @@ def image_fetch(url, instance_uuid):
         if instance_uuid:
             db.enqueue_instance_delete(instance_uuid, 'error',
                                        'Image fetch failed: %s' % e)
-            raise exceptions.ImageFetchTaskFailedException(
-                'Failed to fetch iamge %s' % url)
+        db.add_event('image', url, 'fetch', 'failed', None, str(e))
+        raise exceptions.ImageFetchTaskFailedException(
+            'Failed to fetch image %s' % url)
 
 
 def instance_preflight(instance_uuid, network):
