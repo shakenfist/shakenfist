@@ -13,7 +13,7 @@ from shakenfist import util
 
 class DHCP(object):
     def __init__(self, network, interface):
-        self.network_uuid = network.uuid
+        self.network_uuid = network.db_entry['uuid']
 
         self.subst = {
             'config_dir': os.path.join(

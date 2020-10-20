@@ -56,6 +56,10 @@ class Monitor(daemon.Daemon):
                 if not n:
                     continue
 
+                if n.db_entry['state_updated'] - time.time() < 60:
+                    # Network state changed in the last minute, punt for now
+                    continue
+
                 if not n.is_okay():
                     LOG.withObj(n).info('Recreating not okay network')
                     n.create()
@@ -64,14 +68,16 @@ class Monitor(daemon.Daemon):
                 seen_vxids.append(n.vxlan_id)
 
             except exceptions.LockException as e:
-                LOG.warning('Failed to acquire lock while maintaining networks: %s' % e)
+                LOG.warning(
+                    'Failed to acquire lock while maintaining networks: %s' % e)
 
         # Determine if there are any extra vxids
         extra_vxids = set(vxid_to_mac.keys()) - set(seen_vxids)
 
         # Delete "deleted" SF networks and log unknown vxlans
         if extra_vxids:
-            LOG.withField('vxids', extra_vxids).warning('Extra vxlans present!')
+            LOG.withField('vxids', extra_vxids).warning(
+                'Extra vxlans present!')
 
             # Determine the network uuids for those vxids
             # vxid_to_uuid = {}
