@@ -138,6 +138,12 @@ class BaseTestCase(testtools.TestCase):
 
             time.sleep(5)
 
+            # If this is a login prompt, then try mashing the console keyboard
+            if message == 'login prompt':
+                s = telnetlib.Telnet(i['node'], i['console_port'], 30)
+                s.write('\n'.encode('ascii'))
+                s.close()
+
         self._log_console(instance_uuid)
         self._log_instance_events(instance_uuid)
         raise TimeoutException(
@@ -166,7 +172,7 @@ class BaseTestCase(testtools.TestCase):
                     self._log_image_events(url)
                     raise WrongEventException(
                         'After time %s, image %s expected event "%s:%s" got %s' % (
-                         after, url, operation, message, event['message']))
+                            after, url, operation, message, event['message']))
 
             time.sleep(5)
 
