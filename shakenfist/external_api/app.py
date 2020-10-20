@@ -1104,7 +1104,7 @@ def _delete_network(network_from_db):
     if n.db_entry.get('floating_gateway'):
         with db.get_lock('ipmanager', None, 'floating', ttl=120):
             ipm = db.get_ipmanager('floating')
-            ipm.release(n.floating_gateway)
+            ipm.release(n.db_entry['floating_gateway'])
             db.persist_ipmanager('floating', ipm.save())
 
     db.update_network_state(network_uuid, 'deleted')
