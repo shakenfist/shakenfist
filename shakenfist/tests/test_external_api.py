@@ -955,6 +955,7 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
                 'NODE_IP': '127.0.0.1',
                 'NETWORK_NODE_IP': '127.0.0.1',
                 'LOG_METHOD_TRACE': 1,
+                'NODE_EGRESS_NIC': 'eth0'
             }
             if key in fc:
                 return fc[key]
@@ -993,7 +994,7 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
                                  mock_db_get_networks):
 
         mock_network = mock.patch('shakenfist.net.from_db',
-                                  return_value=net.Network())
+                                  return_value=net.Network({'uuid': 'foo'}))
         mock_network.start()
         self.addCleanup(mock_network.stop)
 

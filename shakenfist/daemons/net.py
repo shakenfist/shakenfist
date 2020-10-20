@@ -56,7 +56,7 @@ class Monitor(daemon.Daemon):
                 if not n:
                     continue
 
-                if n['state_updated'] - time.time() < 60:
+                if n.db_entry['state_updated'] - time.time() < 60:
                     # Network state changed in the last minute, punt for now
                     continue
 

@@ -1101,7 +1101,7 @@ def _delete_network(network_from_db):
     n.remove_dhcp()
     n.delete()
 
-    if n.floating_gateway:
+    if n.db_entry.get('floating_gateway'):
         with db.get_lock('ipmanager', None, 'floating', ttl=120):
             ipm = db.get_ipmanager('floating')
             ipm.release(n.floating_gateway)
