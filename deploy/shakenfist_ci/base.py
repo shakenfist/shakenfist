@@ -1,5 +1,6 @@
 import datetime
 import random
+from socket import error as socket_error
 import string
 import sys
 import testtools
@@ -140,9 +141,12 @@ class BaseTestCase(testtools.TestCase):
 
             # If this is a login prompt, then try mashing the console keyboard
             if message == 'login prompt':
-                s = telnetlib.Telnet(i['node'], i['console_port'], 30)
-                s.write('\n'.encode('ascii'))
-                s.close()
+                try:
+                    s = telnetlib.Telnet(i['node'], i['console_port'], 30)
+                    s.write('\n'.encode('ascii'))
+                    s.close()
+                except socket_error:
+                    pass
 
         self._log_console(instance_uuid)
         self._log_instance_events(instance_uuid)
