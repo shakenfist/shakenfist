@@ -587,3 +587,13 @@ def get_queue_length(queuename):
 
 def restart_queues():
     etcd.restart_queues()
+
+
+# Image
+
+def get_image_metadata(url_hash, node=None):
+    return etcd.get('image', url_hash, node)
+
+
+def persist_image_metadata(url_hash, node, metadata):
+    etcd.put('image', url_hash, node, metadata)
