@@ -947,7 +947,7 @@ def _safe_get_network_interface(interface_uuid):
         log.info('Network not found or deleted')
         return None, None, error(404, 'interface network not found')
 
-    if get_jwt_identity() not in [n.namespace, 'system']:
+    if get_jwt_identity() not in [n.db_entry['namespace'], 'system']:
         log.info('Interface not found, failed ownership test')
         return None, None, error(404, 'interface not found')
 
