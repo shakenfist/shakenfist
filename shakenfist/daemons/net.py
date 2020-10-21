@@ -129,6 +129,8 @@ class Monitor(daemon.Daemon):
                              'network node', 'deploy', None, None)
 
             elif isinstance(workitem, UpdateDHCPNetworkTask):
+                n.create()
+                n.ensure_mesh()
                 n.update_dhcp()
                 db.add_event('network', workitem.network_uuid(),
                              'network node', 'update dhcp', None, None)

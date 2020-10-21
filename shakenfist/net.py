@@ -279,7 +279,6 @@ class Network(object):
             return
 
         if util.is_network_node():
-            self.ensure_mesh()
             subst = self.subst_dict()
             with util.RecordedOperation('update dhcp', self):
                 with db.get_lock('network', None, self.db_entry['uuid'], ttl=120):
