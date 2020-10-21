@@ -173,8 +173,9 @@ class Image(object):
                 fetched += len(chunk)
                 f.write(chunk)
 
-                if time.time() - last_refresh > 10:
+                if time.time() - last_refresh > 5:
                     db.refresh_locks(locks)
+                    last_refresh = time.time()
 
         if fetched > 0:
             self._persist_info()
