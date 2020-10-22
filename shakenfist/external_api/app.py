@@ -341,6 +341,13 @@ class Root(Resource):
         return resp
 
 
+class AdminLocks(Resource):
+    @jwt_required
+    @caller_is_admin
+    def get(self):
+        return db.get_existing_locks()
+
+
 class Auth(Resource):
     def _get_keys(self, namespace):
         rec = db.get_namespace(namespace)
@@ -1301,6 +1308,8 @@ class Nodes(Resource):
 
 
 api.add_resource(Root, '/')
+
+api.add_resource(AdminLocks, '/admin/locks')
 
 api.add_resource(Auth, '/auth')
 api.add_resource(AuthNamespaces, '/auth/namespaces')

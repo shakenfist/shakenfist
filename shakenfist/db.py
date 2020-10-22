@@ -55,6 +55,10 @@ def clear_stale_locks():
     etcd.clear_stale_locks()
 
 
+def get_existing_locks():
+    return etcd.get_existing_locks()
+
+
 def get_node_ips():
     for value in etcd.get_all('node', None):
         yield value['ip']
