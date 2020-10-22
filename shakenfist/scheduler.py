@@ -114,30 +114,38 @@ class Scheduler(object):
 
     def _find_most_matching_images(self, requested_images, candidates):
         candidates_image_matches = {}
+
+        img_meta = db.get_image_metadata_all()
+        if not img_meta:
+            # No images in the cluster so return the original candidate list
+            return candidates
+
+        # Determine number of matching images per node
         for node in candidates:
             candidates_image_matches[node] = 0
 
             present_images = []
-            for inst in list(db.get_instances(only_node=node)):
-                if inst['block_devices']:
-                    for disk in inst['block_devices']['devices']:
-                        if (disk.get('base') and
-                                not disk.get('base') in present_images):
-                            present_images.append(disk.get('base'))
+            for key, meta in img_meta.items():
+                if not key.endswith('/' + node):
+                    continue
+                present_images.append(meta['url'])
 
             for image in present_images:
                 if image in requested_images:
                     candidates_image_matches[node] += 1
 
+        # Create dict of candidate lists keyed by number of image matches
         candidates_by_image_matches = {}
         for node in candidates:
             matches = candidates_image_matches[node]
             candidates_by_image_matches.setdefault(matches, [])
             candidates_by_image_matches[matches].append(node)
 
+        # If no matches, return the original candidate list
         if len(candidates_by_image_matches) == 0:
             return candidates
 
+        # Return all candidates that have the highest number of image matches
         max_matches = max(candidates_by_image_matches.keys())
         return candidates_by_image_matches[max_matches]
 

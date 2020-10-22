@@ -9,7 +9,7 @@ from shakenfist import config
 from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import exceptions
-from shakenfist import images
+from shakenfist.images import Image
 from shakenfist import logutil
 from shakenfist import net
 from shakenfist import scheduler
@@ -135,9 +135,14 @@ def image_fetch(url, instance_uuid):
         instance = virt.from_db(instance_uuid)
 
     try:
-        img = images.Image(url)
-        img.get([], instance)
-        db.add_event('image', url, 'fetch', None, None, 'success')
+        # TODO(andy): Wait up to 15 mins for another queue process to download
+        # the required image. This will be changed to queue on a
+        # "waiting_image_fetch" queue but this works now.
+        with db.get_lock('image', config.parsed.get('NODE_NAME'),
+                         Image.calc_unique_ref(url), timeout=15*60) as lock:
+            img = Image.from_url(url)
+            img.get([lock], instance)
+            db.add_event('image', url, 'fetch', None, None, 'success')
 
     except (exceptions.HTTPError, requests.exceptions.RequestException) as e:
         LOG.withField('image', url).warning('Failed to fetch image')

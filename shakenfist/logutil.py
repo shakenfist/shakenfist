@@ -64,7 +64,7 @@ class SFPyLogrus(logging.Logger, PyLogrusBase):
 
     def withImage(self, inst):
         if not isinstance(inst, str):
-            inst = inst.hashed_image_url
+            inst = inst.unique_ref
         return SFCustomAdapter(self, {'image': inst})
 
 
@@ -167,7 +167,7 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
     def withImage(self, inst):
         extra = copy.deepcopy(self._extra)
         if not isinstance(inst, str):
-            inst = inst.hashed_image_url
+            inst = inst.unique_ref
         extra.update({'image': inst})
         return SFCustomAdapter(self._logger, extra, self._prefix)
 

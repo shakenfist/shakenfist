@@ -22,6 +22,7 @@ class AbortInstanceStartException(SchedulerException):
     pass
 
 
+# Database
 class DatabaseException(Exception):
     pass
 
@@ -35,6 +36,10 @@ class WriteException(DatabaseException):
 
 
 class ReadException(DatabaseException):
+    pass
+
+
+class BadMetadataPacket(DatabaseException):
     pass
 
 
