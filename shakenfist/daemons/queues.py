@@ -135,9 +135,12 @@ def image_fetch(url, instance_uuid):
         instance = virt.from_db(instance_uuid)
 
     try:
+        # TODO(andy): Wait up to 15 mins for another queue process to download
+        # the required image. This will be changed to queue on a
+        # "waiting_image_fetch" queue but this works now.
         with db.get_lock('image', config.parsed.get('NODE_NAME'),
-                         Image.calc_unique_ref(url)) as lock:
-            img = Image.fromURL(url)
+                         Image.calc_unique_ref(url), timeout=15*60) as lock:
+            img = Image.from_url(url)
             img.get([lock], instance)
             db.add_event('image', url, 'fetch', None, None, 'success')
 

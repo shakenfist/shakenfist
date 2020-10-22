@@ -76,7 +76,7 @@ class Image(object):
         return h.hexdigest()
 
     @staticmethod
-    def fromURL(url, checksum=None):
+    def from_url(url, checksum=None):
         # Handle URL shortcut with built-in resolvers
         url, resolver_checksum = Image._resolve(url)
 

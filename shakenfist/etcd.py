@@ -193,6 +193,14 @@ def get_all(objecttype, subtype, sort_order=None):
         yield json.loads(value[0])
 
 
+def get_all_dict(objecttype, subtype=None, sort_order=None):
+    path = _construct_key(objecttype, subtype, None)
+    key_val = {}
+    for value in Etcd3Client().get_prefix(path, sort_order=sort_order):
+        key_val[value[1]['key'].decode('utf-8')] = json.loads(value[0])
+    return key_val
+
+
 def delete(objecttype, subtype, name):
     path = _construct_key(objecttype, subtype, name)
     Etcd3Client().delete(path)

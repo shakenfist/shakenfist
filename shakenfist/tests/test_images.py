@@ -150,22 +150,22 @@ class ImageObjectTestCase(testtools.TestCase):
     @mock.patch('shakenfist.db.get_image_metadata', return_value=None)
     @mock.patch('os.makedirs')
     def test_resolve_image(self, mock_mkdirs, mock_exists, mock_ubuntu, mock_centos):
-        img = images.Image.fromURL('win10')
+        img = images.Image.from_url('win10')
         self.assertEqual('win10', img.url)
 
-        img = images.Image.fromURL('http://example.com/image')
+        img = images.Image.from_url('http://example.com/image')
         self.assertEqual('http://example.com/image', img.url)
 
-        img = images.Image.fromURL('cirros')
+        img = images.Image.from_url('cirros')
         self.assertEqual('!!!cirros!!!', img.url)
 
-        img = images.Image.fromURL('ubuntu')
+        img = images.Image.from_url('ubuntu')
         self.assertEqual('!!!ubuntu!!!', img.url)
 
     @mock.patch('shakenfist.db.get_image_metadata', return_value=None)
     @mock.patch('os.makedirs')
     def test_hash_image(self, mock_mkdirs, mock_get_meta):
-        img = images.Image.fromURL('http://example.com')
+        img = images.Image.from_url('http://example.com')
         self.assertEqual('f0e6a6a97042a4f1f1c87f5f7d44315b2d'
                          '852c2df5c7991cc66241bf7072d1c4', img.unique_ref)
 
@@ -187,7 +187,7 @@ class ImageObjectTestCase(testtools.TestCase):
     @mock.patch('os.makedirs')
     def test_does_not_require_fetch(self, mock_mkdirs,
                                     mock_get_meta, mock_request_head):
-        img = images.Image.fromURL('http://example.com')
+        img = images.Image.from_url('http://example.com')
         dirty_fields = img._new_image_available(img._open_connection())
         self.assertEqual(1, img.file_version)
         self.assertEqual(False, dirty_fields)
@@ -205,12 +205,12 @@ class ImageObjectTestCase(testtools.TestCase):
     @mock.patch('os.makedirs')
     def test_image_rejects_bad_packet(self, mock_mkdirs, mock_get_meta):
         with testtools.ExpectedException(exceptions.BadMetadataPacket):
-            images.Image.fromURL('http://example.com')
+            images.Image.from_url('http://example.com')
 
     @mock.patch('shakenfist.db.get_image_metadata', return_value=None)
     @mock.patch('os.makedirs')
     def test_image_stores_checksum(self, mock_mkdirs, mock_get_meta):
-        img = images.Image.fromURL('http://example.com', '1abab')
+        img = images.Image.from_url('http://example.com', '1abab')
         self.assertEqual('1abab', img.checksum)
 
     @mock.patch('shakenfist.config.parsed.get', return_value='sf-245')
@@ -219,7 +219,7 @@ class ImageObjectTestCase(testtools.TestCase):
     @mock.patch('shakenfist.db.persist_image_metadata')
     def test_image_persist(self, mock_db_persist, mock_mkdirs, mock_get_meta,
                            mock_config):
-        img = images.Image.fromURL('http://example.com', '1abab')
+        img = images.Image.from_url('http://example.com', '1abab')
         img.size = 1234
         img.file_version = 4
         img.persist()
@@ -240,7 +240,7 @@ class ImageObjectTestCase(testtools.TestCase):
     @mock.patch('shakenfist.db.get_image_metadata', return_value=None)
     @mock.patch('os.makedirs')
     def test_version_image_path(self, mock_mkdirs, mock_get_meta, mock_config):
-        img = images.Image.fromURL('http://some.com')
+        img = images.Image.from_url('http://some.com')
         img.file_version = 1
         self.assertEqual('/a/b/c/image_cache/bbf155338660b476435'
                          '06f35a6f92ebaef11e630b17d33da88b8638d267763f4.v001',
@@ -264,7 +264,7 @@ class ImageObjectTestCase(testtools.TestCase):
     @mock.patch('os.makedirs')
     def test_requires_fetch_due_age(self, mock_mkdirs,
                                     mock_get_meta, mock_request_head):
-        img = images.Image.fromURL('http://example.com')
+        img = images.Image.from_url('http://example.com')
         dirty_fields = img._new_image_available(img._open_connection())
         self.assertEqual(1, img.file_version)
         self.assertEqual(('modified', 'Fri, 06 Mar 2020 19:19:05 GMT',
@@ -289,7 +289,7 @@ class ImageObjectTestCase(testtools.TestCase):
     @mock.patch('os.makedirs')
     def test_requires_fetch_due_size(self, mock_mkdirs,
                                      mock_get_meta, mock_request_head):
-        img = images.Image.fromURL('http://example.com')
+        img = images.Image.from_url('http://example.com')
         dirty_fields = img._new_image_available(img._open_connection())
         self.assertEqual(1, img.file_version)
         self.assertEqual(('size', 16338944, 200001), dirty_fields)
@@ -304,7 +304,7 @@ class ImageObjectTestCase(testtools.TestCase):
                              'Content-Length': 200000}))
     def test_fetch_image_new(self, mock_get,
                              mock_makedirs, mock_get_meta, mock_config):
-        img = images.Image.fromURL('http://example.com')
+        img = images.Image.from_url('http://example.com')
         dirty_fields = img._new_image_available(img._open_connection())
         self.assertEqual(('modified', None, 'Tue, 10 Sep 2019 07:24:40 GMT'),
                          dirty_fields)
