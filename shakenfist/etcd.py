@@ -22,6 +22,8 @@ from shakenfist.tasks import QueueTask
 
 LOG, _ = logutil.setup(__name__)
 
+LOCK_PREFIX = '/sflocks'
+
 
 class ActualLock(Lock):
     def __init__(self, objecttype, subtype, name, ttl=120,
@@ -44,7 +46,7 @@ class ActualLock(Lock):
             indent=4, sort_keys=True)
 
         # We also override the location of the lock so that we're in our own spot
-        self.key = '/sflocks%s' % self.path
+        self.key = LOCK_PREFIX + self.path
 
     def get_holder(self):
         value = Etcd3Client().get(self.key, metadata=True)
@@ -142,8 +144,9 @@ def clear_stale_locks():
     # timeout and that can take a long time.
     client = Etcd3Client()
 
-    for data, metadata in client.get_prefix('/sflocks/', sort_order='ascend', sort_target='key'):
-        lockname = str(metadata['key']).replace('/sflocks/', '')
+    for data, metadata in client.get_prefix(
+            LOCK_PREFIX + '/', sort_order='ascend', sort_target='key'):
+        lockname = str(metadata['key']).replace(LOCK_PREFIX + '/', '')
         holder = json.loads(data)
         node = holder['node']
         pid = int(holder['pid'])
@@ -154,6 +157,13 @@ def clear_stale_locks():
                             'old-pid': pid,
                             'old-node': node,
                             }).warning('Removed stale lock')
+
+
+def get_existing_locks():
+    key_val = {}
+    for value in Etcd3Client().get_prefix(LOCK_PREFIX + '/'):
+        key_val[value[1]['key'].decode('utf-8')] = json.loads(value[0])
+    return key_val
 
 
 def _construct_key(objecttype, subtype, name):
