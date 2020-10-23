@@ -139,7 +139,8 @@ def image_fetch(url, instance_uuid):
         # the required image. This will be changed to queue on a
         # "waiting_image_fetch" queue but this works now.
         with db.get_lock('image', config.parsed.get('NODE_NAME'),
-                         Image.calc_unique_ref(url), timeout=15*60) as lock:
+                         Image.calc_unique_ref(url), timeout=15*60,
+                         op='Image fetch') as lock:
             img = Image.from_url(url)
             img.get([lock], instance)
             db.add_event('image', url, 'fetch', None, None, 'success')
@@ -206,7 +207,8 @@ def instance_preflight(instance_uuid, network):
 
 def instance_start(instance_uuid, network):
     with db.get_lock(
-            'instance', None, instance_uuid, ttl=900, timeout=120) as lock:
+            'instance', None, instance_uuid, ttl=900, timeout=120,
+            op='Instance start') as lock:
         instance = virt.from_db(instance_uuid)
 
         # Collect the networks
@@ -248,7 +250,8 @@ def instance_start(instance_uuid, network):
 
 
 def instance_delete(instance_uuid):
-    with db.get_lock('instance', None, instance_uuid, timeout=120):
+    with db.get_lock('instance', None, instance_uuid, timeout=120,
+                     op='Instance delete'):
         db.add_event('instance', instance_uuid,
                      'queued', 'delete', None, None)
 

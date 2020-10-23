@@ -36,9 +36,9 @@ def see_this_node():
 
 
 def get_lock(objecttype, subtype, name, ttl=60, timeout=ETCD_ATTEMPT_TIMEOUT,
-             relatedobjects=None, log_ctx=LOG):
+             relatedobjects=None, log_ctx=LOG, op=None):
     return etcd.get_lock(objecttype, subtype, name, ttl=ttl, timeout=timeout,
-                         log_ctx=log_ctx)
+                         log_ctx=log_ctx, op=None)
 
 
 def refresh_lock(lock, relatedobjects=None, log_ctx=LOG):
@@ -103,7 +103,7 @@ def allocate_network(netblock, provide_dhcp=True, provide_nat=False, name=None,
     ipm = ipmanager.NetBlock(netblock)
     etcd.put('ipmanager', None, net_id, ipm.save())
 
-    with etcd.get_lock('vxlan', None, 'all'):
+    with etcd.get_lock('vxlan', None, 'all', op='Allocate network'):
         vxid = 1
         while etcd.get('vxlan', None, vxid):
             vxid += 1
@@ -331,7 +331,8 @@ def get_stale_instances(delay):
 
 def create_network_interface(interface_uuid, netdesc, instance_uuid, order):
     if 'macaddress' not in netdesc or not netdesc['macaddress']:
-        with etcd.get_lock('macaddress', None, 'all', ttl=120):
+        with etcd.get_lock('macaddress', None, 'all', ttl=120,
+                           op='Allocate macaddress'):
             possible_mac = util.random_macaddr()
             while etcd.get('macaddress', None, possible_mac):
                 possible_mac = util.random_macaddr()
@@ -490,7 +491,8 @@ def _port_free(port):
 
 def allocate_console_port(instance_uuid):
     node = config.parsed.get('NODE_NAME')
-    with etcd.get_lock('console', None, node):
+    with etcd.get_lock('console', None, node,
+                       op='Allocate console port'):
         consumed = []
         for value in etcd.get_all('console', node):
             consumed.append(value['port'])

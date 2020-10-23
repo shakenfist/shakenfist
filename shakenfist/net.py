@@ -35,7 +35,8 @@ class Network(object):
         self.db_entry = db_entry
         self.physical_nic = config.parsed.get('NODE_EGRESS_NIC')
 
-        with db.get_lock('ipmanager', None, self.db_entry['uuid'], ttl=120):
+        with db.get_lock('ipmanager', None, self.db_entry['uuid'], ttl=120,
+                         op='Network object initialization'):
             ipm = db.get_ipmanager(self.db_entry['uuid'])
 
             self.ipblock = ipm.network_address
@@ -107,7 +108,8 @@ class Network(object):
     def create(self):
         subst = self.subst_dict()
 
-        with db.get_lock('network', None, self.db_entry['uuid'], ttl=120):
+        with db.get_lock('network', None, self.db_entry['uuid'], ttl=120,
+                         op='Network create'):
             if not util.check_for_interface(subst['vx_interface']):
                 with util.RecordedOperation('create vxlan interface', self):
                     util.create_interface(
@@ -181,7 +183,7 @@ class Network(object):
 
         subst = self.subst_dict()
         if not self.db_entry['floating_gateway']:
-            with db.get_lock('ipmanager', None, 'floating', ttl=120):
+            with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Network deploy NAT'):
                 ipm = db.get_ipmanager('floating')
                 self.db_entry['floating_gateway'] = ipm.get_random_free_address()
                 db.persist_ipmanager('floating', ipm.save())
@@ -193,7 +195,8 @@ class Network(object):
         subst['floating_gateway'] = self.db_entry['floating_gateway']
         subst['floating_netmask'] = ipm.netmask
 
-        with db.get_lock('network', None, self.db_entry['uuid'], ttl=120):
+        with db.get_lock('network', None, self.db_entry['uuid'], ttl=120,
+                         op='Network deploy NAT'):
             with util.RecordedOperation('enable virtual routing', self):
                 if not subst['floating_gateway'] in list(util.get_interface_addresses(
                         subst['netns'], subst['physical_veth_inner'])):
@@ -231,7 +234,8 @@ class Network(object):
         subst = self.subst_dict()
 
         # Cleanup local node
-        with db.get_lock('network', None, self.db_entry['uuid'], ttl=120):
+        with db.get_lock('network', None, self.db_entry['uuid'], ttl=120,
+                         op='Network delete'):
             if util.check_for_interface(subst['vx_bridge']):
                 with util.RecordedOperation('delete vxlan bridge', self):
                     util.execute(None, 'ip link delete %(vx_bridge)s' % subst)
@@ -258,7 +262,8 @@ class Network(object):
                         util.execute(None, 'ip netns del %(netns)s' % subst)
 
                 if self.db_entry['floating_gateway']:
-                    with db.get_lock('ipmanager', None, 'floating', ttl=120):
+                    with db.get_lock('ipmanager', None, 'floating', ttl=120,
+                                     op='Network delete'):
                         ipm = db.get_ipmanager('floating')
                         ipm.release(self.db_entry['floating_gateway'])
                         db.persist_ipmanager('floating', ipm.save())
@@ -281,7 +286,8 @@ class Network(object):
         if util.is_network_node():
             subst = self.subst_dict()
             with util.RecordedOperation('update dhcp', self):
-                with db.get_lock('network', None, self.db_entry['uuid'], ttl=120):
+                with db.get_lock('network', None, self.db_entry['uuid'], ttl=120,
+                                 op='Network update DHCP'):
                     d = dhcp.DHCP(self, subst['vx_veth_inner'])
                     d.restart_dhcpd()
         else:
@@ -294,7 +300,8 @@ class Network(object):
         if util.is_network_node():
             subst = self.subst_dict()
             with util.RecordedOperation('remove dhcp', self):
-                with db.get_lock('network', None, self.db_entry['uuid'], ttl=120):
+                with db.get_lock('network', None, self.db_entry['uuid'], ttl=120,
+                                 op='Network remove DHCP'):
                     d = dhcp.DHCP(self, subst['vx_veth_inner'])
                     d.remove_dhcpd()
         else:
@@ -315,7 +322,8 @@ class Network(object):
                 yield m.group(1)
 
     def ensure_mesh(self):
-        with db.get_lock('network', None, self.db_entry['uuid'], ttl=120):
+        with db.get_lock('network', None, self.db_entry['uuid'], ttl=120,
+                         op='Network ensure mesh'):
             removed = []
             added = []
 

@@ -27,7 +27,8 @@ LOCK_PREFIX = '/sflocks'
 
 class ActualLock(Lock):
     def __init__(self, objecttype, subtype, name, ttl=120,
-                 client=None, timeout=None, log_ctx=LOG):
+                 client=None, timeout=1000000000, log_ctx=LOG,
+                 op=None):
 
         self.path = _construct_key(objecttype, subtype, name)
         super(ActualLock, self).__init__(self.path, ttl=ttl, client=client)
@@ -36,12 +37,14 @@ class ActualLock(Lock):
         self.objectname = name
         self.timeout = min(timeout, 1000000000)
         self.log_ctx = log_ctx.withField('path', self.path)
+        self.operation = op
 
         # We override the UUID of the lock with something more helpful to debugging
         self._uuid = json.dumps(
             {
                 'node': config.parsed.get('NODE_NAME'),
-                'pid': os.getpid()
+                'pid': os.getpid(),
+                'operation': self.operation
             },
             indent=4, sort_keys=True)
 
@@ -64,51 +67,48 @@ class ActualLock(Lock):
         slow_warned = False
         threshold = int(config.parsed.get('SLOW_LOCK_THRESHOLD'))
 
-        try:
-            while time.time() - start_time < self.timeout:
-                res = self.acquire()
-                if res:
-                    return self
-
+        while time.time() - start_time < self.timeout:
+            res = self.acquire()
+            if res:
                 duration = time.time() - start_time
-                if (duration > threshold and not slow_warned):
+                if duration > threshold:
                     db.add_event(self.objecttype, self.objectname,
-                                 'lock', 'acquire', None,
-                                 'Waiting for lock more than threshold')
-
-                    node, pid = self.get_holder()
+                                 'lock', 'acquired', None,
+                                 'Waited %d seconds for lock' % duration)
                     self.log_ctx.withFields({'duration': duration,
-                                             'threshold': threshold,
-                                             'holder-pid': pid,
-                                             'holder-node': node,
-                                             }).info('Waiting for lock')
-                    slow_warned = True
-
-                time.sleep(1)
+                                             }).info('Acquiring a lock was slow')
+                return self
 
             duration = time.time() - start_time
-            db.add_event(self.objecttype, self.objectname,
-                         'lock', 'failed', None,
-                         'Failed to acquire lock after %.02f seconds' % duration)
-
-            node, pid = self.get_holder()
-            self.log_ctx.withFields({'duration': duration,
-                                     'holder-pid': pid,
-                                     'holder-node': node,
-                                     }).info('Failed to acquire lock')
-
-            raise exceptions.LockException(
-                'Cannot acquire lock %s, timed out after %.02f seconds'
-                % (self.name, duration))
-
-        finally:
-            duration = time.time() - start_time
-            if duration > threshold:
+            if (duration > threshold and not slow_warned):
                 db.add_event(self.objecttype, self.objectname,
-                             'lock', 'acquired', None,
-                             'Waited %d seconds for lock' % duration)
+                             'lock', 'acquire', None,
+                             'Waiting for lock more than threshold')
+
+                node, pid = self.get_holder()
                 self.log_ctx.withFields({'duration': duration,
-                                         }).info('Acquiring a lock was slow')
+                                         'threshold': threshold,
+                                         'holder-pid': pid,
+                                         'holder-node': node,
+                                         }).info('Waiting for lock')
+                slow_warned = True
+
+            time.sleep(1)
+
+        duration = time.time() - start_time
+        db.add_event(self.objecttype, self.objectname,
+                     'lock', 'failed', None,
+                     'Failed to acquire lock after %.02f seconds' % duration)
+
+        node, pid = self.get_holder()
+        self.log_ctx.withFields({'duration': duration,
+                                 'holder-pid': pid,
+                                 'holder-node': node,
+                                 }).info('Failed to acquire lock')
+
+        raise exceptions.LockException(
+            'Cannot acquire lock %s, timed out after %.02f seconds'
+            % (self.name, duration))
 
     def __exit__(self, _exception_type, _exception_value, _traceback):
         if not self.release():
@@ -116,7 +116,8 @@ class ActualLock(Lock):
                 'Cannot release lock: %s' % self.name)
 
 
-def get_lock(objecttype, subtype, name, ttl=60, timeout=10, log_ctx=LOG):
+def get_lock(objecttype, subtype, name, ttl=60, timeout=10, log_ctx=LOG,
+             op=None):
     """Retrieves an etcd lock object. It is not locked, to lock use acquire().
 
     The returned lock can be used as a context manager, with the lock being
@@ -124,7 +125,7 @@ def get_lock(objecttype, subtype, name, ttl=60, timeout=10, log_ctx=LOG):
     will have no timeout.
     """
     return ActualLock(objecttype, subtype, name, ttl=ttl, client=Etcd3Client(),
-                      log_ctx=log_ctx, timeout=timeout)
+                      log_ctx=log_ctx, timeout=timeout, op=op)
 
 
 def refresh_lock(lock, log_ctx=LOG):
@@ -222,7 +223,7 @@ def delete_all(objecttype, subtype, sort_order=None):
 
 
 def enqueue(queuename, workitem):
-    with get_lock('queue', None, queuename):
+    with get_lock('queue', None, queuename, op='Enqueue'):
         i = 0
         entry_time = time.time()
         jobname = '%s-%03d' % (entry_time, i)
@@ -285,7 +286,7 @@ def dequeue(queuename):
     if not client.get_prefix(queue_path):
         return None, None
 
-    with get_lock('queue', None, queuename):
+    with get_lock('queue', None, queuename, op='Dequeue'):
         for data, metadata in client.get_prefix(queue_path, sort_order='ascend', sort_target='key'):
             jobname = str(metadata['key']).split('/')[-1].rstrip("'")
             workitem = json.loads(data, object_hook=decodeTasks)
@@ -302,7 +303,7 @@ def dequeue(queuename):
 
 
 def resolve(queuename, jobname):
-    with get_lock('queue', None, queuename):
+    with get_lock('queue', None, queuename, op='Resolve'):
         delete('processing', queuename, jobname)
         LOG.withFields({'jobname': jobname,
                         'queuename': queuename,
@@ -310,15 +311,14 @@ def resolve(queuename, jobname):
 
 
 def get_queue_length(queuename):
-    with get_lock('queue', None, queuename):
-        queued = len(list(get_all('queue', queuename)))
-        processing = len(list(get_all('processing', queuename)))
-        return processing, queued
+    queued = len(list(get_all('queue', queuename)))
+    processing = len(list(get_all('processing', queuename)))
+    return processing, queued
 
 
 def _restart_queue(queuename):
     queue_path = _construct_key('processing', queuename, None)
-    with get_lock('queue', None, queuename):
+    with get_lock('queue', None, queuename, op='Restart'):
         for data, metadata in Etcd3Client().get_prefix(queue_path, sort_order='ascend'):
             jobname = str(metadata['key']).split('/')[-1].rstrip("'")
             workitem = json.loads(data)
