@@ -105,6 +105,7 @@ class Monitor(daemon.Daemon):
                 p = observers[instance_uuid]
                 try:
                     os.kill(p.pid, signal.SIGKILL)
+                    observers[instance_uuid].join(1)
                 except Exception:
                     pass
 

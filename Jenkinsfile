@@ -68,6 +68,17 @@ pipeline {
           '''
       }
     }
+    stage('Assert that we have a reasonable set of processes') {
+      steps {
+        sh '''  # No zombies!
+                if [ `ps -ef | grep sf | grep -c defunct` -gt 0 ]
+                then
+                  echo "We have zombies!"
+                  exit 1
+                fi
+          '''
+      }
+    }
   }
 
   post {
