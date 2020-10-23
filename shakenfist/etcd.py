@@ -281,6 +281,10 @@ def dequeue(queuename):
     queue_path = _construct_key('queue', queuename, None)
     client = Etcd3Client()
 
+    # We only hold the lock if there is anything in the queue
+    if not client.get_prefix(queue_path):
+        return None, None
+
     with get_lock('queue', None, queuename):
         for data, metadata in client.get_prefix(queue_path, sort_order='ascend', sort_target='key'):
             jobname = str(metadata['key']).split('/')[-1].rstrip("'")
