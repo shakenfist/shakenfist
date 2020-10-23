@@ -148,7 +148,7 @@ class Image(object):
             diff_field = self._new_image_available(resp)
             if diff_field:
                 self.log.withField('diff_field', diff_field).info(
-                                    'Fetch required due HTTP field change')
+                    'Fetch required due HTTP field change')
                 if related_object:
                     t, u = related_object.unique_label()
                     msg = '%s: %s -> %s' % diff_field
@@ -272,7 +272,8 @@ def resize(locks, image_path, size):
         return backing_file
 
     util.execute(locks,
-                 'cp %s %s' % (image_path + '.qcow2', backing_file))
+                 'qemu-img create -b %s.qcow2 -f qcow2 %s'
+                 % (image_path, backing_file))
     util.execute(locks,
                  'qemu-img resize %s %sG' % (backing_file, size))
 
@@ -327,8 +328,8 @@ def create_cow(locks, cache_file, disk_file):
         return
 
     util.execute(locks,
-                 'qemu-img create -b %s -f qcow2 %s' % (
-                     cache_file, disk_file))
+                 'qemu-img create -b %s -f qcow2 %s'
+                 % (cache_file, disk_file))
 
 
 def create_flat(locks, cache_file, disk_file):
