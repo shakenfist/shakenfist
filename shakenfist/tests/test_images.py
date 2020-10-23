@@ -227,13 +227,13 @@ class ImageObjectTestCase(testtools.TestCase):
             'f0e6a6a97042a4f1f1c87f5f7d44315b2d852c2df5c7991cc66241bf7072d1c4',
             'sf-245',
             {
-              'url': 'http://example.com',
-              'checksum': '1abab',
-              'size': 1234,
-              'modified': None,
-              'fetched': None,
-              'file_version': 4,
-              'version': 1,
+                'url': 'http://example.com',
+                'checksum': '1abab',
+                'size': 1234,
+                'modified': None,
+                'fetched': None,
+                'file_version': 4,
+                'version': 1,
             })
 
     @mock.patch('shakenfist.config.parsed.get', return_value='/a/b/c')
@@ -382,7 +382,7 @@ class ImageObjectTestCase(testtools.TestCase):
         images.resize(None, '/a/b/c/hash', 8)
         mock_link.assert_not_called()
         mock_execute.assert_has_calls(
-            [mock.call(None, 'cp /a/b/c/hash.qcow2 /a/b/c/hash.qcow2.8G'),
+            [mock.call(None, 'qemu-img create -b /a/b/c/hash.qcow2 -f qcow2 /a/b/c/hash.qcow2.8G'),
              mock.call(None, 'qemu-img resize /a/b/c/hash.qcow2.8G 8G')]
         )
 
