@@ -135,7 +135,7 @@ def refresh_lock(lock, log_ctx=LOG):
             'The lock on %s has expired.' % lock.path)
 
     lock.refresh()
-    log_ctx.withField('lock', lock.name).info('Refreshed lock')
+    log_ctx.withField('lock', lock.name).debug('Refreshed lock')
 
 
 def clear_stale_locks():

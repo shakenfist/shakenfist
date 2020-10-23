@@ -159,7 +159,7 @@ class Monitor(daemon.Daemon):
                 gauges[metric].set(stats[metric])
 
             db.update_metrics_bulk(stats)
-            LOG.info('Updated metrics')
+            LOG.debug('Updated metrics')
             gauges['updated_at'].set_to_current_time()
 
         while True:
