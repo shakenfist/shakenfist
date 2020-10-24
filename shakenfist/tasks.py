@@ -25,7 +25,8 @@ class QueueTask(object):
 
     def __eq__(self, other):
         if not QueueTask.__subclasscheck__(type(other)):
-            raise NotImplementedError('Objects must be subclasses of QueueTask')
+            raise NotImplementedError(
+                'Objects must be subclasses of QueueTask')
         return self.__hash__() == other.__hash__()
 
     def __hash__(self):
@@ -47,7 +48,8 @@ class InstanceTask(QueueTask):
 
         # General checks
         if not instance_uuid:
-            raise NoInstanceTaskException('No instance specified for InstanceTask')
+            raise NoInstanceTaskException(
+                'No instance specified for InstanceTask')
         if not isinstance(instance_uuid, str):
             raise NoInstanceTaskException('Instance UUID is not a string')
         if network and not isinstance(network, list):
@@ -111,7 +113,8 @@ class NetworkTask(QueueTask):
 
         # General checks
         if not network_uuid:
-            raise NoNetworkTaskException('No network specified for NetworkTask')
+            raise NoNetworkTaskException(
+                'No network specified for NetworkTask')
         if not isinstance(network_uuid, str):
             raise NoNetworkTaskException('Network UUID is not a string')
 
@@ -156,8 +159,7 @@ class ImageTask(QueueTask):
 
     def json_dump(self):
         return {**super(ImageTask, self).json_dump(),
-                'url': self._url,
-                'instance_uuid': self._instance_uuid}
+                'url': self._url}
 
     # Data methods
     def url(self):
@@ -175,6 +177,35 @@ class FetchImageTask(ImageTask):
         return hash((super(FetchImageTask, self).__hash__(),
                      self._instance_uuid))
 
+    def json_dump(self):
+        return {**super(FetchImageTask, self).json_dump(),
+                'instance_uuid': self._instance_uuid}
+
     # Data methods
     def instance_uuid(self):
         return self._instance_uuid
+
+
+class ResizeImageTask(ImageTask):
+    _name = 'image_resize'
+
+    def __init__(self, url, size, instance_uuid=None):
+        super(ResizeImageTask, self).__init__(url)
+        self._size = size
+        self._instance_uuid = instance_uuid
+
+    def __hash__(self):
+        return hash((super(ResizeImageTask, self).__hash__(),
+                     self._instance_uuid, self._size))
+
+    def json_dump(self):
+        return {**super(ResizeImageTask, self).json_dump(),
+                'instance_uuid': self._instance_uuid,
+                'size': self._size}
+
+    # Data methods
+    def instance_uuid(self):
+        return self._instance_uuid
+
+    def size(self):
+        return self._size
