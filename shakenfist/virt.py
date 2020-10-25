@@ -203,11 +203,13 @@ class Instance(object):
                             # Record the backing store for modern libvirts
                             disk['backing'] = (
                                 '<backingStore type=\'file\'>\n'
-                                '        <format type=\'qcow2\'/><source file=\'%s\'/>\n'
+                                '        <format type=\'qcow2\'/>\n'
+                                '        <source file=\'%s\'/>\n'
                                 '        <backingStore type=\'file\'>\n'
-                                '                <format type=\'qcow2\'/><source file=\'%s.qcow2\'/>\n'
-                                '                </backingStore>'
-                                '        </backingStore>'
+                                '          <format type=\'qcow2\'/>\n'
+                                '          <source file=\'%s.qcow2\'/>\n'
+                                '        </backingStore>\n'
+                                '      </backingStore>\n'
                                 % (resized_image_path, hashed_image_path))
 
                         elif config.parsed.get('DISK_FORMAT') == 'qcow_flat':
