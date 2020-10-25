@@ -87,7 +87,7 @@ class Monitor(daemon.Daemon):
             # for extra in extra_vxids:
             #     if extra in vxid_to_uuid:
             #         with db.get_lock('network', None, vxid_to_uuid[extra],
-            #                          ttl=120):
+            #                          ttl=120, op='Network reap VXLAN'):
             #             n = net.from_db(vxid_to_uuid[extra])
             #             n.delete()
             #             LOG.info('Extra vxlan %s (network %s) removed.'

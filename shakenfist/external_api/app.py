@@ -307,7 +307,8 @@ def _metadata_putpost(meta_type, owner, key, value):
     if not value:
         return error(400, 'no value specified')
 
-    with db.get_lock('metadata', meta_type, owner):
+    with db.get_lock('metadata', meta_type, owner,
+                     op='Metadata update'):
         md = db.get_metadata(meta_type, owner)
         if md is None:
             md = {}
@@ -385,7 +386,7 @@ class AuthNamespaces(Resource):
         if not namespace:
             return error(400, 'no namespace specified')
 
-        with db.get_lock('namespace', None, 'all'):
+        with db.get_lock('namespace', None, 'all', op='Namespace update'):
             rec = db.get_namespace(namespace)
             if not rec:
                 rec = {
@@ -466,7 +467,7 @@ def _namespace_keys_putpost(namespace=None, key_name=None, key=None):
     if key_name == 'service_key':
         return error(403, 'illegal key name')
 
-    with db.get_lock('namespace', None, 'all'):
+    with db.get_lock('namespace', None, 'all', op='Namespace key update'):
         rec = db.get_namespace(namespace)
         if not rec:
             return error(404, 'namespace does not exist')
@@ -519,7 +520,7 @@ class AuthNamespaceKey(Resource):
         if not key_name:
             return error(400, 'no key name specified')
 
-        with db.get_lock('namespace', None, namespace):
+        with db.get_lock('namespace', None, namespace, op='Namespace key delete'):
             ns = db.get_namespace(namespace)
             if ns.get('keys') and key_name in ns['keys']:
                 del ns['keys'][key_name]
@@ -555,7 +556,7 @@ class AuthMetadata(Resource):
         if not key:
             return error(400, 'no key specified')
 
-        with db.get_lock('metadata', 'namespace', namespace):
+        with db.get_lock('metadata', 'namespace', namespace, op='Metadata delete'):
             md = db.get_metadata('namespace', namespace)
             if md is None or key not in md:
                 return error(404, 'key not found')
@@ -692,7 +693,7 @@ class Instances(Resource):
                         404, 'network %s not found' % netdesc['network_uuid'])
 
                 with db.get_lock('ipmanager', None,  netdesc['network_uuid'],
-                                 ttl=120):
+                                 ttl=120, op='Network allocate IP'):
                     db.add_event('network', netdesc['network_uuid'], 'allocate address',
                                  None, None, instance_uuid)
                     ipm = db.get_ipmanager(netdesc['network_uuid'])
@@ -866,7 +867,8 @@ class InstanceRebootSoft(Resource):
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
         with db.get_lock(
-                'instance', None, instance_uuid, ttl=120, timeout=120):
+                'instance', None, instance_uuid, ttl=120, timeout=120,
+                op='Instance reboot soft'):
             db.add_event(
                 'instance', instance_uuid, 'api', 'soft reboot', None, None)
             return instance_from_db_virt.reboot(hard=False)
@@ -880,7 +882,8 @@ class InstanceRebootHard(Resource):
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
         with db.get_lock(
-                'instance', None, instance_uuid, ttl=120, timeout=120):
+                'instance', None, instance_uuid, ttl=120, timeout=120,
+                op='Instance reboot hard'):
             db.add_event(
                 'instance', instance_uuid, 'api', 'hard reboot', None, None)
             return instance_from_db_virt.reboot(hard=True)
@@ -894,7 +897,8 @@ class InstancePowerOff(Resource):
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
         with db.get_lock(
-                'instance', None, instance_uuid, ttl=120, timeout=120):
+                'instance', None, instance_uuid, ttl=120, timeout=120,
+                op='Instance power off'):
             db.add_event(
                 'instance', instance_uuid, 'api', 'poweroff', None, None)
             return instance_from_db_virt.power_off()
@@ -908,7 +912,8 @@ class InstancePowerOn(Resource):
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
         with db.get_lock(
-                'instance', None, instance_uuid, ttl=120, timeout=120):
+                'instance', None, instance_uuid, ttl=120, timeout=120,
+                op='Instance power on'):
             db.add_event(
                 'instance', instance_uuid, 'api', 'poweron', None, None)
             return instance_from_db_virt.power_on()
@@ -922,7 +927,8 @@ class InstancePause(Resource):
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
         with db.get_lock(
-                'instance', None, instance_uuid, ttl=120, timeout=120):
+                'instance', None, instance_uuid, ttl=120, timeout=120,
+                op='Instance pause'):
             db.add_event('instance', instance_uuid, 'api', 'pause', None, None)
             return instance_from_db_virt.pause()
 
@@ -935,7 +941,8 @@ class InstanceUnpause(Resource):
     @redirect_instance_request
     def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
         with db.get_lock(
-                'instance', None, instance_uuid, ttl=120, timeout=120):
+                'instance', None, instance_uuid, ttl=120, timeout=120,
+                op='Instance unpause'):
             db.add_event(
                 'instance', instance_uuid, 'api', 'unpause', None, None)
             return instance_from_db_virt.unpause()
@@ -990,7 +997,7 @@ class InterfaceFloat(Resource):
 
         db.add_event('interface', interface_uuid,
                      'api', 'float', None, None)
-        with db.get_lock('ipmanager', None, 'floating', ttl=120):
+        with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Interface float'):
             ipm = db.get_ipmanager('floating')
             addr = ipm.get_random_free_address()
             db.persist_ipmanager('floating', ipm.save())
@@ -1013,7 +1020,7 @@ class InterfaceDefloat(Resource):
 
         db.add_event('interface', interface_uuid,
                      'api', 'defloat', None, None)
-        with db.get_lock('ipmanager', None, 'floating', ttl=120):
+        with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Instance defloat'):
             ipm = db.get_ipmanager('floating')
             ipm.release(ni['floating'])
             db.persist_ipmanager('floating', ipm.save())
@@ -1053,7 +1060,7 @@ class InstanceMetadata(Resource):
         if not key:
             return error(400, 'no key specified')
 
-        with db.get_lock('metadata', 'instance', instance_uuid):
+        with db.get_lock('metadata', 'instance', instance_uuid, op='Instance metadata delete'):
             md = db.get_metadata('instance', instance_uuid)
             if md is None or key not in md:
                 return error(404, 'key not found')
@@ -1109,7 +1116,7 @@ def _delete_network(network_from_db):
     n.delete()
 
     if n.db_entry.get('floating_gateway'):
-        with db.get_lock('ipmanager', None, 'floating', ttl=120):
+        with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Network delete'):
             ipm = db.get_ipmanager('floating')
             ipm.release(n.db_entry['floating_gateway'])
             db.persist_ipmanager('floating', ipm.save())
@@ -1286,7 +1293,7 @@ class NetworkMetadata(Resource):
         if not key:
             return error(400, 'no key specified')
 
-        with db.get_lock('metadata', 'network', network_uuid):
+        with db.get_lock('metadata', 'network', network_uuid, op='Network metadata delete'):
             md = db.get_metadata('network', network_uuid)
             if md is None or key not in md:
                 return error(404, 'key not found')
