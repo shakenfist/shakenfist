@@ -35,21 +35,21 @@ class ActualLockTestCase(testtools.TestCase):
     @mock.patch('etcd3gw.lock.Lock.acquire', return_value=True)
     @mock.patch('os.getpid', return_value=42)
     def test_context_manager(self, mock_pid, mock_acquire, mock_release):
-        l = etcd.ActualLock('instance', None, 'auuid', op='Test case')
+        al = etcd.ActualLock('instance', None, 'auuid', op='Test case')
 
-        self.assertEqual('/sflocks/sf/instance/auuid', l.key)
-        self.assertEqual('instance', l.objecttype)
-        self.assertEqual('auuid', l.objectname)
-        self.assertEqual(1000000000, l.timeout)
-        self.assertEqual('Test case', l.operation)
+        self.assertEqual('/sflocks/sf/instance/auuid', al.key)
+        self.assertEqual('instance', al.objecttype)
+        self.assertEqual('auuid', al.objectname)
+        self.assertEqual(1000000000, al.timeout)
+        self.assertEqual('Test case', al.operation)
         self.assertEqual(
             json.dumps({
                 'node': 'thisnode',
                 'pid': 42,
                 'operation': 'Test case'
-            }, indent=4, sort_keys=True), l._uuid)
+            }, indent=4, sort_keys=True), al._uuid)
 
-        with l:
+        with al:
             mock_acquire.assert_called_with()
 
         mock_release.assert_called_with()
@@ -69,10 +69,10 @@ class ActualLockTestCase(testtools.TestCase):
     def test_context_manager_slow(
             self, mock_pid, mock_acquire, mock_release, mock_sleep,
             mock_time, mock_add_event, mock_get_holder):
-        l = etcd.ActualLock('instance', None, 'auuid', op='Test case')
-        l.log_ctx = mock.MagicMock()
+        al = etcd.ActualLock('instance', None, 'auuid', op='Test case')
+        al.log_ctx = mock.MagicMock()
 
-        with l:
+        with al:
             mock_acquire.assert_has_calls(
                 [mock.call(), mock.call(), mock.call(),
                  mock.call(), mock.call(), mock.call()])
@@ -103,11 +103,11 @@ class ActualLockTestCase(testtools.TestCase):
     def test_context_manager_timeout(
             self, mock_pid, mock_acquire, mock_release, mock_sleep,
             mock_time, mock_add_event, mock_get_holder):
-        l = etcd.ActualLock('instance', None, 'auuid', op='Test case',
-                            timeout=4)
-        l.log_ctx = mock.MagicMock()
+        al = etcd.ActualLock('instance', None, 'auuid', op='Test case',
+                             timeout=4)
+        al.log_ctx = mock.MagicMock()
 
-        self.assertRaises(exceptions.LockException, l.__enter__)
+        self.assertRaises(exceptions.LockException, al.__enter__)
 
         mock_acquire.assert_has_calls([mock.call(), mock.call()])
         mock_sleep.assert_has_calls([mock.call(1), mock.call(1)])
