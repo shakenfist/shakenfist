@@ -205,7 +205,7 @@ class Instance(object):
                                 '<backingStore type=\'file\'>\n'
                                 '        <format type=\'qcow2\'/><source file=\'%s\'/>\n'
                                 '        <backingStore type=\'file\'>\n'
-                                '                <format type=\'qcow2\'/><source file=\'%s.qcow2\'>\n'
+                                '                <format type=\'qcow2\'/><source file=\'%s.qcow2\'/>\n'
                                 '                </backingStore>'
                                 '        </backingStore>'
                                 % (resized_image_path, hashed_image_path))
