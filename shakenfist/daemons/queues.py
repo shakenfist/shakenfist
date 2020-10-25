@@ -166,11 +166,7 @@ def image_fetch(url, instance_uuid):
             'Failed to fetch image %s' % url)
 
 
-def image_resize(url, size, instance_uuid):
-    instance = None
-    if instance_uuid:
-        instance = virt.from_db(instance_uuid)
-
+def image_resize(url, size, _instance_uuid):
     # TODO(andy): Wait up to 15 mins for another queue process to download
     # the required image. This will be changed to queue on a
     # "waiting_image_fetch" queue but this works now.

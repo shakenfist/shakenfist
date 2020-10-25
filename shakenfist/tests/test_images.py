@@ -377,8 +377,10 @@ class ImageObjectTestCase(testtools.TestCase):
         img = images.Image.from_url('http://example.com')
         img.resize(None, 8)
         mock_link.assert_called_with(
-            '/a/b/c/image_cache/f0e6a6a97042a4f1f1c87f5f7d44315b2d852c2df5c7991cc66241bf7072d1c4.v000',
-            '/a/b/c/image_cache/f0e6a6a97042a4f1f1c87f5f7d44315b2d852c2df5c7991cc66241bf7072d1c4.v000.qcow2.8G')
+            '/a/b/c/image_cache/f0e6a6a97042a4f1f1c87f5f7d4'
+            '4315b2d852c2df5c7991cc66241bf7072d1c4.v000',
+            '/a/b/c/image_cache/f0e6a6a97042a4f1f1c87f5f7d4'
+            '4315b2d852c2df5c7991cc66241bf7072d1c4.v000.qcow2.8G')
         mock_execute.assert_not_called()
 
     @mock.patch('shakenfist.config.parsed.get', return_value='/a/b/c')
@@ -396,11 +398,18 @@ class ImageObjectTestCase(testtools.TestCase):
         img.resize(None, 8)
         mock_link.assert_not_called()
         mock_execute.assert_has_calls(
-            [mock.call(None, ('qemu-img create -b '
-                              '/a/b/c/image_cache/f0e6a6a97042a4f1f1c87f5f7d44315b2d852c2df5c7991cc66241bf7072d1c4.v000.qcow2 '
-                              '-f qcow2 /a/b/c/image_cache/f0e6a6a97042a4f1f1c87f5f7d44315b2d852c2df5c7991cc66241bf7072d1c4.v000.qcow2.8G')),
-             mock.call(None, ('qemu-img resize '
-                              '/a/b/c/image_cache/f0e6a6a97042a4f1f1c87f5f7d44315b2d852c2df5c7991cc66241bf7072d1c4.v000.qcow2.8G 8G'))]
+            [mock.call(
+                None,
+                ('qemu-img create -b '
+                 '/a/b/c/image_cache/f0e6a6a97042a4f1f1c87f5f7d4431'
+                 '5b2d852c2df5c7991cc66241bf7072d1c4.v000.qcow2 '
+                 '-f qcow2 /a/b/c/image_cache/f0e6a6a97042a4f1f1c87f'
+                 '5f7d44315b2d852c2df5c7991cc66241bf7072d1c4.v000.qcow2.8G')),
+             mock.call(
+                 None,
+                 ('qemu-img resize '
+                  '/a/b/c/image_cache/f0e6a6a97042a4f1f1c87f5f7d4431'
+                  '5b2d852c2df5c7991cc66241bf7072d1c4.v000.qcow2.8G 8G'))]
         )
 
     @mock.patch('shakenfist.util.execute',
