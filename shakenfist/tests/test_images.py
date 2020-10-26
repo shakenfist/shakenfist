@@ -404,12 +404,9 @@ class ImageObjectTestCase(testtools.TestCase):
                  '/a/b/c/image_cache/f0e6a6a97042a4f1f1c87f5f7d4431'
                  '5b2d852c2df5c7991cc66241bf7072d1c4.v000.qcow2 '
                  '-f qcow2 /a/b/c/image_cache/f0e6a6a97042a4f1f1c87f'
-                 '5f7d44315b2d852c2df5c7991cc66241bf7072d1c4.v000.qcow2.8G')),
-             mock.call(
-                 None,
-                 ('qemu-img resize '
-                  '/a/b/c/image_cache/f0e6a6a97042a4f1f1c87f5f7d4431'
-                  '5b2d852c2df5c7991cc66241bf7072d1c4.v000.qcow2.8G 8G'))]
+                 '5f7d44315b2d852c2df5c7991cc66241bf7072d1c4.v000.qcow2.8G 8G')
+                )
+             ]
         )
 
     @mock.patch('shakenfist.util.execute',
@@ -433,9 +430,9 @@ class ImageObjectTestCase(testtools.TestCase):
                 return_value=(None, None))
     @mock.patch('os.path.exists', return_value=False)
     def test_create_cow(self, mock_exists, mock_execute):
-        images.create_cow(None, '/a/b/c/base', '/a/b/c/cow')
+        images.create_cow(None, '/a/b/c/base', '/a/b/c/cow', 10)
         mock_execute.assert_called_with(
-            None, 'qemu-img create -b /a/b/c/base -f qcow2 /a/b/c/cow')
+            None, 'qemu-img create -b /a/b/c/base -f qcow2 /a/b/c/cow 10G')
 
     @mock.patch('shakenfist.util.execute',
                 return_value=(None, None))

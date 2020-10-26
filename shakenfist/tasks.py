@@ -165,24 +165,3 @@ class FetchImageTask(ImageTask):
     # Data methods
     def instance_uuid(self):
         return self._instance_uuid
-
-
-class ResizeImageTask(ImageTask):
-    _name = 'image_resize'
-
-    def __init__(self, url, size, instance_uuid=None):
-        super(ResizeImageTask, self).__init__(url)
-        self._size = size
-        self._instance_uuid = instance_uuid
-
-    def json_dump(self):
-        return {**super(ResizeImageTask, self).json_dump(),
-                'instance_uuid': self._instance_uuid,
-                'size': self._size}
-
-    # Data methods
-    def instance_uuid(self):
-        return self._instance_uuid
-
-    def size(self):
-        return self._size
