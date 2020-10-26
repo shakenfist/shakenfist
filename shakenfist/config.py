@@ -25,6 +25,10 @@ def get_node_ip():
         return '127.0.0.1'
 
 
+def get_node_name():
+    return socket.getfqdn()
+
+
 class SFConfig(BaseSettings):
     ###################
     # Deployment Wide #
@@ -138,7 +142,7 @@ class SFConfig(BaseSettings):
         default_factory=get_node_ip, description='IP of this node'
     )
     NODE_NAME: str = Field(
-        default_factory=socket.getfqdn, description='FQDN of this node'
+        default_factory=get_node_name, description='FQDN of this node'
     )
     NODE_EGRESS_NIC: str = Field('eth0', description='NIC for outbound traffic')
     STORAGE_PATH: str = Field(
