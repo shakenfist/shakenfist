@@ -123,7 +123,7 @@ class ActualLockTestCase(testtools.TestCase):
 
 
 class TaskEncodingETCDtestCase(testtools.TestCase):
-    @ mock.patch('etcd3gw.Etcd3Client.put')
+    @mock.patch('etcd3gw.Etcd3Client.put')
     def test_put_PreflightInstanceTask(self, mock_put):
         etcd.put('objecttype', 'subtype', 'name',
                  tasks.PreflightInstanceTask('fake_uuid'))
@@ -137,7 +137,7 @@ class TaskEncodingETCDtestCase(testtools.TestCase):
 }'''
         mock_put.assert_called_with(path, encoded, lease=None)
 
-    @ mock.patch('etcd3gw.Etcd3Client.put')
+    @mock.patch('etcd3gw.Etcd3Client.put')
     def test_put_StartInstanceTask(self, mock_put):
         etcd.put('objecttype', 'subtype', 'name',
                  tasks.StartInstanceTask('fake_uuid', ['net_uuid']))
@@ -153,7 +153,7 @@ class TaskEncodingETCDtestCase(testtools.TestCase):
 }'''
         mock_put.assert_called_with(path, encoded, lease=None)
 
-    @ mock.patch('etcd3gw.Etcd3Client.put')
+    @mock.patch('etcd3gw.Etcd3Client.put')
     def test_put_DeleteInstanceTask(self, mock_put):
         etcd.put('objecttype', 'subtype', 'name',
                  tasks.DeleteInstanceTask('fake_uuid'))
@@ -167,7 +167,7 @@ class TaskEncodingETCDtestCase(testtools.TestCase):
 }'''
         mock_put.assert_called_with(path, encoded, lease=None)
 
-    @ mock.patch('etcd3gw.Etcd3Client.put')
+    @mock.patch('etcd3gw.Etcd3Client.put')
     def test_put_ErrorInstanceTask(self, mock_put):
         etcd.put('objecttype', 'subtype', 'name',
                  tasks.ErrorInstanceTask('fake_uuid', 'dunno'))
@@ -182,7 +182,7 @@ class TaskEncodingETCDtestCase(testtools.TestCase):
 }'''
         mock_put.assert_called_with(path, encoded, lease=None)
 
-    @ mock.patch('etcd3gw.Etcd3Client.put')
+    @mock.patch('etcd3gw.Etcd3Client.put')
     def test_put_DeployNetworkTask(self, mock_put):
         etcd.put('objecttype', 'subtype', 'name',
                  tasks.DeployNetworkTask('fake_uuid'))
@@ -195,7 +195,7 @@ class TaskEncodingETCDtestCase(testtools.TestCase):
 }'''
         mock_put.assert_called_with(path, encoded, lease=None)
 
-    @ mock.patch('etcd3gw.Etcd3Client.put')
+    @mock.patch('etcd3gw.Etcd3Client.put')
     def test_put_FetchImageTask(self, mock_put):
         etcd.put('objecttype', 'subtype', 'name',
                  tasks.FetchImageTask('http://server/image'))
@@ -274,7 +274,7 @@ class TaskDecodingETCDtestCase(testtools.TestCase):
 # Dequeue tasks from ETCD
 #
 class TaskDequeueTestCase(testtools.TestCase):
-    @ mock.patch('etcd3gw.Etcd3Client.get_prefix', return_value=[(
+    @mock.patch('etcd3gw.Etcd3Client.get_prefix', return_value=[(
         '''{
             "tasks": [
                         {
@@ -289,9 +289,9 @@ class TaskDequeueTestCase(testtools.TestCase):
             'key': '/somejob'
         },
     )])
-    @ mock.patch('shakenfist.etcd.get_lock')
-    @ mock.patch('shakenfist.etcd.put')
-    @ mock.patch('etcd3gw.Etcd3Client.delete')
+    @mock.patch('shakenfist.etcd.get_lock')
+    @mock.patch('shakenfist.etcd.put')
+    @mock.patch('etcd3gw.Etcd3Client.delete')
     def test_dequeue_preflight(self, m_delete, m_put, m_get_lock, m_get_prefix):
         jobname, workitem = etcd.dequeue('node01')
         self.assertEqual('somejob', jobname)
@@ -301,7 +301,7 @@ class TaskDequeueTestCase(testtools.TestCase):
         self.assertCountEqual(expected, workitem['tasks'])
         self.assertSequenceEqual(expected, workitem['tasks'])
 
-    @ mock.patch('etcd3gw.Etcd3Client.get_prefix', return_value=[(
+    @mock.patch('etcd3gw.Etcd3Client.get_prefix', return_value=[(
         '''{
             "tasks": [
                         {
@@ -316,9 +316,9 @@ class TaskDequeueTestCase(testtools.TestCase):
             'key': '/somejob'
         },
     )])
-    @ mock.patch('shakenfist.etcd.get_lock')
-    @ mock.patch('shakenfist.etcd.put')
-    @ mock.patch('etcd3gw.Etcd3Client.delete')
+    @mock.patch('shakenfist.etcd.get_lock')
+    @mock.patch('shakenfist.etcd.put')
+    @mock.patch('etcd3gw.Etcd3Client.delete')
     def test_dequeue_start(self, m_delete, m_put, m_get_lock, m_get_prefix):
         jobname, workitem = etcd.dequeue('node01')
         self.assertEqual('somejob', jobname)
@@ -328,7 +328,7 @@ class TaskDequeueTestCase(testtools.TestCase):
         self.assertCountEqual(expected, workitem['tasks'])
         self.assertSequenceEqual(expected, workitem['tasks'])
 
-    @ mock.patch('etcd3gw.Etcd3Client.get_prefix', return_value=[(
+    @mock.patch('etcd3gw.Etcd3Client.get_prefix', return_value=[(
         '''{
             "tasks": [
                         {
@@ -344,9 +344,9 @@ class TaskDequeueTestCase(testtools.TestCase):
             'key': '/somejob'
         },
     )])
-    @ mock.patch('shakenfist.etcd.get_lock')
-    @ mock.patch('shakenfist.etcd.put')
-    @ mock.patch('etcd3gw.Etcd3Client.delete')
+    @mock.patch('shakenfist.etcd.get_lock')
+    @mock.patch('shakenfist.etcd.put')
+    @mock.patch('etcd3gw.Etcd3Client.delete')
     def test_dequeue_error(self, m_delete, m_put, m_get_lock, m_get_prefix):
         jobname, workitem = etcd.dequeue('node01')
         self.assertEqual('somejob', jobname)
@@ -356,7 +356,7 @@ class TaskDequeueTestCase(testtools.TestCase):
         self.assertCountEqual(expected, workitem['tasks'])
         self.assertSequenceEqual(expected, workitem['tasks'])
 
-    @ mock.patch('etcd3gw.Etcd3Client.get_prefix', return_value=[(
+    @mock.patch('etcd3gw.Etcd3Client.get_prefix', return_value=[(
         '''{
             "tasks": [
                         {
@@ -382,9 +382,9 @@ class TaskDequeueTestCase(testtools.TestCase):
             'key': '/somejob'
         },
     )])
-    @ mock.patch('shakenfist.etcd.get_lock')
-    @ mock.patch('shakenfist.etcd.put')
-    @ mock.patch('etcd3gw.Etcd3Client.delete')
+    @mock.patch('shakenfist.etcd.get_lock')
+    @mock.patch('shakenfist.etcd.put')
+    @mock.patch('etcd3gw.Etcd3Client.delete')
     def test_dequeue_multi(self, m_delete, m_put, m_get_lock, m_get_prefix):
         jobname, workitem = etcd.dequeue('node01')
         self.assertEqual('somejob', jobname)
@@ -396,7 +396,7 @@ class TaskDequeueTestCase(testtools.TestCase):
         self.assertCountEqual(expected, workitem['tasks'])
         self.assertSequenceEqual(expected, workitem['tasks'])
 
-    @ mock.patch('etcd3gw.Etcd3Client.get_prefix', return_value=[(
+    @mock.patch('etcd3gw.Etcd3Client.get_prefix', return_value=[(
         '''{
             "tasks": [
                         {
@@ -412,9 +412,9 @@ class TaskDequeueTestCase(testtools.TestCase):
             'key': '/somejob'
         },
     )])
-    @ mock.patch('shakenfist.etcd.get_lock')
-    @ mock.patch('shakenfist.etcd.put')
-    @ mock.patch('etcd3gw.Etcd3Client.delete')
+    @mock.patch('shakenfist.etcd.get_lock')
+    @mock.patch('shakenfist.etcd.put')
+    @mock.patch('etcd3gw.Etcd3Client.delete')
     def test_dequeue_delete(self, m_delete, m_put, m_get_lock, m_get_prefix):
         jobname, workitem = etcd.dequeue('node01')
         self.assertEqual('somejob', jobname)
@@ -424,7 +424,7 @@ class TaskDequeueTestCase(testtools.TestCase):
         self.assertCountEqual(expected, workitem['tasks'])
         self.assertSequenceEqual(expected, workitem['tasks'])
 
-    @ mock.patch('etcd3gw.Etcd3Client.get_prefix', return_value=[(
+    @mock.patch('etcd3gw.Etcd3Client.get_prefix', return_value=[(
         '''{
             "tasks": [
                         {
@@ -440,9 +440,9 @@ class TaskDequeueTestCase(testtools.TestCase):
             'key': '/somejob'
         },
     )])
-    @ mock.patch('shakenfist.etcd.get_lock')
-    @ mock.patch('shakenfist.etcd.put')
-    @ mock.patch('etcd3gw.Etcd3Client.delete')
+    @mock.patch('shakenfist.etcd.get_lock')
+    @mock.patch('shakenfist.etcd.put')
+    @mock.patch('etcd3gw.Etcd3Client.delete')
     def test_dequeue_image_fetch(self, m_delete, m_put, m_get_lock, m_get_prefix):
         jobname, workitem = etcd.dequeue('node01')
         self.assertEqual('somejob', jobname)
@@ -459,8 +459,8 @@ class TaskDequeueTestCase(testtools.TestCase):
 class GeneralETCDtestCase(testtools.TestCase):
     maxDiff = None
 
-    @ mock.patch('etcd3gw.Etcd3Client.get_prefix',
-                 return_value=[
+    @mock.patch('etcd3gw.Etcd3Client.get_prefix',
+                return_value=[
                      ('''{"checksum": "ed44b9745b8d62bcbbc180b5f36c24bb",
                         "file_version": 1,
                         "size": "359464960",
