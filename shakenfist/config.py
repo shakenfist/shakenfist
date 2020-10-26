@@ -29,7 +29,19 @@ def get_node_name():
     return socket.getfqdn()
 
 
-class SFConfig(BaseSettings):
+class SFConfigBase(BaseSettings):
+    """
+    Separated from SFConfig for ease of testing
+    """
+    @cached_property
+    def _dict(self):
+        return self.dict()
+
+    def get(self, key):
+        return self._dict.get(key)
+
+
+class SFConfig(SFConfigBase):
     ###################
     # Deployment Wide #
     ###################
@@ -163,13 +175,6 @@ class SFConfig(BaseSettings):
 
     class Config:
         env_prefix = 'SHAKENFIST_'
-
-    @cached_property
-    def _dict(self):
-        return self.dict()
-
-    def get(self, key):
-        return self._dict.get(key)
 
 
 parsed = SFConfig()

@@ -1,8 +1,10 @@
 import mock
 import testtools
+from pydantic import IPvAnyAddress
 
 from shakenfist import exceptions
 from shakenfist import scheduler
+from shakenfist.config import SFConfigBase, SFConfig
 
 
 class FakeInstance(object):
@@ -66,24 +68,17 @@ class SchedulerTestCase(testtools.TestCase):
         self.recorded_op.start()
         self.addCleanup(self.recorded_op.stop)
 
-        # Fake system configuration
-        def fake_config(key):
-            data = {
-                'NODE_NAME': 'node01',
-                'SCHEDULER_CACHE_TIMEOUT': 30,
-                'CPU_OVERCOMMIT_RATIO': 16,
-                'RAM_OVERCOMMIT_RATIO': 1.5,
-                'RAM_SYSTEM_RESERVATION': 5.0,
-                'NETWORK_NODE_IP': '10.0.0.1',
-                'LOG_METHOD_TRACE': 1,
-            }
+        fake_config = SFConfig(
+            NODE_NAME='node01',
+            SCHEDULER_CACHE_TIMEOUT=30,
+            CPU_OVERCOMMIT_RATIO=16.0,
+            RAM_OVERCOMMIT_RATIO=1.5,
+            RAM_SYSTEM_RESERVATION=5.0,
+            NETWORK_NODE_IP='10.0.0.1',
+            LOG_METHOD_TRACE=1,
+        )
 
-            if key not in data:
-                raise Exception('fake_config() Unknown key')
-            return data[key]
-
-        self.mock_config = mock.patch('shakenfist.config.parsed.get',
-                                      fake_config)
+        self.mock_config = mock.patch('shakenfist.config.parsed', fake_config)
         self.mock_config.start()
         self.addCleanup(self.mock_config.stop)
 

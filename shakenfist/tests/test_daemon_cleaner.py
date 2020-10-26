@@ -1,7 +1,7 @@
 import mock
 import testtools
 
-
+from shakenfist.config import SFConfigBase
 from shakenfist.daemons import cleaner
 
 
@@ -57,17 +57,14 @@ def fake_exists(path):
     return True
 
 
-def fake_config(key):
-    fc = {
-        'NODE_NAME': 'abigcomputer',
-        'STORAGE_PATH': '/srv/shakenfist',
-        'LOGLEVEL_CLEANER': 'debug',
-        'LOG_METHOD_TRACE': 1,
-    }
+class FakeConfig(SFConfigBase):
+    NODE_NAME: str = 'abigcomputer'
+    STORAGE_PATH: str = '/srv/shakenfist'
+    LOGLEVEL_CLEANER: str = 'debug'
+    LOG_METHOD_TRACE: int = 1
 
-    if key in fc:
-        return fc[key]
-    raise Exception('Unknown config key %s' % key)
+
+fake_config = FakeConfig()
 
 
 FAKE_ETCD_STATE = {}
@@ -98,8 +95,7 @@ class CleanerTestCase(testtools.TestCase):
         self.proctitle = mock.patch('setproctitle.setproctitle')
         self.mock_proctitle = self.proctitle.start()
         self.addCleanup(self.proctitle.stop)
-
-        self.config = mock.patch('shakenfist.config.parsed.get',
+        self.config = mock.patch('shakenfist.config.parsed',
                                  fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)

@@ -3,9 +3,10 @@ import bcrypt
 import json
 import mock
 import testtools
-
+from pydantic import IPvAnyAddress
 
 from shakenfist import config
+from shakenfist.config import SFConfigBase
 from shakenfist.external_api import app as external_api
 from shakenfist import ipmanager
 from shakenfist import net
@@ -201,6 +202,7 @@ class ExternalApiTestCase(testtools.TestCase):
 
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'system', 'key': 'foo'}))
+        print(resp.get_json())
         self.assertEqual(200, resp.status_code)
         self.auth_header = 'Bearer %s' % resp.get_json()['access_token']
 
@@ -679,17 +681,14 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         self.mock_virt_from_db = self.virt_from_db.start()
         self.addCleanup(self.virt_from_db.stop)
 
-        def fake_config_instance(key):
-            fc = {
-                'API_ASYNC_WAIT': 1,
-                'LOG_METHOD_TRACE': 1,
-            }
-            if key in fc:
-                return fc[key]
-            raise Exception('fake_config_instance() Unknown config key')
+        class FakeConfig(SFConfigBase):
+            API_ASYNC_WAIT: int = 1
+            LOG_METHOD_TRACE: int = 1
 
-        self.config = mock.patch('shakenfist.config.parsed.get',
-                                 fake_config_instance)
+        fake_config = FakeConfig()
+
+        self.config = mock.patch('shakenfist.config.parsed',
+                                 fake_config)
         self.mock_config = self.config.start()
 
         self.addCleanup(self.config.stop)
@@ -949,19 +948,15 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
     def setUp(self):
         super(ExternalApiNetworkTestCase, self).setUp()
 
-        def fake_config_network(key):
-            fc = {
-                'NODE_NAME': 'seriously',
-                'NODE_IP': '127.0.0.1',
-                'NETWORK_NODE_IP': '127.0.0.1',
-                'LOG_METHOD_TRACE': 1,
-                'NODE_EGRESS_NIC': 'eth0'
-            }
-            if key in fc:
-                return fc[key]
-            raise Exception('fake_config_network() Unknown config key')
+        class FakeConfig(SFConfigBase):
+            NODE_NAME: str = 'seriously'
+            NODE_IP: IPvAnyAddress = IPvAnyAddress('127.0.0.1')
+            NETWORK_NODE_IP: IPvAnyAddress = IPvAnyAddress('127.0.0.1')
+            LOG_METHOD_TRACE: int = 1
+            NODE_EGRESS_NIC: str = 'eth0'
 
-        self.config = mock.patch('shakenfist.config.parsed.get',
+        fake_config_network = FakeConfig()
+        self.config = mock.patch('shakenfist.config.parsed',
                                  fake_config_network)
         self.mock_config = self.config.start()
         # Without this cleanup, other test classes will have 'config.parsed.get'

@@ -9,6 +9,7 @@ import testtools
 
 from shakenfist import ipmanager
 from shakenfist import virt
+from shakenfist.config import SFConfig
 
 
 class FakeNetwork(object):
@@ -23,21 +24,15 @@ class FakeNetwork(object):
 class VirtTestCase(testtools.TestCase):
     def setUp(self):
         super(VirtTestCase, self).setUp()
+        fake_config = SFConfig(
+            STORAGE_PATH="/a/b/c",
+            DISK_BUS="virtio",
+            DISK_FORMAT="qcow",
+            ZONE="sfzone",
+            NODE_NAME="node01",
+        )
 
-        def fake_config(key):
-            if key == 'STORAGE_PATH':
-                return '/a/b/c'
-            if key == 'DISK_BUS':
-                return 'virtio'
-            if key == 'DISK_FORMAT':
-                return 'qcow'
-            if key == 'ZONE':
-                return 'sfzone'
-            if key == 'NODE_NAME':
-                return 'node01'
-            raise Exception('Unknown key')
-
-        self.config = mock.patch('shakenfist.config.parsed.get',
+        self.config = mock.patch('shakenfist.config.parsed',
                                  fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
