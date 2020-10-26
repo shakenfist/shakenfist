@@ -41,7 +41,7 @@ class QueueTask(object):
 # Instance Tasks
 #
 class InstanceTask(QueueTask):
-    def __init__(self, instance_uuid, network=[]):
+    def __init__(self, instance_uuid, network=None):
         super(InstanceTask, self).__init__()
         self._instance_uuid = instance_uuid
         # Only set network if deliberately set in function paramater. This
@@ -56,7 +56,7 @@ class InstanceTask(QueueTask):
                 'No instance specified for InstanceTask')
         if not isinstance(instance_uuid, str):
             raise NoInstanceTaskException('Instance UUID is not a string')
-        if network and not isinstance(network, list):
+        if not isinstance(self._network, list):
             raise NetworkNotListTaskException()
 
     def instance_uuid(self):
