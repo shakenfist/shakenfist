@@ -12,6 +12,12 @@ class TasksEqTestCase(testtools.TestCase):
         self.assertEqual(tasks.PreflightInstanceTask('abcd', []),
                          tasks.PreflightInstanceTask('abcd', []))
 
+        self.assertEqual(tasks.PreflightInstanceTask('abcd'),
+                         tasks.PreflightInstanceTask('abcd', []))
+
+        self.assertNotEqual(tasks.PreflightInstanceTask('abcd'),
+                            tasks.PreflightInstanceTask('abcd', ['netuuid']))
+
         self.assertEqual(tasks.PreflightInstanceTask('abcd', ['a1', 'b2']),
                          tasks.PreflightInstanceTask('abcd', ['a1', 'b2']))
 
@@ -45,6 +51,24 @@ class TasksEqTestCase(testtools.TestCase):
 
         self.assertNotEqual(tasks.FetchImageTask('http://someurl'),
                             tasks.FetchImageTask('http://someurl', 'fake_uuid'))
+
+        self.assertEqual(tasks.ResizeImageTask('http://someurl', 100),
+                         tasks.ResizeImageTask('http://someurl', 100))
+
+        self.assertEqual(tasks.ResizeImageTask('http://someurl', 100, 'uuid'),
+                         tasks.ResizeImageTask('http://someurl', 100, 'uuid'))
+
+        self.assertNotEqual(
+            tasks.ResizeImageTask('http://someurl', 100),
+            tasks.ResizeImageTask('http://someurl', 100, 'uuid'))
+
+        self.assertNotEqual(
+            tasks.ResizeImageTask('http://someurl', 100, 'uuid'),
+            tasks.ResizeImageTask('http://someurl', 101, 'uuid'))
+
+        self.assertNotEqual(
+            tasks.ResizeImageTask('http://someurl', 100, 'uuid1'),
+            tasks.ResizeImageTask('http://someurl', 100, 'uuid2'))
 
 
 class InstanceTasksTestCase(testtools.TestCase):
