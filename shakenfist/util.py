@@ -7,6 +7,7 @@ from pbr.version import VersionInfo
 import random
 import re
 import requests
+import secrets
 import string
 import sys
 import time
@@ -195,7 +196,7 @@ def get_api_token(base_url, namespace='system'):
         if 'service_key' in ns:
             key = ns['service_key']
         else:
-            key = ''.join(random.choice(string.ascii_lowercase)
+            key = ''.join(secrets.choice(string.ascii_lowercase)
                           for i in range(50))
             ns['service_key'] = key
             db.persist_namespace(namespace, ns)
