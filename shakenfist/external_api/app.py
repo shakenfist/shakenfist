@@ -1091,9 +1091,21 @@ class InstanceConsoleData(Resource):
         return resp
 
 
-class Image(Resource):
+class Images(Resource):
     @jwt_required
-    @caller_is_admin
+    def get(self, node=None):
+        db_data = db.get_image_metadata_all(only_node=node)
+
+        # Clean up DB references to be user relevant
+        images = []
+        for db_name, meta in db_data.items():
+            name_split = db_name.split('/')
+            images.append({**meta,
+                           'ref': name_split[-2],
+                           'node': name_split[-1]})
+        return images
+
+    @jwt_required
     def post(self, url=None, size=None):
         tasks = [FetchImageTask(url)]
         if size:
@@ -1354,7 +1366,7 @@ api.add_resource(InstanceMetadata,
 api.add_resource(InstanceConsoleData, '/instances/<instance_uuid>/consoledata',
                  defaults={'length': 10240})
 
-api.add_resource(Image, '/images')
+api.add_resource(Images, '/images')
 api.add_resource(ImageEvents, '/images/events')
 
 api.add_resource(Networks, '/networks')
