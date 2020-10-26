@@ -225,7 +225,8 @@ class LowResourceTestCase(SchedulerTestCase):
                                 [])
         self.assertEqual('No nodes with enough disk space', str(exc))
 
-    def test_ok(self):
+    @mock.patch('shakenfist.db.get_image_metadata_all', return_value=None)
+    def test_ok(self, mock_get_image_meta):
         self.fake_db.set_node_metrics_same({
             'cpu_max_per_instance': 16,
             'cpu_max': 4,
@@ -272,17 +273,20 @@ class CorrectAllocationTestCase(SchedulerTestCase):
         mock_db_get_metrics.start()
         self.addCleanup(mock_db_get_metrics.stop)
 
-        self.mock_get_instances = mock.patch('shakenfist.db.get_instances',
-                                             side_effect=self.fake_db.get_instances)
+        self.mock_get_instances = mock.patch(
+            'shakenfist.db.get_instances',
+            side_effect=self.fake_db.get_instances)
         self.mock_get_instances.start()
         self.addCleanup(self.mock_get_instances.stop)
 
-        self.mock_get_instances = mock.patch('shakenfist.db.get_instance_interfaces',
-                                             side_effect=self.fake_db.get_instance_interfaces)
+        self.mock_get_instances = mock.patch(
+            'shakenfist.db.get_instance_interfaces',
+            side_effect=self.fake_db.get_instance_interfaces)
         self.mock_get_instances.start()
         self.addCleanup(self.mock_get_instances.stop)
 
-    def test_any_node_but_not_network_node(self):
+    @mock.patch('shakenfist.db.get_image_metadata_all', return_value=None)
+    def test_any_node_but_not_network_node(self, mock_get_image_meta):
         self.fake_db.set_node_metrics_same({
             'cpu_max_per_instance': 16,
             'cpu_max': 4,
@@ -303,7 +307,8 @@ class CorrectAllocationTestCase(SchedulerTestCase):
         self.assertSetEqual(set(self.fake_db.nodes)-{'node1_net', },
                             set(nodes))
 
-    def test_single_node_that_has_network(self):
+    @mock.patch('shakenfist.db.get_image_metadata_all', return_value=None)
+    def test_single_node_that_has_network(self, mock_get_image_meta):
         self.fake_db.set_node_metrics_same({
             'cpu_max_per_instance': 16,
             'cpu_max': 4,
@@ -322,3 +327,96 @@ class CorrectAllocationTestCase(SchedulerTestCase):
 
         nodes = scheduler.Scheduler().place_instance(fake_inst, nets)
         self.assertSetEqual(set(['node3']), set(nodes))
+
+
+class FindMostTestCase(SchedulerTestCase):
+    """Test basic information source to scheduler"""
+
+    def setUp(self):
+        super(FindMostTestCase, self).setUp()
+
+        self.fake_db = FakeDB(['node1_net', 'node2', 'node3', 'node4'],
+                              {'node3': [{'uuid': 'inst-1',
+                                          'node': 'node3',
+                                          'block_devices': [],
+                                          },
+                                         ],
+                               },
+                              {'inst-1': [{'network_uuid': 'uuid-net1'},
+                                          ],
+                               })
+
+        mock_db_get_nodes = mock.patch('shakenfist.db.get_nodes',
+                                       side_effect=self.fake_db.get_nodes)
+        mock_db_get_nodes.start()
+        self.addCleanup(mock_db_get_nodes.stop)
+
+        mock_db_get_metrics = mock.patch('shakenfist.db.get_metrics',
+                                         side_effect=self.fake_db.get_metrics)
+        mock_db_get_metrics.start()
+        self.addCleanup(mock_db_get_metrics.stop)
+
+    @mock.patch('shakenfist.db.get_image_metadata_all',
+                return_value={
+                    '/sf/image/095fdd2b66625412aa/node2': {
+                        'checksum': None,
+                        'fetched': 'Tue, 20 Oct 2020 23:02:29 -0000',
+                        'file_version': 1,
+                        'modified': 'Tue, 10 Sep 2019 07:24:40 GMT',
+                        'size': 200000,
+                        'url': 'req_image1',
+                        'version': 1,
+                        },
+                    '/sf/image/aca41cefa18b052074e092/node3': {
+                        'checksum': None,
+                        'fetched': 'Tue, 20 Oct 2020 23:02:29 -0000',
+                        'file_version': 1,
+                        'modified': 'Tue, 10 Sep 2019 07:24:40 GMT',
+                        'size': 200000,
+                        'url': 'http://example.com',
+                        'version': 1,
+                        }
+                    })
+    def test_most_matching_images(self, mock_get_meta_all):
+        req_images = ['req_image1']
+        candidates = ['node1_net', 'node2', 'node3', 'node4']
+
+        finalists = scheduler.Scheduler()._find_most_matching_images(
+            req_images, candidates)
+        self.assertSetEqual(set(['node2']), set(finalists))
+
+    @mock.patch('shakenfist.db.get_image_metadata_all',
+                return_value={
+                    '/sf/image/095fdd2b66625412aa/node1_net': {
+                        'url': 'req_image1',
+                        },
+                    '/sf/image/095fdd2b66635412aa/node1_net': {
+                        'url': 'req_image2',
+                        },
+                    '/sf/image/095fdd2b66625412aa/node2': {
+                        'url': 'req_image2',
+                        },
+                    '/sf/image/095fdd2b66625712aa/node3': {
+                        'url': 'req_image2',
+                        },
+                    '/sf/image/095fdd2b66625482aa/node4': {
+                        'url': 'req_image4',
+                        },
+                    '/sf/image/aca41cefa18b052974e092/node4': {
+                        'url': 'req_image5',
+                        }
+                    })
+    def test_most_matching_images_big(self, mock_get_meta_all):
+        candidates = ['node1_net', 'node2', 'node3', 'node4']
+
+        finalists = scheduler.Scheduler()._find_most_matching_images(
+                    ['req_image1'], candidates)
+        self.assertSetEqual(set(['node1_net']), set(finalists))
+
+        finalists = scheduler.Scheduler()._find_most_matching_images(
+                    ['req_image1', 'req_image2'], candidates)
+        self.assertSetEqual(set(['node1_net']), set(finalists))
+
+        finalists = scheduler.Scheduler()._find_most_matching_images(
+                    ['req_image2'], candidates)
+        self.assertSetEqual(set(['node1_net', 'node2', 'node3']), set(finalists))

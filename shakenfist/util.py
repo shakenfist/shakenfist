@@ -7,6 +7,7 @@ from pbr.version import VersionInfo
 import random
 import re
 import requests
+import secrets
 import string
 import sys
 import time
@@ -104,6 +105,27 @@ def get_interface_addresses(namespace, name):
     return
 
 
+def get_default_routes(namespace):
+    in_namespace = ''
+    if namespace:
+        in_namespace = 'ip netns exec %s ' % namespace
+
+    stdout, _ = execute(None,
+                        '%(in_namespace)sip route list default'
+                        % {
+                            'in_namespace': in_namespace
+                        })
+    if not stdout:
+        return []
+
+    routes = []
+    for line in stdout.split('\n'):
+        elems = line.split(' ')
+        if len(elems) > 3 and elems[2] not in routes:
+            routes.append(elems[2])
+    return routes
+
+
 def get_safe_interface_name(interface):
     if len(interface) > 15:
         orig_interface = interface
@@ -166,14 +188,15 @@ def extract_power_state(libvirt, domain):
 
 
 def get_api_token(base_url, namespace='system'):
-    with db.get_lock('namespace', None, namespace):
+    with db.get_lock('namespace', None, namespace,
+                     op='Get API token'):
         auth_url = base_url + '/auth'
         LOG.info('Fetching %s auth token from %s' % (namespace, auth_url))
         ns = db.get_namespace(namespace)
         if 'service_key' in ns:
             key = ns['service_key']
         else:
-            key = ''.join(random.choice(string.ascii_lowercase)
+            key = ''.join(secrets.choice(string.ascii_lowercase)
                           for i in range(50))
             ns['service_key'] = key
             db.persist_namespace(namespace, ns)

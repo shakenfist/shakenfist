@@ -1,5 +1,6 @@
 # Copyright 2020 Michael Still
 
+import copy
 import random
 import socket
 import time
@@ -35,9 +36,19 @@ def see_this_node():
 
 
 def get_lock(objecttype, subtype, name, ttl=60, timeout=ETCD_ATTEMPT_TIMEOUT,
-             relatedobjects=None, log_ctx=LOG):
+             relatedobjects=None, log_ctx=LOG, op=None):
     return etcd.get_lock(objecttype, subtype, name, ttl=ttl, timeout=timeout,
-                         log_ctx=log_ctx)
+                         log_ctx=log_ctx, op=None)
+
+
+def get_object_lock(obj, ttl=60, timeout=ETCD_ATTEMPT_TIMEOUT,
+                    relatedobjects=None, log_ctx=LOG, op=None):
+    obj_type, obj_name = obj.unique_label()
+    if not (obj_type and obj_name):
+        raise exceptions.LockException(
+            'Could not derive lock name from %s' % obj)
+    return get_lock(obj_type, None, obj_name, ttl=ttl, timeout=timeout,
+                    relatedobjects=relatedobjects, log_ctx=log_ctx, op=op)
 
 
 def refresh_lock(lock, relatedobjects=None, log_ctx=LOG):
@@ -53,6 +64,10 @@ def refresh_locks(locks, relatedobjects=None, log_ctx=LOG):
 
 def clear_stale_locks():
     etcd.clear_stale_locks()
+
+
+def get_existing_locks():
+    return etcd.get_existing_locks()
 
 
 def get_node_ips():
@@ -98,15 +113,9 @@ def allocate_network(netblock, provide_dhcp=True, provide_nat=False, name=None,
     ipm = ipmanager.NetBlock(netblock)
     etcd.put('ipmanager', None, net_id, ipm.save())
 
-    with etcd.get_lock('vxlan', None, 'all'):
-        vxid = 1
-        while etcd.get('vxlan', None, vxid):
-            vxid += 1
-
-        etcd.put('vxlan', None, vxid,
-                 {
-                     'network_uuid': net_id
-                 })
+    vxid = 1
+    while not etcd.create('vxlan', None, vxid, {'network_uuid': net_id}):
+        vxid += 1
 
     d = {
         'uuid': net_id,
@@ -326,16 +335,11 @@ def get_stale_instances(delay):
 
 def create_network_interface(interface_uuid, netdesc, instance_uuid, order):
     if 'macaddress' not in netdesc or not netdesc['macaddress']:
-        with etcd.get_lock('macaddress', None, 'all', ttl=120):
+        possible_mac = util.random_macaddr()
+        mac_iface = {'interface_uuid': interface_uuid}
+        while not etcd.create('macaddress', None, possible_mac, mac_iface):
             possible_mac = util.random_macaddr()
-            while etcd.get('macaddress', None, possible_mac):
-                possible_mac = util.random_macaddr()
-
-            etcd.put('macaddress', None, possible_mac,
-                     {
-                         'interface_uuid': interface_uuid
-                     })
-            netdesc['macaddress'] = possible_mac
+        netdesc['macaddress'] = possible_mac
 
     etcd.put('networkinterface', None, interface_uuid,
              {
@@ -472,35 +476,32 @@ def get_metrics(fqdn):
     return d.get('metrics', {})
 
 
-def _port_free(port):
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        s.bind(('0.0.0.0', port))  # lgtm
-        return True
-    except socket.error:
-        return False
-    finally:
-        s.close()
-
-
 def allocate_console_port(instance_uuid):
     node = config.parsed.get('NODE_NAME')
-    with etcd.get_lock('console', None, node):
-        consumed = []
-        for value in etcd.get_all('console', node):
-            consumed.append(value['port'])
-
+    consumed = {value['port'] for value in etcd.get_all('console', node)}
+    while True:
         port = random.randint(30000, 50000)
-        while port in consumed or not _port_free(port):
-            port = random.randint(30000, 50000)
-
-        etcd.put(
-            'console', node, port,
-            {
-                'instance_uuid': instance_uuid,
-                'port': port,
-            })
-        return port
+        # avoid hitting etcd if it's probably in use
+        if port in consumed:
+            continue
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            # We hold this port open until it's in etcd to prevent
+            # anyone else needing to hit etcd to find out they can't
+            # use it as well as to verify we can use it
+            s.bind(('0.0.0.0', port))
+            allocatedPort = etcd.create(
+                'console', node, port,
+                {
+                    'instance_uuid': instance_uuid,
+                    'port': port,
+                })
+            if allocatedPort:
+                return port
+        except socket.error:
+            pass
+        finally:
+            s.close()
 
 
 def free_console_port(port):
@@ -587,3 +588,24 @@ def get_queue_length(queuename):
 
 def restart_queues():
     etcd.restart_queues()
+
+
+# Image
+
+def get_image_metadata(url_hash, node=None):
+    return etcd.get('image', url_hash, node)
+
+
+def get_image_metadata_all(only_node=None):
+    key_val = etcd.get_all_dict('image')
+
+    if only_node:
+        for k in copy.copy(key_val):
+            if not k.endswith('/' + only_node):
+                del key_val[k]
+
+    return key_val
+
+
+def persist_image_metadata(url_hash, node, metadata):
+    etcd.put('image', url_hash, node, metadata)

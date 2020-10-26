@@ -369,6 +369,7 @@
           global:
             external_labels:
               monitor: 'shakenfist'
+              origin_prometheus: {{deploy_name}}
 
           scrape_configs:
             #- job_name: 'node'

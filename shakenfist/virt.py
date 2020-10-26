@@ -163,8 +163,8 @@ class Instance(object):
             modified_disks = []
             for disk in self.db_entry['block_devices']['devices']:
                 if disk.get('base'):
-                    img = images.Image(disk['base'])
-                    hashed_image_path = img.get([lock], self)
+                    img = images.Image.from_url(disk['base'])
+                    hashed_image_path = img.version_image_path()
 
                     with util.RecordedOperation('detect cdrom images', self):
                         try:
@@ -192,8 +192,8 @@ class Instance(object):
                         disk['bus'] = 'ide'
                     else:
                         with util.RecordedOperation('resize image', self):
-                            resized_image_path = images.resize(
-                                [lock], hashed_image_path, disk['size'])
+                            resized_image_path = img.resize(
+                                [lock], disk['size'])
 
                         if config.parsed.get('DISK_FORMAT') == 'qcow':
                             with util.RecordedOperation('create copy on write layer', self):
@@ -201,10 +201,16 @@ class Instance(object):
                                     [lock], resized_image_path, disk['path'])
 
                             # Record the backing store for modern libvirts
-                            disk['backing'] = ('<backingStore type=\'file\'>\n'
-                                               '        <format type=\'qcow2\'/>\n'
-                                               '        <source file=\'%s\'/>\n'
-                                               '      </backingStore>' % resized_image_path)
+                            disk['backing'] = (
+                                '<backingStore type=\'file\'>\n'
+                                '        <format type=\'qcow2\'/>\n'
+                                '        <source file=\'%s\'/>\n'
+                                '        <backingStore type=\'file\'>\n'
+                                '          <format type=\'qcow2\'/>\n'
+                                '          <source file=\'%s.qcow2\'/>\n'
+                                '        </backingStore>\n'
+                                '      </backingStore>\n'
+                                % (resized_image_path, hashed_image_path))
 
                         elif config.parsed.get('DISK_FORMAT') == 'qcow_flat':
                             with util.RecordedOperation('create flat layer', self):
@@ -274,7 +280,7 @@ class Instance(object):
             for ni in db.get_instance_interfaces(self.db_entry['uuid']):
                 db.update_network_interface_state(ni['uuid'], 'deleted')
                 with db.get_lock('ipmanager', None, ni['network_uuid'],
-                                 ttl=120):
+                                 ttl=120, op='Instance delete'):
                     ipm = db.get_ipmanager(ni['network_uuid'])
                     ipm.release(ni['ipv4'])
                     db.persist_ipmanager(ni['network_uuid'], ipm.save())

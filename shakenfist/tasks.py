@@ -25,11 +25,12 @@ class QueueTask(object):
 
     def __eq__(self, other):
         if not QueueTask.__subclasscheck__(type(other)):
-            raise NotImplementedError('Objects must be subclasses of QueueTask')
+            raise NotImplementedError(
+                'Objects must be subclasses of QueueTask')
         return self.__hash__() == other.__hash__()
 
     def __hash__(self):
-        return hash((self._name, self._version))
+        return hash(str(self.json_dump()))
 
     def json_dump(self):
         return {'task': self._name,
@@ -43,20 +44,18 @@ class InstanceTask(QueueTask):
     def __init__(self, instance_uuid, network=None):
         super(InstanceTask, self).__init__()
         self._instance_uuid = instance_uuid
-        self._network = network
+        self._network = None
+        if network:
+            self._network = network
 
         # General checks
         if not instance_uuid:
-            raise NoInstanceTaskException('No instance specified for InstanceTask')
+            raise NoInstanceTaskException(
+                'No instance specified for InstanceTask')
         if not isinstance(instance_uuid, str):
             raise NoInstanceTaskException('Instance UUID is not a string')
         if network and not isinstance(network, list):
             raise NetworkNotListTaskException()
-
-    def __hash__(self):
-        return hash((super(InstanceTask, self).__hash__(),
-                     self._instance_uuid,
-                     hash(''.join(self._network) if self._network else '')))
 
     def instance_uuid(self):
         return self._instance_uuid
@@ -89,10 +88,6 @@ class ErrorInstanceTask(InstanceTask):
         super(ErrorInstanceTask, self).__init__(instance_uuid)
         self._error_msg = error_msg
 
-    def __hash__(self):
-        return hash((super(ErrorInstanceTask, self).__hash__(),
-                     self._error_msg))
-
     def json_dump(self):
         return {**super(ErrorInstanceTask, self).json_dump(),
                 'error_msg': self._error_msg}
@@ -111,13 +106,10 @@ class NetworkTask(QueueTask):
 
         # General checks
         if not network_uuid:
-            raise NoNetworkTaskException('No network specified for NetworkTask')
+            raise NoNetworkTaskException(
+                'No network specified for NetworkTask')
         if not isinstance(network_uuid, str):
             raise NoNetworkTaskException('Network UUID is not a string')
-
-    def __hash__(self):
-        return hash((super(NetworkTask, self).__hash__(),
-                     self._network_uuid))
 
     def network_uuid(self):
         return self._network_uuid
@@ -150,14 +142,9 @@ class ImageTask(QueueTask):
         if not isinstance(url, str):
             raise NoURLImageFetchTaskException
 
-    def __hash__(self):
-        return hash((super(ImageTask, self).__hash__(),
-                     self._url))
-
     def json_dump(self):
         return {**super(ImageTask, self).json_dump(),
-                'url': self._url,
-                'instance_uuid': self._instance_uuid}
+                'url': self._url}
 
     # Data methods
     def url(self):
@@ -171,10 +158,31 @@ class FetchImageTask(ImageTask):
         super(FetchImageTask, self).__init__(url)
         self._instance_uuid = instance_uuid
 
-    def __hash__(self):
-        return hash((super(FetchImageTask, self).__hash__(),
-                     self._instance_uuid))
+    def json_dump(self):
+        return {**super(FetchImageTask, self).json_dump(),
+                'instance_uuid': self._instance_uuid}
 
     # Data methods
     def instance_uuid(self):
         return self._instance_uuid
+
+
+class ResizeImageTask(ImageTask):
+    _name = 'image_resize'
+
+    def __init__(self, url, size, instance_uuid=None):
+        super(ResizeImageTask, self).__init__(url)
+        self._size = size
+        self._instance_uuid = instance_uuid
+
+    def json_dump(self):
+        return {**super(ResizeImageTask, self).json_dump(),
+                'instance_uuid': self._instance_uuid,
+                'size': self._size}
+
+    # Data methods
+    def instance_uuid(self):
+        return self._instance_uuid
+
+    def size(self):
+        return self._size

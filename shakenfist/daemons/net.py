@@ -56,6 +56,10 @@ class Monitor(daemon.Daemon):
                 if not n:
                     continue
 
+                if n.db_entry['state_updated'] - time.time() < 60:
+                    # Network state changed in the last minute, punt for now
+                    continue
+
                 if not n.is_okay():
                     LOG.withObj(n).info('Recreating not okay network')
                     n.create()
@@ -64,14 +68,16 @@ class Monitor(daemon.Daemon):
                 seen_vxids.append(n.vxlan_id)
 
             except exceptions.LockException as e:
-                LOG.warning('Failed to acquire lock while maintaining networks: %s' % e)
+                LOG.warning(
+                    'Failed to acquire lock while maintaining networks: %s' % e)
 
         # Determine if there are any extra vxids
         extra_vxids = set(vxid_to_mac.keys()) - set(seen_vxids)
 
         # Delete "deleted" SF networks and log unknown vxlans
         if extra_vxids:
-            LOG.withField('vxids', extra_vxids).warning('Extra vxlans present!')
+            LOG.withField('vxids', extra_vxids).warning(
+                'Extra vxlans present!')
 
             # Determine the network uuids for those vxids
             # vxid_to_uuid = {}
@@ -81,7 +87,7 @@ class Monitor(daemon.Daemon):
             # for extra in extra_vxids:
             #     if extra in vxid_to_uuid:
             #         with db.get_lock('network', None, vxid_to_uuid[extra],
-            #                          ttl=120):
+            #                          ttl=120, op='Network reap VXLAN'):
             #             n = net.from_db(vxid_to_uuid[extra])
             #             n.delete()
             #             LOG.info('Extra vxlan %s (network %s) removed.'
@@ -123,6 +129,8 @@ class Monitor(daemon.Daemon):
                              'network node', 'deploy', None, None)
 
             elif isinstance(workitem, UpdateDHCPNetworkTask):
+                n.create()
+                n.ensure_mesh()
                 n.update_dhcp()
                 db.add_event('network', workitem.network_uuid(),
                              'network node', 'update dhcp', None, None)

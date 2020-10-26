@@ -2,7 +2,6 @@
 
 import email.utils
 import hashlib
-import json
 import os
 import re
 import requests
@@ -25,9 +24,6 @@ resolvers = {
     'ubuntu': image_resolver_ubuntu
 }
 
-# The HTTP fields we use to decide if an image is out of date in the cache
-VALIDATED_IMAGE_FIELDS = ['Last-Modified', 'Content-Length']
-
 
 def _get_cache_path():
     image_cache_path = os.path.join(
@@ -40,46 +36,83 @@ def _get_cache_path():
 
 
 class Image(object):
-    def __init__(self, url, checksum=None):
+    def __init__(self, url, checksum, size, modified, fetched, file_version):
+        self.url = url
         self.checksum = checksum
-        self.url, resolver_checksum = self._resolve(url)
-        if not self.checksum:
-            self.checksum = resolver_checksum
+        self.size = size
+        self.modified = modified
+        self.fetched = fetched
+        self.file_version = file_version
 
-        self._hash()
-        self.info = self._read_local_info()
+        # Derive extra parameters
+        self.unique_ref = self.calc_unique_ref(self.url)
+        self.image_path = os.path.join(_get_cache_path(), self.unique_ref)
+
+        self.log = LOG.withImage(self)
 
     def unique_label(self):
-        return ('image', self.hashed_image_url)
+        return ('image', self.unique_ref)
 
-    def _resolve(self, url):
+    @staticmethod
+    def _resolve(url):
         for resolver in resolvers:
             if url.startswith(resolver):
                 return resolvers[resolver].resolve(url)
         return url, None
 
-    def _hash(self):
+    @staticmethod
+    def calc_unique_ref(url):
+        """Calc unique reference for this image.
+
+        The calculated reference is used as the unique DB reference and as the
+        on-disk filename.
+        """
+
+        # TODO(andy): If we namespace downloads then this can combine namespace
+        # with the URL. The DB stores the URL allowing searches to re-use
+        # already downloaded images.
         h = hashlib.sha256()
-        h.update(self.url.encode('utf-8'))
-        self.hashed_image_url = h.hexdigest()
-        self.hashed_image_path = os.path.join(
-            _get_cache_path(), self.hashed_image_url)
+        h.update(url.encode('utf-8'))
+        return h.hexdigest()
 
-    def _read_local_info(self):
-        if not os.path.exists(self.hashed_image_path + '.info'):
-            LOG.withImage(self).info('No info in cache for this image')
-            return {
-                'url': self.url,
-                'hash': self.hashed_image_url,
-                'version': 0
-            }
-        else:
-            with open(self.hashed_image_path + '.info') as f:
-                return json.loads(f.read())
+    @staticmethod
+    def from_url(url, checksum=None):
+        # Handle URL shortcut with built-in resolvers
+        url, resolver_checksum = Image._resolve(url)
 
-    def _persist_info(self):
-        with open(self.hashed_image_path + '.info', 'w') as f:
-            f.write(json.dumps(self.info, indent=4, sort_keys=True))
+        # Check for existing metadata in DB
+        db_data = db.get_image_metadata(Image.calc_unique_ref(url),
+                                        config.parsed.get('NODE_NAME'))
+
+        # Load DB data into new Image object
+        if db_data:
+            ver = db_data['version']
+            del db_data['version']
+
+            # Check version of DB metadata packet
+            if ver == 1:
+                return Image(**db_data)
+            else:
+                raise exceptions.BadMetadataPacket('Image: %s', db_data)
+
+        # Create new object since not found in database
+        if not checksum:
+            checksum = resolver_checksum
+        return Image(url, checksum, None, None, None, 0)
+
+    def persist(self):
+        metadata = {
+            'url': self.url,
+            'checksum': self.checksum,
+            'size': self.size,
+            'modified': self.modified,
+            'fetched': self.fetched,
+            'file_version': self.file_version,
+            'version': 1,
+        }
+        db.persist_image_metadata(self.unique_ref,
+                                  config.parsed.get('NODE_NAME'),
+                                  metadata)
 
     def get(self, locks, related_object):
         """Wrap some lock retries around the get."""
@@ -102,92 +135,92 @@ class Image(object):
         raise exceptions.LockException(
             'Failed to acquire image fetch lock after retries: %s' % exc)
 
+    def version_image_path(self):
+        return '%s.v%03d' % (self.image_path, self.file_version)
+
     def _get(self, locks, related_object):
         """Fetch image if not downloaded and return image path."""
-        actual_image = '%s.v%03d' % (
-            self.hashed_image_path, self.info['version'])
+        actual_image = self.version_image_path()
 
-        with db.get_lock('image', config.parsed.get('NODE_NAME'),
-                         self.hashed_image_url) as image_lock:
-            with util.RecordedOperation('fetch image', related_object):
-                dirty_fields, resp = self._requires_fetch()
+        with util.RecordedOperation('fetch image', related_object):
+            resp = self._open_connection()
 
-                if dirty_fields:
-                    LOG.withImage(self).withField(
-                        'dirty_fields', dirty_fields).info(
-                            'Starting fetch due to dirty fields')
+            diff_field = self._new_image_available(resp)
+            if diff_field:
+                self.log.withField('diff_field', diff_field).info(
+                    'Fetch required due HTTP field change')
+                if related_object:
+                    t, u = related_object.unique_label()
+                    msg = '%s: %s -> %s' % diff_field
+                    db.add_event(t, u, 'image requires fetch', None, None, msg)
 
-                    if related_object:
-                        t, u = related_object.unique_label()
-                        dirty_fields_pretty = []
-                        for field in dirty_fields:
-                            dirty_fields_pretty.append(
-                                '%s: %s -> %s' % (field, dirty_fields[field]['before'],
-                                                  dirty_fields[field]['after']))
-                        db.add_event(t, u, 'image requires fetch',
-                                     None, None, '\n'.join(dirty_fields_pretty))
-                    actual_image = self._fetch(
-                        resp, locks=locks.append(image_lock))
+                actual_image = self._fetch(resp, locks)
 
                 # Ensure checksum is correct
                 if not self.correct_checksum(actual_image):
-                    raise exceptions.BadCheckSum
+                    raise exceptions.BadCheckSum('url=%s' % self.url)
 
-            _transcode(locks, actual_image, related_object)
+        _transcode(locks, actual_image, related_object)
 
         return actual_image
 
-    def _requires_fetch(self):
+    def _open_connection(self):
         resp = requests.get(self.url, allow_redirects=True, stream=True,
                             headers={'User-Agent': util.get_user_agent()})
         if resp.status_code != 200:
             raise exceptions.HTTPError(
                 'Failed to fetch HEAD of %s (status code %d)'
                 % (self.url, resp.status_code))
+        return resp
 
-        dirty_fields = {}
-        for field in VALIDATED_IMAGE_FIELDS:
-            if self.info.get(field) != resp.headers.get(field):
-                dirty_fields[field] = {
-                    'before': self.info.get(field),
-                    'after': resp.headers.get(field)
-                }
+    def _new_image_available(self, resp):
+        """Check if HTTP headers indicate the image file has changed."""
+        modified = resp.headers.get('Last-Modified')
+        if self.modified != modified:
+            return ('modified', self.modified, modified)
 
-        return dirty_fields, resp
+        size = resp.headers.get('Content-Length')
+        if self.size != size:
+            return ('size', self.size, size)
+
+        return False
 
     def _fetch(self, resp, locks=None):
-        """Download the image if we don't already have the latest version in cache."""
+        """Download the image if we don't already have the latest version in
+        cache.
+        """
 
         # Do the fetch
         fetched = 0
-        self.info['version'] += 1
-        self.info['fetched_at'] = email.utils.formatdate()
-        for field in VALIDATED_IMAGE_FIELDS:
-            self.info[field] = resp.headers.get(field)
+        self.file_version += 1
+        self.fetched = email.utils.formatdate()
+        self.modified = resp.headers.get('Last-Modified')
+        self.size = resp.headers.get('Content-Length')
 
         last_refresh = 0
-        with open(self.hashed_image_path + '.v%03d' % self.info['version'], 'wb') as f:
+        with open(self.version_image_path(), 'wb') as f:
             for chunk in resp.iter_content(chunk_size=8192):
                 fetched += len(chunk)
                 f.write(chunk)
 
-                if time.time() - last_refresh > 10:
+                if time.time() - last_refresh > 5:
                     db.refresh_locks(locks)
+                    last_refresh = time.time()
 
         if fetched > 0:
-            self._persist_info()
+            self.persist()
             LOG.withImage(self).withField('bytes_fetched',
                                           fetched).info('Fetch complete')
 
-        # Decompress if required
-        if self.info['url'].endswith('.gz'):
-            if not os.path.exists(self.hashed_image_path + '.v%03d.orig' % self.info['version']):
-                util.execute(locks,
-                             'gunzip -k -q -c %(img)s > %(img)s.orig' % {
-                                 'img': self.hashed_image_path + '.v%03d' % self.info['version']})
-            return '%s.v%03d.orig' % (self.hashed_image_path, self.info['version'])
+        # Check if decompression not required
+        fn = self.version_image_path()
+        if not self.url.endswith('.gz'):
+            return fn
 
-        return '%s.v%03d' % (self.hashed_image_path, self.info['version'])
+        # Check if already decompressed
+        if not os.path.exists(f + '.orig'):
+            util.execute(locks, 'gunzip -k -q -c %s > %s.orig' % (fn, fn))
+        return fn + '.orig'
 
     def correct_checksum(self, image_name):
         log = LOG.withField('image', image_name)
@@ -208,6 +241,29 @@ class Image(object):
         log.withField('correct', correct).info('Image checksum verification')
         return correct
 
+    def resize(self, locks, size):
+        """Resize the image to the specified size."""
+
+        image_path = self.version_image_path()
+        backing_file = image_path + '.qcow2' + '.' + str(size) + 'G'
+
+        if os.path.exists(backing_file):
+            return backing_file
+
+        current_size = identify(image_path).get('virtual size')
+
+        if current_size == size * 1024 * 1024 * 1024:
+            os.link(image_path, backing_file)
+            return backing_file
+
+        util.execute(locks,
+                     'qemu-img create -b %s.qcow2 -f qcow2 %s'
+                     % (image_path, backing_file))
+        util.execute(locks,
+                     'qemu-img resize %s %sG' % (backing_file, size))
+
+        return backing_file
+
 
 def _transcode(locks, actual_image, related_object):
     with util.RecordedOperation('transcode image', related_object):
@@ -222,28 +278,6 @@ def _transcode(locks, actual_image, related_object):
         util.execute(locks,
                      'qemu-img convert -t none -O qcow2 %s %s.qcow2'
                      % (actual_image, actual_image))
-
-
-def resize(locks, hashed_image_path, size):
-    """Resize the image to the specified size."""
-
-    backing_file = hashed_image_path + '.qcow2' + '.' + str(size) + 'G'
-
-    if os.path.exists(backing_file):
-        return backing_file
-
-    current_size = identify(hashed_image_path).get('virtual size')
-
-    if current_size == size * 1024 * 1024 * 1024:
-        os.link(hashed_image_path, backing_file)
-        return backing_file
-
-    util.execute(locks,
-                 'cp %s %s' % (hashed_image_path + '.qcow2', backing_file))
-    util.execute(locks,
-                 'qemu-img resize %s %sG' % (backing_file, size))
-
-    return backing_file
 
 
 VALUE_WITH_BRACKETS_RE = re.compile(r'.* \(([0-9]+) bytes\)')
@@ -294,8 +328,8 @@ def create_cow(locks, cache_file, disk_file):
         return
 
     util.execute(locks,
-                 'qemu-img create -b %s -f qcow2 %s' % (
-                     cache_file, disk_file))
+                 'qemu-img create -b %s -f qcow2 %s'
+                 % (cache_file, disk_file))
 
 
 def create_flat(locks, cache_file, disk_file):

@@ -1,5 +1,6 @@
 import datetime
 import random
+from socket import error as socket_error
 import string
 import sys
 import testtools
@@ -16,6 +17,10 @@ class TimeoutException(Exception):
 
 
 class StartException(Exception):
+    pass
+
+
+class WrongEventException(Exception):
     pass
 
 
@@ -56,22 +61,29 @@ class BaseTestCase(testtools.TestCase):
 
     def _log_instance_events(self, instance_uuid):
         # If we've failed, log all events and then raise an exception
+        self._log_events(instance_uuid,
+                         self.system_client.get_instance_events(instance_uuid))
+
+    def _log_image_events(self, url):
+        self._log_events(url, self.system_client.get_image_events(url))
+
+    def _log_events(self, uuid, event_source):
         x = PrettyTable()
         x.field_names = ['timestamp', 'node',
                          'operation', 'phase', 'duration', 'message']
-        for e in self.system_client.get_instance_events(instance_uuid):
+        for e in event_source:
             e['timestamp'] = datetime.datetime.fromtimestamp(e['timestamp'])
             x.add_row([e['timestamp'], e['fqdn'], e['operation'], e['phase'],
                        e['duration'], e['message']])
 
         sys.stderr.write(
             '----------------------- start %s events -----------------------\n'
-            % instance_uuid)
+            % uuid)
         sys.stderr.write(str(x))
         sys.stderr.write('\n')
         sys.stderr.write(
             '----------------------- end %s events -----------------------\n'
-            % instance_uuid)
+            % uuid)
 
     def _log_netns(self):
         """ Log the current net namespaces """
@@ -85,14 +97,15 @@ class BaseTestCase(testtools.TestCase):
             '----------------------- end netns -----------------------\n')
 
     def _await_power_off(self, instance_uuid, after=None):
-        return self._await_event(
+        return self._await_instance_event(
             instance_uuid, 'detected poweroff', after=after)
 
     def _await_login_prompt(self, instance_uuid, after=None):
-        return self._await_event(
+        return self._await_instance_event(
             instance_uuid, 'trigger', 'login prompt', after)
 
-    def _await_event(self, instance_uuid, operation, message=None, after=None):
+    def _await_instance_event(
+            self, instance_uuid, operation, message=None, after=None):
         # Wait up to two minutes for the instance to be created.
         start_time = time.time()
         final = False
@@ -126,11 +139,51 @@ class BaseTestCase(testtools.TestCase):
 
             time.sleep(5)
 
+            # If this is a login prompt, then try mashing the console keyboard
+            if message == 'login prompt':
+                try:
+                    s = telnetlib.Telnet(i['node'], i['console_port'], 30)
+                    s.write('\n'.encode('ascii'))
+                    s.close()
+                except socket_error:
+                    pass
+
         self._log_console(instance_uuid)
         self._log_instance_events(instance_uuid)
         raise TimeoutException(
             'After time %s, instance %s had no event "%s:%s" (waited 5 mins)' % (
                 after, instance_uuid, operation, message))
+
+    def _await_image_download_success(self, url, after=None):
+        return self._await_image_event(url, 'fetch', 'success', after)
+
+    def _await_image_download_error(self, url, after=None):
+        return self._await_image_event(
+            url, 'fetch', 'Name or service not known', after)
+
+    def _await_image_event(
+            self, url, operation, message=None, after=None):
+        start_time = time.time()
+        while time.time() - start_time < 300:
+            for event in self.system_client.get_image_events(url):
+                if after and event['timestamp'] <= after:
+                    continue
+
+                if event['operation'] == operation:
+                    if message in str(event['message']):
+                        return event['timestamp']
+
+                    self._log_image_events(url)
+                    raise WrongEventException(
+                        'After time %s, image %s expected event "%s:%s" got %s' % (
+                            after, url, operation, message, event['message']))
+
+            time.sleep(5)
+
+        self._log_image_events(url)
+        raise TimeoutException(
+            'After time %s, image %s had no event type "%s" (waited 5 mins)' % (
+                after, url, operation))
 
     def _test_ping(self, instance_uuid, network_uuid, ip, expected, attempts=1):
         while attempts:

@@ -48,7 +48,8 @@ def restore_instances():
         for instance in instances:
             try:
                 with db.get_lock(
-                        'instance', None, instance, ttl=120, timeout=120):
+                        'instance', None, instance, ttl=120, timeout=120,
+                        op='Instance restore'):
                     i = virt.from_db(instance)
                     if not i:
                         continue
