@@ -8,11 +8,6 @@ from pydantic import BaseSettings, Field, SecretStr, IPvAnyAddress, IPvAnyNetwor
 from shakenfist import util
 
 
-# NOTE(mikal): Dear future developer. Thanks ftheor dropping by! Remember that the type
-# of values in this set of defaults matters, as we use it to decide how to parse
-# override values from the user. Your current options are strings (the default), integers,
-# and floats. Integers and floats differ in that a float has values after a decimal point.
-
 def get_node_ip():
     node_name = socket.getfqdn()
     try:
