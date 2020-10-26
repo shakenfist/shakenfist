@@ -190,6 +190,12 @@ def put(objecttype, subtype, name, data, ttl=None):
     Etcd3Client().put(path, encoded, lease=None)
 
 
+def create(objecttype, subtype, name, data, ttle=None):
+    path = _construct_key(objecttype, subtype, name)
+    encoded = json.dumps(data, indent=4, sort_keys=True, cls=JSONEncoderTasks)
+    return Etcd3Client().create(path, encoded, lease=None)
+
+
 def get(objecttype, subtype, name):
     path = _construct_key(objecttype, subtype, name)
     value = Etcd3Client().get(path, metadata=True)

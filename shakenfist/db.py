@@ -113,15 +113,9 @@ def allocate_network(netblock, provide_dhcp=True, provide_nat=False, name=None,
     ipm = ipmanager.NetBlock(netblock)
     etcd.put('ipmanager', None, net_id, ipm.save())
 
-    with etcd.get_lock('vxlan', None, 'all', op='Allocate network'):
-        vxid = 1
-        while etcd.get('vxlan', None, vxid):
-            vxid += 1
-
-        etcd.put('vxlan', None, vxid,
-                 {
-                     'network_uuid': net_id
-                 })
+    vxid = 1
+    while not etcd.create('vxlan', None, vxid, {'network_uuid': net_id}):
+        vxid += 1
 
     d = {
         'uuid': net_id,
