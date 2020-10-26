@@ -192,8 +192,8 @@ class Instance(object):
                         disk['bus'] = 'ide'
                     else:
                         with util.RecordedOperation('resize image', self):
-                            resized_image_path = images.resize(
-                                [lock], hashed_image_path, disk['size'])
+                            resized_image_path = img.resize(
+                                [lock], disk['size'])
 
                         if config.parsed.get('DISK_FORMAT') == 'qcow':
                             with util.RecordedOperation('create copy on write layer', self):

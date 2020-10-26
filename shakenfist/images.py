@@ -241,6 +241,29 @@ class Image(object):
         log.withField('correct', correct).info('Image checksum verification')
         return correct
 
+    def resize(self, locks, size):
+        """Resize the image to the specified size."""
+
+        image_path = self.version_image_path()
+        backing_file = image_path + '.qcow2' + '.' + str(size) + 'G'
+
+        if os.path.exists(backing_file):
+            return backing_file
+
+        current_size = identify(image_path).get('virtual size')
+
+        if current_size == size * 1024 * 1024 * 1024:
+            os.link(image_path, backing_file)
+            return backing_file
+
+        util.execute(locks,
+                     'qemu-img create -b %s.qcow2 -f qcow2 %s'
+                     % (image_path, backing_file))
+        util.execute(locks,
+                     'qemu-img resize %s %sG' % (backing_file, size))
+
+        return backing_file
+
 
 def _transcode(locks, actual_image, related_object):
     with util.RecordedOperation('transcode image', related_object):
@@ -255,29 +278,6 @@ def _transcode(locks, actual_image, related_object):
         util.execute(locks,
                      'qemu-img convert -t none -O qcow2 %s %s.qcow2'
                      % (actual_image, actual_image))
-
-
-def resize(locks, image_path, size):
-    """Resize the image to the specified size."""
-
-    backing_file = image_path + '.qcow2' + '.' + str(size) + 'G'
-
-    if os.path.exists(backing_file):
-        return backing_file
-
-    current_size = identify(image_path).get('virtual size')
-
-    if current_size == size * 1024 * 1024 * 1024:
-        os.link(image_path, backing_file)
-        return backing_file
-
-    util.execute(locks,
-                 'qemu-img create -b %s.qcow2 -f qcow2 %s'
-                 % (image_path, backing_file))
-    util.execute(locks,
-                 'qemu-img resize %s %sG' % (backing_file, size))
-
-    return backing_file
 
 
 VALUE_WITH_BRACKETS_RE = re.compile(r'.* \(([0-9]+) bytes\)')

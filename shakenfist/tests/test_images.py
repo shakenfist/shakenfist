@@ -347,6 +347,9 @@ class ImageObjectTestCase(testtools.TestCase):
         mock_execute.assert_called_with(
             None, 'qemu-img convert -t none -O qcow2 /a/b/c/hash /a/b/c/hash.qcow2')
 
+    @mock.patch('shakenfist.config.parsed.get', return_value='/a/b/c')
+    @mock.patch('shakenfist.db.get_image_metadata', return_value=None)
+    @mock.patch('os.makedirs')
     @mock.patch('shakenfist.util.execute',
                 return_value=(None, None))
     @mock.patch('os.path.exists', return_value=True)
@@ -354,11 +357,15 @@ class ImageObjectTestCase(testtools.TestCase):
                 return_value={'virtual size': 8 * 1024 * 1024 * 1024})
     @mock.patch('os.link')
     def test_resize_image_noop(self, mock_link, mock_identify, mock_exists,
-                               mock_execute):
-        images.resize(None, '/a/b/c/hash', 8)
+                               mock_execute, mock_makedirs, mock_get_meta, mock_config):
+        img = images.Image.from_url('http://example.com')
+        img.resize(None, 8)
         mock_link.assert_not_called()
         mock_execute.assert_not_called()
 
+    @mock.patch('shakenfist.config.parsed.get', return_value='/a/b/c')
+    @mock.patch('shakenfist.db.get_image_metadata', return_value=None)
+    @mock.patch('os.makedirs')
     @mock.patch('shakenfist.util.execute',
                 return_value=(None, None))
     @mock.patch('os.path.exists', return_value=False)
@@ -366,11 +373,19 @@ class ImageObjectTestCase(testtools.TestCase):
                 return_value={'virtual size': 8 * 1024 * 1024 * 1024})
     @mock.patch('os.link')
     def test_resize_image_link(self, mock_link, mock_identify, mock_exists,
-                               mock_execute):
-        images.resize(None, '/a/b/c/hash', 8)
-        mock_link.assert_called_with('/a/b/c/hash', '/a/b/c/hash.qcow2.8G')
+                               mock_execute, mock_makedirs, mock_get_meta, mock_config):
+        img = images.Image.from_url('http://example.com')
+        img.resize(None, 8)
+        mock_link.assert_called_with(
+            '/a/b/c/image_cache/f0e6a6a97042a4f1f1c87f5f7d4'
+            '4315b2d852c2df5c7991cc66241bf7072d1c4.v000',
+            '/a/b/c/image_cache/f0e6a6a97042a4f1f1c87f5f7d4'
+            '4315b2d852c2df5c7991cc66241bf7072d1c4.v000.qcow2.8G')
         mock_execute.assert_not_called()
 
+    @mock.patch('shakenfist.config.parsed.get', return_value='/a/b/c')
+    @mock.patch('shakenfist.db.get_image_metadata', return_value=None)
+    @mock.patch('os.makedirs')
     @mock.patch('shakenfist.util.execute',
                 return_value=(None, None))
     @mock.patch('os.path.exists', return_value=False)
@@ -378,12 +393,23 @@ class ImageObjectTestCase(testtools.TestCase):
                 return_value={'virtual size': 4 * 1024 * 1024 * 1024})
     @mock.patch('os.link')
     def test_resize_image_resize(self, mock_link, mock_identify, mock_exists,
-                                 mock_execute):
-        images.resize(None, '/a/b/c/hash', 8)
+                                 mock_execute, mock_makedirs, mock_get_meta, mock_config):
+        img = images.Image.from_url('http://example.com')
+        img.resize(None, 8)
         mock_link.assert_not_called()
         mock_execute.assert_has_calls(
-            [mock.call(None, 'qemu-img create -b /a/b/c/hash.qcow2 -f qcow2 /a/b/c/hash.qcow2.8G'),
-             mock.call(None, 'qemu-img resize /a/b/c/hash.qcow2.8G 8G')]
+            [mock.call(
+                None,
+                ('qemu-img create -b '
+                 '/a/b/c/image_cache/f0e6a6a97042a4f1f1c87f5f7d4431'
+                 '5b2d852c2df5c7991cc66241bf7072d1c4.v000.qcow2 '
+                 '-f qcow2 /a/b/c/image_cache/f0e6a6a97042a4f1f1c87f'
+                 '5f7d44315b2d852c2df5c7991cc66241bf7072d1c4.v000.qcow2.8G')),
+             mock.call(
+                 None,
+                 ('qemu-img resize '
+                  '/a/b/c/image_cache/f0e6a6a97042a4f1f1c87f5f7d4431'
+                  '5b2d852c2df5c7991cc66241bf7072d1c4.v000.qcow2.8G 8G'))]
         )
 
     @mock.patch('shakenfist.util.execute',

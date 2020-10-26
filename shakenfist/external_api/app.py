@@ -42,6 +42,7 @@ from shakenfist.daemons import daemon
 from shakenfist.tasks import (DeleteInstanceTask,
                               DeployNetworkTask,
                               FetchImageTask,
+                              ResizeImageTask,
                               PreflightInstanceTask,
                               StartInstanceTask,
                               )
@@ -1093,10 +1094,14 @@ class InstanceConsoleData(Resource):
 class Image(Resource):
     @jwt_required
     @caller_is_admin
-    def post(self, url=None):
+    def post(self, url=None, size=None):
+        tasks = [FetchImageTask(url)]
+        if size:
+            tasks.append(ResizeImageTask(url, size))
+
         db.add_event('image', url, 'api', 'cache', None, None)
         db.enqueue(config.parsed.get('NODE_NAME'), {
-            'tasks': [FetchImageTask(url)],
+            'tasks': tasks,
         })
 
 
