@@ -41,10 +41,12 @@ class QueueTask(object):
 # Instance Tasks
 #
 class InstanceTask(QueueTask):
-    def __init__(self, instance_uuid, network=None):
+    def __init__(self, instance_uuid, network=[]):
         super(InstanceTask, self).__init__()
         self._instance_uuid = instance_uuid
-        self._network = None
+        # Only set network if deliberately set in function paramater. This
+        # avoids setting _network to None which is not iterable.
+        self._network = []
         if network:
             self._network = network
 

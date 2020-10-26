@@ -131,7 +131,7 @@ class TaskEncodingETCDtestCase(testtools.TestCase):
         path = '/sf/objecttype/subtype/name'
         encoded = '''{
     "instance_uuid": "fake_uuid",
-    "network": null,
+    "network": [],
     "task": "instance_preflight",
     "version": 1
 }'''
@@ -161,7 +161,7 @@ class TaskEncodingETCDtestCase(testtools.TestCase):
         path = '/sf/objecttype/subtype/name'
         encoded = '''{
     "instance_uuid": "fake_uuid",
-    "network": null,
+    "network": [],
     "task": "instance_delete",
     "version": 1
 }'''
@@ -176,7 +176,7 @@ class TaskEncodingETCDtestCase(testtools.TestCase):
         encoded = '''{
     "error_msg": "dunno",
     "instance_uuid": "fake_uuid",
-    "network": null,
+    "network": [],
     "task": "instance_error",
     "version": 1
 }'''
@@ -332,7 +332,7 @@ class TaskDequeueTestCase(testtools.TestCase):
         '''{
             "tasks": [
                         {
-                            "network": null,
+                            "network": [],
                             "instance_uuid": "fake_uuid",
                             "task": "instance_error",
                             "version": 1
@@ -370,7 +370,7 @@ class TaskDequeueTestCase(testtools.TestCase):
                             "version": 1
                         },
                         {
-                            "network": null,
+                            "network": [],
                             "instance_uuid": "fake_uuid",
                             "task": "instance_error",
                             "version": 1
@@ -400,7 +400,7 @@ class TaskDequeueTestCase(testtools.TestCase):
         '''{
             "tasks": [
                         {
-                            "network": null,
+                            "network": [],
                             "instance_uuid": "fake_uuid",
                             "task": "instance_delete",
                             "version": 1
