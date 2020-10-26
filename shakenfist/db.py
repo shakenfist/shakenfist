@@ -41,13 +41,13 @@ def get_lock(objecttype, subtype, name, ttl=60, timeout=ETCD_ATTEMPT_TIMEOUT,
                          log_ctx=log_ctx, op=None)
 
 
-def get_object_lock(object, ttl=60, timeout=ETCD_ATTEMPT_TIMEOUT,
+def get_object_lock(obj, ttl=60, timeout=ETCD_ATTEMPT_TIMEOUT,
                     relatedobjects=None, log_ctx=LOG, op=None):
-    objecttype, objectname = util.unique_label(object)
-    if not objecttype or objectname:
+    obj_type, obj_name = obj.unique_label()
+    if not (obj_type and obj_name):
         raise exceptions.LockException(
-            'Could not derive lock name from %s' % object)
-    return get_lock(objecttype, None, objectname, ttl=ttl, timeout=timeout,
+            'Could not derive lock name from %s' % obj)
+    return get_lock(obj_type, None, obj_name, ttl=ttl, timeout=timeout,
                     relatedobjects=relatedobjects, log_ctx=log_ctx, op=op)
 
 
