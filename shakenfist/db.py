@@ -335,17 +335,11 @@ def get_stale_instances(delay):
 
 def create_network_interface(interface_uuid, netdesc, instance_uuid, order):
     if 'macaddress' not in netdesc or not netdesc['macaddress']:
-        with etcd.get_lock('macaddress', None, 'all', ttl=120,
-                           op='Allocate macaddress'):
+        possible_mac = util.random_macaddr()
+        mac_iface = {'interface_uuid': interface_uuid}
+        while not etcd.create('macaddress', None, possible_mac, mac_iface):
             possible_mac = util.random_macaddr()
-            while etcd.get('macaddress', None, possible_mac):
-                possible_mac = util.random_macaddr()
-
-            etcd.put('macaddress', None, possible_mac,
-                     {
-                         'interface_uuid': interface_uuid
-                     })
-            netdesc['macaddress'] = possible_mac
+        netdesc['macaddress'] = possible_mac
 
     etcd.put('networkinterface', None, interface_uuid,
              {
@@ -482,36 +476,32 @@ def get_metrics(fqdn):
     return d.get('metrics', {})
 
 
-def _port_free(port):
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        s.bind(('0.0.0.0', port))  # lgtm
-        return True
-    except socket.error:
-        return False
-    finally:
-        s.close()
-
-
 def allocate_console_port(instance_uuid):
     node = config.parsed.get('NODE_NAME')
-    with etcd.get_lock('console', None, node,
-                       op='Allocate console port'):
-        consumed = []
-        for value in etcd.get_all('console', node):
-            consumed.append(value['port'])
-
+    consumed = {value['port'] for value in etcd.get_all('console', node)}
+    while True:
         port = random.randint(30000, 50000)
-        while port in consumed or not _port_free(port):
-            port = random.randint(30000, 50000)
-
-        etcd.put(
-            'console', node, port,
-            {
-                'instance_uuid': instance_uuid,
-                'port': port,
-            })
-        return port
+        # avoid hitting etcd if it's probably in use
+        if port in consumed:
+            continue
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            # We hold this port open until it's in etcd to prevent
+            # anyone else needing to hit etcd to find out they can't
+            # use it as well as to verify we can use it
+            s.bind(('0.0.0.0', port))
+            allocatedPort = etcd.create(
+                'console', node, port,
+                {
+                    'instance_uuid': instance_uuid,
+                    'port': port,
+                })
+            if allocatedPort:
+                return port
+        except socket.error:
+            pass
+        finally:
+            s.close()
 
 
 def free_console_port(port):
