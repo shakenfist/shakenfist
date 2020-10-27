@@ -52,23 +52,11 @@ class TasksEqTestCase(testtools.TestCase):
         self.assertNotEqual(tasks.FetchImageTask('http://someurl'),
                             tasks.FetchImageTask('http://someurl', 'fake_uuid'))
 
-        self.assertEqual(tasks.ResizeImageTask('http://someurl', 100),
-                         tasks.ResizeImageTask('http://someurl', 100))
+        self.assertNotEqual(tasks.FetchImageTask('http://someurl', 'fake_uuid'),
+                            tasks.FetchImageTask('http://someurl', 'fake_uudd'))
 
-        self.assertEqual(tasks.ResizeImageTask('http://someurl', 100, 'uuid'),
-                         tasks.ResizeImageTask('http://someurl', 100, 'uuid'))
-
-        self.assertNotEqual(
-            tasks.ResizeImageTask('http://someurl', 100),
-            tasks.ResizeImageTask('http://someurl', 100, 'uuid'))
-
-        self.assertNotEqual(
-            tasks.ResizeImageTask('http://someurl', 100, 'uuid'),
-            tasks.ResizeImageTask('http://someurl', 101, 'uuid'))
-
-        self.assertNotEqual(
-            tasks.ResizeImageTask('http://someurl', 100, 'uuid1'),
-            tasks.ResizeImageTask('http://someurl', 100, 'uuid2'))
+        self.assertNotEqual(tasks.FetchImageTask('http://someurl', 'fake_uuid'),
+                            tasks.FetchImageTask('http://someurm', 'fake_uuid'))
 
 
 class InstanceTasksTestCase(testtools.TestCase):
