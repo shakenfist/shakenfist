@@ -75,8 +75,8 @@ class ActualLock(Lock):
                     db.add_event(self.objecttype, self.objectname,
                                  'lock', 'acquired', None,
                                  'Waited %d seconds for lock' % duration)
-                    self.log_ctx.withFields({'duration': duration,
-                                             }).info('Acquiring a lock was slow')
+                    self.log_ctx.withField('duration', duration
+                                           ).info('Acquiring a lock was slow')
                 return self
 
             duration = time.time() - start_time

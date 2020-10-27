@@ -40,9 +40,6 @@ class SFPyLogrus(logging.Logger, PyLogrusBase):
             raise Exception('Bad object - no unique_label() function: %s' % e)
         return SFCustomAdapter(self, {label: value})
 
-    def withLabel(self, label, value):
-        return SFCustomAdapter(self, {label: value})
-
     #
     # Use labelled convenience methods when ID is a string (not object)
     # Note: the helper method still handles objects
@@ -135,9 +132,6 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
                     'Bad object - no unique_label() function: %s' % e)
             extra.update({label: value})
         return SFCustomAdapter(self._logger, extra, self._prefix)
-
-    def withLabel(self, label, value):
-        return SFCustomAdapter(self, {label: value})
 
     #
     # Use labelled convenience methods when ID is a string (not object)

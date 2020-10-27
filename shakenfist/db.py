@@ -429,8 +429,9 @@ def get_instance_snapshots(instance_uuid):
 
 def add_event(object_type, object_uuid, operation, phase, duration, message):
     t = time.time()
-    LOG.withLabel(object_type, object_uuid).withFields(
+    LOG.withFields(
         {
+            object_type: object_uuid,
             'fqdn': config.parsed.get('NODE_NAME'),
             'operation': operation,
             'phase': phase,
