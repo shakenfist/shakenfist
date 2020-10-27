@@ -48,7 +48,7 @@ def resolve(name):
                   ).withField('resp', resp).debug("Checksum request response")
     if resp.status_code != 200:
         # Cirros does not always have a checksum file available
-        log.warning('Unable to retrieve MD5SUMS')
+        log.info('Unable to retrieve MD5SUMS for cirros image')
         return url, None
 
     sum_re = re.compile(r'^([0-9a-f]+) .*'+'cirros-'+vernum+'-x86_64-disk.img')
