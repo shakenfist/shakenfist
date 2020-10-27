@@ -227,11 +227,11 @@ class TaskEncodingETCDtestCase(test_shakenfist.ShakenFistTestCase):
 # Decode tasks from JSON
 #
 class TaskDecodingETCDtestCase(test_shakenfist.ShakenFistTestCase):
-    '''Test that decodeTasks does decode subclasses of QueueTasks.
+    """Test that decodeTasks does decode subclasses of QueueTasks.
 
     Only need to check that JSON will convert to QueueTask objects. Testing of
     the actual JSON conversion is in TaskDequeueTestCase.
-    '''
+    """
 
     def test_decode_PreflightInstanceTask(self):
         obs = etcd.decodeTasks({'tasks': [
