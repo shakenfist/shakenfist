@@ -1,8 +1,7 @@
 import mock
-import testtools
-
 
 from shakenfist.daemons import cleaner
+from shakenfist.tests import test_shakenfist
 
 
 class FakeLibvirt(object):
@@ -85,7 +84,7 @@ def fake_put(objecttype, subtype, name, v):
     FAKE_ETCD_STATE['%s/%s/%s' % (objecttype, subtype, name)] = v
 
 
-class CleanerTestCase(testtools.TestCase):
+class CleanerTestCase(test_shakenfist.ShakenFistTestCase):
     def setUp(self):
         super(CleanerTestCase, self).setUp()
 

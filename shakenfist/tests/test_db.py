@@ -1,12 +1,11 @@
 import mock
-import testtools
 import time
 
-
 from shakenfist import db
+from shakenfist.tests import test_shakenfist
 
 
-class DBTestCase(testtools.TestCase):
+class DBTestCase(test_shakenfist.ShakenFistTestCase):
     maxDiff = None
 
     def setUp(self):

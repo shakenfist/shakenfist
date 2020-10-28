@@ -1,8 +1,8 @@
 import mock
-import testtools
 
 from shakenfist import exceptions
 from shakenfist import scheduler
+from shakenfist.tests import test_shakenfist
 
 
 class FakeInstance(object):
@@ -57,7 +57,7 @@ class FakeDB(object):
         return self.metrics[node_name]
 
 
-class SchedulerTestCase(testtools.TestCase):
+class SchedulerTestCase(test_shakenfist.ShakenFistTestCase):
     def setUp(self):
         super(SchedulerTestCase, self).setUp()
 

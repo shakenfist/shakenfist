@@ -1,11 +1,11 @@
 import mock
-import testtools
 
 from shakenfist import config
 from shakenfist import exceptions
+from shakenfist.tests import test_shakenfist
 
 
-class ConfigTestCase(testtools.TestCase):
+class ConfigTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('socket.getfqdn', return_value='a.b.com')
     @mock.patch('socket.gethostbyname', return_value='1.1.1.1')
     def test_hostname(self, mock_hostname, mock_fqdn):

@@ -2,11 +2,11 @@ import mock
 import os
 import testtools
 
-
 from shakenfist import exceptions
 from shakenfist import images
 from shakenfist import image_resolver_cirros
 from shakenfist import image_resolver_ubuntu
+from shakenfist.tests import test_shakenfist
 
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -53,7 +53,7 @@ class FakeImage(object):
         return ('image', self.url)
 
 
-class ImageUtilsTestCase(testtools.TestCase):
+class ImageUtilsTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.config.parsed.get', return_value='/a/b/c')
     @mock.patch('os.path.exists', return_value=True)
     def test_get_cache_path(self, mock_exists, mock_config):
@@ -71,7 +71,7 @@ class ImageUtilsTestCase(testtools.TestCase):
         self.assertEqual('/a/b/c/image_cache', p)
 
 
-class ImageResolversTestCase(testtools.TestCase):
+class ImageResolversTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('requests.get', side_effect=[
         FakeResponse(200, CIRROS_DOWNLOAD_HTML),
         FakeResponse(200, ''),  # Handle no file available
@@ -142,7 +142,7 @@ class ImageResolversTestCase(testtools.TestCase):
                           image_resolver_ubuntu.resolve, 'ubuntu')
 
 
-class ImageObjectTestCase(testtools.TestCase):
+class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.image_resolver_cirros.resolve',
                 return_value=('!!!cirros!!!', '123abc'))
     @mock.patch('shakenfist.image_resolver_ubuntu.resolve',
