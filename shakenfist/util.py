@@ -69,15 +69,20 @@ def is_network_node():
 
 
 def check_for_interface(name, up=False):
+    log = LOG.withFields({'name': name, 'up': up})
     stdout, stderr = execute(None,
                              'ip link show %s' % name, check_exit_code=[0, 1])
 
     if stderr.rstrip('\n').endswith(' does not exist.'):
+        log.info('check_for_interface() does not exist')
         return False
 
     if up:
-        return bool(re.match(r'.*[<,]UP[,>].*', stdout))
+        state = bool(re.match(r'.*[<,]UP[,>].*', stdout))
+        log.withField('actual_up', state).info('check_for_interface()')
+        return state
 
+    log.info('check_for_interface() return True')
     return True
 
 
@@ -136,7 +141,13 @@ def get_safe_interface_name(interface):
 
 
 def create_interface(interface, interface_type, extra):
+    orig_interface = interface
     interface = get_safe_interface_name(interface)
+    LOG.withFields({'interface': interface,
+                    'interface_type': interface_type,
+                    'extra': extra,
+                    'orig_interface_name': orig_interface,
+                    }).debug('create_interface()')
     execute(None,
             'ip link add %(interface)s type %(interface_type)s %(extra)s'
             % {'interface': interface,

@@ -109,6 +109,7 @@ class Network(object):
     def create(self):
         subst = self.subst_dict()
 
+        LOG.withFields(subst).debug('net.create() starting...')
         with db.get_object_lock(self, ttl=120, op='Network create'):
             if not util.check_for_interface(subst['vx_interface']):
                 with util.RecordedOperation('create vxlan interface', self):
@@ -176,6 +177,7 @@ class Network(object):
             db.enqueue('networknode', DeployNetworkTask(self.db_entry['uuid']))
             db.add_event('network', self.db_entry['uuid'], 'deploy',
                          'enqueued', None, None)
+        LOG.withField(subst['netns']).debug('net.create() ...complete')
 
     def deploy_nat(self):
         if not self.db_entry['provide_nat']:
