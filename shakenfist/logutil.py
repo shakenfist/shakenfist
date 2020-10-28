@@ -173,6 +173,7 @@ def setup(name):
     logging.root.setLevel(logging.DEBUG)
     log = logging.getLogger(name)
 
+    handler = None
     if log.hasHandlers():
         # The parent logger might have the handler, not this lower logger
         if len(log.handlers) > 0:

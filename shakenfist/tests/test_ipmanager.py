@@ -1,12 +1,10 @@
 import ipaddress
-import mock
-import testtools
-
 
 from shakenfist import ipmanager
+from shakenfist.tests import test_shakenfist
 
 
-class IPManagerTestCase(testtools.TestCase):
+class IPManagerTestCase(test_shakenfist.ShakenFistTestCase):
     def test_init(self):
         ipm = ipmanager.NetBlock('192.168.1.0/24')
         self.assertEqual({

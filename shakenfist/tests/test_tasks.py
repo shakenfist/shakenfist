@@ -2,9 +2,10 @@ import testtools
 
 from shakenfist import tasks
 from shakenfist import exceptions
+from shakenfist.tests import test_shakenfist
 
 
-class TasksEqTestCase(testtools.TestCase):
+class TasksEqTestCase(test_shakenfist.ShakenFistTestCase):
     def test_QueueTask_eq(self):
         self.assertEqual(tasks.PreflightInstanceTask('abcd'),
                          tasks.PreflightInstanceTask('abcd'))
@@ -59,7 +60,7 @@ class TasksEqTestCase(testtools.TestCase):
                             tasks.FetchImageTask('http://someurm', 'fake_uuid'))
 
 
-class InstanceTasksTestCase(testtools.TestCase):
+class InstanceTasksTestCase(test_shakenfist.ShakenFistTestCase):
     def test_InstanceTask(self):
         i = tasks.InstanceTask('some-uuid')
         self.assertEqual('some-uuid', i.instance_uuid())
@@ -89,7 +90,7 @@ class InstanceTasksTestCase(testtools.TestCase):
             tasks.FetchImageTask(1234)
 
 
-class NetworkTasksTestCase(testtools.TestCase):
+class NetworkTasksTestCase(test_shakenfist.ShakenFistTestCase):
     def test_NetworkTask(self):
         n = tasks.NetworkTask('some-uuid')
         self.assertEqual('some-uuid', n.network_uuid())

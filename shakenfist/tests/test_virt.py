@@ -4,11 +4,10 @@ import mock
 import os
 import pycdlib
 import tempfile
-import testtools
-
 
 from shakenfist import ipmanager
 from shakenfist import virt
+from shakenfist.tests import test_shakenfist
 
 
 class FakeNetwork(object):
@@ -20,7 +19,7 @@ class FakeNetwork(object):
         self.broadcast = '127.255.255.255'
 
 
-class VirtTestCase(testtools.TestCase):
+class VirtTestCase(test_shakenfist.ShakenFistTestCase):
     def setUp(self):
         super(VirtTestCase, self).setUp()
 

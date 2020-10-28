@@ -1,12 +1,11 @@
 import mock
-import testtools
-
 
 from shakenfist import util
 from shakenfist import config
+from shakenfist.tests import test_shakenfist
 
 
-class UtilTestCase(testtools.TestCase):
+class UtilTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch.dict('os.environ',
                      {'SHAKENFIST_NODE_IP': '1.1.1.1',
                       'SHAKENFIST_NETWORK_NODE_IP': '1.1.1.1'})

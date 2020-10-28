@@ -1,11 +1,11 @@
 import json
 import mock
-import testtools
 
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist import tasks
+from shakenfist.tests import test_shakenfist
 
 
 LOG, _ = logutil.setup(__name__)
@@ -22,7 +22,7 @@ def fake_config(key):
     raise Exception('Unknown config key %s' % key)
 
 
-class ActualLockTestCase(testtools.TestCase):
+class ActualLockTestCase(test_shakenfist.ShakenFistTestCase):
     def setUp(self):
         super(ActualLockTestCase, self).setUp()
 
@@ -122,7 +122,7 @@ class ActualLockTestCase(testtools.TestCase):
         mock_release.assert_not_called()
 
 
-class TaskEncodingETCDtestCase(testtools.TestCase):
+class TaskEncodingETCDtestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('etcd3gw.Etcd3Client.put')
     def test_put_PreflightInstanceTask(self, mock_put):
         etcd.put('objecttype', 'subtype', 'name',
@@ -226,7 +226,7 @@ class TaskEncodingETCDtestCase(testtools.TestCase):
 #
 # Decode tasks from JSON
 #
-class TaskDecodingETCDtestCase(testtools.TestCase):
+class TaskDecodingETCDtestCase(test_shakenfist.ShakenFistTestCase):
     '''Test that decodeTasks does decode subclasses of QueueTasks.
 
     Only need to check that JSON will convert to QueueTask objects. Testing of
@@ -273,7 +273,7 @@ class TaskDecodingETCDtestCase(testtools.TestCase):
 #
 # Dequeue tasks from ETCD
 #
-class TaskDequeueTestCase(testtools.TestCase):
+class TaskDequeueTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('etcd3gw.Etcd3Client.get_prefix', return_value=[(
         '''{
             "tasks": [
@@ -456,7 +456,7 @@ class TaskDequeueTestCase(testtools.TestCase):
 #
 # General ETCD operations
 #
-class GeneralETCDtestCase(testtools.TestCase):
+class GeneralETCDtestCase(test_shakenfist.ShakenFistTestCase):
     maxDiff = None
 
     @mock.patch('etcd3gw.Etcd3Client.get_prefix',
