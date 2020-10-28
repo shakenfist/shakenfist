@@ -146,7 +146,7 @@ def image_fetch(url, instance_uuid):
             db.add_event('image', url, 'fetch', None, None, 'success')
 
     except (exceptions.HTTPError, requests.exceptions.RequestException) as e:
-        LOG.withField('image', url).warning('Failed to fetch image')
+        LOG.withField('image', url).info('Failed to fetch image')
         if instance_uuid:
             db.enqueue_instance_error(instance_uuid,
                                       'Image fetch failed: %s' % e)
@@ -210,6 +210,9 @@ def instance_start(instance_uuid, network):
             'instance', None, instance_uuid, ttl=900, timeout=120,
             op='Instance start') as lock:
         instance = virt.from_db(instance_uuid)
+
+        # Allocate console and VDI ports
+        instance.allocate_instance_ports()
 
         # Collect the networks
         nets = {}

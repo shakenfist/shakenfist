@@ -190,11 +190,7 @@ class Image(object):
         return False
 
     def _fetch(self, resp, locks=None):
-        """Download the image if we don't already have the latest version in
-        cache.
-        """
-
-        # Do the fetch
+        """Download the image if the latest version is not in the cache."""
         fetched = 0
         self.file_version += 1
         self.fetched = email.utils.formatdate()
@@ -247,7 +243,6 @@ class Image(object):
 
     def resize(self, locks, size):
         """Resize the image to the specified size."""
-
         image_path = self.version_image_path()
         backing_file = image_path + '.qcow2' + '.' + str(size) + 'G'
 

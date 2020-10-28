@@ -288,6 +288,16 @@ class Instance(object):
         db.free_console_port(self.db_entry['console_port'])
         db.free_console_port(self.db_entry['vdi_port'])
 
+    def allocate_instance_ports(self):
+        uuid = self.db_entry['uuid']
+        self.db_entry['console_port'] = db.allocate_console_port(uuid)
+        self.db_entry['vdi_port'] = db.allocate_console_port(uuid)
+
+        # TODO(andy): When class is modified to model Image class this
+        # repetitive write will be moved to a single persist() function.
+        db.persist_console_ports(
+            uuid, self.db_entry['console_port'], self.db_entry['vdi_port'])
+
     def _make_config_drive(self, disk_path):
         """Create a config drive"""
 

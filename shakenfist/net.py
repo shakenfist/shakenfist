@@ -83,7 +83,7 @@ class Network(object):
             self.db_entry['uuid'], self.db_entry['floating_gateway'])
 
     def is_okay(self):
-        """Check if network is created and running"""
+        """Check if network is created and running."""
         # TODO(andy):This will be built upon with further code re-design
 
         if not self.is_created():
@@ -96,7 +96,7 @@ class Network(object):
         return True
 
     def is_created(self):
-        """Attempt to ensure network has been created successfully"""
+        """Attempt to ensure network has been created successfully."""
 
         subst = self.subst_dict()
         if not util.check_for_interface(subst['vx_bridge'], up=True):

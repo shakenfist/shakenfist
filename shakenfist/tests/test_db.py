@@ -12,8 +12,7 @@ class DBTestCase(test_shakenfist.ShakenFistTestCase):
         super(DBTestCase, self).setUp()
 
     @mock.patch('shakenfist.etcd.put')
-    @mock.patch('shakenfist.db.allocate_console_port', side_effect=[1, 2])
-    def test_create_instance(self, mock_console_allocate, mock_put):
+    def test_create_instance(self, mock_put):
         db.create_instance('uuid42', 'barry', 1, 2048, 'disks',
                            'sshkey', 'userdata', 'namespace',
                            {'memory': 16384, 'model': 'cirrus'}, None)
@@ -31,8 +30,8 @@ class DBTestCase(test_shakenfist.ShakenFistTestCase):
                  'memory': 2048,
                  'disk_spec': 'disks',
                  'ssh_key': 'sshkey',
-                 'console_port': 1,
-                 'vdi_port': 2,
+                 'console_port': 0,
+                 'vdi_port': 0,
                  'user_data': 'userdata',
                  'block_devices': None,
                  'state': 'initial',

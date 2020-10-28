@@ -6,8 +6,7 @@ from shakenfist.exceptions import (NoURLImageFetchTaskException,
 
 
 class QueueTask(object):
-    '''QueueTask defines a validated task placed on the job queue.
-    '''
+    """QueueTask defines a validated task placed on the job queue."""
     _name = None
     _version = 1  # Enable future upgrades to existing tasks
 

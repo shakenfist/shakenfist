@@ -97,7 +97,7 @@ class SchedulerTestCase(test_shakenfist.ShakenFistTestCase):
 
 
 class LowResourceTestCase(SchedulerTestCase):
-    """Test low resource exceptions"""
+    """Test low resource exceptions."""
 
     def setUp(self):
         super(LowResourceTestCase, self).setUp()
@@ -247,7 +247,7 @@ class LowResourceTestCase(SchedulerTestCase):
 
 
 class CorrectAllocationTestCase(SchedulerTestCase):
-    """Test correct node allocation"""
+    """Test correct node allocation."""
 
     def setUp(self):
         super(CorrectAllocationTestCase, self).setUp()
@@ -330,7 +330,7 @@ class CorrectAllocationTestCase(SchedulerTestCase):
 
 
 class FindMostTestCase(SchedulerTestCase):
-    """Test basic information source to scheduler"""
+    """Test basic information source to scheduler."""
 
     def setUp(self):
         super(FindMostTestCase, self).setUp()
