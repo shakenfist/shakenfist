@@ -576,7 +576,7 @@
 <h2 id="the-simplest-case-a-virtual-network-with-no-dhcp-and-no-nat-and-a-single-remote-instance">The simplest case: a virtual network with no DHCP and no NAT, and a single remote instance</h2>
 <p>Let's assume you want a new virtual network with no network services. Its just two instances talking to each other.</p>
 <p>The basic flow is like this -- you create a virtual network. We allocate you a VXLAN network id (called the vxid in various places in the code):</p>
-<pre><code>sf-1 # sf-client network create 192.168.0.0/24 demonet --no-dhcp --no-nat
+<pre><code>sf-1 # sf-client network create demonet 192.168.0.0/24 --no-dhcp --no-nat
 uuid            : b41b067a-44b7-40c5-9ab8-7abdcf5fdc61
 name            : demonet
 vxlan id        : 2

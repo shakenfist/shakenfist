@@ -538,7 +538,7 @@
 <p>Virtual networks / micro segmentation is provided by VXLAN meshes between the instances. Hypervisors are joined to a given mesh when they start their first instance on that network. DHCP services are optionally offered from a "network services" node, which is just a hypervisor node with some extra dnsmasq process. NAT is also optionally available from the network services node. If your network provides NAT, it consumes an IP address from the
 floating IP pool to do so, and performs NAT in a network namespace on the network node.</p>
 <p>You create a network on the command line like this:</p>
-<pre><code class="language-bash">sf-client network create 192.168.1.0/24 mynet
+<pre><code class="language-bash">sf-client network create mynet 192.168.1.0/24
 </code></pre>
 <p>Where "192.168.1.0/24" is the netblock to use, and "mynet" is the name of the network. You'll get back output describing the network, including the UUID of the network, which is used in later calls.</p>
 <h1 id="instances">Instances</h1>
