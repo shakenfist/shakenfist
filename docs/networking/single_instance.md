@@ -9,7 +9,7 @@ Let's assume you want a new virtual network with no network services. Its just t
 The basic flow is like this -- you create a virtual network. We allocate you a VXLAN network id (called the vxid in various places in the code):
 
 ```
-sf-1 # sf-client network create 192.168.0.0/24 demonet --no-dhcp --no-nat
+sf-1 # sf-client network create demonet 192.168.0.0/24 --no-dhcp --no-nat
 uuid            : b41b067a-44b7-40c5-9ab8-7abdcf5fdc61
 name            : demonet
 vxlan id        : 2
