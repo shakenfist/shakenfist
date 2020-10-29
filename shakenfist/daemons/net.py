@@ -56,7 +56,9 @@ class Monitor(daemon.Daemon):
                 if not n:
                     continue
 
-                if n.db_entry['state_updated'] - time.time() < 60:
+                seen_vxids.append(n.db_entry['vxid'])
+
+                if time.time() - n.db_entry['state_updated'] < 60:
                     # Network state changed in the last minute, punt for now
                     continue
 
@@ -65,7 +67,6 @@ class Monitor(daemon.Daemon):
                     n.create()
 
                 n.ensure_mesh()
-                seen_vxids.append(n.vxlan_id)
 
             except exceptions.LockException as e:
                 LOG.warning(
