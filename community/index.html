@@ -9,7 +9,7 @@
         <meta name="description" content="A minimal cloud aimed at small and edge deployments">
       
       
-        <link rel="canonical" href="https://shakenfist.com/usage/">
+        <link rel="canonical" href="https://shakenfist.com/community/">
       
       
       <link rel="shortcut icon" href="../assets/images/favicon.png">
@@ -17,7 +17,7 @@
     
     
       
-        <title>Usage guide - Shaken Fist</title>
+        <title>Community - Shaken Fist</title>
       
     
     
@@ -60,7 +60,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#clients" class="md-skip">
+        <a href="#welcome-to-the-shaken-fist-community" class="md-skip">
           Skip to content
         </a>
       
@@ -90,7 +90,7 @@
           </span>
           <span class="md-header-nav__topic md-ellipsis">
             
-              Usage guide
+              Community
             
           </span>
         </div>
@@ -212,11 +212,20 @@
       
       
 
+  
 
-  <li class="md-nav__item">
-    <a href="../community/" class="md-nav__link">
+
+  <li class="md-nav__item md-nav__item--active">
+    
+    <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+    
+      
+    
+    
+    <a href="./" class="md-nav__link md-nav__link--active">
       Community
     </a>
+    
   </li>
 
     
@@ -224,12 +233,10 @@
       
       
 
-  
 
-
-  <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+  <li class="md-nav__item md-nav__item--nested">
     
-      <input class="md-nav__toggle md-toggle" data-md-toggle="nav-4" type="checkbox" id="nav-4" checked>
+      <input class="md-nav__toggle md-toggle" data-md-toggle="nav-4" type="checkbox" id="nav-4">
     
     <label class="md-nav__link" for="nav-4">
       User Guide
@@ -259,20 +266,11 @@
           
           
 
-  
 
-
-  <li class="md-nav__item md-nav__item--active">
-    
-    <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
-    
-      
-    
-    
-    <a href="./" class="md-nav__link md-nav__link--active">
+  <li class="md-nav__item">
+    <a href="../usage/" class="md-nav__link">
       Usage
     </a>
-    
   </li>
 
         
@@ -532,71 +530,17 @@
             <article class="md-content__inner md-typeset">
               
                 
-                  <a href="https://github.com/shakenfist/shakenfist/edit/master/docs/usage.md" title="Edit this page" class="md-content__button md-icon">
+                  <a href="https://github.com/shakenfist/shakenfist/edit/master/docs/community.md" title="Edit this page" class="md-content__button md-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25z"/></svg>
                   </a>
                 
                 
-                <h1 id="clients">Clients</h1>
-<p>There is a command line client called "sf-client" deployed by ansible. It talks to Shaken Fist via a REST API. There is also a python API client library at shakenfist.clients.apiclient, which is what the command line client uses to call the API. The apiclient module also serves as useful example code for how to write your own client.</p>
-<p>The command line client can produce output in three formats: the standard "pretty" format, a mostly-csv format called "simple" (which is aimed at being easy to parse in shell scripts), and JSON. You select the output format with a flag like this:</p>
-<pre><code class="language-bash">sf-client --simple instance list
-</code></pre>
-<p>The default formatter is the "pretty" formatter, so you never need to specify that on the command line.</p>
-<p>You can explore what the command line client is capable of by asking it for help:</p>
-<pre><code class="language-bash">sf-client --help
-</code></pre>
-<h1 id="networking">Networking</h1>
-<p>Virtual networks / micro segmentation is provided by VXLAN meshes between the instances. Hypervisors are joined to a given mesh when they start their first instance on that network. DHCP services are optionally offered from a "network services" node, which is just a hypervisor node with some extra dnsmasq process. NAT is also optionally available from the network services node. If your network provides NAT, it consumes an IP address from the
-floating IP pool to do so, and performs NAT in a network namespace on the network node.</p>
-<p>You create a network on the command line like this:</p>
-<pre><code class="language-bash">sf-client network create mynet 192.168.1.0/24
-</code></pre>
-<p>Where "192.168.1.0/24" is the netblock to use, and "mynet" is the name of the network. You'll get back output describing the network, including the UUID of the network, which is used in later calls.</p>
-<h1 id="instances">Instances</h1>
-<p>Every instance gets a config drive. Its always an ISO9660 drive. It's always the second virtual disk attached to the VM (vdb on Linux). There is no metadata server. Additionally, there is no image service -- you specify the image to use by providing a URL. That URL is cached, but can be to any HTTP server anywhere. Even better, there are no flavors. You specify what resources your instance should have at boot time and that's what you get. No more being forced into a t-shirt sized description of your needs.</p>
-<p>Instances are always cattle. Any feature that made instances feel like pets has not been implemented. That said, you can snapshot an instance. Snapshots aren't reliable backups, just like they're not really reliable backups on OpenStack. There is a small but real chance that a snapshot will contain an inconsistent state if you're snapshotting a busy database or something like that. One minor difference from OpenStack -- when you snapshot your instance you can snapshot all of the virtual disks (except the config drive) if you want to. Snapshots are delivered as files you can download via a mechanism external to Shaken Fist (for example an HTTP server pointed at the snapshot directory).</p>
-<p>You start an instance like this:</p>
-<pre><code class="language-bash">sf-client instance create &quot;myinstance&quot; 1 2048 -d 8@cirros -n netuuid
-</code></pre>
-<p>Where "myinstance" is the name of the instance, it has 1 vCPU, 2048MB of RAM, a single 8gb disk (more on this in a second) and a single network interface on the network with the UUID "netuuid".</p>
-<p>"8<a class="magiclink magiclink-github magiclink-mention" href="https://github.com/cirros" title="GitHub User: cirros">@cirros</a>" is a "short disk specification". These are in the form size@image, where the <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/image" title="GitHub User: image">@image</a> is optional. You can specify more than one disk, so this is valid:</p>
-<pre><code class="language-bash">sf-client instance create &quot;myinstance&quot; 1 2048 -d 8@cirros -d 8 -d 8 -n netuuid
-</code></pre>
-<p>In this case we have three disks, all of 8gb. The boot disk is imaged with cirros. The "cirros" here is shorthand. By default, you specify a URL for the image you want, so to boot a cirros instance you might use <a href="http://download.cirros-cloud.net/0.5.1/cirros-0.5.1-x86_64-disk.img">http://download.cirros-cloud.net/0.5.1/cirros-0.5.1-x86_64-disk.img</a> -- that gets old though, so for common cloud images there is a shorthand format, where Shaken Fist knows how to generate the download URL from a short description. In this case "cirros" means "the latest release of cirros". You can also specify a version like this:</p>
-<pre><code class="language-bash">sf-client instance create &quot;myinstance&quot; 1 2048 -d 8@cirros:0.5.1 -d 8 -d 8 -n netuuid
-</code></pre>
-<p>"Common cloud images" is currently defined as cirros and Ubuntu. You can also use a "detailed disk specification", which is what fancy people use. Its syntax is similar:</p>
-<pre><code class="language-bash">sf-client instance create &quot;myinstance&quot; 1 2048 -D size=8,base=cirros,bus=ide,type=cdrom -d 8 -d 8 -n netuuid
-</code></pre>
-<p>The specification is composed of a series of key-value pairs. Valid keys are: size; base; bus; and type. If you don't specify a key, you'll get a reasonable default. Here's how the keys work:</p>
+                <h1 id="welcome-to-the-shaken-fist-community">Welcome to the Shaken Fist community</h1>
+<p>First off, Shaken Fist is an open source project covered by the Apache2 license. The community is relatively small at this point and we're still working out what works for us. For now, we communicate through the following mechanisms:</p>
 <ul>
-<li><em>size</em> as per the shorthand notation.</li>
-<li><em>base</em> as per the shorthand notation, including version specification.</li>
-<li><em>bus</em> is any valid disk bus for libvirt, which is virtio, ide, scsi, usb. Use virtio unless you have a really good reason otherwise -- the performance of the others are terrible. An example of a good reason is to install virtio drivers into legacy operating systems that lack them natively.</li>
-<li><em>type</em> can be one of disk or cdrom. Note that cdroms are excluded from snapshots.</li>
+<li>github issues and pull requests in the various repositories</li>
+<li>a slack workspace at <a href="https://shakenfist.slack.com">https://shakenfist.slack.com</a> -- unfortunately you need to be invited to that workspace, but we're happy to do that. If you're interested, please email <a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#109;&#105;&#107;&#97;&#108;&#64;&#115;&#116;&#105;&#108;&#108;&#104;&#113;&#46;&#99;&#111;&#109;">&#109;&#105;&#107;&#97;&#108;&#64;&#115;&#116;&#105;&#108;&#108;&#104;&#113;&#46;&#99;&#111;&#109;</a></li>
 </ul>
-<p>Similarly, networks have a "short network specification", where you can specify the UUID of a network, but also optionally the IP address to use for the interface. You can also have more than one network interface, so this is valid:</p>
-<pre><code class="language-bash">sf-client instance create &quot;myinstance&quot; 1 2048 -d 8@cirros -n netuuid1@192.168.1.2 \
-    -n netuuid2@10.0.0.4
-</code></pre>
-<p>There is a "detailed network specification" as well, which is composed of the following keys:</p>
-<ul>
-<li><em>network_uuid</em> is the UUID of the network to use.</li>
-<li><em>address</em> is the IPv4 network address to use, if free. If its not free the instance will fail to start.</li>
-<li><em>macaddress</em> the mac address to use for the interface.</li>
-</ul>
-<h1 id="missing-documentation">Missing documentation</h1>
-<p>I really should document these as well:</p>
-<ul>
-<li>nodes</li>
-<li>networks: delete, list</li>
-<li>instance: show, delete, list, ssh keys, user data, reboots (hard and soft), poweroff, poweron, pause, unpause, snapshot</li>
-<li>images: pre-caching</li>
-<li>metadata</li>
-<li>authentication</li>
-</ul>
-<p>Maybe one day I will.</p>
                 
                   
                 
@@ -617,7 +561,7 @@ floating IP pool to do so, and performs NAT in a network namespace on the networ
     <div class="md-footer-nav">
       <nav class="md-footer-nav__inner md-grid" aria-label="Footer">
         
-          <a href="../installation/" class="md-footer-nav__link md-footer-nav__link--prev" rel="prev">
+          <a href="../manifesto/" class="md-footer-nav__link md-footer-nav__link--prev" rel="prev">
             <div class="md-footer-nav__button md-icon">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
             </div>
@@ -626,19 +570,19 @@ floating IP pool to do so, and performs NAT in a network namespace on the networ
                 <span class="md-footer-nav__direction">
                   Previous
                 </span>
-                Installation
+                Manifesto
               </div>
             </div>
           </a>
         
         
-          <a href="../development/git_usage/" class="md-footer-nav__link md-footer-nav__link--next" rel="next">
+          <a href="../installation/" class="md-footer-nav__link md-footer-nav__link--next" rel="next">
             <div class="md-footer-nav__title">
               <div class="md-ellipsis">
                 <span class="md-footer-nav__direction">
                   Next
                 </span>
-                Workflow
+                Installation
               </div>
             </div>
             <div class="md-footer-nav__button md-icon">
