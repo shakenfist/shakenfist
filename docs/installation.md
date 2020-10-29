@@ -69,13 +69,13 @@ Instances must be launched attached to a network.
 
 Create your first network:
 ```bash
-sf-client network create 192.168.42.0/24 mynet
+sf-client network create mynet 192.168.42.0/24
 ```
 
 You can get help for the command line client by running ```sf-client --help``. The above command creates a new network called "mynet", with the IP block 192.168.42.0/24. You will receive some descriptive output back:
 
 ```bash
-$ sf-client network create 192.168.42.0/24 mynet
+$ sf-client network create mynet 192.168.42.0/24
 uuid            : 16baa325-5adf-473f-8e7a-75710a822d45
 name            : mynet
 vxlan id        : 2

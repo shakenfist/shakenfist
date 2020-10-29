@@ -28,7 +28,7 @@ floating IP pool to do so, and performs NAT in a network namespace on the networ
 You create a network on the command line like this:
 
 ```bash
-sf-client network create 192.168.1.0/24 mynet
+sf-client network create mynet 192.168.1.0/24
 ```
 
 Where "192.168.1.0/24" is the netblock to use, and "mynet" is the name of the network. You'll get back output describing the network, including the UUID of the network, which is used in later calls.
