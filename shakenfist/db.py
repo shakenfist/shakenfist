@@ -286,6 +286,10 @@ def instance_enforced_deletes_increment(instance_uuid):
 
 def update_instance_state(instance_uuid, state):
     i = get_instance(instance_uuid)
+    if not i:
+        LOG.withField('instance_uuid', instance_uuid).error(
+            'update_instance_state() Instance does not exist')
+        return
 
     # We don't write unchanged things to the database
     if i.get('state') == state:
