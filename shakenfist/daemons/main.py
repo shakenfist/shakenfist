@@ -124,11 +124,11 @@ def main():
 
         if not util.check_for_interface(subst['physical_bridge']):
             # NOTE(mikal): Adding the physical interface to the physical bridge
-            # is considered outside the scope of the orchestration software as it
-            # will cause the node to lose network connectivity. So instead all we
-            # do is create a bridge if it doesn't exist and the wire everything up
-            # to it. We can do egress NAT in that state, even if floating IPs
-            # don't work.
+            # is considered outside the scope of the orchestration software as
+            # it will cause the node to lose network connectivity. So instead
+            # all we do is create a bridge if it doesn't exist and the wire
+            # everything up to it. We can do egress NAT in that state, even if
+            # floating IPs don't work.
             with util.RecordedOperation('create physical bridge', None):
                 # No locking as read only
                 ipm = db.get_ipmanager('floating')
@@ -139,20 +139,23 @@ def main():
                 util.execute(None,
                              'ip link set %(physical_bridge)s up' % subst)
                 util.execute(None,
-                             'ip addr add %(master_float)s/%(netmask)s dev %(physical_bridge)s' % subst)
+                             'ip addr add %(master_float)s/%(netmask)s '
+                             'dev %(physical_bridge)s' % subst)
 
                 util.execute(None,
-                             'iptables -A FORWARD -o %(physical_nic)s -i %(physical_bridge)s -j ACCEPT' % subst)
+                             'iptables -A FORWARD -o %(physical_nic)s '
+                             '-i %(physical_bridge)s -j ACCEPT' % subst)
                 util.execute(None,
-                             'iptables -A FORWARD -i %(physical_nic)s -o %(physical_bridge)s -j ACCEPT' % subst)
+                             'iptables -A FORWARD -i %(physical_nic)s '
+                             '-o %(physical_bridge)s -j ACCEPT' % subst)
                 util.execute(None,
-                             'iptables -t nat -A POSTROUTING -o %(physical_nic)s -j MASQUERADE' % subst)
+                             'iptables -t nat -A POSTROUTING '
+                             '-o %(physical_nic)s -j MASQUERADE' % subst)
 
     def _audit_daemons():
         running_daemons = []
         for pid in DAEMON_PIDS:
             running_daemons.append(DAEMON_PIDS[pid])
-        LOG.info('Daemons running: %s' % ', '.join(sorted(running_daemons)))
 
         for d in DAEMON_IMPLEMENTATIONS:
             if d not in running_daemons:

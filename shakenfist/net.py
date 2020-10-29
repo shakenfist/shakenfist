@@ -23,7 +23,7 @@ def from_db(uuid):
     dbnet = db.get_network(uuid)
     if not dbnet:
         return None
-    if dbnet['state'] == 'deleted':
+    if dbnet['state'] in ('deleted', 'deleting'):
         LOG.withNetwork(uuid).info('Network is deleted, returning None.')
         return None
     return Network(dbnet)
@@ -131,21 +131,25 @@ class Network(object):
                 with util.RecordedOperation('create vxlan interface', self):
                     util.create_interface(
                         subst['vx_interface'], 'vxlan',
-                        'id %(vx_id)s dev %(physical_interface)s dstport 0' % subst)
+                        'id %(vx_id)s dev %(physical_interface)s dstport 0'
+                        % subst)
                     util.execute(None,
-                                 'sysctl -w net.ipv4.conf.%(vx_interface)s.arp_notify=1' % subst)
+                                 'sysctl -w net.ipv4.conf.'
+                                 '%(vx_interface)s.arp_notify=1' % subst)
 
             if not util.check_for_interface(subst['vx_bridge']):
                 with util.RecordedOperation('create vxlan bridge', self):
                     util.create_interface(subst['vx_bridge'], 'bridge', '')
                     util.execute(None,
-                                 'ip link set %(vx_interface)s master %(vx_bridge)s' % subst)
+                                 'ip link set %(vx_interface)s '
+                                 'master %(vx_bridge)s' % subst)
                     util.execute(None,
                                  'ip link set %(vx_interface)s up' % subst)
                     util.execute(None,
                                  'ip link set %(vx_bridge)s up' % subst)
                     util.execute(None,
-                                 'sysctl -w net.ipv4.conf.%(vx_bridge)s.arp_notify=1' % subst)
+                                 'sysctl -w net.ipv4.conf.'
+                                 '%(vx_bridge)s.arp_notify=1' % subst)
                     util.execute(None,
                                  'brctl setfd %(vx_bridge)s 0' % subst)
                     util.execute(None,
@@ -164,16 +168,21 @@ class Network(object):
                     util.create_interface(
                         subst['vx_veth_outer'], 'veth',
                         'peer name %(vx_veth_inner)s' % subst)
-                    util.execute(None,
-                                 'ip link set %(vx_veth_inner)s netns %(netns)s' % subst)
-                    util.execute(None,
-                                 'brctl addif %(vx_bridge)s %(vx_veth_outer)s' % subst)
+                    util.execute(
+                        None,
+                        'ip link set %(vx_veth_inner)s netns %(netns)s' % subst)
+                    util.execute(
+                        None,
+                        'brctl addif %(vx_bridge)s %(vx_veth_outer)s' % subst)
                     util.execute(None,
                                  'ip link set %(vx_veth_outer)s up' % subst)
-                    util.execute(None,
-                                 '%(in_netns)s ip link set %(vx_veth_inner)s up' % subst)
-                    util.execute(None,
-                                 '%(in_netns)s ip addr add %(router)s/%(netmask)s dev %(vx_veth_inner)s' % subst)
+                    util.execute(
+                        None,
+                        '%(in_netns)s ip link set %(vx_veth_inner)s up' % subst)
+                    util.execute(
+                        None,
+                        '%(in_netns)s ip addr add %(router)s/%(netmask)s '
+                        'dev %(vx_veth_inner)s' % subst)
 
             if not util.check_for_interface(subst['physical_veth_outer']):
                 with util.RecordedOperation('create physical veth', self):
@@ -181,11 +190,14 @@ class Network(object):
                         subst['physical_veth_outer'], 'veth',
                         'peer name %(physical_veth_inner)s' % subst)
                     util.execute(None,
-                                 'brctl addif %(physical_bridge)s %(physical_veth_outer)s' % subst)
+                                 'brctl addif %(physical_bridge)s '
+                                 '%(physical_veth_outer)s' % subst)
                     util.execute(None,
-                                 'ip link set %(physical_veth_outer)s up' % subst)
+                                 'ip link set %(physical_veth_outer)s up'
+                                 % subst)
                     util.execute(None,
-                                 'ip link set %(physical_veth_inner)s netns %(netns)s' % subst)
+                                 'ip link set %(physical_veth_inner)s '
+                                 'netns %(netns)s' % subst)
 
             self.deploy_nat()
             self.update_dhcp()
@@ -200,7 +212,8 @@ class Network(object):
 
         subst = self.subst_dict()
         if not self.db_entry['floating_gateway']:
-            with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Network deploy NAT'):
+            with db.get_lock('ipmanager', None,
+                             'floating', ttl=120, op='Network deploy NAT'):
                 ipm = db.get_ipmanager('floating')
                 self.db_entry['floating_gateway'] = ipm.get_random_free_address()
                 db.persist_ipmanager('floating', ipm.save())
@@ -218,40 +231,51 @@ class Network(object):
                 raise DeadNetwork('network=%s' % self)
 
             with util.RecordedOperation('enable virtual routing', self):
-                if not subst['floating_gateway'] in list(util.get_interface_addresses(
-                        subst['netns'], subst['physical_veth_inner'])):
+                addresses = util.get_interface_addresses(
+                    subst['netns'],
+                    subst['physical_veth_inner'])
+                if not subst['floating_gateway'] in list(addresses):
                     util.execute(None,
-                                 '%(in_netns)s ip addr add %(floating_gateway)s/%(floating_netmask)s '
+                                 '%(in_netns)s ip addr add '
+                                 '%(floating_gateway)s/%(floating_netmask)s '
                                  'dev %(physical_veth_inner)s' % subst)
                     util.execute(None,
-                                 '%(in_netns)s ip link set %(physical_veth_inner)s up' % subst)
+                                 '%(in_netns)s ip link set '
+                                 '%(physical_veth_inner)s up' % subst)
 
                 default_routes = util.get_default_routes(subst['netns'])
                 if default_routes != [subst['floating_router']]:
                     if default_routes:
                         for default_route in default_routes:
                             util.execute(None,
-                                         '%s route del default gw %s' % (subst['in_netns'], default_route))
+                                         '%s route del default gw %s'
+                                         % (subst['in_netns'], default_route))
 
                     util.execute(None,
-                                 '%(in_netns)s route add default gw %(floating_router)s' % subst)
+                                 '%(in_netns)s route add default '
+                                 'gw %(floating_router)s' % subst)
 
             if not util.nat_rules_for_ipblock(self.network_address):
                 with util.RecordedOperation('enable nat', self):
                     util.execute(None,
                                  'echo 1 > /proc/sys/net/ipv4/ip_forward')
                     util.execute(None,
-                                 '%(in_netns)s iptables -A FORWARD -o %(physical_veth_inner)s '
+                                 '%(in_netns)s iptables -A FORWARD '
+                                 '-o %(physical_veth_inner)s '
                                  '-i %(vx_veth_inner)s -j ACCEPT' % subst)
                     util.execute(None,
-                                 '%(in_netns)s iptables -A FORWARD -i %(physical_veth_inner)s '
+                                 '%(in_netns)s iptables -A FORWARD '
+                                 '-i %(physical_veth_inner)s '
                                  '-o %(vx_veth_inner)s -j ACCEPT' % subst)
                     util.execute(None,
-                                 '%(in_netns)s iptables -t nat -A POSTROUTING -s %(ipblock)s/%(netmask)s '
-                                 '-o %(physical_veth_inner)s -j MASQUERADE' % subst)
+                                 '%(in_netns)s iptables -t nat -A POSTROUTING '
+                                 '-s %(ipblock)s/%(netmask)s '
+                                 '-o %(physical_veth_inner)s '
+                                 '-j MASQUERADE' % subst)
 
     def delete(self):
         subst = self.subst_dict()
+        LOG.withFields(subst).debug('net.delete()')
 
         # Cleanup local node
         with db.get_object_lock(self, ttl=120, op='Network delete'):
@@ -389,27 +413,29 @@ class Network(object):
                 added.append(node)
 
             if removed:
-                db.add_event('network', self.db_entry['uuid'], 'remove mesh elements',
-                             None, None, ' '.join(removed))
+                db.add_event(
+                    'network', self.db_entry['uuid'], 'remove mesh elements',
+                    None, None, ' '.join(removed))
             if added:
-                db.add_event('network', self.db_entry['uuid'], 'add mesh elements',
-                             None, None, ' '.join(added))
+                db.add_event(
+                    'network', self.db_entry['uuid'], 'add mesh elements',
+                    None, None, ' '.join(added))
 
     def _add_mesh_element(self, node):
         LOG.withObj(self).info('Adding new mesh element %s' % node)
         subst = self.subst_dict()
         subst['node'] = node
         util.execute(None,
-                     'bridge fdb append to 00:00:00:00:00:00 dst %(node)s dev %(vx_interface)s'
-                     % subst)
+                     'bridge fdb append to 00:00:00:00:00:00 '
+                     'dst %(node)s dev %(vx_interface)s' % subst)
 
     def _remove_mesh_element(self, node):
         LOG.withObj(self).info('Removing excess mesh element %s' % node)
         subst = self.subst_dict()
         subst['node'] = node
         util.execute(None,
-                     'bridge fdb del to 00:00:00:00:00:00 dst %(node)s dev %(vx_interface)s'
-                     % subst)
+                     'bridge fdb del to 00:00:00:00:00:00 dst %(node)s '
+                     'dev %(vx_interface)s' % subst)
 
     def add_floating_ip(self, floating_address, inner_address):
         LOG.withObj(self).info('Adding floating ip %s -> %s'
@@ -423,7 +449,8 @@ class Network(object):
                      'dev %(physical_veth_outer)s' % subst)
         util.execute(None,
                      '%(in_netns)s iptables -t nat -A PREROUTING '
-                     '-d %(floating_address)s -j DNAT --to-destination %(inner_address)s' % subst)
+                     '-d %(floating_address)s '
+                     '-j DNAT --to-destination %(inner_address)s' % subst)
 
     def remove_floating_ip(self, floating_address, inner_address):
         LOG.withObj(self).info('Removing floating ip %s -> %s'
@@ -437,4 +464,5 @@ class Network(object):
                      'dev %(physical_veth_outer)s' % subst)
         util.execute(None,
                      '%(in_netns)s iptables -t nat -D PREROUTING '
-                     '-d %(floating_address)s -j DNAT --to-destination %(inner_address)s' % subst)
+                     '-d %(floating_address)s '
+                     '-j DNAT --to-destination %(inner_address)s' % subst)
