@@ -112,9 +112,17 @@ def allocate_network(netblock, provide_dhcp=True, provide_nat=False, name=None,
     ipm = ipmanager.NetBlock(netblock)
     etcd.put('ipmanager', None, net_id, ipm.save())
 
+    LOG.withField('vxid',
+                  etcd.get_all_dict('vxlan', None)).debug('Existing VXIDs')
+    nets = {k: [v['vxid'], v['state']]
+            for k, v in etcd.get_all_dict('network', None).items()}
+    LOG.withField('networks', nets).debug('Existing networks')
+
     vxid = 1
     while not etcd.create('vxlan', None, vxid, {'network_uuid': net_id}):
         vxid += 1
+
+    LOG.withField('vxid', vxid).debug('Allocated VXID')
 
     d = {
         'uuid': net_id,

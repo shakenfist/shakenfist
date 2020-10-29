@@ -71,8 +71,7 @@ def error(status_code, message):
     resp = flask.Response(json.dumps(body),
                           mimetype='application/json')
     resp.status_code = status_code
-    LOG.error('Returning API error: %d, %s\n    %s'
-              % (status_code, message, '\n    '.join(body.get('traceback', '').split('\n'))))
+    LOG.info('Returning API error: %d, %s' % (status_code, message))
     return resp
 
 
@@ -141,6 +140,7 @@ def generic_wrapper(func):
             return error(401, str(e))
 
         except Exception as e:
+            LOG.exception('Server error')
             return error(500, 'server error: %s' % repr(e))
 
     return wrapper
@@ -1192,8 +1192,9 @@ class Networks(Resource):
 
         # If accessing a foreign name namespace, we need to be an admin
         if get_jwt_identity() not in [namespace, 'system']:
-            return error(401,
-                         'only admins can create resources in a different namespace')
+            return error(
+                401,
+                'only admins can create resources in a different namespace')
 
         network = db.allocate_network(netblock, provide_dhcp,
                                       provide_nat, name, namespace)
