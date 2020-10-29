@@ -290,6 +290,7 @@ def _lock_refresher(locks):
 
 
 def execute(locks, command, check_exit_code=[0], env_variables=None):
+    LOG.withField('command', command).debug('util.execute()')
     if not locks:
         return processutils.execute(
             command, check_exit_code=check_exit_code,
