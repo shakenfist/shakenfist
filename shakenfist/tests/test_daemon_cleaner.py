@@ -98,7 +98,7 @@ class CleanerTestCase(test_shakenfist.ShakenFistTestCase):
         self.mock_proctitle = self.proctitle.start()
         self.addCleanup(self.proctitle.stop)
 
-        self.config = mock.patch('shakenfist.config.parsed.get',
+        self.config = mock.patch('shakenfist.configuration.config.get',
                                  fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)

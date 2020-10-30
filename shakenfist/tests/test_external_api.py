@@ -4,7 +4,7 @@ import json
 import mock
 
 
-from shakenfist import config
+from shakenfist.configuration import config
 from shakenfist.external_api import app as external_api
 from shakenfist import ipmanager
 from shakenfist import net
@@ -22,7 +22,7 @@ class FakeResponse(object):
 
 class FakeScheduler(object):
     def place_instance(self, *args, **kwargs):
-        return config.parsed.get('NODE_NAME')
+        return config.node_name()
 
 
 class FakeInstance(object):
@@ -688,7 +688,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                 return fc[key]
             raise Exception('fake_config_instance() Unknown config key')
 
-        self.config = mock.patch('shakenfist.config.parsed.get',
+        self.config = mock.patch('shakenfist.configuration.config.get',
                                  fake_config_instance)
         self.mock_config = self.config.start()
 
@@ -961,11 +961,12 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
                 return fc[key]
             raise Exception('fake_config_network() Unknown config key')
 
-        self.config = mock.patch('shakenfist.config.parsed.get',
+        self.config = mock.patch('shakenfist.configuration.config.get',
                                  fake_config_network)
         self.mock_config = self.config.start()
-        # Without this cleanup, other test classes will have 'config.parsed.get'
-        # mocked during parallel testing by stestr.
+        # Without this cleanup, other test classes will have
+        # 'shakenfist.configuration.config.get' mocked during parallel testing
+        # by stestr.
         self.addCleanup(self.config.stop)
 
     @mock.patch('shakenfist.db.get_networks',

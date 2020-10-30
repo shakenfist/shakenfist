@@ -5,7 +5,7 @@ import setproctitle
 import signal
 import time
 
-from shakenfist import config
+from shakenfist.configuration import config
 from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import logutil
@@ -78,7 +78,7 @@ class Monitor(daemon.Daemon):
             # Start missing observers
             extra_instances = list(observers.keys())
 
-            for inst in db.get_instances(only_node=config.parsed.get('NODE_NAME')):
+            for inst in db.get_instances(only_node=config.node_name()):
                 if inst['uuid'] in extra_instances:
                     extra_instances.remove(inst['uuid'])
 
@@ -86,8 +86,10 @@ class Monitor(daemon.Daemon):
                     continue
 
                 if inst['uuid'] not in observers:
-                    console_path = os.path.join(
-                        config.parsed.get('STORAGE_PATH'), 'instances', inst['uuid'], 'console.log')
+                    console_path = os.path.join(config.get('STORAGE_PATH'),
+                                                'instances',
+                                                inst['uuid'],
+                                                'console.log')
                     p = multiprocessing.Process(
                         target=observe, args=(console_path, inst['uuid']),
                         name='%s-%s' % (daemon.process_name('triggers'),

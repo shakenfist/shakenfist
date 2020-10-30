@@ -26,7 +26,7 @@ class ActualLockTestCase(test_shakenfist.ShakenFistTestCase):
     def setUp(self):
         super(ActualLockTestCase, self).setUp()
 
-        self.config = mock.patch('shakenfist.config.parsed.get',
+        self.config = mock.patch('shakenfist.configuration.config.get',
                                  fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)

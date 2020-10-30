@@ -30,7 +30,7 @@ import time
 import traceback
 import uuid
 
-from shakenfist import config
+from shakenfist.configuration import config
 from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import logutil
@@ -63,7 +63,7 @@ def error(status_code, message):
         'status': status_code
     }
 
-    if TESTING or config.parsed.get('INCLUDE_TRACEBACKS') == '1':
+    if TESTING or config.get('INCLUDE_TRACEBACKS') == '1':
         _, _, tb = sys.exc_info()
         if tb:
             body['traceback'] = traceback.format_exc()
@@ -195,13 +195,13 @@ def redirect_instance_request(func):
     # Redirect method to the hypervisor hosting the instance
     def wrapper(*args, **kwargs):
         i = kwargs.get('instance_from_db_virt')
-        if i and i.db_entry['node'] != config.parsed.get('NODE_NAME'):
+        if i and i.db_entry['node'] != config.node_name():
             url = 'http://%s:%d%s' % (i.db_entry['node'],
-                                      config.parsed.get('API_PORT'),
+                                      config.get('API_PORT'),
                                       flask.request.environ['PATH_INFO'])
             api_token = util.get_api_token(
                 'http://%s:%d' % (i.db_entry['node'],
-                                  config.parsed.get('API_PORT')),
+                                  config.get('API_PORT')),
                 namespace=get_jwt_identity())
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'], url,
@@ -256,16 +256,16 @@ def arg_is_network_uuid(func):
 def redirect_to_network_node(func):
     # Redirect method to the network node
     def wrapper(*args, **kwargs):
-        if config.parsed.get('NODE_IP') != config.parsed.get('NETWORK_NODE_IP'):
+        if not util.is_network_node():
             admin_token = util.get_api_token(
-                'http://%s:%d' % (config.parsed.get('NETWORK_NODE_IP'),
-                                  config.parsed.get('API_PORT')),
+                'http://%s:%d' % (config.network_node_ip(),
+                                  config.get('API_PORT')),
                 namespace='system')
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'],
                 'http://%s:%d%s'
-                % (config.parsed.get('NETWORK_NODE_IP'),
-                   config.parsed.get('API_PORT'),
+                % (config.network_node_ip(),
+                   config.get('API_PORT'),
                    flask.request.environ['PATH_INFO']),
                 data=flask.request.data,
                 headers={'Authorization': admin_token,
@@ -318,7 +318,7 @@ def _metadata_putpost(meta_type, owner, key, value):
 
 app = flask.Flask(__name__)
 api = flask_restful.Api(app, catch_all_404s=False)
-app.config['JWT_SECRET_KEY'] = config.parsed.get('AUTH_SECRET_SEED')
+app.config['JWT_SECRET_KEY'] = config.get('AUTH_SECRET_SEED')
 jwt = JWTManager(app)
 
 # Use our handler to get SF log format (instead of gunicorn's handlers)
@@ -582,14 +582,14 @@ class Instance(Resource):
 
         # If this instance is not on a node, just do the DB cleanup locally
         if not instance_from_db['node']:
-            node = config.parsed.get('NODE_NAME')
+            node = config.node_name()
         else:
             node = instance_from_db['node']
 
         db.enqueue_instance_delete_remote(node, instance_from_db['uuid'])
 
         start_time = time.time()
-        while time.time() - start_time < config.parsed.get('API_ASYNC_WAIT'):
+        while time.time() - start_time < config.get('API_ASYNC_WAIT'):
             i = db.get_instance(instance_uuid)
             if i['state'] in ['deleted', 'error']:
                 return
@@ -761,7 +761,7 @@ class Instances(Resource):
         # Watch for a while and return results if things are fast, give up
         # after a while and just return the current state
         start_time = time.time()
-        while time.time() - start_time < config.parsed.get('API_ASYNC_WAIT'):
+        while time.time() - start_time < config.get('API_ASYNC_WAIT'):
             i = db.get_instance(instance_uuid)
             if i['state'] in ['created', 'deleted', 'error']:
                 return i
@@ -795,7 +795,7 @@ class Instances(Resource):
 
             # If this instance is not on a node, just do the DB cleanup locally
             if not instance['node']:
-                node = config.parsed.get('NODE_NAME')
+                node = config.node_name()
             else:
                 node = instance['node']
 
@@ -808,7 +808,8 @@ class Instances(Resource):
 
         waiting_for = copy.copy(instances_del)
         start_time = time.time()
-        while (waiting_for and (time.time() - start_time < config.parsed.get('API_ASYNC_WAIT'))):
+        while (waiting_for and
+               (time.time() - start_time < config.get('API_ASYNC_WAIT'))):
             for instance_uuid in copy.copy(waiting_for):
                 i = db.get_instance(instance_uuid)
                 if i['state'] in ['deleted', 'error']:
@@ -1107,7 +1108,7 @@ class Images(Resource):
     @jwt_required
     def post(self, url=None):
         db.add_event('image', url, 'api', 'cache', None, None)
-        db.enqueue(config.parsed.get('NODE_NAME'), {
+        db.enqueue(config.node_name(), {
             'tasks': [FetchImageTask(url)],
         })
 

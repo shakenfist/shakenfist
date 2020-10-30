@@ -36,7 +36,7 @@ class VirtTestCase(test_shakenfist.ShakenFistTestCase):
                 return 'node01'
             raise Exception('Unknown key')
 
-        self.config = mock.patch('shakenfist.config.parsed.get',
+        self.config = mock.patch('shakenfist.configuration.config.get',
                                  fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)

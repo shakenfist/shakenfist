@@ -82,7 +82,7 @@ class SchedulerTestCase(test_shakenfist.ShakenFistTestCase):
                 raise Exception('fake_config() Unknown key')
             return data[key]
 
-        self.mock_config = mock.patch('shakenfist.config.parsed.get',
+        self.mock_config = mock.patch('shakenfist.configuration.config.get',
                                       fake_config)
         self.mock_config.start()
         self.addCleanup(self.mock_config.stop)
