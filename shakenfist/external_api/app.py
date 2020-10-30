@@ -444,11 +444,10 @@ class AuthNamespace(Resource):
             return error(400, 'you cannot delete a namespace with instances')
 
         networks = []
-        deleted_networks = []
         for n in db.get_networks(all=True, namespace=namespace):
-            if n['state'] in ['deleted', 'error']:
-                deleted_networks.append(n['uuid'])
-            else:
+            # Deliberately include 'deleting' networks as live since that is a
+            # transient state. If it hangs in that state we want to know.
+            if n['state'] not in ['deleted', 'error']:
                 networks.append(n['uuid'])
         if len(networks) > 0:
             return error(400, 'you cannot delete a namespace with networks')
@@ -1121,20 +1120,33 @@ class ImageEvents(Resource):
 
 
 def _delete_network(network_from_db):
-    network_uuid = network_from_db['uuid']
-    db.add_event('network', network_uuid, 'api', 'delete', None, None)
+    # Load network from DB to ensure obtaining correct lock.
+    n = net.from_db(network_from_db['uuid'])
 
-    n = net.from_db(network_uuid)
+    with db.get_object_lock(n, ttl=120, op='Network deleting'):
+        # Inefficiently reload from DB to ensure nothing changed while waiting
+        # for the lock.
+        n = net.from_db(network_from_db['uuid'])
+        if not n or n.is_dead():
+            LOG.withFields({'network_uuid': n.db_entry['uuid'],
+                            'state': n.db_entry['state']}).warning(
+                                'delete_network: network does not exist')
+            return error(404, 'network is deleted')
+        db.update_network_state(n.db_entry['uuid'], 'deleting')
+
+    db.add_event('network', n.db_entry['uuid'], 'api', 'delete', None, None)
+
     n.remove_dhcp()
     n.delete()
 
     if n.db_entry.get('floating_gateway'):
-        with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Network delete'):
+        with db.get_lock(
+                'ipmanager', None, 'floating', ttl=120, op='Network delete'):
             ipm = db.get_ipmanager('floating')
             ipm.release(n.db_entry['floating_gateway'])
             db.persist_ipmanager('floating', ipm.save())
 
-    db.update_network_state(network_uuid, 'deleted')
+    db.update_network_state(n.db_entry['uuid'], 'deleted')
 
 
 class Network(Resource):
@@ -1162,7 +1174,7 @@ class Network(Resource):
         if network_from_db['state'] in 'deleted':
             return error(404, 'network not found')
 
-        _delete_network(network_from_db)
+        return _delete_network(network_from_db)
 
 
 class Networks(Resource):

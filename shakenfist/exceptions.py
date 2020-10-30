@@ -87,3 +87,12 @@ class NoNetworkTaskException(TaskException):
 
 class NetworkNotListTaskException(TaskException):
     pass
+
+
+# Networks
+class NetworkException(Exception):
+    pass
+
+
+class DeadNetwork(NetworkException):
+    pass

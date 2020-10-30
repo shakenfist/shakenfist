@@ -71,6 +71,9 @@ class Monitor(daemon.Daemon):
             except exceptions.LockException as e:
                 LOG.warning(
                     'Failed to acquire lock while maintaining networks: %s' % e)
+            except exceptions.DeadNetwork as e:
+                LOG.withField('exception', e).info(
+                    'maintain_network attempted on dead network')
 
         # Determine if there are any extra vxids
         extra_vxids = set(vxid_to_mac.keys()) - set(seen_vxids)
@@ -115,7 +118,7 @@ class Monitor(daemon.Daemon):
             n = net.from_db(workitem.network_uuid())
             if not n:
                 log_ctx.withNetwork(workitem.network_uuid()).warning(
-                    'Received work item for non-existant network')
+                    'Received work item for non-existent network')
                 return
 
             # NOTE(mikal): there's really nothing stopping us from processing a bunch
@@ -123,17 +126,25 @@ class Monitor(daemon.Daemon):
             # worth the complexity right now. Are we really going to be changing
             # networks that much?
             if isinstance(workitem, DeployNetworkTask):
-                n.create()
-                n.ensure_mesh()
-                db.add_event('network', workitem.network_uuid(),
-                             'network node', 'deploy', None, None)
+                try:
+                    n.create()
+                    n.ensure_mesh()
+                    db.add_event('network', workitem.network_uuid(),
+                                 'network node', 'deploy', None, None)
+                except exceptions.DeadNetwork as e:
+                    log_ctx.withField('exception', e).warning(
+                        'DeployNetworkTask on dead network')
 
             elif isinstance(workitem, UpdateDHCPNetworkTask):
-                n.create()
-                n.ensure_mesh()
-                n.update_dhcp()
-                db.add_event('network', workitem.network_uuid(),
-                             'network node', 'update dhcp', None, None)
+                try:
+                    n.create()
+                    n.ensure_mesh()
+                    n.update_dhcp()
+                    db.add_event('network', workitem.network_uuid(),
+                                 'network node', 'update dhcp', None, None)
+                except exceptions.DeadNetwork as e:
+                    log_ctx.withField('exception', e).warning(
+                        'UpdateDHCPNetworkTask on dead network')
 
             elif isinstance(workitem, RemoveDHCPNetworkTask):
                 n.remove_dhcp()
