@@ -1,7 +1,6 @@
 # Copyright 2019 Michael Still
 
 import socket
-from functools import cached_property
 
 from pydantic import (
     BaseSettings,
@@ -28,12 +27,8 @@ class SFConfigBase(BaseSettings):
     """
     Separated from SFConfig for ease of testing
     """
-    @cached_property
-    def _dict(self):
-        return self.dict()
-
     def get(self, key):
-        return self._dict[key]
+        return self.dict()[key]
 
 
 class SFConfig(SFConfigBase):
