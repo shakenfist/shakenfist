@@ -57,6 +57,7 @@ class FakeDB(object):
             raise exceptions.ReadException
         return self.metrics[node_name]
 
+
 fake_config = SFConfig(
     NODE_NAME='node01',
     SCHEDULER_CACHE_TIMEOUT=30,

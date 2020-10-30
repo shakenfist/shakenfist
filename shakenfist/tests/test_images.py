@@ -104,6 +104,7 @@ class ImageResolversTestCase(test_shakenfist.ShakenFistTestCase):
                                  fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
+
     @mock.patch('requests.get', side_effect=[
         FakeResponse(200, CIRROS_DOWNLOAD_HTML),
         FakeResponse(200, ''),  # Handle no file available
@@ -184,6 +185,7 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
                                  fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
+
     @mock.patch('shakenfist.image_resolver_cirros.resolve',
                 return_value=('!!!cirros!!!', '123abc'))
     @mock.patch('shakenfist.image_resolver_ubuntu.resolve',
