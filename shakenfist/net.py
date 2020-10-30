@@ -5,7 +5,7 @@ import psutil
 import re
 
 
-from shakenfist import config
+from shakenfist.configuration import config
 from shakenfist import db
 from shakenfist import dhcp
 from shakenfist import logutil
@@ -33,7 +33,7 @@ class Network(object):
     # on Linux is 15 user visible characters.
     def __init__(self, db_entry):
         self.db_entry = db_entry
-        self.physical_nic = config.parsed.get('NODE_EGRESS_NIC')
+        self.physical_nic = config.get('NODE_EGRESS_NIC')
 
         with db.get_lock('ipmanager', None, self.db_entry['uuid'], ttl=120,
                          op='Network object initialization'):
@@ -50,7 +50,8 @@ class Network(object):
             db.persist_ipmanager(self.db_entry['uuid'], ipm.save())
 
     def __str__(self):
-        return 'network(%s, vxid %s)' % (self.db_entry['uuid'], self.db_entry['vxid'])
+        return 'network(%s, vxid %s)' % (self.db_entry['uuid'],
+                                         self.db_entry['vxid'])
 
     def unique_label(self):
         return ('network', self.db_entry['uuid'])
@@ -64,7 +65,7 @@ class Network(object):
             'vx_veth_inner': 'veth-%s-i' % self.db_entry['vxid'],
 
             'physical_interface': self.physical_nic,
-            'physical_bridge': 'phy-br-%s' % config.parsed.get('NODE_EGRESS_NIC'),
+            'physical_bridge': 'phy-br-%s' % config.get('NODE_EGRESS_NIC'),
             'physical_veth_outer': 'phy-%s-o' % self.db_entry['vxid'],
             'physical_veth_inner': 'phy-%s-i' % self.db_entry['vxid'],
 
@@ -340,7 +341,7 @@ class Network(object):
             # NOTE(mikal): why not use DNS here? Well, DNS might be outside
             # the control of the deployer if we're running in a public cloud
             # as an overlay cloud...
-            node_ips = [config.parsed.get('NETWORK_NODE_IP')]
+            node_ips = [config.network_node_ip()]
             for fqdn in node_fqdns:
                 ip = db.get_node(fqdn)['ip']
                 if ip not in node_ips:

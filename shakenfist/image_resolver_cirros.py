@@ -1,7 +1,7 @@
 import re
 import requests
 
-from shakenfist import config
+from shakenfist.configuration import config
 from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist import util
@@ -37,7 +37,7 @@ def resolve(name):
             raise exceptions.VersionSpecificationError(
                 'Cannot parse version: %s' % name)
 
-    url = config.parsed.get('DOWNLOAD_URL_CIRROS') % {'vernum': vernum}
+    url = config.get('DOWNLOAD_URL_CIRROS') % {'vernum': vernum}
     log = LOG.withField('url', url)
 
     # Retrieve check sum file

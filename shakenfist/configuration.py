@@ -6,7 +6,6 @@ import os
 import socket
 
 from shakenfist import exceptions
-from shakenfist import util
 
 
 # NOTE(mikal): Dear future developer. Thanks ftheor dropping by! Remember that the type
@@ -99,6 +98,7 @@ CONFIG_DEFAULTS = {
     'LOGLEVEL_CLEANER': 'info',
     'LOGLEVEL_MAIN': 'info',
     'LOGLEVEL_NET': 'info',
+    'LOGLEVEL_QUEUES': 'info',
     'LOGLEVEL_RESOURCES': 'info',
     'LOGLEVEL_TRIGGERS': 'info',
     # Add method name and module line number to log messages
@@ -116,10 +116,9 @@ class Config(object):
         node_name = socket.getfqdn()
         try:
             node_ip = socket.gethostbyname(node_name)
-        except Exception as e:
+        except Exception:
             # Only for localhost development environments
             node_ip = '127.0.0.1'
-            util.ignore_exception('config parser', e)
 
         CONFIG_DEFAULTS['NODE_NAME'] = node_name
         CONFIG_DEFAULTS['NODE_IP'] = node_ip
@@ -149,7 +148,17 @@ class Config(object):
     def get(self, var):
         if not self.config:
             self.parse()
-        return self.config.get(var)
+        # Ensure an exception if code attempts to retrieve non-existent config
+        return self.config[var]
+
+    def node_name(self):
+        return self.get('NODE_NAME')
+
+    def node_ip(self):
+        return self.get('NODE_IP')
+
+    def network_node_ip(self):
+        return self.get('NETWORK_NODE_IP')
 
 
-parsed = Config()
+config = Config()

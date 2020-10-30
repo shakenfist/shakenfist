@@ -6,14 +6,14 @@ import socket
 import time
 import uuid
 
-
-from shakenfist import config
+from shakenfist.configuration import config
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import ipmanager
 from shakenfist import logutil
 from shakenfist import util
 from shakenfist.tasks import DeleteInstanceTask, ErrorInstanceTask
+
 
 # TODO(andy): Change back to 5 once network bugs fixed
 ETCD_ATTEMPT_TIMEOUT = 15
@@ -24,11 +24,10 @@ LOG, _ = logutil.setup(__name__)
 
 def see_this_node():
     etcd.put(
-        'node', None,
-        config.parsed.get('NODE_NAME'),
+        'node', None, config.node_name(),
         {
-            'fqdn': config.parsed.get('NODE_NAME'),
-            'ip': config.parsed.get('NODE_IP'),
+            'fqdn': config.node_name(),
+            'ip': config.node_ip(),
             'lastseen': time.time(),
             'version': util.get_version()
         },
@@ -85,7 +84,7 @@ def get_nodes():
 
 def get_network_node():
     for n in get_nodes():
-        if n['ip'] == config.parsed.get('NETWORK_NODE_IP'):
+        if n['ip'] == config.network_node_ip():
             return n
 
 
@@ -247,7 +246,7 @@ def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key,
         'memory': memory_mb,
         'disk_spec': disk_spec,
         'ssh_key': ssh_key,
-        'node': config.parsed.get('NODE_NAME'),
+        'node': config.node_name(),
         'console_port': 0,
         'vdi_port': 0,
         'user_data': user_data,
@@ -445,7 +444,7 @@ def add_event(object_type, object_uuid, operation, phase, duration, message):
     LOG.withFields(
         {
             object_type: object_uuid,
-            'fqdn': config.parsed.get('NODE_NAME'),
+            'fqdn': config.node_name(),
             'operation': operation,
             'phase': phase,
             'duration': duration,
@@ -457,7 +456,7 @@ def add_event(object_type, object_uuid, operation, phase, duration, message):
             'timestamp': t,
             'object_type': object_type,
             'object_uuid': object_uuid,
-            'fqdn': config.parsed.get('NODE_NAME'),
+            'fqdn': config.node_name(),
             'operation': operation,
             'phase': phase,
             'duration': duration,
@@ -472,11 +471,10 @@ def get_events(object_type, object_uuid):
 
 
 def update_metrics_bulk(metrics):
-    node = config.parsed.get('NODE_NAME')
     etcd.put(
-        'metrics', node, None,
+        'metrics', config.node_name(), None,
         {
-            'fqdn': node,
+            'fqdn': config.node_name(),
             'timestamp': time.time(),
             'metrics': metrics
         },
@@ -491,7 +489,7 @@ def get_metrics(fqdn):
 
 
 def allocate_console_port(instance_uuid):
-    node = config.parsed.get('NODE_NAME')
+    node = config.node_name()
     consumed = {value['port'] for value in etcd.get_all('console', node)}
     while True:
         port = random.randint(30000, 50000)
@@ -520,7 +518,7 @@ def allocate_console_port(instance_uuid):
 
 
 def free_console_port(port):
-    etcd.delete('console', config.parsed.get('NODE_NAME'), port)
+    etcd.delete('console', config.node_name(), port)
 
 
 def list_namespaces():
@@ -564,8 +562,7 @@ def enqueue(queuename, workitem):
 
 
 def enqueue_instance_delete(instance_uuid):
-    enqueue_instance_delete_remote(config.parsed.get('NODE_NAME'),
-                                   instance_uuid)
+    enqueue_instance_delete_remote(config.node_name(), instance_uuid)
 
 
 def enqueue_instance_delete_remote(node, instance_uuid):
@@ -577,7 +574,7 @@ def enqueue_instance_delete_remote(node, instance_uuid):
 
 
 def enqueue_instance_error(instance_uuid, error_msg):
-    enqueue(config.parsed.get('NODE_NAME'), {
+    enqueue(config.node_name(), {
         'tasks': [
             ErrorInstanceTask(instance_uuid, error_msg)
         ],

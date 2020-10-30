@@ -46,7 +46,7 @@ class DHCPTestCase(testtools.TestCase):
                 return fc[key]
             raise Exception('Unknown config key')
 
-        self.config = mock.patch('shakenfist.config.parsed.get',
+        self.config = mock.patch('shakenfist.configuration.config.get',
                                  fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)

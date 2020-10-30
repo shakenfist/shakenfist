@@ -1,7 +1,7 @@
 import mock
 
 from shakenfist import net
-from shakenfist import config
+from shakenfist.configuration import config
 from shakenfist.tests import test_shakenfist
 
 
@@ -58,9 +58,13 @@ class NetworkGeneralTestCase(NetworkTestCase):
 class NetworkNormalNodeTestCase(NetworkTestCase):
     def setUp(self):
         super(NetworkNormalNodeTestCase, self).setUp()
-        config.CONFIG_DEFAULTS['NODE_IP'] = '1.1.1.2'
-        config.CONFIG_DEFAULTS['NETWORK_NODE_IP'] = '1.1.1.1'
-        config.parsed = config.Config()
+        os_environ = mock.patch.dict('os.environ', {
+            'SHAKENFIST_NODE_IP': '1.1.1.2',
+            'SHAKENFIST_NETWORK_NODE_IP': '1.1.1.1'
+            })
+        os_environ.start()
+        self.addCleanup(os_environ.stop)
+        config.parse()
 
     #
     #  is_okay()
@@ -97,9 +101,6 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
 
     @mock.patch('shakenfist.net.Network.is_created', return_value=True)
     @mock.patch('shakenfist.net.Network.is_dnsmasq_running', return_value=False)
-    @mock.patch.dict('os.environ',
-                     {'SHAKENFIST_NODE_IP': '1.1.1.1',
-                      'SHAKENFIST_NETWORK_NODE_IP': '1.1.1.2'})
     def test_is_okay_no_dns(self, mock_is_dnsmasq, mock_is_created):
         n = net.Network(
             {
@@ -117,9 +118,12 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
 class NetworkNetNodeTestCase(NetworkTestCase):
     def setUp(self):
         super(NetworkNetNodeTestCase, self).setUp()
-        config.CONFIG_DEFAULTS['NODE_IP'] = '1.1.1.1'
-        config.CONFIG_DEFAULTS['NETWORK_NODE_IP'] = '1.1.1.1'
-        config.parsed = config.Config()
+        os_environ = mock.patch.dict('os.environ', {
+            'SHAKENFIST_NODE_IP': '1.1.1.1',
+            'SHAKENFIST_NETWORK_NODE_IP': '1.1.1.1'
+            })
+        os_environ.start()
+        self.addCleanup(os_environ.stop)
 
     #
     #  is_okay()

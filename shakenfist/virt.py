@@ -10,7 +10,7 @@ import shutil
 import time
 import uuid
 
-from shakenfist import config
+from shakenfist.configuration import config
 from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import images
@@ -41,7 +41,7 @@ def _get_defaulted_disk_bus(disk):
     bus = disk.get('bus')
     if bus:
         return bus
-    return config.parsed.get('DISK_BUS')
+    return config.get('DISK_BUS')
 
 
 def _get_disk_device_base(bus):
@@ -66,9 +66,9 @@ class Instance(object):
         self.db_entry = db_entry
 
         self.instance_path = os.path.join(
-            config.parsed.get('STORAGE_PATH'), 'instances', self.db_entry['uuid'])
+            config.get('STORAGE_PATH'), 'instances', self.db_entry['uuid'])
         self.snapshot_path = os.path.join(
-            config.parsed.get('STORAGE_PATH'), 'snapshots')
+            config.get('STORAGE_PATH'), 'snapshots')
         self.xml_file = os.path.join(self.instance_path, 'libvirt.xml')
 
         if not self.db_entry['block_devices']:
@@ -96,7 +96,7 @@ class Instance(object):
         config_device = _get_disk_device_base(bus) + 'b'
 
         disk_type = 'qcow2'
-        if config.parsed.get('DISK_FORMAT') == 'flat':
+        if config.get('DISK_FORMAT') == 'flat':
             disk_type = 'raw'
 
         self.db_entry['block_devices'] = {
@@ -191,7 +191,7 @@ class Instance(object):
                         disk['device'] = 'hd%s' % disk['device'][-1]
                         disk['bus'] = 'ide'
                     else:
-                        if config.parsed.get('DISK_FORMAT') == 'qcow':
+                        if config.get('DISK_FORMAT') == 'qcow':
                             with util.RecordedOperation('create copy on write layer', self):
                                 images.create_cow([lock], hashed_image_path,
                                                   disk['path'], disk['size'])
@@ -204,7 +204,7 @@ class Instance(object):
                                 '      </backingStore>\n'
                                 % (hashed_image_path))
 
-                        elif config.parsed.get('DISK_FORMAT') == 'qcow_flat':
+                        elif config.get('DISK_FORMAT') == 'qcow_flat':
                             with util.RecordedOperation('resize image', self):
                                 resized_image_path = img.resize(
                                     [lock], disk['size'])
@@ -213,7 +213,7 @@ class Instance(object):
                                 images.create_flat(
                                     [lock], resized_image_path, disk['path'])
 
-                        elif config.parsed.get('DISK_FORMAT') == 'flat':
+                        elif config.get('DISK_FORMAT') == 'flat':
                             with util.RecordedOperation('resize image', self):
                                 resized_image_path = img.resize(
                                     [lock], disk['size'])
@@ -323,7 +323,7 @@ class Instance(object):
         md = json.dumps({
             'random_seed': base64.b64encode(os.urandom(512)).decode('ascii'),
             'uuid': self.db_entry['uuid'],
-            'availability_zone': config.parsed.get('ZONE'),
+            'availability_zone': config.get('ZONE'),
             'hostname': '%s.local' % self.db_entry['name'],
             'launch_index': 0,
             'devices': [],
@@ -398,25 +398,31 @@ class Instance(object):
                 seen_networks.append(iface['network_uuid'])
 
         nd_encoded = json.dumps(nd).encode('ascii')
-        iso.add_fp(io.BytesIO(nd_encoded), len(nd_encoded), '/openstack/latest/network_data.json;3',
+        iso.add_fp(io.BytesIO(nd_encoded), len(nd_encoded),
+                   '/openstack/latest/network_data.json;3',
                    rr_name='network_data.json',
                    joliet_path='/openstack/latest/vendor_data.json')
-        iso.add_fp(io.BytesIO(nd_encoded), len(nd_encoded), '/openstack/2017-02-22/network_data.json;4',
+        iso.add_fp(io.BytesIO(nd_encoded), len(nd_encoded),
+                   '/openstack/2017-02-22/network_data.json;4',
                    rr_name='network_data.json',
                    joliet_path='/openstack/2017-02-22/vendor_data.json')
 
         # empty vendor_data.json and vendor_data2.json
         vd = '{}'.encode('ascii')
-        iso.add_fp(io.BytesIO(vd), len(vd), '/openstack/latest/vendor_data.json;5',
+        iso.add_fp(io.BytesIO(vd), len(vd),
+                   '/openstack/latest/vendor_data.json;5',
                    rr_name='vendor_data.json',
                    joliet_path='/openstack/latest/vendor_data.json')
-        iso.add_fp(io.BytesIO(vd), len(vd), '/openstack/2017-02-22/vendor_data.json;6',
+        iso.add_fp(io.BytesIO(vd), len(vd),
+                   '/openstack/2017-02-22/vendor_data.json;6',
                    rr_name='vendor_data.json',
                    joliet_path='/openstack/2017-02-22/vendor_data.json')
-        iso.add_fp(io.BytesIO(vd), len(vd), '/openstack/latest/vendor_data2.json;7',
+        iso.add_fp(io.BytesIO(vd), len(vd),
+                   '/openstack/latest/vendor_data2.json;7',
                    rr_name='vendor_data2.json',
                    joliet_path='/openstack/latest/vendor_data2.json')
-        iso.add_fp(io.BytesIO(vd), len(vd), '/openstack/2017-02-22/vendor_data2.json;8',
+        iso.add_fp(io.BytesIO(vd), len(vd),
+                   '/openstack/2017-02-22/vendor_data2.json;8',
                    rr_name='vendor_data2.json',
                    joliet_path='/openstack/2017-02-22/vendor_data2.json')
 
@@ -430,7 +436,7 @@ class Instance(object):
         if os.path.exists(self.xml_file):
             return
 
-        with open(os.path.join(config.parsed.get('STORAGE_PATH'), 'libvirt.tmpl')) as f:
+        with open(os.path.join(config.get('STORAGE_PATH'), 'libvirt.tmpl')) as f:
             t = jinja2.Template(f.read())
 
         networks = []
@@ -444,9 +450,9 @@ class Instance(object):
                 }
             )
 
-        # NOTE(mikal): the database stores memory allocations in MB, but the domain
-        # XML takes them in KB. That wouldn't be worth a comment here if I hadn't
-        # spent _ages_ finding a bug related to it.
+        # NOTE(mikal): the database stores memory allocations in MB, but the
+        # domain XML takes them in KB. That wouldn't be worth a comment here if
+        # I hadn't spent _ages_ finding a bug related to it.
         xml = t.render(
             uuid=self.db_entry['uuid'],
             memory=self.db_entry['memory'] * 1024,
@@ -501,7 +507,8 @@ class Instance(object):
         try:
             instance.create()
         except libvirt.libvirtError as e:
-            if not str(e).startswith('Requested operation is not valid: domain is already running'):
+            err = 'Requested operation is not valid: domain is already running'
+            if not str(e).startswith(err):
                 LOG.withObj(self).warning('Instance start error: %s' % e)
                 return False
 
@@ -509,8 +516,8 @@ class Instance(object):
         db.update_instance_power_state(
             self.db_entry['uuid'],
             util.extract_power_state(libvirt, instance))
-        db.add_event(
-            'instance', self.db_entry['uuid'], 'poweron', 'complete', None, None)
+        db.add_event('instance',
+                     self.db_entry['uuid'], 'poweron', 'complete', None, None)
         return True
 
     def power_off(self):
@@ -525,8 +532,8 @@ class Instance(object):
             LOG.withObj(self).error('Failed to delete domain: %s' % e)
 
         db.update_instance_power_state(self.db_entry['uuid'], 'off')
-        db.add_event(
-            'instance', self.db_entry['uuid'], 'poweroff', 'complete', None, None)
+        db.add_event('instance',
+                     self.db_entry['uuid'], 'poweroff', 'complete', None, None)
 
     def _snapshot_device(self, source, destination):
         images.snapshot(None, source, destination)
