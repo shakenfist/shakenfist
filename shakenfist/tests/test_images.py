@@ -74,10 +74,11 @@ class ImageUtilsTestCase(test_shakenfist.ShakenFistTestCase):
 
         fake_config = FakeConfig()
 
-        self.config = mock.patch('shakenfist.configuration.config',
+        self.config = mock.patch('shakenfist.images.config',
                                  fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
+
     @mock.patch('os.path.exists', return_value=True)
     def test_get_cache_path(self, mock_exists):
         p = images._get_cache_path()
@@ -179,7 +180,7 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
 
         fake_config = FakeConfig()
 
-        self.config = mock.patch('shakenfist.configuration.config',
+        self.config = mock.patch('shakenfist.images.config',
                                  fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)

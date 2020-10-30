@@ -42,7 +42,7 @@ class DHCPTestCase(testtools.TestCase):
                                                '%(vername)s-server-cloudimg-amd64.img')
         fake_config = FakeConfig()
 
-        self.config = mock.patch('shakenfist.configuration.config',
+        self.config = mock.patch('shakenfist.dhcp.config',
                                  fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)

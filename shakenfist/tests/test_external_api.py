@@ -2,7 +2,6 @@ import base64
 import bcrypt
 import json
 import mock
-from pydantic import IPvAnyAddress
 
 
 from shakenfist.configuration import config, SFConfigBase
@@ -950,8 +949,8 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
 
         class FakeConfig(SFConfigBase):
             NODE_NAME: str = 'seriously'
-            NODE_IP: IPvAnyAddress = IPvAnyAddress('127.0.0.1')
-            NETWORK_NODE_IP: IPvAnyAddress = IPvAnyAddress('127.0.0.1')
+            NODE_IP: str = '127.0.0.1'
+            NETWORK_NODE_IP = '127.0.0.1'
             LOG_METHOD_TRACE: int = 1
             NODE_EGRESS_NIC: str = 'eth0'
 

@@ -31,7 +31,7 @@ class VirtTestCase(test_shakenfist.ShakenFistTestCase):
             NODE_NAME="node01",
         )
 
-        self.config = mock.patch('shakenfist.configuration.config',
+        self.config = mock.patch('shakenfist.virt.config',
                                  fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)

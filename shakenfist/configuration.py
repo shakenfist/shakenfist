@@ -7,8 +7,6 @@ from pydantic import (
     BaseSettings,
     Field,
     SecretStr,
-    IPvAnyAddress,
-    IPvAnyNetwork,
     AnyHttpUrl,
 )
 
@@ -35,7 +33,7 @@ class SFConfigBase(BaseSettings):
         return self.dict()
 
     def get(self, key):
-        return self._dict.get(key)
+        return self._dict[key]
 
 
 class SFConfig(SFConfigBase):
@@ -96,12 +94,12 @@ class SFConfig(SFConfigBase):
     )
 
     # Network Options
-    FLOATING_NETWORK: IPvAnyNetwork = Field(
+    FLOATING_NETWORK: str = Field(
         '192.168.20.0/24',
         description='Network block used for NAT egress from VMs and floating '
                     'IPs',
     )
-    NETWORK_NODE_IP: IPvAnyAddress = Field(
+    NETWORK_NODE_IP: str = Field(
         default_factory=get_node_ip,
         description='IP of the node which will egress all traffic',
     )
@@ -147,7 +145,7 @@ class SFConfig(SFConfigBase):
                     'of image cache), qcow_flat (just qcow2, no COW), and flat '
                     '(just raw disk).',
     )
-    NODE_IP: IPvAnyAddress = Field(
+    NODE_IP: str = Field(
         default_factory=get_node_ip, description='IP of this node'
     )
     NODE_NAME: str = Field(

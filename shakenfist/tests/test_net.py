@@ -1,5 +1,3 @@
-from ipaddress import IPv4Address
-
 import mock
 
 from shakenfist import net
@@ -101,7 +99,7 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
 
     @mock.patch('shakenfist.net.Network.is_created', return_value=True)
     @mock.patch('shakenfist.net.Network.is_dnsmasq_running', return_value=False)
-    @mock.patch('shakenfist.configuration.config', SFConfig(NODE_IP="1.1.1.1", NETWORK_NODE_IP="1.1.1.2"))
+    @mock.patch('shakenfist.util.config', SFConfig(NODE_IP="1.1.1.1", NETWORK_NODE_IP="1.1.1.2"))
     def test_is_okay_no_dns(self, mock_is_dnsmasq, mock_is_created):
         n = net.Network(
             {

@@ -318,7 +318,7 @@ def _metadata_putpost(meta_type, owner, key, value):
 
 app = flask.Flask(__name__)
 api = flask_restful.Api(app, catch_all_404s=False)
-app.config['JWT_SECRET_KEY'] = config.get('AUTH_SECRET_SEED')
+app.config['JWT_SECRET_KEY'] = config.AUTH_SECRET_SEED.get_secret_value()
 jwt = JWTManager(app)
 
 # Use our handler to get SF log format (instead of gunicorn's handlers)

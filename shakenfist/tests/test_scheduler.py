@@ -57,6 +57,16 @@ class FakeDB(object):
             raise exceptions.ReadException
         return self.metrics[node_name]
 
+fake_config = SFConfig(
+    NODE_NAME='node01',
+    SCHEDULER_CACHE_TIMEOUT=30,
+    CPU_OVERCOMMIT_RATIO=16.0,
+    RAM_OVERCOMMIT_RATIO=1.5,
+    RAM_SYSTEM_RESERVATION=5.0,
+    NETWORK_NODE_IP='10.0.0.1',
+    LOG_METHOD_TRACE=1,
+)
+
 
 class SchedulerTestCase(test_shakenfist.ShakenFistTestCase):
     def setUp(self):
@@ -67,17 +77,7 @@ class SchedulerTestCase(test_shakenfist.ShakenFistTestCase):
         self.recorded_op.start()
         self.addCleanup(self.recorded_op.stop)
 
-        fake_config = SFConfig(
-            NODE_NAME='node01',
-            SCHEDULER_CACHE_TIMEOUT=30,
-            CPU_OVERCOMMIT_RATIO=16.0,
-            RAM_OVERCOMMIT_RATIO=1.5,
-            RAM_SYSTEM_RESERVATION=5.0,
-            NETWORK_NODE_IP='10.0.0.1',
-            LOG_METHOD_TRACE=1,
-        )
-
-        self.mock_config = mock.patch('shakenfist.configuration.config', fake_config)
+        self.mock_config = mock.patch('shakenfist.db.config', fake_config)
         self.mock_config.start()
         self.addCleanup(self.mock_config.stop)
 
