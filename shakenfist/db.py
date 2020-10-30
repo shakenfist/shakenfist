@@ -229,6 +229,15 @@ def persist_block_devices(instance_uuid, block_devices):
     etcd.put('instance', None, instance_uuid, i)
 
 
+def persist_console_ports(instance_uuid, console_port, vdi_port):
+    # TODO(andy): When Instance class is modified to model Image class this
+    # repetitive write will be moved to a single persist() function.
+    i = get_instance(instance_uuid)
+    i['console_port'] = console_port
+    i['vdi_port'] = vdi_port
+    etcd.put('instance', None, instance_uuid, i)
+
+
 def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key,
                     user_data, namespace, video, requested_placement):
     d = {
@@ -239,8 +248,8 @@ def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key,
         'disk_spec': disk_spec,
         'ssh_key': ssh_key,
         'node': config.parsed.get('NODE_NAME'),
-        'console_port': allocate_console_port(instance_uuid),
-        'vdi_port': allocate_console_port(instance_uuid),
+        'console_port': 0,
+        'vdi_port': 0,
         'user_data': user_data,
         'block_devices': None,
         'state': 'initial',
@@ -429,8 +438,9 @@ def get_instance_snapshots(instance_uuid):
 
 def add_event(object_type, object_uuid, operation, phase, duration, message):
     t = time.time()
-    LOG.withLabel(object_type, object_uuid).withFields(
+    LOG.withFields(
         {
+            object_type: object_uuid,
             'fqdn': config.parsed.get('NODE_NAME'),
             'operation': operation,
             'phase': phase,
@@ -498,8 +508,9 @@ def allocate_console_port(instance_uuid):
                 })
             if allocatedPort:
                 return port
-        except socket.error:
-            pass
+        except socket.error as e:
+            LOG.withField('instance', instance_uuid).info(
+                "Exception during port allocation: %s" % e)
         finally:
             s.close()
 

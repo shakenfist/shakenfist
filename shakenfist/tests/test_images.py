@@ -3,10 +3,12 @@ import os
 import testtools
 from pydantic import AnyHttpUrl
 
+
 from shakenfist import exceptions
 from shakenfist import images
 from shakenfist import image_resolver_cirros
 from shakenfist import image_resolver_ubuntu
+from shakenfist.tests import test_shakenfist
 from shakenfist.config import SFConfigBase
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -66,7 +68,7 @@ class FakeConfig(SFConfigBase):
 fake_config = FakeConfig()
 
 
-class ImageUtilsTestCase(testtools.TestCase):
+class ImageUtilsTestCase(test_shakenfist.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
 
@@ -76,7 +78,6 @@ class ImageUtilsTestCase(testtools.TestCase):
                                  fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
-
     @mock.patch('os.path.exists', return_value=True)
     def test_get_cache_path(self, mock_exists):
         p = images._get_cache_path()
@@ -92,7 +93,7 @@ class ImageUtilsTestCase(testtools.TestCase):
         self.assertEqual('/a/b/c/image_cache', p)
 
 
-class ImageResolversTestCase(testtools.TestCase):
+class ImageResolversTestCase(test_shakenfist.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
 
@@ -102,7 +103,6 @@ class ImageResolversTestCase(testtools.TestCase):
                                  fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
-
     @mock.patch('requests.get', side_effect=[
         FakeResponse(200, CIRROS_DOWNLOAD_HTML),
         FakeResponse(200, ''),  # Handle no file available
@@ -173,7 +173,7 @@ class ImageResolversTestCase(testtools.TestCase):
                           image_resolver_ubuntu.resolve, 'ubuntu')
 
 
-class ImageObjectTestCase(testtools.TestCase):
+class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
 
@@ -183,7 +183,6 @@ class ImageObjectTestCase(testtools.TestCase):
                                  fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
-
     @mock.patch('shakenfist.image_resolver_cirros.resolve',
                 return_value=('!!!cirros!!!', '123abc'))
     @mock.patch('shakenfist.image_resolver_ubuntu.resolve',
@@ -438,12 +437,9 @@ class ImageObjectTestCase(testtools.TestCase):
                  '/a/b/c/image_cache/f0e6a6a97042a4f1f1c87f5f7d4431'
                  '5b2d852c2df5c7991cc66241bf7072d1c4.v000.qcow2 '
                  '-f qcow2 /a/b/c/image_cache/f0e6a6a97042a4f1f1c87f'
-                 '5f7d44315b2d852c2df5c7991cc66241bf7072d1c4.v000.qcow2.8G')),
-             mock.call(
-                 None,
-                 ('qemu-img resize '
-                  '/a/b/c/image_cache/f0e6a6a97042a4f1f1c87f5f7d4431'
-                  '5b2d852c2df5c7991cc66241bf7072d1c4.v000.qcow2.8G 8G'))]
+                 '5f7d44315b2d852c2df5c7991cc66241bf7072d1c4.v000.qcow2.8G 8G')
+                )
+             ]
         )
 
     @mock.patch('shakenfist.util.execute',
@@ -467,9 +463,9 @@ class ImageObjectTestCase(testtools.TestCase):
                 return_value=(None, None))
     @mock.patch('os.path.exists', return_value=False)
     def test_create_cow(self, mock_exists, mock_execute):
-        images.create_cow(None, '/a/b/c/base', '/a/b/c/cow')
+        images.create_cow(None, '/a/b/c/base', '/a/b/c/cow', 10)
         mock_execute.assert_called_with(
-            None, 'qemu-img create -b /a/b/c/base -f qcow2 /a/b/c/cow')
+            None, 'qemu-img create -b /a/b/c/base -f qcow2 /a/b/c/cow 10G')
 
     @mock.patch('shakenfist.util.execute',
                 return_value=(None, None))

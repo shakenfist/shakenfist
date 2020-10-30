@@ -2,14 +2,15 @@ import base64
 import bcrypt
 import json
 import mock
-import testtools
 from pydantic import IPvAnyAddress
+
 
 from shakenfist import config
 from shakenfist.config import SFConfigBase
 from shakenfist.external_api import app as external_api
 from shakenfist import ipmanager
 from shakenfist import net
+from shakenfist.tests import test_shakenfist
 
 
 class FakeResponse(object):
@@ -44,7 +45,7 @@ def _clean_traceback(resp):
     return resp
 
 
-class AuthTestCase(testtools.TestCase):
+class AuthTestCase(test_shakenfist.ShakenFistTestCase):
     def setUp(self):
         super(AuthTestCase, self).setUp()
 
@@ -173,7 +174,7 @@ class AuthTestCase(testtools.TestCase):
         self.assertEqual(401, resp.status_code)
 
 
-class ExternalApiTestCase(testtools.TestCase):
+class ExternalApiTestCase(test_shakenfist.ShakenFistTestCase):
     def setUp(self):
         super(ExternalApiTestCase, self).setUp()
 

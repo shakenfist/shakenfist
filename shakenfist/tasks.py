@@ -6,8 +6,7 @@ from shakenfist.exceptions import (NoURLImageFetchTaskException,
 
 
 class QueueTask(object):
-    '''QueueTask defines a validated task placed on the job queue.
-    '''
+    """QueueTask defines a validated task placed on the job queue."""
     _name = None
     _version = 1  # Enable future upgrades to existing tasks
 
@@ -44,7 +43,9 @@ class InstanceTask(QueueTask):
     def __init__(self, instance_uuid, network=None):
         super(InstanceTask, self).__init__()
         self._instance_uuid = instance_uuid
-        self._network = None
+        # Only set network if deliberately set in function paramater. This
+        # avoids setting _network to None which is not iterable.
+        self._network = []
         if network:
             self._network = network
 
@@ -54,7 +55,7 @@ class InstanceTask(QueueTask):
                 'No instance specified for InstanceTask')
         if not isinstance(instance_uuid, str):
             raise NoInstanceTaskException('Instance UUID is not a string')
-        if network and not isinstance(network, list):
+        if not isinstance(self._network, list):
             raise NetworkNotListTaskException()
 
     def instance_uuid(self):
@@ -165,24 +166,3 @@ class FetchImageTask(ImageTask):
     # Data methods
     def instance_uuid(self):
         return self._instance_uuid
-
-
-class ResizeImageTask(ImageTask):
-    _name = 'image_resize'
-
-    def __init__(self, url, size, instance_uuid=None):
-        super(ResizeImageTask, self).__init__(url)
-        self._size = size
-        self._instance_uuid = instance_uuid
-
-    def json_dump(self):
-        return {**super(ResizeImageTask, self).json_dump(),
-                'instance_uuid': self._instance_uuid,
-                'size': self._size}
-
-    # Data methods
-    def instance_uuid(self):
-        return self._instance_uuid
-
-    def size(self):
-        return self._size

@@ -1,13 +1,13 @@
 from ipaddress import IPv4Address
 
 import mock
-import testtools
 
 from shakenfist import net
 from shakenfist import config
+from shakenfist.tests import test_shakenfist
 
 
-class NetworkTestCase(testtools.TestCase):
+class NetworkTestCase(test_shakenfist.ShakenFistTestCase):
     def setUp(self):
         super(NetworkTestCase, self).setUp()
 

@@ -40,9 +40,6 @@ class SFPyLogrus(logging.Logger, PyLogrusBase):
             raise Exception('Bad object - no unique_label() function: %s' % e)
         return SFCustomAdapter(self, {label: value})
 
-    def withLabel(self, label, value):
-        return SFCustomAdapter(self, {label: value})
-
     #
     # Use labelled convenience methods when ID is a string (not object)
     # Note: the helper method still handles objects
@@ -136,9 +133,6 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
             extra.update({label: value})
         return SFCustomAdapter(self._logger, extra, self._prefix)
 
-    def withLabel(self, label, value):
-        return SFCustomAdapter(self, {label: value})
-
     #
     # Use labelled convenience methods when ID is a string (not object)
     # Note: the helper method still handles objects
@@ -179,6 +173,7 @@ def setup(name):
     logging.root.setLevel(logging.DEBUG)
     log = logging.getLogger(name)
 
+    handler = None
     if log.hasHandlers():
         # The parent logger might have the handler, not this lower logger
         if len(log.handlers) > 0:

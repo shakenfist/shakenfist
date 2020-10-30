@@ -1,16 +1,15 @@
 import mock
-import testtools
-
 
 from shakenfist import util
 from shakenfist import config
+from shakenfist.tests import test_shakenfist
 
 
 net_node_conf = config.SFConfig(NODE_IP='1.1.1.1', NETWORK_NODE_IP='1.1.1.1')
 not_net_node_conf = config.SFConfig(NODE_IP='1.1.1.1', NETWORK_NODE_IP='1.1.1.2')
 
 
-class UtilTestCase(testtools.TestCase):
+class UtilTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.config.parsed', net_node_conf)
     def test_is_network_node_yes(self):
         self.assertTrue(util.is_network_node())

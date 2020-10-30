@@ -10,7 +10,7 @@ pipeline {
       steps {
         sh '''  echo "Wait for apt to finish its on-boot work"
                 sleep 60
-                while [[ `ps -ef | grep -v grep | grep -c dpkg` -gt 0 ]]
+                while [[ `ps -ef | grep -v grep | grep -cE '(apt|dpkg)'` -gt 0 ]]
                 do
                   echo "Waiting for apt to finish..."
                   sleep 10

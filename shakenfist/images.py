@@ -86,19 +86,23 @@ class Image(object):
 
         # Load DB data into new Image object
         if db_data:
-            ver = db_data['version']
-            del db_data['version']
-
-            # Check version of DB metadata packet
-            if ver == 1:
-                return Image(**db_data)
-            else:
-                raise exceptions.BadMetadataPacket('Image: %s', db_data)
+            return Image.from_db_data(db_data)
 
         # Create new object since not found in database
         if not checksum:
             checksum = resolver_checksum
         return Image(url, checksum, None, None, None, 0)
+
+    @staticmethod
+    def from_db_data(db_data):
+        ver = db_data['version']
+        del db_data['version']
+
+        # Check version of DB metadata packet
+        if ver == 1:
+            return Image(**db_data)
+        else:
+            raise exceptions.BadMetadataPacket('Image: %s', db_data)
 
     def persist(self):
         metadata = {
@@ -186,11 +190,7 @@ class Image(object):
         return False
 
     def _fetch(self, resp, locks=None):
-        """Download the image if we don't already have the latest version in
-        cache.
-        """
-
-        # Do the fetch
+        """Download the image if the latest version is not in the cache."""
         fetched = 0
         self.file_version += 1
         self.fetched = email.utils.formatdate()
@@ -243,7 +243,6 @@ class Image(object):
 
     def resize(self, locks, size):
         """Resize the image to the specified size."""
-
         image_path = self.version_image_path()
         backing_file = image_path + '.qcow2' + '.' + str(size) + 'G'
 
@@ -257,10 +256,8 @@ class Image(object):
             return backing_file
 
         util.execute(locks,
-                     'qemu-img create -b %s.qcow2 -f qcow2 %s'
-                     % (image_path, backing_file))
-        util.execute(locks,
-                     'qemu-img resize %s %sG' % (backing_file, size))
+                     'qemu-img create -b %s.qcow2 -f qcow2 %s %dG'
+                     % (image_path, backing_file, size))
 
         return backing_file
 
@@ -321,15 +318,18 @@ def identify(path):
     return data
 
 
-def create_cow(locks, cache_file, disk_file):
-    """Create a COW layer on top of the image cache."""
+def create_cow(locks, cache_file, disk_file, disk_size):
+    """Create a COW layer on top of the image cache.
+
+    disk_size is specified in Gigabytes.
+    """
 
     if os.path.exists(disk_file):
         return
 
     util.execute(locks,
-                 'qemu-img create -b %s -f qcow2 %s'
-                 % (cache_file, disk_file))
+                 'qemu-img create -b %s -f qcow2 %s %dG'
+                 % (cache_file, disk_file, disk_size))
 
 
 def create_flat(locks, cache_file, disk_file):

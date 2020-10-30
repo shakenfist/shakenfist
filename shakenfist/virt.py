@@ -191,33 +191,33 @@ class Instance(object):
                         disk['device'] = 'hd%s' % disk['device'][-1]
                         disk['bus'] = 'ide'
                     else:
-                        with util.RecordedOperation('resize image', self):
-                            resized_image_path = img.resize(
-                                [lock], disk['size'])
-
                         if config.parsed.get('DISK_FORMAT') == 'qcow':
                             with util.RecordedOperation('create copy on write layer', self):
-                                images.create_cow(
-                                    [lock], resized_image_path, disk['path'])
+                                images.create_cow([lock], hashed_image_path,
+                                                  disk['path'], disk['size'])
 
                             # Record the backing store for modern libvirts
                             disk['backing'] = (
                                 '<backingStore type=\'file\'>\n'
                                 '        <format type=\'qcow2\'/>\n'
                                 '        <source file=\'%s\'/>\n'
-                                '        <backingStore type=\'file\'>\n'
-                                '          <format type=\'qcow2\'/>\n'
-                                '          <source file=\'%s.qcow2\'/>\n'
-                                '        </backingStore>\n'
                                 '      </backingStore>\n'
-                                % (resized_image_path, hashed_image_path))
+                                % (hashed_image_path))
 
                         elif config.parsed.get('DISK_FORMAT') == 'qcow_flat':
+                            with util.RecordedOperation('resize image', self):
+                                resized_image_path = img.resize(
+                                    [lock], disk['size'])
+
                             with util.RecordedOperation('create flat layer', self):
                                 images.create_flat(
                                     [lock], resized_image_path, disk['path'])
 
                         elif config.parsed.get('DISK_FORMAT') == 'flat':
+                            with util.RecordedOperation('resize image', self):
+                                resized_image_path = img.resize(
+                                    [lock], disk['size'])
+
                             with util.RecordedOperation('create raw disk', self):
                                 images.create_raw(
                                     [lock], resized_image_path, disk['path'])
@@ -287,6 +287,16 @@ class Instance(object):
 
         db.free_console_port(self.db_entry['console_port'])
         db.free_console_port(self.db_entry['vdi_port'])
+
+    def allocate_instance_ports(self):
+        uuid = self.db_entry['uuid']
+        self.db_entry['console_port'] = db.allocate_console_port(uuid)
+        self.db_entry['vdi_port'] = db.allocate_console_port(uuid)
+
+        # TODO(andy): When class is modified to model Image class this
+        # repetitive write will be moved to a single persist() function.
+        db.persist_console_ports(
+            uuid, self.db_entry['console_port'], self.db_entry['vdi_port'])
 
     def _make_config_drive(self, disk_path):
         """Create a config drive"""

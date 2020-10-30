@@ -1,10 +1,9 @@
 import mock
-import testtools
-from pydantic import IPvAnyAddress
 
 from shakenfist import exceptions
 from shakenfist import scheduler
-from shakenfist.config import SFConfigBase, SFConfig
+from shakenfist.tests import test_shakenfist
+from shakenfist.config import SFConfig
 
 
 class FakeInstance(object):
@@ -59,7 +58,7 @@ class FakeDB(object):
         return self.metrics[node_name]
 
 
-class SchedulerTestCase(testtools.TestCase):
+class SchedulerTestCase(test_shakenfist.ShakenFistTestCase):
     def setUp(self):
         super(SchedulerTestCase, self).setUp()
 
@@ -92,7 +91,7 @@ class SchedulerTestCase(testtools.TestCase):
 
 
 class LowResourceTestCase(SchedulerTestCase):
-    """Test low resource exceptions"""
+    """Test low resource exceptions."""
 
     def setUp(self):
         super(LowResourceTestCase, self).setUp()
@@ -242,7 +241,7 @@ class LowResourceTestCase(SchedulerTestCase):
 
 
 class CorrectAllocationTestCase(SchedulerTestCase):
-    """Test correct node allocation"""
+    """Test correct node allocation."""
 
     def setUp(self):
         super(CorrectAllocationTestCase, self).setUp()
@@ -325,7 +324,7 @@ class CorrectAllocationTestCase(SchedulerTestCase):
 
 
 class FindMostTestCase(SchedulerTestCase):
-    """Test basic information source to scheduler"""
+    """Test basic information source to scheduler."""
 
     def setUp(self):
         super(FindMostTestCase, self).setUp()

@@ -19,7 +19,6 @@ from shakenfist.tasks import (QueueTask,
                               DeleteInstanceTask,
                               ErrorInstanceTask,
                               FetchImageTask,
-                              ResizeImageTask,
                               InstanceTask,
                               PreflightInstanceTask,
                               StartInstanceTask,
@@ -69,9 +68,6 @@ def handle(jobname, workitem):
 
             if isinstance(task, FetchImageTask):
                 image_fetch(task.url(), instance_uuid)
-
-            elif isinstance(task, ResizeImageTask):
-                image_resize(task.url(). task.size(), instance_uuid)
 
             elif isinstance(task, PreflightInstanceTask):
                 redirect_to = instance_preflight(instance_uuid, task.network())
@@ -150,7 +146,7 @@ def image_fetch(url, instance_uuid):
             db.add_event('image', url, 'fetch', None, None, 'success')
 
     except (exceptions.HTTPError, requests.exceptions.RequestException) as e:
-        LOG.withField('image', url).warning('Failed to fetch image')
+        LOG.withField('image', url).info('Failed to fetch image')
         if instance_uuid:
             db.enqueue_instance_error(instance_uuid,
                                       'Image fetch failed: %s' % e)
@@ -165,18 +161,6 @@ def image_fetch(url, instance_uuid):
 
         raise exceptions.ImageFetchTaskFailedException(
             'Failed to fetch image %s' % url)
-
-
-def image_resize(url, size, _instance_uuid):
-    # TODO(andy): Wait up to 15 mins for another queue process to download
-    # the required image. This will be changed to queue on a
-    # "waiting_image_fetch" queue but this works now.
-    with db.get_lock('image', config.parsed.get('NODE_NAME'),
-                     Image.calc_unique_ref(url), timeout=15*60) as lock:
-        img = Image.from_url(url)
-        img.resize([lock], size)
-        db.add_event(
-            'image', url, 'resize to %sgb' % size, None, None, 'success')
 
 
 def instance_preflight(instance_uuid, network):
@@ -226,6 +210,9 @@ def instance_start(instance_uuid, network):
             'instance', None, instance_uuid, ttl=900, timeout=120,
             op='Instance start') as lock:
         instance = virt.from_db(instance_uuid)
+
+        # Allocate console and VDI ports
+        instance.allocate_instance_ports()
 
         # Collect the networks
         nets = {}

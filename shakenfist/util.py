@@ -64,7 +64,7 @@ class RecordedOperation():
 
 
 def is_network_node():
-    """Test if this node is the network node"""
+    """Test if this node is the network node."""
     return config.parsed.get('NODE_IP') == config.parsed.get('NETWORK_NODE_IP')
 
 

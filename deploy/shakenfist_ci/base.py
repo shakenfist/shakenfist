@@ -86,7 +86,7 @@ class BaseTestCase(testtools.TestCase):
             % uuid)
 
     def _log_netns(self):
-        """ Log the current net namespaces """
+        """Log the current net namespaces."""
         sys.stderr.write(
             '----------------------- netns -----------------------\n')
         out, err = processutils.execute('sudo ip netns', shell=True,
