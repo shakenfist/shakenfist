@@ -8,6 +8,7 @@ import re
 from shakenfist.configuration import config
 from shakenfist import db
 from shakenfist import dhcp
+from shakenfist.exceptions import DeadNetwork
 from shakenfist import logutil
 from shakenfist.tasks import (DeployNetworkTask,
                               UpdateDHCPNetworkTask,
@@ -106,11 +107,27 @@ class Network(object):
 
         return True
 
+    def is_dead(self):
+        """Check if the network is deleted or being deleted, or in error.
+
+        First, update the object model to the ensure latest configuration. Some
+        callers will wait on a lock before calling this function. In this case
+        we definitely need to update the in-memory object model.
+        """
+        # TODO(andy): To be improved when object model mirrors Image class
+        self.db_entry = db.get_network(self.db_entry['uuid'])
+
+        return self.db_entry['state'] in ('deleted', 'deleting', 'error')
+
     def create(self):
         subst = self.subst_dict()
         LOG.withFields(subst).debug('net.create() starting...')
 
         with db.get_object_lock(self, ttl=120, op='Network create'):
+            # Ensure network was not deleted whilst waiting for the lock.
+            if self.is_dead():
+                raise DeadNetwork('network=%s' % self)
+
             if not util.check_for_interface(subst['vx_interface']):
                 with util.RecordedOperation('create vxlan interface', self):
                     util.create_interface(
@@ -211,6 +228,10 @@ class Network(object):
         subst['floating_netmask'] = ipm.netmask
 
         with db.get_object_lock(self, ttl=120, op='Network deploy NAT'):
+            # Ensure network was not deleted whilst waiting for the lock.
+            if self.is_dead():
+                raise DeadNetwork('network=%s' % self)
+
             with util.RecordedOperation('enable virtual routing', self):
                 addresses = util.get_interface_addresses(
                     subst['netns'],
@@ -279,7 +300,8 @@ class Network(object):
                 if util.check_for_interface(subst['physical_veth_outer']):
                     with util.RecordedOperation('delete physical veth', self):
                         util.execute(
-                            None, 'ip link delete %(physical_veth_outer)s' % subst)
+                            None,
+                            'ip link delete %(physical_veth_outer)s' % subst)
 
                 if os.path.exists('/var/run/netns/%(netns)s' % subst):
                     with util.RecordedOperation('delete netns', self):
@@ -345,6 +367,10 @@ class Network(object):
 
     def ensure_mesh(self):
         with db.get_object_lock(self, ttl=120, op='Network ensure mesh'):
+            # Ensure network was not deleted whilst waiting for the lock.
+            if self.is_dead():
+                raise DeadNetwork('network=%s' % self)
+
             removed = []
             added = []
 
