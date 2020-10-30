@@ -5,7 +5,7 @@ import time
 import os
 import psutil
 
-from shakenfist import config
+from shakenfist.configuration import config
 from shakenfist.daemons import daemon
 from shakenfist.daemons import external_api as external_api_daemon
 from shakenfist.daemons import cleaner as cleaner_daemon
@@ -27,7 +27,7 @@ def restore_instances():
     # Ensure all instances for this node are defined
     networks = []
     instances = []
-    for inst in list(db.get_instances(only_node=config.parsed.get('NODE_NAME'))):
+    for inst in list(db.get_instances(only_node=config.NODE_NAME)):
         for iface in db.get_instance_interfaces(inst['uuid']):
             if not iface['network_uuid'] in networks:
                 networks.append(iface['network_uuid'])
@@ -86,7 +86,7 @@ def main():
     setproctitle.setproctitle(daemon.process_name('main'))
 
     # Log configuration on startup
-    for key, value in config.parsed.items():
+    for key, value in config.dict().items():
         LOG.info('Configuration item %s = %s' % (key, value))
 
     daemon.set_log_level(LOG, 'main')
@@ -112,13 +112,13 @@ def main():
         # Bootstrap the floating network in the Networks table
         floating_network = db.get_network('floating')
         if not floating_network:
-            db.create_floating_network(config.parsed.get('FLOATING_NETWORK'))
+            db.create_floating_network(config.get('FLOATING_NETWORK'))
             floating_network = net.from_db('floating')
 
         subst = {
             'physical_bridge': util.get_safe_interface_name(
-                'phy-br-%s' % config.parsed.get('NODE_EGRESS_NIC')),
-            'physical_nic': config.parsed.get('NODE_EGRESS_NIC')
+                'phy-br-%s' % config.get('NODE_EGRESS_NIC')),
+            'physical_nic': config.get('NODE_EGRESS_NIC')
         }
 
         if not util.check_for_interface(subst['physical_bridge']):

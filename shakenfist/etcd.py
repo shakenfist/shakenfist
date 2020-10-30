@@ -6,7 +6,7 @@ import time
 from etcd3gw.client import Etcd3Client
 from etcd3gw.lock import Lock
 
-from shakenfist import config
+from shakenfist.configuration import config
 from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import logutil
@@ -42,7 +42,7 @@ class ActualLock(Lock):
         # We override the UUID of the lock with something more helpful to debugging
         self._uuid = json.dumps(
             {
-                'node': config.parsed.get('NODE_NAME'),
+                'node': config.NODE_NAME,
                 'pid': os.getpid(),
                 'operation': self.operation
             },
@@ -65,7 +65,7 @@ class ActualLock(Lock):
     def __enter__(self):
         start_time = time.time()
         slow_warned = False
-        threshold = int(config.parsed.get('SLOW_LOCK_THRESHOLD'))
+        threshold = int(config.get('SLOW_LOCK_THRESHOLD'))
 
         while time.time() - start_time < self.timeout:
             res = self.acquire()
@@ -152,7 +152,7 @@ def clear_stale_locks():
         node = holder['node']
         pid = int(holder['pid'])
 
-        if node == config.parsed.get('NODE_NAME') and not psutil.pid_exists(pid):
+        if node == config.NODE_NAME and not psutil.pid_exists(pid):
             client.delete(metadata['key'])
             LOG.withFields({'lock': lockname,
                             'old-pid': pid,
@@ -340,4 +340,4 @@ def restart_queues():
     # we didn't complete them before crashing.
     if util.is_network_node():
         _restart_queue('networknode')
-    _restart_queue(config.parsed.get('NODE_NAME'))
+    _restart_queue(config.NODE_NAME)

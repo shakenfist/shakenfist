@@ -1,7 +1,7 @@
 import re
 import requests
 
-from shakenfist import config
+from shakenfist.configuration import config
 from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist import util
@@ -18,8 +18,8 @@ def resolve(name):
     resp = requests.get(UBUNTU_URL,
                         headers={'User-Agent': util.get_user_agent()})
     if resp.status_code != 200:
-        raise exceptions.HTTPError(
-            'Failed to fetch %s, status code %d' % (UBUNTU_URL, resp.status_code))
+        raise exceptions.HTTPError('Failed to fetch %s, status code %d'
+                                   % (UBUNTU_URL, resp.status_code))
 
     num_to_name = {}
     name_to_num = {}
@@ -52,8 +52,8 @@ def resolve(name):
             raise exceptions.VersionSpecificationError(
                 'Cannot parse version: %s' % name)
 
-    url = (config.parsed.get('DOWNLOAD_URL_UBUNTU') % {'vernum': vernum,
-                                                       'vername': vername})
+    url = (config.get('DOWNLOAD_URL_UBUNTU') % {'vernum': vernum,
+                                                'vername': vername})
     log = LOG.withField('url', url)
 
     # Retrieve check sum file

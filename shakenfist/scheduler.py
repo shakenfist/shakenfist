@@ -4,7 +4,7 @@ import copy
 import random
 import time
 
-from shakenfist import config
+from shakenfist.configuration import config
 from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import logutil
@@ -33,27 +33,28 @@ class Scheduler(object):
 
     def _has_sufficient_cpu(self, cpus, node):
         max_cpu = (self.metrics[node].get('cpu_max', 0) *
-                   config.parsed.get('CPU_OVERCOMMIT_RATIO'))
+                   config.get('CPU_OVERCOMMIT_RATIO'))
         current_cpu = self.metrics[node].get('cpu_total_instance_vcpus', 0)
         if current_cpu + cpus > max_cpu:
             return False
         return True
 
     def _has_sufficient_ram(self, memory, node):
-        # There are two things to track here... We must always have RAM_SYSTEM_RESERVATION
-        # gb of RAM for operating system tasks -- assume there is no overlap with existing
-        # VMs when checking this. Note as well that metrics are in MB...
+        # There are two things to track here... We must always have
+        # RAM_SYSTEM_RESERVATION gb of RAM for operating system tasks -- assume
+        # there is no overlap with existing VMs when checking this. Note as
+        # well that metrics are in MB...
         available = (self.metrics[node].get('memory_available', 0) -
-                     (config.parsed.get('RAM_SYSTEM_RESERVATION') * 1024))
+                     (config.get('RAM_SYSTEM_RESERVATION') * 1024))
         if available - memory < 0.0:
             return False
 
-        # ...Secondly, if we're using KSM and over committing memory, we shouldn't
-        # overcommit more than by RAM_OVERCOMMIT_RATIO
-        instance_memory = (self.metrics[node].get('memory_total_instance_actual', 0) +
-                           memory)
+        # ...Secondly, if we're using KSM and over committing memory, we
+        # shouldn't overcommit more than by RAM_OVERCOMMIT_RATIO
+        instance_memory = (
+            self.metrics[node].get('memory_total_instance_actual', 0) + memory)
         if (instance_memory / self.metrics[node].get('memory_max', 0) >
-                config.parsed.get('RAM_OVERCOMMIT_RATIO')):
+                config.get('RAM_OVERCOMMIT_RATIO')):
             return False
 
         return True
@@ -154,7 +155,7 @@ class Scheduler(object):
             log_ctx = LOG.withObj(instance)
 
             diff = time.time() - self.metrics_updated
-            if diff > config.parsed.get('SCHEDULER_CACHE_TIMEOUT'):
+            if diff > config.get('SCHEDULER_CACHE_TIMEOUT'):
                 self.refresh_metrics()
 
             if candidates:

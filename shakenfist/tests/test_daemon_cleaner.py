@@ -1,6 +1,6 @@
 import mock
 
-from shakenfist.config import SFConfigBase
+from shakenfist.configuration import SFConfigBase
 from shakenfist.daemons import cleaner
 from shakenfist.tests import test_shakenfist
 
@@ -95,7 +95,7 @@ class CleanerTestCase(test_shakenfist.ShakenFistTestCase):
         self.proctitle = mock.patch('setproctitle.setproctitle')
         self.mock_proctitle = self.proctitle.start()
         self.addCleanup(self.proctitle.stop)
-        self.config = mock.patch('shakenfist.config.parsed',
+        self.config = mock.patch('shakenfist.configuration.config',
                                  fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)

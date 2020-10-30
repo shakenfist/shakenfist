@@ -7,7 +7,7 @@ import tempfile
 
 from shakenfist import ipmanager
 from shakenfist import virt
-from shakenfist.config import SFConfig
+from shakenfist.configuration import SFConfig
 from shakenfist.tests import test_shakenfist
 
 
@@ -31,7 +31,7 @@ class VirtTestCase(test_shakenfist.ShakenFistTestCase):
             NODE_NAME="node01",
         )
 
-        self.config = mock.patch('shakenfist.config.parsed',
+        self.config = mock.patch('shakenfist.configuration.config',
                                  fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)

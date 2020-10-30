@@ -6,7 +6,7 @@ from prometheus_client import Gauge
 from prometheus_client import start_http_server
 
 from shakenfist.daemons import daemon
-from shakenfist import config
+from shakenfist.configuration import config
 from shakenfist import db
 from shakenfist import logutil
 from shakenfist import util
@@ -68,7 +68,7 @@ def _get_stats():
     retval.update(ksm_details)
 
     # Disk info
-    s = os.statvfs(config.parsed.get('STORAGE_PATH'))
+    s = os.statvfs(config.get('STORAGE_PATH'))
     disk_counters = psutil.disk_io_counters()
     retval.update({
         'disk_total': s.f_frsize * s.f_blocks,
@@ -111,7 +111,7 @@ def _get_stats():
 
     # Queue health statistics
     node_queue_processing, node_queue_waiting = db.get_queue_length(
-        config.parsed.get('NODE_NAME'))
+        config.NODE_NAME)
 
     retval.update({
         'cpu_total_instance_vcpus': total_instance_vcpus,
@@ -139,13 +139,13 @@ def _get_stats():
 class Monitor(daemon.Daemon):
     def __init__(self, id):
         super(Monitor, self).__init__(id)
-        start_http_server(config.parsed.get('PROMETHEUS_METRICS_PORT'))
+        start_http_server(config.get('PROMETHEUS_METRICS_PORT'))
 
     def run(self):
         LOG.info('Starting')
-        gauges = {
-            'updated_at': Gauge('updated_at', 'The last time metrics were updated')
-        }
+        gauges = {'updated_at': Gauge('updated_at',
+                                      'The last time metrics were updated')
+                  }
 
         last_metrics = 0
 
@@ -164,18 +164,17 @@ class Monitor(daemon.Daemon):
 
         while True:
             try:
-                jobname, _ = db.dequeue(
-                    '%s-metrics' % config.parsed.get('NODE_NAME'))
+                jobname, _ = db.dequeue('%s-metrics' % config.NODE_NAME)
                 if jobname:
                     if time.time() - last_metrics > 2:
                         update_metrics()
                         last_metrics = time.time()
-                    db.resolve('%s-metrics' % config.parsed.get('NODE_NAME'),
-                               jobname)
+                    db.resolve('%s-metrics' % config.NODE_NAME, jobname)
                 else:
                     time.sleep(0.2)
 
-                if time.time() - last_metrics > config.parsed.get('SCHEDULER_CACHE_TIMEOUT'):
+                timer = time.time() - last_metrics
+                if timer > config.get('SCHEDULER_CACHE_TIMEOUT'):
                     update_metrics()
                     last_metrics = time.time()
 

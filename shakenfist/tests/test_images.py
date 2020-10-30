@@ -9,7 +9,7 @@ from shakenfist import images
 from shakenfist import image_resolver_cirros
 from shakenfist import image_resolver_ubuntu
 from shakenfist.tests import test_shakenfist
-from shakenfist.config import SFConfigBase
+from shakenfist.configuration import SFConfigBase
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -74,7 +74,7 @@ class ImageUtilsTestCase(test_shakenfist.ShakenFistTestCase):
 
         fake_config = FakeConfig()
 
-        self.config = mock.patch('shakenfist.config.parsed',
+        self.config = mock.patch('shakenfist.configuration.config',
                                  fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
@@ -99,7 +99,7 @@ class ImageResolversTestCase(test_shakenfist.ShakenFistTestCase):
 
         fake_config = FakeConfig()
 
-        self.config = mock.patch('shakenfist.config.parsed',
+        self.config = mock.patch('shakenfist.configuration.config',
                                  fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
@@ -179,7 +179,7 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
 
         fake_config = FakeConfig()
 
-        self.config = mock.patch('shakenfist.config.parsed',
+        self.config = mock.patch('shakenfist.configuration.config',
                                  fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
@@ -189,7 +189,8 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
                 return_value=('!!!ubuntu!!!', '123abc'))
     @mock.patch('shakenfist.db.get_image_metadata', return_value=None)
     @mock.patch('os.makedirs')
-    def test_resolve_image(self, mock_mkdirs, mock_exists, mock_ubuntu, mock_centos):
+    def test_resolve_image(self, mock_mkdirs, mock_exists, mock_ubuntu,
+                           mock_centos):
         img = images.Image.from_url('win10')
         self.assertEqual('win10', img.url)
 
@@ -350,7 +351,8 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('os.path.exists', return_value=True)
     @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.db.add_event')
-    def test_transcode_image_noop(self, mock_event, mock_lock, mock_exists, mock_execute):
+    def test_transcode_image_noop(self, mock_event, mock_lock, mock_exists,
+                                  mock_execute):
         images._transcode(None, '/a/b/c/hash', FakeImage())
         mock_execute.assert_not_called()
 
@@ -362,8 +364,8 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('os.link')
     @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.db.add_event')
-    def test_transcode_image_link(self, mock_event, mock_lock, mock_link, mock_identify, mock_exists,
-                                  mock_execute):
+    def test_transcode_image_link(self, mock_event, mock_lock, mock_link,
+                                  mock_identify, mock_exists, mock_execute):
         images._transcode(None, '/a/b/c/hash', FakeImage())
         mock_link.assert_called_with('/a/b/c/hash', '/a/b/c/hash.qcow2')
         mock_execute.assert_not_called()
@@ -376,12 +378,13 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('os.link')
     @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.db.add_event')
-    def test_transcode_image_convert(self, mock_event, mock_lock, mock_link, mock_identify, mock_exists,
-                                     mock_execute):
+    def test_transcode_image_convert(self, mock_event, mock_lock, mock_link,
+                                     mock_identify, mock_exists, mock_execute):
         images._transcode(None, '/a/b/c/hash', FakeImage())
         mock_link.assert_not_called()
         mock_execute.assert_called_with(
-            None, 'qemu-img convert -t none -O qcow2 /a/b/c/hash /a/b/c/hash.qcow2')
+            None,
+            'qemu-img convert -t none -O qcow2 /a/b/c/hash /a/b/c/hash.qcow2')
 
     @mock.patch('shakenfist.db.get_image_metadata', return_value=None)
     @mock.patch('os.makedirs')
@@ -472,4 +475,5 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
     def test_snapshot(self, mock_execute):
         images.snapshot(None, '/a/b/c/base', '/a/b/c/snap')
         mock_execute.assert_called_with(
-            None, 'qemu-img convert --force-share -O qcow2 /a/b/c/base /a/b/c/snap')
+            None,
+            'qemu-img convert --force-share -O qcow2 /a/b/c/base /a/b/c/snap')

@@ -8,7 +8,7 @@ import requests
 import time
 
 from shakenfist import db
-from shakenfist import config
+from shakenfist.configuration import config
 from shakenfist import exceptions
 from shakenfist import image_resolver_cirros
 from shakenfist import image_resolver_ubuntu
@@ -26,8 +26,7 @@ resolvers = {
 
 
 def _get_cache_path():
-    image_cache_path = os.path.join(
-        config.parsed.get('STORAGE_PATH'), 'image_cache')
+    image_cache_path = os.path.join(config.get('STORAGE_PATH'), 'image_cache')
     if not os.path.exists(image_cache_path):
         LOG.withField('image_cache_path',
                       image_cache_path).debug('Creating image cache')
@@ -82,7 +81,7 @@ class Image(object):
 
         # Check for existing metadata in DB
         db_data = db.get_image_metadata(Image.calc_unique_ref(url),
-                                        config.parsed.get('NODE_NAME'))
+                                        config.NODE_NAME)
 
         # Load DB data into new Image object
         if db_data:
@@ -114,8 +113,7 @@ class Image(object):
             'file_version': self.file_version,
             'version': 1,
         }
-        db.persist_image_metadata(self.unique_ref,
-                                  config.parsed.get('NODE_NAME'),
+        db.persist_image_metadata(self.unique_ref, config.NODE_NAME,
                                   metadata)
 
     def get(self, locks, related_object):

@@ -1,6 +1,6 @@
 import time
 
-from shakenfist import config
+from shakenfist.configuration import config
 from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import exceptions
@@ -29,7 +29,7 @@ class Monitor(daemon.Daemon):
 
         if not util.is_network_node():
             # For normal nodes, just the ones we have instances for
-            for inst in list(db.get_instances(only_node=config.parsed.get('NODE_NAME'))):
+            for inst in list(db.get_instances(only_node=config.NODE_NAME)):
                 for iface in db.get_instance_interfaces(inst['uuid']):
                     if not iface['network_uuid'] in host_networks:
                         host_networks.append(iface['network_uuid'])
@@ -56,7 +56,9 @@ class Monitor(daemon.Daemon):
                 if not n:
                     continue
 
-                if n.db_entry['state_updated'] - time.time() < 60:
+                seen_vxids.append(n.db_entry['vxid'])
+
+                if time.time() - n.db_entry['state_updated'] < 60:
                     # Network state changed in the last minute, punt for now
                     continue
 
@@ -65,7 +67,6 @@ class Monitor(daemon.Daemon):
                     n.create()
 
                 n.ensure_mesh()
-                seen_vxids.append(n.vxlan_id)
 
             except exceptions.LockException as e:
                 LOG.warning(
@@ -97,8 +98,7 @@ class Monitor(daemon.Daemon):
             #                   % extra)
 
         # And record vxids in the database
-        db.persist_node_vxid_mapping(
-            config.parsed.get('NODE_NAME'), vxid_to_mac)
+        db.persist_node_vxid_mapping(config.NODE_NAME, vxid_to_mac)
 
     def _process_network_node_workitems(self):
         jobname, workitem = db.dequeue('networknode')

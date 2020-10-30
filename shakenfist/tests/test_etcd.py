@@ -5,7 +5,7 @@ from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist import tasks
-from shakenfist.config import SFConfigBase
+from shakenfist.configuration import SFConfigBase
 from shakenfist.tests import test_shakenfist
 
 LOG, _ = logutil.setup(__name__)
@@ -23,7 +23,7 @@ class ActualLockTestCase(test_shakenfist.ShakenFistTestCase):
     def setUp(self):
         super(ActualLockTestCase, self).setUp()
 
-        self.config = mock.patch('shakenfist.config.parsed',
+        self.config = mock.patch('shakenfist.configuration.config',
                                  fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)

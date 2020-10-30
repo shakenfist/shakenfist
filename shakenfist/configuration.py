@@ -12,16 +12,13 @@ from pydantic import (
     AnyHttpUrl,
 )
 
-from shakenfist import util
-
 
 def get_node_ip():
     node_name = socket.getfqdn()
     try:
         return socket.gethostbyname(node_name)
-    except Exception as e:
+    except Exception:
         # Only for localhost development environments
-        util.ignore_exception('config parser', e)
         return '127.0.0.1'
 
 
@@ -177,4 +174,4 @@ class SFConfig(SFConfigBase):
         env_prefix = 'SHAKENFIST_'
 
 
-parsed = SFConfig()
+config = SFConfig()

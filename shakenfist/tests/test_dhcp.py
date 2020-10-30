@@ -8,7 +8,7 @@ from pydantic import AnyHttpUrl, IPvAnyAddress
 
 from shakenfist import dhcp
 from shakenfist import ipmanager
-from shakenfist.config import SFConfigBase
+from shakenfist.configuration import SFConfigBase
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -42,7 +42,7 @@ class DHCPTestCase(testtools.TestCase):
                                                '%(vername)s-server-cloudimg-amd64.img')
         fake_config = FakeConfig()
 
-        self.config = mock.patch('shakenfist.config.parsed',
+        self.config = mock.patch('shakenfist.configuration.config',
                                  fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)

@@ -1,20 +1,20 @@
 import mock
 
+from shakenfist.configuration import SFConfig
 from shakenfist import util
-from shakenfist import config
 from shakenfist.tests import test_shakenfist
 
 
-net_node_conf = config.SFConfig(NODE_IP='1.1.1.1', NETWORK_NODE_IP='1.1.1.1')
-not_net_node_conf = config.SFConfig(NODE_IP='1.1.1.1', NETWORK_NODE_IP='1.1.1.2')
+net_node_conf = SFConfig(NODE_IP='1.1.1.1', NETWORK_NODE_IP='1.1.1.1')
+not_net_node_conf = SFConfig(NODE_IP='1.1.1.1', NETWORK_NODE_IP='1.1.1.2')
 
 
 class UtilTestCase(test_shakenfist.ShakenFistTestCase):
-    @mock.patch('shakenfist.config.parsed', net_node_conf)
+    @mock.patch('shakenfist.configuration.config', net_node_conf)
     def test_is_network_node_yes(self):
         self.assertTrue(util.is_network_node())
 
-    @mock.patch('shakenfist.config.parsed', not_net_node_conf)
+    @mock.patch('shakenfist.configuration.config', not_net_node_conf)
     def test_is_network_node_no(self):
         self.assertFalse(util.is_network_node())
 

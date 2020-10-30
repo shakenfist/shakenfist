@@ -3,7 +3,7 @@ import mock
 from shakenfist import exceptions
 from shakenfist import scheduler
 from shakenfist.tests import test_shakenfist
-from shakenfist.config import SFConfig
+from shakenfist.configuration import SFConfig
 
 
 class FakeInstance(object):
@@ -77,7 +77,7 @@ class SchedulerTestCase(test_shakenfist.ShakenFistTestCase):
             LOG_METHOD_TRACE=1,
         )
 
-        self.mock_config = mock.patch('shakenfist.config.parsed', fake_config)
+        self.mock_config = mock.patch('shakenfist.configuration.config', fake_config)
         self.mock_config.start()
         self.addCleanup(self.mock_config.stop)
 

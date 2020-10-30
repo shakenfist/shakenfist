@@ -6,7 +6,7 @@ import psutil
 import shutil
 import signal
 
-from shakenfist import config
+from shakenfist.configuration import config
 from shakenfist import db
 from shakenfist import util
 
@@ -17,8 +17,8 @@ class DHCP(object):
 
         self.subst = {
             'config_dir': os.path.join(
-                config.parsed.get('STORAGE_PATH'), 'dhcp', self.network_uuid),
-            'zone': config.parsed.get('ZONE'),
+                config.get('STORAGE_PATH'), 'dhcp', self.network_uuid),
+            'zone': config.get('ZONE'),
 
             'router': network.router,
             'dhcp_start': network.dhcp_start,
@@ -36,7 +36,7 @@ class DHCP(object):
         return ('dhcp', self.network_uuid)
 
     def _read_template(self, template):
-        with open(os.path.join(config.parsed.get('STORAGE_PATH'),
+        with open(os.path.join(config.get('STORAGE_PATH'),
                                template)) as f:
             return jinja2.Template(f.read())
 
