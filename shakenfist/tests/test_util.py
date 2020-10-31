@@ -1,29 +1,21 @@
 import mock
 
-from shakenfist.configuration import config
+from shakenfist.configuration import SFConfig
 from shakenfist import util
 from shakenfist.tests import test_shakenfist
 
 
+net_node_conf = SFConfig(NODE_IP='1.1.1.1', NETWORK_NODE_IP='1.1.1.1')
+not_net_node_conf = SFConfig(NODE_IP='1.1.1.1', NETWORK_NODE_IP='1.1.1.2')
+
+
 class UtilTestCase(test_shakenfist.ShakenFistTestCase):
-    @mock.patch.dict('os.environ',
-                     {'SHAKENFIST_NODE_IP': '1.1.1.1',
-                      'SHAKENFIST_NETWORK_NODE_IP': '1.1.1.1'})
+    @mock.patch('shakenfist.util.config', net_node_conf)
     def test_is_network_node_yes(self):
-        # Parse the config with the mock edit of os.environ. Smarter developers
-        # would mock the os.environ when accessed during the get() inside
-        # is_network_node().
-        config.parse()
         self.assertTrue(util.is_network_node())
 
-    @mock.patch.dict('os.environ',
-                     {'SHAKENFIST_NODE_IP': '1.1.1.1',
-                      'SHAKENFIST_NETWORK_NODE_IP': '1.1.1.2'})
+    @mock.patch('shakenfist.util.config', not_net_node_conf)
     def test_is_network_node_no(self):
-        # Parse the config with the mock edit of os.environ. Smarter developers
-        # would mock the os.environ when accessed during the get() inside
-        # is_network_node().
-        config.parse()
         self.assertFalse(util.is_network_node())
 
     @mock.patch('shakenfist.util.execute',

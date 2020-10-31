@@ -24,10 +24,10 @@ LOG, _ = logutil.setup(__name__)
 
 def see_this_node():
     etcd.put(
-        'node', None, config.node_name(),
+        'node', None, config.NODE_NAME,
         {
-            'fqdn': config.node_name(),
-            'ip': config.node_ip(),
+            'fqdn': config.NODE_NAME,
+            'ip': config.NODE_IP,
             'lastseen': time.time(),
             'version': util.get_version()
         },
@@ -84,7 +84,7 @@ def get_nodes():
 
 def get_network_node():
     for n in get_nodes():
-        if n['ip'] == config.network_node_ip():
+        if n['ip'] == config.NETWORK_NODE_IP:
             return n
 
 
@@ -246,7 +246,7 @@ def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key,
         'memory': memory_mb,
         'disk_spec': disk_spec,
         'ssh_key': ssh_key,
-        'node': config.node_name(),
+        'node': config.NODE_NAME,
         'console_port': 0,
         'vdi_port': 0,
         'user_data': user_data,
@@ -444,7 +444,7 @@ def add_event(object_type, object_uuid, operation, phase, duration, message):
     LOG.withFields(
         {
             object_type: object_uuid,
-            'fqdn': config.node_name(),
+            'fqdn': config.NODE_NAME,
             'operation': operation,
             'phase': phase,
             'duration': duration,
@@ -456,7 +456,7 @@ def add_event(object_type, object_uuid, operation, phase, duration, message):
             'timestamp': t,
             'object_type': object_type,
             'object_uuid': object_uuid,
-            'fqdn': config.node_name(),
+            'fqdn': config.NODE_NAME,
             'operation': operation,
             'phase': phase,
             'duration': duration,
@@ -472,9 +472,9 @@ def get_events(object_type, object_uuid):
 
 def update_metrics_bulk(metrics):
     etcd.put(
-        'metrics', config.node_name(), None,
+        'metrics', config.NODE_NAME, None,
         {
-            'fqdn': config.node_name(),
+            'fqdn': config.NODE_NAME,
             'timestamp': time.time(),
             'metrics': metrics
         },
@@ -489,7 +489,7 @@ def get_metrics(fqdn):
 
 
 def allocate_console_port(instance_uuid):
-    node = config.node_name()
+    node = config.NODE_NAME
     consumed = {value['port'] for value in etcd.get_all('console', node)}
     while True:
         port = random.randint(30000, 50000)
@@ -518,7 +518,7 @@ def allocate_console_port(instance_uuid):
 
 
 def free_console_port(port):
-    etcd.delete('console', config.node_name(), port)
+    etcd.delete('console', config.NODE_NAME, port)
 
 
 def list_namespaces():
@@ -562,7 +562,7 @@ def enqueue(queuename, workitem):
 
 
 def enqueue_instance_delete(instance_uuid):
-    enqueue_instance_delete_remote(config.node_name(), instance_uuid)
+    enqueue_instance_delete_remote(config.NODE_NAME, instance_uuid)
 
 
 def enqueue_instance_delete_remote(node, instance_uuid):
@@ -574,7 +574,7 @@ def enqueue_instance_delete_remote(node, instance_uuid):
 
 
 def enqueue_instance_error(instance_uuid, error_msg):
-    enqueue(config.node_name(), {
+    enqueue(config.NODE_NAME, {
         'tasks': [
             ErrorInstanceTask(instance_uuid, error_msg)
         ],

@@ -81,7 +81,7 @@ class Image(object):
 
         # Check for existing metadata in DB
         db_data = db.get_image_metadata(Image.calc_unique_ref(url),
-                                        config.node_name())
+                                        config.NODE_NAME)
 
         # Load DB data into new Image object
         if db_data:
@@ -113,7 +113,7 @@ class Image(object):
             'file_version': self.file_version,
             'version': 1,
         }
-        db.persist_image_metadata(self.unique_ref, config.node_name(),
+        db.persist_image_metadata(self.unique_ref, config.NODE_NAME,
                                   metadata)
 
     def get(self, locks, related_object):

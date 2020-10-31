@@ -78,7 +78,7 @@ class Monitor(daemon.Daemon):
             # Start missing observers
             extra_instances = list(observers.keys())
 
-            for inst in db.get_instances(only_node=config.node_name()):
+            for inst in db.get_instances(only_node=config.NODE_NAME):
                 if inst['uuid'] in extra_instances:
                     extra_instances.remove(inst['uuid'])
 

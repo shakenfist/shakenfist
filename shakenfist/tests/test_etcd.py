@@ -5,28 +5,25 @@ from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist import tasks
+from shakenfist.configuration import SFConfigBase
 from shakenfist.tests import test_shakenfist
-
 
 LOG, _ = logutil.setup(__name__)
 
 
-def fake_config(key):
-    fc = {
-        'NODE_NAME': 'thisnode',
-        'SLOW_LOCK_THRESHOLD': 2,
-    }
+class FakeConfig(SFConfigBase):
+    NODE_NAME: str = 'thisnode'
+    SLOW_LOCK_THRESHOLD: int = 2
 
-    if key in fc:
-        return fc[key]
-    raise Exception('Unknown config key %s' % key)
+
+fake_config = FakeConfig()
 
 
 class ActualLockTestCase(test_shakenfist.ShakenFistTestCase):
     def setUp(self):
         super(ActualLockTestCase, self).setUp()
 
-        self.config = mock.patch('shakenfist.configuration.config.get',
+        self.config = mock.patch('shakenfist.etcd.config',
                                  fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)

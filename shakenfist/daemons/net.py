@@ -29,7 +29,7 @@ class Monitor(daemon.Daemon):
 
         if not util.is_network_node():
             # For normal nodes, just the ones we have instances for
-            for inst in list(db.get_instances(only_node=config.node_name())):
+            for inst in list(db.get_instances(only_node=config.NODE_NAME)):
                 for iface in db.get_instance_interfaces(inst['uuid']):
                     if not iface['network_uuid'] in host_networks:
                         host_networks.append(iface['network_uuid'])
@@ -101,7 +101,7 @@ class Monitor(daemon.Daemon):
             #                   % extra)
 
         # And record vxids in the database
-        db.persist_node_vxid_mapping(config.node_name(), vxid_to_mac)
+        db.persist_node_vxid_mapping(config.NODE_NAME, vxid_to_mac)
 
     def _process_network_node_workitems(self):
         jobname, workitem = db.dequeue('networknode')

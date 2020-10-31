@@ -39,7 +39,7 @@ class Monitor(daemon.Daemon):
                                  'virsh destroy "sf:%s"' % instance_uuid)
                     continue
 
-                db.place_instance(instance_uuid, config.node_name())
+                db.place_instance(instance_uuid, config.NODE_NAME)
                 seen.append(domain.name())
 
                 if instance.get('state') == 'deleted':
@@ -107,7 +107,7 @@ class Monitor(daemon.Daemon):
                                      'deleted stray', 'complete', None, None)
                         continue
 
-                    db.place_instance(instance_uuid, config.node_name())
+                    db.place_instance(instance_uuid, config.NODE_NAME)
                     instance_path = os.path.join(
                         config.get('STORAGE_PATH'), 'instances', instance_uuid)
 

@@ -27,7 +27,7 @@ def restore_instances():
     # Ensure all instances for this node are defined
     networks = []
     instances = []
-    for inst in list(db.get_instances(only_node=config.node_name())):
+    for inst in list(db.get_instances(only_node=config.NODE_NAME)):
         for iface in db.get_instance_interfaces(inst['uuid']):
             if not iface['network_uuid'] in networks:
                 networks.append(iface['network_uuid'])
@@ -86,8 +86,7 @@ def main():
     setproctitle.setproctitle(daemon.process_name('main'))
 
     # Log configuration on startup
-    config.parse()
-    for key, value in config.config.items():
+    for key, value in config.dict().items():
         LOG.info('Configuration item %s = %s' % (key, value))
 
     daemon.set_log_level(LOG, 'main')

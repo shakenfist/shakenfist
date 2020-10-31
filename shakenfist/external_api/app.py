@@ -63,7 +63,7 @@ def error(status_code, message):
         'status': status_code
     }
 
-    if TESTING or config.get('INCLUDE_TRACEBACKS') == '1':
+    if TESTING or config.get('INCLUDE_TRACEBACKS'):
         _, _, tb = sys.exc_info()
         if tb:
             body['traceback'] = traceback.format_exc()
@@ -195,7 +195,7 @@ def redirect_instance_request(func):
     # Redirect method to the hypervisor hosting the instance
     def wrapper(*args, **kwargs):
         i = kwargs.get('instance_from_db_virt')
-        if i and i.db_entry['node'] != config.node_name():
+        if i and i.db_entry['node'] != config.NODE_NAME:
             url = 'http://%s:%d%s' % (i.db_entry['node'],
                                       config.get('API_PORT'),
                                       flask.request.environ['PATH_INFO'])
@@ -258,13 +258,13 @@ def redirect_to_network_node(func):
     def wrapper(*args, **kwargs):
         if not util.is_network_node():
             admin_token = util.get_api_token(
-                'http://%s:%d' % (config.network_node_ip(),
+                'http://%s:%d' % (config.NETWORK_NODE_IP,
                                   config.get('API_PORT')),
                 namespace='system')
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'],
                 'http://%s:%d%s'
-                % (config.network_node_ip(),
+                % (config.NETWORK_NODE_IP,
                    config.get('API_PORT'),
                    flask.request.environ['PATH_INFO']),
                 data=flask.request.data,
@@ -318,7 +318,7 @@ def _metadata_putpost(meta_type, owner, key, value):
 
 app = flask.Flask(__name__)
 api = flask_restful.Api(app, catch_all_404s=False)
-app.config['JWT_SECRET_KEY'] = config.get('AUTH_SECRET_SEED')
+app.config['JWT_SECRET_KEY'] = config.AUTH_SECRET_SEED.get_secret_value()
 jwt = JWTManager(app)
 
 # Use our handler to get SF log format (instead of gunicorn's handlers)
@@ -583,7 +583,7 @@ class Instance(Resource):
 
         # If this instance is not on a node, just do the DB cleanup locally
         if not instance_from_db['node']:
-            node = config.node_name()
+            node = config.NODE_NAME
         else:
             node = instance_from_db['node']
 
@@ -796,7 +796,7 @@ class Instances(Resource):
 
             # If this instance is not on a node, just do the DB cleanup locally
             if not instance['node']:
-                node = config.node_name()
+                node = config.NODE_NAME
             else:
                 node = instance['node']
 
@@ -1109,7 +1109,7 @@ class Images(Resource):
     @jwt_required
     def post(self, url=None):
         db.add_event('image', url, 'api', 'cache', None, None)
-        db.enqueue(config.node_name(), {
+        db.enqueue(config.NODE_NAME, {
             'tasks': [FetchImageTask(url)],
         })
 

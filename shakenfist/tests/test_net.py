@@ -1,7 +1,7 @@
 import mock
 
 from shakenfist import net
-from shakenfist.configuration import config
+from shakenfist.configuration import SFConfig
 from shakenfist.tests import test_shakenfist
 
 
@@ -58,13 +58,11 @@ class NetworkGeneralTestCase(NetworkTestCase):
 class NetworkNormalNodeTestCase(NetworkTestCase):
     def setUp(self):
         super(NetworkNormalNodeTestCase, self).setUp()
-        os_environ = mock.patch.dict('os.environ', {
-            'SHAKENFIST_NODE_IP': '1.1.1.2',
-            'SHAKENFIST_NETWORK_NODE_IP': '1.1.1.1'
-            })
-        os_environ.start()
-        self.addCleanup(os_environ.stop)
-        config.parse()
+        fake_config = SFConfig(NODE_IP="1.1.1.2", NETWORK_NODE_IP="1.1.1.2")
+        self.config = mock.patch('shakenfist.configuration.config',
+                                 fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
 
     #
     #  is_okay()
@@ -101,6 +99,7 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
 
     @mock.patch('shakenfist.net.Network.is_created', return_value=True)
     @mock.patch('shakenfist.net.Network.is_dnsmasq_running', return_value=False)
+    @mock.patch('shakenfist.util.config', SFConfig(NODE_IP="1.1.1.1", NETWORK_NODE_IP="1.1.1.2"))
     def test_is_okay_no_dns(self, mock_is_dnsmasq, mock_is_created):
         n = net.Network(
             {
@@ -118,12 +117,12 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
 class NetworkNetNodeTestCase(NetworkTestCase):
     def setUp(self):
         super(NetworkNetNodeTestCase, self).setUp()
-        os_environ = mock.patch.dict('os.environ', {
-            'SHAKENFIST_NODE_IP': '1.1.1.1',
-            'SHAKENFIST_NETWORK_NODE_IP': '1.1.1.1'
-            })
-        os_environ.start()
-        self.addCleanup(os_environ.stop)
+
+        fake_config = SFConfig(NODE_IP="1.1.1.2", NETWORK_NODE_IP="1.1.1.2")
+        self.config = mock.patch('shakenfist.configuration.config',
+                                 fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
 
     #
     #  is_okay()

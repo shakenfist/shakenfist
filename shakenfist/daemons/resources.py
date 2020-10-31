@@ -111,7 +111,7 @@ def _get_stats():
 
     # Queue health statistics
     node_queue_processing, node_queue_waiting = db.get_queue_length(
-        config.node_name())
+        config.NODE_NAME)
 
     retval.update({
         'cpu_total_instance_vcpus': total_instance_vcpus,
@@ -163,12 +163,12 @@ class Monitor(daemon.Daemon):
 
         while True:
             try:
-                jobname, _ = db.dequeue('%s-metrics' % config.node_name())
+                jobname, _ = db.dequeue('%s-metrics' % config.NODE_NAME)
                 if jobname:
                     if time.time() - last_metrics > 2:
                         update_metrics()
                         last_metrics = time.time()
-                    db.resolve('%s-metrics' % config.node_name(), jobname)
+                    db.resolve('%s-metrics' % config.NODE_NAME, jobname)
                 else:
                     time.sleep(0.2)
 

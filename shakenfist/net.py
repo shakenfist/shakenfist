@@ -391,7 +391,7 @@ class Network(object):
             # NOTE(mikal): why not use DNS here? Well, DNS might be outside
             # the control of the deployer if we're running in a public cloud
             # as an overlay cloud...
-            node_ips = [config.network_node_ip()]
+            node_ips = [config.NETWORK_NODE_IP]
             for fqdn in node_fqdns:
                 ip = db.get_node(fqdn)['ip']
                 if ip not in node_ips:

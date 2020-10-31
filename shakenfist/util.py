@@ -65,7 +65,7 @@ class RecordedOperation():
 
 def is_network_node():
     """Test if this node is the network node."""
-    return config.node_ip() == config.network_node_ip()
+    return config.NODE_IP == config.NETWORK_NODE_IP
 
 
 def check_for_interface(name, up=False):

@@ -42,7 +42,7 @@ class ActualLock(Lock):
         # We override the UUID of the lock with something more helpful to debugging
         self._uuid = json.dumps(
             {
-                'node': config.node_name(),
+                'node': config.NODE_NAME,
                 'pid': os.getpid(),
                 'operation': self.operation
             },
@@ -152,7 +152,7 @@ def clear_stale_locks():
         node = holder['node']
         pid = int(holder['pid'])
 
-        if node == config.node_name() and not psutil.pid_exists(pid):
+        if node == config.NODE_NAME and not psutil.pid_exists(pid):
             client.delete(metadata['key'])
             LOG.withFields({'lock': lockname,
                             'old-pid': pid,
@@ -340,4 +340,4 @@ def restart_queues():
     # we didn't complete them before crashing.
     if util.is_network_node():
         _restart_queue('networknode')
-    _restart_queue(config.node_name())
+    _restart_queue(config.NODE_NAME)

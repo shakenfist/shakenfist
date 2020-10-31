@@ -81,7 +81,7 @@ def handle(jobname, workitem):
             elif isinstance(task, StartInstanceTask):
                 instance_start(instance_uuid, task.network())
                 db.update_instance_state(instance_uuid, 'created')
-                db.enqueue('%s-metrics' % config.node_name(), {})
+                db.enqueue('%s-metrics' % config.NODE_NAME, {})
 
             elif isinstance(task, DeleteInstanceTask):
                 try:
@@ -98,7 +98,7 @@ def handle(jobname, workitem):
                     if task.error_msg():
                         db.update_instance_error_message(
                             instance_uuid, task.error_msg())
-                    db.enqueue('%s-metrics' % config.node_name(), {})
+                    db.enqueue('%s-metrics' % config.NODE_NAME, {})
                 except Exception as e:
                     util.ignore_exception(daemon.process_name('queues'), e)
 
@@ -121,7 +121,7 @@ def handle(jobname, workitem):
                                       'failed queue task: %s' % e)
 
     finally:
-        db.resolve(config.node_name(), jobname)
+        db.resolve(config.NODE_NAME, jobname)
         if instance_uuid:
             db.add_event('instance', instance_uuid, 'tasks complete',
                          'dequeued', None, 'Work item %s' % jobname)
@@ -137,7 +137,7 @@ def image_fetch(url, instance_uuid):
         # TODO(andy): Wait up to 15 mins for another queue process to download
         # the required image. This will be changed to queue on a
         # "waiting_image_fetch" queue but this works now.
-        with db.get_lock('image', config.node_name(),
+        with db.get_lock('image', config.NODE_NAME,
                          Image.calc_unique_ref(url), timeout=15*60,
                          op='Image fetch') as lock:
             img = Image.from_url(url)
@@ -169,7 +169,7 @@ def instance_preflight(instance_uuid, network):
     instance = virt.from_db(instance_uuid)
 
     try:
-        s.place_instance(instance, network, candidates=[config.node_name()])
+        s.place_instance(instance, network, candidates=[config.NODE_NAME])
         return None
 
     except exceptions.LowResourceException as e:
@@ -187,7 +187,7 @@ def instance_preflight(instance_uuid, network):
         else:
             candidates = []
             for node in s.metrics.keys():
-                if node != config.node_name():
+                if node != config.NODE_NAME:
                     candidates.append(node)
 
         candidates = s.place_instance(instance, network,
@@ -273,7 +273,7 @@ def instance_delete(instance_uuid):
 
         # Create list of networks used by all other instances
         host_networks = []
-        for inst in list(db.get_instances(only_node=config.node_name())):
+        for inst in list(db.get_instances(only_node=config.NODE_NAME)):
             if not inst['uuid'] == instance_uuid:
                 for iface in db.get_instance_interfaces(inst['uuid']):
                     if not iface['network_uuid'] in host_networks:
@@ -315,7 +315,7 @@ class Monitor(daemon.Daemon):
                         workers.remove(w)
 
                 if len(workers) < present_cpus / 2:
-                    jobname, workitem = db.dequeue(config.node_name())
+                    jobname, workitem = db.dequeue(config.NODE_NAME)
                 else:
                     workitem = None
 

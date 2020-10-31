@@ -4,11 +4,11 @@ import os
 import signal
 import six
 import testtools
-
+from pydantic import AnyHttpUrl, IPvAnyAddress
 
 from shakenfist import dhcp
 from shakenfist import ipmanager
-
+from shakenfist.configuration import SFConfigBase
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -27,26 +27,22 @@ class DHCPTestCase(testtools.TestCase):
     def setUp(self):
         super(DHCPTestCase, self).setUp()
 
-        def fake_config(key):
-            fc = {
-                'NODE_NAME': 'foo',
-                'STORAGE_PATH': '/a/b/c',
-                'ZONE': 'shakenfist',
-                'ETCD_USER': 'sf',
-                'ETCD_PASSWORD': 'foo',
-                'ETCD_SERVER': 'localhost',
-                'NODE_IP': '127.0.0.1',
-                'DOWNLOAD_URL_CIRROS': ('http://download.cirros-cloud.net/%(vernum)s/'
-                                        'cirros-%(vernum)s-x86_64-disk.img'),
-                'DOWNLOAD_URL_UBUNTU': ('https://cloud-images.ubuntu.com/%(vername)s/current/'
-                                        '%(vername)s-server-cloudimg-amd64.img'),
-            }
+        class FakeConfig(SFConfigBase):
+            NODE_NAME: str = 'foo'
+            STORAGE_PATH: str = '/a/b/c'
+            ZONE: str = 'shakenfist'
+            ETCD_USER: str = 'sf'
+            ETCD_PASSWORD: str = 'foo'
+            ETCD_SERVER: str = 'localhost'
+            NODE_IP: IPvAnyAddress = '127.0.0.1'
+            DOWNLOAD_URL_CIRROS: AnyHttpUrl = ('http://download.cirros-cloud.net/%(vernum)s/'
+                                               'cirros-%(vernum)s-x86_64-disk.img')
 
-            if key in fc:
-                return fc[key]
-            raise Exception('Unknown config key')
+            DOWNLOAD_URL_UBUNTU: AnyHttpUrl = ('https://cloud-images.ubuntu.com/%(vername)s/current/'
+                                               '%(vername)s-server-cloudimg-amd64.img')
+        fake_config = FakeConfig()
 
-        self.config = mock.patch('shakenfist.configuration.config.get',
+        self.config = mock.patch('shakenfist.dhcp.config',
                                  fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
