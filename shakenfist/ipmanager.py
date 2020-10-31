@@ -1,5 +1,4 @@
 import ipaddress
-import json
 import random
 
 
@@ -27,7 +26,7 @@ class NetBlock(object):
         return self.ipblock_obj[idx]
 
     def is_free(self, address):
-        return not address in self.in_use
+        return address not in self.in_use
 
     def reserve(self, address):
         if not self.is_free(address):
@@ -72,7 +71,7 @@ class NetBlock(object):
         in_use = []
         for ip in self.in_use:
             ip_str = str(ip)
-            if not ip_str in in_use:
+            if ip_str not in in_use:
                 in_use.append(ip_str)
 
         return {"ipmanager.v1": {"ipblock": self.ipblock, "in_use": in_use}}
