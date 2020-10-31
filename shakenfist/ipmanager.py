@@ -4,8 +4,8 @@ import random
 
 
 def from_db(d):
-    nb = NetBlock(d['ipmanager.v1']['ipblock'])
-    for addr in d['ipmanager.v1']['in_use']:
+    nb = NetBlock(d["ipmanager.v1"]["ipblock"])
+    for addr in d["ipmanager.v1"]["in_use"]:
         nb.reserve(addr)
     return nb
 
@@ -20,10 +20,7 @@ class NetBlock(object):
         self.network_address = self.ipblock_obj.network_address
 
         self.num_addresses = self.ipblock_obj.num_addresses
-        self.in_use = {
-            self.network_address: True,
-            self.broadcast_address: True
-        }
+        self.in_use = {self.network_address: True, self.broadcast_address: True}
         self.in_use_counter = 0
 
     def get_address_at_index(self, idx):
@@ -49,7 +46,8 @@ class NetBlock(object):
 
     def get_random_address(self):
         bits = random.getrandbits(
-            self.ipblock_obj.max_prefixlen - self.ipblock_obj.prefixlen)
+            self.ipblock_obj.max_prefixlen - self.ipblock_obj.prefixlen
+        )
         return str(ipaddress.IPv4Address(self.ipblock_obj.network_address + bits))
 
     def get_random_free_address(self):
@@ -77,9 +75,4 @@ class NetBlock(object):
             if not ip_str in in_use:
                 in_use.append(ip_str)
 
-        return {
-            'ipmanager.v1': {
-                'ipblock': self.ipblock,
-                'in_use': in_use
-            }
-        }
+        return {"ipmanager.v1": {"ipblock": self.ipblock, "in_use": in_use}}

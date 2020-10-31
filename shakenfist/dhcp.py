@@ -13,74 +13,70 @@ from shakenfist import util
 
 class DHCP(object):
     def __init__(self, network, interface):
-        self.network_uuid = network.db_entry['uuid']
+        self.network_uuid = network.db_entry["uuid"]
 
         self.subst = {
-            'config_dir': os.path.join(
-                config.get('STORAGE_PATH'), 'dhcp', self.network_uuid),
-            'zone': config.get('ZONE'),
-
-            'router': network.router,
-            'dhcp_start': network.dhcp_start,
-            'netmask': network.netmask,
-            'broadcast': network.broadcast,
-
-            'in_netns': 'ip netns exec %s' % self.network_uuid,
-            'interface': interface
+            "config_dir": os.path.join(
+                config.get("STORAGE_PATH"), "dhcp", self.network_uuid
+            ),
+            "zone": config.get("ZONE"),
+            "router": network.router,
+            "dhcp_start": network.dhcp_start,
+            "netmask": network.netmask,
+            "broadcast": network.broadcast,
+            "in_netns": "ip netns exec %s" % self.network_uuid,
+            "interface": interface,
         }
 
     def __str__(self):
-        return 'dhcp(%s)' % self.network_uuid
+        return "dhcp(%s)" % self.network_uuid
 
     def unique_label(self):
-        return ('dhcp', self.network_uuid)
+        return ("dhcp", self.network_uuid)
 
     def _read_template(self, template):
-        with open(os.path.join(config.get('STORAGE_PATH'),
-                               template)) as f:
+        with open(os.path.join(config.get("STORAGE_PATH"), template)) as f:
             return jinja2.Template(f.read())
 
     def _make_config(self):
-        if not os.path.exists(self.subst['config_dir']):
-            os.makedirs(self.subst['config_dir'])
+        if not os.path.exists(self.subst["config_dir"]):
+            os.makedirs(self.subst["config_dir"])
 
-        t = self._read_template('dhcp.tmpl')
+        t = self._read_template("dhcp.tmpl")
         c = t.render(self.subst)
 
-        with open(os.path.join(self.subst['config_dir'],
-                               'config'), 'w') as f:
+        with open(os.path.join(self.subst["config_dir"], "config"), "w") as f:
             f.write(c)
 
     def _make_hosts(self):
-        if not os.path.exists(self.subst['config_dir']):
-            os.makedirs(self.subst['config_dir'])
+        if not os.path.exists(self.subst["config_dir"]):
+            os.makedirs(self.subst["config_dir"])
 
-        t = self._read_template('dhcphosts.tmpl')
+        t = self._read_template("dhcphosts.tmpl")
 
         instances = []
         for ni in list(db.get_network_interfaces(self.network_uuid)):
-            instance = db.get_instance(ni['instance_uuid'])
+            instance = db.get_instance(ni["instance_uuid"])
             if not instance:
                 continue
 
             instances.append(
                 {
-                    'uuid': ni['instance_uuid'],
-                    'macaddr': ni['macaddr'],
-                    'ipv4': ni['ipv4'],
-                    'name': instance.get('name', 'instance').replace(',', '')
+                    "uuid": ni["instance_uuid"],
+                    "macaddr": ni["macaddr"],
+                    "ipv4": ni["ipv4"],
+                    "name": instance.get("name", "instance").replace(",", ""),
                 }
             )
-        self.subst['instances'] = instances
+        self.subst["instances"] = instances
         c = t.render(self.subst)
 
-        with open(os.path.join(self.subst['config_dir'],
-                               'hosts'), 'w') as f:
+        with open(os.path.join(self.subst["config_dir"], "hosts"), "w") as f:
             f.write(c)
 
     def _remove_config(self):
-        if os.path.exists(self.subst['config_dir']):
-            shutil.rmtree(self.subst['config_dir'])
+        if os.path.exists(self.subst["config_dir"]):
+            shutil.rmtree(self.subst["config_dir"])
 
     def _send_signal(self, sig):
         pid = self.get_pid()
@@ -92,7 +88,7 @@ class DHCP(object):
         return False
 
     def get_pid(self):
-        pid_file = os.path.join(self.subst['config_dir'], 'pid')
+        pid_file = os.path.join(self.subst["config_dir"], "pid")
         if os.path.exists(pid_file):
             with open(pid_file) as f:
                 pid = int(f.read())
@@ -107,5 +103,7 @@ class DHCP(object):
         self._make_config()
         self._make_hosts()
         if not self._send_signal(signal.SIGHUP):
-            util.execute(None,
-                         '%(in_netns)s dnsmasq --conf-file=%(config_dir)s/config' % self.subst)
+            util.execute(
+                None,
+                "%(in_netns)s dnsmasq --conf-file=%(config_dir)s/config" % self.subst,
+            )

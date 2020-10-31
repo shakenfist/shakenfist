@@ -7,80 +7,105 @@ from shakenfist.tests import test_shakenfist
 
 class TasksEqTestCase(test_shakenfist.ShakenFistTestCase):
     def test_QueueTask_eq(self):
-        self.assertEqual(tasks.PreflightInstanceTask('abcd'),
-                         tasks.PreflightInstanceTask('abcd'))
+        self.assertEqual(
+            tasks.PreflightInstanceTask("abcd"), tasks.PreflightInstanceTask("abcd")
+        )
 
-        self.assertEqual(tasks.PreflightInstanceTask('abcd', []),
-                         tasks.PreflightInstanceTask('abcd', []))
+        self.assertEqual(
+            tasks.PreflightInstanceTask("abcd", []),
+            tasks.PreflightInstanceTask("abcd", []),
+        )
 
-        self.assertEqual(tasks.PreflightInstanceTask('abcd'),
-                         tasks.PreflightInstanceTask('abcd', []))
+        self.assertEqual(
+            tasks.PreflightInstanceTask("abcd"), tasks.PreflightInstanceTask("abcd", [])
+        )
 
-        self.assertNotEqual(tasks.PreflightInstanceTask('abcd'),
-                            tasks.PreflightInstanceTask('abcd', ['netuuid']))
+        self.assertNotEqual(
+            tasks.PreflightInstanceTask("abcd"),
+            tasks.PreflightInstanceTask("abcd", ["netuuid"]),
+        )
 
-        self.assertEqual(tasks.PreflightInstanceTask('abcd', ['a1', 'b2']),
-                         tasks.PreflightInstanceTask('abcd', ['a1', 'b2']))
+        self.assertEqual(
+            tasks.PreflightInstanceTask("abcd", ["a1", "b2"]),
+            tasks.PreflightInstanceTask("abcd", ["a1", "b2"]),
+        )
 
-        self.assertNotEqual(tasks.PreflightInstanceTask('abcd', ['a1', 'b2']),
-                            tasks.PreflightInstanceTask('abcd', ['a1']))
+        self.assertNotEqual(
+            tasks.PreflightInstanceTask("abcd", ["a1", "b2"]),
+            tasks.PreflightInstanceTask("abcd", ["a1"]),
+        )
 
         with testtools.ExpectedException(NotImplementedError):
-            self.assertEqual(tasks.PreflightInstanceTask('abcd', ['a1', 'b2']),
-                             42)
+            self.assertEqual(tasks.PreflightInstanceTask("abcd", ["a1", "b2"]), 42)
 
-        self.assertEqual(tasks.DeleteInstanceTask('abcd'),
-                         tasks.DeleteInstanceTask('abcd'))
+        self.assertEqual(
+            tasks.DeleteInstanceTask("abcd"), tasks.DeleteInstanceTask("abcd")
+        )
 
-        self.assertEqual(tasks.ErrorInstanceTask('abcd', 'someExcuse'),
-                         tasks.ErrorInstanceTask('abcd', 'someExcuse'))
+        self.assertEqual(
+            tasks.ErrorInstanceTask("abcd", "someExcuse"),
+            tasks.ErrorInstanceTask("abcd", "someExcuse"),
+        )
 
-        self.assertNotEqual(tasks.ErrorInstanceTask('abcd', 'someExcuse'),
-                            tasks.ErrorInstanceTask('abcd', 'something'))
+        self.assertNotEqual(
+            tasks.ErrorInstanceTask("abcd", "someExcuse"),
+            tasks.ErrorInstanceTask("abcd", "something"),
+        )
 
-        self.assertEqual(tasks.ErrorInstanceTask('abcd', 'dunno'),
-                         tasks.ErrorInstanceTask('abcd', 'dunno'))
+        self.assertEqual(
+            tasks.ErrorInstanceTask("abcd", "dunno"),
+            tasks.ErrorInstanceTask("abcd", "dunno"),
+        )
 
-        self.assertEqual(tasks.ImageTask('http://someurl'),
-                         tasks.ImageTask('http://someurl'))
+        self.assertEqual(
+            tasks.ImageTask("http://someurl"), tasks.ImageTask("http://someurl")
+        )
 
-        self.assertNotEqual(tasks.ImageTask('http://someurl'),
-                            tasks.ImageTask('http://someur'))
+        self.assertNotEqual(
+            tasks.ImageTask("http://someurl"), tasks.ImageTask("http://someur")
+        )
 
-        self.assertEqual(tasks.FetchImageTask('http://someurl', 'fake_uuid'),
-                         tasks.FetchImageTask('http://someurl', 'fake_uuid'))
+        self.assertEqual(
+            tasks.FetchImageTask("http://someurl", "fake_uuid"),
+            tasks.FetchImageTask("http://someurl", "fake_uuid"),
+        )
 
-        self.assertNotEqual(tasks.FetchImageTask('http://someurl'),
-                            tasks.FetchImageTask('http://someurl', 'fake_uuid'))
+        self.assertNotEqual(
+            tasks.FetchImageTask("http://someurl"),
+            tasks.FetchImageTask("http://someurl", "fake_uuid"),
+        )
 
-        self.assertNotEqual(tasks.FetchImageTask('http://someurl', 'fake_uuid'),
-                            tasks.FetchImageTask('http://someurl', 'fake_uudd'))
+        self.assertNotEqual(
+            tasks.FetchImageTask("http://someurl", "fake_uuid"),
+            tasks.FetchImageTask("http://someurl", "fake_uudd"),
+        )
 
-        self.assertNotEqual(tasks.FetchImageTask('http://someurl', 'fake_uuid'),
-                            tasks.FetchImageTask('http://someurm', 'fake_uuid'))
+        self.assertNotEqual(
+            tasks.FetchImageTask("http://someurl", "fake_uuid"),
+            tasks.FetchImageTask("http://someurm", "fake_uuid"),
+        )
 
 
 class InstanceTasksTestCase(test_shakenfist.ShakenFistTestCase):
     def test_InstanceTask(self):
-        i = tasks.InstanceTask('some-uuid')
-        self.assertEqual('some-uuid', i.instance_uuid())
+        i = tasks.InstanceTask("some-uuid")
+        self.assertEqual("some-uuid", i.instance_uuid())
 
         with testtools.ExpectedException(exceptions.NoInstanceTaskException):
             tasks.InstanceTask(None)
 
         with testtools.ExpectedException(exceptions.NoInstanceTaskException):
-            tasks.InstanceTask({'uuid': 'some-uuid'})
+            tasks.InstanceTask({"uuid": "some-uuid"})
 
         with testtools.ExpectedException(exceptions.NetworkNotListTaskException):
-            tasks.InstanceTask('uuid', 'not a list')
+            tasks.InstanceTask("uuid", "not a list")
 
     def test_ErrorInstanceTask(self):
-        self.assertIsNone(
-            tasks.ErrorInstanceTask('uuid', None).error_msg())
+        self.assertIsNone(tasks.ErrorInstanceTask("uuid", None).error_msg())
 
         self.assertEqual(
-            'broken',
-            tasks.ErrorInstanceTask('uuid', 'broken').error_msg())
+            "broken", tasks.ErrorInstanceTask("uuid", "broken").error_msg()
+        )
 
     def test_FetchImageTask(self):
         with testtools.ExpectedException(exceptions.NoURLImageFetchTaskException):
@@ -92,18 +117,18 @@ class InstanceTasksTestCase(test_shakenfist.ShakenFistTestCase):
 
 class NetworkTasksTestCase(test_shakenfist.ShakenFistTestCase):
     def test_NetworkTask(self):
-        n = tasks.NetworkTask('some-uuid')
-        self.assertEqual('some-uuid', n.network_uuid())
+        n = tasks.NetworkTask("some-uuid")
+        self.assertEqual("some-uuid", n.network_uuid())
 
         with testtools.ExpectedException(exceptions.NoNetworkTaskException):
             tasks.NetworkTask(None)
 
         with testtools.ExpectedException(exceptions.NoNetworkTaskException):
-            tasks.NetworkTask({'uuid': 'test-uuid'})
+            tasks.NetworkTask({"uuid": "test-uuid"})
 
     def test_DeployNetworkTask(self):
-        d = tasks.DeployNetworkTask('some-uuid')
+        d = tasks.DeployNetworkTask("some-uuid")
 
         # Test hashing via equality
-        self.assertEqual(d, tasks.DeployNetworkTask('some-uuid'))
-        self.assertNotEqual(d, tasks.DeployNetworkTask('diff-uuid'))
+        self.assertEqual(d, tasks.DeployNetworkTask("some-uuid"))
+        self.assertNotEqual(d, tasks.DeployNetworkTask("diff-uuid"))

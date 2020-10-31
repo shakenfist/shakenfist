@@ -16,31 +16,31 @@ LOG, _ = logutil.setup(__name__)
 
 def observe(path, instance_uuid):
     setproctitle.setproctitle(
-        '%s-%s' % (daemon.process_name('triggers'), instance_uuid))
-    regexps = {
-        'login prompt': ['^.* login: .*', re.compile('.* login: .*')]
-    }
+        "%s-%s" % (daemon.process_name("triggers"), instance_uuid)
+    )
+    regexps = {"login prompt": ["^.* login: .*", re.compile(".* login: .*")]}
 
     while not os.path.exists(path):
         time.sleep(1)
     fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
 
     log_ctx = LOG.withInstance(instance_uuid)
-    log_ctx.withField('path', path).info('Monitoring path for triggers')
-    db.add_event('instance', instance_uuid, 'trigger monitor',
-                 'detected console log', None, None)
+    log_ctx.withField("path", path).info("Monitoring path for triggers")
+    db.add_event(
+        "instance", instance_uuid, "trigger monitor", "detected console log", None, None
+    )
 
     # Sometimes the trigger process is slow to start, so rewind 4KB to ensure
     # that the last few log lines are not missed. (4KB since Cloud-Init can be
     # noisy after the login prompt.)
     os.lseek(fd, max(0, os.fstat(fd).st_size - 4096), os.SEEK_SET)
 
-    buffer = ''
+    buffer = ""
     while True:
-        d = os.read(fd, 1024).decode('utf-8', errors='ignore')
+        d = os.read(fd, 1024).decode("utf-8", errors="ignore")
         if d:
             buffer += d
-            lines = buffer.split('\n')
+            lines = buffer.split("\n")
             buffer = lines[-1]
 
             for line in lines:
@@ -48,10 +48,18 @@ def observe(path, instance_uuid):
                     for trigger in regexps:
                         m = regexps[trigger][1].match(line)
                         if m:
-                            log_ctx.withField('trigger', trigger,
-                                              ).info('Trigger matched')
-                            db.add_event('instance', instance_uuid, 'trigger',
-                                         None, None, trigger)
+                            log_ctx.withField(
+                                "trigger",
+                                trigger,
+                            ).info("Trigger matched")
+                            db.add_event(
+                                "instance",
+                                instance_uuid,
+                                "trigger",
+                                None,
+                                None,
+                                trigger,
+                            )
         else:
             # Only pause if there was no data to read
             time.sleep(1)
@@ -59,7 +67,7 @@ def observe(path, instance_uuid):
 
 class Monitor(daemon.Daemon):
     def run(self):
-        LOG.info('Starting Monitor Daemon')
+        LOG.info("Starting Monitor Daemon")
         observers = {}
 
         while True:
@@ -69,38 +77,53 @@ class Monitor(daemon.Daemon):
                 if not observers[instance_uuid].is_alive():
                     # Reap process
                     observers[instance_uuid].join(1)
-                    LOG.withInstance(instance_uuid
-                                     ).info('Trigger observer has terminated')
+                    LOG.withInstance(instance_uuid).info(
+                        "Trigger observer has terminated"
+                    )
                     db.add_event(
-                        'instance', instance_uuid, 'trigger monitor', 'crashed', None, None)
+                        "instance",
+                        instance_uuid,
+                        "trigger monitor",
+                        "crashed",
+                        None,
+                        None,
+                    )
                     del observers[instance_uuid]
 
             # Start missing observers
             extra_instances = list(observers.keys())
 
             for inst in db.get_instances(only_node=config.NODE_NAME):
-                if inst['uuid'] in extra_instances:
-                    extra_instances.remove(inst['uuid'])
+                if inst["uuid"] in extra_instances:
+                    extra_instances.remove(inst["uuid"])
 
-                if inst['state'] != 'created':
+                if inst["state"] != "created":
                     continue
 
-                if inst['uuid'] not in observers:
-                    console_path = os.path.join(config.get('STORAGE_PATH'),
-                                                'instances',
-                                                inst['uuid'],
-                                                'console.log')
+                if inst["uuid"] not in observers:
+                    console_path = os.path.join(
+                        config.get("STORAGE_PATH"),
+                        "instances",
+                        inst["uuid"],
+                        "console.log",
+                    )
                     p = multiprocessing.Process(
-                        target=observe, args=(console_path, inst['uuid']),
-                        name='%s-%s' % (daemon.process_name('triggers'),
-                                        inst['uuid']))
+                        target=observe,
+                        args=(console_path, inst["uuid"]),
+                        name="%s-%s" % (daemon.process_name("triggers"), inst["uuid"]),
+                    )
                     p.start()
 
-                    observers[inst['uuid']] = p
-                    LOG.withInstance(inst['uuid']).info(
-                        'Started trigger observer')
+                    observers[inst["uuid"]] = p
+                    LOG.withInstance(inst["uuid"]).info("Started trigger observer")
                     db.add_event(
-                        'instance', inst['uuid'], 'trigger monitor', 'started', None, None)
+                        "instance",
+                        inst["uuid"],
+                        "trigger monitor",
+                        "started",
+                        None,
+                        None,
+                    )
 
             # Cleanup extra observers
             for instance_uuid in extra_instances:
@@ -112,9 +135,9 @@ class Monitor(daemon.Daemon):
                     pass
 
                 del observers[instance_uuid]
-                LOG.withInstance(instance_uuid).info(
-                    'Finished trigger observer')
+                LOG.withInstance(instance_uuid).info("Finished trigger observer")
                 db.add_event(
-                    'instance', instance_uuid, 'trigger monitor', 'finished', None, None)
+                    "instance", instance_uuid, "trigger monitor", "finished", None, None
+                )
 
             time.sleep(1)

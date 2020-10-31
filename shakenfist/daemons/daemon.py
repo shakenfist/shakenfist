@@ -6,19 +6,19 @@ from shakenfist import logutil
 
 
 DAEMON_NAMES = {
-    'api': 'sf-api',
-    'cleaner': 'sf-cleaner',
-    'main': 'sf-main',
-    'net': 'sf-net',
-    'queues': 'sf-queues',
-    'resources': 'sf-resources',
-    'triggers': 'sf-triggers',
+    "api": "sf-api",
+    "cleaner": "sf-cleaner",
+    "main": "sf-main",
+    "net": "sf-net",
+    "queues": "sf-queues",
+    "resources": "sf-resources",
+    "triggers": "sf-triggers",
 }
 
 
 def process_name(name):
     if name not in DAEMON_NAMES:
-        raise Exception('Code Error: Bad process name: %s' % name)
+        raise Exception("Code Error: Bad process name: %s" % name)
     return DAEMON_NAMES[name]
 
 
@@ -27,11 +27,11 @@ def set_log_level(log, name):
     process_name(name)
 
     # Check for configuration override
-    level = config.get('LOGLEVEL_' + name.upper())
+    level = config.get("LOGLEVEL_" + name.upper())
     if level:
         numeric_level = getattr(logging, level.upper(), None)
         if not isinstance(numeric_level, int):
-            raise ValueError('Invalid log level: %s' % level)
+            raise ValueError("Invalid log level: %s" % level)
     else:
         numeric_level = logging.INFO
 

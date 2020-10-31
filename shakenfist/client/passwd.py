@@ -12,19 +12,15 @@ from shakenfist import db
 
 
 def main():
-    print('Creating key %s' % sys.argv[1])
+    print("Creating key %s" % sys.argv[1])
 
-    encoded = str(base64.b64encode(bcrypt.hashpw(
-        sys.argv[2].encode('utf-8'), bcrypt.gensalt())), 'utf-8')
+    encoded = str(
+        base64.b64encode(bcrypt.hashpw(sys.argv[2].encode("utf-8"), bcrypt.gensalt())),
+        "utf-8",
+    )
 
-    db.persist_namespace('system',
-                         {
-                             'name': 'system',
-                             'keys': {
-                                 sys.argv[1]: encoded
-                             }
-                         })
+    db.persist_namespace("system", {"name": "system", "keys": {sys.argv[1]: encoded}})
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -16,29 +16,31 @@ def clean_events_mesh_operations(etcd_client):
     # can return at one time.
 
     # Save time and use the already available etcdctl client.
-    net_keys, stderr = util.execute(None,
-                                    'etcdctl get --prefix /sf/event/network/ | grep sf/event',
-                                    check_exit_code=[0, 1])
+    net_keys, stderr = util.execute(
+        None,
+        "etcdctl get --prefix /sf/event/network/ | grep sf/event",
+        check_exit_code=[0, 1],
+    )
     if stderr:
-        print('ERROR: Unable to retrieve network keys:%s' % stderr)
+        print("ERROR: Unable to retrieve network keys:%s" % stderr)
         return
 
     # Split network events into networks
     network_events = {}
-    for key in net_keys.split('\n'):
+    for key in net_keys.split("\n"):
         if not key:
             continue
-        _blank, _sf, _event, _network, uuid, _time = key.split('/')
+        _blank, _sf, _event, _network, uuid, _time = key.split("/")
         network_events.setdefault(uuid, []).append(key)
 
     # Delete all but last 50 events
     count = 0
     for keys in network_events.values():
         for k in keys[:-50]:
-            print('--> Removing verbose network event %s' % k)
+            print("--> Removing verbose network event %s" % k)
             etcd_client.delete(k)
             count += 1
-    print(' - Cleaned up %d old network mesh events' % count)
+    print(" - Cleaned up %d old network mesh events" % count)
 
 
 def main():
@@ -46,24 +48,24 @@ def main():
 
     versions = {}
     for node in db.get_nodes():
-        versions.setdefault(node.get('version', 'unknown'), 0)
-        versions[node.get('version', 'unknown')] += 1
+        versions.setdefault(node.get("version", "unknown"), 0)
+        versions[node.get("version", "unknown")] += 1
 
-    print('Deployed versions:')
+    print("Deployed versions:")
     for version in sorted(versions):
-        print(' - %s: %s' % (version, versions[version]))
+        print(" - %s: %s" % (version, versions[version]))
     print()
 
     min_version = None
     if not versions:
-        min_version = '0.2'
-    elif 'unknown' in versions:
-        min_version = '0.2'
+        min_version = "0.2"
+    elif "unknown" in versions:
+        min_version = "0.2"
     else:
         min_version = sorted(versions)[0]
-    print('Minimum version is %s' % min_version)
+    print("Minimum version is %s" % min_version)
 
-    elems = min_version.split('.')
+    elems = min_version.split(".")
     major = int(elems[0])
     minor = int(elems[1])
 
@@ -72,5 +74,5 @@ def main():
             clean_events_mesh_operations(etcd_client)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

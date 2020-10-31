@@ -13,9 +13,8 @@ from shakenfist.configuration import config
 
 # These classes are extensions of the work in https://github.com/vmig/pylogrus
 class SFPyLogrus(logging.Logger, PyLogrusBase):
-
     def __init__(self, *args, **kwargs):
-        extra = kwargs.pop('extra', None)
+        extra = kwargs.pop("extra", None)
         self._extra_fields = extra or {}
         super(SFPyLogrus, self).__init__(*args, **kwargs)
 
@@ -37,7 +36,7 @@ class SFPyLogrus(logging.Logger, PyLogrusBase):
         try:
             label, value = object.unique_label()
         except Exception as e:
-            raise Exception('Bad object - no unique_label() function: %s' % e)
+            raise Exception("Bad object - no unique_label() function: %s" % e)
         return SFCustomAdapter(self, {label: value})
 
     #
@@ -46,27 +45,26 @@ class SFPyLogrus(logging.Logger, PyLogrusBase):
     #
     def withInstance(self, inst):
         if not isinstance(inst, str):
-            inst = inst.db_entry['uuid']
-        return SFCustomAdapter(self, {'instance': inst})
+            inst = inst.db_entry["uuid"]
+        return SFCustomAdapter(self, {"instance": inst})
 
     def withNetwork(self, inst):
         if not isinstance(inst, str):
             inst = inst.uuid
-        return SFCustomAdapter(self, {'network': inst})
+        return SFCustomAdapter(self, {"network": inst})
 
     def withNetworkInterface(self, inst):
         if not isinstance(inst, str):
             inst = inst.uuid
-        return SFCustomAdapter(self, {'networkinterface': inst})
+        return SFCustomAdapter(self, {"networkinterface": inst})
 
     def withImage(self, inst):
         if not isinstance(inst, str):
             inst = inst.unique_ref
-        return SFCustomAdapter(self, {'image': inst})
+        return SFCustomAdapter(self, {"image": inst})
 
 
 class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
-
     def __init__(self, logger, extra=None, prefix=None):
         """Logger modifier.
 
@@ -81,11 +79,16 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
         self._extra = self._normalize(extra)
         self._prefix = prefix
         super(SFCustomAdapter, self).__init__(
-            self._logger, {'extra_fields': self._extra, 'prefix': self._prefix})
+            self._logger, {"extra_fields": self._extra, "prefix": self._prefix}
+        )
 
     @staticmethod
     def _normalize(fields):
-        return {k.lower(): v for k, v in fields.items()} if isinstance(fields, dict) else {}
+        return (
+            {k.lower(): v for k, v in fields.items()}
+            if isinstance(fields, dict)
+            else {}
+        )
 
     def withFields(self, fields=None):
         extra = copy.deepcopy(self._extra)
@@ -98,24 +101,30 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
         return SFCustomAdapter(self._logger, extra, self._prefix)
 
     def withPrefix(self, prefix=None):
-        return self if prefix is None else SFCustomAdapter(self._logger, self._extra, prefix)
+        return (
+            self
+            if prefix is None
+            else SFCustomAdapter(self._logger, self._extra, prefix)
+        )
 
-    FILENAME_RE = re.compile('.*/dist-packages/shakenfist/(.*)')
+    FILENAME_RE = re.compile(".*/dist-packages/shakenfist/(.*)")
 
     def process(self, msg, kwargs):
-        msg = '%s[%s] %s' % (setproctitle.getproctitle(), os.getpid(), msg)
+        msg = "%s[%s] %s" % (setproctitle.getproctitle(), os.getpid(), msg)
         kwargs["extra"] = self.extra
 
-        if config.get('LOG_METHOD_TRACE'):
+        if config.get("LOG_METHOD_TRACE"):
             # Determine the name of the calling method
             filename = traceback.extract_stack()[-4].filename
             f_match = self.FILENAME_RE.match(filename)
             if f_match:
                 filename = f_match.group(1)
-            caller = '%s:%s:%s()' % (filename,
-                                     traceback.extract_stack()[-4].lineno,
-                                     traceback.extract_stack()[-4].name)
-            self._extra['method'] = caller
+            caller = "%s:%s:%s()" % (
+                filename,
+                traceback.extract_stack()[-4].lineno,
+                traceback.extract_stack()[-4].name,
+            )
+            self._extra["method"] = caller
 
         return msg, kwargs
 
@@ -128,8 +137,7 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
             try:
                 label, value = object.unique_label()
             except Exception as e:
-                raise Exception(
-                    'Bad object - no unique_label() function: %s' % e)
+                raise Exception("Bad object - no unique_label() function: %s" % e)
             extra.update({label: value})
         return SFCustomAdapter(self._logger, extra, self._prefix)
 
@@ -140,29 +148,29 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
     def withInstance(self, inst):
         extra = copy.deepcopy(self._extra)
         if not isinstance(inst, str):
-            inst = inst.db_entry['uuid']
-        extra.update({'instance': inst})
+            inst = inst.db_entry["uuid"]
+        extra.update({"instance": inst})
         return SFCustomAdapter(self._logger, extra, self._prefix)
 
     def withNetwork(self, inst):
         extra = copy.deepcopy(self._extra)
         if not isinstance(inst, str):
             inst = inst.uuid
-        extra.update({'network': inst})
+        extra.update({"network": inst})
         return SFCustomAdapter(self._logger, extra, self._prefix)
 
     def withNetworkInterface(self, inst):
         extra = copy.deepcopy(self._extra)
         if not isinstance(inst, str):
             inst = inst.uuid
-        extra.update({'networkinterface': inst})
+        extra.update({"networkinterface": inst})
         return SFCustomAdapter(self._logger, extra, self._prefix)
 
     def withImage(self, inst):
         extra = copy.deepcopy(self._extra)
         if not isinstance(inst, str):
             inst = inst.unique_ref
-        extra.update({'image': inst})
+        extra.update({"image": inst})
         return SFCustomAdapter(self._logger, extra, self._prefix)
 
 
@@ -182,9 +190,10 @@ def setup(name):
             handler = log.handlers[0]
     else:
         # Add our handler
-        handler = logging_handlers.SysLogHandler(address='/dev/log')
-        handler.setFormatter(TextFormatter(
-            fmt='%(levelname)s %(message)s', colorize=False))
+        handler = logging_handlers.SysLogHandler(address="/dev/log")
+        handler.setFormatter(
+            TextFormatter(fmt="%(levelname)s %(message)s", colorize=False)
+        )
         log.addHandler(handler)
 
     return log.withPrefix(), handler
