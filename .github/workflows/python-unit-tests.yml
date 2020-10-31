@@ -31,7 +31,8 @@ jobs:
       - name: Lint with flake8
         run: |
           tox -eflake8
-          
+      - uses: psf/black@stable
+
   build37:
     runs-on: ubuntu-latest
 
