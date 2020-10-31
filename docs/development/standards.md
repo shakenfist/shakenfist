@@ -18,3 +18,11 @@ Gigabytes can be too big if you want a lot of small machines. Kilobytes is just 
 
 ### Interactions
 The ```libvirt``` API measures memory in KiB. Therefore, interactions with the library need to be careful to convert from MiB to KiB.
+
+### Git Hooks
+
+Shakenfist uses `pre-commit` for git hooks. To set it up:
+- Install required packages with `pip install -r requirements.txt`
+- Install the hooks with `pre-commit install`
+
+This will ensure lint changed code at time of commit.
