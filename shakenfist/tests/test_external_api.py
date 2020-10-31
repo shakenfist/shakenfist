@@ -7,7 +7,6 @@ import mock
 from shakenfist.configuration import config
 from shakenfist.external_api import app as external_api
 from shakenfist import ipmanager
-from shakenfist import net
 from shakenfist.tests import test_shakenfist
 
 
@@ -969,6 +968,11 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
         # by stestr.
         self.addCleanup(self.config.stop)
 
+    @mock.patch('shakenfist.db.get_network',
+                return_value={
+                    'uuid': '30f6da44-look-i-am-uuid',
+                    'state': 'created',
+                    })
     @mock.patch('shakenfist.db.get_networks',
                 return_value=[{
                     'floating_gateway': '10.10.0.150',
@@ -992,12 +996,8 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
                                  mock_remove_dhcp,
                                  mock_get_ipmanager,
                                  mock_db_get_network_interfaces,
-                                 mock_db_get_networks):
-
-        mock_network = mock.patch('shakenfist.net.from_db',
-                                  return_value=net.Network({'uuid': 'foo'}))
-        mock_network.start()
-        self.addCleanup(mock_network.stop)
+                                 mock_db_get_networks,
+                                 mock_db_get_network):
 
         resp = self.client.delete('/networks',
                                   headers={'Authorization': self.auth_header},
@@ -1008,8 +1008,6 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
         self.assertEqual(['30f6da44-look-i-am-uuid'],
                          resp.get_json())
         self.assertEqual(200, resp.status_code)
-
-        mock_network.stop()
 
     @mock.patch('shakenfist.db.get_networks',
                 return_value=[{

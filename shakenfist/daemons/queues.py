@@ -204,13 +204,12 @@ def instance_preflight(instance_uuid, network):
 
 
 def instance_start(instance_uuid, network):
+    log = LOG.withField('instance', instance_uuid)
+
     with db.get_lock(
             'instance', None, instance_uuid, ttl=900, timeout=120,
             op='Instance start') as lock:
         instance = virt.from_db(instance_uuid)
-
-        # Allocate console and VDI ports
-        instance.allocate_instance_ports()
 
         # Collect the networks
         nets = {}
@@ -227,9 +226,19 @@ def instance_start(instance_uuid, network):
         with util.RecordedOperation('ensure networks exist', instance):
             for network_uuid in nets:
                 n = nets[network_uuid]
-                n.create()
-                n.ensure_mesh()
-                n.update_dhcp()
+                try:
+                    n.create()
+                    n.ensure_mesh()
+                    n.update_dhcp()
+                except exceptions.DeadNetwork as e:
+                    log.withField('network', n).warning(
+                        'Instance tried to use dead network')
+                    db.enqueue_instance_error(
+                        instance_uuid, 'tried to use dead network: %s' % e)
+                    return
+
+        # Allocate console and VDI ports
+        instance.allocate_instance_ports()
 
         # Now we can start the instance
         libvirt = util.get_libvirt()

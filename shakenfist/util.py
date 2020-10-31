@@ -182,7 +182,7 @@ def extract_power_state(libvirt, domain):
                  libvirt.VIR_DOMAIN_PMSUSPENDED]:
         return 'paused'
 
-    # Covers all "runnning states": BLOCKED, NOSTATE,
+    # Covers all "running states": BLOCKED, NOSTATE,
     # RUNNING, SHUTDOWN
     return 'on'
 

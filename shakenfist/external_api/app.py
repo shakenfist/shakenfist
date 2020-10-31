@@ -71,8 +71,7 @@ def error(status_code, message):
     resp = flask.Response(json.dumps(body),
                           mimetype='application/json')
     resp.status_code = status_code
-    LOG.error('Returning API error: %d, %s\n    %s'
-              % (status_code, message, '\n    '.join(body.get('traceback', '').split('\n'))))
+    LOG.info('Returning API error: %d, %s' % (status_code, message))
     return resp
 
 
@@ -141,6 +140,7 @@ def generic_wrapper(func):
             return error(401, str(e))
 
         except Exception as e:
+            LOG.exception('Server error')
             return error(500, 'server error: %s' % repr(e))
 
     return wrapper
@@ -444,11 +444,12 @@ class AuthNamespace(Resource):
             return error(400, 'you cannot delete a namespace with instances')
 
         networks = []
-        deleted_networks = []
         for n in db.get_networks(all=True, namespace=namespace):
-            if n['state'] in ['deleted', 'error']:
-                deleted_networks.append(n['uuid'])
-            else:
+            # Networks in 'deleting' state are regarded as "live" networks.
+            # They in a transient state. If they hang in that state we want to
+            # know. They will block deletion of a namespace thus giving notice
+            # of the problem.
+            if n['state'] not in ['deleted', 'error']:
                 networks.append(n['uuid'])
         if len(networks) > 0:
             return error(400, 'you cannot delete a namespace with networks')
@@ -1121,20 +1122,33 @@ class ImageEvents(Resource):
 
 
 def _delete_network(network_from_db):
-    network_uuid = network_from_db['uuid']
-    db.add_event('network', network_uuid, 'api', 'delete', None, None)
+    # Load network from DB to ensure obtaining correct lock.
+    n = net.from_db(network_from_db['uuid'])
 
-    n = net.from_db(network_uuid)
+    with db.get_object_lock(n, ttl=120, op='Network deleting'):
+        # Inefficiently reload from DB to ensure nothing changed while waiting
+        # for the lock.
+        n = net.from_db(network_from_db['uuid'])
+        if not n or n.is_dead():
+            LOG.withFields({'network_uuid': n.db_entry['uuid'],
+                            'state': n.db_entry['state']}).warning(
+                                'delete_network: network does not exist')
+            return error(404, 'network is deleted')
+        db.update_network_state(n.db_entry['uuid'], 'deleting')
+
+    db.add_event('network', n.db_entry['uuid'], 'api', 'delete', None, None)
+
     n.remove_dhcp()
     n.delete()
 
     if n.db_entry.get('floating_gateway'):
-        with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Network delete'):
+        with db.get_lock(
+                'ipmanager', None, 'floating', ttl=120, op='Network delete'):
             ipm = db.get_ipmanager('floating')
             ipm.release(n.db_entry['floating_gateway'])
             db.persist_ipmanager('floating', ipm.save())
 
-    db.update_network_state(network_uuid, 'deleted')
+    db.update_network_state(n.db_entry['uuid'], 'deleted')
 
 
 class Network(Resource):
@@ -1162,7 +1176,7 @@ class Network(Resource):
         if network_from_db['state'] in 'deleted':
             return error(404, 'network not found')
 
-        _delete_network(network_from_db)
+        return _delete_network(network_from_db)
 
 
 class Networks(Resource):
@@ -1192,8 +1206,9 @@ class Networks(Resource):
 
         # If accessing a foreign name namespace, we need to be an admin
         if get_jwt_identity() not in [namespace, 'system']:
-            return error(401,
-                         'only admins can create resources in a different namespace')
+            return error(
+                401,
+                'only admins can create resources in a different namespace')
 
         network = db.allocate_network(netblock, provide_dhcp,
                                       provide_nat, name, namespace)
