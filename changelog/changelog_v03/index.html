@@ -13,7 +13,7 @@
       
       
       <link rel="shortcut icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.1.2, mkdocs-material-6.1.0">
+      <meta name="generator" content="mkdocs-1.1.2, mkdocs-material-6.1.2">
     
     
       
@@ -21,10 +21,10 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.bc7e593a.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.19190aaf.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab28b872.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.24b84193.min.css">
         
       
     
@@ -547,14 +547,24 @@
 <p>We also realised somewhere late in v0.2's life that the etcd library we were using was pretty buggy. Locking simply didn't work some of the time. Additionally, our locking code was pretty ad hoc and sometimes we would get the names of the locks wrong because they were just strings. This has now been completely re-written, but that has shaken out a number of bugs that are surfaced by locking actually working now. We have worked through those bugs and sought to resolve them.</p>
 </li>
 </ul>
+<h1 id="changes-between-v031-and-v032">Changes between v0.3.1 and v0.3.2</h1>
+<p>v0.3.2 was released on 29 October 2020.</p>
+<ul>
+<li>Networking shake down as we work towards CI reliably passing. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/435" title="GitHub Issue: shakenfist/shakenfist#435">shakenfist#435</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/438" title="GitHub Issue: shakenfist/shakenfist#438">shakenfist#438</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/469" title="GitHub Issue: shakenfist/shakenfist#469">shakenfist#469</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/477" title="GitHub Issue: shakenfist/shakenfist#477">shakenfist#477</a></li>
+<li>Images improvements including moving towards cluster wide image management. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/440" title="GitHub Issue: shakenfist/shakenfist#440">shakenfist#440</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/442" title="GitHub Issue: shakenfist/shakenfist#442">shakenfist#442</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/451" title="GitHub Issue: shakenfist/shakenfist#451">shakenfist#451</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/453" title="GitHub Issue: shakenfist/shakenfist#453">shakenfist#453</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/460" title="GitHub Issue: shakenfist/shakenfist#460">shakenfist#460</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/465" title="GitHub Issue: shakenfist/shakenfist#465">shakenfist#465</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/472" title="GitHub Issue: shakenfist/shakenfist#472">shakenfist#472</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/481" title="GitHub Issue: shakenfist/shakenfist#481">shakenfist#481</a></li>
+<li>Admins can now list locks that Shaken Fist is holding and locks include a description of the operation being undertaken. Reduce the number of locks we hold to reduce etcd load. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/444" title="GitHub Issue: shakenfist/shakenfist#444">shakenfist#444</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/449" title="GitHub Issue: shakenfist/shakenfist#449">shakenfist#449</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/455" title="GitHub Issue: shakenfist/shakenfist#455">shakenfist#455</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/463" title="GitHub Issue: shakenfist/shakenfist#463">shakenfist#463</a></li>
+<li>Cleanup trigger daemon defunct processes. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/446" title="GitHub Issue: shakenfist/shakenfist#446">shakenfist#446</a></li>
+<li>Deployments were broken if you specified a local prometheus snippet. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/456" title="GitHub Issue: shakenfist/shakenfist#456">shakenfist#456</a></li>
+<li>Console and VDI ports were being checked for availability on the API node not the hypervisor node. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/487" title="GitHub Issue: shakenfist/shakenfist#487">shakenfist#487</a></li>
+</ul>
 <h1 id="changes-between-v030-and-v031">Changes between v0.3.0 and v0.3.1</h1>
 <p>v0.3.1 was released on 21 October 2020.</p>
 <ul>
-<li>Reject power on while powering off. shakenfist/394</li>
-<li>Always use locally administered MAC addresses. shakenfist/409</li>
-<li>Fix unintentionally ignored exceptions. shakenfist/410</li>
-<li>Image downloads should verify checksums where possible. shakenfist/412</li>
-<li>Improved CI reliability. shakenfist/416, shakenfist/418, shakenfist/419, shakenfist/420, shakenfist/426, shakenfist/428</li>
+<li>Reject power on while powering off. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/394" title="GitHub Issue: shakenfist/shakenfist#394">shakenfist#394</a></li>
+<li>Always use locally administered MAC addresses. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/409" title="GitHub Issue: shakenfist/shakenfist#409">shakenfist#409</a></li>
+<li>Fix unintentionally ignored exceptions. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/410" title="GitHub Issue: shakenfist/shakenfist#410">shakenfist#410</a></li>
+<li>Image downloads should verify checksums where possible. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/412" title="GitHub Issue: shakenfist/shakenfist#412">shakenfist#412</a></li>
+<li>Improved CI reliability. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/416" title="GitHub Issue: shakenfist/shakenfist#416">shakenfist#416</a>, shakenfist3418, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/419" title="GitHub Issue: shakenfist/shakenfist#419">shakenfist#419</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/420" title="GitHub Issue: shakenfist/shakenfist#420">shakenfist#420</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/426" title="GitHub Issue: shakenfist/shakenfist#426">shakenfist#426</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/428" title="GitHub Issue: shakenfist/shakenfist#428">shakenfist#428</a></li>
 </ul>
                 
               
@@ -622,8 +632,8 @@
       
     </div>
     
-      <script src="../../assets/javascripts/vendor.6a3d08fc.min.js"></script>
-      <script src="../../assets/javascripts/bundle.71201edf.min.js"></script><script id="__lang" type="application/json">{"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing"}</script>
+      <script src="../../assets/javascripts/vendor.7e0ee788.min.js"></script>
+      <script src="../../assets/javascripts/bundle.c1ccee15.min.js"></script><script id="__lang" type="application/json">{"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing"}</script>
       
       <script>
         app = initialize({
