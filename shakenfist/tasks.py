@@ -20,7 +20,9 @@ class QueueTask(object):
 
     def __repr__(self):
         # All subclasses define json_dump()
-        return 'QUEUETASK:' + self.name() + ': ' + str(self.json_dump())
+        r = 'QueueTask:' + self.__class__.__name__ + ': '
+        r += str(self.json_dump())
+        return r
 
     def __eq__(self, other):
         if not QueueTask.__subclasscheck__(type(other)):
