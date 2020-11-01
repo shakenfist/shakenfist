@@ -20,13 +20,20 @@ LOG, _ = logutil.setup(__name__)
 
 
 def from_db(uuid):
-    dbnet = db.get_network(uuid)
-    if not dbnet:
-        return None
-    if dbnet['state'] in ('deleted', 'deleting'):
-        LOG.withNetwork(uuid).info('Network is deleted, returning None.')
-        return None
-    return Network(dbnet)
+    # TODO(andy): The whole system of unlocked in-memory objects needs to be
+    # revisited. This lock avoids the network being deleted between the DB load
+    # in the get_network() call and Network.__init__() loading the IPManager
+    # from the DB. Under extreme load testing, instance starts on the same
+    # network will have multi-second start delays due to lock contention .
+    with db.get_lock('network', None, uuid,
+                     ttl=10, timeout=120, op='Object load from DB'):
+        dbnet = db.get_network(uuid)
+        if not dbnet:
+            return None
+        if dbnet['state'] in ('deleted', 'deleting'):
+            LOG.withNetwork(uuid).info('Network is deleted, returning None.')
+            return None
+        return Network(dbnet)
 
 
 class Network(object):

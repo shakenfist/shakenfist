@@ -1126,9 +1126,6 @@ def _delete_network(network_from_db):
     n = net.from_db(network_from_db['uuid'])
 
     with db.get_object_lock(n, ttl=120, op='Network deleting'):
-        # Inefficiently reload from DB to ensure nothing changed while waiting
-        # for the lock.
-        n = net.from_db(network_from_db['uuid'])
         if not n or n.is_dead():
             LOG.withFields({'network_uuid': n.db_entry['uuid'],
                             'state': n.db_entry['state']}).warning(
