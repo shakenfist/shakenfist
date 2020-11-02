@@ -106,10 +106,11 @@ class BaseTestCase(testtools.TestCase):
 
     def _await_instance_event(
             self, instance_uuid, operation, message=None, after=None):
-        # Wait up to two minutes for the instance to be created.
+        # Wait up to 5 minutes for the instance to be created. On a slow
+        # morning it can take over 2 minutes to download a Ubuntu image.
         start_time = time.time()
         final = False
-        while time.time() - start_time < 120:
+        while time.time() - start_time < 300:
             i = self.system_client.get_instance(instance_uuid)
             if i['state'] in ['created', 'error']:
                 final = True
