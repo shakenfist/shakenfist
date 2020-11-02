@@ -90,11 +90,25 @@ pipeline {
               pip list
 
               echo "=============================="
-              cat /var/log/syslog'''
+              cat /var/log/syslog
+
+              echo "=============================="
+              etcdctl get --prefix /sf
+              '''
       }
     failure {
       sh '''  echo "Sleep for a long time in case we are debugging"
-              sleep 3600
+              echo "Create /keepme to extend the reboot time - up to 12 hours"
+              x=12
+              while [ $x -gt 0 ]
+              do
+                  echo Sleeping...
+                  sleep 3600
+                  x=$(( $x - 1 ))
+                  if [ ! -f /keep ]; then
+                      x=0
+                  fi
+              done
               '''
       }
     }
