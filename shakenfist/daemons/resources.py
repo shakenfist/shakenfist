@@ -96,10 +96,12 @@ def _get_stats():
     for guest in conn.listAllDomains():
         try:
             active = guest.isActive() == 1
-        except Exception:
-            active = False
+            if active:
+                _, maxmem, mem, cpus, cpu_time = guest.info()
 
-        _, maxmem, mem, cpus, cpu_time = guest.info()
+        except libvirt.libvirtError as e:
+            LOG.debug('During resource calc ignored libvirt error: %s' % e)
+            active = False
 
         if active:
             total_instances += 1
