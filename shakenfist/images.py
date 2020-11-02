@@ -117,25 +117,19 @@ class Image(object):
                                   metadata)
 
     def get(self, locks, related_object):
-        """Wrap some lock retries around the get."""
+        """Wrap three retries around the image get.
 
-        # NOTE(mikal): this deliberately retries the lock for a long time
-        # because the other option is failing instance start and fetching
-        # an image can take an extremely long time. This still means that
-        # for very large images you should probably pre-cache before
-        # attempting a start.
-        exc = None
-        for _ in range(30):
-            db.refresh_locks(locks)
-
+        The Image must be locked before calling this function. During the
+        download, the locks will be refreshed. Any lock error should abort the
+        get, since the lock will have been lost.
+        """
+        for _ in range(3):
             try:
                 return self._get(locks, related_object)
-            except exceptions.LockException as e:
-                time.sleep(10)
+            except exceptions.BadCheckSum as e:
+                LOG.warning('Bad checksum while downloading image: %s' % e)
                 exc = e
-
-        raise exceptions.LockException(
-            'Failed to acquire image fetch lock after retries: %s' % exc)
+        raise exc
 
     def version_image_path(self):
         return '%s.v%03d' % (self.image_path, self.file_version)
@@ -161,6 +155,11 @@ class Image(object):
                 # Ensure checksum is correct
                 if not self.correct_checksum(actual_image):
                     raise exceptions.BadCheckSum('url=%s' % self.url)
+
+                # Only persist values after the file has been verified.
+                # Otherwise diff_field will not trigger a new download in the
+                # case of a checksum verification failure.
+                self.persist()
 
         _transcode(locks, actual_image, related_object)
 
@@ -205,10 +204,8 @@ class Image(object):
                     db.refresh_locks(locks)
                     last_refresh = time.time()
 
-        if fetched > 0:
-            self.persist()
-            LOG.withImage(self).withField('bytes_fetched',
-                                          fetched).info('Fetch complete')
+        LOG.withImage(self).withField('bytes_fetched',
+                                      fetched).info('Fetch complete')
 
         # Check if decompression not required
         fn = self.version_image_path()
@@ -232,10 +229,10 @@ class Image(object):
         with open(image_name, 'rb') as f:
             for byte_block in iter(lambda: f.read(4096), b''):
                 md5_hash.update(byte_block)
-        log.withField(
-            'checksum', md5_hash.hexdigest()).debug('Calc from image download')
+        calc = md5_hash.hexdigest()
+        log.withField('calc', calc).debug('Calc from image download')
 
-        correct = md5_hash.hexdigest() == self.checksum
+        correct = calc == self.checksum
         log.withField('correct', correct).info('Image checksum verification')
         return correct
 
