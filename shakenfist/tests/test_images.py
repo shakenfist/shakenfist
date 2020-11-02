@@ -9,7 +9,7 @@ from shakenfist import images
 from shakenfist import image_resolver_cirros
 from shakenfist import image_resolver_ubuntu
 from shakenfist.tests import test_shakenfist
-from shakenfist.configuration import SFConfigBase
+from shakenfist.config import SFConfigBase
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -100,8 +100,7 @@ class ImageResolversTestCase(test_shakenfist.ShakenFistTestCase):
 
         fake_config = FakeConfig()
 
-        self.config = mock.patch('shakenfist.configuration.config',
-                                 fake_config)
+        self.config = mock.patch('shakenfist.config.config', fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 

@@ -30,7 +30,7 @@ import time
 import traceback
 import uuid
 
-from shakenfist.configuration import config
+from shakenfist.config import config
 from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import logutil

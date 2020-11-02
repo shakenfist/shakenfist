@@ -4,7 +4,7 @@ import os
 import random
 import time
 
-from shakenfist.configuration import config
+from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import logutil

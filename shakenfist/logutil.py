@@ -8,7 +8,7 @@ import re
 import setproctitle
 import traceback
 
-from shakenfist.configuration import config
+from shakenfist.config import config
 
 
 # These classes are extensions of the work in https://github.com/vmig/pylogrus

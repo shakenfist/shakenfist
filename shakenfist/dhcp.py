@@ -6,7 +6,7 @@ import psutil
 import shutil
 import signal
 
-from shakenfist.configuration import config
+from shakenfist.config import config
 from shakenfist import db
 from shakenfist import util
 

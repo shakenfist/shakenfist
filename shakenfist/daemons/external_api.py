@@ -1,6 +1,6 @@
 import os
 
-from shakenfist.configuration import config
+from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import logutil
 from shakenfist import util

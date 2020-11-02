@@ -1,7 +1,7 @@
 import logging
 import setproctitle
 
-from shakenfist.configuration import config
+from shakenfist.config import config
 from shakenfist import logutil
 
 

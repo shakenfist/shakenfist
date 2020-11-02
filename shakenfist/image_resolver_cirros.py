@@ -1,7 +1,7 @@
 import re
 import requests
 
-from shakenfist.configuration import config
+from shakenfist.config import config
 from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist import util

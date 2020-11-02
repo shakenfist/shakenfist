@@ -4,7 +4,7 @@ import json
 import mock
 
 
-from shakenfist.configuration import config, SFConfigBase
+from shakenfist.config import config, SFConfigBase
 from shakenfist.external_api import app as external_api
 from shakenfist import ipmanager
 from shakenfist.tests import test_shakenfist
@@ -685,8 +685,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
 
         fake_config = FakeConfig()
 
-        self.config = mock.patch('shakenfist.configuration.config',
-                                 fake_config)
+        self.config = mock.patch('shakenfist.config.config', fake_config)
         self.mock_config = self.config.start()
 
         self.addCleanup(self.config.stop)
@@ -954,11 +953,11 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
             NODE_EGRESS_NIC: str = 'eth0'
 
         fake_config_network = FakeConfig()
-        self.config = mock.patch('shakenfist.configuration.config',
+        self.config = mock.patch('shakenfist.config.config',
                                  fake_config_network)
         self.mock_config = self.config.start()
         # Without this cleanup, other test classes will have
-        # 'shakenfist.configuration.config.get' mocked during parallel testing
+        # 'shakenfist.config.config.get' mocked during parallel testing
         # by stestr.
         self.addCleanup(self.config.stop)
 

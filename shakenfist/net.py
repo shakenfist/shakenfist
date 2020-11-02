@@ -5,7 +5,7 @@ import psutil
 import re
 
 
-from shakenfist.configuration import config
+from shakenfist.config import config
 from shakenfist import db
 from shakenfist import dhcp
 from shakenfist.exceptions import DeadNetwork

@@ -5,7 +5,7 @@ from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist import tasks
-from shakenfist.configuration import SFConfigBase
+from shakenfist.config import SFConfigBase
 from shakenfist.tests import test_shakenfist
 
 LOG, _ = logutil.setup(__name__)

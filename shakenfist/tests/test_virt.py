@@ -7,7 +7,7 @@ import tempfile
 
 from shakenfist import ipmanager
 from shakenfist import virt
-from shakenfist.configuration import SFConfig
+from shakenfist.config import SFConfig
 from shakenfist.tests import test_shakenfist
 
 
