@@ -73,6 +73,7 @@ def resolve(name):
             break
     if not checksum_url:
         log.warning('Did not find checksum')
+    checksum = checksum.strip()
 
     log.withField('checksum', checksum).info('Checksum check')
     return (url, checksum)
