@@ -1,0 +1,41 @@
+- name: Install glusterfs dependencies
+  apt:
+    name:
+      [
+        "glusterfs-server",
+        "libvirt-daemon-driver-storage-gluster",
+        "qemu-block-extra",
+      ]
+    state: latest
+
+- name: Write glusterd volume configuration
+  copy:
+    src: files/glusterd.vol
+    dest: /etc/glusterfs/glusterd.vol
+    owner: root
+    mode: u=r,g=r,o=r
+
+- name: Restart glusterd
+  service:
+    name: glusterd
+    enabled: yes
+    state: restarted
+
+- name: Create glusterfs storage directory
+  file:
+    path: /srv/glusterfs
+    state: directory
+    mode: "0755"
+
+- name: Add gluster permissions to apparmor
+  copy:
+    src: files/usr.lib.libvirt.virt-aa-helper
+    dest: /etc/apparmor.d/local/usr.lib.libvirt.virt-aa-helper
+    owner: root
+    mode: u=r,g=r,o=r
+
+- name: Restart apparmor
+  service:
+    name: apparmor
+    enabled: yes
+    state: restarted

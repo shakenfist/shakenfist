@@ -71,6 +71,8 @@ class FakeConfig(SFConfigBase):
         'https://cloud-images.ubuntu.com/%(vername)s/current/'
         '%(vername)s-server-cloudimg-amd64.img')
 
+    GLUSTER_ENABLED = False
+
 
 fake_config = FakeConfig()
 
@@ -270,7 +272,7 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
             'node': 'bod',
             'version': 1,
             'url': 'a'
-            })
+        })
         i.state = 'initial'
         with testtools.ExpectedException(exceptions.InvalidStateException):
             i.state = 'created'
@@ -908,7 +910,7 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
                     {'value': 'error', 'update_time': 123},
                     {'value': 'error', 'update_time': 123},
                     {'value': 'error', 'update_time': 123},
-                    ])
+                ])
     @mock.patch('shakenfist.images.Image.get_lock_attr')
     @mock.patch('shakenfist.images.Image._add_download_version')
     @mock.patch('shakenfist.images.Image.latest_download_version',
