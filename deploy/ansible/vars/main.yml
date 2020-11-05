@@ -1,6 +1,7 @@
 ---
 # Defaults are Ubuntu specific
 shakenfist_deps:
+  - ack
   - ansible
   - arping
   - bridge-utils
@@ -18,4 +19,5 @@ shakenfist_deps:
   - python3-libvirt
   - qemu-kvm
   - rsync
+  - telnet
   - unzip

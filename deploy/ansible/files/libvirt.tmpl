@@ -32,9 +32,9 @@
     <emulator>/usr/bin/kvm</emulator>
 
     {% for disk in disks %}
-    <disk type='file' device='{{disk.present_as}}'>
+    <disk type='{{disk.source_type}}' device='{{disk.present_as}}'>
       <driver name='qemu' type='{{disk.type}}'/>
-      <source file='{{disk.path}}'/>
+      {{disk.source}}
       {{disk.backing}}
       <target dev='{{disk.device}}' bus='{{disk.bus}}'/>
     </disk>
