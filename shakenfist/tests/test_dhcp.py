@@ -8,7 +8,7 @@ from pydantic import AnyHttpUrl, IPvAnyAddress
 
 from shakenfist import dhcp
 from shakenfist import ipmanager
-from shakenfist.configuration import SFConfigBase
+from shakenfist.config import SFConfigBase
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 

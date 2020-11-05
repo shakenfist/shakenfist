@@ -4,7 +4,7 @@ import copy
 import random
 import time
 
-from shakenfist.configuration import config
+from shakenfist.config import config
 from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import logutil

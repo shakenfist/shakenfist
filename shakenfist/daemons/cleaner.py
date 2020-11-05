@@ -1,9 +1,10 @@
 import etcd3
 import json
 import os
+import random
 import time
 
-from shakenfist.configuration import config
+from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import logutil
@@ -147,7 +148,9 @@ class Monitor(daemon.Daemon):
 
     def run(self):
         LOG.info('Starting')
-        last_compaction = 0
+
+        # Delay first compaction until system startup load has reduced
+        last_compaction = time.time() - random.randint(1, 20*60)
 
         while True:
             # Update power state of all instances on this hypervisor

@@ -1,7 +1,7 @@
 import mock
 
 from shakenfist import net
-from shakenfist.configuration import SFConfig
+from shakenfist.config import SFConfig
 from shakenfist.tests import test_shakenfist
 
 
@@ -59,8 +59,7 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
     def setUp(self):
         super(NetworkNormalNodeTestCase, self).setUp()
         fake_config = SFConfig(NODE_IP="1.1.1.2", NETWORK_NODE_IP="1.1.1.2")
-        self.config = mock.patch('shakenfist.configuration.config',
-                                 fake_config)
+        self.config = mock.patch('shakenfist.config.config', fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
@@ -119,8 +118,7 @@ class NetworkNetNodeTestCase(NetworkTestCase):
         super(NetworkNetNodeTestCase, self).setUp()
 
         fake_config = SFConfig(NODE_IP="1.1.1.2", NETWORK_NODE_IP="1.1.1.2")
-        self.config = mock.patch('shakenfist.configuration.config',
-                                 fake_config)
+        self.config = mock.patch('shakenfist.config.config', fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 

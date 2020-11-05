@@ -3,7 +3,7 @@ import mock
 from shakenfist import exceptions
 from shakenfist import scheduler
 from shakenfist.tests import test_shakenfist
-from shakenfist.configuration import SFConfig
+from shakenfist.config import SFConfig
 
 
 class FakeInstance(object):

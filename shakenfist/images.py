@@ -8,7 +8,7 @@ import requests
 import time
 
 from shakenfist import db
-from shakenfist.configuration import config
+from shakenfist.config import config
 from shakenfist import exceptions
 from shakenfist import image_resolver_cirros
 from shakenfist import image_resolver_ubuntu

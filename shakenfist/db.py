@@ -6,7 +6,7 @@ import socket
 import time
 import uuid
 
-from shakenfist.configuration import config
+from shakenfist.config import config
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import ipmanager

@@ -6,7 +6,7 @@ import time
 from etcd3gw.client import Etcd3Client
 from etcd3gw.lock import Lock
 
-from shakenfist.configuration import config
+from shakenfist.config import config
 from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import logutil

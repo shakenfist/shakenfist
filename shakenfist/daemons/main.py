@@ -5,7 +5,7 @@ import time
 import os
 import psutil
 
-from shakenfist.configuration import config
+from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.daemons import external_api as external_api_daemon
 from shakenfist.daemons import cleaner as cleaner_daemon

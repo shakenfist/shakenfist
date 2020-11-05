@@ -6,7 +6,7 @@ from prometheus_client import Gauge
 from prometheus_client import start_http_server
 
 from shakenfist.daemons import daemon
-from shakenfist.configuration import config
+from shakenfist.config import config
 from shakenfist import db
 from shakenfist import logutil
 from shakenfist import util

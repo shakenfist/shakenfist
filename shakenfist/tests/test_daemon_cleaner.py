@@ -1,6 +1,6 @@
 import mock
 
-from shakenfist.configuration import SFConfigBase
+from shakenfist.config import SFConfigBase
 from shakenfist.daemons import cleaner
 from shakenfist.tests import test_shakenfist
 

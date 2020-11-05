@@ -16,7 +16,7 @@ import traceback
 from oslo_concurrency import processutils
 
 from shakenfist import db
-from shakenfist.configuration import config
+from shakenfist.config import config
 from shakenfist import logutil
 
 
