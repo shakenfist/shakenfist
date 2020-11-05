@@ -1,0 +1,16 @@
+##################################################################
+# The following entries are required for gfapi / gluster to work #
+##################################################################
+
+# Read task command lines
+@{PROC}/@{pid}/task/@{tid}/comm rw,
+
+# Read openssl config
+/etc/ssl/openssl.cnf r,
+
+# Read local port range
+@{PROC}/sys/net/ipv4/ip_local_port_range r,
+
+# Files in /tmp
+/tmp/gfapi.volfile.* rw,
+/tmp/tmp.* rw,
