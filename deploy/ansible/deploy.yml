@@ -221,6 +221,52 @@
         mode: "0755"
       when: mode == "deploy"
 
+# Install glusterfs
+- hosts: hypervisors
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: yes
+  connection: ssh
+  vars:
+    release: git
+    mode: deploy
+
+  tasks:
+    - name: Install glusterfs on all nodes
+      include: includes/glusterfs-all-initial.yml
+      when: gluster_enabled == "1" and mode == "deploy"
+
+- hosts: primary
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: yes
+  connection: ssh
+  vars:
+    release: git
+    mode: deploy
+
+  tasks:
+    - name: Single node gluster configuration
+      include: includes/glusterfs-primary.yml
+      when: gluster_enabled == "1" and mode == "deploy"
+
+- hosts: hypervisors
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: yes
+  connection: ssh
+  vars:
+    release: git
+    mode: deploy
+
+  tasks:
+    - name: Finalize glusterfs on all nodes
+      include: includes/glusterfs-all-final.yml
+      when: gluster_enabled == "1" and mode == "deploy"
+
 # Install etcd
 - hosts: etcd
   roles:
