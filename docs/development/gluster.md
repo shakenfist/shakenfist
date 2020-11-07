@@ -17,7 +17,7 @@ machine to the disk.
 
 ### Lack of qemu support
 
-Ubuntu has chosen to not provide qemu with glusterfs support compiled in. This means
+Ubuntu has chosen to not provide qemu with glusterfs support compiled in (https://bugs.launchpad.net/ubuntu/+source/glusterfs/+bug/1274247). This means
 we can't specify direct paths to glusterfs in qemu commands. In a perfect world we'd be
 able to execute command lines like this:
 
@@ -54,7 +54,8 @@ libvirtd[300135]: internal error: qemu unexpectedly closed the monitor: 2020-11-
 ```
 
 Hints welcome. To use the broken direct gluster support, append "_gluster" to your
-SHAKENFIST_DISK_FORMAT environment variable in the sf.service file.
+SHAKENFIST_DISK_FORMAT environment variable in the sf.service file. You might find
+https://staged-gluster-docs.readthedocs.io/en/release3.7.0beta1/Features/qemu-integration/#create-libvirt-xml-to-define-virtual-machine to be helful, as might https://docs.gluster.org/en/latest/Administrator%20Guide/Building%20QEMU%20With%20gfapi%20For%20Debian%20Based%20Systems/#building-qemu be.
 
 ## Performance via fuse mount
 
