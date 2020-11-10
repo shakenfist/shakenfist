@@ -324,7 +324,7 @@ def create_cow(locks, cache_file, disk_file, disk_size):
 
     util.execute(locks,
                  'qemu-img create -b %s -f qcow2 %s %dG'
-                 % (cache_file, disk_file, disk_size))
+                 % (cache_file, disk_file, int(disk_size)))
 
 
 def create_flat(locks, cache_file, disk_file):
