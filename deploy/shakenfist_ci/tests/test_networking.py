@@ -14,6 +14,8 @@ class TestNetworking(base.BaseNamespacedTestCase):
             '192.168.243.0/24', True, True, '%s-net-two' % self.namespace)
         self.net_three = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net-three' % self.namespace)
+        self.net_four = self.test_client.allocate_network(
+            '192.168.10.0/24', True, True, '%s-net-four' % self.namespace)
 
     def test_virtual_networks_are_separate(self):
         inst1 = self.test_client.create_instance(
@@ -152,3 +154,49 @@ class TestNetworking(base.BaseNamespacedTestCase):
         out = console.execute('ping -c 3 8.8.8.8')
         if not out.find(' 0% packet'):
             self.fail('Ping should have worked!\n\n%s' % out)
+
+    def test_specific_ip_request(self):
+        inst = self.test_client.create_instance(
+            'cirros', 1, 1024,
+            [
+                {
+                    'network_uuid': self.net_four['uuid'],
+                    'address': '192.168.10.56'
+                }
+            ],
+            [
+                {
+                    'size': 8,
+                    'base': 'cirros',
+                    'type': 'disk'
+                }
+            ], None, None)
+
+        self.assertIsNotNone(inst['uuid'])
+        self.assertIsNotNone(inst['node'])
+
+        nics = self.test_client.get_instance_interfaces(inst['uuid'])
+        ips = []
+        for nic in nics:
+            ips.append(nic['ipv4'])
+
+        self.assertEqual(['192.168.10.56'], ips)
+
+    def test_specific_ip_request_invalid(self):
+        inst = self.test_client.create_instance(
+            'cirros', 1, 1024,
+            [
+                {
+                    'network_uuid': self.net_four['uuid'],
+                    'address': '192.168.100.56'
+                }
+            ],
+            [
+                {
+                    'size': 8,
+                    'base': 'cirros',
+                    'type': 'disk'
+                }
+            ], None, None)
+
+        self.assertEqual('error', inst['state'])

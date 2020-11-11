@@ -1,37 +1,4 @@
 #########################################
-# Scenario: requesting a specific IP address should work
-#########################################
-
-- hosts: sf-1
-  any_errors_fatal: true
-  become: yes
-  become_method: sudo
-  gather_facts: no
-  connection: ssh
-
-  tasks:
-    - include: _util_network_create.yml
-        netblock="192.168.242.0/24"
-        name="net_four"
-
-    - include: _util_instance_start.yml
-        name="cirros_net_four"
-        distro=cirros
-        network="{{net_four_uuid}}@192.168.242.42"
-        sshkey=""
-        userdata=""
-
-    - name: Make sure we get the IP we requested
-      fail:
-        msg: "We did not get the IP we requested: {{cirros_net_four_ip}} != 192.168.242.42"
-      when: cirros_net_four_ip != "192.168.242.42"
-
-    - name: Delete instance
-      sf_instance:
-        uuid: "{{cirros_net_four_uuid}}"
-        state: absent
-
-#########################################
 # Scenario: try other ways to specify networks
 #########################################
 
