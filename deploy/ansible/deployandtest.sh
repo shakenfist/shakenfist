@@ -277,17 +277,7 @@ then
   ansible-playbook $VERBOSE -i hosts --extra-vars "$ANSIBLE_VARS" terraform/$CLOUD/local.yml $@
 fi
 
-# Old fashioned ansible CI
 if [ "%$SKIP_SF_TESTS%" == "%%" ]
 then
-  ansible-playbook $VERBOSE -i hosts --extra-vars "$ANSIBLE_VARS" ../ansible-ci/pretest.yml $@
-  for playbook in `ls ../ansible-ci/tests/test_*.yml | grep -v test_final.yml | shuf`
-  do
-    ansible-playbook $VERBOSE -i hosts --extra-vars "$ANSIBLE_VARS" $playbook $@
-  done
-
-  ansible-playbook $VERBOSE -i hosts --extra-vars "$ANSIBLE_VARS" ../ansible-ci/tests/test_final.yml $@
-
-  # New fangled python CI
   ansible-playbook $VERBOSE -i hosts --extra-vars "$ANSIBLE_VARS" test.yml $@
 fi
