@@ -635,6 +635,15 @@ class Instances(Resource):
                 if 'network_uuid' not in n:
                     return error(400, 'network specification is missing network_uuid')
 
+                if 'address' in n:
+                    # The requested address must be within the ip range specified
+                    # for that virtual network
+                    ipm = db.get_ipmanager(n['network_uuid'])
+                    if not ipm.is_in_range(n['address']):
+                        return error(400,
+                                     'network specification requests an address outside the '
+                                     'range of the network')
+
         if not video:
             video = {'model': 'cirrus', 'memory': 16384}
 

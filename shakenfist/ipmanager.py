@@ -29,6 +29,9 @@ class NetBlock(object):
     def get_address_at_index(self, idx):
         return self.ipblock_obj[idx]
 
+    def is_in_range(self, address):
+        return ipaddress.ip_address(address) in self.ipblock_obj
+
     def is_free(self, address):
         return not address in self.in_use
 
