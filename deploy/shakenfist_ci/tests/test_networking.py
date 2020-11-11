@@ -142,7 +142,13 @@ class TestNetworking(base.BaseNamespacedTestCase):
 
         nics = self.test_client.get_instance_interfaces(inst2['uuid'])
 
+        # Ping the other instance on this network
         console = base.LoggingSocket(inst1['node'], inst1['console_port'])
         out = console.execute('ping -c 3 %s' % nics[0]['ipv4'])
+        if not out.find(' 0% packet'):
+            self.fail('Ping should have worked!\n\n%s' % out)
+
+        # Ping google (prove NAT works)
+        out = console.execute('ping -c 3 8.8.8.8')
         if not out.find(' 0% packet'):
             self.fail('Ping should have worked!\n\n%s' % out)
