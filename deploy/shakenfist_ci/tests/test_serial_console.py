@@ -16,7 +16,7 @@ class TestSerialConsole(base.BaseNamespacedTestCase):
             'cirros', 1, 1024,
             [
                 {
-                    'network_uuid': self.net_one['uuid']
+                    'network_uuid': self.net['uuid']
                 }
             ],
             [
@@ -32,5 +32,5 @@ class TestSerialConsole(base.BaseNamespacedTestCase):
 
         self._await_login_prompt(inst['uuid'])
 
-        console = base.LoggingSocket(inst1['node'], inst1['console_port'])
+        console = base.LoggingSocket(inst['node'], inst['console_port'])
         self.assertTrue(console.execute('uptime').find('load average'))
