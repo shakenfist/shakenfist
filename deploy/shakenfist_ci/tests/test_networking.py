@@ -202,3 +202,28 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 }
             ], None, None)
+
+    def test_specific_macaddress_request(self):
+        inst = self.test_client.create_instance(
+            'cirros', 1, 1024,
+            [
+                {
+                    'network_uuid': self.net_four['uuid'],
+                    'macaddress': '04:ed:33:c0:2e:6c'
+                }
+            ],
+            [
+                {
+                    'size': 8,
+                    'base': 'cirros',
+                    'type': 'disk'
+                }
+            ], None, None)
+
+        self.assertIsNotNone(inst['uuid'])
+        self.assertIsNotNone(inst['node'])
+
+        console = base.LoggingSocket(inst['node'], inst['console_port'])
+        out = console.execute('ip link')
+        if not out.find('04:ed:33:c0:2e:6c'):
+            self.fail('Requested macaddress not used!\n\n%s' % out)
