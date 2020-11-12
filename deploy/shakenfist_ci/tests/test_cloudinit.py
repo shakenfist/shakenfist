@@ -21,10 +21,10 @@ sudo echo 'banana' >  /tmp/output"""
             'cirros', 1, 1024,
             [
                 {
-                    'network_uuid': self.net_one['uuid']
+                    'network_uuid': self.net['uuid']
                 },
                 {
-                    'network_uuid': self.net_two['uuid']
+                    'network_uuid': self.net['uuid']
                 }
             ],
             [
