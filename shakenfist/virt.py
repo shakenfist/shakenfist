@@ -61,6 +61,12 @@ def _get_defaulted_disk_type(disk):
     return 'disk'
 
 
+def _safe_int_cast(i):
+    if i:
+        return int(i)
+    return i
+
+
 class Instance(object):
     def __init__(self, db_entry):
         self.db_entry = db_entry
@@ -103,7 +109,7 @@ class Instance(object):
             'devices': [
                 {
                     'type': disk_type,
-                    'size': self.db_entry['disk_spec'][0].get('size'),
+                    'size': _safe_int_cast(self.db_entry['disk_spec'][0].get('size')),
                     'device': root_device,
                     'bus': bus,
                     'path': os.path.join(self.instance_path, root_device),
@@ -128,7 +134,7 @@ class Instance(object):
             device = _get_disk_device_base(bus) + chr(ord('c') + i)
             self.db_entry['block_devices']['devices'].append({
                 'type': disk_type,
-                'size': d.get('size'),
+                'size': _safe_int_cast(d.get('size')),
                 'device': device,
                 'bus': bus,
                 'path': os.path.join(self.instance_path, device),
