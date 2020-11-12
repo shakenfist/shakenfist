@@ -254,13 +254,13 @@ class LoggingSocket(object):
             self.recv()
 
     def send(self, data):
-        # print('>> %s' % data.replace('\n', '\\n').replace('\r', '\\r'))
+        print('>> %s' % data.replace('\n', '\\n').replace('\r', '\\r'))
         self.s.write(data.encode('ascii'))
 
     def recv(self):
         data = self.s.read_eager().decode('ascii')
-        # for line in data.split('\n'):
-        #    print('<< %s' % line.replace('\n', '\\n').replace('\r', '\\r'))
+        for line in data.split('\n'):
+            print('<< %s' % line.replace('\n', '\\n').replace('\r', '\\r'))
         return data
 
     def execute(self, cmd):
@@ -268,6 +268,12 @@ class LoggingSocket(object):
         self.send(cmd + '\n')
         time.sleep(5)
         d = ''
+
+        reads = 0
         while not d.endswith('\n$ '):
             d += self.recv()
+            reads += 1
+
+            if reads > 10:
+                break
         return d
