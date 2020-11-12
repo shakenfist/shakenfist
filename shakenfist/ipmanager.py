@@ -1,5 +1,4 @@
 import ipaddress
-import json
 import random
 
 
@@ -29,8 +28,11 @@ class NetBlock(object):
     def get_address_at_index(self, idx):
         return self.ipblock_obj[idx]
 
+    def is_in_range(self, address):
+        return ipaddress.ip_address(address) in self.ipblock_obj
+
     def is_free(self, address):
-        return not address in self.in_use
+        return address not in self.in_use
 
     def reserve(self, address):
         if not self.is_free(address):
@@ -74,7 +76,7 @@ class NetBlock(object):
         in_use = []
         for ip in self.in_use:
             ip_str = str(ip)
-            if not ip_str in in_use:
+            if ip_str not in in_use:
                 in_use.append(ip_str)
 
         return {
