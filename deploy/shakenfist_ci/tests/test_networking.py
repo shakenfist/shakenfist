@@ -1,3 +1,5 @@
+from shakenfist_client import apiclient
+
 from shakenfist_ci import base
 
 
@@ -183,7 +185,9 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self.assertEqual(['192.168.10.56'], ips)
 
     def test_specific_ip_request_invalid(self):
-        inst = self.test_client.create_instance(
+        self.assertRaises(
+            apiclient.RequestMalformedException,
+            self.test_client.create_instance,
             'cirros', 1, 1024,
             [
                 {
@@ -198,5 +202,3 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 }
             ], None, None)
-
-        self.assertEqual('error', inst['state'])
