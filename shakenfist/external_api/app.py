@@ -635,7 +635,7 @@ class Instances(Resource):
                 if 'network_uuid' not in n:
                     return error(400, 'network specification is missing network_uuid')
 
-                if 'address' in n:
+                if n.get('address'):
                     # The requested address must be within the ip range specified
                     # for that virtual network
                     ipm = db.get_ipmanager(n['network_uuid'])
