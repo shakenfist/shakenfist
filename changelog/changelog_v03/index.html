@@ -560,6 +560,22 @@
 <p>We also realised somewhere late in v0.2's life that the etcd library we were using was pretty buggy. Locking simply didn't work some of the time. Additionally, our locking code was pretty ad hoc and sometimes we would get the names of the locks wrong because they were just strings. This has now been completely re-written, but that has shaken out a number of bugs that are surfaced by locking actually working now. We have worked through those bugs and sought to resolve them.</p>
 </li>
 </ul>
+<h1 id="changes-between-v032-and-v033">Changes between v0.3.2 and v0.3.3</h1>
+<p>v0.3.3 was released on 13 November 2020.</p>
+<ul>
+<li>Remove incorrect warnings for extra VLANs. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/496" title="GitHub Issue: shakenfist/shakenfist#496">shakenfist#496</a></li>
+<li>Fix logging for queue workers. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/498" title="GitHub Issue: shakenfist/shakenfist#498">shakenfist#498</a></li>
+<li>Resolve network delete collisions and races. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/500" title="GitHub Issue: shakenfist/shakenfist#500">shakenfist#500</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/504" title="GitHub Issue: shakenfist/shakenfist#504">shakenfist#504</a></li>
+<li>Resolve resources daemon issue casued by race with instance deletion. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/507" title="GitHub Issue: shakenfist/shakenfist#507">shakenfist#507</a></li>
+<li>Image fetch should retry after bad checksum. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/509" title="GitHub Issue: shakenfist/shakenfist#509">shakenfist#509</a></li>
+<li>Add an option to delay deletion of failed CI jobs. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/511" title="GitHub Issue: shakenfist/shakenfist#511">shakenfist#511</a></li>
+<li>Enable full state change CI. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/514" title="GitHub Issue: shakenfist/shakenfist#514">shakenfist#514</a></li>
+<li>Fix etcd connection error on compaction. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/516" title="GitHub Issue: shakenfist/shakenfist#516">shakenfist#516</a></li>
+<li>CI fails when the Ubuntu mirror is slow. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/518" title="GitHub Issue: shakenfist/shakenfist#518">shakenfist#518</a></li>
+<li>Nightly large CI failing because of logic errors in grep. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/522" title="GitHub Issue: shakenfist/shakenfist#522">shakenfist#522</a></li>
+<li>Fix numeric conversion error in disk sizes. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/526" title="GitHub Issue: shakenfist/shakenfist#526">shakenfist#526</a></li>
+<li>Ensure requested IPs are within the ipblock of the virtual network. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/533" title="GitHub Issue: shakenfist/shakenfist#533">shakenfist#533</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/536" title="GitHub Issue: shakenfist/shakenfist#536">shakenfist#536</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/538" title="GitHub Issue: shakenfist/shakenfist#538">shakenfist#538</a></li>
+</ul>
 <h1 id="changes-between-v031-and-v032">Changes between v0.3.1 and v0.3.2</h1>
 <p>v0.3.2 was released on 29 October 2020.</p>
 <ul>
