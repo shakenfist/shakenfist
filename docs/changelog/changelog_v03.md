@@ -7,6 +7,24 @@ v0.3 is a re-write of portions of v0.2 that we felt were holding Shaken Fist bac
 
 * We also realised somewhere late in v0.2's life that the etcd library we were using was pretty buggy. Locking simply didn't work some of the time. Additionally, our locking code was pretty ad hoc and sometimes we would get the names of the locks wrong because they were just strings. This has now been completely re-written, but that has shaken out a number of bugs that are surfaced by locking actually working now. We have worked through those bugs and sought to resolve them.
 
+Changes between v0.3.2 and v0.3.3
+=================================
+
+v0.3.3 was released on 13 November 2020.
+
+* Remove incorrect warnings for extra VLANs. shakenfist#496
+* Fix logging for queue workers. shakenfist#498
+* Resolve network delete collisions and races. shakenfist#500, shakenfist#504
+* Resolve resources daemon issue casued by race with instance deletion. shakenfist#507
+* Image fetch should retry after bad checksum. shakenfist#509
+* Add an option to delay deletion of failed CI jobs. shakenfist#511
+* Enable full state change CI. shakenfist#514
+* Fix etcd connection error on compaction. shakenfist#516
+* CI fails when the Ubuntu mirror is slow. shakenfist#518
+* Nightly large CI failing because of logic errors in grep. shakenfist#522
+* Fix numeric conversion error in disk sizes. shakenfist#526
+* Ensure requested IPs are within the ipblock of the virtual network. shakenfist#533, shakenfist#536, shakenfist#538
+
 Changes between v0.3.1 and v0.3.2
 =================================
 
