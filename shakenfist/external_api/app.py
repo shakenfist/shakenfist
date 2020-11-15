@@ -179,7 +179,7 @@ def arg_is_instance_uuid_as_virt(func):
     # Method uses the rehydrated instance
     def wrapper(*args, **kwargs):
         if 'instance_uuid' in kwargs:
-            kwargs['instance_from_db_virt'] = virt.from_db(
+            kwargs['instance_from_db_virt'] = virt.Instance.from_db(
                 kwargs['instance_uuid']
             )
         if not kwargs.get('instance_from_db_virt'):
@@ -195,13 +195,11 @@ def redirect_instance_request(func):
     # Redirect method to the hypervisor hosting the instance
     def wrapper(*args, **kwargs):
         i = kwargs.get('instance_from_db_virt')
-        if i and i.db_entry['node'] != config.NODE_NAME:
-            url = 'http://%s:%d%s' % (i.db_entry['node'],
-                                      config.get('API_PORT'),
+        if i and i.node != config.NODE_NAME:
+            url = 'http://%s:%d%s' % (i.node, config.get('API_PORT'),
                                       flask.request.environ['PATH_INFO'])
             api_token = util.get_api_token(
-                'http://%s:%d' % (i.db_entry['node'],
-                                  config.get('API_PORT')),
+                'http://%s:%d' % (i.node, config.get('API_PORT')),
                 namespace=get_jwt_identity())
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'], url,
@@ -660,35 +658,30 @@ class Instances(Resource):
                          'only admins can create resources in a different namespace')
 
         # The instance needs to exist in the DB before network interfaces are created
-        if not instance_uuid:
-            instance_uuid = str(uuid.uuid4())
-            db.add_event('instance', instance_uuid,
-                         'uuid allocated', None, None, None)
-
-        # Create instance object
-        instance = virt.from_db(instance_uuid)
+        instance = virt.Instance.from_db(instance_uuid)
         if instance:
-            if get_jwt_identity() not in [instance.db_entry['namespace'], 'system']:
+            if get_jwt_identity() not in [instance.namespace, 'system']:
                 LOG.withField('instance', instance_uuid).info(
                     'Instance not found, ownership test')
                 return error(404, 'instance not found')
 
+        # Create instance object
         if not instance:
-            instance = virt.from_definition(
+            instance = virt.Instance.new(
                 uuid=instance_uuid,
                 name=name,
-                disks=disk,
-                memory_mb=memory,
-                vcpus=cpus,
+                disk_spec=disk,
+                memory=memory,
+                cpus=cpus,
                 ssh_key=ssh_key,
                 user_data=user_data,
-                owner=namespace,
+                namespace=namespace,
                 video=video,
                 requested_placement=placed_on
             )
 
         # Initialise metadata
-        db.persist_metadata('instance', instance_uuid, {})
+        db.persist_metadata('instance', instance.uuid, {})
 
         # Allocate IP addresses
         order = 0
@@ -698,14 +691,14 @@ class Instances(Resource):
                 if not n:
                     m = 'missing network %s during IP allocation phase' % (
                         netdesc['network_uuid'])
-                    db.enqueue_instance_error(instance_uuid, m)
+                    db.enqueue_instance_error(instance.uuid, m)
                     return error(
                         404, 'network %s not found' % netdesc['network_uuid'])
 
                 with db.get_lock('ipmanager', None,  netdesc['network_uuid'],
                                  ttl=120, op='Network allocate IP'):
                     db.add_event('network', netdesc['network_uuid'], 'allocate address',
-                                 None, None, instance_uuid)
+                                 None, None, instance.uuid)
                     ipm = db.get_ipmanager(netdesc['network_uuid'])
                     if 'address' not in netdesc or not netdesc['address']:
                         netdesc['address'] = ipm.get_random_free_address()
@@ -713,7 +706,7 @@ class Instances(Resource):
                         if not ipm.reserve(netdesc['address']):
                             m = 'failed to reserve an IP on network %s' % (
                                 netdesc['network_uuid'])
-                            db.enqueue_instance_error(instance_uuid, m)
+                            db.enqueue_instance_error(instance.uuid, m)
                             return error(409, 'address %s in use' %
                                          netdesc['address'])
 
@@ -723,7 +716,7 @@ class Instances(Resource):
                     netdesc['model'] = 'virtio'
 
                 db.create_network_interface(
-                    str(uuid.uuid4()), netdesc, instance_uuid, order)
+                    str(uuid.uuid4()), netdesc, instance.uuid, order)
 
         if not SCHEDULER:
             SCHEDULER = scheduler.Scheduler()
@@ -740,39 +733,36 @@ class Instances(Resource):
                 placement = placed_on
 
         except exceptions.LowResourceException as e:
-            db.add_event('instance', instance_uuid, 'schedule', 'failed', None,
-                         'insufficient resources: ' + str(e))
-            db.enqueue_instance_error(instance_uuid, 'scheduling failed')
+            instance.add_event('schedule', 'failed', None,
+                               'Insufficient resources: ' + str(e))
+            db.enqueue_instance_error(instance.uuid, 'scheduling failed')
             return error(507, str(e))
 
         except exceptions.CandidateNodeNotFoundException as e:
-            db.add_event('instance', instance_uuid, 'schedule', 'failed', None,
-                         'candidate node not found: ' + str(e))
-            db.enqueue_instance_error(instance_uuid, 'scheduling failed')
+            instance.add_event('schedule', 'failed', None,
+                               'Candidate node not found: ' + str(e))
+            db.enqueue_instance_error(instance.uuid, 'scheduling failed')
             return error(404, 'node not found: %s' % e)
 
         # Record placement
-        db.place_instance(instance_uuid, placement)
-        db.add_event('instance', instance_uuid,
-                     'placement', None, None, placement)
+        instance.place_instance(placement)
 
         # Create a queue entry for the instance start
-        tasks = [PreflightInstanceTask(instance_uuid, network)]
-        for disk in instance.db_entry['block_devices']['devices']:
+        tasks = [PreflightInstanceTask(instance.uuid, network)]
+        for disk in instance.block_devices['devices']:
             if 'base' in disk and disk['base']:
-                tasks.append(FetchImageTask(disk['base'], instance_uuid))
-        tasks.append(StartInstanceTask(instance_uuid, network))
+                tasks.append(FetchImageTask(disk['base'], instance.uuid))
+        tasks.append(StartInstanceTask(instance.uuid, network))
 
         # Enqueue creation tasks on desired node task queue
         db.enqueue(placement, {'tasks': tasks})
-        db.add_event('instance', instance_uuid,
-                     'create', 'enqueued', None, None)
+        instance.add_event('create', 'enqueued', None, None)
 
         # Watch for a while and return results if things are fast, give up
         # after a while and just return the current state
         start_time = time.time()
         while time.time() - start_time < config.get('API_ASYNC_WAIT'):
-            i = db.get_instance(instance_uuid)
+            i = db.get_instance(instance.uuid)
             if i['state'] in ['created', 'deleted', 'error']:
                 return i
             time.sleep(0.5)
@@ -850,13 +840,12 @@ class InstanceSnapshot(Resource):
     @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None, all=None):
+    def post(self, instance_uuid=None,
+             instance_from_db=None, instance_from_db_virt=None, all=None):
         snap_uuid = instance_from_db_virt.snapshot(all=all)
-        db.add_event('instance', instance_uuid,
-                     'api', 'snapshot (all=%s)' % all,
-                     None, snap_uuid)
-        db.add_event('snapshot', snap_uuid,
-                     'api', 'create', None, None)
+        instance_from_db_virt.add_event('api', 'snapshot (all=%s)' % all,
+                                        None, snap_uuid)
+        db.add_event('snapshot', snap_uuid, 'api', 'create', None, None)
         return snap_uuid
 
     @jwt_required
@@ -876,12 +865,12 @@ class InstanceRebootSoft(Resource):
     @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
+    def post(self, instance_uuid=None,
+             instance_from_db=None, instance_from_db_virt=None):
         with db.get_lock(
                 'instance', None, instance_uuid, ttl=120, timeout=120,
                 op='Instance reboot soft'):
-            db.add_event(
-                'instance', instance_uuid, 'api', 'soft reboot', None, None)
+            instance_from_db_virt.add_event('api', 'soft reboot')
             return instance_from_db_virt.reboot(hard=False)
 
 
@@ -891,12 +880,12 @@ class InstanceRebootHard(Resource):
     @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
+    def post(self, instance_uuid=None,
+             instance_from_db=None, instance_from_db_virt=None):
         with db.get_lock(
                 'instance', None, instance_uuid, ttl=120, timeout=120,
                 op='Instance reboot hard'):
-            db.add_event(
-                'instance', instance_uuid, 'api', 'hard reboot', None, None)
+            instance_from_db_virt.add_event('api', 'hard reboot')
             return instance_from_db_virt.reboot(hard=True)
 
 
@@ -906,12 +895,12 @@ class InstancePowerOff(Resource):
     @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
+    def post(self, instance_uuid=None,
+             instance_from_db=None, instance_from_db_virt=None):
         with db.get_lock(
                 'instance', None, instance_uuid, ttl=120, timeout=120,
                 op='Instance power off'):
-            db.add_event(
-                'instance', instance_uuid, 'api', 'poweroff', None, None)
+            instance_from_db_virt.add_event('api', 'poweroff')
             return instance_from_db_virt.power_off()
 
 
@@ -921,12 +910,12 @@ class InstancePowerOn(Resource):
     @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
+    def post(self, instance_uuid=None,
+             instance_from_db=None, instance_from_db_virt=None):
         with db.get_lock(
                 'instance', None, instance_uuid, ttl=120, timeout=120,
                 op='Instance power on'):
-            db.add_event(
-                'instance', instance_uuid, 'api', 'poweron', None, None)
+            instance_from_db_virt.add_event('api', 'poweron')
             return instance_from_db_virt.power_on()
 
 
@@ -936,11 +925,12 @@ class InstancePause(Resource):
     @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
+    def post(self, instance_uuid=None,
+             instance_from_db=None, instance_from_db_virt=None):
         with db.get_lock(
                 'instance', None, instance_uuid, ttl=120, timeout=120,
                 op='Instance pause'):
-            db.add_event('instance', instance_uuid, 'api', 'pause', None, None)
+            instance_from_db_virt.add_event('api', 'pause')
             return instance_from_db_virt.pause()
 
 
@@ -950,12 +940,12 @@ class InstanceUnpause(Resource):
     @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None, instance_from_db=None, instance_from_db_virt=None):
+    def post(self, instance_uuid=None,
+             instance_from_db=None, instance_from_db_virt=None):
         with db.get_lock(
                 'instance', None, instance_uuid, ttl=120, timeout=120,
                 op='Instance unpause'):
-            db.add_event(
-                'instance', instance_uuid, 'api', 'unpause', None, None)
+            instance_from_db_virt.add_event('api', 'unpause')
             return instance_from_db_virt.unpause()
 
 
@@ -976,8 +966,8 @@ def _safe_get_network_interface(interface_uuid):
         log.info('Interface not found, failed ownership test')
         return None, None, error(404, 'interface not found')
 
-    i = virt.from_db(ni['instance_uuid'])
-    if get_jwt_identity() not in [i.db_entry['namespace'], 'system']:
+    i = virt.Instance.from_db(ni['instance_uuid'])
+    if get_jwt_identity() not in [i.namespace, 'system']:
         log.withObj(i).info('Instance not found, failed ownership test')
         return None, None, error(404, 'interface not found')
 

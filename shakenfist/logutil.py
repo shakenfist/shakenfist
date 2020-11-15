@@ -46,7 +46,7 @@ class SFPyLogrus(logging.Logger, PyLogrusBase):
     #
     def withInstance(self, inst):
         if not isinstance(inst, str):
-            inst = inst.db_entry['uuid']
+            inst = inst.uuid
         return SFCustomAdapter(self, {'instance': inst})
 
     def withNetwork(self, inst):
@@ -140,7 +140,7 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
     def withInstance(self, inst):
         extra = copy.deepcopy(self._extra)
         if not isinstance(inst, str):
-            inst = inst.db_entry['uuid']
+            inst = inst.uuid
         extra.update({'instance': inst})
         return SFCustomAdapter(self._logger, extra, self._prefix)
 

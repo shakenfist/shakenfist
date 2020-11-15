@@ -74,30 +74,22 @@ def handle(jobname, workitem):
                 if redirect_to:
                     log_i.info('Redirecting instance start to %s'
                                % redirect_to)
-                    db.place_instance(instance_uuid, redirect_to)
                     db.enqueue(redirect_to, workitem)
                     return
 
             elif isinstance(task, StartInstanceTask):
                 instance_start(instance_uuid, task.network())
-                db.update_instance_state(instance_uuid, 'created')
                 db.enqueue('%s-metrics' % config.NODE_NAME, {})
 
             elif isinstance(task, DeleteInstanceTask):
                 try:
-                    instance_delete(instance_uuid)
-                    db.update_instance_state(instance_uuid, 'deleted')
+                    instance_delete(instance_uuid, 'deleted')
                 except Exception as e:
                     util.ignore_exception(daemon.process_name('queues'), e)
 
             elif isinstance(task, ErrorInstanceTask):
                 try:
-                    instance_delete(instance_uuid)
-                    db.update_instance_state(instance_uuid, 'error')
-
-                    if task.error_msg():
-                        db.update_instance_error_message(
-                            instance_uuid, task.error_msg())
+                    instance_delete(instance_uuid, 'error', task.error_msg())
                     db.enqueue('%s-metrics' % config.NODE_NAME, {})
                 except Exception as e:
                     util.ignore_exception(daemon.process_name('queues'), e)
@@ -129,9 +121,7 @@ def handle(jobname, workitem):
 
 
 def image_fetch(url, instance_uuid):
-    instance = None
-    if instance_uuid:
-        instance = virt.from_db(instance_uuid)
+    instance = virt.Instance.from_db(instance_uuid)
 
     try:
         # TODO(andy): Wait up to 15 mins for another queue process to download
@@ -162,27 +152,32 @@ def image_fetch(url, instance_uuid):
 
 
 def instance_preflight(instance_uuid, network):
-    db.update_instance_state(instance_uuid, 'preflight')
+    instance = virt.Instance.from_db(instance_uuid)
+    if not instance:
+        raise exceptions.InstanceNotInDBException(instance_uuid)
 
+    instance.update_instance_state('preflight')
+
+    # Try to place on this node
     s = scheduler.Scheduler()
-    instance = virt.from_db(instance_uuid)
-
     try:
         s.place_instance(instance, network, candidates=[config.NODE_NAME])
         return None
 
     except exceptions.LowResourceException as e:
-        db.add_event('instance', instance_uuid,
-                     'schedule', 'retry', None,
-                     'insufficient resources: ' + str(e))
+        instance.add_event('schedule', 'retry', None,
+                           'insufficient resources: ' + str(e))
 
-    if instance.db_entry.get('placement_attempts') > 3:
+    # Unsuccessful placement, check if reached placement attempt limit
+    if instance.placement_attempts > 3:
         raise exceptions.AbortInstanceStartException(
             'Too many start attempts')
 
+    # Try placing on another node
     try:
-        if instance.db_entry.get('requested_placement'):
-            candidates = [instance.db_entry.get('requested_placement')]
+        if instance.requested_placement:
+            # TODO(andy): Ask Mikal why this is not the current node?
+            candidates = [instance.requested_placement]
         else:
             candidates = []
             for node in s.metrics.keys():
@@ -191,12 +186,12 @@ def instance_preflight(instance_uuid, network):
 
         candidates = s.place_instance(instance, network,
                                       candidates=candidates)
+        instance.place_instance(candidates[0])
         return candidates[0]
 
     except exceptions.LowResourceException as e:
-        db.add_event('instance', instance_uuid,
-                     'schedule', 'failed', None,
-                     'insufficient resources: ' + str(e))
+        instance.add_event('schedule', 'failed', None,
+                           'insufficient resources: ' + str(e))
         # This raise implies delete above
         raise exceptions.AbortInstanceStartException(
             'Unable to find suitable node')
@@ -208,7 +203,7 @@ def instance_start(instance_uuid, network):
     with db.get_lock(
             'instance', None, instance_uuid, ttl=900, timeout=120,
             op='Instance start') as lock:
-        instance = virt.from_db(instance_uuid)
+        instance = virt.Instance.from_db(instance_uuid)
 
         # Collect the networks
         nets = {}
@@ -257,12 +252,13 @@ def instance_start(instance_uuid, network):
         for iface in db.get_instance_interfaces(instance_uuid):
             db.update_network_interface_state(iface['uuid'], 'created')
 
+        instance.update_instance_state('created')
 
-def instance_delete(instance_uuid):
+
+def instance_delete(instance_uuid, new_state, error_msg=None):
     with db.get_lock('instance', None, instance_uuid, timeout=120,
                      op='Instance delete'):
-        db.add_event('instance', instance_uuid,
-                     'queued', 'delete', None, None)
+        db.add_event('instance', instance_uuid, 'queued', 'delete', None, None)
 
         # Create list of networks used by instance
         instance_networks = []
@@ -278,9 +274,12 @@ def instance_delete(instance_uuid):
                     if not iface['network_uuid'] in host_networks:
                         host_networks.append(iface['network_uuid'])
 
-        instance_from_db_virt = virt.from_db(instance_uuid)
-        if instance_from_db_virt:
-            instance_from_db_virt.delete()
+        instance = virt.Instance.from_db(instance_uuid)
+        if instance:
+            instance.delete()
+            instance.update_instance_state(new_state)
+            if error_msg:
+                instance.update_error_message(error_msg)
 
         # Check each network used by the deleted instance
         for network in instance_networks:
@@ -289,7 +288,7 @@ def instance_delete(instance_uuid):
                 # If network used by another instance, only update
                 if network in host_networks:
                     with util.RecordedOperation('deallocate ip address',
-                                                instance_from_db_virt):
+                                                instance):
                         n.update_dhcp()
                 else:
                     # Network not used by any other instance therefore delete

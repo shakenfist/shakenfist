@@ -70,11 +70,13 @@ fake_config = FakeConfig()
 FAKE_ETCD_STATE = {}
 
 
-def fake_get(objecttype, subtype, name):
+def fake_instance_get(objecttype, subtype, uuid):
     global FAKE_ETCD_STATE
     return FAKE_ETCD_STATE.get(
-        '%s/%s/%s' % (objecttype, subtype, name),
-        {'uuid': name, 'node': 'abigcomputer'})
+        '%s/%s/%s' % (objecttype, subtype, uuid),
+        {'uuid': uuid, 'node': 'abigcomputer',
+         'name': 'bob', 'cpus': 1, 'memory': 1024, 'namespace': 'space',
+         'version': 1})
 
 
 def fake_put(objecttype, subtype, name, v):
@@ -102,7 +104,7 @@ class CleanerTestCase(test_shakenfist.ShakenFistTestCase):
 
     @mock.patch('shakenfist.db.see_this_node')
     @mock.patch('shakenfist.db.add_event')
-    @mock.patch('shakenfist.etcd.get', side_effect=fake_get)
+    @mock.patch('shakenfist.etcd.get', side_effect=fake_instance_get)
     @mock.patch('shakenfist.etcd.put', side_effect=fake_put)
     @mock.patch('os.path.exists', side_effect=fake_exists)
     @mock.patch('time.time', return_value=7)
@@ -111,100 +113,57 @@ class CleanerTestCase(test_shakenfist.ShakenFistTestCase):
         m = cleaner.Monitor('cleaner')
         m._update_power_states()
 
-        self.assertEqual(
-            [
-                mock.call('instance', None, 'running',
+        result = [(c[1][0], c[1][1], c[1][2],
+                   {'uuid': c[1][3]['uuid'],
+                    'power_state': c[1][3]['power_state'],
+                    }
+                   ) for c in mock_put.mock_calls]
+
+        self.assertEqual([
+                         ('instance', None, 'running',
                           {
                               'uuid': 'running',
-                              'node': 'abigcomputer',
-                              'power_state_previous': 'unknown',
                               'power_state': 'on',
-                              'power_state_updated': 7,
-                              'video': {'memory': 16384, 'model': 'cirrus'},
-                              'error_message': None,
-                          }),
-                mock.call('instance', None, 'shutoff',
+                           }),
+                         ('instance', None, 'shutoff',
                           {
                               'uuid': 'shutoff',
-                              'node': 'abigcomputer',
-                              'power_state_previous': 'unknown',
                               'power_state': 'off',
-                              'power_state_updated': 7,
-                              'video': {'memory': 16384, 'model': 'cirrus'},
-                              'error_message': None,
                           }),
-                mock.call('instance', None, 'crashed',
+                         ('instance', None, 'crashed',
                           {
                               'uuid': 'crashed',
-                              'node': 'abigcomputer',
-                              'power_state_previous': 'unknown',
                               'power_state': 'crashed',
-                              'power_state_updated': 7,
-                              'state': 'error',
-                              'state_updated': 7,
-                              'video': {'memory': 16384, 'model': 'cirrus'},
-                              'error_message': None,
                           }),
-                mock.call('instance', None, 'crashed',
+                         ('instance', None, 'crashed',
                           {
                               'uuid': 'crashed',
-                              'node': 'abigcomputer',
-                              'power_state_previous': 'unknown',
                               'power_state': 'crashed',
-                              'power_state_updated': 7,
-                              'state': 'error',
-                              'state_updated': 7,
-                              'video': {'memory': 16384, 'model': 'cirrus'},
-                              'error_message': None,
                           }),
-                mock.call('instance', None, 'paused',
+                         ('instance', None, 'paused',
                           {
                               'uuid': 'paused',
-                              'node': 'abigcomputer',
-                              'power_state_previous': 'unknown',
                               'power_state': 'paused',
-                              'power_state_updated': 7,
-                              'video': {'memory': 16384, 'model': 'cirrus'},
-                              'error_message': None,
                           }),
-                mock.call('instance', None, 'suspended',
+                         ('instance', None, 'suspended',
                           {
                               'uuid': 'suspended',
-                              'node': 'abigcomputer',
-                              'power_state_previous': 'unknown',
                               'power_state': 'paused',
-                              'power_state_updated': 7,
-                              'video': {'memory': 16384, 'model': 'cirrus'},
-                              'error_message': None,
                           }),
-                mock.call('instance', None, 'foo',
+                         ('instance', None, 'foo',
                           {
                               'uuid': 'foo',
-                              'node': 'abigcomputer',
-                              'power_state_previous': 'unknown',
                               'power_state': 'off',
-                              'power_state_updated': 7,
-                              'video': {'memory': 16384, 'model': 'cirrus'},
-                              'error_message': None,
                           }),
-                mock.call('instance', None, 'bar',
+                         ('instance', None, 'bar',
                           {
                               'uuid': 'bar',
-                              'node': 'abigcomputer',
-                              'power_state_previous': 'unknown',
                               'power_state': 'off',
-                              'power_state_updated': 7,
-                              'video': {'memory': 16384, 'model': 'cirrus'},
-                              'error_message': None,
                           }),
-                mock.call('instance', None, 'nofiles',
+                         ('instance', None, 'nofiles',
                           {
                               'uuid': 'nofiles',
-                              'node': 'abigcomputer',
-                              'state': 'error',
-                              'state_updated': 7,
-                              'video': {'memory': 16384, 'model': 'cirrus'},
-                              'error_message': None,
+                              'power_state': '',
                           })
-            ],
-            mock_put.mock_calls)
+                         ],
+                         result)

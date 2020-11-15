@@ -32,7 +32,7 @@ class Monitor(daemon.Daemon):
                 instance_uuid = domain.name().split(':')[1]
                 log_ctx = LOG.withInstance(instance_uuid)
 
-                instance = db.get_instance(instance_uuid)
+                instance = virt.Instance.from_db(instance_uuid)
                 if not instance:
                     # Instance is SF but not in database. Kill to reduce load.
                     log_ctx.warning('Destroying unknown instance')
@@ -40,31 +40,30 @@ class Monitor(daemon.Daemon):
                                  'virsh destroy "sf:%s"' % instance_uuid)
                     continue
 
-                db.place_instance(instance_uuid, config.NODE_NAME)
+                instance.place_instance(config.NODE_NAME)
                 seen.append(domain.name())
 
-                if instance.get('state') == 'deleted':
+                if instance.state == 'deleted':
                     # NOTE(mikal): a delete might be in-flight in the queue.
                     # We only worry about instances which should have gone
                     # away five minutes ago.
-                    if time.time() - instance['state_updated'] < 300:
+                    if time.time() - instance.state_updated < 300:
                         continue
 
-                    db.instance_enforced_deletes_increment(instance_uuid)
-                    attempts = instance.get('enforced_deletes', 0)
+                    instance.enforced_deletes_increment()
+                    attempts = instance.enforced_deletes
 
                     if attempts > 5:
-                        # Sometimes we just can't delete the VM. Try the big hammer instead.
-                        log_ctx.warning('Attempting alternate delete method for instance')
+                        # Sometimes we just can't delete the VM. Try the big
+                        # hammer instead.
+                        log_ctx.warning(
+                            'Attempting alternate delete method for instance')
                         util.execute(None,
                                      'virsh destroy "sf:%s"' % instance_uuid)
 
-                        db.add_event('instance', instance_uuid,
-                                     'enforced delete', 'complete', None, None)
+                        instance.add_event('enforced delete', 'complete')
                     else:
-                        i = virt.from_db(instance_uuid)
-                        i.delete()
-                        i.update_instance_state('deleted')
+                        instance.delete()
 
                     log_ctx.withField('attempt', attempts).warning(
                         'Deleting stray instance')
@@ -72,9 +71,9 @@ class Monitor(daemon.Daemon):
                     continue
 
                 state = util.extract_power_state(libvirt, domain)
-                db.update_instance_power_state(instance_uuid, state)
+                instance.update_power_state(state)
                 if state == 'crashed':
-                    db.update_instance_state(instance_uuid, 'error')
+                    instance.update_instance_state('error')
 
             # Inactive VMs just have a name, and are powered off
             # in our state system.
@@ -85,16 +84,17 @@ class Monitor(daemon.Daemon):
                 if domain_name not in seen:
                     instance_uuid = domain_name.split(':')[1]
                     log_ctx = LOG.withInstance(instance_uuid)
-                    instance = db.get_instance(instance_uuid)
+                    instance = virt.Instance.from_db(instance_uuid)
 
                     if not instance:
-                        # Instance is SF but not in database. Kill because unknown.
+                        # Instance is SF but not in database. Kill because
+                        # unknown.
                         log_ctx.warning('Removing unknown inactive instance')
                         domain = conn.lookupByName(domain_name)
                         domain.undefine()
                         continue
 
-                    if instance.get('state') == 'deleted':
+                    if instance.state == 'deleted':
                         # NOTE(mikal): a delete might be in-flight in the queue.
                         # We only worry about instances which should have gone
                         # away five minutes ago.
@@ -104,26 +104,21 @@ class Monitor(daemon.Daemon):
                         domain = conn.lookupByName(domain_name)
                         domain.undefine()
                         log_ctx.info('Detected stray instance')
-                        db.add_event('instance', instance_uuid,
-                                     'deleted stray', 'complete', None, None)
+                        instance.add_event('deleted stray', 'complete')
                         continue
 
-                    db.place_instance(instance_uuid, config.NODE_NAME)
-                    instance_path = os.path.join(
-                        config.get('STORAGE_PATH'), 'instances', instance_uuid)
+                    instance.place_instance(config.NODE_NAME)
 
-                    if not os.path.exists(instance_path):
+                    if not os.path.exists(instance.instance_path()):
                         # If we're inactive and our files aren't on disk,
                         # we have a problem.
                         log_ctx.info('Detected error state for instance')
-                        db.update_instance_state(instance_uuid, 'error')
+                        instance.update_instance_state('error')
 
-                    elif instance.get('power_state') != 'off':
+                    elif instance.power_state != 'off':
                         log_ctx.info('Detected power off for instance')
-                        db.update_instance_power_state(
-                            instance_uuid, 'off')
-                        db.add_event('instance', instance_uuid,
-                                     'detected poweroff', 'complete', None, None)
+                        instance.update_power_state('off')
+                        instance.add_event('detected poweroff', 'complete')
 
         except libvirt.libvirtError as e:
             LOG.error('Failed to lookup all domains: %s' % e)

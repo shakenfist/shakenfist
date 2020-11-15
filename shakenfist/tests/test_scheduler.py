@@ -4,20 +4,36 @@ from shakenfist import exceptions
 from shakenfist import scheduler
 from shakenfist.tests import test_shakenfist
 from shakenfist.config import SFConfig
+from shakenfist.virt import Instance
 
 
-class FakeInstance(object):
-    def __init__(self, uuid='fake_uuid'):
-        self.db_entry = {
-            'uuid': uuid,
-        }
+class FakeInstance(Instance):
+    def __init__(self, cpus=1, memory=1024, name='fake_name',
+                 namespace='fake_namespace', uuid='fake_uuid',
+                 block_devices=None, devices=None, console_port=0,
+                 disk_spec=None, error_message=None, node=None,
+                 node_history=None, placement_attempts=0, power_state=None,
+                 power_state_previous=None, power_state_updated=0,
+                 requested_placement=None, ssh_key=None, state=None,
+                 state_updated=None, user_data=None, vdi_port=0,
+                 video=None):
 
-    def db_setup(self, **kwargs):
-        for k in kwargs:
-            self.db_entry[k] = kwargs[k]
+        super(FakeInstance, self).__init__(
+            cpus=cpus, memory=memory, name=name, namespace=namespace,
+            uuid=uuid,
+            block_devices=block_devices, devices=devices,
+            console_port=console_port,
+            disk_spec=disk_spec, error_message=error_message, node=node,
+            node_history=node_history, placement_attempts=placement_attempts,
+            power_state=power_state,
+            power_state_previous=power_state_previous,
+            power_state_updated=power_state_updated,
+            requested_placement=requested_placement, ssh_key=ssh_key, state=state,
+            state_updated=state_updated, user_data=user_data, vdi_port=vdi_port,
+            video=video)
 
-    def unique_label(self):
-        return ('instance', self.db_entry['uuid'])
+    def add_event(self, operation, phase, duration=None, message=None):
+        pass
 
 
 class FakeDB(object):
@@ -114,8 +130,7 @@ class LowResourceTestCase(SchedulerTestCase):
         self.addCleanup(self.mock_get_instances.stop)
 
     def test_no_metrics(self):
-        fake_inst = FakeInstance()
-        fake_inst.db_setup(cpus=1)
+        fake_inst = FakeInstance(cpus=1)
 
         exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().place_instance,
@@ -128,8 +143,7 @@ class LowResourceTestCase(SchedulerTestCase):
             'cpu_max_per_instance': 5,
         })
 
-        fake_inst = FakeInstance()
-        fake_inst.db_setup(cpus=6)
+        fake_inst = FakeInstance(cpus=6)
 
         exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().place_instance,
@@ -147,8 +161,7 @@ class LowResourceTestCase(SchedulerTestCase):
             'disk_free': 2000*1024*1024*1024
         })
 
-        fake_inst = FakeInstance()
-        fake_inst.db_setup(cpus=1)
+        fake_inst = FakeInstance(cpus=1)
 
         exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().place_instance,
@@ -165,11 +178,10 @@ class LowResourceTestCase(SchedulerTestCase):
             'disk_free': 2000*1024*1024*1024
         })
 
-        fake_inst = FakeInstance()
-        fake_inst.db_setup(cpus=1, memory=1024,
-                           block_devices={'devices': [
-                               {'size': 21, 'base': 'some-os'}
-                           ]})
+        fake_inst = FakeInstance(cpus=1, memory=1024,
+                                 block_devices={'devices': [
+                                    {'size': 21, 'base': 'some-os'}
+                                 ]})
 
         exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().place_instance,
@@ -187,11 +199,10 @@ class LowResourceTestCase(SchedulerTestCase):
             'disk_free': 2000*1024*1024*1024,
         })
 
-        fake_inst = FakeInstance()
-        fake_inst.db_setup(cpus=1, memory=1,
-                           block_devices={'devices': [
-                               {'size': 21, 'base': 'some-os'}
-                           ]})
+        fake_inst = FakeInstance(cpus=1, memory=1,
+                                 block_devices={'devices': [
+                                    {'size': 21, 'base': 'some-os'}
+                                 ]})
 
         exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().place_instance,
@@ -208,11 +219,10 @@ class LowResourceTestCase(SchedulerTestCase):
             'disk_free': 20*1024*1024*1024
         })
 
-        fake_inst = FakeInstance()
-        fake_inst.db_setup(cpus=1, memory=1024,
-                           block_devices={'devices': [
-                               {'size': 21, 'base': 'some-os'}
-                           ]})
+        fake_inst = FakeInstance(cpus=1, memory=1024,
+                                 block_devices={'devices': [
+                                    {'size': 21, 'base': 'some-os'}
+                                 ]})
 
         exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().place_instance,
@@ -230,11 +240,10 @@ class LowResourceTestCase(SchedulerTestCase):
             'disk_free': 2000*1024*1024*1024
         })
 
-        fake_inst = FakeInstance()
-        fake_inst.db_setup(cpus=1, memory=1024,
-                           block_devices={'devices': [
-                               {'size': 8, 'base': 'some-os'}
-                           ]})
+        fake_inst = FakeInstance(cpus=1, memory=1024,
+                                 block_devices={'devices': [
+                                    {'size': 8, 'base': 'some-os'}
+                                 ]})
 
         nodes = scheduler.Scheduler().place_instance(fake_inst, [])
         self.assertSetEqual(set(self.fake_db.nodes)-{'node1_net', },
@@ -290,12 +299,10 @@ class CorrectAllocationTestCase(SchedulerTestCase):
             'disk_free': 2000*1024*1024*1024
         })
 
-        fake_inst = FakeInstance()
-        fake_inst.db_setup(cpus=1, memory=1024,
-                           block_devices={'devices': [
-                               {'size': 8, 'base': 'some-os'}
-                           ]},
-                           )
+        fake_inst = FakeInstance(cpus=1, memory=1024,
+                                 block_devices={'devices': [
+                                    {'size': 8, 'base': 'some-os'}
+                                    ]})
         nets = [{'network_uuid': 'uuid-net2'}]
 
         nodes = scheduler.Scheduler().place_instance(fake_inst, nets)
@@ -312,12 +319,10 @@ class CorrectAllocationTestCase(SchedulerTestCase):
             'disk_free': 2000*1024*1024*1024
         })
 
-        fake_inst = FakeInstance()
-        fake_inst.db_setup(cpus=1, memory=1024,
-                           block_devices={'devices': [
-                               {'size': 8, 'base': 'some-os'}
-                           ]},
-                           )
+        fake_inst = FakeInstance(cpus=1, memory=1024,
+                                 block_devices={'devices': [
+                                    {'size': 8, 'base': 'some-os'}
+                                 ]})
         nets = [{'network_uuid': 'uuid-net1'}]
 
         nodes = scheduler.Scheduler().place_instance(fake_inst, nets)

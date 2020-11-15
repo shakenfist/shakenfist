@@ -61,7 +61,7 @@ class Scheduler(object):
 
     def _has_sufficient_disk(self, instance, node):
         requested_disk = 0
-        for disk in instance.db_entry.get('block_devices', {}).get('devices', []):
+        for disk in instance.block_devices.get('devices', []):
             # TODO(mikal): this ignores "sizeless disks", that is ones that
             # are exactly the size of their base image, for example CD ROMs.
             if 'size' in disk:
@@ -161,8 +161,8 @@ class Scheduler(object):
             if candidates:
                 log_ctx.info('Scheduling %s forced as candidates' %
                              candidates)
-                db.add_event('instance', instance.db_entry['uuid'], 'schedule',
-                             'Forced candidates', None, str(candidates))
+                instance.add_event('schedule',
+                                   'Forced candidates', None, str(candidates))
                 for node in candidates:
                     if node not in self.metrics:
                         raise exceptions.CandidateNodeNotFoundException(node)
@@ -171,19 +171,19 @@ class Scheduler(object):
                 for node in self.metrics.keys():
                     candidates.append(node)
             log_ctx.info('Scheduling %s start as candidates' % candidates)
-            db.add_event('instance', instance.db_entry['uuid'], 'schedule',
-                         'Initial candidates', None, str(candidates))
+            instance.add_event('schedule',
+                               'Initial candidates', None, str(candidates))
             if not candidates:
                 raise exceptions.LowResourceException('No nodes with metrics')
 
             # Can we host that many vCPUs?
             for node in copy.copy(candidates):
                 max_cpu = self.metrics[node].get('cpu_max_per_instance', 0)
-                if instance.db_entry['cpus'] > max_cpu:
+                if instance.cpus > max_cpu:
                     candidates.remove(node)
             log_ctx.info('Scheduling %s have enough actual CPU' % candidates)
-            db.add_event('instance', instance.db_entry['uuid'], 'schedule',
-                         'Have enough actual CPU', None, str(candidates))
+            instance.add_event('schedule',
+                               'Have enough actual CPU', None, str(candidates))
             if not candidates:
                 raise exceptions.LowResourceException(
                     'Requested vCPUs exceeds vCPU limit')
@@ -191,11 +191,11 @@ class Scheduler(object):
             # Do we have enough idle CPU?
             for node in copy.copy(candidates):
                 if not self._has_sufficient_cpu(
-                        instance.db_entry['cpus'], node):
+                        instance.cpus, node):
                     candidates.remove(node)
             log_ctx.info('Scheduling %s have enough idle CPU' % candidates)
-            db.add_event('instance', instance.db_entry['uuid'], 'schedule',
-                         'Have enough idle CPU', None, str(candidates))
+            instance.add_event('schedule',
+                               'Have enough idle CPU', None, str(candidates))
             if not candidates:
                 raise exceptions.LowResourceException(
                     'No nodes with enough idle CPU')
@@ -203,11 +203,11 @@ class Scheduler(object):
             # Do we have enough idle RAM?
             for node in copy.copy(candidates):
                 if not self._has_sufficient_ram(
-                        instance.db_entry['memory'], node):
+                        instance.memory, node):
                     candidates.remove(node)
             log_ctx.info('Scheduling %s have enough idle RAM' % candidates)
-            db.add_event('instance', instance.db_entry['uuid'], 'schedule',
-                         'Have enough idle RAM', None, str(candidates))
+            instance.add_event('schedule',
+                               'Have enough idle RAM', None, str(candidates))
             if not candidates:
                 raise exceptions.LowResourceException(
                     'No nodes with enough idle RAM')
@@ -217,8 +217,8 @@ class Scheduler(object):
                 if not self._has_sufficient_disk(instance, node):
                     candidates.remove(node)
             log_ctx.info('Scheduling %s have enough idle disk' % candidates)
-            db.add_event('instance', instance.db_entry['uuid'], 'schedule',
-                         'Have enough idle disk', None, str(candidates))
+            instance.add_event('schedule',
+                               'Have enough idle disk', None, str(candidates))
             if not candidates:
                 raise exceptions.LowResourceException(
                     'No nodes with enough disk space')
@@ -235,29 +235,28 @@ class Scheduler(object):
                     requested_networks, candidates)
                 log_ctx.info('Scheduling %s have most matching networks'
                              % candidates)
-                db.add_event('instance', instance.db_entry['uuid'], 'schedule',
-                             'Have most matching networks', None,
-                             str(candidates))
+                instance.add_event('schedule', 'Have most matching networks',
+                                   None, str(candidates))
 
             # What nodes have the base image already?
             requested_images = []
-            for disk in instance.db_entry['block_devices']['devices']:
+            for disk in instance.block_devices['devices']:
                 if disk.get('base'):
                     requested_images = disk.get('base')
 
             candidates = self._find_most_matching_images(
                 requested_images, candidates)
             log_ctx.info('Scheduling %s have most matching images' % candidates)
-            db.add_event('instance', instance.db_entry['uuid'], 'schedule',
-                         'Have most matching images', None, str(candidates))
+            instance.add_event('schedule', 'Have most matching images',
+                               None, str(candidates))
 
             # Avoid allocating to network node if possible
             net_node = db.get_network_node()
             if len(candidates) > 1 and net_node['fqdn'] in candidates:
                 candidates.remove(net_node['fqdn'])
                 log_ctx.info('Scheduling %s are non-network nodes' % candidates)
-                db.add_event('instance', instance.db_entry['uuid'], 'schedule',
-                             'Are non-network nodes', None, str(candidates))
+                instance.add_event('schedule', 'Are non-network nodes',
+                                   None, str(candidates))
 
             # Return a shuffled list of options
             random.shuffle(candidates)

@@ -50,11 +50,11 @@ def restore_instances():
                 with db.get_lock(
                         'instance', None, instance, ttl=120, timeout=120,
                         op='Instance restore'):
-                    i = virt.from_db(instance)
+                    i = virt.Instance.from_db(instance)
                     if not i:
                         continue
                     started = ['on', 'transition-to-on', 'initial', 'unknown']
-                    if i.db_entry.get('power_state', 'unknown') not in started:
+                    if i.power_state not in started:
                         continue
 
                     LOG.withObj(i).info('Restoring instance')

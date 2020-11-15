@@ -14,6 +14,7 @@ from shakenfist import image_resolver_cirros
 from shakenfist import image_resolver_ubuntu
 from shakenfist import logutil
 from shakenfist import util
+from shakenfist import virt
 
 
 LOG, _ = logutil.setup(__name__)
@@ -101,7 +102,8 @@ class Image(object):
         if ver == 1:
             return Image(**db_data)
         else:
-            raise exceptions.BadMetadataPacket('Image: %s', db_data)
+            raise exceptions.BadMetadataPacket(
+                'Unknown version - Image: %s', db_data)
 
     def persist(self):
         metadata = {
@@ -154,11 +156,16 @@ class Image(object):
 
                 # Ensure checksum is correct
                 if not self.correct_checksum(actual_image):
+                    if isinstance(related_object, virt.Instance):
+                        related_object.add_event('fetch image', 'bad checksum')
                     raise exceptions.BadCheckSum('url=%s' % self.url)
 
                 # Only persist values after the file has been verified.
                 # Otherwise diff_field will not trigger a new download in the
                 # case of a checksum verification failure.
+                self.fetched = email.utils.formatdate()
+                self.modified = resp.headers.get('Last-Modified')
+                self.size = resp.headers.get('Content-Length')
                 self.persist()
 
         _transcode(locks, actual_image, related_object)
@@ -190,9 +197,6 @@ class Image(object):
         """Download the image if the latest version is not in the cache."""
         fetched = 0
         self.file_version += 1
-        self.fetched = email.utils.formatdate()
-        self.modified = resp.headers.get('Last-Modified')
-        self.size = resp.headers.get('Content-Length')
 
         last_refresh = 0
         with open(self.version_image_path(), 'wb') as f:
