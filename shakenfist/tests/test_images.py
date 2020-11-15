@@ -8,9 +8,12 @@ from shakenfist import exceptions
 from shakenfist import images
 from shakenfist import image_resolver_cirros
 from shakenfist import image_resolver_ubuntu
+from shakenfist import logutil
 from shakenfist.tests import test_shakenfist
 from shakenfist.config import SFConfigBase
 
+
+LOG, _ = logutil.setup(__name__)
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -479,3 +482,142 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
         mock_execute.assert_called_with(
             None,
             'qemu-img convert --force-share -O qcow2 /a/b/c/base /a/b/c/snap')
+
+
+class FakeConfigTmpFile(SFConfigBase):
+    STORAGE_PATH: str = '/tmp/'
+    NODE_NAME: str = 'sf-245'
+    DOWNLOAD_URL_CIRROS: AnyHttpUrl = ('http://download.cirros-cloud.net/%(vernum)s/'
+                                       'cirros-%(vernum)s-x86_64-disk.img')
+
+    DOWNLOAD_URL_UBUNTU: AnyHttpUrl = ('https://cloud-images.ubuntu.com/%(vername)s/current/'
+                                       '%(vername)s-server-cloudimg-amd64.img')
+
+
+class FakeHeaders(object):
+    def __init__(self, headers):
+        self.headers = headers
+
+    def get(self, header):
+        return self.headers.get(header)
+
+
+class FakeResp(object):
+    def __init__(self, headers=None, chunks=None):
+        self.headers = FakeHeaders(headers)
+        self.chunks = chunks
+
+    def iter_content(self, chunk_size=None):
+        for c in self.chunks.pop():
+            yield c
+
+
+class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
+    def setUp(self):
+        super().setUp()
+
+        fake_config = FakeConfigTmpFile()
+
+        self.config = mock.patch('shakenfist.images.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+    def test_correct_checksum(self):
+        test_file = '/tmp/' + self.id()
+        test_checksum = 'a5890ace30a3e84d9118196c161aeec2'
+        image = images.Image('testurl', test_checksum, None, None, None, 0)
+        with open(test_file, 'w') as f:
+            f.write('this is a test file')
+        self.addCleanup(os.remove, test_file)
+
+        # Correct checksum
+        self.assertTrue(image.correct_checksum(test_file))
+
+        # Bad checksum
+        image.checksum = 'wrong'
+        self.assertFalse(image.correct_checksum(test_file))
+
+    @mock.patch('shakenfist.db.refresh_locks')
+    def test__fetch(self, mock_refresh_locks):
+        test_checksum = '097c42989a9e5d9dcced7b35ec4b0486'
+        image = images.Image(self.id(), test_checksum, None, None, None, 0)
+
+        # Data matching checksum
+        self.addCleanup(os.remove, image.image_path + '.v001')
+        resp = FakeResp(chunks=[(b'chunk1', b'chunk2')])
+        ret = image._fetch(resp)
+        self.assertEqual('/tmp/image_cache/d025021483c8f33152ffee46fa274ab00a9be367e19822fa07f25c9650197036.v001', ret)
+        self.assertTrue(image.correct_checksum(image.version_image_path()))
+
+        # Data does not match checksum
+        self.addCleanup(os.remove, image.image_path + '.v002')
+        resp = FakeResp(chunks=[(b'chunk1', b'badchunk2')])
+        ret = image._fetch(resp)
+        self.assertEqual('/tmp/image_cache/d025021483c8f33152ffee46fa274ab00a9be367e19822fa07f25c9650197036.v002', ret)
+        self.assertFalse(image.correct_checksum(image.version_image_path()))
+
+    # Data matches checksum
+    @mock.patch('shakenfist.images._transcode')
+    @mock.patch('shakenfist.images.Image._open_connection',
+                return_value=FakeResp(headers={'Last-Modified': 'yesterday',
+                                               'Content-Length': 123,
+                                               },
+                                      chunks=[
+                                          (b'chunk1', b'chunk2'),
+                                      ]))
+    @mock.patch('shakenfist.etcd.put')
+    @mock.patch('shakenfist.db.refresh_locks')
+    def test_get(self,
+                 mock_refresh_locks, mock_put, mock_open, mock_transcode):
+        test_checksum = '097c42989a9e5d9dcced7b35ec4b0486'
+        image = images.Image(self.id(), test_checksum, None, None, None, 0)
+        self.addCleanup(os.remove, image.image_path + '.v001')
+
+        ret = image.get(None, None)
+        self.assertEqual('/tmp/image_cache/a428fe2fb5e893a6a875e921334e8ebbf9913ba3e74cd2bd3397b6c76b867539.v001', ret)
+        self.assertTrue(image.correct_checksum(image.version_image_path()))
+
+    # First download attempt corrupted, second download matches checksum
+    @mock.patch('shakenfist.images._transcode')
+    @mock.patch('shakenfist.images.Image._open_connection',
+                return_value=FakeResp(headers={'Last-Modified': 'yesterday',
+                                               'Content-Length': 123,
+                                               },
+                                      chunks=[
+                                          (b'chunk1', b'badchunk2'),
+                                          (b'chunk1', b'chunk2'),
+                                      ]))
+    @mock.patch('shakenfist.etcd.put')
+    @mock.patch('shakenfist.db.refresh_locks')
+    def test_get_one_corrupt(self, mock_refresh_locks,
+                             mock_put, mock_open, mock_transcode):
+        test_checksum = '097c42989a9e5d9dcced7b35ec4b0486'
+        image = images.Image(self.id(), test_checksum, None, None, None, 0)
+
+        self.addCleanup(os.remove, image.image_path + '.v001')
+
+        ret = image.get(None, None)
+        self.assertEqual('/tmp/image_cache/318549312751bc53373bf5470d298956be5097c0e492158d03594c44035463eb.v001', ret)
+        self.assertTrue(image.correct_checksum(image.version_image_path()))
+
+    # All download attempts not matching checksum
+    @mock.patch('shakenfist.images.Image._open_connection',
+                return_value=FakeResp(headers={'Last-Modified': 'yesterday',
+                                               'Content-Length': 123,
+                                               },
+                                      chunks=[
+                                          (b'chunk1', b'badchunk2'),
+                                          (b'chunk1', b'badchunk2'),
+                                          (b'chunk1', b'differentbadchunk'),
+                                      ]))
+    @mock.patch('shakenfist.etcd.put')
+    @mock.patch('shakenfist.db.refresh_locks')
+    def test_get_always_corrupt(self, mock_refresh_locks, mock_put, mock_open):
+        test_checksum = '097c42989a9e5d9dcced7b35ec4b0486'
+        image = images.Image(self.id(), test_checksum, None, None, None, 0)
+
+        self.addCleanup(os.remove, image.image_path + '.v001')
+        self.addCleanup(os.remove, image.image_path + '.v002')
+        self.addCleanup(os.remove, image.image_path + '.v003')
+
+        self.assertRaises(exceptions.BadCheckSum, image.get, None, None)
