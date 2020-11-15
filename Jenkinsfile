@@ -28,9 +28,17 @@ pipeline {
                 sudo mkdir -p /var/lib/etcd
                 sudo mount -t tmpfs -o size=2g tmpfs /var/lib/etcd
 
-                echo "Deploying on localhost"
+                if [ "$JOB_NAME%" == "%shakenfist_nightly%" ]
+                then
+                  echo "Deploying a larger cluster"
+                  export CLOUD="gcp-xl"
+                else
+                  echo "Deploying on localhost"
+                  export CLOUD="localhost"
+                fi
+
                 cd $WORKSPACE/deploy/ansible
-                CLOUD=localhost RELEASE="git:master" ./deployandtest.sh
+                RELEASE="git:master" ./deployandtest.sh
           '''
         }
       }
