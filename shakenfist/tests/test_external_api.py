@@ -784,7 +784,6 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                                     'user_data': None,
                                     'placed_on': None,
                                     'namespace': None,
-                                    'instance_uuid': None
                                 }))
         self.assertEqual(
             {'error': 'instance must specify at least one disk', 'status': 400},
@@ -804,7 +803,6 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                                     'user_data': None,
                                     'placed_on': None,
                                     'namespace': None,
-                                    'instance_uuid': None
                                 }))
         self.assertEqual(
             {'error': 'disk specification should contain JSON objects', 'status': 400},
@@ -825,7 +823,6 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                                     'user_data': None,
                                     'placed_on': None,
                                     'namespace': None,
-                                    'instance_uuid': None
                                 }))
         self.assertEqual(
             {'error': 'network specification should contain JSON objects', 'status': 400},
@@ -847,40 +844,11 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                                     'user_data': None,
                                     'placed_on': None,
                                     'namespace': None,
-                                    'instance_uuid': None
                                 }))
         self.assertEqual(
             {'error': 'network specification is missing network_uuid', 'status': 400},
             resp.get_json())
         self.assertEqual(400, resp.status_code)
-
-    def test_post_instance_only_system_allocates_uuids(self):
-        resp = self.client.post(
-            '/auth', data=json.dumps({'namespace': 'banana', 'key': 'foo'}))
-        self.assertEqual(200, resp.status_code)
-        non_system_auth_header = 'Bearer %s' % resp.get_json()['access_token']
-
-        resp = self.client.post('/instances',
-                                headers={
-                                    'Authorization': non_system_auth_header},
-                                data=json.dumps({
-                                    'name': 'test_instance',
-                                    'cpus': 1,
-                                    'memory': 1024,
-                                    'network': [
-                                        {'network_uuid': '87c15186-5f73-4947-a9fb-2183c4951efc'}],
-                                    'disk': [{'size': 8,
-                                              'base': 'cirros'}],
-                                    'ssh_key': None,
-                                    'user_data': None,
-                                    'placed_on': None,
-                                    'namespace': None,
-                                    'instance_uuid': 'cbc58e78-d9ec-4cd5-b417-f715849126e1'
-                                }))
-        self.assertEqual(
-            {'error': 'only system can specify an instance uuid', 'status': 401},
-            resp.get_json())
-        self.assertEqual(401, resp.status_code)
 
     def test_post_instance_only_system_specifies_namespaces(self):
         resp = self.client.post(
@@ -903,42 +871,12 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                                     'user_data': None,
                                     'placed_on': None,
                                     'namespace': 'gerkin',
-                                    'instance_uuid': None
                                 }))
         self.assertEqual(
             {'error': 'only admins can create resources in a different namespace',
              'status': 401},
             resp.get_json())
         self.assertEqual(401, resp.status_code)
-
-    @mock.patch('shakenfist.virt.Instance.from_db', return_value=FakeInstance(namespace='foo'))
-    @mock.patch('shakenfist.db.add_event')
-    def test_post_instance_fails_ownership(self, mock_event, mock_virt_from_db):
-        resp = self.client.post(
-            '/auth', data=json.dumps({'namespace': 'banana', 'key': 'foo'}))
-        self.assertEqual(200, resp.status_code)
-        non_system_auth_header = 'Bearer %s' % resp.get_json()['access_token']
-
-        resp = self.client.post('/instances',
-                                headers={
-                                    'Authorization': non_system_auth_header},
-                                data=json.dumps({
-                                    'name': 'test_instance',
-                                    'cpus': 1,
-                                    'memory': 1024,
-                                    'network': [
-                                        {'network_uuid': '87c15186-5f73-4947-a9fb-2183c4951efc'}],
-                                    'disk': [{'size': 8,
-                                              'base': 'cirros'}],
-                                    'ssh_key': None,
-                                    'user_data': None,
-                                    'placed_on': None,
-                                    'namespace': None,
-                                    'instance_uuid': None
-                                }))
-        self.assertEqual({'error': 'instance not found',
-                          'status': 404}, resp.get_json())
-        self.assertEqual(404, resp.status_code)
 
 
 class ExternalApiNetworkTestCase(ExternalApiTestCase):
