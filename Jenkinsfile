@@ -1,7 +1,7 @@
 pipeline {
   agent {
     node {
-      label 'sf-ci-image'
+      label 'sf-privci'
     }
   }
 
