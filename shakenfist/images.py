@@ -78,6 +78,8 @@ class Image(object):
     def from_url(url, checksum=None):
         # Handle URL shortcut with built-in resolvers
         url, resolver_checksum = Image._resolve(url)
+        if not checksum:
+            checksum = resolver_checksum
 
         # Check for existing metadata in DB
         db_data = db.get_image_metadata(Image.calc_unique_ref(url),
@@ -85,11 +87,10 @@ class Image(object):
 
         # Load DB data into new Image object
         if db_data:
+            db_data['checksum'] = checksum
             return Image.from_db_data(db_data)
 
         # Create new object since not found in database
-        if not checksum:
-            checksum = resolver_checksum
         return Image(url, checksum, None, None, None, 0)
 
     @staticmethod
@@ -159,6 +160,9 @@ class Image(object):
                 # Only persist values after the file has been verified.
                 # Otherwise diff_field will not trigger a new download in the
                 # case of a checksum verification failure.
+                self.fetched = email.utils.formatdate()
+                self.modified = resp.headers.get('Last-Modified')
+                self.size = resp.headers.get('Content-Length')
                 self.persist()
 
         _transcode(locks, actual_image, related_object)
@@ -190,9 +194,6 @@ class Image(object):
         """Download the image if the latest version is not in the cache."""
         fetched = 0
         self.file_version += 1
-        self.fetched = email.utils.formatdate()
-        self.modified = resp.headers.get('Last-Modified')
-        self.size = resp.headers.get('Content-Length')
 
         last_refresh = 0
         with open(self.version_image_path(), 'wb') as f:
