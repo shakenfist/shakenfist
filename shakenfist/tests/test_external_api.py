@@ -26,10 +26,10 @@ class FakeScheduler(object):
 
 class FakeInstance(object):
     def __init__(self, namespace=None):
-        self.db_entry = {'namespace': namespace}
+        self.namespace = namespace
 
     def unique_label(self):
-        return ('instance', self.db_entry['uuid'])
+        return ('instance', self.uuid)
 
 
 def _encode_key(key):
@@ -674,7 +674,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         def fake_virt_from_db(uuid):
             return {'uuid': uuid}
 
-        self.virt_from_db = mock.patch('shakenfist.virt.from_db',
+        self.virt_from_db = mock.patch('shakenfist.virt.Instance.from_db',
                                        fake_virt_from_db)
         self.mock_virt_from_db = self.virt_from_db.start()
         self.addCleanup(self.virt_from_db.stop)
@@ -911,7 +911,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
             resp.get_json())
         self.assertEqual(401, resp.status_code)
 
-    @mock.patch('shakenfist.virt.from_db', return_value=FakeInstance(namespace='foo'))
+    @mock.patch('shakenfist.virt.Instance.from_db', return_value=FakeInstance(namespace='foo'))
     @mock.patch('shakenfist.db.add_event')
     def test_post_instance_fails_ownership(self, mock_event, mock_virt_from_db):
         resp = self.client.post(

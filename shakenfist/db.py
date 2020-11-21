@@ -192,15 +192,7 @@ def persist_floating_gateway(network_uuid, gateway):
 
 
 def get_instance(instance_uuid):
-    i = etcd.get('instance', None, instance_uuid)
-    if not i:
-        return None
-
-    if 'video' not in i:
-        i['video'] = {'model': 'cirrus', 'memory': 16384}
-    if 'error_message' not in i:
-        i['error_message'] = None
-    return i
+    return etcd.get('instance', None, instance_uuid)
 
 
 def get_instances(only_node=None, all=False, namespace=None):
@@ -222,114 +214,8 @@ def get_instances(only_node=None, all=False, namespace=None):
         yield i
 
 
-def persist_block_devices(instance_uuid, block_devices):
-    i = get_instance(instance_uuid)
-    i['block_devices'] = block_devices
-    etcd.put('instance', None, instance_uuid, i)
-
-
-def persist_console_ports(instance_uuid, console_port, vdi_port):
-    # TODO(andy): When Instance class is modified to model Image class this
-    # repetitive write will be moved to a single persist() function.
-    i = get_instance(instance_uuid)
-    i['console_port'] = console_port
-    i['vdi_port'] = vdi_port
-    etcd.put('instance', None, instance_uuid, i)
-
-
-def create_instance(instance_uuid, name, cpus, memory_mb, disk_spec, ssh_key,
-                    user_data, namespace, video, requested_placement):
-    d = {
-        'uuid': instance_uuid,
-        'name': name,
-        'cpus': cpus,
-        'memory': memory_mb,
-        'disk_spec': disk_spec,
-        'ssh_key': ssh_key,
-        'node': config.NODE_NAME,
-        'console_port': 0,
-        'vdi_port': 0,
-        'user_data': user_data,
-        'block_devices': None,
-        'state': 'initial',
-        'state_updated': time.time(),
-        'namespace': namespace,
-        'power_state': 'initial',
-        'video': video,
-        'node_history': [],
-        'error_message': None,
-        'requested_placement': None,
-        'placement_attempts': 0,
-    }
-    etcd.put('instance', None, instance_uuid, d)
-    return d
-
-
-def place_instance(instance_uuid, node):
-    i = get_instance(instance_uuid)
-
-    # We don't write unchanged things to the database
-    if i.get('node') == node:
-        return
-
-    i['node'] = node
-    i['placement_attempts'] = i.get('placement_attempts', 0) + 1
-    etcd.put('instance', None, instance_uuid, i)
-
-
-def instance_enforced_deletes_increment(instance_uuid):
-    i = get_instance(instance_uuid)
-    i['enforced_deletes'] = i.get('enforced_deletes', 0) + 1
-    etcd.put('instance', None, instance_uuid, i)
-
-
-def update_instance_state(instance_uuid, state):
-    i = get_instance(instance_uuid)
-    if not i:
-        LOG.withField('instance_uuid', instance_uuid).error(
-            'update_instance_state() Instance does not exist')
-        return
-
-    # We don't write unchanged things to the database
-    if i.get('state') == state:
-        return
-
-    orig_state = i.get('state', 'unknown')
-    i['state'] = state
-    i['state_updated'] = time.time()
-    etcd.put('instance', None, instance_uuid, i)
-
-    add_event('instance', instance_uuid, 'state changed',
-              '%s -> %s' % (orig_state, state), None, None)
-
-
-def update_instance_power_state(instance_uuid, state):
-    i = get_instance(instance_uuid)
-
-    # We don't write unchanged things to the database
-    if i.get('power_state') == state:
-        return
-
-    # If we are in transition, and its new, then we might
-    # not want to update just yet
-    state_age = time.time() - i.get('power_state_updated', 0)
-    if (i.get('power_state', '').startswith('transition-to-') and
-            i.get('power_state_previous') == state and state_age < 70):
-        return
-
-    i['power_state_previous'] = i.get('power_state', 'unknown')
-    i['power_state'] = state
-    i['power_state_updated'] = time.time()
-    etcd.put('instance', None, instance_uuid, i)
-
-
-def update_instance_error_message(instance_uuid, error_message):
-    i = get_instance(instance_uuid)
-    i['error_message'] = error_message
-    etcd.put('instance', None, instance_uuid, i)
-
-    add_event('instance', instance_uuid, 'error message',
-              error_message, None, None)
+def persist_instance_metadata(instance_uuid, metadata):
+    etcd.put('instance', None, instance_uuid, metadata)
 
 
 def hard_delete_instance(instance_uuid):

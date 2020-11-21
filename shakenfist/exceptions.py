@@ -6,6 +6,15 @@ class VersionSpecificationError(Exception):
     pass
 
 
+# Instance
+class InstanceException(Exception):
+    pass
+
+
+class InstanceNotInDBException(InstanceException):
+    pass
+
+
 class SchedulerException(Exception):
     pass
 

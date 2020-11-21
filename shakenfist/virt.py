@@ -8,7 +8,7 @@ import os
 import pycdlib
 import shutil
 import time
-import uuid
+from uuid import uuid4
 
 from shakenfist.config import config
 from shakenfist import db
@@ -20,21 +20,6 @@ from shakenfist import util
 
 
 LOG, _ = logutil.setup(__name__)
-
-
-def from_definition(uuid=None, name=None, disks=None, memory_mb=None,
-                    vcpus=None, ssh_key=None, user_data=None, owner=None,
-                    video=None, requested_placement=None):
-    db_entry = db.create_instance(uuid, name, vcpus, memory_mb, disks,
-                                  ssh_key, user_data, owner, video, requested_placement)
-    return Instance(db_entry)
-
-
-def from_db(uuid):
-    db_entry = db.get_instance(uuid)
-    if not db_entry:
-        return None
-    return Instance(db_entry)
 
 
 def _get_defaulted_disk_bus(disk):
@@ -68,36 +53,147 @@ def _safe_int_cast(i):
 
 
 class Instance(object):
-    def __init__(self, db_entry):
-        self.db_entry = db_entry
+    def __init__(self, cpus, memory, name, namespace, uuid,
+                 block_devices=None, devices=None, console_port=0,
+                 disk_spec=None, error_message=None, node=None,
+                 node_history=None, placement_attempts=0, power_state='',
+                 power_state_previous=None, power_state_updated=0,
+                 requested_placement=None, ssh_key=None, state=None,
+                 state_updated=None, user_data=None, vdi_port=0,
+                 video=None):
 
-        self.instance_path = os.path.join(
-            config.get('STORAGE_PATH'), 'instances', self.db_entry['uuid'])
-        self.snapshot_path = os.path.join(
-            config.get('STORAGE_PATH'), 'snapshots')
-        self.xml_file = os.path.join(self.instance_path, 'libvirt.xml')
+        self.uuid = uuid
+        self.memory = memory
+        self.name = name
+        self.namespace = namespace
+        self.block_devices = block_devices
+        self.devices = devices
+        self.console_port = console_port
+        self.cpus = cpus
+        self.disk_spec = disk_spec
+        self.error_message = error_message
+        self.node = node
+        self.node_history = node_history
+        self.placement_attempts = placement_attempts
+        self.power_state = power_state
+        self.power_state_previous = power_state_previous
+        self.power_state_updated = power_state_updated
+        self.requested_placement = requested_placement
+        self.ssh_key = ssh_key
+        self.state = state
+        self.state_updated = state_updated
+        self.user_data = user_data
+        self.vdi_port = vdi_port
+        self.video = video
 
-        if not self.db_entry['block_devices']:
-            self._populate_block_devices()
+    @staticmethod
+    def new(name, cpus, memory, namespace, ssh_key=None, disk_spec=None,
+            user_data=None, video=None, requested_placement=None, uuid=None):
+
+        if not uuid:
+            # uuid should only be specified in testing
+            uuid = str(uuid4())
+
+        i = Instance(uuid=uuid,
+                     block_devices=None,
+                     console_port=0,
+                     cpus=cpus,
+                     disk_spec=disk_spec,
+                     error_message=None,
+                     memory=memory,
+                     name=name,
+                     namespace=namespace,
+                     node=None,
+                     node_history=[],
+                     placement_attempts=0,
+                     power_state='initial',
+                     requested_placement=requested_placement,
+                     ssh_key=ssh_key,
+                     state='initial',
+                     state_updated=time.time(),
+                     user_data=user_data,
+                     vdi_port=0,
+                     video=video,
+                     )
+
+        i._populate_block_devices()
+        i.persist()
+        i.add_event('db record creation', None)
+
+        return i
+
+    @staticmethod
+    def from_db(uuid):
+        if not uuid:
+            return None
+
+        db_data = db.get_instance(uuid)
+        if not db_data:
+            return None
+
+        # Handle pre-versioning DB entries
+        if 'version' not in db_data:
+            # Handle old version that also does not have video information
+            if 'video' not in db_data:
+                db_data['video'] = {'model': 'cirrus', 'memory': 16384}
+            version = 1
+        else:
+            version = db_data['version']
+            del db_data['version']
+
+        if version == 1:
+            return Instance(**db_data)
+
+        # Version number is unknown
+        raise exceptions.BadMetadataPacket(
+            'Unknown version - Instance: %s', db_data)
+
+    def persist(self):
+        metadata = {
+                    'uuid': self.uuid,
+                    'memory': self.memory,
+                    'name': self.name,
+                    'namespace': self.namespace,
+                    'block_devices': self.block_devices,
+                    'devices': self.devices,
+                    'console_port': self.console_port,
+                    'cpus': self.cpus,
+                    'disk_spec': self.disk_spec,
+                    'error_message': self.error_message,
+                    'node': self.node,
+                    'node_history': self.node_history,
+                    'placement_attempts': self.placement_attempts,
+                    'power_state': self.power_state,
+                    'power_state_previous': self.power_state_previous,
+                    'power_state_updated': self.power_state_updated,
+                    'requested_placement': self.requested_placement,
+                    'ssh_key': self.ssh_key,
+                    'state': self.state,
+                    'state_updated': self.state_updated,
+                    'user_data': self.user_data,
+                    'vdi_port': self.vdi_port,
+                    'video': self.video,
+
+                    'version': 1
+        }
+        db.persist_instance_metadata(self.uuid, metadata)
 
     def __str__(self):
-        return 'instance(%s)' % self.db_entry['uuid']
+        return 'instance(%s)' % self.uuid
 
     def unique_label(self):
-        return ('instance', self.db_entry['uuid'])
+        return ('instance', self.uuid)
 
     def _populate_block_devices(self):
-        disk_spec = self.db_entry['disk_spec']
-        if not disk_spec:
+        if not self.disk_spec:
             # This should not occur since the API will filter for zero disks.
-            LOG.withObj(self).error(
-                'Found disk spec empty: %s' % self.db_entry)
+            LOG.withObj(self).error('Found disk spec empty')
 
             # Stop continuous crashing by falsely claiming disks are configured.
-            self.db_entry['block_devices'] = {'finalized': True}
+            self.block_devices = {'finalized': True}
             return
 
-        bus = _get_defaulted_disk_bus(disk_spec[0])
+        bus = _get_defaulted_disk_bus(self.disk_spec[0])
         root_device = _get_disk_device_base(bus) + 'a'
         config_device = _get_disk_device_base(bus) + 'b'
 
@@ -105,23 +201,23 @@ class Instance(object):
         if config.get('DISK_FORMAT') == 'flat':
             disk_type = 'raw'
 
-        self.db_entry['block_devices'] = {
+        self.block_devices = {
             'devices': [
                 {
                     'type': disk_type,
-                    'size': _safe_int_cast(self.db_entry['disk_spec'][0].get('size')),
+                    'size': _safe_int_cast(self.disk_spec[0].get('size')),
                     'device': root_device,
                     'bus': bus,
-                    'path': os.path.join(self.instance_path, root_device),
-                    'base': self.db_entry['disk_spec'][0].get('base'),
-                    'present_as': _get_defaulted_disk_type(self.db_entry['disk_spec'][0]),
+                    'path': os.path.join(self.instance_path(), root_device),
+                    'base': self.disk_spec[0].get('base'),
+                    'present_as': _get_defaulted_disk_type(self.disk_spec[0]),
                     'snapshot_ignores': False
                 },
                 {
                     'type': 'raw',
                     'device': config_device,
                     'bus': bus,
-                    'path': os.path.join(self.instance_path, config_device),
+                    'path': os.path.join(self.instance_path(), config_device),
                     'present_as': 'disk',
                     'snapshot_ignores': True
                 }
@@ -129,45 +225,108 @@ class Instance(object):
         }
 
         i = 0
-        for d in self.db_entry['disk_spec'][1:]:
+        for d in self.disk_spec[1:]:
             bus = _get_defaulted_disk_bus(d)
             device = _get_disk_device_base(bus) + chr(ord('c') + i)
-            self.db_entry['block_devices']['devices'].append({
+            self.block_devices['devices'].append({
                 'type': disk_type,
                 'size': _safe_int_cast(d.get('size')),
                 'device': device,
                 'bus': bus,
-                'path': os.path.join(self.instance_path, device),
+                'path': os.path.join(self.instance_path(), device),
                 'base': d.get('base'),
                 'present_as': _get_defaulted_disk_type(d),
                 'snapshot_ignores': False
             })
             i += 1
 
-        self.db_entry['block_devices']['finalized'] = False
+        self.block_devices['finalized'] = False
+
+    def add_event(self, operation, phase, duration=None, msg=None):
+        db.add_event('instance', self.uuid, operation, phase, duration, msg)
+
+    def instance_path(self):
+        return os.path.join(config.get('STORAGE_PATH'), 'instances', self.uuid)
+
+    def snapshot_path(self):
+        return os.path.join(config.get('STORAGE_PATH'), 'snapshots')
+
+    def xml_file(self):
+        return os.path.join(self.instance_path(), 'libvirt.xml')
+
+    def place_instance(self, node):
+        # We don't write unchanged things to the database
+        if self.node == node:
+            return
+
+        self.node = node
+        self.placement_attempts = self.placement_attempts + 1
+        self.persist()
+        self.add_event('placement', None, None, node)
+
+    def enforced_deletes_increment(self):
+        self.enforced_deletes += 1
+        self.persist()
+
+    def update_instance_state(self, state):
+        # We don't write unchanged things to the database
+        if self.state == state:
+            return
+
+        orig_state = self.state
+        self.state = state
+        self.state_updated = time.time()
+        self.persist()
+
+        self.add_event('state changed', '%s -> %s' % (orig_state, state))
+
+    def update_power_state(self, state):
+        # We don't write unchanged things to the database
+        if self.power_state == state:
+            return
+
+        # TODO(andy): Find out what problem this is avoiding
+
+        # If we are in transition, and its new, then we might
+        # not want to update just yet
+        state_age = time.time() - self.power_state_updated
+        if (self.power_state.startswith('transition-to-') and
+                self.power_state_previous == state and
+                state_age < 70):
+            return
+
+        self.power_state_previous = self.power_state
+        self.power_state = state
+        self.power_state_updated = time.time()
+        self.persist()
+
+    def update_error_message(self, error_message):
+        self.error_message = error_message
+        self.persist()
+        self.add_event('error message', error_message)
 
     # NOTE(mikal): this method is now strictly the instance specific steps for
     # creation. It is assumed that the image sits in local cache already, and
     # has been transcoded to the right format. This has been done to facilitate
     # moving to a queue and task based creation mechanism.
     def create(self, lock=None):
-        db.update_instance_state(self.db_entry['uuid'], 'creating')
+        self.update_instance_state('creating')
 
         # Ensure we have state on disk
-        if not os.path.exists(self.instance_path):
+        if not os.path.exists(self.instance_path()):
             LOG.withObj(self).debug(
-                'Creating instance storage at %s' % self.instance_path)
-            os.makedirs(self.instance_path)
+                'Creating instance storage at %s' % self.instance_path())
+            os.makedirs(self.instance_path())
 
         # Generate a config drive
         with util.RecordedOperation('make config drive', self):
             self._make_config_drive(os.path.join(
-                self.instance_path, self.db_entry['block_devices']['devices'][1]['path']))
+                self.instance_path(), self.block_devices['devices'][1]['path']))
 
         # Prepare disks
-        if not self.db_entry['block_devices']['finalized']:
+        if not self.block_devices['finalized']:
             modified_disks = []
-            for disk in self.db_entry['block_devices']['devices']:
+            for disk in self.block_devices['devices']:
                 if disk.get('base'):
                     img = images.Image.from_url(disk['base'])
                     hashed_image_path = img.version_image_path()
@@ -237,11 +396,10 @@ class Instance(object):
 
                 modified_disks.append(disk)
 
-            self.db_entry['block_devices']['devices'] = modified_disks
-            self.db_entry['block_devices']['finalized'] = True
+            self.block_devices['devices'] = modified_disks
+            self.block_devices['finalized'] = True
 
-        db.persist_block_devices(
-            self.db_entry['uuid'], self.db_entry['block_devices'])
+        self.persist()
 
         # Create the actual instance
         with util.RecordedOperation('create domain XML', self):
@@ -262,7 +420,7 @@ class Instance(object):
             LOG.withObj(self).info('Instance now powered on')
         else:
             LOG.withObj(self).info('Instance failed to power on')
-        db.update_instance_state(self.db_entry['uuid'], 'created')
+        self.update_instance_state('created')
 
     def delete(self):
         with util.RecordedOperation('delete domain', self):
@@ -277,13 +435,13 @@ class Instance(object):
 
         with util.RecordedOperation('delete disks', self):
             try:
-                if os.path.exists(self.instance_path):
-                    shutil.rmtree(self.instance_path)
+                if os.path.exists(self.instance_path()):
+                    shutil.rmtree(self.instance_path())
             except Exception as e:
                 util.ignore_exception('instance delete', e)
 
         with util.RecordedOperation('release network addresses', self):
-            for ni in db.get_instance_interfaces(self.db_entry['uuid']):
+            for ni in db.get_instance_interfaces(self.uuid):
                 db.update_network_interface_state(ni['uuid'], 'deleted')
                 with db.get_lock('ipmanager', None, ni['network_uuid'],
                                  ttl=120, op='Instance delete'):
@@ -291,18 +449,16 @@ class Instance(object):
                     ipm.release(ni['ipv4'])
                     db.persist_ipmanager(ni['network_uuid'], ipm.save())
 
-        db.free_console_port(self.db_entry['console_port'])
-        db.free_console_port(self.db_entry['vdi_port'])
+        db.free_console_port(self.console_port)
+        db.free_console_port(self.vdi_port)
+
+        self.update_instance_state('deleted')
 
     def allocate_instance_ports(self):
-        uuid = self.db_entry['uuid']
-        self.db_entry['console_port'] = db.allocate_console_port(uuid)
-        self.db_entry['vdi_port'] = db.allocate_console_port(uuid)
-
-        # TODO(andy): When class is modified to model Image class this
-        # repetitive write will be moved to a single persist() function.
-        db.persist_console_ports(
-            uuid, self.db_entry['console_port'], self.db_entry['vdi_port'])
+        uuid = self.uuid
+        self.console_port = db.allocate_console_port(uuid)
+        self.vdi_port = db.allocate_console_port(uuid)
+        self.persist()
 
     def _make_config_drive(self, disk_path):
         """Create a config drive"""
@@ -328,15 +484,15 @@ class Instance(object):
         # meta_data.json
         md = json.dumps({
             'random_seed': base64.b64encode(os.urandom(512)).decode('ascii'),
-            'uuid': self.db_entry['uuid'],
+            'uuid': self.uuid,
             'availability_zone': config.get('ZONE'),
-            'hostname': '%s.local' % self.db_entry['name'],
+            'hostname': '%s.local' % self.name,
             'launch_index': 0,
             'devices': [],
             'project_id': None,
-            'name': self.db_entry['name'],
+            'name': self.name,
             'public_keys': {
-                'mykey': self.db_entry['ssh_key']
+                'mykey': self.ssh_key
             }
         }).encode('ascii')
         iso.add_fp(io.BytesIO(md), len(md), '/openstack/latest/meta_data.json;1',
@@ -347,8 +503,8 @@ class Instance(object):
                    joliet_path='/openstack/2017-02-22/meta_data.json')
 
         # user_data
-        if self.db_entry['user_data']:
-            user_data = base64.b64decode(self.db_entry['user_data'])
+        if self.user_data:
+            user_data = base64.b64decode(self.user_data)
             iso.add_fp(io.BytesIO(user_data), len(user_data), '/openstack/latest/user_data',
                        rr_name='user_data',
                        joliet_path='/openstack/latest/user_data.json')
@@ -369,7 +525,7 @@ class Instance(object):
         }
 
         seen_networks = []
-        for iface in db.get_instance_interfaces(self.db_entry['uuid']):
+        for iface in db.get_instance_interfaces(self.uuid):
             devname = 'eth%d' % iface['order']
             nd['links'].append(
                 {
@@ -439,14 +595,14 @@ class Instance(object):
     def _create_domain_xml(self):
         """Create the domain XML for the instance."""
 
-        if os.path.exists(self.xml_file):
+        if os.path.exists(self.xml_file()):
             return
 
         with open(os.path.join(config.get('STORAGE_PATH'), 'libvirt.tmpl')) as f:
             t = jinja2.Template(f.read())
 
         networks = []
-        for iface in list(db.get_instance_interfaces(self.db_entry['uuid'])):
+        for iface in list(db.get_instance_interfaces(self.uuid)):
             n = net.from_db(iface['network_uuid'])
             networks.append(
                 {
@@ -460,26 +616,26 @@ class Instance(object):
         # domain XML takes them in KB. That wouldn't be worth a comment here if
         # I hadn't spent _ages_ finding a bug related to it.
         xml = t.render(
-            uuid=self.db_entry['uuid'],
-            memory=self.db_entry['memory'] * 1024,
-            vcpus=self.db_entry['cpus'],
-            disks=self.db_entry['block_devices']['devices'],
+            uuid=self.uuid,
+            memory=self.memory * 1024,
+            vcpus=self.cpus,
+            disks=self.block_devices['devices'],
             networks=networks,
-            instance_path=self.instance_path,
-            console_port=self.db_entry['console_port'],
-            vdi_port=self.db_entry['vdi_port'],
-            video_model=self.db_entry['video']['model'],
-            video_memory=self.db_entry['video']['memory']
+            instance_path=self.instance_path(),
+            console_port=self.console_port,
+            vdi_port=self.vdi_port,
+            video_model=self.video['model'],
+            video_memory=self.video['memory']
         )
 
-        with open(self.xml_file, 'w') as f:
+        with open(self.xml_file(), 'w') as f:
             f.write(xml)
 
     def _get_domain(self):
         libvirt = util.get_libvirt()
         conn = libvirt.open(None)
         try:
-            return conn.lookupByName('sf:' + self.db_entry['uuid'])
+            return conn.lookupByName('sf:' + self.uuid)
 
         except libvirt.libvirtError:
             return None
@@ -493,12 +649,12 @@ class Instance(object):
         return util.extract_power_state(libvirt, instance)
 
     def power_on(self):
-        if not os.path.exists(self.xml_file):
-            db.enqueue_instance_error(self.db_entry['uuid'],
+        if not os.path.exists(self.xml_file()):
+            db.enqueue_instance_error(self.uuid,
                                       'missing domain file in power on')
 
         libvirt = util.get_libvirt()
-        with open(self.xml_file) as f:
+        with open(self.xml_file()) as f:
             xml = f.read()
 
         instance = self._get_domain()
@@ -506,7 +662,7 @@ class Instance(object):
             conn = libvirt.open(None)
             instance = conn.defineXML(xml)
             if not instance:
-                db.enqueue_instance_error(self.db_entry['uuid'],
+                db.enqueue_instance_error(self.uuid,
                                           'power on failed to create domain')
                 raise exceptions.NoDomainException()
 
@@ -519,11 +675,8 @@ class Instance(object):
                 return False
 
         instance.setAutostart(1)
-        db.update_instance_power_state(
-            self.db_entry['uuid'],
-            util.extract_power_state(libvirt, instance))
-        db.add_event('instance',
-                     self.db_entry['uuid'], 'poweron', 'complete', None, None)
+        self.update_power_state(util.extract_power_state(libvirt, instance))
+        self.add_event('poweron', 'complete')
         return True
 
     def power_off(self):
@@ -537,25 +690,24 @@ class Instance(object):
         except libvirt.libvirtError as e:
             LOG.withObj(self).error('Failed to delete domain: %s' % e)
 
-        db.update_instance_power_state(self.db_entry['uuid'], 'off')
-        db.add_event('instance',
-                     self.db_entry['uuid'], 'poweroff', 'complete', None, None)
+        self.update_power_state('off')
+        self.add_event('poweroff', 'complete')
 
     def _snapshot_device(self, source, destination):
         images.snapshot(None, source, destination)
 
     def snapshot(self, all=False):
-        disks = self.db_entry['block_devices']['devices']
+        disks = self.block_devices['devices']
         if not all:
             disks = [disks[0]]
 
-        snapshot_uuid = str(uuid.uuid4())
-        snappath = os.path.join(self.snapshot_path, snapshot_uuid)
+        snapshot_uuid = str(uuid4())
+        snappath = os.path.join(self.snapshot_path(), snapshot_uuid)
         if not os.path.exists(snappath):
             LOG.withObj(self).debug(
                 'Creating snapshot storage at %s' % snappath)
             os.makedirs(snappath)
-            with open(os.path.join(self.snapshot_path, 'index.html'), 'w') as f:
+            with open(os.path.join(self.snapshot_path(), 'index.html'), 'w') as f:
                 f.write('<html></html>')
 
         for d in disks:
@@ -571,7 +723,7 @@ class Instance(object):
             with util.RecordedOperation('snapshot %s' % d['device'], self):
                 self._snapshot_device(
                     d['path'], os.path.join(snappath, d['device']))
-                db.create_snapshot(snapshot_uuid, d['device'], self.db_entry['uuid'],
+                db.create_snapshot(snapshot_uuid, d['device'], self.uuid,
                                    time.time())
 
         return snapshot_uuid
@@ -583,34 +735,24 @@ class Instance(object):
             instance.reboot(flags=libvirt.VIR_DOMAIN_REBOOT_ACPI_POWER_BTN)
         else:
             instance.reset()
-
-        db.add_event(
-            'instance', self.db_entry['uuid'], 'reboot', 'complete', None, None)
+        self.add_event('reboot', 'complete')
 
     def pause(self):
         libvirt = util.get_libvirt()
         instance = self._get_domain()
         instance.suspend()
-        db.update_instance_power_state(
-            self.db_entry['uuid'],
-            util.extract_power_state(libvirt, instance))
-
-        db.add_event(
-            'instance', self.db_entry['uuid'], 'pause', 'complete', None, None)
+        self.update_power_state(util.extract_power_state(libvirt, instance))
+        self.add_event('pause', 'complete')
 
     def unpause(self):
         libvirt = util.get_libvirt()
         instance = self._get_domain()
         instance.resume()
-        db.update_instance_power_state(
-            self.db_entry['uuid'],
-            util.extract_power_state(libvirt, instance))
-
-        db.add_event(
-            'instance', self.db_entry['uuid'], 'unpause', 'complete', None, None)
+        self.update_power_state(util.extract_power_state(libvirt, instance))
+        self.add_event('unpause', 'complete')
 
     def get_console_data(self, length):
-        console_path = os.path.join(self.instance_path, 'console.log')
+        console_path = os.path.join(self.instance_path(), 'console.log')
         if not os.path.exists(console_path):
             return ''
 

@@ -14,6 +14,7 @@ from shakenfist import image_resolver_cirros
 from shakenfist import image_resolver_ubuntu
 from shakenfist import logutil
 from shakenfist import util
+from shakenfist import virt
 
 
 LOG, _ = logutil.setup(__name__)
@@ -102,7 +103,8 @@ class Image(object):
         if ver == 1:
             return Image(**db_data)
         else:
-            raise exceptions.BadMetadataPacket('Image: %s', db_data)
+            raise exceptions.BadMetadataPacket(
+                'Unknown version - Image: %s', db_data)
 
     def persist(self):
         metadata = {
@@ -155,6 +157,8 @@ class Image(object):
 
                 # Ensure checksum is correct
                 if not self.correct_checksum(actual_image):
+                    if isinstance(related_object, virt.Instance):
+                        related_object.add_event('fetch image', 'bad checksum')
                     raise exceptions.BadCheckSum('url=%s' % self.url)
 
                 # Only persist values after the file has been verified.
