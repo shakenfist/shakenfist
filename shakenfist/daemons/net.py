@@ -52,13 +52,13 @@ class Monitor(daemon.Daemon):
         # Ensure we are on every network we have a host for
         for network in host_networks:
             try:
-                n = net.from_db(network)
+                n = net.Network.from_db(network)
                 if not n:
                     continue
 
-                seen_vxids.append(n.db_entry['vxid'])
+                seen_vxids.append(n.vxid)
 
-                if time.time() - n.db_entry['state_updated'] < 60:
+                if time.time() - n.state_updated < 60:
                     # Network state changed in the last minute, punt for now
                     continue
 
@@ -92,7 +92,7 @@ class Monitor(daemon.Daemon):
             #     if extra in vxid_to_uuid:
             #         with db.get_lock('network', None, vxid_to_uuid[extra],
             #                          ttl=120, op='Network reap VXLAN'):
-            #             n = net.from_db(vxid_to_uuid[extra])
+            #             n = net.Network.from_db(vxid_to_uuid[extra])
             #             n.delete()
             #             LOG.info('Extra vxlan %s (network %s) removed.'
             #                      % (extra, vxid_to_uuid[extra]))
@@ -115,7 +115,7 @@ class Monitor(daemon.Daemon):
                 raise exceptions.UnknownTaskException(
                     'Network workitem was not decoded: %s' % workitem)
 
-            n = net.from_db(workitem.network_uuid())
+            n = net.Network.from_db(workitem.network_uuid())
             if not n:
                 log_ctx.withNetwork(workitem.network_uuid()).warning(
                     'Received work item for non-existent network')

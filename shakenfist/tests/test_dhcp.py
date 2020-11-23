@@ -15,7 +15,7 @@ TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 
 class FakeNetwork(object):
     def __init__(self):
-        self.db_entry = {'uuid': 'notauuid'}
+        self.uuid = 'notauuid'
         self.ipmanager = ipmanager.NetBlock('10.0.0.0/8')
         self.router = self.ipmanager.get_address_at_index(1)
         self.dhcp_start = '10.0.0.2'
