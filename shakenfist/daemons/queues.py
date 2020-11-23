@@ -209,7 +209,7 @@ def instance_start(instance_uuid, network):
         nets = {}
         for netdesc in network:
             if netdesc['network_uuid'] not in nets:
-                n = net.from_db(netdesc['network_uuid'])
+                n = net.Network.from_db(netdesc['network_uuid'])
                 if not n:
                     db.enqueue_instance_error(instance_uuid, 'missing network')
                     return
@@ -283,7 +283,7 @@ def instance_delete(instance_uuid, new_state, error_msg=None):
 
         # Check each network used by the deleted instance
         for network in instance_networks:
-            n = net.from_db(network)
+            n = net.Network.from_db(network)
             if n:
                 # If network used by another instance, only update
                 if network in host_networks:

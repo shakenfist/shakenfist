@@ -673,7 +673,7 @@ class Instances(Resource):
         order = 0
         if network:
             for netdesc in network:
-                n = net.from_db(netdesc['network_uuid'])
+                n = net.Network.from_db(netdesc['network_uuid'])
                 if not n:
                     m = 'missing network %s during IP allocation phase' % (
                         netdesc['network_uuid'])
@@ -943,12 +943,12 @@ def _safe_get_network_interface(interface_uuid):
     log = LOG.withFields({'network': ni['network_uuid'],
                           'networkinterface': ni['uuid']})
 
-    n = net.from_db(ni['network_uuid'])
+    n = net.Network.from_db(ni['network_uuid'])
     if not n:
         log.info('Network not found or deleted')
         return None, None, error(404, 'interface network not found')
 
-    if get_jwt_identity() not in [n.db_entry['namespace'], 'system']:
+    if get_jwt_identity() not in [n.namespace, 'system']:
         log.info('Interface not found, failed ownership test')
         return None, None, error(404, 'interface not found')
 
@@ -978,7 +978,7 @@ class InterfaceFloat(Resource):
         if err:
             return err
 
-        float_net = net.from_db('floating')
+        float_net = net.Network.from_db('floating')
         if not float_net:
             return error(404, 'floating network not found')
 
@@ -1001,7 +1001,7 @@ class InterfaceDefloat(Resource):
         if err:
             return err
 
-        float_net = net.from_db('floating')
+        float_net = net.Network.from_db('floating')
         if not float_net:
             return error(404, 'floating network not found')
 
@@ -1108,29 +1108,30 @@ class ImageEvents(Resource):
 
 def _delete_network(network_from_db):
     # Load network from DB to ensure obtaining correct lock.
-    n = net.from_db(network_from_db['uuid'])
+    n = net.Network.from_db(network_from_db['uuid'])
 
     with db.get_object_lock(n, ttl=120, op='Network deleting'):
         if not n or n.is_dead():
-            LOG.withFields({'network_uuid': n.db_entry['uuid'],
-                            'state': n.db_entry['state']}).warning(
+            LOG.withFields({'network_uuid': n.uuid,
+                            'state': n.state}).warning(
                                 'delete_network: network does not exist')
             return error(404, 'network is deleted')
-        db.update_network_state(n.db_entry['uuid'], 'deleting')
+        db.update_network_state(n.uuid, 'deleting')
 
-    db.add_event('network', n.db_entry['uuid'], 'api', 'delete', None, None)
+    db.add_event('network', n.uuid, 'api', 'delete', None, None)
 
     n.remove_dhcp()
     n.delete()
 
-    if n.db_entry.get('floating_gateway'):
+    # TODO(andy): consolidate to one function
+    if n.floating_gateway:
         with db.get_lock(
                 'ipmanager', None, 'floating', ttl=120, op='Network delete'):
             ipm = db.get_ipmanager('floating')
-            ipm.release(n.db_entry['floating_gateway'])
+            ipm.release(n.floating_gateway)
             db.persist_ipmanager('floating', ipm.save())
 
-    db.update_network_state(n.db_entry['uuid'], 'deleted')
+    db.update_network_state(n.uuid, 'deleted')
 
 
 class Network(Resource):

@@ -8,7 +8,7 @@ import re
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import dhcp
-from shakenfist.exceptions import DeadNetwork
+from shakenfist.exceptions import DeadNetwork, BadMetadataPacket
 from shakenfist import logutil
 from shakenfist.tasks import (DeployNetworkTask,
                               UpdateDHCPNetworkTask,
@@ -19,66 +19,100 @@ from shakenfist import util
 LOG, _ = logutil.setup(__name__)
 
 
-def from_db(uuid):
-    # TODO(andy): The whole system of unlocked in-memory objects needs to be
-    # revisited. This lock avoids the network being deleted between the DB load
-    # in the get_network() call and Network.__init__() loading the IPManager
-    # from the DB. Under extreme load testing, instance starts on the same
-    # network will have multi-second start delays due to lock contention .
-    with db.get_lock('network', None, uuid,
-                     ttl=10, timeout=120, op='Object load from DB'):
-        dbnet = db.get_network(uuid)
-        if not dbnet:
-            return None
-        if dbnet['state'] in ('deleted', 'deleting'):
-            LOG.withNetwork(uuid).info('Network is deleted, returning None.')
-            return None
-        return Network(dbnet)
-
-
 class Network(object):
-    # NOTE(mikal): it should be noted that the maximum interface name length
-    # on Linux is 15 user visible characters.
-    def __init__(self, db_entry):
-        self.db_entry = db_entry
-        self.physical_nic = config.get('NODE_EGRESS_NIC')
+    def __init__(self, uuid, vxid, name, namespace, netblock,
+                 provide_dhcp=False, provide_nat=False, state='created',
+                 state_updated=None, floating_gateway=None, ipm=None,
+                 physical_nic=None):
 
-        with db.get_lock('ipmanager', None, self.db_entry['uuid'], ttl=120,
-                         op='Network object initialization'):
-            ipm = db.get_ipmanager(self.db_entry['uuid'])
+        self.floating_gateway = floating_gateway
+        self.name = name
+        self.namespace = namespace
+        self.netblock = netblock
+        self.provide_dhcp = provide_dhcp
+        self.provide_nat = provide_nat
+        self.state = state
+        self.state_updated = state_updated
+        self.uuid = uuid
+        self.vxid = vxid
 
-            self.ipblock = ipm.network_address
-            self.router = ipm.get_address_at_index(1)
-            self.dhcp_start = ipm.get_address_at_index(2)
-            self.netmask = ipm.netmask
-            self.broadcast = ipm.broadcast_address
-            self.network_address = ipm.network_address
+        # NOTE(mikal): it should be noted that the maximum interface name length
+        # on Linux is 15 user visible characters.
 
-            ipm.reserve(self.router)
-            db.persist_ipmanager(self.db_entry['uuid'], ipm.save())
+        self.physical_nic = physical_nic or config.get('NODE_EGRESS_NIC')
+
+        self.ipblock = ipm.network_address
+        self.router = ipm.get_address_at_index(1)
+        self.dhcp_start = ipm.get_address_at_index(2)
+        self.netmask = ipm.netmask
+        self.broadcast = ipm.broadcast_address
+        self.network_address = ipm.network_address
+
+    # @staticmethod
+    # def new():
+
+    @staticmethod
+    def from_db(uuid):
+        if not uuid:
+            return None
+
+        # TODO(andy): The whole system of unlocked in-memory objects needs to
+        # be revisited. This lock avoids the network being deleted between the
+        # DB load in the get_network() call and Network.__init__() loading the
+        # IPManager from the DB. Under extreme load testing, instance starts on
+        # the same network will have multi-second start delays due to lock
+        # contention .
+        with db.get_lock('network', None, uuid,
+                         ttl=10, timeout=120, op='Object load from DB'):
+
+            db_data = db.get_network(uuid)
+            if not db_data:
+                return None
+            if db_data.get('state') in ('deleted', 'deleting'):
+                LOG.withNetwork(uuid).info('Network is deleted.')
+                return None
+
+            with db.get_lock('ipmanager', None, uuid, ttl=120,
+                             op='Network object initialization'):
+                ipm = db.get_ipmanager(uuid)
+                # Reserve first IP address
+                ipm.reserve(ipm.get_address_at_index(1))
+                db.persist_ipmanager(uuid, ipm.save())
+
+        # Handle pre-versioning DB entries
+        if 'version' not in db_data:
+            version = 1
+        else:
+            version = db_data['version']
+            del db_data['version']
+
+        if version == 1:
+            return Network(ipm=ipm, **db_data)
+
+        # Version number is unknown
+        raise BadMetadataPacket('Unknown version - Network: %s', db_data)
 
     def __str__(self):
-        return 'network(%s, vxid %s)' % (self.db_entry['uuid'],
-                                         self.db_entry['vxid'])
+        return 'network(%s, vxid %s)' % (self.uuid, self.vxid)
 
     def unique_label(self):
-        return ('network', self.db_entry['uuid'])
+        return ('network', self.uuid)
 
     def subst_dict(self):
         retval = {
-            'vx_id': self.db_entry['vxid'],
-            'vx_interface': 'vxlan-%s' % self.db_entry['vxid'],
-            'vx_bridge': 'br-vxlan-%s' % self.db_entry['vxid'],
-            'vx_veth_outer': 'veth-%s-o' % self.db_entry['vxid'],
-            'vx_veth_inner': 'veth-%s-i' % self.db_entry['vxid'],
+            'vx_id': self.vxid,
+            'vx_interface': 'vxlan-%s' % self.vxid,
+            'vx_bridge': 'br-vxlan-%s' % self.vxid,
+            'vx_veth_outer': 'veth-%s-o' % self.vxid,
+            'vx_veth_inner': 'veth-%s-i' % self.vxid,
 
             'physical_interface': self.physical_nic,
             'physical_bridge': 'phy-br-%s' % config.get('NODE_EGRESS_NIC'),
-            'physical_veth_outer': 'phy-%s-o' % self.db_entry['vxid'],
-            'physical_veth_inner': 'phy-%s-i' % self.db_entry['vxid'],
+            'physical_veth_outer': 'phy-%s-o' % self.vxid,
+            'physical_veth_inner': 'phy-%s-i' % self.vxid,
 
-            'netns': self.db_entry['uuid'],
-            'in_netns': 'ip netns exec %s' % self.db_entry['uuid'],
+            'netns': self.uuid,
+            'in_netns': 'ip netns exec %s' % self.uuid,
 
             'ipblock': self.ipblock,
             'netmask': self.netmask,
@@ -89,7 +123,7 @@ class Network(object):
 
     def persist_floating_gateway(self):
         db.persist_floating_gateway(
-            self.db_entry['uuid'], self.db_entry['floating_gateway'])
+            self.uuid, self.floating_gateway)
 
     def is_okay(self):
         """Check if network is created and running."""
@@ -98,7 +132,7 @@ class Network(object):
         if not self.is_created():
             return False
 
-        if self.db_entry['provide_dhcp'] and util.is_network_node():
+        if self.provide_dhcp and util.is_network_node():
             if not self.is_dnsmasq_running():
                 return False
 
@@ -122,9 +156,9 @@ class Network(object):
         we definitely need to update the in-memory object model.
         """
         # TODO(andy): To be improved when object model mirrors Image class
-        self.db_entry = db.get_network(self.db_entry['uuid'])
+        db_net = db.get_network(self.uuid)
 
-        return self.db_entry['state'] in ('deleted', 'deleting', 'error')
+        return db_net['state'] in ('deleted', 'deleting', 'error')
 
     def create(self):
         subst = self.subst_dict()
@@ -209,27 +243,27 @@ class Network(object):
             self.deploy_nat()
             self.update_dhcp()
         else:
-            db.enqueue('networknode', DeployNetworkTask(self.db_entry['uuid']))
-            db.add_event('network', self.db_entry['uuid'], 'deploy',
+            db.enqueue('networknode', DeployNetworkTask(self.uuid))
+            db.add_event('network', self.uuid, 'deploy',
                          'enqueued', None, None)
 
     def deploy_nat(self):
-        if not self.db_entry['provide_nat']:
+        if not self.provide_nat:
             return
 
         subst = self.subst_dict()
-        if not self.db_entry['floating_gateway']:
+        if not self.floating_gateway:
             with db.get_lock('ipmanager', None,
                              'floating', ttl=120, op='Network deploy NAT'):
                 ipm = db.get_ipmanager('floating')
-                self.db_entry['floating_gateway'] = ipm.get_random_free_address()
+                self.floating_gateway = ipm.get_random_free_address()
                 db.persist_ipmanager('floating', ipm.save())
                 self.persist_floating_gateway()
 
         # No lock because no data changing
         ipm = db.get_ipmanager('floating')
         subst['floating_router'] = ipm.get_address_at_index(1)
-        subst['floating_gateway'] = self.db_entry['floating_gateway']
+        subst['floating_gateway'] = self.floating_gateway
         subst['floating_netmask'] = ipm.netmask
 
         with db.get_object_lock(self, ttl=120, op='Network deploy NAT'):
@@ -312,11 +346,11 @@ class Network(object):
                     with util.RecordedOperation('delete netns', self):
                         util.execute(None, 'ip netns del %(netns)s' % subst)
 
-                if self.db_entry['floating_gateway']:
+                if self.floating_gateway:
                     with db.get_lock('ipmanager', None, 'floating', ttl=120,
                                      op='Network delete'):
                         ipm = db.get_ipmanager('floating')
-                        ipm.release(self.db_entry['floating_gateway'])
+                        ipm.release(self.floating_gateway)
                         db.persist_ipmanager('floating', ipm.save())
 
     def is_dnsmasq_running(self):
@@ -331,7 +365,7 @@ class Network(object):
         return False
 
     def update_dhcp(self):
-        if not self.db_entry['provide_dhcp']:
+        if not self.provide_dhcp:
             return
 
         if util.is_network_node():
@@ -341,9 +375,8 @@ class Network(object):
                     d = dhcp.DHCP(self, subst['vx_veth_inner'])
                     d.restart_dhcpd()
         else:
-            db.enqueue('networknode', UpdateDHCPNetworkTask(
-                self.db_entry['uuid']))
-            db.add_event('network', self.db_entry['uuid'], 'update dhcp',
+            db.enqueue('networknode', UpdateDHCPNetworkTask(self.uuid))
+            db.add_event('network', self.uuid, 'update dhcp',
                          'enqueued', None, None)
 
     def remove_dhcp(self):
@@ -354,9 +387,8 @@ class Network(object):
                     d = dhcp.DHCP(self, subst['vx_veth_inner'])
                     d.remove_dhcpd()
         else:
-            db.enqueue('networknode', RemoveDHCPNetworkTask(
-                self.db_entry['uuid']))
-            db.add_event('network', self.db_entry['uuid'], 'remove dhcp',
+            db.enqueue('networknode', RemoveDHCPNetworkTask(self.uuid))
+            db.add_event('network', self.uuid, 'remove dhcp',
                          'enqueued', None, None)
 
     def discover_mesh(self):
@@ -380,7 +412,7 @@ class Network(object):
             added = []
 
             instances = []
-            for iface in db.get_network_interfaces(self.db_entry['uuid']):
+            for iface in db.get_network_interfaces(self.uuid):
                 if not iface['instance_uuid'] in instances:
                     instances.append(iface['instance_uuid'])
 
@@ -420,13 +452,11 @@ class Network(object):
                 added.append(node)
 
             if removed:
-                db.add_event(
-                    'network', self.db_entry['uuid'], 'remove mesh elements',
-                    None, None, ' '.join(removed))
+                db.add_event('network', self.uuid, 'remove mesh elements',
+                             None, None, ' '.join(removed))
             if added:
-                db.add_event(
-                    'network', self.db_entry['uuid'], 'add mesh elements',
-                    None, None, ' '.join(added))
+                db.add_event('network', self.uuid, 'add mesh elements',
+                             None, None, ' '.join(added))
 
     def _add_mesh_element(self, node):
         LOG.withObj(self).info('Adding new mesh element %s' % node)

@@ -903,6 +903,10 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
                 return_value={
                     'uuid': '30f6da44-look-i-am-uuid',
                     'state': 'created',
+                    'vxid': 1,
+                    'namespace': 'nonespace',
+                    'name': 'bob',
+                    'netblock': '10.10.0.0/24',
                     })
     @mock.patch('shakenfist.db.get_networks',
                 return_value=[{
@@ -910,6 +914,9 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
                     'name': 'bob',
                     'state': 'created',
                     'uuid': '30f6da44-look-i-am-uuid',
+                    'vxid': 1,
+                    'namespace': 'nonespace',
+                    'netblock': '10.10.0.0/24',
                 }])
     @mock.patch('shakenfist.db.get_network_interfaces', return_value=[])
     @mock.patch('shakenfist.db.get_ipmanager',
