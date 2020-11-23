@@ -1,6 +1,8 @@
 import ipaddress
 import random
 
+from shakenfist import db
+
 
 def from_db(d):
     nb = NetBlock(d['ipmanager.v1']['ipblock'])
@@ -10,7 +12,7 @@ def from_db(d):
 
 
 class NetBlock(object):
-    def __init__(self, ipblock):
+    def __init__(self, ipblock, in_use=None):
         self.ipblock = ipblock
         self.ipblock_obj = ipaddress.ip_network(ipblock, strict=False)
 
@@ -24,6 +26,23 @@ class NetBlock(object):
             self.broadcast_address: True
         }
         self.in_use_counter = 0
+
+        if in_use:
+            for addr in in_use:
+                self.reserve(addr)
+
+    @staticmethod
+    def new():
+        # Reserve first IP address
+        # ipm.reserve(ipm.get_address_at_index(1))
+        # db.persist_ipmanager(uuid, ipm.save())
+        pass
+
+    @staticmethod
+    def from_db(uuid):
+        db_data = db.get_ipmanager(uuid)
+        nb = NetBlock(**db_data['ipmanager.v1'])
+        return nb
 
     def get_address_at_index(self, idx):
         return self.ipblock_obj[idx]

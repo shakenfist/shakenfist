@@ -389,7 +389,7 @@ class VirtTestCase(test_shakenfist.ShakenFistTestCase):
                         'order': 1
                     }
                 ])
-    @mock.patch('shakenfist.net.from_db',
+    @mock.patch('shakenfist.net.Network.from_db',
                 return_value=FakeNetwork())
     def test_make_config_drive(self, mock_net_from_db, mock_interfaces,
                                mock_network):

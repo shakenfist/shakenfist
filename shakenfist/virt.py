@@ -539,7 +539,7 @@ class Instance(object):
             )
 
             if not iface['network_uuid'] in seen_networks:
-                n = net.from_db(iface['network_uuid'])
+                n = net.Network.from_db(iface['network_uuid'])
                 nd['networks'].append(
                     {
                         'id': iface['network_uuid'],
@@ -603,7 +603,7 @@ class Instance(object):
 
         networks = []
         for iface in list(db.get_instance_interfaces(self.uuid)):
-            n = net.from_db(iface['network_uuid'])
+            n = net.Network.from_db(iface['network_uuid'])
             networks.append(
                 {
                     'macaddr': iface['macaddr'],

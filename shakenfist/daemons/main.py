@@ -36,7 +36,7 @@ def restore_instances():
     with util.RecordedOperation('restore networks', None):
         for network in networks:
             try:
-                n = net.from_db(network)
+                n = net.Network.from_db(network)
                 LOG.withObj(n).info('Restoring network')
                 n.create()
                 n.ensure_mesh()
@@ -113,7 +113,7 @@ def main():
         floating_network = db.get_network('floating')
         if not floating_network:
             db.create_floating_network(config.get('FLOATING_NETWORK'))
-            floating_network = net.from_db('floating')
+            floating_network = net.Network.from_db('floating')
 
         subst = {
             'physical_bridge': util.get_safe_interface_name(
