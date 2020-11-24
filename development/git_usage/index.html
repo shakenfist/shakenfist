@@ -712,30 +712,41 @@
 <p>The Shaken Fist developers have chosen <strong>Trunk Based Development.</strong></p>
 <h2 id="branch-types">Branch Types</h2>
 <ol>
-<li><code>master</code> branch<ul>
-<li>This is the development trunk.</li>
-<li>All <code>feature</code> branches are branched from <code>master</code> and merged to <code>master</code>.</li>
+<li>
+<p>Branch <code>master</code></p>
+<ul>
+<li>This branch should be a working version of the project that has passed all unit and integration tests.</li>
+<li>The code is reasonably reliable but still has the reliability of software with a v0.x semver tag.</li>
+<li>Code on the <code>develop</code> branch that has passed all CI pipelines can be merged to <code>master</code>.</li>
 </ul>
 </li>
-<li><code>feature</code> branches<ul>
+<li>
+<p>Branch <code>develop</code></p>
+<ul>
+<li>This is the development trunk.</li>
+<li>All <code>feature</code> branches are branched from <code>develop</code> and merged to <code>develop</code>.</li>
+<li>The <code>develop</code> branch is merged to <code>master</code> when significant development milestones have been adequately tested.</li>
+</ul>
+</li>
+<li>
+<p>Feature branches</p>
+<ul>
 <li>Short-lived, generally a few days.</li>
 <li>Normally only one developer.</li>
 <li>When presented to the team, it is expected to pass the linter and unit tests.</li>
 <li>It is normal that other team members suggest changes/improvements before merging.</li>
 </ul>
 </li>
-<li><code>release-vX.X</code> branches<ul>
+<li>
+<p>Branches <code>release-vX.X</code></p>
+<ul>
 <li>Only created when a release requires patches (hot-fixes).</li>
-<li>Commits to this branch are cherry-picks from <code>master</code>.</li>
+<li>Commits to this branch are cherry-picks from <code>develop</code>.</li>
 <li>It is not expected that many commits are made to this branch.</li>
 <li>If many commits are required to a release branch then this indicates the need for another release.</li>
 </ul>
 </li>
 </ol>
-<div class="admonition attention">
-<p class="admonition-title">Attention</p>
-<p>One day the project might desire a <code>develop</code> branch to ensure that <code>master</code> is always production ready. This can be useful when adding and maturing multiple inter-dependant features. At this stage, it is not required and would lead to more complexity. At this of project maturity, that complexity would be extra effort with the possibility of errors without a significant return.</p>
-</div>
 <h2 id="process">Process</h2>
 <h3 id="feature-branches">Feature branches</h3>
 <ul>
