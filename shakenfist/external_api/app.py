@@ -604,9 +604,9 @@ class Instances(Resource):
         return list(db.get_instances(all=all, namespace=get_jwt_identity()))
 
     @jwt_required
-    def post(self, name=None, cpus=None, memory=None, network=None,
-             disk=None, ssh_key=None, user_data=None, placed_on=None, namespace=None,
-             instance_uuid=None, video=None):
+    def post(self, name=None, cpus=None, memory=None, network=None, disk=None,
+             ssh_key=None, user_data=None, placed_on=None, namespace=None,
+             video=None):
         global SCHEDULER
 
         # Check that the instance name is safe for use as a DNS host name
@@ -648,37 +648,23 @@ class Instances(Resource):
         if not namespace:
             namespace = get_jwt_identity()
 
-        # Only system can specify a uuid
-        if instance_uuid and get_jwt_identity() != 'system':
-            return error(401, 'only system can specify an instance uuid')
-
         # If accessing a foreign namespace, we need to be an admin
         if get_jwt_identity() not in [namespace, 'system']:
             return error(401,
                          'only admins can create resources in a different namespace')
 
-        # The instance needs to exist in the DB before network interfaces are created
-        instance = virt.Instance.from_db(instance_uuid)
-        if instance:
-            if get_jwt_identity() not in [instance.namespace, 'system']:
-                LOG.withField('instance', instance_uuid).info(
-                    'Instance not found, ownership test')
-                return error(404, 'instance not found')
-
         # Create instance object
-        if not instance:
-            instance = virt.Instance.new(
-                uuid=instance_uuid,
-                name=name,
-                disk_spec=disk,
-                memory=memory,
-                cpus=cpus,
-                ssh_key=ssh_key,
-                user_data=user_data,
-                namespace=namespace,
-                video=video,
-                requested_placement=placed_on
-            )
+        instance = virt.Instance.new(
+            name=name,
+            disk_spec=disk,
+            memory=memory,
+            cpus=cpus,
+            ssh_key=ssh_key,
+            user_data=user_data,
+            namespace=namespace,
+            video=video,
+            requested_placement=placed_on
+        )
 
         # Initialise metadata
         db.persist_metadata('instance', instance.uuid, {})
