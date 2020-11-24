@@ -3,12 +3,15 @@
 import os
 import psutil
 import re
+import time
+from uuid import uuid4
 
 
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import dhcp
-from shakenfist.exceptions import DeadNetwork, BadMetadataPacket
+from shakenfist.exceptions import DeadNetwork, BadMetadataPacket, IllegalState
+from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist.tasks import (DeployNetworkTask,
                               UpdateDHCPNetworkTask,
@@ -31,7 +34,7 @@ class Network(object):
         self.netblock = netblock
         self.provide_dhcp = provide_dhcp
         self.provide_nat = provide_nat
-        self.state = state
+        self._state = state
         self.state_updated = state_updated
         self.uuid = uuid
         self.vxid = vxid
@@ -41,6 +44,7 @@ class Network(object):
 
         self.physical_nic = physical_nic or config.get('NODE_EGRESS_NIC')
 
+        self.ipm = ipm
         self.ipblock = ipm.network_address
         self.router = ipm.get_address_at_index(1)
         self.dhcp_start = ipm.get_address_at_index(2)
@@ -48,8 +52,54 @@ class Network(object):
         self.broadcast = ipm.broadcast_address
         self.network_address = ipm.network_address
 
-    # @staticmethod
-    # def new():
+    @property
+    def state(self):
+        return self._state
+
+    @state.setter
+    def state(self, new_state):
+        # TODO(andy): should we update from db? should we lock?
+        # TODO(andy): are networks ever set to 'error'?
+        if new_state not in ('created', 'deleting', 'deleted', 'error'):
+            raise IllegalState('Tried to set Network to state: %s' % new_state)
+        self._state = new_state
+        self._state_updated = time.time()
+        self.persist()
+
+    @staticmethod
+    def new(name, namespace, netblock, provide_dhcp=False,
+            provide_nat=False, floating_gateway=None, uuid=None, vxid=None):
+
+        if not uuid:
+            uuid = str(uuid4())
+        ipm = IPManager.new(uuid, netblock)
+
+        if not vxid:
+            vxid = db.allocate_vxid(uuid)
+
+        ipm = IPManager.new(uuid, netblock)
+        net = Network(uuid=uuid,
+                      vxid=vxid,
+                      name=name,
+                      namespace=namespace,
+                      netblock=netblock,
+                      provide_dhcp=provide_dhcp,
+                      provide_nat=provide_nat,
+                      floating_gateway=None,
+                      state_updated=time.time(),
+                      ipm=ipm)
+        net.persist()
+        net.add_event('network', 'created')
+
+        # Networks should immediately appear on the network node
+        db.enqueue('networknode', DeployNetworkTask(uuid))
+        net.add_event('deploy', 'enqueued')
+
+        # TODO(andy): Integrate metadata into each object type
+        # Initialise metadata
+        db.persist_metadata('network', uuid, {})
+
+        return net
 
     @staticmethod
     def from_db(uuid):
@@ -72,12 +122,7 @@ class Network(object):
                 LOG.withNetwork(uuid).info('Network is deleted.')
                 return None
 
-            with db.get_lock('ipmanager', None, uuid, ttl=120,
-                             op='Network object initialization'):
-                ipm = db.get_ipmanager(uuid)
-                # Reserve first IP address
-                ipm.reserve(ipm.get_address_at_index(1))
-                db.persist_ipmanager(uuid, ipm.save())
+            ipm = IPManager.from_db(uuid)
 
         # Handle pre-versioning DB entries
         if 'version' not in db_data:
@@ -92,11 +137,44 @@ class Network(object):
         # Version number is unknown
         raise BadMetadataPacket('Unknown version - Network: %s', db_data)
 
+    def metadata(self):
+        return {
+            "floating_gateway": self.floating_gateway,
+            "name": self.name,
+            "namespace": self.namespace,
+            "netblock": self.netblock,
+            "provide_dhcp": self.provide_dhcp,
+            "provide_nat": self.provide_nat,
+            "state": self._state,
+            "state_updated": self.state_updated,
+            "uuid": self.uuid,
+            "vxid": self.vxid,
+
+            "version": 1,
+            }
+
+    def persist(self):
+        db.persist_network(self.uuid, self.metadata())
+
     def __str__(self):
         return 'network(%s, vxid %s)' % (self.uuid, self.vxid)
 
     def unique_label(self):
         return ('network', self.uuid)
+
+    @staticmethod
+    def create_floating_network(netblock):
+        return Network.new(uuid='floating',
+                           vxid=0,
+                           netblock=netblock,
+                           provide_dhcp=False,
+                           provide_nat=False,
+                           namespace=None,
+                           floating_gateway=None,
+                           name='floating')
+
+    def add_event(self, operation, phase=None, duration=None, message=None):
+        db.add_event('network', self.uuid, operation, phase, duration, message)
 
     def subst_dict(self):
         retval = {
@@ -120,10 +198,6 @@ class Network(object):
             'broadcast': self.broadcast,
         }
         return retval
-
-    def persist_floating_gateway(self):
-        db.persist_floating_gateway(
-            self.uuid, self.floating_gateway)
 
     def is_okay(self):
         """Check if network is created and running."""
@@ -255,13 +329,13 @@ class Network(object):
         if not self.floating_gateway:
             with db.get_lock('ipmanager', None,
                              'floating', ttl=120, op='Network deploy NAT'):
-                ipm = db.get_ipmanager('floating')
+                ipm = IPManager.from_db('floating')
                 self.floating_gateway = ipm.get_random_free_address()
-                db.persist_ipmanager('floating', ipm.save())
-                self.persist_floating_gateway()
+                ipm.persist()
+                self.persist()
 
         # No lock because no data changing
-        ipm = db.get_ipmanager('floating')
+        ipm = IPManager.from_db('floating')
         subst['floating_router'] = ipm.get_address_at_index(1)
         subst['floating_gateway'] = self.floating_gateway
         subst['floating_netmask'] = ipm.netmask
@@ -349,9 +423,12 @@ class Network(object):
                 if self.floating_gateway:
                     with db.get_lock('ipmanager', None, 'floating', ttl=120,
                                      op='Network delete'):
-                        ipm = db.get_ipmanager('floating')
+                        ipm = IPManager.from_db('floating')
                         ipm.release(self.floating_gateway)
-                        db.persist_ipmanager('floating', ipm.save())
+                        ipm.persist()
+
+            db.deallocate_vxid(self.vxid)
+            self.ipm.delete()
 
     def is_dnsmasq_running(self):
         """Determine if dnsmasq process is running for this network"""

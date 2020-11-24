@@ -4,15 +4,9 @@ import random
 from shakenfist import db
 
 
-def from_db(d):
-    nb = NetBlock(d['ipmanager.v1']['ipblock'])
-    for addr in d['ipmanager.v1']['in_use']:
-        nb.reserve(addr)
-    return nb
-
-
-class NetBlock(object):
-    def __init__(self, ipblock, in_use=None):
+class IPManager(object):
+    def __init__(self, uuid, ipblock, in_use=None):
+        self.uuid = uuid
         self.ipblock = ipblock
         self.ipblock_obj = ipaddress.ip_network(ipblock, strict=False)
 
@@ -32,17 +26,38 @@ class NetBlock(object):
                 self.reserve(addr)
 
     @staticmethod
-    def new():
-        # Reserve first IP address
-        # ipm.reserve(ipm.get_address_at_index(1))
-        # db.persist_ipmanager(uuid, ipm.save())
-        pass
+    def new(uuid, ipblock):
+        with db.get_lock('ipmanager', None, uuid, ttl=120,
+                         op='Network object initialization'):
+            ipm = IPManager(uuid, ipblock)
+            # Reserve first IP address
+            ipm.reserve(ipm.get_address_at_index(1))
+            ipm.persist()
+        return ipm
 
     @staticmethod
     def from_db(uuid):
         db_data = db.get_ipmanager(uuid)
-        nb = NetBlock(**db_data['ipmanager.v1'])
-        return nb
+        ipm = IPManager(uuid=uuid, **db_data['ipmanager.v1'])
+        return ipm
+
+    def persist(self):
+        in_use = []
+        for ip in self.in_use:
+            ip_str = str(ip)
+            if ip_str not in in_use:
+                in_use.append(ip_str)
+
+        d = {
+                'ipmanager.v1': {
+                    'ipblock': self.ipblock,
+                    'in_use': in_use
+                }
+            }
+        db.persist_ipmanager(self.uuid, d)
+
+    def delete(self):
+        db.delete_ipmanager(self.uuid)
 
     def get_address_at_index(self, idx):
         return self.ipblock_obj[idx]
@@ -90,17 +105,3 @@ class NetBlock(object):
                     return str(addr)
 
                 idx += 1
-
-    def save(self):
-        in_use = []
-        for ip in self.in_use:
-            ip_str = str(ip)
-            if ip_str not in in_use:
-                in_use.append(ip_str)
-
-        return {
-            'ipmanager.v1': {
-                'ipblock': self.ipblock,
-                'in_use': in_use
-            }
-        }

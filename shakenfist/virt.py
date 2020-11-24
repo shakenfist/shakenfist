@@ -14,6 +14,7 @@ from shakenfist.config import config
 from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import images
+from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
 from shakenfist import util
@@ -445,9 +446,9 @@ class Instance(object):
                 db.update_network_interface_state(ni['uuid'], 'deleted')
                 with db.get_lock('ipmanager', None, ni['network_uuid'],
                                  ttl=120, op='Instance delete'):
-                    ipm = db.get_ipmanager(ni['network_uuid'])
+                    ipm = IPManager.from_db(ni['network_uuid'])
                     ipm.release(ni['ipv4'])
-                    db.persist_ipmanager(ni['network_uuid'], ipm.save())
+                    ipm.persist()
 
         db.free_console_port(self.console_port)
         db.free_console_port(self.vdi_port)

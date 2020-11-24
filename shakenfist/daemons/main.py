@@ -14,6 +14,7 @@ from shakenfist.daemons import net as net_daemon
 from shakenfist.daemons import resources as resource_daemon
 from shakenfist.daemons import triggers as trigger_daemon
 from shakenfist import db
+from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
 from shakenfist import util
@@ -130,7 +131,7 @@ def main():
             # floating IPs don't work.
             with util.RecordedOperation('create physical bridge', None):
                 # No locking as read only
-                ipm = db.get_ipmanager('floating')
+                ipm = IPManager.from_db('floating')
                 subst['master_float'] = ipm.get_address_at_index(1)
                 subst['netmask'] = ipm.netmask
 
