@@ -6,7 +6,7 @@ import pycdlib
 import tempfile
 import time
 
-from shakenfist import ipmanager
+from shakenfist.ipmanager import IPManager
 from shakenfist import virt
 from shakenfist.config import SFConfig
 from shakenfist.tests import test_shakenfist
@@ -14,7 +14,7 @@ from shakenfist.tests import test_shakenfist
 
 class FakeNetwork(object):
     def __init__(self):
-        self.ipmanager = ipmanager.NetBlock('127.0.0.0/8')
+        self.ipmanager = IPManager('uuid', '127.0.0.0/8')
         self.router = self.ipmanager.get_address_at_index(1)
         self.netmask = '255.0.0.0'
         self.dhcp_start = '127.0.0.2'

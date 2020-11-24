@@ -2,7 +2,7 @@ import mock
 
 from shakenfist import net
 from shakenfist.config import SFConfig
-from shakenfist import ipmanager
+from shakenfist.ipmanager import IPManager
 from shakenfist.tests import test_shakenfist
 
 
@@ -11,7 +11,7 @@ class NetworkTestCase(test_shakenfist.ShakenFistTestCase):
         super(NetworkTestCase, self).setUp()
 
         self.ipmanager_get = mock.patch(
-            'shakenfist.db.get_ipmanager')
+            'shakenfist.ipmanager.IPManager.from_db')
         self.mock_ipmanager_get = self.ipmanager_get.start()
         self.addCleanup(self.ipmanager_get.stop)
 
@@ -39,7 +39,7 @@ class NetworkGeneralTestCase(NetworkTestCase):
                     provide_nat=True,
                     physical_nic='eth0',
                     netblock='192.168.1.0/24',
-                    ipm=ipmanager.NetBlock('192.168.1.0/24'))
+                    ipm=IPManager('uuid', '192.168.1.0/24'))
 
     def test_str(self):
         n = net.Network(uuid='notauuid',
@@ -50,7 +50,7 @@ class NetworkGeneralTestCase(NetworkTestCase):
                         provide_nat=True,
                         physical_nic='eth0',
                         netblock='192.168.1.0/24',
-                        ipm=ipmanager.NetBlock('192.168.1.0/24'))
+                        ipm=IPManager('uuid', '192.168.1.0/24'))
         self.assertEqual('network(notauuid, vxid 42)', str(n))
 
 
@@ -76,7 +76,7 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
                         provide_nat=True,
                         physical_nic='eth0',
                         netblock='192.168.1.0/24',
-                        ipm=ipmanager.NetBlock('192.168.1.0/24'))
+                        ipm=IPManager('uuid', '192.168.1.0/24'))
         self.assertTrue(n.is_okay())
 
     @mock.patch('shakenfist.net.Network.is_created', return_value=False)
@@ -90,7 +90,7 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
                         provide_nat=True,
                         physical_nic='eth0',
                         netblock='192.168.1.0/24',
-                        ipm=ipmanager.NetBlock('192.168.1.0/24'))
+                        ipm=IPManager('uuid', '192.168.1.0/24'))
         self.assertFalse(n.is_okay())
 
     @mock.patch('shakenfist.net.Network.is_created', return_value=True)
@@ -105,7 +105,7 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
                         provide_nat=True,
                         physical_nic='eth0',
                         netblock='192.168.1.0/24',
-                        ipm=ipmanager.NetBlock('192.168.1.0/24'))
+                        ipm=IPManager('uuid', '192.168.1.0/24'))
         self.assertTrue(n.is_okay())
 
 
@@ -132,7 +132,7 @@ class NetworkNetNodeTestCase(NetworkTestCase):
                         provide_nat=True,
                         physical_nic='eth0',
                         netblock='192.168.1.0/24',
-                        ipm=ipmanager.NetBlock('192.168.1.0/24'))
+                        ipm=IPManager('uuid', '192.168.1.0/24'))
         self.assertTrue(n.is_okay())
 
     @mock.patch('shakenfist.net.Network.is_created', return_value=False)
@@ -146,7 +146,7 @@ class NetworkNetNodeTestCase(NetworkTestCase):
                         provide_nat=True,
                         physical_nic='eth0',
                         netblock='192.168.1.0/24',
-                        ipm=ipmanager.NetBlock('192.168.1.0/24'))
+                        ipm=IPManager('uuid', '192.168.1.0/24'))
         self.assertFalse(n.is_okay())
 
     @mock.patch('shakenfist.net.Network.is_created', return_value=True)
@@ -160,7 +160,7 @@ class NetworkNetNodeTestCase(NetworkTestCase):
                         provide_nat=False,
                         physical_nic='eth0',
                         netblock='192.168.1.0/24',
-                        ipm=ipmanager.NetBlock('192.168.1.0/24'))
+                        ipm=IPManager('uuid', '192.168.1.0/24'))
         self.assertFalse(n.is_okay())
 
     @mock.patch('shakenfist.net.Network.is_created', return_value=True)
@@ -174,7 +174,7 @@ class NetworkNetNodeTestCase(NetworkTestCase):
                         provide_nat=False,
                         physical_nic='eth0',
                         netblock='192.168.1.0/24',
-                        ipm=ipmanager.NetBlock('192.168.1.0/24'))
+                        ipm=IPManager('uuid', '192.168.1.0/24'))
         self.assertTrue(n.is_okay())
 
     #
@@ -196,7 +196,7 @@ link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
                         provide_nat=True,
                         physical_nic='eth0',
                         netblock='192.168.1.0/24',
-                        ipm=ipmanager.NetBlock('192.168.1.0/24'))
+                        ipm=IPManager('uuid', '192.168.1.0/24'))
         self.assertTrue(n.is_created())
 
     pgrep = ('1: br-vxlan-5: <BROADCAST,MULTICAST,DOWN,LOWER_UP> mtu 1500'
@@ -215,7 +215,7 @@ link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
                         provide_nat=True,
                         physical_nic='eth0',
                         netblock='192.168.1.0/24',
-                        ipm=ipmanager.NetBlock('192.168.1.0/24'))
+                        ipm=IPManager('uuid', '192.168.1.0/24'))
         self.assertFalse(n.is_created())
 
     pgrep = 'Device "br-vxlan-45" does not exist.'
@@ -231,5 +231,5 @@ link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
                         provide_nat=True,
                         physical_nic='eth0',
                         netblock='192.168.1.0/24',
-                        ipm=ipmanager.NetBlock('192.168.1.0/24'))
+                        ipm=IPManager('uuid', '192.168.1.0/24'))
         self.assertFalse(n.is_created())
