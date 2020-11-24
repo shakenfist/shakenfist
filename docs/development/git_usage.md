@@ -13,22 +13,28 @@ The majority of teams using git have a work flow that looks similar to the four 
 The Shaken Fist developers have chosen **Trunk Based Development.**
 
 ## Branch Types
-1. `master` branch
+1. Branch `master`
+    - This branch should be a working version of the project that has passed all unit and integration tests.
+    - The code is reasonably reliable but still has the reliability of software with a v0.x semver tag.
+    - Code on the `develop` branch that has passed all CI pipelines can be merged to `master`.
+
+2. Branch `develop`
     - This is the development trunk.
-    - All `feature` branches are branched from `master` and merged to `master`.
-2. `feature` branches
+    - All `feature` branches are branched from `develop` and merged to `develop`.
+    - The `develop` branch is merged to `master` when significant development milestones have been adequately tested.
+
+3. Feature branches
     - Short-lived, generally a few days.
     - Normally only one developer.
     - When presented to the team, it is expected to pass the linter and unit tests.
     - It is normal that other team members suggest changes/improvements before merging.
-3. `release-vX.X` branches
+
+4. Branches `release-vX.X`
     - Only created when a release requires patches (hot-fixes).
-    - Commits to this branch are cherry-picks from `master`.
+    - Commits to this branch are cherry-picks from `develop`.
     - It is not expected that many commits are made to this branch.
     - If many commits are required to a release branch then this indicates the need for another release.
 
-!!! attention
-    One day the project might desire a `develop` branch to ensure that `master` is always production ready. This can be useful when adding and maturing multiple inter-dependant features. At this stage, it is not required and would lead to more complexity. At this of project maturity, that complexity would be extra effort with the possibility of errors without a significant return.
 
 ## Process
 
