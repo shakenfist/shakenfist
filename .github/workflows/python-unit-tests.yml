@@ -7,16 +7,18 @@ on:
   push:
     branches:
       - master
+      - develop
       - v*-devel
   pull_request:
     branches:
       - master
+      - develop
       - v*-devel
 
 jobs:
   lint:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code with two commits
         uses: actions/checkout@v2
@@ -31,7 +33,7 @@ jobs:
       - name: Lint with flake8
         run: |
           tox -eflake8
-          
+
   build37:
     runs-on: ubuntu-latest
 
@@ -62,7 +64,7 @@ jobs:
       - name: Test with python 3.7 again again
         run: |
           tox -epy37
-          
+
   build38:
     runs-on: ubuntu-latest
 
