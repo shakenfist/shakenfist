@@ -7,7 +7,7 @@ import testtools
 from pydantic import AnyHttpUrl, IPvAnyAddress
 
 from shakenfist import dhcp
-from shakenfist import ipmanager
+from shakenfist.ipmanager import IPManager
 from shakenfist.config import SFConfigBase
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -16,7 +16,7 @@ TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 class FakeNetwork(object):
     def __init__(self):
         self.uuid = 'notauuid'
-        self.ipmanager = ipmanager.NetBlock('10.0.0.0/8')
+        self.ipmanager = IPManager('uuid', '10.0.0.0/8')
         self.router = self.ipmanager.get_address_at_index(1)
         self.dhcp_start = '10.0.0.2'
         self.netmask = '255.0.0.0'

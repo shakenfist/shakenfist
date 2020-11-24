@@ -9,7 +9,6 @@ import uuid
 from shakenfist.config import config
 from shakenfist import etcd
 from shakenfist import exceptions
-from shakenfist import ipmanager
 from shakenfist import logutil
 from shakenfist import util
 from shakenfist.tasks import DeleteInstanceTask, ErrorInstanceTask
@@ -92,6 +91,10 @@ def get_network(network_uuid):
     return etcd.get('network', None, network_uuid)
 
 
+def persist_network(network_uuid, data):
+    etcd.put('network', None, network_uuid, data)
+
+
 def get_networks(all=False, namespace=None):
     for n in etcd.get_all('network', None):
         if n['uuid'] == 'floating':
@@ -105,42 +108,15 @@ def get_networks(all=False, namespace=None):
         yield n
 
 
-def allocate_network(netblock, provide_dhcp=True, provide_nat=False, name=None,
-                     namespace=None):
-
-    net_id = str(uuid.uuid4())
-    ipm = ipmanager.NetBlock(netblock)
-    etcd.put('ipmanager', None, net_id, ipm.save())
-
+def allocate_vxid(net_id):
     vxid = 1
     while not etcd.create('vxlan', None, vxid, {'network_uuid': net_id}):
         vxid += 1
-
-    d = {
-        'uuid': net_id,
-        'vxid': vxid,
-        'netblock': netblock,
-        'provide_dhcp': provide_dhcp,
-        'provide_nat': provide_nat,
-        'namespace': namespace,
-        'floating_gateway': None,
-        'name': name,
-        'state': 'initial',
-        'state_updated': time.time()
-    }
-    etcd.put('network', None, net_id, d)
-    return d
+    return vxid
 
 
-def update_network_state(network_uuid, state):
-    n = get_network(network_uuid)
-    n['state'] = state
-    n['state_updated'] = time.time()
-    etcd.put('network', None, network_uuid, n)
-
-    if state == 'deleted':
-        etcd.delete('vxlan', None, n['vxid'])
-        etcd.delete('ipmanager', None, n['uuid'])
+def deallocate_vxid(vxid):
+    etcd.delete('vxlan', None, vxid)
 
 
 def get_stale_networks(delay):
@@ -156,39 +132,19 @@ def hard_delete_network(network_uuid):
     delete_metadata('network', network_uuid)
 
 
-def create_floating_network(netblock):
-    ipm = ipmanager.NetBlock(netblock)
-    etcd.put('ipmanager', None, 'floating', ipm.save())
-    etcd.put('network', None, 'floating',
-             {
-                 'uuid': 'floating',
-                 'vxid': 0,
-                 'netblock': netblock,
-                 'provide_dhcp': False,
-                 'provide_nat': False,
-                 'namespace': None,
-                 'floating_gateway': None,
-                 'name': 'floating',
-                 'state': 'initial',
-                 'state_updated': time.time()
-             })
-
-
 def get_ipmanager(network_uuid):
     ipm = etcd.get('ipmanager', None, network_uuid)
     if not ipm:
         raise Exception('IP Manager not found for network %s' % network_uuid)
-    return ipmanager.from_db(ipm)
+    return ipm
 
 
 def persist_ipmanager(network_uuid, data):
     etcd.put('ipmanager', None, network_uuid, data)
 
 
-def persist_floating_gateway(network_uuid, gateway):
-    n = get_network(network_uuid)
-    n['floating_gateway'] = gateway
-    etcd.put('network', None, network_uuid, n)
+def delete_ipmanager(network_uuid):
+    etcd.delete('ipmanager', None, uuid)
 
 
 def get_instance(instance_uuid):

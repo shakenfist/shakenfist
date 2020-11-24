@@ -6,6 +6,15 @@ class VersionSpecificationError(Exception):
     pass
 
 
+# Objects
+class ObjectException(Exception):
+    pass
+
+
+class IllegalState(ObjectException):
+    pass
+
+
 # Instance
 class InstanceException(Exception):
     pass
