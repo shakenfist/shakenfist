@@ -4,6 +4,7 @@ import psutil
 import time
 
 from etcd3gw.client import Etcd3Client
+from etcd3gw.exceptions import InternalServerError
 from etcd3gw.lock import Lock
 
 from shakenfist.config import config
@@ -23,6 +24,29 @@ from shakenfist.tasks import QueueTask
 LOG, _ = logutil.setup(__name__)
 
 LOCK_PREFIX = '/sflocks'
+
+
+def retry_etcd_forever(func):
+    """Retry the Etcd server forever.
+
+    If the DB is unable to process the request then SF cannot operate,
+    therefore wait until it comes back online. If the DB falls out of sync with
+    the system then we will have bigger problems than a small delay.
+
+    If the etcd server is not running, then a ConnectionFailedError exception
+    will occur. This is deliberately allowed to cause an SF daemon failure to
+    bring attention to the deeper problem.
+    """
+    def wrapper(*args, **kwargs):
+        count = 0
+        while True:
+            try:
+                return func(*args, **kwargs)
+            except InternalServerError as e:
+                LOG.error('Etcd3gw Internal Server Error: %s' % e)
+            time.sleep(count/10.0)
+            count += 1
+    return wrapper
 
 
 class ActualLock(Lock):
@@ -51,6 +75,7 @@ class ActualLock(Lock):
         # We also override the location of the lock so that we're in our own spot
         self.key = LOCK_PREFIX + self.path
 
+    @retry_etcd_forever
     def get_holder(self):
         value = Etcd3Client().get(self.key, metadata=True)
         if value is None or len(value) == 0:
@@ -139,6 +164,7 @@ def refresh_lock(lock, log_ctx=LOG):
     log_ctx.withField('lock', lock.name).debug('Refreshed lock')
 
 
+@retry_etcd_forever
 def clear_stale_locks():
     # Remove all locks held by former processes on this node. This is required
     # after an unclean restart, otherwise we need to wait for these locks to
@@ -160,6 +186,7 @@ def clear_stale_locks():
                             }).warning('Removed stale lock')
 
 
+@retry_etcd_forever
 def get_existing_locks():
     key_val = {}
     for value in Etcd3Client().get_prefix(LOCK_PREFIX + '/'):
@@ -184,18 +211,21 @@ class JSONEncoderTasks(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
+@retry_etcd_forever
 def put(objecttype, subtype, name, data, ttl=None):
     path = _construct_key(objecttype, subtype, name)
     encoded = json.dumps(data, indent=4, sort_keys=True, cls=JSONEncoderTasks)
     Etcd3Client().put(path, encoded, lease=None)
 
 
+@retry_etcd_forever
 def create(objecttype, subtype, name, data, ttle=None):
     path = _construct_key(objecttype, subtype, name)
     encoded = json.dumps(data, indent=4, sort_keys=True, cls=JSONEncoderTasks)
     return Etcd3Client().create(path, encoded, lease=None)
 
 
+@retry_etcd_forever
 def get(objecttype, subtype, name):
     path = _construct_key(objecttype, subtype, name)
     value = Etcd3Client().get(path, metadata=True)
@@ -204,12 +234,14 @@ def get(objecttype, subtype, name):
     return json.loads(value[0][0])
 
 
+@retry_etcd_forever
 def get_all(objecttype, subtype, sort_order=None):
     path = _construct_key(objecttype, subtype, None)
     for value in Etcd3Client().get_prefix(path, sort_order=sort_order):
         yield json.loads(value[0])
 
 
+@retry_etcd_forever
 def get_all_dict(objecttype, subtype=None, sort_order=None):
     path = _construct_key(objecttype, subtype, None)
     key_val = {}
@@ -218,11 +250,13 @@ def get_all_dict(objecttype, subtype=None, sort_order=None):
     return key_val
 
 
+@retry_etcd_forever
 def delete(objecttype, subtype, name):
     path = _construct_key(objecttype, subtype, name)
     Etcd3Client().delete(path)
 
 
+@retry_etcd_forever
 def delete_all(objecttype, subtype, sort_order=None):
     path = _construct_key(objecttype, subtype, None)
     Etcd3Client().delete_prefix(path)
@@ -284,6 +318,7 @@ def decodeTasks(obj):
     return obj
 
 
+@retry_etcd_forever
 def dequeue(queuename):
     queue_path = _construct_key('queue', queuename, None)
     client = Etcd3Client()
@@ -322,6 +357,7 @@ def get_queue_length(queuename):
     return processing, queued
 
 
+@retry_etcd_forever
 def _restart_queue(queuename):
     queue_path = _construct_key('processing', queuename, None)
     with get_lock('queue', None, queuename, op='Restart'):
