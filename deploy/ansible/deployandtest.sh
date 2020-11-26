@@ -187,10 +187,6 @@ then
     branch="master"
   fi
 
-  # Make sure shakenfist is using the specified branch
-  git checkout $branch || git checkout master
-  git pull
-
   # And make sure our other repos are using the right branch too
   for repo in client-python ansible-modules
   do
