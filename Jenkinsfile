@@ -44,7 +44,7 @@ pipeline {
     stage('Run CI tests') {
       steps {
         sh '''  # Run the nextgen CI
-                cd $WORKSPACE/deploy
+                cd $WORKSPACE/deploy/
                 sudo chmod ugo+rx /etc/sf/shakenfist.json
                 tox -epy3
           '''
@@ -92,14 +92,15 @@ pipeline {
     always {
       sh '''  echo "=============================="
               virsh list --all
+              '''
 
-              echo "=============================="
+      sh '''  echo "=============================="
               pip list
 
               echo "=============================="
               cat /var/log/syslog
-
-              echo "=============================="
+              '''
+      sh '''  echo "=============================="
               etcdctl get --prefix /sf
               '''
       }
