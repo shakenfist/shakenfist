@@ -1,5 +1,5 @@
 {
     "namespace": "system",
     "key": "{{system_key}}",
-    "apiurl": "http://localhost:13000"
+    "apiurl": "http://sf-1:13000"
 }

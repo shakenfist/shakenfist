@@ -50,7 +50,7 @@
         minutes: "{{bootdelay}}"
       when: mode == "deploy" and cloud != "localhost"
 
-- hosts: hypervisors
+- hosts: allsf
   any_errors_fatal: true
   become: yes
   become_method: sudo
