@@ -119,8 +119,5 @@ pipeline {
               done
               '''
       }
-    success {
-
-      }
     }
 }
