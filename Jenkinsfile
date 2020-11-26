@@ -34,10 +34,9 @@ pipeline {
                 export RELEASE="git:master"
                 export FLOATING_IP_BLOCK="10.0.0.0/24"
                 export KSM_ENABLED="0"
-                export DEPLOY_LOCATION=$WORKSPACE/deploy/ansible
 
                 echo "Deploying $RELEASE to cloud $CLOUD"
-                cd $DEPLOY_LOCATION
+                cd $WORKSPACE/deploy/ansible
                 ./deployandtest.sh
           '''
         }
@@ -45,7 +44,7 @@ pipeline {
     stage('Run CI tests') {
       steps {
         sh '''  # Run the nextgen CI
-                cd $DEPLOY_LOCATION/..
+                cd $WORKSPACE/deploy
                 sudo chmod ugo+rx /etc/sf/shakenfist.json
                 tox -epy3
           '''

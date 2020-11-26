@@ -4,7 +4,7 @@ This page documents how the CI images for Shaken Fist are setup in our testing c
 
 ## The sf-privci image
 
-Our test nodes are used for a single test each, and are based on the "sf-privci" series of images in the relevant Google Cloud project. These images need regular updates or the dist-upgrade time on startup gets our of hand. The process to do that is as follows:
+Our test nodes are used for a single test each, and are based on the "sf-privci" series of images in the relevant Google Cloud project. These images need regular updates or the dist-upgrade time on startup gets out of hand. The process to do that is as follows:
 
 Find the most recent image and boot a VM using it:
 
