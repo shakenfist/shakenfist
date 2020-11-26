@@ -6,7 +6,7 @@ import pycdlib
 import tempfile
 import time
 
-from shakenfist import ipmanager
+from shakenfist.ipmanager import IPManager
 from shakenfist import virt
 from shakenfist.config import SFConfig
 from shakenfist.tests import test_shakenfist
@@ -14,7 +14,7 @@ from shakenfist.tests import test_shakenfist
 
 class FakeNetwork(object):
     def __init__(self):
-        self.ipmanager = ipmanager.NetBlock('127.0.0.0/8')
+        self.ipmanager = IPManager('uuid', '127.0.0.0/8')
         self.router = self.ipmanager.get_address_at_index(1)
         self.netmask = '255.0.0.0'
         self.dhcp_start = '127.0.0.2'
@@ -389,7 +389,7 @@ class VirtTestCase(test_shakenfist.ShakenFistTestCase):
                         'order': 1
                     }
                 ])
-    @mock.patch('shakenfist.net.from_db',
+    @mock.patch('shakenfist.net.Network.from_db',
                 return_value=FakeNetwork())
     def test_make_config_drive(self, mock_net_from_db, mock_interfaces,
                                mock_network):

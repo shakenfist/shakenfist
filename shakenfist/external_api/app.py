@@ -33,6 +33,7 @@ import uuid
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import exceptions
+from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
 from shakenfist import scheduler
@@ -40,7 +41,6 @@ from shakenfist import util
 from shakenfist import virt
 from shakenfist.daemons import daemon
 from shakenfist.tasks import (DeleteInstanceTask,
-                              DeployNetworkTask,
                               FetchImageTask,
                               PreflightInstanceTask,
                               StartInstanceTask,
@@ -636,7 +636,7 @@ class Instances(Resource):
                 if n.get('address'):
                     # The requested address must be within the ip range specified
                     # for that virtual network
-                    ipm = db.get_ipmanager(n['network_uuid'])
+                    ipm = IPManager.from_db(n['network_uuid'])
                     if not ipm.is_in_range(n['address']):
                         return error(400,
                                      'network specification requests an address outside the '
@@ -673,7 +673,7 @@ class Instances(Resource):
         order = 0
         if network:
             for netdesc in network:
-                n = net.from_db(netdesc['network_uuid'])
+                n = net.Network.from_db(netdesc['network_uuid'])
                 if not n:
                     m = 'missing network %s during IP allocation phase' % (
                         netdesc['network_uuid'])
@@ -685,7 +685,7 @@ class Instances(Resource):
                                  ttl=120, op='Network allocate IP'):
                     db.add_event('network', netdesc['network_uuid'], 'allocate address',
                                  None, None, instance.uuid)
-                    ipm = db.get_ipmanager(netdesc['network_uuid'])
+                    ipm = IPManager.from_db(netdesc['network_uuid'])
                     if 'address' not in netdesc or not netdesc['address']:
                         netdesc['address'] = ipm.get_random_free_address()
                     else:
@@ -696,7 +696,7 @@ class Instances(Resource):
                             return error(409, 'address %s in use' %
                                          netdesc['address'])
 
-                    db.persist_ipmanager(netdesc['network_uuid'], ipm.save())
+                    ipm.persist()
 
                 if 'model' not in netdesc or not netdesc['model']:
                     netdesc['model'] = 'virtio'
@@ -943,12 +943,12 @@ def _safe_get_network_interface(interface_uuid):
     log = LOG.withFields({'network': ni['network_uuid'],
                           'networkinterface': ni['uuid']})
 
-    n = net.from_db(ni['network_uuid'])
+    n = net.Network.from_db(ni['network_uuid'])
     if not n:
         log.info('Network not found or deleted')
         return None, None, error(404, 'interface network not found')
 
-    if get_jwt_identity() not in [n.db_entry['namespace'], 'system']:
+    if get_jwt_identity() not in [n.namespace, 'system']:
         log.info('Interface not found, failed ownership test')
         return None, None, error(404, 'interface not found')
 
@@ -978,16 +978,16 @@ class InterfaceFloat(Resource):
         if err:
             return err
 
-        float_net = net.from_db('floating')
+        float_net = net.Network.from_db('floating')
         if not float_net:
             return error(404, 'floating network not found')
 
         db.add_event('interface', interface_uuid,
                      'api', 'float', None, None)
         with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Interface float'):
-            ipm = db.get_ipmanager('floating')
+            ipm = IPManager.from_db('floating')
             addr = ipm.get_random_free_address()
-            db.persist_ipmanager('floating', ipm.save())
+            ipm.persist()
 
         db.add_floating_to_interface(ni['uuid'], addr)
         n.add_floating_ip(addr, ni['ipv4'])
@@ -1001,16 +1001,16 @@ class InterfaceDefloat(Resource):
         if err:
             return err
 
-        float_net = net.from_db('floating')
+        float_net = net.Network.from_db('floating')
         if not float_net:
             return error(404, 'floating network not found')
 
         db.add_event('interface', interface_uuid,
                      'api', 'defloat', None, None)
         with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Instance defloat'):
-            ipm = db.get_ipmanager('floating')
+            ipm = IPManager.from_db('floating')
             ipm.release(ni['floating'])
-            db.persist_ipmanager('floating', ipm.save())
+            ipm.persist()
 
         db.remove_floating_from_interface(ni['uuid'])
         n.remove_floating_ip(ni['floating'], ni['ipv4'])
@@ -1108,29 +1108,33 @@ class ImageEvents(Resource):
 
 def _delete_network(network_from_db):
     # Load network from DB to ensure obtaining correct lock.
-    n = net.from_db(network_from_db['uuid'])
+    n = net.Network.from_db(network_from_db['uuid'])
+    if not n:
+        LOG.withFields({'network_uuid': network_from_db['uuid'],
+                        }).warning('delete_network: network does not exist')
+        return error(404, 'network does not exist')
 
     with db.get_object_lock(n, ttl=120, op='Network deleting'):
-        if not n or n.is_dead():
-            LOG.withFields({'network_uuid': n.db_entry['uuid'],
-                            'state': n.db_entry['state']}).warning(
-                                'delete_network: network does not exist')
+        if n.is_dead():
+            LOG.withFields({'network_uuid': n.uuid,
+                            'state': n.state,
+                            }).warning('delete_network: network is dead')
             return error(404, 'network is deleted')
-        db.update_network_state(n.db_entry['uuid'], 'deleting')
+        n.state = 'deleting'
 
-    db.add_event('network', n.db_entry['uuid'], 'api', 'delete', None, None)
-
+    n.add_event('api', 'delete')
     n.remove_dhcp()
     n.delete()
 
-    if n.db_entry.get('floating_gateway'):
+    # TODO(andy): consolidate to one function
+    if n.floating_gateway:
         with db.get_lock(
                 'ipmanager', None, 'floating', ttl=120, op='Network delete'):
-            ipm = db.get_ipmanager('floating')
-            ipm.release(n.db_entry['floating_gateway'])
-            db.persist_ipmanager('floating', ipm.save())
+            ipm = IPManager.from_db('floating')
+            ipm.release(n.floating_gateway)
+            ipm.persist()
 
-    db.update_network_state(n.db_entry['uuid'], 'deleted')
+    n.state = 'deleted'
 
 
 class Network(Resource):
@@ -1192,24 +1196,10 @@ class Networks(Resource):
                 401,
                 'only admins can create resources in a different namespace')
 
-        network = db.allocate_network(netblock, provide_dhcp,
-                                      provide_nat, name, namespace)
-        db.add_event('network', network['uuid'],
-                     'api', 'create', None, None)
+        network = net.Network.new(name, namespace, netblock, provide_dhcp,
+                                  provide_nat)
 
-        # Networks should immediately appear on the network node
-        db.enqueue('networknode', DeployNetworkTask(network['uuid']))
-
-        db.add_event('network', network['uuid'],
-                     'deploy', 'enqueued', None, None)
-        db.add_event('network', network['uuid'],
-                     'api', 'created', None, None)
-        db.update_network_state(network['uuid'], 'created')
-
-        # Initialise metadata
-        db.persist_metadata('network', network['uuid'], {})
-
-        return network
+        return network.metadata()
 
     @jwt_required
     @redirect_to_network_node

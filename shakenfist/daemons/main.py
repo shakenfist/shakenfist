@@ -14,6 +14,7 @@ from shakenfist.daemons import net as net_daemon
 from shakenfist.daemons import resources as resource_daemon
 from shakenfist.daemons import triggers as trigger_daemon
 from shakenfist import db
+from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
 from shakenfist import util
@@ -36,7 +37,7 @@ def restore_instances():
     with util.RecordedOperation('restore networks', None):
         for network in networks:
             try:
-                n = net.from_db(network)
+                n = net.Network.from_db(network)
                 LOG.withObj(n).info('Restoring network')
                 n.create()
                 n.ensure_mesh()
@@ -112,8 +113,8 @@ def main():
         # Bootstrap the floating network in the Networks table
         floating_network = db.get_network('floating')
         if not floating_network:
-            db.create_floating_network(config.get('FLOATING_NETWORK'))
-            floating_network = net.from_db('floating')
+            floating_network = net.Network.create_floating_network(
+                config.get('FLOATING_NETWORK'))
 
         subst = {
             'physical_bridge': util.get_safe_interface_name(
@@ -130,7 +131,7 @@ def main():
             # floating IPs don't work.
             with util.RecordedOperation('create physical bridge', None):
                 # No locking as read only
-                ipm = db.get_ipmanager('floating')
+                ipm = IPManager.from_db('floating')
                 subst['master_float'] = ipm.get_address_at_index(1)
                 subst['netmask'] = ipm.netmask
 
