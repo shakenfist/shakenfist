@@ -1,10 +1,6 @@
 #!/bin/bash -e
 #
 # ./deployandtest.sh [aws|aws-single-node|gcp|metal|openstack|shakenfist]
-#
-#
-# Note: Tests can be skipped by setting $SKIP_SF_TESTS
-#
 
 #### Required settings
 VARIABLES=""
@@ -115,8 +111,6 @@ fi
 ### Localhost
 if [ "$CLOUD" == "localhost" ]
 then
-  # CI is not supported on single node deploys
-  SKIP_SF_TESTS=1
   VARIABLES="$VARIABLES,ram_system_reservation=1.0"
 fi
 
@@ -275,9 +269,4 @@ ansible-playbook $VERBOSE -i hosts --extra-vars "$ANSIBLE_VARS" deploy.yml $@
 if [ -e terraform/$CLOUD/local.yml ]
 then
   ansible-playbook $VERBOSE -i hosts --extra-vars "$ANSIBLE_VARS" terraform/$CLOUD/local.yml $@
-fi
-
-if [ "%$SKIP_SF_TESTS%" == "%%" ]
-then
-  ansible-playbook $VERBOSE -i hosts --extra-vars "$ANSIBLE_VARS" test.yml $@
 fi
