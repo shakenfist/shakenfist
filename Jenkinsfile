@@ -6,7 +6,7 @@ pipeline {
   }
 
   stages {
-    stage('Localhost deployment') {
+    stage('Setup') {
       steps {
         sh '''  echo "Wait for apt to finish its on-boot work"
                 sleep 60
@@ -23,29 +23,29 @@ pipeline {
 
                 sudo pip3 install -U ansible tox
                 ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform andrewrothstein.go
+                ansible-galaxy collection install community.general
 
                 # We create a RAM disk for etcd to work around poor performance on cloud instances
                 sudo mkdir -p /var/lib/etcd
                 sudo mount -t tmpfs -o size=2g tmpfs /var/lib/etcd
 
-                if [ "$JOB_NAME%" == "%shakenfist_nightly%" ]
-                then
-                  echo "Deploying a larger cluster"
-                  export CLOUD="gcp-xl"
-                else
-                  echo "Deploying on localhost"
-                  export CLOUD="localhost"
-                fi
+                # The actual job
+                export CLOUD="localhost"
+                export RELEASE="git:master"
+                export FLOATING_IP_BLOCK="10.0.0.0/24"
+                export KSM_ENABLED="0"
+                export DEPLOY_LOCATION=$WORKSPACE/deploy/ansible
 
-                cd $WORKSPACE/deploy/ansible
-                RELEASE="git:master" ./deployandtest.sh
+                echo "Deploying $RELEASE to cloud $CLOUD"
+                cd $DEPLOY_LOCATION
+                ./deployandtest.sh
           '''
         }
       }
-   stage('Run CI tests') {
-     steps {
-        sh '''  # Run the nextgen CI (the old CI wont work on single node deployments)
-                cd $WORKSPACE/deploy
+    stage('Run CI tests') {
+      steps {
+        sh '''  # Run the nextgen CI
+                cd $DEPLOY_LOCATION/..
                 sudo chmod ugo+rx /etc/sf/shakenfist.json
                 tox -epy3
           '''
@@ -119,5 +119,8 @@ pipeline {
               done
               '''
       }
+    success {
+
+      }
     }
-  }
+}
