@@ -187,6 +187,14 @@ then
     branch="master"
   fi
 
+  # Make sure shakenfist is using the specified branch
+  if [ `git branch | grep -c $branch` -gt 1 ]
+  then
+    git checkout $branch
+    git pull
+  fi
+
+  # And make sure our other repos are using the right branch too
   for repo in client-python ansible-modules
   do
     cd ../gitrepos/$repo
