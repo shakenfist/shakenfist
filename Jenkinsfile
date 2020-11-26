@@ -6,7 +6,7 @@ pipeline {
   }
 
   stages {
-    stage('Localhost deployment') {
+    stage('Setup') {
       steps {
         sh '''  echo "Wait for apt to finish its on-boot work"
                 sleep 60
@@ -23,21 +23,28 @@ pipeline {
 
                 sudo pip3 install -U ansible tox
                 ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform andrewrothstein.go
+                ansible-galaxy collection install community.general
 
                 # We create a RAM disk for etcd to work around poor performance on cloud instances
                 sudo mkdir -p /var/lib/etcd
                 sudo mount -t tmpfs -o size=2g tmpfs /var/lib/etcd
 
-                echo "Deploying on localhost"
+                # The actual job
+                export CLOUD="localhost"
+                export RELEASE="git:master"
+                export FLOATING_IP_BLOCK="10.0.0.0/24"
+                export KSM_ENABLED="0"
+
+                echo "Deploying $RELEASE to cloud $CLOUD"
                 cd $WORKSPACE/deploy/ansible
-                CLOUD=localhost RELEASE="git:master" ./deployandtest.sh
+                ./deployandtest.sh
           '''
         }
       }
-   stage('Run CI tests') {
-     steps {
-        sh '''  # Run the nextgen CI (the old CI wont work on single node deployments)
-                cd $WORKSPACE/deploy
+    stage('Run CI tests') {
+      steps {
+        sh '''  # Run the nextgen CI
+                cd $WORKSPACE/deploy/
                 sudo chmod ugo+rx /etc/sf/shakenfist.json
                 tox -epy3
           '''
@@ -85,14 +92,15 @@ pipeline {
     always {
       sh '''  echo "=============================="
               virsh list --all
+              '''
 
-              echo "=============================="
+      sh '''  echo "=============================="
               pip list
 
               echo "=============================="
               cat /var/log/syslog
-
-              echo "=============================="
+              '''
+      sh '''  echo "=============================="
               etcdctl get --prefix /sf
               '''
       }
@@ -112,4 +120,4 @@ pipeline {
               '''
       }
     }
-  }
+}
