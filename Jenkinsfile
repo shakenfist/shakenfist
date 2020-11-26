@@ -29,8 +29,8 @@ pipeline {
                 sudo mkdir -p /var/lib/etcd
                 sudo mount -t tmpfs -o size=2g tmpfs /var/lib/etcd
 
-                # Specify a non-existent branch, which means we'll use whatever Jenkins pulled for us
-                export RELEASE="git:nosuchbranch"
+                # This means we'll use the master branch of our other repos
+                export RELEASE="git:master"
 
                 # The actual job
                 export CLOUD="localhost"
