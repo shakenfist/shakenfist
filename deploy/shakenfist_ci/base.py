@@ -190,11 +190,9 @@ class BaseTestCase(testtools.TestCase):
         while attempts:
             sys.stderr.write('    _test_ping()  attempts=%s\n' % attempts)
             attempts -= 1
-            out, err = processutils.execute(
-                'sudo ip netns exec %s ping -c 10 %s' % (network_uuid, ip),
-                shell=True, check_exit_code=[0, 1])
+            output = self.system_client.ping(network_uuid, ip)
 
-            actual = out.find(' 0% packet loss') != -1
+            actual = output.get('stdout').find(' 0% packet loss') != -1
             if actual == expected:
                 break
 
