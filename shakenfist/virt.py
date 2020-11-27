@@ -151,31 +151,31 @@ class Instance(object):
 
     def persist(self):
         metadata = {
-                    'uuid': self.uuid,
-                    'memory': self.memory,
-                    'name': self.name,
-                    'namespace': self.namespace,
-                    'block_devices': self.block_devices,
-                    'devices': self.devices,
-                    'console_port': self.console_port,
-                    'cpus': self.cpus,
-                    'disk_spec': self.disk_spec,
-                    'error_message': self.error_message,
-                    'node': self.node,
-                    'node_history': self.node_history,
-                    'placement_attempts': self.placement_attempts,
-                    'power_state': self.power_state,
-                    'power_state_previous': self.power_state_previous,
-                    'power_state_updated': self.power_state_updated,
-                    'requested_placement': self.requested_placement,
-                    'ssh_key': self.ssh_key,
-                    'state': self.state,
-                    'state_updated': self.state_updated,
-                    'user_data': self.user_data,
-                    'vdi_port': self.vdi_port,
-                    'video': self.video,
+            'uuid': self.uuid,
+            'memory': self.memory,
+            'name': self.name,
+            'namespace': self.namespace,
+            'block_devices': self.block_devices,
+            'devices': self.devices,
+            'console_port': self.console_port,
+            'cpus': self.cpus,
+            'disk_spec': self.disk_spec,
+            'error_message': self.error_message,
+            'node': self.node,
+            'node_history': self.node_history,
+            'placement_attempts': self.placement_attempts,
+            'power_state': self.power_state,
+            'power_state_previous': self.power_state_previous,
+            'power_state_updated': self.power_state_updated,
+            'requested_placement': self.requested_placement,
+            'ssh_key': self.ssh_key,
+            'state': self.state,
+            'state_updated': self.state_updated,
+            'user_data': self.user_data,
+            'vdi_port': self.vdi_port,
+            'video': self.video,
 
-                    'version': 1
+            'version': 1
         }
         db.persist_instance_metadata(self.uuid, metadata)
 
@@ -634,7 +634,7 @@ class Instance(object):
 
     def _get_domain(self):
         libvirt = util.get_libvirt()
-        conn = libvirt.open(None)
+        conn = libvirt.open('qemu:///system')
         try:
             return conn.lookupByName('sf:' + self.uuid)
 
@@ -660,7 +660,7 @@ class Instance(object):
 
         instance = self._get_domain()
         if not instance:
-            conn = libvirt.open(None)
+            conn = libvirt.open('qemu:///system')
             instance = conn.defineXML(xml)
             if not instance:
                 db.enqueue_instance_error(self.uuid,

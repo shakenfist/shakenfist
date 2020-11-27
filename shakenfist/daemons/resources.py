@@ -18,7 +18,7 @@ LOG, _ = logutil.setup(__name__)
 def _get_stats():
     libvirt = util.get_libvirt()
     retval = {}
-    conn = libvirt.open(None)
+    conn = libvirt.open('qemu:///system')
 
     # CPU info
     present_cpus, _, available_cpus = conn.getCPUMap()

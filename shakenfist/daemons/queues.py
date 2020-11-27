@@ -302,7 +302,7 @@ class Monitor(daemon.Daemon):
         LOG.info('Starting Queues')
 
         libvirt = util.get_libvirt()
-        conn = libvirt.open(None)
+        conn = libvirt.open('qemu:///system')
         present_cpus, _, _ = conn.getCPUMap()
 
         while True:
