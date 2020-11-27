@@ -2,7 +2,7 @@
 
 This document tracks the CI coverage for each of our public APIs. The intent to make it clear what is "sufficiently tested", and what needs further effort. This list is manually updated, so we'll need to show discipline in ensuring that we update it as we change APIs or CI.
 
-For this document we use the python API client as a model of what to cover, as its simpler to extract a list of calls from than the API implementation itself.
+For this document we use the python API client as a model of what to cover, as its simpler to extract a list of calls from than the API implementation itself. We list whether we have CI which calls the API directly, CI which uses the python command line client to call the API, or both. The gold standard is both.
 
 ## get_instances
 
@@ -221,3 +221,7 @@ As well as being tested as a side effect of most other tests, there is the follo
 ## get_existing_locks
 
 *Not tested.*
+
+## ping
+
+Tested as a side effect of many other tests, but no explicit test.
