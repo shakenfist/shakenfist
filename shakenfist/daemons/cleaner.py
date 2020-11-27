@@ -18,7 +18,7 @@ LOG, _ = logutil.setup(__name__)
 class Monitor(daemon.Daemon):
     def _update_power_states(self):
         libvirt = util.get_libvirt()
-        conn = libvirt.open(None)
+        conn = libvirt.open('qemu:///system')
         try:
             seen = []
 

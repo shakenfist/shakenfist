@@ -634,7 +634,7 @@ class Instance(object):
 
     def _get_domain(self):
         libvirt = util.get_libvirt()
-        conn = libvirt.open(None)
+        conn = libvirt.open('qemu:///system')
         try:
             return conn.lookupByName('sf:' + self.uuid)
 
@@ -660,7 +660,7 @@ class Instance(object):
 
         instance = self._get_domain()
         if not instance:
-            conn = libvirt.open(None)
+            conn = libvirt.open('qemu:///system')
             instance = conn.defineXML(xml)
             if not instance:
                 db.enqueue_instance_error(self.uuid,
