@@ -42,7 +42,7 @@ class DHCP(object):
 
     def _make_config(self):
         if not os.path.exists(self.subst['config_dir']):
-            os.makedirs(self.subst['config_dir'])
+            os.makedirs(self.subst['config_dir'], exist_ok=True)
 
         t = self._read_template('dhcp.tmpl')
         c = t.render(self.subst)
@@ -53,7 +53,7 @@ class DHCP(object):
 
     def _make_hosts(self):
         if not os.path.exists(self.subst['config_dir']):
-            os.makedirs(self.subst['config_dir'])
+            os.makedirs(self.subst['config_dir'], exist_ok=True)
 
         t = self._read_template('dhcphosts.tmpl')
 

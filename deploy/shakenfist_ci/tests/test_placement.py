@@ -36,20 +36,24 @@ class TestPlacement(base.BaseNamespacedTestCase):
 
     def test_local_placement_works(self):
         # Create an instance, force it to be on the name node as us.
-        inst = self.test_client.create_instance(
-            'cirros', 1, 1024,
-            [
-                {
-                    'network_uuid': self.net['uuid']
-                }
-            ],
-            [
-                {
-                    'size': 8,
-                    'base': 'ubuntu:18.04',
-                    'type': 'disk'
-                }
-            ], None, None, force_placement=socket.getfqdn())
+        try:
+            inst = self.test_client.create_instance(
+                'cirros', 1, 1024,
+                [
+                    {
+                        'network_uuid': self.net['uuid']
+                    }
+                ],
+                [
+                    {
+                        'size': 8,
+                        'base': 'ubuntu:18.04',
+                        'type': 'disk'
+                    }
+                ], None, None, force_placement=socket.getfqdn())
+        except apiclient.ResourceNotFoundException as e:
+            self.skip('Target node does not exist. %s' % e)
+            return
 
         self._await_login_prompt(inst['uuid'])
 

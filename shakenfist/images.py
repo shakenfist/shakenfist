@@ -31,7 +31,7 @@ def _get_cache_path():
     if not os.path.exists(image_cache_path):
         LOG.withField('image_cache_path',
                       image_cache_path).debug('Creating image cache')
-        os.makedirs(image_cache_path)
+        os.makedirs(image_cache_path, exist_ok=True)
     return image_cache_path
 
 
