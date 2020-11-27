@@ -1321,13 +1321,15 @@ class NetworkPing(Resource):
         if not ipm.is_in_range(address):
             return error(400, 'ping request for address outside network block')
 
-        out, err = util.execute(
-            'ip netns exec %s ping -c 10 %s' % (network_uuid, address),
-            check_exit_code=[0, 1])
-        return {
-            'stdout': out,
-            'stderr': err
-        }
+        with db.get_lock('network', None, network_uuid,
+                     ttl=10, timeout=120, op='Network ping'):
+            out, err = util.execute(
+                None, 'ip netns exec %s ping -c 10 %s' % (network_uuid, address),
+                check_exit_code=[0, 1])
+            return {
+                'stdout': out,
+                'stderr': err
+            }
 
 
 class Nodes(Resource):
