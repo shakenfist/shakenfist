@@ -243,7 +243,18 @@ class LoggingSocket(object):
     ctrlc = '\x03'
 
     def __init__(self, host, port):
-        self.s = telnetlib.Telnet(host, port, 30)
+        attempts = 5
+        while attempts:
+            try:
+                attempts -= 1
+                self.s = telnetlib.Telnet(host, port, 30)
+                return
+
+            except ConnectionRefusedError:
+                print('!! Connection refused, retrying')
+                time.sleep(5)
+
+        raise ConnectionRefusedError('Repeated connection attempts failed')
 
     def ensure_fresh(self):
         for d in [self.ctrlc, self.ctrlc, '\nexit\n', 'cirros\n', 'gocubsgo\n']:
