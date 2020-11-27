@@ -1311,6 +1311,25 @@ class NetworkMetadata(Resource):
             db.persist_metadata('network', network_uuid, md)
 
 
+class NetworkPing(Resource):
+    @jwt_required
+    @arg_is_network_uuid
+    @requires_network_ownership
+    @redirect_to_network_node
+    def get(self, network_uuid=None, address=None, network_from_db=None):
+        ipm = db.get_ipmanager(network_uuid)
+        if not ipm.is_in_range(address):
+            return error(400, 'ping request for address outside network block')
+
+        out, err = util.execute(
+            'ip netns exec %s ping -c 10 %s' % (network_uuid, address),
+            check_exit_code=[0, 1])
+        return {
+            'stdout': out,
+            'stderr': err
+        }
+
+
 class Nodes(Resource):
     @jwt_required
     @caller_is_admin
@@ -1369,5 +1388,7 @@ api.add_resource(NetworkInterfaces, '/networks/<network_uuid>/interfaces')
 api.add_resource(NetworkMetadatas, '/networks/<network_uuid>/metadata')
 api.add_resource(NetworkMetadata,
                  '/networks/<network_uuid>/metadata/<key>')
+api.add_resource(NetworkPing,
+                 '/networks/<network_uuid>/ping/<address>')
 
 api.add_resource(Nodes, '/nodes')

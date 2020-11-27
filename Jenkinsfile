@@ -29,9 +29,11 @@ pipeline {
                 sudo mkdir -p /var/lib/etcd
                 sudo mount -t tmpfs -o size=2g tmpfs /var/lib/etcd
 
+                # This means we'll use the master branch of our other repos
+                export RELEASE="git:master"
+
                 # The actual job
                 export CLOUD="localhost"
-                export RELEASE="git:master"
                 export FLOATING_IP_BLOCK="10.0.0.0/24"
                 export KSM_ENABLED="0"
 

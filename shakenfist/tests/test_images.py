@@ -93,7 +93,7 @@ class ImageUtilsTestCase(test_shakenfist.ShakenFistTestCase):
     def test_get_cache_path_create(self, mock_makedirs, mock_exists):
         p = images._get_cache_path()
         mock_exists.assert_called_with('/a/b/c/image_cache')
-        mock_makedirs.assert_called_with('/a/b/c/image_cache')
+        mock_makedirs.assert_called_with('/a/b/c/image_cache', exist_ok=True)
         self.assertEqual('/a/b/c/image_cache', p)
 
 
@@ -446,8 +446,8 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
                  '5b2d852c2df5c7991cc66241bf7072d1c4.v000.qcow2 '
                  '-f qcow2 /a/b/c/image_cache/f0e6a6a97042a4f1f1c87f'
                  '5f7d44315b2d852c2df5c7991cc66241bf7072d1c4.v000.qcow2.8G 8G')
-                )
-             ]
+            )
+            ]
         )
 
     @mock.patch('shakenfist.util.execute',
@@ -546,14 +546,16 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
         self.addCleanup(os.remove, image.image_path + '.v001')
         resp = FakeResp(chunks=[(b'chunk1', b'chunk2')])
         ret = image._fetch(resp)
-        self.assertEqual('/tmp/image_cache/d025021483c8f33152ffee46fa274ab00a9be367e19822fa07f25c9650197036.v001', ret)
+        self.assertEqual(
+            '/tmp/image_cache/d025021483c8f33152ffee46fa274ab00a9be367e19822fa07f25c9650197036.v001', ret)
         self.assertTrue(image.correct_checksum(image.version_image_path()))
 
         # Data does not match checksum
         self.addCleanup(os.remove, image.image_path + '.v002')
         resp = FakeResp(chunks=[(b'chunk1', b'badchunk2')])
         ret = image._fetch(resp)
-        self.assertEqual('/tmp/image_cache/d025021483c8f33152ffee46fa274ab00a9be367e19822fa07f25c9650197036.v002', ret)
+        self.assertEqual(
+            '/tmp/image_cache/d025021483c8f33152ffee46fa274ab00a9be367e19822fa07f25c9650197036.v002', ret)
         self.assertFalse(image.correct_checksum(image.version_image_path()))
 
     # Data matches checksum
@@ -564,7 +566,7 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
                                                },
                                       chunks=[
                                           (b'chunk1', b'chunk2'),
-                                      ]))
+                ]))
     @mock.patch('shakenfist.etcd.put')
     @mock.patch('shakenfist.db.refresh_locks')
     def test_get(self,
@@ -574,7 +576,8 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
         self.addCleanup(os.remove, image.image_path + '.v001')
 
         ret = image.get(None, None)
-        self.assertEqual('/tmp/image_cache/a428fe2fb5e893a6a875e921334e8ebbf9913ba3e74cd2bd3397b6c76b867539.v001', ret)
+        self.assertEqual(
+            '/tmp/image_cache/a428fe2fb5e893a6a875e921334e8ebbf9913ba3e74cd2bd3397b6c76b867539.v001', ret)
         self.assertTrue(image.correct_checksum(image.version_image_path()))
 
     # First download attempt corrupted, second download matches checksum
@@ -586,7 +589,7 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
                                       chunks=[
                                           (b'chunk1', b'badchunk2'),
                                           (b'chunk1', b'chunk2'),
-                                      ]))
+                ]))
     @mock.patch('shakenfist.etcd.put')
     @mock.patch('shakenfist.db.refresh_locks')
     def test_get_one_corrupt(self, mock_refresh_locks,
@@ -597,7 +600,8 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
         self.addCleanup(os.remove, image.image_path + '.v001')
 
         ret = image.get(None, None)
-        self.assertEqual('/tmp/image_cache/318549312751bc53373bf5470d298956be5097c0e492158d03594c44035463eb.v001', ret)
+        self.assertEqual(
+            '/tmp/image_cache/318549312751bc53373bf5470d298956be5097c0e492158d03594c44035463eb.v001', ret)
         self.assertTrue(image.correct_checksum(image.version_image_path()))
 
     # All download attempts not matching checksum
@@ -609,7 +613,7 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
                                           (b'chunk1', b'badchunk2'),
                                           (b'chunk1', b'badchunk2'),
                                           (b'chunk1', b'differentbadchunk'),
-                                      ]))
+                ]))
     @mock.patch('shakenfist.etcd.put')
     @mock.patch('shakenfist.db.refresh_locks')
     def test_get_always_corrupt(self, mock_refresh_locks, mock_put, mock_open):
