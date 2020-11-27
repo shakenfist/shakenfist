@@ -29,8 +29,25 @@ pipeline {
                 sudo mkdir -p /var/lib/etcd
                 sudo mount -t tmpfs -o size=2g tmpfs /var/lib/etcd
 
-                # This means we'll use the master branch of our other repos
-                export RELEASE="git:master"
+                if [ '%%' == '%%' ]
+                then
+                  BRANCH=`git branch --show-current`
+                else
+                  BRANCH=""
+                fi
+
+                PREVIOUS_CHECKOUT=`pwd`
+                cd $WORKSPACE
+                git clone https://github.com/shakenfist/shakenfist
+
+                export RELEASE="git:$BRANCH"
+                cd $WORKSPACE/shakenfist/deploy/ansible
+                git checkout $BRANCH || git checkout master
+                git branch
+                git pull
+
+                mkdir -p ../gitrepos
+                ln -s $PREVIOUS_CHECKOUT ../gitrepos/client-python
 
                 # The actual job
                 export CLOUD="localhost"
