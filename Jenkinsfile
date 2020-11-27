@@ -38,6 +38,7 @@ pipeline {
 
                 # This means we'll use the master branch of our other repos
                 export RELEASE="git:master"
+                cd $WORKSPACE/deploy/ansible
 
 
 
@@ -47,7 +48,6 @@ pipeline {
                 export KSM_ENABLED="0"
 
                 echo "Deploying $RELEASE to cloud $CLOUD"
-                cd $WORKSPACE/deploy/ansible
                 ./deployandtest.sh
           '''
         }
