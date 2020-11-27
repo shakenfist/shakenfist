@@ -205,7 +205,7 @@ class BaseTestCase(testtools.TestCase):
             self._log_netns()
             sys.stderr.write('Current time: '+time.ctime()+'\n')
             self.fail('Ping test failed. Expected %s != actual %s.\nout: %s\nerr: %s\n'
-                      % (expected, actual, out, err))
+                      % (expected, actual, output['stdout'], output['stderr']))
 
 
 class BaseNamespacedTestCase(BaseTestCase):
