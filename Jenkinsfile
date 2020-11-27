@@ -31,23 +31,15 @@ pipeline {
 
                 if [ '%%' == '%%' ]
                 then
-                  BRANCH=`git branch --show-current`
+                  BRANCH=`git rev-parse --abbrev-ref HEAD`
                 else
                   BRANCH=""
                 fi
 
-                PREVIOUS_CHECKOUT=`pwd`
-                cd $WORKSPACE
-                git clone https://github.com/shakenfist/shakenfist
+                # This means we'll use the master branch of our other repos
+                export RELEASE="git:master"
 
-                export RELEASE="git:$BRANCH"
-                cd $WORKSPACE/shakenfist/deploy/ansible
-                git checkout $BRANCH || git checkout master
-                git branch
-                git pull
 
-                mkdir -p ../gitrepos
-                ln -s $PREVIOUS_CHECKOUT ../gitrepos/client-python
 
                 # The actual job
                 export CLOUD="localhost"
