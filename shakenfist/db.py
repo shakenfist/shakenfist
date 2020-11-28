@@ -170,7 +170,7 @@ def get_instances(only_node=None, all=False, namespace=None):
         yield i
 
 
-def persist_instance_metadata(instance_uuid, metadata):
+def persist_instance(instance_uuid, metadata):
     etcd.put('instance', None, instance_uuid, metadata)
 
 
