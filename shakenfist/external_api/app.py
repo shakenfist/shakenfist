@@ -1307,7 +1307,7 @@ class NetworkPing(Resource):
     @requires_network_ownership
     @redirect_to_network_node
     def get(self, network_uuid=None, address=None, network_from_db=None):
-        ipm = db.get_ipmanager(network_uuid)
+        ipm = IPManager.from_db(network_uuid)
         if not ipm.is_in_range(address):
             return error(400, 'ping request for address outside network block')
 
