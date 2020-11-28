@@ -1311,7 +1311,7 @@ class NetworkPing(Resource):
         if not ipm.is_in_range(address):
             return error(400, 'ping request for address outside network block')
 
-        n = net.from_db(network_uuid)
+        n = net.Network.from_db(network_uuid)
         if not n:
             return error(404, 'network %s not found' % network_uuid)
 
