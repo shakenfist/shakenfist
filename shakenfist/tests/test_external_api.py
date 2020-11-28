@@ -29,7 +29,7 @@ class FakeInstance(object):
         self.namespace = namespace
 
     def unique_label(self):
-        return ('instance', self.uuid)
+        return ('instance', self.static_values['uuid'])
 
 
 def _encode_key(key):
@@ -296,7 +296,9 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
 
     @mock.patch('shakenfist.etcd.get_all',
                 return_value=[
-                    {'name': 'aaa'}, {'name': 'bbb'}, {'name': 'ccc'}
+                    ('/sf/namespace/aaa', {'name': 'aaa'}),
+                    ('/sf/namespace/bbb', {'name': 'bbb'}),
+                    ('/sf/namespace/ccc', {'name': 'ccc'})
                 ])
     def test_get_namespaces(self, mock_get_all):
         resp = self.client.get('/auth/namespaces',
@@ -325,9 +327,12 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
             },
             resp.get_json())
 
+    @mock.patch('shakenfist.db.get_instance_attribute',
+                return_value={'state': 'created'})
     @mock.patch('shakenfist.db.get_instances',
-                return_value=[{'uuid': '123', 'state': 'created'}])
-    def test_delete_namespace_with_instances(self, mock_get_instances):
+                return_value=[{'uuid': '123'}])
+    def test_delete_namespace_with_instances(self, mock_get_instances,
+                                             mock_get_instance_attribute):
         resp = self.client.delete('/auth/namespaces/foo',
                                   headers={'Authorization': self.auth_header})
         self.assertEqual(400, resp.status_code)
@@ -690,21 +695,22 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
 
         self.addCleanup(self.config.stop)
 
+    @mock.patch('shakenfist.db.get_instance_attribute',
+                side_effect=[{'state': 'created'}, {'node': 'sf-2'},
+                             {'state': 'created'}, {'node': 'sf-2'},
+                             {'state': 'deleted'}, {'state': 'created'},
+                             {'state': 'deleted'}])
     @mock.patch('shakenfist.db.enqueue')
     @mock.patch('shakenfist.db.get_instances',
                 return_value=[{
                     'namespace': 'system',
                     'node': 'sf-2',
-                    'power_state': 'initial',
-                    'state': 'created',
                     'uuid': '6a973b82-31b3-4780-93e4-04d99ae49f3f',
                 },
                     {
                     'name': 'timma',
                     'namespace': 'system',
                     'node': 'sf-2',
-                    'power_state': 'initial',
-                    'state': 'created',
                     'uuid': '847b0327-9b17-4148-b4ed-be72b6722c17',
                 }])
     @mock.patch('shakenfist.db.get_instance',
@@ -713,12 +719,9 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                 },)
     @mock.patch('shakenfist.etcd.put')
     @mock.patch('shakenfist.db.get_lock')
-    def test_delete_all_instances(self,
-                                  mock_db_get_lock,
-                                  mock_etcd_put,
-                                  mock_get_instance,
-                                  mock_get_instances,
-                                  mock_enqueue):
+    def test_delete_all_instances(
+            self, mock_db_get_lock, mock_etcd_put, mock_get_instance,
+            mock_get_instances, mock_enqueue, mock_get_instance_attribute):
 
         resp = self.client.delete('/instances',
                                   headers={'Authorization': self.auth_header},
@@ -731,21 +734,20 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                          resp.get_json())
         self.assertEqual(200, resp.status_code)
 
+    @mock.patch('shakenfist.db.get_instance_attribute',
+                side_effect=[{'state': 'deleted'}, {'state': 'created'},
+                             {'node': 'sf-2'}, {'state': 'deleted'}])
     @mock.patch('shakenfist.db.enqueue')
     @mock.patch('shakenfist.db.get_instances',
                 return_value=[{
                     'namespace': 'system',
                     'node': 'sf-2',
-                    'power_state': 'initial',
-                    'state': 'deleted',
                     'uuid': '6a973b82-31b3-4780-93e4-04d99ae49f3f',
                 },
                     {
                     'name': 'timma',
                     'namespace': 'system',
                     'node': 'sf-2',
-                    'power_state': 'initial',
-                    'state': 'created',
                     'uuid': '847b0327-9b17-4148-b4ed-be72b6722c17',
                 }])
     @mock.patch('shakenfist.db.get_instance',
@@ -754,12 +756,9 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                 },)
     @mock.patch('shakenfist.etcd.put')
     @mock.patch('shakenfist.db.get_lock')
-    def test_delete_all_instances_one_already_deleted(self,
-                                                      mock_db_get_lock,
-                                                      mock_etcd_put,
-                                                      mock_get_instance,
-                                                      mock_get_instances,
-                                                      mock_enqueue):
+    def test_delete_all_instances_one_already_deleted(
+            self, mock_db_get_lock,  mock_etcd_put, mock_get_instance,
+            mock_get_instances, mock_enqueue, mock_get_instance_attribute):
 
         resp = self.client.delete('/instances',
                                   headers={'Authorization': self.auth_header},
@@ -908,7 +907,7 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
                     'namespace': 'nonespace',
                     'name': 'bob',
                     'netblock': '10.10.0.0/24',
-                    })
+                })
     @mock.patch('shakenfist.db.get_networks',
                 return_value=[{
                     'floating_gateway': '10.10.0.150',

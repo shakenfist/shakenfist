@@ -24,6 +24,10 @@ class InstanceNotInDBException(InstanceException):
     pass
 
 
+class InstanceBadDiskSpecification(InstanceException):
+    pass
+
+
 class SchedulerException(Exception):
     pass
 
@@ -57,7 +61,7 @@ class ReadException(DatabaseException):
     pass
 
 
-class BadMetadataPacket(DatabaseException):
+class BadObjectVersion(DatabaseException):
     pass
 
 

@@ -250,7 +250,7 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
                 })
     @mock.patch('os.makedirs')
     def test_image_rejects_bad_packet(self, mock_mkdirs, mock_get_meta):
-        with testtools.ExpectedException(exceptions.BadMetadataPacket):
+        with testtools.ExpectedException(exceptions.BadObjectVersion):
             images.Image.from_url('http://example.com')
 
     @mock.patch('shakenfist.db.get_image_metadata', return_value=None)

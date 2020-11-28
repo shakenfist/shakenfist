@@ -103,7 +103,7 @@ class Image(object):
         if ver == 1:
             return Image(**db_data)
         else:
-            raise exceptions.BadMetadataPacket(
+            raise exceptions.BadObjectVersion(
                 'Unknown version - Image: %s', db_data)
 
     def persist(self):

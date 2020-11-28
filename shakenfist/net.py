@@ -10,7 +10,7 @@ from uuid import uuid4
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import dhcp
-from shakenfist.exceptions import DeadNetwork, BadMetadataPacket, IllegalState
+from shakenfist.exceptions import DeadNetwork, BadObjectVersion, IllegalState
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist.tasks import (DeployNetworkTask,
@@ -135,7 +135,7 @@ class Network(object):
             return Network(ipm=ipm, **db_data)
 
         # Version number is unknown
-        raise BadMetadataPacket('Unknown version - Network: %s', db_data)
+        raise BadObjectVersion('Unknown version - Network: %s', db_data)
 
     def metadata(self):
         return {
@@ -495,14 +495,14 @@ class Network(object):
 
             node_fqdns = []
             for inst in instances:
-                i = db.get_instance(inst)
-                if not i:
+                placement = db.get_instance_attribute(inst, 'placement')
+                if not placement:
                     continue
-                if not i['node']:
+                if not placement.get('node'):
                     continue
 
-                if not i['node'] in node_fqdns:
-                    node_fqdns.append(i['node'])
+                if not placement.get('node') in node_fqdns:
+                    node_fqdns.append(placement.get('node'))
 
             # NOTE(mikal): why not use DNS here? Well, DNS might be outside
             # the control of the deployer if we're running in a public cloud
