@@ -177,7 +177,7 @@ class Instance(object):
 
             'version': 1
         }
-        db.persist_instance_metadata(self.uuid, metadata)
+        db.persist_instance(self.uuid, metadata)
 
     def __str__(self):
         return 'instance(%s)' % self.uuid
