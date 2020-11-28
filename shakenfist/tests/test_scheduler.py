@@ -8,30 +8,6 @@ from shakenfist.virt import Instance
 
 
 class FakeInstance(Instance):
-    def __init__(self, cpus=1, memory=1024, name='fake_name',
-                 namespace='fake_namespace', uuid='fake_uuid',
-                 block_devices=None, devices=None, console_port=0,
-                 disk_spec=None, error_message=None, node=None,
-                 node_history=None, placement_attempts=0, power_state=None,
-                 power_state_previous=None, power_state_updated=0,
-                 requested_placement=None, ssh_key=None, state=None,
-                 state_updated=None, user_data=None, vdi_port=0,
-                 video=None):
-
-        super(FakeInstance, self).__init__(
-            cpus=cpus, memory=memory, name=name, namespace=namespace,
-            uuid=uuid,
-            block_devices=block_devices, devices=devices,
-            console_port=console_port,
-            disk_spec=disk_spec, error_message=error_message, node=node,
-            node_history=node_history, placement_attempts=placement_attempts,
-            power_state=power_state,
-            power_state_previous=power_state_previous,
-            power_state_updated=power_state_updated,
-            requested_placement=requested_placement, ssh_key=ssh_key, state=state,
-            state_updated=state_updated, user_data=user_data, vdi_port=vdi_port,
-            video=video)
-
     def add_event(self, operation, phase, duration=None, message=None):
         pass
 
@@ -130,7 +106,14 @@ class LowResourceTestCase(SchedulerTestCase):
         self.addCleanup(self.mock_get_instances.stop)
 
     def test_no_metrics(self):
-        fake_inst = FakeInstance(cpus=1)
+        fake_inst = FakeInstance({
+            'uuid': 'fakeuuid',
+            'cpus': 1,
+            'memory': 1024,
+            'disk_spec': [{
+                'base': 'cirros',
+                        'size': 8
+            }]})
 
         exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().place_instance,
@@ -143,7 +126,14 @@ class LowResourceTestCase(SchedulerTestCase):
             'cpu_max_per_instance': 5,
         })
 
-        fake_inst = FakeInstance(cpus=6)
+        fake_inst = FakeInstance({
+            'uuid': 'fakeuuid',
+            'cpus': 6,
+            'memory': 1024,
+            'disk_spec': [{
+                'base': 'cirros',
+                        'size': 8
+            }]})
 
         exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().place_instance,
@@ -161,7 +151,14 @@ class LowResourceTestCase(SchedulerTestCase):
             'disk_free': 2000*1024*1024*1024
         })
 
-        fake_inst = FakeInstance(cpus=1)
+        fake_inst = FakeInstance({
+            'uuid': 'fakeuuid',
+            'cpus': 1,
+            'memory': 1024,
+            'disk_spec': [{
+                'base': 'cirros',
+                        'size': 8
+            }]})
 
         exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().place_instance,
@@ -178,10 +175,14 @@ class LowResourceTestCase(SchedulerTestCase):
             'disk_free': 2000*1024*1024*1024
         })
 
-        fake_inst = FakeInstance(cpus=1, memory=1024,
-                                 block_devices={'devices': [
-                                     {'size': 21, 'base': 'some-os'}
-                                 ]})
+        fake_inst = FakeInstance({
+            'uuid': 'fakeuuid',
+            'cpus': 1,
+            'memory': 1024,
+            'disk_spec': [{
+                'base': 'cirros',
+                        'size': 8
+            }]})
 
         exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().place_instance,
@@ -199,10 +200,14 @@ class LowResourceTestCase(SchedulerTestCase):
             'disk_free': 2000*1024*1024*1024,
         })
 
-        fake_inst = FakeInstance(cpus=1, memory=1,
-                                 block_devices={'devices': [
-                                     {'size': 21, 'base': 'some-os'}
-                                 ]})
+        fake_inst = FakeInstance({
+            'uuid': 'fakeuuid',
+            'cpus': 1,
+            'memory': 1024,
+            'disk_spec': [{
+                'base': 'cirros',
+                        'size': 8
+            }]})
 
         exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().place_instance,
@@ -210,7 +215,9 @@ class LowResourceTestCase(SchedulerTestCase):
                                 [])
         self.assertEqual('No nodes with enough idle RAM', str(exc))
 
-    def test_not_enough_disk(self):
+    @mock.patch('shakenfist.images.Image.from_url')
+    @mock.patch('shakenfist.db.get_image_metadata_all', return_value=None)
+    def test_not_enough_disk(self, mock_get_image_meta, mock_image_from_url):
         self.fake_db.set_node_metrics_same({
             'cpu_max_per_instance': 16,
             'cpu_max': 4,
@@ -219,10 +226,14 @@ class LowResourceTestCase(SchedulerTestCase):
             'disk_free': 20*1024*1024*1024
         })
 
-        fake_inst = FakeInstance(cpus=1, memory=1024,
-                                 block_devices={'devices': [
-                                     {'size': 21, 'base': 'some-os'}
-                                 ]})
+        fake_inst = FakeInstance({
+            'uuid': 'fakeuuid',
+            'cpus': 1,
+            'memory': 1024,
+            'disk_spec': [{
+                'base': 'cirros',
+                        'size': 21
+            }]})
 
         exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().place_instance,
@@ -230,8 +241,9 @@ class LowResourceTestCase(SchedulerTestCase):
                                 [])
         self.assertEqual('No nodes with enough disk space', str(exc))
 
+    @mock.patch('shakenfist.images.Image.from_url')
     @mock.patch('shakenfist.db.get_image_metadata_all', return_value=None)
-    def test_ok(self, mock_get_image_meta):
+    def test_ok(self, mock_get_image_meta, mock_image_from_url):
         self.fake_db.set_node_metrics_same({
             'cpu_max_per_instance': 16,
             'cpu_max': 4,
@@ -240,10 +252,14 @@ class LowResourceTestCase(SchedulerTestCase):
             'disk_free': 2000*1024*1024*1024
         })
 
-        fake_inst = FakeInstance(cpus=1, memory=1024,
-                                 block_devices={'devices': [
-                                     {'size': 8, 'base': 'some-os'}
-                                 ]})
+        fake_inst = FakeInstance({
+            'uuid': 'fakeuuid',
+            'cpus': 1,
+            'memory': 1024,
+            'disk_spec': [{
+                'base': 'cirros',
+                        'size': 8
+            }]})
 
         nodes = scheduler.Scheduler().place_instance(fake_inst, [])
         self.assertSetEqual(set(self.fake_db.nodes)-{'node1_net', },
@@ -289,8 +305,9 @@ class CorrectAllocationTestCase(SchedulerTestCase):
         self.mock_get_instances.start()
         self.addCleanup(self.mock_get_instances.stop)
 
-    @mock.patch('shakenfist.db.get_image_metadata_all', return_value=None)
-    def test_any_node_but_not_network_node(self, mock_get_image_meta):
+    @ mock.patch('shakenfist.images.Image.from_url')
+    @ mock.patch('shakenfist.db.get_image_metadata_all', return_value=None)
+    def test_any_node_but_not_network_node(self, mock_get_image_meta, mock_image_from_url):
         self.fake_db.set_node_metrics_same({
             'cpu_max_per_instance': 16,
             'cpu_max': 4,
@@ -299,18 +316,23 @@ class CorrectAllocationTestCase(SchedulerTestCase):
             'disk_free': 2000*1024*1024*1024
         })
 
-        fake_inst = FakeInstance(cpus=1, memory=1024,
-                                 block_devices={'devices': [
-                                     {'size': 8, 'base': 'some-os'}
-                                 ]})
+        fake_inst = FakeInstance({
+            'uuid': 'fakeuuid',
+            'cpus': 1,
+            'memory': 1024,
+            'disk_spec': [{
+                'base': 'cirros',
+                        'size': 8
+            }]})
         nets = [{'network_uuid': 'uuid-net2'}]
 
         nodes = scheduler.Scheduler().place_instance(fake_inst, nets)
         self.assertSetEqual(set(self.fake_db.nodes)-{'node1_net', },
                             set(nodes))
 
-    @mock.patch('shakenfist.db.get_image_metadata_all', return_value=None)
-    def test_single_node_that_has_network(self, mock_get_image_meta):
+    @ mock.patch('shakenfist.images.Image.from_url')
+    @ mock.patch('shakenfist.db.get_image_metadata_all', return_value=None)
+    def test_single_node_that_has_network(self, mock_get_image_meta, mock_image_from_url):
         self.fake_db.set_node_metrics_same({
             'cpu_max_per_instance': 16,
             'cpu_max': 4,
@@ -319,10 +341,14 @@ class CorrectAllocationTestCase(SchedulerTestCase):
             'disk_free': 2000*1024*1024*1024
         })
 
-        fake_inst = FakeInstance(cpus=1, memory=1024,
-                                 block_devices={'devices': [
-                                     {'size': 8, 'base': 'some-os'}
-                                 ]})
+        fake_inst = FakeInstance({
+            'uuid': 'fakeuuid',
+            'cpus': 1,
+            'memory': 1024,
+            'disk_spec': [{
+                'base': 'cirros',
+                        'size': 8
+            }]})
         nets = [{'network_uuid': 'uuid-net1'}]
 
         nodes = scheduler.Scheduler().place_instance(fake_inst, nets)
@@ -356,27 +382,27 @@ class FindMostTestCase(SchedulerTestCase):
         mock_db_get_metrics.start()
         self.addCleanup(mock_db_get_metrics.stop)
 
-    @mock.patch('shakenfist.db.get_image_metadata_all',
-                return_value={
-                    '/sf/image/095fdd2b66625412aa/node2': {
-                        'checksum': None,
-                        'fetched': 'Tue, 20 Oct 2020 23:02:29 -0000',
-                        'file_version': 1,
-                        'modified': 'Tue, 10 Sep 2019 07:24:40 GMT',
-                        'size': 200000,
-                        'url': 'req_image1',
-                        'version': 1,
-                    },
-                    '/sf/image/aca41cefa18b052074e092/node3': {
-                        'checksum': None,
-                        'fetched': 'Tue, 20 Oct 2020 23:02:29 -0000',
-                        'file_version': 1,
-                        'modified': 'Tue, 10 Sep 2019 07:24:40 GMT',
-                        'size': 200000,
-                        'url': 'http://example.com',
-                        'version': 1,
-                    }
-                })
+    @ mock.patch('shakenfist.db.get_image_metadata_all',
+                 return_value={
+                     '/sf/image/095fdd2b66625412aa/node2': {
+                         'checksum': None,
+                         'fetched': 'Tue, 20 Oct 2020 23:02:29 -0000',
+                         'file_version': 1,
+                         'modified': 'Tue, 10 Sep 2019 07:24:40 GMT',
+                         'size': 200000,
+                         'url': 'req_image1',
+                         'version': 1,
+                     },
+                     '/sf/image/aca41cefa18b052074e092/node3': {
+                         'checksum': None,
+                         'fetched': 'Tue, 20 Oct 2020 23:02:29 -0000',
+                         'file_version': 1,
+                         'modified': 'Tue, 10 Sep 2019 07:24:40 GMT',
+                         'size': 200000,
+                         'url': 'http://example.com',
+                         'version': 1,
+                     }
+                 })
     def test_most_matching_images(self, mock_get_meta_all):
         req_images = ['req_image1']
         candidates = ['node1_net', 'node2', 'node3', 'node4']

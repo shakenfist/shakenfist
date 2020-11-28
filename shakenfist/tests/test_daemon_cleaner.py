@@ -70,13 +70,20 @@ fake_config = FakeConfig()
 FAKE_ETCD_STATE = {}
 
 
-def fake_instance_get(objecttype, subtype, uuid):
+def fake_instance_get(uuid):
     global FAKE_ETCD_STATE
     return FAKE_ETCD_STATE.get(
-        '%s/%s/%s' % (objecttype, subtype, uuid),
-        {'uuid': uuid, 'node': 'abigcomputer',
-         'name': 'bob', 'cpus': 1, 'memory': 1024, 'namespace': 'space',
-         'version': 1})
+        '%s/%s/%s' % ('instance', None, uuid),
+        {
+            'uuid': uuid,
+            'node': 'abigcomputer',
+            'name': 'bob',
+            'cpus': 1,
+            'memory': 1024,
+            'namespace': 'space',
+            'disk_spec': [{'base': 'cirros', 'size': 8}],
+            'version': 2
+        })
 
 
 def fake_put(objecttype, subtype, name, v):
@@ -102,68 +109,37 @@ class CleanerTestCase(test_shakenfist.ShakenFistTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
+    @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.db.see_this_node')
     @mock.patch('shakenfist.db.add_event')
-    @mock.patch('shakenfist.etcd.get', side_effect=fake_instance_get)
+    @mock.patch('shakenfist.db.get_instance', side_effect=fake_instance_get)
+    @mock.patch('shakenfist.db.get_instance_attribute', return_value={})
     @mock.patch('shakenfist.etcd.put', side_effect=fake_put)
     @mock.patch('os.path.exists', side_effect=fake_exists)
     @mock.patch('time.time', return_value=7)
     def test_update_power_states(self, mock_time, mock_exists, mock_put,
-                                 mock_get, mock_event, mock_see):
+                                 mock_get_instance_attribute, mock_get_instance,
+                                 mock_event, mock_see, mock_lock):
         m = cleaner.Monitor('cleaner')
         m._update_power_states()
 
-        result = [(c[1][0], c[1][1], c[1][2],
-                   {'uuid': c[1][3]['uuid'],
-                    'power_state': c[1][3]['power_state'],
-                    }
+        result = [(c[1][0], c[1][1], c[1][2], {'power_state': c[1][3]['power_state']}
                    ) for c in mock_put.mock_calls]
 
-        self.assertEqual([
-                         ('instance', None, 'running',
-                          {
-                              'uuid': 'running',
-                              'power_state': 'on',
-                           }),
-                         ('instance', None, 'shutoff',
-                          {
-                              'uuid': 'shutoff',
-                              'power_state': 'off',
-                          }),
-                         ('instance', None, 'crashed',
-                          {
-                              'uuid': 'crashed',
-                              'power_state': 'crashed',
-                          }),
-                         ('instance', None, 'crashed',
-                          {
-                              'uuid': 'crashed',
-                              'power_state': 'crashed',
-                          }),
-                         ('instance', None, 'paused',
-                          {
-                              'uuid': 'paused',
-                              'power_state': 'paused',
-                          }),
-                         ('instance', None, 'suspended',
-                          {
-                              'uuid': 'suspended',
-                              'power_state': 'paused',
-                          }),
-                         ('instance', None, 'foo',
-                          {
-                              'uuid': 'foo',
-                              'power_state': 'off',
-                          }),
-                         ('instance', None, 'bar',
-                          {
-                              'uuid': 'bar',
-                              'power_state': 'off',
-                          }),
-                         ('instance', None, 'nofiles',
-                          {
-                              'uuid': 'nofiles',
-                              'power_state': '',
-                          })
-                         ],
-                         result)
+        self.assertEqual(
+            [
+                ('attribute/instance', 'running',
+                 'placement', {'power_state': 'off'}),
+                ('attribute/instance', 'running',
+                 'power_state', {'power_state': 'off'}),
+                ('attribute/instance', 'shutoff',
+                 'power_state', {'power_state': 'off'}),
+                ('attribute/instance', 'crashed',
+                 'power_state', {'power_state': 'off'}),
+                ('attribute/instance', 'crashed',
+                 'state', {'power_state': 'off'}),
+                ('attribute/instance', 'paused',
+                 'power_state', {'power_state': 'off'}),
+                ('attribute/instance', 'foo',
+                 'power_state', {'power_state': 'off'})
+            ], result)

@@ -43,15 +43,18 @@ class Monitor(daemon.Daemon):
                 instance.place_instance(config.NODE_NAME)
                 seen.append(domain.name())
 
-                if instance.state == 'deleted':
+                dbstate = db.get_instance_attribute(
+                    instance.static_values['uuid'], 'state')
+                if dbstate.get('state') == 'deleted':
                     # NOTE(mikal): a delete might be in-flight in the queue.
                     # We only worry about instances which should have gone
                     # away five minutes ago.
-                    if time.time() - instance.state_updated < 300:
+                    if time.time() - dbstate['state_updated'] < 300:
                         continue
 
                     instance.enforced_deletes_increment()
-                    attempts = instance.enforced_deletes
+                    attempts = db.get_instance_attribute(
+                        instance.static_values['uuid'], 'enforced_deletes')['count']
 
                     if attempts > 5:
                         # Sometimes we just can't delete the VM. Try the big
@@ -94,7 +97,9 @@ class Monitor(daemon.Daemon):
                         domain.undefine()
                         continue
 
-                    if instance.state == 'deleted':
+                    dbstate = db.get_instance_attribute(
+                        instance.static_values['uuid'], 'state')
+                    if dbstate.get('state') == 'deleted':
                         # NOTE(mikal): a delete might be in-flight in the queue.
                         # We only worry about instances which should have gone
                         # away five minutes ago.
@@ -109,13 +114,15 @@ class Monitor(daemon.Daemon):
 
                     instance.place_instance(config.NODE_NAME)
 
-                    if not os.path.exists(instance.instance_path()):
+                    dbpowerstate = db.get_instance_attribute(
+                        instance.static_values['uuid'], 'power_state')
+                    if not os.path.exists(virt.instance_path(instance.static_values['uuid'])):
                         # If we're inactive and our files aren't on disk,
                         # we have a problem.
                         log_ctx.info('Detected error state for instance')
                         instance.update_instance_state('error')
 
-                    elif instance.power_state != 'off':
+                    elif dbpowerstate['power_state'] != 'off':
                         log_ctx.info('Detected power off for instance')
                         instance.update_power_state('off')
                         instance.add_event('detected poweroff', 'complete')
