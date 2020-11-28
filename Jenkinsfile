@@ -29,8 +29,18 @@ pipeline {
                 sudo mkdir -p /var/lib/etcd
                 sudo mount -t tmpfs -o size=2g tmpfs /var/lib/etcd
 
+                if [ '%%' == '%%' ]
+                then
+                  BRANCH=`git rev-parse --abbrev-ref HEAD`
+                else
+                  BRANCH=""
+                fi
+
                 # This means we'll use the master branch of our other repos
                 export RELEASE="git:master"
+                cd $WORKSPACE/deploy/ansible
+
+
 
                 # The actual job
                 export CLOUD="localhost"
@@ -38,7 +48,6 @@ pipeline {
                 export KSM_ENABLED="0"
 
                 echo "Deploying $RELEASE to cloud $CLOUD"
-                cd $WORKSPACE/deploy/ansible
                 ./deployandtest.sh
           '''
         }

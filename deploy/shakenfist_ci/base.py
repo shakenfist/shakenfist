@@ -190,11 +190,9 @@ class BaseTestCase(testtools.TestCase):
         while attempts:
             sys.stderr.write('    _test_ping()  attempts=%s\n' % attempts)
             attempts -= 1
-            out, err = processutils.execute(
-                'sudo ip netns exec %s ping -c 10 %s' % (network_uuid, ip),
-                shell=True, check_exit_code=[0, 1])
+            output = self.system_client.ping(network_uuid, ip)
 
-            actual = out.find(' 0% packet loss') != -1
+            actual = output.get('stdout').find(' 0% packet loss') != -1
             if actual == expected:
                 break
 
@@ -207,7 +205,7 @@ class BaseTestCase(testtools.TestCase):
             self._log_netns()
             sys.stderr.write('Current time: '+time.ctime()+'\n')
             self.fail('Ping test failed. Expected %s != actual %s.\nout: %s\nerr: %s\n'
-                      % (expected, actual, out, err))
+                      % (expected, actual, output['stdout'], output['stderr']))
 
 
 class BaseNamespacedTestCase(BaseTestCase):
@@ -245,7 +243,18 @@ class LoggingSocket(object):
     ctrlc = '\x03'
 
     def __init__(self, host, port):
-        self.s = telnetlib.Telnet(host, port, 30)
+        attempts = 5
+        while attempts:
+            try:
+                attempts -= 1
+                self.s = telnetlib.Telnet(host, port, 30)
+                return
+
+            except ConnectionRefusedError:
+                print('!! Connection refused, retrying')
+                time.sleep(5)
+
+        raise ConnectionRefusedError('Repeated connection attempts failed')
 
     def ensure_fresh(self):
         for d in [self.ctrlc, self.ctrlc, '\nexit\n', 'cirros\n', 'gocubsgo\n']:
