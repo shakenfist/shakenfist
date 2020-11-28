@@ -643,6 +643,13 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#ping" class="md-nav__link">
+    ping
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1200,6 +1207,13 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#ping" class="md-nav__link">
+    ping
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1219,7 +1233,7 @@
                 
                 <h1 id="ci-api-coverage">CI API Coverage</h1>
 <p>This document tracks the CI coverage for each of our public APIs. The intent to make it clear what is "sufficiently tested", and what needs further effort. This list is manually updated, so we'll need to show discipline in ensuring that we update it as we change APIs or CI.</p>
-<p>For this document we use the python API client as a model of what to cover, as its simpler to extract a list of calls from than the API implementation itself.</p>
+<p>For this document we use the python API client as a model of what to cover, as its simpler to extract a list of calls from than the API implementation itself. We list whether we have CI which calls the API directly, CI which uses the python command line client to call the API, or both. The gold standard is both.</p>
 <h2 id="get_instances">get_instances</h2>
 <p>Whilst being implied by every test tearDown(), this call is explicitly used in:</p>
 <ul>
@@ -1384,6 +1398,8 @@
 <p><em>Not tested.</em></p>
 <h2 id="get_existing_locks">get_existing_locks</h2>
 <p><em>Not tested.</em></p>
+<h2 id="ping">ping</h2>
+<p>Tested as a side effect of many other tests, but no explicit test.</p>
                 
               
               
