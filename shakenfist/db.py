@@ -2,7 +2,6 @@
 
 import copy
 import random
-import re
 import socket
 import time
 import uuid
@@ -201,25 +200,8 @@ def get_instance(instance_uuid, external_view=False):
     return i
 
 
-INSTANCE_RE = re.compile('^/sf/instance/[0-9a-f\\-]+$')
-
-
 def get_instances(only_node=None, all=False, namespace=None):
-    # NOTE(mikal): the structure in etcd for an instance is now like this:
-    #
-    # /sf/instance/uuid
-    # /sf/instance/uuid/placement
-    # /sf/instance/uuid/state
-    # /sf/instance/uuid/...etc...
-    #
-    # This means not every value returned by this get_all is actually an
-    # instance, some are attributes under the instance. We therefore need
-    # to filter here.
-    for key, i in etcd.get_all('instance', None):
-        m = INSTANCE_RE.match(key)
-        if not m:
-            continue
-
+    for _, i in etcd.get_all('instance', None):
         node = get_instance_attribute(i['uuid'], 'placement')
         if only_node and node.get('node') != only_node:
             continue
@@ -241,25 +223,21 @@ def hard_delete_instance(instance_uuid):
 
 
 def get_stale_instances(delay):
-    for key, i in etcd.get_all('instance', None):
-        m = INSTANCE_RE.match(key)
-        if not m:
-            continue
-
+    for _, i in etcd.get_all('instance', None):
         if i['state'] in ['deleted', 'error']:
             if time.time() - i['state_updated'] > delay:
                 yield i
 
 
 def get_instance_attribute(instance_uuid, attribute):
-    retval = etcd.get('instance', instance_uuid, attribute)
+    retval = etcd.get('attribute/instance', instance_uuid, attribute)
     if not retval:
         return {}
     return retval
 
 
 def set_instance_attribute(instance_uuid, attribute, value):
-    etcd.put('instance', instance_uuid, attribute, value)
+    etcd.put('attribute/instance', instance_uuid, attribute, value)
 
 #####################################################################
 # NetworkInterfaces

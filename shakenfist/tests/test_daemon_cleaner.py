@@ -127,11 +127,18 @@ class CleanerTestCase(test_shakenfist.ShakenFistTestCase):
 
         self.assertEqual(
             [
-                ('instance', 'running', 'placement', {'power_state': 'off'}),
-                ('instance', 'running', 'power_state', {'power_state': 'off'}),
-                ('instance', 'shutoff', 'power_state', {'power_state': 'off'}),
-                ('instance', 'crashed', 'power_state', {'power_state': 'off'}),
-                ('instance', 'crashed', 'state', {'power_state': 'off'}),
-                ('instance', 'paused', 'power_state', {'power_state': 'off'}),
-                ('instance', 'foo', 'power_state', {'power_state': 'off'})
+                ('attribute/instance', 'running',
+                 'placement', {'power_state': 'off'}),
+                ('attribute/instance', 'running',
+                 'power_state', {'power_state': 'off'}),
+                ('attribute/instance', 'shutoff',
+                 'power_state', {'power_state': 'off'}),
+                ('attribute/instance', 'crashed',
+                 'power_state', {'power_state': 'off'}),
+                ('attribute/instance', 'crashed',
+                 'state', {'power_state': 'off'}),
+                ('attribute/instance', 'paused',
+                 'power_state', {'power_state': 'off'}),
+                ('attribute/instance', 'foo',
+                 'power_state', {'power_state': 'off'})
             ], result)
