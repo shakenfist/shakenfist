@@ -61,7 +61,9 @@ class VirtMetaTestCase(test_shakenfist.ShakenFistTestCase):
                           [{}], 'userdata', {'memory': 16384, 'model': 'cirrus'},
                           uuid='uuid42',)
 
-        etcd_write = mock_put.mock_calls[0][1]
+        self.assertEqual(
+            ('attribute/instance', 'uuid42', 'state', {'state': 'initial'}),
+            mock_put.mock_calls[0][1])
         self.assertEqual(
             ('instance', None, 'uuid42',
              {'cpus': 1,
@@ -75,7 +77,7 @@ class VirtMetaTestCase(test_shakenfist.ShakenFistTestCase):
               'uuid': 'uuid42',
               'version': 2,
               'video': {'memory': 16384, 'model': 'cirrus'}}),
-            etcd_write)
+            mock_put.mock_calls[1][1])
 
     @mock.patch('shakenfist.etcd.get',
                 return_value={

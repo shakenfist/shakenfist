@@ -181,6 +181,7 @@ def delete_ipmanager(network_uuid):
 
 
 def create_instance(instance_uuid, metadata):
+    set_instance_attribute(instance_uuid, 'state', {'state': 'initial'})
     etcd.put('instance', None, instance_uuid, metadata)
 
 
@@ -225,7 +226,7 @@ def hard_delete_instance(instance_uuid):
 def get_stale_instances(delay):
     for _, i in etcd.get_all('instance', None):
         dbstate = get_instance_attribute(i['uuid'], 'state')
-        if dbstate['state'] in ['deleted', 'error']:
+        if dbstate.get('state') in ['deleted', 'error']:
             if time.time() - dbstate['state_updated'] > delay:
                 yield i
 

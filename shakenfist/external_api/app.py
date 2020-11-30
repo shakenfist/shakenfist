@@ -794,7 +794,7 @@ class Instances(Resource):
         tasks_by_node = {}
         for instance in list(db.get_instances(all=all, namespace=namespace)):
             dbstate = db.get_instance_attribute(instance['uuid'], 'state')
-            if dbstate['state'] in ['deleted', 'error']:
+            if dbstate.get('state') in ['deleted', 'error']:
                 continue
 
             # If this instance is not on a node, just do the DB cleanup locally
@@ -819,7 +819,7 @@ class Instances(Resource):
             for instance_uuid in copy.copy(waiting_for):
                 dbstate = db.get_instance_attribute(instance_uuid, 'state')
                 print(dbstate)
-                if dbstate['state'] in ['deleted', 'error']:
+                if dbstate.get('state') in ['deleted', 'error']:
                     waiting_for.remove(instance_uuid)
 
         return instances_del

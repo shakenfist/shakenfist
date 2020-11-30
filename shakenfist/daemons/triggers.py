@@ -83,7 +83,7 @@ class Monitor(daemon.Daemon):
                     extra_instances.remove(inst['uuid'])
 
                 dbstate = db.get_instance_attribute(inst['uuid'], 'state')
-                if dbstate['state'] != 'created':
+                if dbstate.get('state') != 'created':
                     continue
 
                 if inst['uuid'] not in observers:
