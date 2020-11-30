@@ -41,9 +41,17 @@ class Monitor(daemon.Daemon):
                 # Network nodes also look for interfaces for absent instances
                 # and delete them
                 for ni in db.get_network_interfaces(n['uuid']):
+                    stray = False
                     inst = db.get_instance(ni['instance_uuid'])
-                    if (not inst
-                            or inst.get('state', 'unknown') in ['deleted', 'error', 'unknown']):
+                    if not inst:
+                        stray = True
+                    else:
+                        dbstate = db.get_instance_attribute(
+                            ni['instance_uuid'], 'state')
+                        if dbstate.get('state') in ['deleted', 'error', 'unknown']:
+                            stray = True
+
+                    if stray:
                         db.hard_delete_network_interface(ni['uuid'])
                         LOG.withInstance(
                             ni['instance_uuid']).withNetworkInterface(
