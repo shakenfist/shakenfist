@@ -206,8 +206,8 @@ def get_instances(only_node=None, all=False, namespace=None):
         if only_node and node.get('node') != only_node:
             continue
         if not all:
-            state = get_instance_attribute(i['uuid'], 'state')
-            if state.get('state') in ['deleted', 'error']:
+            dbstate = get_instance_attribute(i['uuid'], 'state')
+            if dbstate.get('state') in ['deleted', 'error']:
                 continue
         if namespace:
             if namespace not in [i['namespace'], 'system']:
@@ -224,8 +224,9 @@ def hard_delete_instance(instance_uuid):
 
 def get_stale_instances(delay):
     for _, i in etcd.get_all('instance', None):
-        if i['state'] in ['deleted', 'error']:
-            if time.time() - i['state_updated'] > delay:
+        dbstate = get_instance_attribute(i['uuid'], 'state')
+        if dbstate['state'] in ['deleted', 'error']:
+            if time.time() - dbstate['state_updated'] > delay:
                 yield i
 
 
