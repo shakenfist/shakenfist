@@ -653,12 +653,13 @@ class Instance(object):
             disks = [disks[0]]
 
         snapshot_uuid = str(uuid4())
-        snappath = os.path.join(_snapshot_path(), snapshot_uuid)
+        snappath = os.path.join(_snapshot_path(
+            self.static_values['uuid']), snapshot_uuid)
         if not os.path.exists(snappath):
             LOG.withObj(self).debug(
                 'Creating snapshot storage at %s' % snappath)
             os.makedirs(snappath, exist_ok=True)
-            with open(os.path.join(_snapshot_path(), 'index.html'), 'w') as f:
+            with open(os.path.join(_snapshot_path(self.static_values['uuid']), 'index.html'), 'w') as f:
                 f.write('<html></html>')
 
         for d in disks:
