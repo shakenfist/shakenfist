@@ -181,67 +181,76 @@ class Instance(object):
             'instance', self.static_values['uuid'], operation, phase, duration, msg)
 
     def place_instance(self, location):
-        # We don't write unchanged things to the database
-        placement = db.get_instance_attribute(
-            self.static_values['uuid'], 'placement')
-        if placement.get('node') == location:
-            return
+        with db.get_lock('attribute/instance', self.static_values['uuid'], 'placement',
+                         op='Instance placement'):
+            # We don't write unchanged things to the database
+            placement = db.get_instance_attribute(
+                self.static_values['uuid'], 'placement')
+            if placement.get('node') == location:
+                return
 
-        placement['node'] = location
-        placement['placement_attempts'] = placement.get(
-            'placement_attempts', 0) + 1
-        db.set_instance_attribute(
-            self.static_values['uuid'], 'placement', placement)
-        self.add_event('placement', None, None, location)
+            placement['node'] = location
+            placement['placement_attempts'] = placement.get(
+                'placement_attempts', 0) + 1
+            db.set_instance_attribute(
+                self.static_values['uuid'], 'placement', placement)
+            self.add_event('placement', None, None, location)
 
     def enforced_deletes_increment(self):
-        enforced_deletes = db.get_instance_attribute(
-            self.static_values['uuid'], 'enforced_deletes')
-        enforced_deletes['count'] = enforced_deletes.get('count', 0) + 1
-        db.set_instance_attribute(
-            self.static_values['uuid'], 'enforced_deletes', enforced_deletes)
+        with db.get_lock('attribute/instance', self.static_values['uuid'], 'enforced_deletes',
+                         op='Instance enforced deletes increment'):
+            enforced_deletes = db.get_instance_attribute(
+                self.static_values['uuid'], 'enforced_deletes')
+            enforced_deletes['count'] = enforced_deletes.get('count', 0) + 1
+            db.set_instance_attribute(
+                self.static_values['uuid'], 'enforced_deletes', enforced_deletes)
 
     def update_instance_state(self, state, error_message=None):
-        # We don't write unchanged things to the database
-        dbstate = db.get_instance_attribute(
-            self.static_values['uuid'], 'state')
-        if dbstate.get('state') == state:
-            return
+        with db.get_lock('attribute/instance', self.static_values['uuid'], 'state',
+                         op='Instance state update'):
+            # We don't write unchanged things to the database
+            dbstate = db.get_instance_attribute(
+                self.static_values['uuid'], 'state')
+            if dbstate.get('state') == state:
+                return
 
-        orig_state = dbstate.get('state')
-        dbstate['state'] = state
-        dbstate['state_updated'] = time.time()
+            orig_state = dbstate.get('state')
+            dbstate['state'] = state
+            dbstate['state_updated'] = time.time()
 
-        if error_message:
-            dbstate['error_message'] = error_message
+            if error_message:
+                dbstate['error_message'] = error_message
 
-        db.set_instance_attribute(self.static_values['uuid'], 'state', dbstate)
-        self.add_event('state changed', '%s -> %s' % (orig_state, state))
+            db.set_instance_attribute(
+                self.static_values['uuid'], 'state', dbstate)
+            self.add_event('state changed', '%s -> %s' % (orig_state, state))
 
     def update_power_state(self, state):
-        # We don't write unchanged things to the database
-        dbstate = db.get_instance_attribute(
-            self.static_values['uuid'], 'power_state')
-        if dbstate.get('power_state') == state:
-            return
+        with db.get_lock('attribute/instance', self.static_values['uuid'], 'power_state',
+                         op='Instance power state update'):
+            # We don't write unchanged things to the database
+            dbstate = db.get_instance_attribute(
+                self.static_values['uuid'], 'power_state')
+            if dbstate.get('power_state') == state:
+                return
 
-        # TODO(andy): Find out what problem this is avoiding
+            # TODO(andy): Find out what problem this is avoiding
 
-        # If we are in transition, and its new, then we might
-        # not want to update just yet
-        state_age = time.time() - dbstate.get('power_state_updated', 0)
-        if (dbstate.get('power_state', '').startswith('transition-to-') and
-                dbstate['power_state_previous'] == state and
-                state_age < 70):
-            return
+            # If we are in transition, and its new, then we might
+            # not want to update just yet
+            state_age = time.time() - dbstate.get('power_state_updated', 0)
+            if (dbstate.get('power_state', '').startswith('transition-to-') and
+                    dbstate['power_state_previous'] == state and
+                    state_age < 70):
+                return
 
-        dbstate['power_state_previous'] = dbstate.get('power_state')
-        dbstate['power_state'] = state
-        dbstate['power_state_updated'] = time.time()
-        db.set_instance_attribute(
-            self.static_values['uuid'], 'power_state', dbstate)
-        self.add_event('power state changed', '%s -> %s' %
-                       (dbstate['power_state_previous'], state))
+            dbstate['power_state_previous'] = dbstate.get('power_state')
+            dbstate['power_state'] = state
+            dbstate['power_state_updated'] = time.time()
+            db.set_instance_attribute(
+                self.static_values['uuid'], 'power_state', dbstate)
+            self.add_event('power state changed', '%s -> %s' %
+                           (dbstate['power_state_previous'], state))
 
     # NOTE(mikal): this method is now strictly the instance specific steps for
     # creation. It is assumed that the image sits in local cache already, and
@@ -253,95 +262,8 @@ class Instance(object):
         # Ensure we have state on disk
         os.makedirs(instance_path(self.static_values['uuid']), exist_ok=True)
 
-        # Create block devices if required
-        block_devices = db.get_instance_attribute(
-            self.static_values['uuid'], 'block_devices')
-        if not block_devices:
-            block_devices = _initialize_block_devices(
-                instance_path(self.static_values['uuid']), self.static_values['disk_spec'])
-
-        # Generate a config drive
-        with util.RecordedOperation('make config drive', self):
-            self._make_config_drive(os.path.join(
-                instance_path(self.static_values['uuid']), block_devices['devices'][1]['path']))
-
-        # Prepare disks
-        if not block_devices['finalized']:
-            modified_disks = []
-            for disk in block_devices['devices']:
-                if disk.get('base'):
-                    img = images.Image.from_url(disk['base'])
-                    hashed_image_path = img.version_image_path()
-
-                    with util.RecordedOperation('detect cdrom images', self):
-                        try:
-                            cd = pycdlib.PyCdlib()
-                            cd.open(hashed_image_path)
-                            disk['present_as'] = 'cdrom'
-                        except Exception:
-                            pass
-
-                    if disk.get('present_as', 'cdrom') == 'cdrom':
-                        # There is no point in resizing or COW'ing a cdrom
-                        disk['path'] = disk['path'].replace('.qcow2', '.raw')
-                        disk['type'] = 'raw'
-                        disk['snapshot_ignores'] = True
-
-                        try:
-                            os.link(hashed_image_path, disk['path'])
-                        except OSError:
-                            # Different filesystems
-                            util.execute(
-                                [lock], 'cp %s %s' % (hashed_image_path, disk['path']))
-
-                        # Due to limitations in some installers, cdroms are always on IDE
-                        disk['device'] = 'hd%s' % disk['device'][-1]
-                        disk['bus'] = 'ide'
-                    else:
-                        if config.get('DISK_FORMAT') == 'qcow':
-                            with util.RecordedOperation('create copy on write layer', self):
-                                images.create_cow([lock], hashed_image_path,
-                                                  disk['path'], disk['size'])
-
-                            # Record the backing store for modern libvirts
-                            disk['backing'] = (
-                                '<backingStore type=\'file\'>\n'
-                                '        <format type=\'qcow2\'/>\n'
-                                '        <source file=\'%s\'/>\n'
-                                '      </backingStore>\n'
-                                % (hashed_image_path))
-
-                        elif config.get('DISK_FORMAT') == 'qcow_flat':
-                            with util.RecordedOperation('resize image', self):
-                                resized_image_path = img.resize(
-                                    [lock], disk['size'])
-
-                            with util.RecordedOperation('create flat layer', self):
-                                images.create_flat(
-                                    [lock], resized_image_path, disk['path'])
-
-                        elif config.get('DISK_FORMAT') == 'flat':
-                            with util.RecordedOperation('resize image', self):
-                                resized_image_path = img.resize(
-                                    [lock], disk['size'])
-
-                            with util.RecordedOperation('create raw disk', self):
-                                images.create_raw(
-                                    [lock], resized_image_path, disk['path'])
-
-                        else:
-                            raise Exception('Unknown disk format')
-
-                elif not os.path.exists(disk['path']):
-                    util.execute(None, 'qemu-img create -f qcow2 %s %sG'
-                                 % (disk['path'], disk['size']))
-
-                modified_disks.append(disk)
-
-            block_devices['devices'] = modified_disks
-            block_devices['finalized'] = True
-            db.set_instance_attribute(
-                self.static_values['uuid'], 'block_devices', block_devices)
+        # Configure block devices, include config drive creation
+        self._configure_block_devices(lock)
 
         # Create the actual instance
         with util.RecordedOperation('create domain XML', self):
@@ -398,14 +320,112 @@ class Instance(object):
         self.update_instance_state('deleted')
 
     def allocate_instance_ports(self):
-        ports = db.get_instance_attribute(self.static_values['uuid'], 'ports')
-        if not ports:
-            db.set_instance_attribute(
-                self.static_values['uuid'], 'ports',
-                {
-                    'console_port': db.allocate_console_port(self.static_values['uuid']),
-                    'vdi_port': db.allocate_console_port(self.static_values['uuid'])
-                })
+        with db.get_lock('attribute/instance', self.static_values['uuid'], 'ports',
+                         op='Instance port allocation'):
+            ports = db.get_instance_attribute(
+                self.static_values['uuid'], 'ports')
+            if not ports:
+                db.set_instance_attribute(
+                    self.static_values['uuid'], 'ports',
+                    {
+                        'console_port': db.allocate_console_port(self.static_values['uuid']),
+                        'vdi_port': db.allocate_console_port(self.static_values['uuid'])
+                    })
+
+    def _configure_block_devices(self, lock):
+        with db.get_lock('attribute/instance', self.static_values['uuid'], 'block_devices',
+                         op='Instance initialize block devices'):
+            # Create block devices if required
+            block_devices = db.get_instance_attribute(
+                self.static_values['uuid'], 'block_devices')
+            if not block_devices:
+                block_devices = _initialize_block_devices(
+                    instance_path(self.static_values['uuid']), self.static_values['disk_spec'])
+
+            # Generate a config drive
+            with util.RecordedOperation('make config drive', self):
+                self._make_config_drive(
+                    os.path.join(instance_path(self.static_values['uuid']),
+                                 block_devices['devices'][1]['path']))
+
+            # Prepare disks
+            if not block_devices['finalized']:
+                modified_disks = []
+                for disk in block_devices['devices']:
+                    if disk.get('base'):
+                        img = images.Image.from_url(disk['base'])
+                        hashed_image_path = img.version_image_path()
+
+                        with util.RecordedOperation('detect cdrom images', self):
+                            try:
+                                cd = pycdlib.PyCdlib()
+                                cd.open(hashed_image_path)
+                                disk['present_as'] = 'cdrom'
+                            except Exception:
+                                pass
+
+                        if disk.get('present_as', 'cdrom') == 'cdrom':
+                            # There is no point in resizing or COW'ing a cdrom
+                            disk['path'] = disk['path'].replace(
+                                '.qcow2', '.raw')
+                            disk['type'] = 'raw'
+                            disk['snapshot_ignores'] = True
+
+                            try:
+                                os.link(hashed_image_path, disk['path'])
+                            except OSError:
+                                # Different filesystems
+                                util.execute(
+                                    [lock], 'cp %s %s' % (hashed_image_path, disk['path']))
+
+                            # Due to limitations in some installers, cdroms are always on IDE
+                            disk['device'] = 'hd%s' % disk['device'][-1]
+                            disk['bus'] = 'ide'
+                        else:
+                            if config.get('DISK_FORMAT') == 'qcow':
+                                with util.RecordedOperation('create copy on write layer', self):
+                                    images.create_cow([lock], hashed_image_path,
+                                                      disk['path'], disk['size'])
+
+                                # Record the backing store for modern libvirts
+                                disk['backing'] = (
+                                    '<backingStore type=\'file\'>\n'
+                                    '        <format type=\'qcow2\'/>\n'
+                                    '        <source file=\'%s\'/>\n'
+                                    '      </backingStore>\n'
+                                    % (hashed_image_path))
+
+                            elif config.get('DISK_FORMAT') == 'qcow_flat':
+                                with util.RecordedOperation('resize image', self):
+                                    resized_image_path = img.resize(
+                                        [lock], disk['size'])
+
+                                with util.RecordedOperation('create flat layer', self):
+                                    images.create_flat(
+                                        [lock], resized_image_path, disk['path'])
+
+                            elif config.get('DISK_FORMAT') == 'flat':
+                                with util.RecordedOperation('resize image', self):
+                                    resized_image_path = img.resize(
+                                        [lock], disk['size'])
+
+                                with util.RecordedOperation('create raw disk', self):
+                                    images.create_raw(
+                                        [lock], resized_image_path, disk['path'])
+
+                            else:
+                                raise Exception('Unknown disk format')
+
+                    elif not os.path.exists(disk['path']):
+                        util.execute(None, 'qemu-img create -f qcow2 %s %sG'
+                                     % (disk['path'], disk['size']))
+
+                    modified_disks.append(disk)
+
+                block_devices['devices'] = modified_disks
+                block_devices['finalized'] = True
+                db.set_instance_attribute(
+                    self.static_values['uuid'], 'block_devices', block_devices)
 
     def _make_config_drive(self, disk_path):
         """Create a config drive"""

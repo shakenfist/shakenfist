@@ -165,12 +165,14 @@ class VirtTestCase(test_shakenfist.ShakenFistTestCase):
                 'thisisuserdata'.encode('utf-8')), 'utf-8'),
         )
 
+    @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.db.get_instance_attribute',
                 return_value={
                     'state': 'initial'
                 })
     @mock.patch('shakenfist.etcd.put')
-    def test_update_instance_state(self, mock_put, mock_get_attribute):
+    def test_update_instance_state(self, mock_put, mock_get_attribute,
+                                   mock_lock):
         i = self._make_instance()
         i.update_instance_state('created')
 
@@ -178,23 +180,26 @@ class VirtTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertTrue(time.time() - etcd_write[3]['state_updated'] < 3)
         self.assertEqual('created', etcd_write[3]['state'])
 
+    @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.db.get_instance_attribute',
                 return_value={
                     'state': 'created'
                 })
     @mock.patch('shakenfist.etcd.put')
-    def test_update_instance_state_duplicate(self, mock_put, mock_get_attribute):
+    def test_update_instance_state_duplicate(self, mock_put, mock_get_attribute,
+                                             mock_lock):
         i = self._make_instance()
         i.update_instance_state('created')
         self.assertEqual(1, mock_put.call_count)
 
+    @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.db.get_instance_attribute',
                 return_value={
                     'power_state': 'on',
                     'power_state_updated': 0
                 })
     @mock.patch('shakenfist.etcd.put')
-    def test_update_power_state(self, mock_put, mock_get_attribute):
+    def test_update_power_state(self, mock_put, mock_get_attribute, mock_lock):
         i = self._make_instance()
         i.update_power_state('off')
 
@@ -203,17 +208,20 @@ class VirtTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertEqual('off', etcd_write[3]['power_state'])
         self.assertEqual('on', etcd_write[3]['power_state_previous'])
 
+    @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.db.get_instance_attribute',
                 return_value={
                     'power_state': 'on',
                     'power_state_updated': 0
                 })
     @mock.patch('shakenfist.etcd.put')
-    def test_update_power_state_duplicate(self, mock_put, mock_get_attribute):
+    def test_update_power_state_duplicate(self, mock_put, mock_get_attribute,
+                                          mock_lock):
         i = self._make_instance()
         i.update_power_state('on')
         self.assertEqual(1, mock_put.call_count)
 
+    @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.db.get_instance_attribute',
                 return_value={
                     'power_state_previous': 'on',
@@ -221,11 +229,13 @@ class VirtTestCase(test_shakenfist.ShakenFistTestCase):
                     'power_state_updated': time.time()
                 })
     @mock.patch('shakenfist.etcd.put')
-    def test_update_power_state_transition_new(self, mock_put, mock_get_attribute):
+    def test_update_power_state_transition_new(self, mock_put, mock_get_attribute,
+                                               mock_lock):
         i = self._make_instance()
         i.update_power_state('on')
         self.assertEqual(1, mock_put.call_count)
 
+    @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.db.get_instance_attribute',
                 return_value={
                     'power_state_previous': 'on',
@@ -233,7 +243,8 @@ class VirtTestCase(test_shakenfist.ShakenFistTestCase):
                     'power_state_updated': time.time() - 71
                 })
     @mock.patch('shakenfist.etcd.put')
-    def test_update_power_state_transition_old(self, mock_put, mock_get_attribute):
+    def test_update_power_state_transition_old(self, mock_put, mock_get_attribute,
+                                               mock_lock):
         i = self._make_instance()
         i.update_power_state('on')
 
