@@ -578,7 +578,7 @@ class Instance(Resource):
     @requires_instance_ownership
     def delete(self, instance_uuid=None, instance_from_db=None):
         # Check if instance has already been deleted
-        state = db.get_attribute(instance_uuid, 'state')
+        state = db.get_instance_attribute(instance_uuid, 'state')
         if state['state'] == 'deleted':
             return error(404, 'instance not found')
 
