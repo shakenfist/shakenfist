@@ -22,7 +22,7 @@ def cli(ctx, verbose=None):
 
 
 @click.command()
-@click.argument('output', type=click.STRING, help='File path to write backup to')
+@click.argument('output', type=click.Path(exists=False))
 @click.pass_context
 def backup(ctx, output):
     with tarfile.open(output, 'w:gz') as tar:
@@ -32,8 +32,11 @@ def backup(ctx, output):
             tar.addfile(info, io.BytesIO(data))
 
 
+cli.add_command(backup)
+
+
 @click.command()
-@click.argument('input', type=click.STRING, help='File path to write backup to')
+@click.argument('input', type=click.Path(exists=True))
 @click.pass_context
 def restore(ctx, input):
     with tarfile.open(input, 'r:gz') as tar:
@@ -44,4 +47,4 @@ def restore(ctx, input):
             etcd.Etcd3Client().put(key, data)
 
 
-cli.add_command(backup)
+cli.add_command(restore)
