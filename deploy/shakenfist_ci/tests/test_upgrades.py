@@ -1,0 +1,218 @@
+from shakenfist_ci import base
+
+
+class TestUpgrades(base.BaseTestCase):
+    def test_upgraded_data_exists(self):
+        # There is an upgraded namespace called 'nstest'
+        self.assertIn('nstest', self.system_client.get_namespaces())
+
+        # Collect networks
+        networks = {}
+        for net in self.system_client.get_networks():
+            networks[net['uuid']] = net
+
+        self.assertIn('30acadd4-66ee-4390-9477-e31d11fe44cb', networks)
+        self.assertIn('3edb03de-4f3d-4859-b822-94924073a1ea', networks)
+        self.assertIn('afce2cce-dec2-4cf7-a61b-2c4614b320c7', networks)
+
+        # First network
+        self.assertEqual(
+            'testnet', networks['30acadd4-66ee-4390-9477-e31d11fe44cb']['name'])
+        self.assertEqual(
+            'system', networks['30acadd4-66ee-4390-9477-e31d11fe44cb']['namespace'])
+        self.assertEqual(
+            '192.16.10.0/24', networks['30acadd4-66ee-4390-9477-e31d11fe44cb']['netblock'])
+
+        # Second network, which has an invalid netblock (allowed in v0.3.3)
+        self.assertEqual(
+            'nsnet', networks['3edb03de-4f3d-4859-b822-94924073a1ea']['name'])
+        self.assertEqual(
+            'nstest', networks['3edb03de-4f3d-4859-b822-94924073a1ea']['namespace'])
+        self.assertEqual(
+            '192.168.20.024', networks['3edb03de-4f3d-4859-b822-94924073a1ea']['netblock'])
+
+        # Third network
+        self.assertEqual(
+            'nsnet', networks['afce2cce-dec2-4cf7-a61b-2c4614b320c7']['name'])
+        self.assertEqual(
+            'nstest', networks['afce2cce-dec2-4cf7-a61b-2c4614b320c7']['namespace'])
+        self.assertEqual(
+            '192.168.20.0/24', networks['afce2cce-dec2-4cf7-a61b-2c4614b320c7']['netblock'])
+
+        # Collect instances
+        instances = {}
+        for inst in self.system_client.get_instances():
+            instances[inst['uuid']] = inst
+
+        self.assertIn('99ef006a-a0f0-4d2f-a784-16bce921431c', instances)
+        self.assertIn('a13ce821-adcb-45a4-9260-1b18b5250ad3', instances)
+        self.assertIn('a9121ca7-4f72-4b94-87f4-2a1e0d54f4f4', instances)
+        self.assertIn('ce2c93af-a9f8-4efe-94df-3786c3f92a7a', instances)
+
+        # First instance
+        self.assertEqual(
+            {
+                'console_port': 31614,
+                'cpus': 1,
+                'disk_spec': [
+                    {
+                        'base': 'cirros',
+                        'bus': None,
+                        'size': 8,
+                        'type': 'disk'
+                    }
+                ],
+                'memory': 1024,
+                'metadata': {},
+                'name': 'inst1',
+                'namespace': 'system',
+                'network_interfaces': [
+                    {
+                        'floating': None,
+                        'ipv4': '192.16.10.44',
+                        'macaddr': '02:00:00:47:3a:aa',
+                        'model': 'virtio',
+                        'network_uuid': '30acadd4-66ee-4390-9477-e31d11fe44cb',
+                        'order': 0,
+                        'uuid': '9293af9b-780f-426e-979c-4f61ca06b833'
+                    }
+                ],
+                'node': 'sf-2',
+                'power_state': 'on',
+                'ssh_key': None,
+                'state': 'created',
+                'user_data': None,
+                'uuid': 'ce2c93af-a9f8-4efe-94df-3786c3f92a7a',
+                'vdi_port': 40495,
+                'video': {
+                    'memory': 16384,
+                    'model': 'cirrus'
+                }
+            }, self.system_client.get_instance('ce2c93af-a9f8-4efe-94df-3786c3f92a7a')
+        )
+
+        # Second instance
+        self.assertEqual(
+            {
+                'console_port': 47305,
+                'cpus': 1,
+                'disk_spec': [
+                    {
+                        'base': 'cirros',
+                        'bus': None,
+                        'size': 8,
+                        'type': 'disk'
+                    }
+                ],
+                'memory': 1024,
+                'metadata': {},
+                'name': 'inst2',
+                'namespace': 'system',
+                'network_interfaces': [
+                    {
+                        'floating': None,
+                        'ipv4': '192.16.10.162',
+                        'macaddr': '02:00:00:f2:fb:81',
+                        'model': 'virtio',
+                        'network_uuid': '30acadd4-66ee-4390-9477-e31d11fe44cb',
+                        'order': 0,
+                        'uuid': '7130a76f-1015-4d17-a27e-89baf12eccfa'
+                    }
+                ],
+                'node': 'sf-2',
+                'power_state': 'on',
+                'ssh_key': None,
+                'state': 'created',
+                'user_data': None,
+                'uuid': 'a9121ca7-4f72-4b94-87f4-2a1e0d54f4f4',
+                'vdi_port': 46898,
+                'video': {
+                    'memory': 16384,
+                    'model': 'cirrus'
+                }
+            }, self.system_client.get_instance('a9121ca7-4f72-4b94-87f4-2a1e0d54f4f4')
+        )
+
+        # Third instance
+        self.assertEqual(
+            {
+                'console_port': 30510,
+                'cpus': 2,
+                'disk_spec': [
+                    {
+                        'base': 'ubuntu',
+                        'bus': None,
+                        'size': 20,
+                        'type': 'disk'
+                    }
+                ],
+                'memory': 2048,
+                'metadata': {},
+                'name': 'ubuntu',
+                'namespace': 'nstest',
+                'network_interfaces': [
+                    {
+                        'floating': None,
+                        'ipv4': '192.168.20.247',
+                        'macaddr': '02:00:00:d6:ca:2e',
+                        'model': 'virtio',
+                        'network_uuid': 'afce2cce-dec2-4cf7-a61b-2c4614b320c7',
+                        'order': 0,
+                        'uuid': '7dc31d8c-fbf3-4dbf-916e-b678fa2db96e'
+                    }
+                ],
+                'node': 'sf-2',
+                'power_state': 'on',
+                'ssh_key': None,
+                'state': 'created',
+                'user_data': None,
+                'uuid': 'a13ce821-adcb-45a4-9260-1b18b5250ad3',
+                'vdi_port': 49802,
+                'video': {
+                    'memory': 16384,
+                    'model': 'cirrus'
+                }
+            }, self.system_client.get_instance('a13ce821-adcb-45a4-9260-1b18b5250ad3')
+        )
+
+        # Fourth instance
+        self.assertEqual(
+            {
+                'console_port': 30364,
+                'cpus': 1,
+                'disk_spec': [
+                    {
+                        'base': 'cirros',
+                        'bus': None,
+                        'size': 8,
+                        'type': 'disk'
+                    }
+                ],
+                'memory': 1024,
+                'metadata': {},
+                'name': 'inst4',
+                'namespace': 'banana',
+                'network_interfaces': [
+                    {
+                        'floating': None,
+                        'ipv4': '192.16.10.219',
+                        'macaddr': '02:00:00:f0:fb:0c',
+                        'model': 'virtio',
+                        'network_uuid': '30acadd4-66ee-4390-9477-e31d11fe44cb',
+                        'order': 0,
+                        'uuid': 'acf8bd4a-c942-4897-afa2-7a7bdc592804'
+                    }
+                ],
+                'node': 'sf-3',
+                'power_state': 'on',
+                'ssh_key': None,
+                'state': 'created',
+                'user_data': None,
+                'uuid': '99ef006a-a0f0-4d2f-a784-16bce921431c',
+                'vdi_port': 48695,
+                'video': {
+                    'memory': 16384,
+                    'model': 'cirrus'
+                }
+            }, self.system_client.get_instance('99ef006a-a0f0-4d2f-a784-16bce921431c')
+        )
