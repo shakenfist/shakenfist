@@ -300,6 +300,10 @@
         mode: "0755"
       when: mode == "deploy"
 
+    - name: Restore from backup, if there is one specified
+      shell: sf-backup restore "{{restore_backup}}"
+      when: restore_backup | length > 0
+
     - name: Set system key from extra-vars
       set_fact:
         system_key: "{{admin_password}}"
