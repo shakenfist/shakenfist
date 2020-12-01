@@ -293,6 +293,17 @@
       command: pip3 install shakenfist-client=={{release}}
       when: release != "git"
 
+- hosts: primary
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars:
+    release: git
+    mode: deploy
+
+  tasks:
     - name: Create config directory
       file:
         path: /etc/sf
@@ -303,6 +314,9 @@
     - name: Restore from backup, if there is one specified
       shell: sf-backup restore "{{restore_backup}}"
       when: restore_backup | length > 0
+
+    - name: Run any upgrade steps
+      shell: sf-upgrade
 
     - name: Set system key from extra-vars
       set_fact:
@@ -345,17 +359,6 @@
         mode: u=r,g=r,o=
       when: mode == "deploy"
 
-- hosts: primary
-  any_errors_fatal: true
-  become: yes
-  become_method: sudo
-  gather_facts: no
-  connection: ssh
-  vars:
-    release: git
-    mode: deploy
-
-  tasks:
     - name: Install prometheus
       apt:
         name: prometheus
@@ -615,6 +618,3 @@
         remote_src: yes
         mode: u+rx,g+rx,o+rx
       when: mode == "deploy"
-
-    - name: Run any upgrade steps
-      shell: sf-upgrade
