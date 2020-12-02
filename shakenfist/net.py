@@ -321,7 +321,7 @@ class Network(object):
             self.update_dhcp()
         else:
             db.enqueue('networknode', DeployNetworkTask(self.uuid))
-            self.add_event('network', self.uuid, 'deploy', 'enqueued')
+            self.add_event('deploy', 'enqueued')
 
     def deploy_nat(self):
         if not self.provide_nat:
