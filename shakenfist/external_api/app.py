@@ -195,9 +195,17 @@ def redirect_instance_request(func):
     # Redirect method to the hypervisor hosting the instance
     def wrapper(*args, **kwargs):
         i = kwargs.get('instance_from_db_virt')
+        if not i:
+            return
+
         placement = db.get_instance_attribute(
             i.static_values['uuid'], 'placement')
-        if i and placement['node'] != config.NODE_NAME:
+        if not placement:
+            return
+        if not placement.get('node'):
+            return
+
+        if placement.get('node') != config.NODE_NAME:
             url = 'http://%s:%d%s' % (placement['node'], config.get('API_PORT'),
                                       flask.request.environ['PATH_INFO'])
             api_token = util.get_api_token(
@@ -584,7 +592,7 @@ class Instance(Resource):
 
         # If this instance is not on a node, just do the DB cleanup locally
         placement = db.get_instance_attribute(instance_uuid, 'placement')
-        if not placement['node']:
+        if not placement.get('node'):
             node = config.NODE_NAME
         else:
             node = placement['node']
@@ -800,7 +808,7 @@ class Instances(Resource):
             # If this instance is not on a node, just do the DB cleanup locally
             dbplacement = db.get_instance_attribute(
                 instance['uuid'], 'placement')
-            if not dbplacement['node']:
+            if not dbplacement.get('node'):
                 node = config.NODE_NAME
             else:
                 node = dbplacement['node']
