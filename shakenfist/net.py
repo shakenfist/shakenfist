@@ -525,7 +525,7 @@ class Network(object):
                     removed.append(node)
 
             for node in node_ips:
-                self._add_mesh_'network', self.uuid, element(node)
+                self._add_mesh_element(node)
                 added.append(node)
 
             if removed:
