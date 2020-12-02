@@ -1,6 +1,7 @@
 # Copyright 2020 Michael Still
 
 import etcd3
+import json
 
 from shakenfist import db
 from shakenfist import util
@@ -73,37 +74,56 @@ def main():
 
         elif minor == 3:
             # Upgrade instances to the new attribute style
-            for instance in etcd_client.get_prefix('/sf/instance/'):
+            for data, _ in etcd_client.get_prefix('/sf/instance/'):
+                instance = json.loads(data.decode('utf-8'))
                 if int(instance.get('version', 0)) < 2:
                     data = {}
                     for attr in ['node', 'placement_attempts']:
-                        if instance.get('attr'):
-                            data[attr] = instance['attr']
+                        if instance.get(attr):
+                            data[attr] = instance[attr]
+                            del instance[attr]
                     etcd_client.put(
-                        '/sf/attribute/instance/%s/placement' % instance['uuid'], data)
+                        '/sf/attribute/instance/%s/placement' % instance['uuid'],
+                        json.dumps(data, indent=4, sort_keys=True))
 
-                    data = {'count': instance.get('enforced_deletes', 0)}
-                    etcd_client.put(
-                        '/sf/attribute/instance/%s/enforce_deletes' % instance['uuid'], data)
+                    if 'enforced_deletes' in instance:
+                        data = {'count': instance.get('enforced_deletes', 0)}
+                        del instance['enforced_deletes']
+                        etcd_client.put(
+                            '/sf/attribute/instance/%s/enforce_deletes' % instance['uuid'],
+                            json.dumps(data, indent=4, sort_keys=True))
+
+                    if 'block_devices' in instance:
+                        data = {'block_devices': instance.get(
+                            'block_devices', 0)}
+                        del instance['block_devices']
+                        etcd_client.put(
+                            '/sf/attribute/instance/%s/block_devices' % instance['uuid'],
+                            json.dumps(data, indent=4, sort_keys=True))
 
                     data = {}
                     for attr in ['state', 'state_updated', 'error_message']:
-                        if instance.get('attr'):
-                            data[attr] = instance['attr']
+                        if instance.get(attr):
+                            data[attr] = instance[attr]
+                            del instance[attr]
                     etcd_client.put(
-                        '/sf/attribute/instance/%s/state' % instance['uuid'], data)
+                        '/sf/attribute/instance/%s/state' % instance['uuid'],
+                        json.dumps(data, indent=4, sort_keys=True))
 
                     data = {}
                     for attr in ['power_state', 'power_state_previous',
                                  'power_state_updated']:
-                        if instance.get('attr'):
-                            data[attr] = instance['attr']
-                    etcd_client.put('/sf/attribute/instance/%s/power_state' %
-                                    instance['uuid'], data)
+                        if instance.get(attr):
+                            data[attr] = instance[attr]
+                            del instance[attr]
+                    etcd_client.put(
+                        '/sf/attribute/instance/%s/power_state' % instance['uuid'],
+                        json.dumps(data, indent=4, sort_keys=True))
 
                     instance['version'] = 2
                     etcd_client.put(
-                        '/sf/instance/%s' % instance['uuid'], instance)
+                        '/sf/instance/%s' % instance['uuid'],
+                        json.dumps(instance, indent=4, sort_keys=True))
 
 
 if __name__ == '__main__':
