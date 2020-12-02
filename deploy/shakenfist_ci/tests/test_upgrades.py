@@ -63,20 +63,8 @@ class TestUpgrades(base.BaseTestCase):
                     }
                 ],
                 'memory': 1024,
-                'metadata': {},
                 'name': 'inst1',
                 'namespace': 'system',
-                'network_interfaces': [
-                    {
-                        'floating': None,
-                        'ipv4': '192.16.10.44',
-                        'macaddr': '02:00:00:47:3a:aa',
-                        'model': 'virtio',
-                        'network_uuid': '30acadd4-66ee-4390-9477-e31d11fe44cb',
-                        'order': 0,
-                        'uuid': '9293af9b-780f-426e-979c-4f61ca06b833'
-                    }
-                ],
                 'node': 'sf-2',
                 'power_state': 'on',
                 'ssh_key': None,
@@ -105,20 +93,8 @@ class TestUpgrades(base.BaseTestCase):
                     }
                 ],
                 'memory': 1024,
-                'metadata': {},
                 'name': 'inst2',
                 'namespace': 'system',
-                'network_interfaces': [
-                    {
-                        'floating': None,
-                        'ipv4': '192.16.10.162',
-                        'macaddr': '02:00:00:f2:fb:81',
-                        'model': 'virtio',
-                        'network_uuid': '30acadd4-66ee-4390-9477-e31d11fe44cb',
-                        'order': 0,
-                        'uuid': '7130a76f-1015-4d17-a27e-89baf12eccfa'
-                    }
-                ],
                 'node': 'sf-2',
                 'power_state': 'on',
                 'ssh_key': None,
@@ -147,20 +123,8 @@ class TestUpgrades(base.BaseTestCase):
                     }
                 ],
                 'memory': 2048,
-                'metadata': {},
                 'name': 'ubuntu',
                 'namespace': 'nstest',
-                'network_interfaces': [
-                    {
-                        'floating': None,
-                        'ipv4': '192.168.20.247',
-                        'macaddr': '02:00:00:d6:ca:2e',
-                        'model': 'virtio',
-                        'network_uuid': 'afce2cce-dec2-4cf7-a61b-2c4614b320c7',
-                        'order': 0,
-                        'uuid': '7dc31d8c-fbf3-4dbf-916e-b678fa2db96e'
-                    }
-                ],
                 'node': 'sf-2',
                 'power_state': 'on',
                 'ssh_key': None,
@@ -189,20 +153,8 @@ class TestUpgrades(base.BaseTestCase):
                     }
                 ],
                 'memory': 1024,
-                'metadata': {},
                 'name': 'inst4',
                 'namespace': 'banana',
-                'network_interfaces': [
-                    {
-                        'floating': None,
-                        'ipv4': '192.16.10.219',
-                        'macaddr': '02:00:00:f0:fb:0c',
-                        'model': 'virtio',
-                        'network_uuid': '30acadd4-66ee-4390-9477-e31d11fe44cb',
-                        'order': 0,
-                        'uuid': 'acf8bd4a-c942-4897-afa2-7a7bdc592804'
-                    }
-                ],
                 'node': 'sf-3',
                 'power_state': 'on',
                 'ssh_key': None,
