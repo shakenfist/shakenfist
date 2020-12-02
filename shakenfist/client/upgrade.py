@@ -71,6 +71,40 @@ def main():
         if minor == 2:
             clean_events_mesh_operations(etcd_client)
 
+        elif minor == 3:
+            # Upgrade instances to the new attribute style
+            for instance in etcd_client.get_prefix('/sf/instance/'):
+                if int(instance.get('version', 0)) < 2:
+                    data = {}
+                    for attr in ['node', 'placement_attempts']:
+                        if instance.get('attr'):
+                            data[attr] = instance['attr']
+                    etcd_client.put(
+                        '/sf/attribute/instance/%s/placement' % instance['uuid'], data)
+
+                    data = {'count': instance.get('enforced_deletes', 0)}
+                    etcd_client.put(
+                        '/sf/attribute/instance/%s/enforce_deletes' % instance['uuid'], data)
+
+                    data = {}
+                    for attr in ['state', 'state_updated', 'error_message']:
+                        if instance.get('attr'):
+                            data[attr] = instance['attr']
+                    etcd_client.put(
+                        '/sf/attribute/instance/%s/state' % instance['uuid'], data)
+
+                    data = {}
+                    for attr in ['power_state', 'power_state_previous',
+                                 'power_state_updated']:
+                        if instance.get('attr'):
+                            data[attr] = instance['attr']
+                    etcd_client.put('/sf/attribute/instance/%s/power_state' %
+                                    instance['uuid'], data)
+
+                    instance['version'] = 2
+                    etcd_client.put(
+                        '/sf/instance/%s' % instance['uuid'], instance)
+
 
 if __name__ == '__main__':
     main()
