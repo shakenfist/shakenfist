@@ -151,7 +151,7 @@ class Network(object):
             "vxid": self.vxid,
 
             "version": 1,
-            }
+        }
 
     def persist(self):
         db.persist_network(self.uuid, self.metadata())
@@ -321,7 +321,7 @@ class Network(object):
             self.update_dhcp()
         else:
             db.enqueue('networknode', DeployNetworkTask(self.uuid))
-            db.add_event('network', self.uuid, 'deploy', 'enqueued')
+            self.add_event('deploy', 'enqueued')
 
     def deploy_nat(self):
         if not self.provide_nat:
@@ -466,7 +466,7 @@ class Network(object):
                     d.remove_dhcpd()
         else:
             db.enqueue('networknode', RemoveDHCPNetworkTask(self.uuid))
-            self.db.add_event('remove dhcp', 'enqueued')
+            self.add_event('remove dhcp', 'enqueued')
 
     def discover_mesh(self):
         mesh_re = re.compile(r'00:00:00:00:00:00 dst (.*) self permanent')
@@ -529,11 +529,9 @@ class Network(object):
                 added.append(node)
 
             if removed:
-                db.add_event('network', self.uuid, 'remove mesh elements',
-                             None, None, ' '.join(removed))
+                self.add_event('remove mesh elements', ' '.join(removed))
             if added:
-                db.add_event('network', self.uuid, 'add mesh elements',
-                             None, None, ' '.join(added))
+                self.add_event('add mesh elements', ' '.join(added))
 
     def _add_mesh_element(self, node):
         LOG.withObj(self).info('Adding new mesh element %s' % node)
