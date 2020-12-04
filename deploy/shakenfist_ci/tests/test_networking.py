@@ -19,6 +19,17 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self.net_four = self.test_client.allocate_network(
             '192.168.10.0/24', True, True, '%s-net-four' % self.namespace)
 
+    def test_network_validity(self):
+        self.assertRaises(apiclient.APIException, self.test_client.allocate_network,
+                          '192.168.242.2', True, True, '%s-validity1' % self.namespace)
+        self.assertRaises(apiclient.APIException, self.test_client.allocate_network,
+                          '192.168.242.2/32', True, True, '%s-validity2' % self.namespace)
+        self.assertRaises(apiclient.APIException, self.test_client.allocate_network,
+                          '192.168.242.0/30', True, True, '%s-validity3' % self.namespace)
+        n = self.test_client.allocate_network(
+            '192.168.10.0/29', True, True, '%s-validity2' % self.namespace)
+        self.test_client.delete_network(n['uuid'])
+
     def test_virtual_networks_are_separate(self):
         inst1 = self.test_client.create_instance(
             'cirros', 1, 1024,
