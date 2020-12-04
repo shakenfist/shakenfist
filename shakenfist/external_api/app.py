@@ -1183,7 +1183,9 @@ class Networks(Resource):
     def post(self, netblock=None, provide_dhcp=None, provide_nat=None, name=None,
              namespace=None):
         try:
-            ipaddress.ip_network(netblock)
+            n = ipaddress.ip_network(netblock)
+            if n.num_addresses < 8:
+                return error(400, 'network is below minimum size of /29')
         except ValueError as e:
             return error(400, 'cannot parse netblock: %s' % e)
 
