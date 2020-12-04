@@ -185,6 +185,16 @@ def create_instance(instance_uuid, metadata):
     etcd.put('instance', None, instance_uuid, metadata)
 
 
+EXTERNAL_ATTRIBUTE_KEY_WHITELIST = [
+    'console_port',
+    'error_message',
+    'node',
+    'power_state',
+    'state',
+    'vdi_port'
+]
+
+
 def get_instance(instance_uuid, external_view=False):
     # NOTE(mikal): we don't do upgrades inflight. They are assumed to have been
     # done as part of the upgrade process.
@@ -196,7 +206,16 @@ def get_instance(instance_uuid, external_view=False):
     # If this is an external view, then mix back in attributes that users expect
     if external_view:
         for attrname in ['placement', 'state', 'power_state', 'ports']:
-            i.update(get_instance_attribute(instance_uuid, attrname))
+            d = get_instance_attribute(instance_uuid, attrname)
+            for key in d:
+                if key not in EXTERNAL_ATTRIBUTE_KEY_WHITELIST:
+                    continue
+
+                # We skip keys with no value
+                if d[key] is None:
+                    continue
+
+                i[key] = d[key]
 
     return i
 

@@ -12,8 +12,11 @@ class TestUpgrades(base.BaseTestCase):
             networks[net['uuid']] = net
 
         self.assertIn('30acadd4-66ee-4390-9477-e31d11fe44cb', networks)
-        self.assertIn('3edb03de-4f3d-4859-b822-94924073a1ea', networks)
         self.assertIn('afce2cce-dec2-4cf7-a61b-2c4614b320c7', networks)
+
+        # This network is in the dump, but removed at upgrade for having
+        # and invalid netblock.
+        self.assertNotIn('3edb03de-4f3d-4859-b822-94924073a1ea', networks)
 
         # First network
         self.assertEqual(
@@ -23,15 +26,7 @@ class TestUpgrades(base.BaseTestCase):
         self.assertEqual(
             '192.16.10.0/24', networks['30acadd4-66ee-4390-9477-e31d11fe44cb']['netblock'])
 
-        # Second network, which has an invalid netblock (allowed in v0.3.3)
-        self.assertEqual(
-            'nsnet', networks['3edb03de-4f3d-4859-b822-94924073a1ea']['name'])
-        self.assertEqual(
-            'nstest', networks['3edb03de-4f3d-4859-b822-94924073a1ea']['namespace'])
-        self.assertEqual(
-            '192.168.20.024', networks['3edb03de-4f3d-4859-b822-94924073a1ea']['netblock'])
-
-        # Third network
+        # Second network
         self.assertEqual(
             'nsnet', networks['afce2cce-dec2-4cf7-a61b-2c4614b320c7']['name'])
         self.assertEqual(

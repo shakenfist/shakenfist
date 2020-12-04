@@ -1,6 +1,7 @@
 # Copyright 2020 Michael Still
 
 import etcd3
+import ipaddress
 import json
 
 from shakenfist import db
@@ -73,6 +74,28 @@ def main():
             clean_events_mesh_operations(etcd_client)
 
         elif minor == 3:
+            # Find invalid networks
+            for n in db.get_networks():
+                bad = False
+                try:
+                    netblock = ipaddress.ip_network(n['netblock'])
+                    if netblock.num_addresses < 8:
+                        bad = True
+                except ValueError:
+                    bad = True
+
+                if bad:
+                    for ni in db.get_network_interfaces(n['uuid']):
+                        db.enqueue_instance_error(
+                            ni['instance_uuid'], 'Instance was on invalid network at upgrade.')
+
+                    # NOTE(mikal): I feel like I _should_ queue a network delete here to
+                    # do it properly, but we don't actually have a network delete queue
+                    # task at the moment. Here's a comment to prompt that refactor when
+                    # the time comes... netobj.delete()
+                    n['state'] = 'deleted'
+                    db.persist_network(n['uuid'], n)
+
             # Upgrade instances to the new attribute style
             for data, _ in etcd_client.get_prefix('/sf/instance/'):
                 instance = json.loads(data.decode('utf-8'))
@@ -119,6 +142,11 @@ def main():
                     etcd_client.put(
                         '/sf/attribute/instance/%s/power_state' % instance['uuid'],
                         json.dumps(data, indent=4, sort_keys=True))
+
+                    # These fields were set in code to v0.3.3, but never used
+                    for key in ['node_history', 'requested_placement']:
+                        if key in instance:
+                            del instance[key]
 
                     instance['version'] = 2
                     etcd_client.put(
