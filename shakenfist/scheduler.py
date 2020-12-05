@@ -21,7 +21,7 @@ class Scheduler(object):
     def refresh_metrics(self):
         metrics = {}
 
-        for node in db.get_nodes():
+        for node in db.get_nodes(seen_recently=True):
             node_name = node['fqdn']
             try:
                 metrics[node_name] = db.get_metrics(node_name)

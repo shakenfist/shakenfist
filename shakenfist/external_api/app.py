@@ -614,7 +614,7 @@ class Instances(Resource):
             return error(400, 'instance name must be useable as a DNS host name')
 
         # If we are placed, make sure that node exists
-        if placed_on and not db.get_node(placed_on):
+        if placed_on and not db.get_node(placed_on, seen_recently=True):
             return error(404, 'Specified node does not exist')
 
         # Sanity check
