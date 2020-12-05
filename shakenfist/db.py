@@ -40,14 +40,16 @@ def get_node_ips():
 
 def get_node(fqdn, seen_recently=False):
     node = etcd.get('node', None, fqdn)
-    if seen_recently and (time.time() - node['lastseen'] > 300):
+    if not node:
+        return None
+    if seen_recently and (time.time() - node.get('lastseen', 0) > 300):
         return None
     return node
 
 
 def get_nodes(seen_recently=False):
     for value in etcd.get_all('node', None):
-        if seen_recently and (time.time() - value['lastseen'] > 300):
+        if seen_recently and (time.time() - value.get('lastseen', 0) > 300):
             continue
         yield value
 
