@@ -48,7 +48,7 @@ class FakeDB(object):
             self.metrics[n] = metrics
 
     # Faked methods from the db class
-    def get_nodes(self):
+    def get_nodes(self, seen_recently=False):
         node_data = []
         for i in range(len(self.nodes)):
             n = self.nodes[i]
@@ -180,7 +180,7 @@ class LowResourceTestCase(SchedulerTestCase):
 
         fake_inst = FakeInstance(cpus=1, memory=1024,
                                  block_devices={'devices': [
-                                    {'size': 21, 'base': 'some-os'}
+                                     {'size': 21, 'base': 'some-os'}
                                  ]})
 
         exc = self.assertRaises(exceptions.LowResourceException,
@@ -201,7 +201,7 @@ class LowResourceTestCase(SchedulerTestCase):
 
         fake_inst = FakeInstance(cpus=1, memory=1,
                                  block_devices={'devices': [
-                                    {'size': 21, 'base': 'some-os'}
+                                     {'size': 21, 'base': 'some-os'}
                                  ]})
 
         exc = self.assertRaises(exceptions.LowResourceException,
@@ -221,7 +221,7 @@ class LowResourceTestCase(SchedulerTestCase):
 
         fake_inst = FakeInstance(cpus=1, memory=1024,
                                  block_devices={'devices': [
-                                    {'size': 21, 'base': 'some-os'}
+                                     {'size': 21, 'base': 'some-os'}
                                  ]})
 
         exc = self.assertRaises(exceptions.LowResourceException,
@@ -242,7 +242,7 @@ class LowResourceTestCase(SchedulerTestCase):
 
         fake_inst = FakeInstance(cpus=1, memory=1024,
                                  block_devices={'devices': [
-                                    {'size': 8, 'base': 'some-os'}
+                                     {'size': 8, 'base': 'some-os'}
                                  ]})
 
         nodes = scheduler.Scheduler().place_instance(fake_inst, [])
@@ -301,8 +301,8 @@ class CorrectAllocationTestCase(SchedulerTestCase):
 
         fake_inst = FakeInstance(cpus=1, memory=1024,
                                  block_devices={'devices': [
-                                    {'size': 8, 'base': 'some-os'}
-                                    ]})
+                                     {'size': 8, 'base': 'some-os'}
+                                 ]})
         nets = [{'network_uuid': 'uuid-net2'}]
 
         nodes = scheduler.Scheduler().place_instance(fake_inst, nets)
@@ -321,7 +321,7 @@ class CorrectAllocationTestCase(SchedulerTestCase):
 
         fake_inst = FakeInstance(cpus=1, memory=1024,
                                  block_devices={'devices': [
-                                    {'size': 8, 'base': 'some-os'}
+                                     {'size': 8, 'base': 'some-os'}
                                  ]})
         nets = [{'network_uuid': 'uuid-net1'}]
 
@@ -366,7 +366,7 @@ class FindMostTestCase(SchedulerTestCase):
                         'size': 200000,
                         'url': 'req_image1',
                         'version': 1,
-                        },
+                    },
                     '/sf/image/aca41cefa18b052074e092/node3': {
                         'checksum': None,
                         'fetched': 'Tue, 20 Oct 2020 23:02:29 -0000',
@@ -375,8 +375,8 @@ class FindMostTestCase(SchedulerTestCase):
                         'size': 200000,
                         'url': 'http://example.com',
                         'version': 1,
-                        }
-                    })
+                    }
+                })
     def test_most_matching_images(self, mock_get_meta_all):
         req_images = ['req_image1']
         candidates = ['node1_net', 'node2', 'node3', 'node4']
@@ -389,34 +389,35 @@ class FindMostTestCase(SchedulerTestCase):
                 return_value={
                     '/sf/image/095fdd2b66625412aa/node1_net': {
                         'url': 'req_image1',
-                        },
+                    },
                     '/sf/image/095fdd2b66635412aa/node1_net': {
                         'url': 'req_image2',
-                        },
+                    },
                     '/sf/image/095fdd2b66625412aa/node2': {
                         'url': 'req_image2',
-                        },
+                    },
                     '/sf/image/095fdd2b66625712aa/node3': {
                         'url': 'req_image2',
-                        },
+                    },
                     '/sf/image/095fdd2b66625482aa/node4': {
                         'url': 'req_image4',
-                        },
+                    },
                     '/sf/image/aca41cefa18b052974e092/node4': {
                         'url': 'req_image5',
-                        }
-                    })
+                    }
+                })
     def test_most_matching_images_big(self, mock_get_meta_all):
         candidates = ['node1_net', 'node2', 'node3', 'node4']
 
         finalists = scheduler.Scheduler()._find_most_matching_images(
-                    ['req_image1'], candidates)
+            ['req_image1'], candidates)
         self.assertSetEqual(set(['node1_net']), set(finalists))
 
         finalists = scheduler.Scheduler()._find_most_matching_images(
-                    ['req_image1', 'req_image2'], candidates)
+            ['req_image1', 'req_image2'], candidates)
         self.assertSetEqual(set(['node1_net']), set(finalists))
 
         finalists = scheduler.Scheduler()._find_most_matching_images(
-                    ['req_image2'], candidates)
-        self.assertSetEqual(set(['node1_net', 'node2', 'node3']), set(finalists))
+            ['req_image2'], candidates)
+        self.assertSetEqual(
+            set(['node1_net', 'node2', 'node3']), set(finalists))

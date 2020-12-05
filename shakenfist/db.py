@@ -33,6 +33,31 @@ def see_this_node():
         ttl=120)
 
 
+def get_node_ips():
+    for _, value in etcd.get_all('node', None):
+        yield value['ip']
+
+
+def get_node(fqdn, seen_recently=False):
+    node = etcd.get('node', None, fqdn)
+    if seen_recently and (time.time() - node['lastseen'] > 300):
+        return None
+    return node
+
+
+def get_nodes(seen_recently=False):
+    for _, value in etcd.get_all('node', None):
+        if seen_recently and (time.time() - value['lastseen'] > 300):
+            continue
+        yield value
+
+
+def get_network_node():
+    for n in get_nodes():
+        if n['ip'] == config.NETWORK_NODE_IP:
+            return n
+
+
 def get_lock(objecttype, subtype, name, ttl=60, timeout=ETCD_ATTEMPT_TIMEOUT,
              relatedobjects=None, log_ctx=LOG, op=None):
     return etcd.get_lock(objecttype, subtype, name, ttl=ttl, timeout=timeout,
@@ -66,25 +91,6 @@ def clear_stale_locks():
 
 def get_existing_locks():
     return etcd.get_existing_locks()
-
-
-def get_node_ips():
-    for value in etcd.get_all('node', None):
-        yield value['ip']
-
-
-def get_node(fqdn):
-    return etcd.get('node', None, fqdn)
-
-
-def get_nodes():
-    return etcd.get_all('node', None)
-
-
-def get_network_node():
-    for n in get_nodes():
-        if n['ip'] == config.NETWORK_NODE_IP:
-            return n
 
 
 def get_network(network_uuid):
