@@ -46,7 +46,7 @@ def get_node(fqdn, seen_recently=False):
 
 
 def get_nodes(seen_recently=False):
-    for _, value in etcd.get_all('node', None):
+    for value in etcd.get_all('node', None):
         if seen_recently and (time.time() - value['lastseen'] > 300):
             continue
         yield value
