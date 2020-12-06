@@ -40,7 +40,8 @@ pipeline {
                 export RELEASE="git:master"
                 cd $WORKSPACE/deploy/ansible
 
-
+                # We restore a backup to ensure upgrades work
+                export RESTORE_BACKUP="$WORKSPACE/examples/schema-v0_3_3.tgz"
 
                 # The actual job
                 export CLOUD="localhost"
