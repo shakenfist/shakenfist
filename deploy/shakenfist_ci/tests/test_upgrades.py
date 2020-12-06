@@ -57,6 +57,7 @@ class TestUpgrades(base.BaseTestCase):
                         'type': 'disk'
                     }
                 ],
+                'error_message': None,
                 'memory': 1024,
                 'name': 'inst1',
                 'namespace': 'system',
@@ -67,6 +68,7 @@ class TestUpgrades(base.BaseTestCase):
                 'user_data': None,
                 'uuid': 'ce2c93af-a9f8-4efe-94df-3786c3f92a7a',
                 'vdi_port': 40495,
+                'version': 2,
                 'video': {
                     'memory': 16384,
                     'model': 'cirrus'
@@ -87,6 +89,7 @@ class TestUpgrades(base.BaseTestCase):
                         'type': 'disk'
                     }
                 ],
+                'error_message': None,
                 'memory': 1024,
                 'name': 'inst2',
                 'namespace': 'system',
@@ -97,6 +100,7 @@ class TestUpgrades(base.BaseTestCase):
                 'user_data': None,
                 'uuid': 'a9121ca7-4f72-4b94-87f4-2a1e0d54f4f4',
                 'vdi_port': 46898,
+                'version': 2,
                 'video': {
                     'memory': 16384,
                     'model': 'cirrus'
@@ -107,7 +111,7 @@ class TestUpgrades(base.BaseTestCase):
         # Third instance
         self.assertEqual(
             {
-                'console_port': 30510,
+                'console_port': 0,
                 'cpus': 2,
                 'disk_spec': [
                     {
@@ -117,16 +121,18 @@ class TestUpgrades(base.BaseTestCase):
                         'type': 'disk'
                     }
                 ],
+                'error_message': None,
                 'memory': 2048,
                 'name': 'ubuntu',
                 'namespace': 'nstest',
                 'node': 'sf-2',
-                'power_state': 'on',
+                'power_state': 'initial',
                 'ssh_key': None,
-                'state': 'created',
+                'state': 'preflight',
                 'user_data': None,
                 'uuid': 'a13ce821-adcb-45a4-9260-1b18b5250ad3',
-                'vdi_port': 49802,
+                'vdi_port': 0,
+                'version': 2,
                 'video': {
                     'memory': 16384,
                     'model': 'cirrus'
@@ -147,6 +153,7 @@ class TestUpgrades(base.BaseTestCase):
                         'type': 'disk'
                     }
                 ],
+                'error_message': None,
                 'memory': 1024,
                 'name': 'inst4',
                 'namespace': 'banana',
@@ -157,6 +164,7 @@ class TestUpgrades(base.BaseTestCase):
                 'user_data': None,
                 'uuid': '99ef006a-a0f0-4d2f-a784-16bce921431c',
                 'vdi_port': 48695,
+                'version': 2,
                 'video': {
                     'memory': 16384,
                     'model': 'cirrus'
