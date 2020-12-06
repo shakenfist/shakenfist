@@ -320,6 +320,8 @@ class Network(object):
             self.deploy_nat()
             self.update_dhcp()
         else:
+            LOG.withNetwork(self.uuid).info(
+                'Requesting network creation on the networknode.')
             db.enqueue('networknode', DeployNetworkTask(self.uuid))
             self.add_event('deploy', 'enqueued')
 
