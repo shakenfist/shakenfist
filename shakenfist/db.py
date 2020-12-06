@@ -21,6 +21,9 @@ ETCD_ATTEMPT_TIMEOUT = 15
 LOG, _ = logutil.setup(__name__)
 
 
+#####################################################################
+# Nodes
+#####################################################################
 def see_this_node():
     etcd.put(
         'node', None, config.NODE_NAME,
@@ -59,6 +62,10 @@ def get_network_node():
         if n['ip'] == config.NETWORK_NODE_IP:
             return n
 
+#####################################################################
+# Locks
+#####################################################################
+
 
 def get_lock(objecttype, subtype, name, ttl=60, timeout=ETCD_ATTEMPT_TIMEOUT,
              relatedobjects=None, log_ctx=LOG, op=None):
@@ -93,6 +100,10 @@ def clear_stale_locks():
 
 def get_existing_locks():
     return etcd.get_existing_locks()
+
+#####################################################################
+# Networks
+#####################################################################
 
 
 def get_network(network_uuid):
@@ -139,6 +150,10 @@ def hard_delete_network(network_uuid):
     etcd.delete_all('event/network', network_uuid)
     delete_metadata('network', network_uuid)
 
+#####################################################################
+# IPManagers
+#####################################################################
+
 
 def get_ipmanager(network_uuid):
     ipm = etcd.get('ipmanager', None, network_uuid)
@@ -153,6 +168,10 @@ def persist_ipmanager(network_uuid, data):
 
 def delete_ipmanager(network_uuid):
     etcd.delete('ipmanager', None, uuid)
+
+#####################################################################
+# Instances
+#####################################################################
 
 
 def get_instance(instance_uuid):
@@ -193,6 +212,10 @@ def get_stale_instances(delay):
         if i['state'] in ['deleted', 'error']:
             if time.time() - i['state_updated'] > delay:
                 yield i
+
+#####################################################################
+# NetworkInterfaces
+#####################################################################
 
 
 def create_network_interface(interface_uuid, netdesc, instance_uuid, order):
@@ -271,6 +294,10 @@ def remove_floating_from_interface(interface_uuid):
     ni['floating'] = None
     etcd.put('networkinterface', None, interface_uuid, ni)
 
+#####################################################################
+# Snapshots
+#####################################################################
+
 
 def create_snapshot(snapshot_uuid, device, instance_uuid, created):
     etcd.put(
@@ -287,6 +314,10 @@ def get_instance_snapshots(instance_uuid):
     for m in etcd.get_all('snapshot', instance_uuid,
                           sort_order='ascend'):
         yield m
+
+#####################################################################
+# Events
+#####################################################################
 
 
 def add_event(object_type, object_uuid, operation, phase, duration, message):
@@ -319,6 +350,10 @@ def get_events(object_type, object_uuid):
                           sort_order='ascend'):
         yield m
 
+#####################################################################
+# Metrics
+#####################################################################
+
 
 def update_metrics_bulk(metrics):
     etcd.put(
@@ -336,6 +371,10 @@ def get_metrics(fqdn):
     if not d:
         return {}
     return d.get('metrics', {})
+
+#####################################################################
+# Console ports
+#####################################################################
 
 
 def allocate_console_port(instance_uuid):
@@ -370,6 +409,10 @@ def allocate_console_port(instance_uuid):
 def free_console_port(port):
     etcd.delete('console', config.NODE_NAME, port)
 
+#####################################################################
+# Namespaces
+#####################################################################
+
 
 def list_namespaces():
     return etcd.get_all('namespace', None)
@@ -386,6 +429,10 @@ def persist_namespace(namespace, data):
 def delete_namespace(namespace):
     etcd.delete('namespace', None, namespace)
 
+#####################################################################
+# Metadata
+#####################################################################
+
 
 def get_metadata(object_type, name):
     return etcd.get('metadata', object_type, name)
@@ -398,6 +445,10 @@ def persist_metadata(object_type, name, metadata):
 def delete_metadata(object_type, name):
     etcd.delete('metadata', object_type, name)
 
+#####################################################################
+# vxid mappings
+#####################################################################
+
 
 def persist_node_vxid_mapping(node, vxid_to_mac):
     etcd.put('vxid_mapping', None, node, vxid_to_mac)
@@ -405,6 +456,10 @@ def persist_node_vxid_mapping(node, vxid_to_mac):
 
 def get_node_vxid_mapping(node):
     etcd.get('vxid_mapping', None, node)
+
+#####################################################################
+# Queues
+#####################################################################
 
 
 def enqueue(queuename, workitem):
@@ -452,8 +507,9 @@ def restart_queues():
     etcd.restart_queues()
 
 
-# Image
-
+#####################################################################
+# Images
+#####################################################################
 def get_image_metadata(url_hash, node=None):
     return etcd.get('image', url_hash, node)
 
