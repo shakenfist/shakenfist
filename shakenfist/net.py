@@ -78,28 +78,24 @@ class Network(object):
             vxid = db.allocate_vxid(uuid)
 
         ipm = IPManager.new(uuid, netblock)
-        net = Network(uuid=uuid,
-                      vxid=vxid,
-                      name=name,
-                      namespace=namespace,
-                      netblock=netblock,
-                      provide_dhcp=provide_dhcp,
-                      provide_nat=provide_nat,
-                      floating_gateway=None,
-                      state_updated=time.time(),
-                      ipm=ipm)
-        net.persist()
-        net.add_event('network', 'created')
-
-        # Networks should immediately appear on the network node
-        db.enqueue('networknode', DeployNetworkTask(uuid))
-        net.add_event('deploy', 'enqueued')
+        n = Network(uuid=uuid,
+                    vxid=vxid,
+                    name=name,
+                    namespace=namespace,
+                    netblock=netblock,
+                    provide_dhcp=provide_dhcp,
+                    provide_nat=provide_nat,
+                    floating_gateway=None,
+                    state_updated=time.time(),
+                    ipm=ipm)
+        n.persist()
+        n.add_event('network', 'initialized')
 
         # TODO(andy): Integrate metadata into each object type
         # Initialise metadata
         db.persist_metadata('network', uuid, {})
 
-        return net
+        return n
 
     @staticmethod
     def from_db(uuid):
