@@ -46,7 +46,7 @@ class SFPyLogrus(logging.Logger, PyLogrusBase):
     #
     def withInstance(self, inst):
         if not isinstance(inst, str):
-            inst = inst.static_values['uuid']
+            inst = inst.uuid
         return SFCustomAdapter(self, {'instance': inst})
 
     def withNetwork(self, inst):

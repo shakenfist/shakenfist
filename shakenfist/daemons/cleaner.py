@@ -44,7 +44,7 @@ class Monitor(daemon.Daemon):
                 seen.append(domain.name())
 
                 dbstate = db.get_instance_attribute(
-                    instance.static_values['uuid'], 'state')
+                    instance.uuid, 'state')
                 if dbstate.get('state') == 'deleted':
                     # NOTE(mikal): a delete might be in-flight in the queue.
                     # We only worry about instances which should have gone
@@ -54,7 +54,7 @@ class Monitor(daemon.Daemon):
 
                     instance.enforced_deletes_increment()
                     attempts = db.get_instance_attribute(
-                        instance.static_values['uuid'], 'enforced_deletes')['count']
+                        instance.uuid, 'enforced_deletes')['count']
 
                     if attempts > 5:
                         # Sometimes we just can't delete the VM. Try the big
@@ -98,7 +98,7 @@ class Monitor(daemon.Daemon):
                         continue
 
                     dbstate = db.get_instance_attribute(
-                        instance.static_values['uuid'], 'state')
+                        instance.uuid, 'state')
                     if dbstate.get('state') == 'deleted':
                         # NOTE(mikal): a delete might be in-flight in the queue.
                         # We only worry about instances which should have gone
@@ -115,8 +115,8 @@ class Monitor(daemon.Daemon):
                     instance.place_instance(config.NODE_NAME)
 
                     dbpowerstate = db.get_instance_attribute(
-                        instance.static_values['uuid'], 'power_state')
-                    if not os.path.exists(virt.instance_path(instance.static_values['uuid'])):
+                        instance.uuid, 'power_state')
+                    if not os.path.exists(virt.instance_path(instance.uuid)):
                         # If we're inactive and our files aren't on disk,
                         # we have a problem.
                         log_ctx.info('Detected error state for instance')

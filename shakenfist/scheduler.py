@@ -62,7 +62,7 @@ class Scheduler(object):
 
     def _has_sufficient_disk(self, instance, node):
         requested_disk = 0
-        for disk in instance.static_values['disk_spec']:
+        for disk in instance.disk_spec:
             # TODO(mikal): this ignores "sizeless disks", that is ones that
             # are exactly the size of their base image, for example CD ROMs.
             if 'size' in disk:
@@ -180,7 +180,7 @@ class Scheduler(object):
             # Can we host that many vCPUs?
             for node in copy.copy(candidates):
                 max_cpu = self.metrics[node].get('cpu_max_per_instance', 0)
-                if instance.static_values['cpus'] > max_cpu:
+                if instance.cpus > max_cpu:
                     candidates.remove(node)
             log_ctx.info('Scheduling %s have enough actual CPU' % candidates)
             instance.add_event('schedule',
@@ -192,7 +192,7 @@ class Scheduler(object):
             # Do we have enough idle CPU?
             for node in copy.copy(candidates):
                 if not self._has_sufficient_cpu(
-                        instance.static_values['cpus'], node):
+                        instance.cpus, node):
                     candidates.remove(node)
             log_ctx.info('Scheduling %s have enough idle CPU' % candidates)
             instance.add_event('schedule',
@@ -204,7 +204,7 @@ class Scheduler(object):
             # Do we have enough idle RAM?
             for node in copy.copy(candidates):
                 if not self._has_sufficient_ram(
-                        instance.static_values['memory'], node):
+                        instance.memory, node):
                     candidates.remove(node)
             log_ctx.info('Scheduling %s have enough idle RAM' % candidates)
             instance.add_event('schedule',
@@ -241,7 +241,7 @@ class Scheduler(object):
 
             # What nodes have the base image already?
             requested_images = []
-            for disk in instance.static_values['disk_spec']:
+            for disk in instance.disk_spec:
                 if disk.get('base'):
                     img = images.Image.from_url(disk['base'])
                     requested_images = img.url
