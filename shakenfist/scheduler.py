@@ -7,6 +7,7 @@ import time
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import exceptions
+from shakenfist import images
 from shakenfist import logutil
 from shakenfist import util
 
@@ -61,7 +62,7 @@ class Scheduler(object):
 
     def _has_sufficient_disk(self, instance, node):
         requested_disk = 0
-        for disk in instance.block_devices.get('devices', []):
+        for disk in instance.static_values['disk_spec']:
             # TODO(mikal): this ignores "sizeless disks", that is ones that
             # are exactly the size of their base image, for example CD ROMs.
             if 'size' in disk:
@@ -179,7 +180,7 @@ class Scheduler(object):
             # Can we host that many vCPUs?
             for node in copy.copy(candidates):
                 max_cpu = self.metrics[node].get('cpu_max_per_instance', 0)
-                if instance.cpus > max_cpu:
+                if instance.static_values['cpus'] > max_cpu:
                     candidates.remove(node)
             log_ctx.info('Scheduling %s have enough actual CPU' % candidates)
             instance.add_event('schedule',
@@ -191,7 +192,7 @@ class Scheduler(object):
             # Do we have enough idle CPU?
             for node in copy.copy(candidates):
                 if not self._has_sufficient_cpu(
-                        instance.cpus, node):
+                        instance.static_values['cpus'], node):
                     candidates.remove(node)
             log_ctx.info('Scheduling %s have enough idle CPU' % candidates)
             instance.add_event('schedule',
@@ -203,7 +204,7 @@ class Scheduler(object):
             # Do we have enough idle RAM?
             for node in copy.copy(candidates):
                 if not self._has_sufficient_ram(
-                        instance.memory, node):
+                        instance.static_values['memory'], node):
                     candidates.remove(node)
             log_ctx.info('Scheduling %s have enough idle RAM' % candidates)
             instance.add_event('schedule',
@@ -240,13 +241,15 @@ class Scheduler(object):
 
             # What nodes have the base image already?
             requested_images = []
-            for disk in instance.block_devices['devices']:
+            for disk in instance.static_values['disk_spec']:
                 if disk.get('base'):
-                    requested_images = disk.get('base')
+                    img = images.Image.from_url(disk['base'])
+                    requested_images = img.url
 
             candidates = self._find_most_matching_images(
                 requested_images, candidates)
-            log_ctx.info('Scheduling %s have most matching images' % candidates)
+            log_ctx.info('Scheduling %s have most matching images' %
+                         candidates)
             instance.add_event('schedule', 'Have most matching images',
                                None, str(candidates))
 
@@ -254,7 +257,8 @@ class Scheduler(object):
             net_node = db.get_network_node()
             if len(candidates) > 1 and net_node['fqdn'] in candidates:
                 candidates.remove(net_node['fqdn'])
-                log_ctx.info('Scheduling %s are non-network nodes' % candidates)
+                log_ctx.info('Scheduling %s are non-network nodes' %
+                             candidates)
                 instance.add_event('schedule', 'Are non-network nodes',
                                    None, str(candidates))
 

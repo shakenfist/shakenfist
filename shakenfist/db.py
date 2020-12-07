@@ -51,7 +51,7 @@ def get_node(fqdn, seen_recently=False):
 
 
 def get_nodes(seen_recently=False):
-    for value in etcd.get_all('node', None):
+    for _, value in etcd.get_all('node', None):
         if seen_recently and (time.time() - value.get('lastseen', 0) > 300):
             continue
         yield value
@@ -115,7 +115,7 @@ def persist_network(network_uuid, data):
 
 
 def get_networks(all=False, namespace=None):
-    for n in etcd.get_all('network', None):
+    for _, n in etcd.get_all('network', None):
         if n['uuid'] == 'floating':
             continue
         if not all:
@@ -139,7 +139,7 @@ def deallocate_vxid(vxid):
 
 
 def get_stale_networks(delay):
-    for n in etcd.get_all('network', None):
+    for _, n in etcd.get_all('network', None):
         if n['state'] in ['deleted', 'error']:
             if time.time() - n['state_updated'] > delay:
                 yield n
@@ -173,32 +173,48 @@ def delete_ipmanager(network_uuid):
 # Instances
 #####################################################################
 
+# Theorem: we never write to the instance object, except for when we
+# create or delete it. Anything which changes value during the lifetime
+# of the instance (state, power_state, etc) is stored in a set of
+# secondary values in etcd that we never cache. This is version 2 of
+# the instance object.
 
-def get_instance(instance_uuid):
-    return etcd.get('instance', None, instance_uuid)
+
+def create_instance(instance_uuid, metadata):
+    set_instance_attribute(instance_uuid, 'state', {'state': 'initial'})
+    etcd.put('instance', None, instance_uuid, metadata)
+
+
+def get_instance(instance_uuid, external_view=False):
+    # NOTE(mikal): we don't do upgrades inflight. They are assumed to have been
+    # done as part of the upgrade process.
+    i = etcd.get('instance', None, instance_uuid)
+    if i.get('version') != 2:
+        raise exceptions.BadObjectVersion(
+            'Unknown version - Instance: %s', i)
+
+    # If this is an external view, then mix back in attributes that users expect
+    if external_view:
+        for attrname in ['placement', 'state', 'power_state', 'ports']:
+            i.update(get_instance_attribute(instance_uuid, attrname))
+
+    return i
 
 
 def get_instances(only_node=None, all=False, namespace=None):
-    for i in etcd.get_all('instance', None):
-        if only_node and i['node'] != only_node:
+    for _, i in etcd.get_all('instance', None):
+        node = get_instance_attribute(i['uuid'], 'placement')
+        if only_node and node.get('node') != only_node:
             continue
         if not all:
-            if i['state'] in ['deleted', 'error']:
+            dbstate = get_instance_attribute(i['uuid'], 'state')
+            if dbstate.get('state') in ['deleted', 'error']:
                 continue
         if namespace:
             if namespace not in [i['namespace'], 'system']:
                 continue
 
-        if 'video' not in i:
-            i['video'] = {'model': 'cirrus', 'memory': 16384}
-        if 'error_message' not in i:
-            i['error_message'] = None
-
         yield i
-
-
-def persist_instance(instance_uuid, metadata):
-    etcd.put('instance', None, instance_uuid, metadata)
 
 
 def hard_delete_instance(instance_uuid):
@@ -208,10 +224,22 @@ def hard_delete_instance(instance_uuid):
 
 
 def get_stale_instances(delay):
-    for i in etcd.get_all('instance', None):
-        if i['state'] in ['deleted', 'error']:
-            if time.time() - i['state_updated'] > delay:
+    for _, i in etcd.get_all('instance', None):
+        dbstate = get_instance_attribute(i['uuid'], 'state')
+        if dbstate.get('state') in ['deleted', 'error']:
+            if time.time() - dbstate['state_updated'] > delay:
                 yield i
+
+
+def get_instance_attribute(instance_uuid, attribute):
+    retval = etcd.get('attribute/instance', instance_uuid, attribute)
+    if not retval:
+        return {}
+    return retval
+
+
+def set_instance_attribute(instance_uuid, attribute, value):
+    etcd.put('attribute/instance', instance_uuid, attribute, value)
 
 #####################################################################
 # NetworkInterfaces
@@ -242,7 +270,7 @@ def create_network_interface(interface_uuid, netdesc, instance_uuid, order):
 
 
 def get_stale_network_interfaces(delay):
-    for n in etcd.get_all('networkinterface', None):
+    for _, n in etcd.get_all('networkinterface', None):
         if n['state'] in ['deleted', 'error']:
             if time.time() - n['state_updated'] > delay:
                 yield n
@@ -254,7 +282,7 @@ def hard_delete_network_interface(interface_uuid):
 
 
 def get_instance_interfaces(instance_uuid):
-    for ni in etcd.get_all('networkinterface', None):
+    for _, ni in etcd.get_all('networkinterface', None):
         if ni['state'] == 'deleted':
             continue
         if ni['instance_uuid'] == instance_uuid:
@@ -262,7 +290,7 @@ def get_instance_interfaces(instance_uuid):
 
 
 def get_network_interfaces(network_uuid):
-    for ni in etcd.get_all('networkinterface', None):
+    for _, ni in etcd.get_all('networkinterface', None):
         if ni['state'] == 'deleted':
             continue
         if ni['network_uuid'] == network_uuid:
@@ -311,8 +339,8 @@ def create_snapshot(snapshot_uuid, device, instance_uuid, created):
 
 
 def get_instance_snapshots(instance_uuid):
-    for m in etcd.get_all('snapshot', instance_uuid,
-                          sort_order='ascend'):
+    for _, m in etcd.get_all('snapshot', instance_uuid,
+                             sort_order='ascend'):
         yield m
 
 #####################################################################
@@ -346,8 +374,8 @@ def add_event(object_type, object_uuid, operation, phase, duration, message):
 
 
 def get_events(object_type, object_uuid):
-    for m in etcd.get_all('event/%s' % object_type, object_uuid,
-                          sort_order='ascend'):
+    for _, m in etcd.get_all('event/%s' % object_type, object_uuid,
+                             sort_order='ascend'):
         yield m
 
 #####################################################################
@@ -379,7 +407,7 @@ def get_metrics(fqdn):
 
 def allocate_console_port(instance_uuid):
     node = config.NODE_NAME
-    consumed = {value['port'] for value in etcd.get_all('console', node)}
+    consumed = {value['port'] for _, value in etcd.get_all('console', node)}
     while True:
         port = random.randint(30000, 50000)
         # avoid hitting etcd if it's probably in use
@@ -398,6 +426,7 @@ def allocate_console_port(instance_uuid):
                     'port': port,
                 })
             if allocatedPort:
+
                 return port
         except socket.error as e:
             LOG.withField('instance', instance_uuid).info(
@@ -407,7 +436,8 @@ def allocate_console_port(instance_uuid):
 
 
 def free_console_port(port):
-    etcd.delete('console', config.NODE_NAME, port)
+    if port:
+        etcd.delete('console', config.NODE_NAME, port)
 
 #####################################################################
 # Namespaces
@@ -415,7 +445,8 @@ def free_console_port(port):
 
 
 def list_namespaces():
-    return etcd.get_all('namespace', None)
+    for _, value in etcd.get_all('namespace', None):
+        yield value
 
 
 def get_namespace(namespace):

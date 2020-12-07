@@ -237,15 +237,15 @@ def get(objecttype, subtype, name):
 @retry_etcd_forever
 def get_all(objecttype, subtype, sort_order=None):
     path = _construct_key(objecttype, subtype, None)
-    for value in Etcd3Client().get_prefix(path, sort_order=sort_order):
-        yield json.loads(value[0])
+    for data, metadata in Etcd3Client().get_prefix(path, sort_order=sort_order, sort_target='key'):
+        yield str(metadata['key']), json.loads(data)
 
 
 @retry_etcd_forever
 def get_all_dict(objecttype, subtype=None, sort_order=None):
     path = _construct_key(objecttype, subtype, None)
     key_val = {}
-    for value in Etcd3Client().get_prefix(path, sort_order=sort_order):
+    for value in Etcd3Client().get_prefix(path, sort_order=sort_order, sort_target='key'):
         key_val[value[1]['key'].decode('utf-8')] = json.loads(value[0])
     return key_val
 
