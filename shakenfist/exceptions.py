@@ -118,8 +118,3 @@ class NetworkException(Exception):
 
 class DeadNetwork(NetworkException):
     pass
-
-
-# Generic
-class NotImplementedException(Exception):
-    pass

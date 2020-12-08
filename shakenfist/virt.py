@@ -178,161 +178,49 @@ class Instance(object):
 
         return Instance(static_values)
 
-    # NOTE(mikal): I wish we could generate this through introspection or
-    # something, this is ugly.
     @property
     def uuid(self):
         return self.__uuid
-
-    @uuid.setter
-    def uuid(self, _):
-        raise exceptions.NotImplementedException(
-            'You cannot set a static variable')
-
-    @uuid.deleter
-    def uuid(self):
-        raise exceptions.NotImplementedException(
-            'You cannot delete a static variable')
 
     @property
     def cpus(self):
         return self.__cpus
 
-    @cpus.setter
-    def cpus(self, _):
-        raise exceptions.NotImplementedException(
-            'You cannot set a static variable')
-
-    @cpus.deleter
-    def cpus(self):
-        raise exceptions.NotImplementedException(
-            'You cannot delete a static variable')
-
     @property
     def disk_spec(self):
         return self.__disk_spec
-
-    @disk_spec.setter
-    def disk_spec(self, _):
-        raise exceptions.NotImplementedException(
-            'You cannot set a static variable')
-
-    @disk_spec.deleter
-    def disk_spec(self):
-        raise exceptions.NotImplementedException(
-            'You cannot delete a static variable')
 
     @property
     def memory(self):
         return self.__memory
 
-    @memory.setter
-    def memory(self, _):
-        raise exceptions.NotImplementedException(
-            'You cannot set a static variable')
-
-    @memory.deleter
-    def memory(self):
-        raise exceptions.NotImplementedException(
-            'You cannot delete a static variable')
-
     @property
     def name(self):
         return self.__name
-
-    @name.setter
-    def name(self, _):
-        raise exceptions.NotImplementedException(
-            'You cannot set a static variable')
-
-    @name.deleter
-    def name(self):
-        raise exceptions.NotImplementedException(
-            'You cannot delete a static variable')
 
     @property
     def namespace(self):
         return self.__namespace
 
-    @namespace.setter
-    def namespace(self, _):
-        raise exceptions.NotImplementedException(
-            'You cannot set a static variable')
-
-    @namespace.deleter
-    def namespace(self):
-        raise exceptions.NotImplementedException(
-            'You cannot delete a static variable')
-
     @property
     def requested_placement(self):
         return self.__requested_placement
-
-    @requested_placement.setter
-    def requested_placement(self, _):
-        raise exceptions.NotImplementedException(
-            'You cannot set a static variable')
-
-    @requested_placement.deleter
-    def requested_placement(self):
-        raise exceptions.NotImplementedException(
-            'You cannot delete a static variable')
 
     @property
     def ssh_key(self):
         return self.__ssh_key
 
-    @ssh_key.setter
-    def ssh_key(self, _):
-        raise exceptions.NotImplementedException(
-            'You cannot set a static variable')
-
-    @ssh_key.deleter
-    def ssh_key(self):
-        raise exceptions.NotImplementedException(
-            'You cannot delete a static variable')
-
     @property
     def user_data(self):
         return self.__user_data
-
-    @user_data.setter
-    def user_data(self, _):
-        raise exceptions.NotImplementedException(
-            'You cannot set a static variable')
-
-    @user_data.deleter
-    def user_data(self):
-        raise exceptions.NotImplementedException(
-            'You cannot delete a static variable')
 
     @property
     def video(self):
         return self.__video
 
-    @video.setter
-    def video(self, _):
-        raise exceptions.NotImplementedException(
-            'You cannot set a static variable')
-
-    @video.deleter
-    def video(self):
-        raise exceptions.NotImplementedException(
-            'You cannot delete a static variable')
-
     @property
     def version(self):
         return self.__version
-
-    @version.setter
-    def version(self, _):
-        raise exceptions.NotImplementedException(
-            'You cannot set a static variable')
-
-    @version.deleter
-    def version(self):
-        raise exceptions.NotImplementedException(
-            'You cannot delete a static variable')
 
     def __str__(self):
         return 'instance(%s)' % self.uuid
