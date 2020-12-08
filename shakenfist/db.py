@@ -182,6 +182,8 @@ def delete_ipmanager(network_uuid):
 
 def create_instance(instance_uuid, metadata):
     set_instance_attribute(instance_uuid, 'state', {'state': 'initial'})
+    set_instance_attribute(instance_uuid, 'power_state',
+                           {'power_state': 'initial'})
     etcd.put('instance', None, instance_uuid, metadata)
 
 
