@@ -199,7 +199,7 @@ def redirect_instance_request(func):
             return
 
         placement = db.get_instance_attribute(
-            i.static_values['uuid'], 'placement')
+            i.uuid, 'placement')
         if not placement:
             return
         if not placement.get('node'):
@@ -684,7 +684,7 @@ class Instances(Resource):
         )
 
         # Initialise metadata
-        db.persist_metadata('instance', instance.static_values['uuid'], {})
+        db.persist_metadata('instance', instance.uuid, {})
 
         # Allocate IP addresses
         order = 0
@@ -695,14 +695,14 @@ class Instances(Resource):
                     m = 'missing network %s during IP allocation phase' % (
                         netdesc['network_uuid'])
                     db.enqueue_instance_error(
-                        instance.static_values['uuid'], m)
+                        instance.uuid, m)
                     return error(
                         404, 'network %s not found' % netdesc['network_uuid'])
 
                 with db.get_lock('ipmanager', None,  netdesc['network_uuid'],
                                  ttl=120, op='Network allocate IP'):
                     db.add_event('network', netdesc['network_uuid'], 'allocate address',
-                                 None, None, instance.static_values['uuid'])
+                                 None, None, instance.uuid)
                     ipm = IPManager.from_db(netdesc['network_uuid'])
                     if 'address' not in netdesc or not netdesc['address']:
                         netdesc['address'] = ipm.get_random_free_address()
@@ -711,7 +711,7 @@ class Instances(Resource):
                             m = 'failed to reserve an IP on network %s' % (
                                 netdesc['network_uuid'])
                             db.enqueue_instance_error(
-                                instance.static_values['uuid'], m)
+                                instance.uuid, m)
                             return error(409, 'address %s in use' %
                                          netdesc['address'])
 
@@ -721,7 +721,7 @@ class Instances(Resource):
                     netdesc['model'] = 'virtio'
 
                 db.create_network_interface(
-                    str(uuid.uuid4()), netdesc, instance.static_values['uuid'], order)
+                    str(uuid.uuid4()), netdesc, instance.uuid, order)
 
         if not SCHEDULER:
             SCHEDULER = scheduler.Scheduler()
@@ -741,14 +741,14 @@ class Instances(Resource):
             instance.add_event('schedule', 'failed', None,
                                'Insufficient resources: ' + str(e))
             db.enqueue_instance_error(
-                instance.static_values['uuid'], 'scheduling failed')
+                instance.uuid, 'scheduling failed')
             return error(507, str(e))
 
         except exceptions.CandidateNodeNotFoundException as e:
             instance.add_event('schedule', 'failed', None,
                                'Candidate node not found: ' + str(e))
             db.enqueue_instance_error(
-                instance.static_values['uuid'], 'scheduling failed')
+                instance.uuid, 'scheduling failed')
             return error(404, 'node not found: %s' % e)
 
         # Record placement
@@ -756,13 +756,13 @@ class Instances(Resource):
 
         # Create a queue entry for the instance start
         tasks = [PreflightInstanceTask(
-            instance.static_values['uuid'], network)]
-        for disk in instance.static_values['disk_spec']:
+            instance.uuid, network)]
+        for disk in instance.disk_spec:
             if disk.get('base'):
                 tasks.append(FetchImageTask(
-                    disk['base'], instance.static_values['uuid']))
+                    disk['base'], instance.uuid))
         tasks.append(StartInstanceTask(
-            instance.static_values['uuid'], network))
+            instance.uuid, network))
 
         # Enqueue creation tasks on desired node task queue
         db.enqueue(placement, {'tasks': tasks})
@@ -773,11 +773,11 @@ class Instances(Resource):
         start_time = time.time()
         while time.time() - start_time < config.get('API_ASYNC_WAIT'):
             state = db.get_instance_attribute(
-                instance.static_values['uuid'], 'state')
+                instance.uuid, 'state')
             if state.get('state') in ['created', 'deleted', 'error']:
-                return db.get_instance(instance.static_values['uuid'], external_view=True)
+                return db.get_instance(instance.uuid, external_view=True)
             time.sleep(0.5)
-        return db.get_instance(instance.static_values['uuid'], external_view=True)
+        return db.get_instance(instance.uuid, external_view=True)
 
     @jwt_required
     def delete(self, confirm=False, namespace=None):
@@ -982,7 +982,7 @@ def _safe_get_network_interface(interface_uuid):
         return None, None, error(404, 'interface not found')
 
     i = virt.Instance.from_db(ni['instance_uuid'])
-    if get_jwt_identity() not in [i.static_values['namespace'], 'system']:
+    if get_jwt_identity() not in [i.namespace, 'system']:
         log.withObj(i).info('Instance not found, failed ownership test')
         return None, None, error(404, 'interface not found')
 

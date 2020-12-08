@@ -120,12 +120,20 @@ def _xml_file(instance_uuid):
 class Instance(object):
     def __init__(self, static_values):
         # This dictionary contains values which will never change for this
-        # instance. It is therefore safe to cache forever. I know this moves
-        # us away from member variables again, but I wanted to make it very
-        # clear that these values are not meant to be assigned to.
-        self.static_values = static_values
+        # instance. It is therefore safe to cache forever.
+        self.__uuid = static_values.get('uuid')
+        self.__cpus = static_values.get('cpus')
+        self.__disk_spec = static_values.get('disk_spec')
+        self.__memory = static_values.get('memory')
+        self.__name = static_values.get('name')
+        self.__namespace = static_values.get('namespace')
+        self.__requested_placement = static_values.get('requested_placement')
+        self.__ssh_key = static_values.get('ssh_key')
+        self.__user_data = static_values.get('user_data')
+        self.__video = static_values.get('video')
+        self.__version = static_values.get('version')
 
-        if not self.static_values.get('disk_spec'):
+        if not self.__disk_spec:
             # This should not occur since the API will filter for zero disks.
             LOG.withObj(self).error('Found disk spec empty')
             raise exceptions.InstanceBadDiskSpecification()
@@ -170,22 +178,66 @@ class Instance(object):
 
         return Instance(static_values)
 
+    @property
+    def uuid(self):
+        return self.__uuid
+
+    @property
+    def cpus(self):
+        return self.__cpus
+
+    @property
+    def disk_spec(self):
+        return self.__disk_spec
+
+    @property
+    def memory(self):
+        return self.__memory
+
+    @property
+    def name(self):
+        return self.__name
+
+    @property
+    def namespace(self):
+        return self.__namespace
+
+    @property
+    def requested_placement(self):
+        return self.__requested_placement
+
+    @property
+    def ssh_key(self):
+        return self.__ssh_key
+
+    @property
+    def user_data(self):
+        return self.__user_data
+
+    @property
+    def video(self):
+        return self.__video
+
+    @property
+    def version(self):
+        return self.__version
+
     def __str__(self):
-        return 'instance(%s)' % self.static_values['uuid']
+        return 'instance(%s)' % self.uuid
 
     def unique_label(self):
-        return ('instance', self.static_values['uuid'])
+        return ('instance', self.uuid)
 
     def add_event(self, operation, phase, duration=None, msg=None):
         db.add_event(
-            'instance', self.static_values['uuid'], operation, phase, duration, msg)
+            'instance', self.uuid, operation, phase, duration, msg)
 
     def place_instance(self, location):
-        with db.get_lock('attribute/instance', self.static_values['uuid'], 'placement',
+        with db.get_lock('attribute/instance', self.uuid, 'placement',
                          op='Instance placement'):
             # We don't write unchanged things to the database
             placement = db.get_instance_attribute(
-                self.static_values['uuid'], 'placement')
+                self.uuid, 'placement')
             if placement.get('node') == location:
                 return
 
@@ -193,24 +245,24 @@ class Instance(object):
             placement['placement_attempts'] = placement.get(
                 'placement_attempts', 0) + 1
             db.set_instance_attribute(
-                self.static_values['uuid'], 'placement', placement)
+                self.uuid, 'placement', placement)
             self.add_event('placement', None, None, location)
 
     def enforced_deletes_increment(self):
-        with db.get_lock('attribute/instance', self.static_values['uuid'], 'enforced_deletes',
+        with db.get_lock('attribute/instance', self.uuid, 'enforced_deletes',
                          op='Instance enforced deletes increment'):
             enforced_deletes = db.get_instance_attribute(
-                self.static_values['uuid'], 'enforced_deletes')
+                self.uuid, 'enforced_deletes')
             enforced_deletes['count'] = enforced_deletes.get('count', 0) + 1
             db.set_instance_attribute(
-                self.static_values['uuid'], 'enforced_deletes', enforced_deletes)
+                self.uuid, 'enforced_deletes', enforced_deletes)
 
     def update_instance_state(self, state, error_message=None):
-        with db.get_lock('attribute/instance', self.static_values['uuid'], 'state',
+        with db.get_lock('attribute/instance', self.uuid, 'state',
                          op='Instance state update'):
             # We don't write unchanged things to the database
             dbstate = db.get_instance_attribute(
-                self.static_values['uuid'], 'state')
+                self.uuid, 'state')
             if dbstate.get('state') == state:
                 return
 
@@ -222,15 +274,15 @@ class Instance(object):
                 dbstate['error_message'] = error_message
 
             db.set_instance_attribute(
-                self.static_values['uuid'], 'state', dbstate)
+                self.uuid, 'state', dbstate)
             self.add_event('state changed', '%s -> %s' % (orig_state, state))
 
     def update_power_state(self, state):
-        with db.get_lock('attribute/instance', self.static_values['uuid'], 'power_state',
+        with db.get_lock('attribute/instance', self.uuid, 'power_state',
                          op='Instance power state update'):
             # We don't write unchanged things to the database
             dbstate = db.get_instance_attribute(
-                self.static_values['uuid'], 'power_state')
+                self.uuid, 'power_state')
             if dbstate.get('power_state') == state:
                 return
 
@@ -248,7 +300,7 @@ class Instance(object):
             dbstate['power_state'] = state
             dbstate['power_state_updated'] = time.time()
             db.set_instance_attribute(
-                self.static_values['uuid'], 'power_state', dbstate)
+                self.uuid, 'power_state', dbstate)
             self.add_event('power state changed', '%s -> %s' %
                            (dbstate['power_state_previous'], state))
 
@@ -260,7 +312,7 @@ class Instance(object):
         self.update_instance_state('creating')
 
         # Ensure we have state on disk
-        os.makedirs(instance_path(self.static_values['uuid']), exist_ok=True)
+        os.makedirs(instance_path(self.uuid), exist_ok=True)
 
         # Configure block devices, include config drive creation
         self._configure_block_devices(lock)
@@ -299,13 +351,13 @@ class Instance(object):
 
         with util.RecordedOperation('delete disks', self):
             try:
-                if os.path.exists(instance_path(self.static_values['uuid'])):
-                    shutil.rmtree(instance_path(self.static_values['uuid']))
+                if os.path.exists(instance_path(self.uuid)):
+                    shutil.rmtree(instance_path(self.uuid))
             except Exception as e:
                 util.ignore_exception('instance delete', e)
 
         with util.RecordedOperation('release network addresses', self):
-            for ni in db.get_instance_interfaces(self.static_values['uuid']):
+            for ni in db.get_instance_interfaces(self.uuid):
                 db.update_network_interface_state(ni['uuid'], 'deleted')
                 with db.get_lock('ipmanager', None, ni['network_uuid'],
                                  ttl=120, op='Instance delete'):
@@ -313,39 +365,39 @@ class Instance(object):
                     ipm.release(ni['ipv4'])
                     ipm.persist()
 
-        ports = db.get_instance_attribute(self.static_values['uuid'], 'ports')
+        ports = db.get_instance_attribute(self.uuid, 'ports')
         db.free_console_port(ports.get('console_port'))
         db.free_console_port(ports.get('vdi_port'))
 
         self.update_instance_state('deleted')
 
     def allocate_instance_ports(self):
-        with db.get_lock('attribute/instance', self.static_values['uuid'], 'ports',
+        with db.get_lock('attribute/instance', self.uuid, 'ports',
                          op='Instance port allocation'):
             ports = db.get_instance_attribute(
-                self.static_values['uuid'], 'ports')
+                self.uuid, 'ports')
             if not ports:
                 db.set_instance_attribute(
-                    self.static_values['uuid'], 'ports',
+                    self.uuid, 'ports',
                     {
-                        'console_port': db.allocate_console_port(self.static_values['uuid']),
-                        'vdi_port': db.allocate_console_port(self.static_values['uuid'])
+                        'console_port': db.allocate_console_port(self.uuid),
+                        'vdi_port': db.allocate_console_port(self.uuid)
                     })
 
     def _configure_block_devices(self, lock):
-        with db.get_lock('attribute/instance', self.static_values['uuid'], 'block_devices',
+        with db.get_lock('attribute/instance', self.uuid, 'block_devices',
                          op='Instance initialize block devices'):
             # Create block devices if required
             block_devices = db.get_instance_attribute(
-                self.static_values['uuid'], 'block_devices')
+                self.uuid, 'block_devices')
             if not block_devices:
                 block_devices = _initialize_block_devices(
-                    instance_path(self.static_values['uuid']), self.static_values['disk_spec'])
+                    instance_path(self.uuid), self.disk_spec)
 
             # Generate a config drive
             with util.RecordedOperation('make config drive', self):
                 self._make_config_drive(
-                    os.path.join(instance_path(self.static_values['uuid']),
+                    os.path.join(instance_path(self.uuid),
                                  block_devices['devices'][1]['path']))
 
             # Prepare disks
@@ -425,7 +477,7 @@ class Instance(object):
                 block_devices['devices'] = modified_disks
                 block_devices['finalized'] = True
                 db.set_instance_attribute(
-                    self.static_values['uuid'], 'block_devices', block_devices)
+                    self.uuid, 'block_devices', block_devices)
 
     def _make_config_drive(self, disk_path):
         """Create a config drive"""
@@ -451,15 +503,15 @@ class Instance(object):
         # meta_data.json
         md = json.dumps({
             'random_seed': base64.b64encode(os.urandom(512)).decode('ascii'),
-            'uuid': self.static_values['uuid'],
+            'uuid': self.uuid,
             'availability_zone': config.get('ZONE'),
-            'hostname': '%s.local' % self.static_values['name'],
+            'hostname': '%s.local' % self.name,
             'launch_index': 0,
             'devices': [],
             'project_id': None,
-            'name': self.static_values['name'],
+            'name': self.name,
             'public_keys': {
-                'mykey': self.static_values['ssh_key']
+                'mykey': self.ssh_key
             }
         }).encode('ascii')
         iso.add_fp(io.BytesIO(md), len(md), '/openstack/latest/meta_data.json;1',
@@ -470,8 +522,8 @@ class Instance(object):
                    joliet_path='/openstack/2017-02-22/meta_data.json')
 
         # user_data
-        if self.static_values['user_data']:
-            user_data = base64.b64decode(self.static_values['user_data'])
+        if self.user_data:
+            user_data = base64.b64decode(self.user_data)
             iso.add_fp(io.BytesIO(user_data), len(user_data), '/openstack/latest/user_data',
                        rr_name='user_data',
                        joliet_path='/openstack/latest/user_data.json')
@@ -492,7 +544,7 @@ class Instance(object):
         }
 
         seen_networks = []
-        for iface in db.get_instance_interfaces(self.static_values['uuid']):
+        for iface in db.get_instance_interfaces(self.uuid):
             devname = 'eth%d' % iface['order']
             nd['links'].append(
                 {
@@ -562,14 +614,14 @@ class Instance(object):
     def _create_domain_xml(self):
         """Create the domain XML for the instance."""
 
-        if os.path.exists(_xml_file(self.static_values['uuid'])):
+        if os.path.exists(_xml_file(self.uuid)):
             return
 
         with open(os.path.join(config.get('STORAGE_PATH'), 'libvirt.tmpl')) as f:
             t = jinja2.Template(f.read())
 
         networks = []
-        for iface in list(db.get_instance_interfaces(self.static_values['uuid'])):
+        for iface in list(db.get_instance_interfaces(self.uuid)):
             n = net.Network.from_db(iface['network_uuid'])
             networks.append(
                 {
@@ -583,29 +635,29 @@ class Instance(object):
         # domain XML takes them in KB. That wouldn't be worth a comment here if
         # I hadn't spent _ages_ finding a bug related to it.
         block_devices = db.get_instance_attribute(
-            self.static_values['uuid'], 'block_devices')
-        ports = db.get_instance_attribute(self.static_values['uuid'], 'ports')
+            self.uuid, 'block_devices')
+        ports = db.get_instance_attribute(self.uuid, 'ports')
         xml = t.render(
-            uuid=self.static_values['uuid'],
-            memory=self.static_values['memory'] * 1024,
-            vcpus=self.static_values['cpus'],
+            uuid=self.uuid,
+            memory=self.memory * 1024,
+            vcpus=self.cpus,
             disks=block_devices.get('devices'),
             networks=networks,
-            instance_path=instance_path(self.static_values['uuid']),
+            instance_path=instance_path(self.uuid),
             console_port=ports.get('console_port'),
             vdi_port=ports.get('vdi_port'),
-            video_model=self.static_values['video']['model'],
-            video_memory=self.static_values['video']['memory']
+            video_model=self.video['model'],
+            video_memory=self.video['memory']
         )
 
-        with open(_xml_file(self.static_values['uuid']), 'w') as f:
+        with open(_xml_file(self.uuid), 'w') as f:
             f.write(xml)
 
     def _get_domain(self):
         libvirt = util.get_libvirt()
         conn = libvirt.open('qemu:///system')
         try:
-            return conn.lookupByName('sf:' + self.static_values['uuid'])
+            return conn.lookupByName('sf:' + self.uuid)
 
         except libvirt.libvirtError:
             return None
@@ -619,12 +671,12 @@ class Instance(object):
         return util.extract_power_state(libvirt, instance)
 
     def power_on(self):
-        if not os.path.exists(_xml_file(self.static_values['uuid'])):
-            db.enqueue_instance_error(self.static_values['uuid'],
+        if not os.path.exists(_xml_file(self.uuid)):
+            db.enqueue_instance_error(self.uuid,
                                       'missing domain file in power on')
 
         libvirt = util.get_libvirt()
-        with open(_xml_file(self.static_values['uuid'])) as f:
+        with open(_xml_file(self.uuid)) as f:
             xml = f.read()
 
         instance = self._get_domain()
@@ -632,7 +684,7 @@ class Instance(object):
             conn = libvirt.open('qemu:///system')
             instance = conn.defineXML(xml)
             if not instance:
-                db.enqueue_instance_error(self.static_values['uuid'],
+                db.enqueue_instance_error(self.uuid,
                                           'power on failed to create domain')
                 raise exceptions.NoDomainException()
 
@@ -668,18 +720,18 @@ class Instance(object):
 
     def snapshot(self, all=False):
         disks = db.get_instance_attribute(
-            self.static_values['uuid'], 'block_devices')['devices']
+            self.uuid, 'block_devices')['devices']
         if not all:
             disks = [disks[0]]
 
         snapshot_uuid = str(uuid4())
         snappath = os.path.join(_snapshot_path(
-            self.static_values['uuid']), snapshot_uuid)
+            self.uuid), snapshot_uuid)
         if not os.path.exists(snappath):
             LOG.withObj(self).debug(
                 'Creating snapshot storage at %s' % snappath)
             os.makedirs(snappath, exist_ok=True)
-            with open(os.path.join(_snapshot_path(self.static_values['uuid']), 'index.html'), 'w') as f:
+            with open(os.path.join(_snapshot_path(self.uuid), 'index.html'), 'w') as f:
                 f.write('<html></html>')
 
         for d in disks:
@@ -695,7 +747,7 @@ class Instance(object):
             with util.RecordedOperation('snapshot %s' % d['device'], self):
                 self._snapshot_device(
                     d['path'], os.path.join(snappath, d['device']))
-                db.create_snapshot(snapshot_uuid, d['device'], self.static_values['uuid'],
+                db.create_snapshot(snapshot_uuid, d['device'], self.uuid,
                                    time.time())
 
         return snapshot_uuid
@@ -725,7 +777,7 @@ class Instance(object):
 
     def get_console_data(self, length):
         console_path = os.path.join(instance_path(
-            self.static_values['uuid']), 'console.log')
+            self.uuid), 'console.log')
         if not os.path.exists(console_path):
             return ''
 

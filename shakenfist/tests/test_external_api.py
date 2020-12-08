@@ -29,7 +29,7 @@ class FakeInstance(object):
         self.namespace = namespace
 
     def unique_label(self):
-        return ('instance', self.static_values['uuid'])
+        return ('instance', self.uuid)
 
 
 def _encode_key(key):

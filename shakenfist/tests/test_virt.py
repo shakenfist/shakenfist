@@ -95,19 +95,17 @@ class VirtMetaTestCase(test_shakenfist.ShakenFistTestCase):
                 })
     def test_from_db(self, mock_get):
         inst = virt.Instance.from_db('uuid42')
-        self.assertEqual({
-            'cpus': 1,
-            'disk_spec': [{}],
-            'memory': 2048,
-            'name': 'barry',
-            'namespace': 'namespace',
-            'requested_placement': None,
-            'ssh_key': 'sshkey',
-            'user_data': 'userdata',
-            'uuid': 'uuid42',
-            'version': 2,
-            'video': {'memory': 16384, 'model': 'cirrus'}
-        }, inst.static_values)
+        self.assertEqual(1, inst.cpus)
+        self.assertEqual([{}], inst.disk_spec)
+        self.assertEqual(2048, inst.memory)
+        self.assertEqual('barry', inst.name)
+        self.assertEqual('namespace', inst.namespace)
+        self.assertEqual(None, inst.requested_placement)
+        self.assertEqual('sshkey', inst.ssh_key)
+        self.assertEqual('userdata', inst.user_data)
+        self.assertEqual('uuid42', inst.uuid)
+        self.assertEqual(2, inst.version)
+        self.assertEqual({'memory': 16384, 'model': 'cirrus'}, inst.video)
 
 
 class VirtTestCase(test_shakenfist.ShakenFistTestCase):
