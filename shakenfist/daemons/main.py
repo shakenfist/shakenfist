@@ -28,11 +28,11 @@ def restore_instances():
     # Ensure all instances for this node are defined
     networks = []
     instances = []
-    for inst in list(db.get_instances(only_node=config.NODE_NAME)):
-        for iface in db.get_instance_interfaces(inst['uuid']):
+    for inst in virt.Instances([virt.this_node_filter, virt.active_states_filter]):
+        for iface in db.get_instance_interfaces(inst.uuid):
             if not iface['network_uuid'] in networks:
                 networks.append(iface['network_uuid'])
-        instances.append(inst['uuid'])
+        instances.append(inst.uuid)
 
     with util.RecordedOperation('restore networks', None):
         for network in networks:

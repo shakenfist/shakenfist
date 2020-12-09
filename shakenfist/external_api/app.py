@@ -8,6 +8,7 @@
 import base64
 import bcrypt
 import copy
+from functools import partial
 import flask
 from flask_jwt_extended import create_access_token
 from flask_jwt_extended import get_jwt_identity
@@ -164,26 +165,10 @@ def arg_is_instance_uuid(func):
     # Method uses the instance from the db
     def wrapper(*args, **kwargs):
         if 'instance_uuid' in kwargs:
-            kwargs['instance_from_db'] = db.get_instance(
+            kwargs['instance_from_db'] = virt.Instance.from_db(
                 kwargs['instance_uuid'])
         if not kwargs.get('instance_from_db'):
             LOG.withInstance(kwargs['instance_uuid']).info(
-                'Instance not found, genuinely missing')
-            return error(404, 'instance not found')
-
-        return func(*args, **kwargs)
-    return wrapper
-
-
-def arg_is_instance_uuid_as_virt(func):
-    # Method uses the rehydrated instance
-    def wrapper(*args, **kwargs):
-        if 'instance_uuid' in kwargs:
-            kwargs['instance_from_db_virt'] = virt.Instance.from_db(
-                kwargs['instance_uuid']
-            )
-        if not kwargs.get('instance_from_db_virt'):
-            LOG.withField('instance', kwargs['instance_uuid']).info(
                 'Instance not found, genuinely missing')
             return error(404, 'instance not found')
 
@@ -237,7 +222,7 @@ def requires_instance_ownership(func):
                 'Instance not found, kwarg missing')
             return error(404, 'instance not found')
 
-        if get_jwt_identity() not in [kwargs['instance_from_db']['namespace'], 'system']:
+        if get_jwt_identity() not in [kwargs['instance_from_db'].namespace, 'system']:
             LOG.withField('instance', kwargs['instance_uuid']).info(
                 'Instance not found, ownership test in decorator')
             return error(404, 'instance not found')
@@ -443,12 +428,12 @@ class AuthNamespace(Resource):
         # The namespace must be empty
         instances = []
         deleted_instances = []
-        for i in db.get_instances(all=True, namespace=namespace):
-            state = db.get_instance_attribute(i['uuid'], 'state')
+        for i in virt.Instances([partial(virt.namespace_filter, namespace)]):
+            state = db.get_instance_attribute(i.uuid, 'state')
             if state['state'] in ['deleted', 'error']:
-                deleted_instances.append(i['uuid'])
+                deleted_instances.append(i.uuid)
             else:
-                instances.append(i['uuid'])
+                instances.append(i.uuid)
         if len(instances) > 0:
             return error(400, 'you cannot delete a namespace with instances')
 
@@ -579,7 +564,7 @@ class Instance(Resource):
     @arg_is_instance_uuid
     @requires_instance_ownership
     def get(self, instance_uuid=None, instance_from_db=None):
-        return db.get_instance(instance_uuid, external_view=True)
+        return instance_from_db.external_view()
 
     @jwt_required
     @arg_is_instance_uuid
@@ -597,12 +582,12 @@ class Instance(Resource):
         else:
             node = placement['node']
 
-        db.enqueue_instance_delete_remote(node, instance_from_db['uuid'])
+        db.enqueue_instance_delete_remote(node, instance_uuid)
 
         start_time = time.time()
         while time.time() - start_time < config.get('API_ASYNC_WAIT'):
             state = db.get_instance_attribute(
-                instance_from_db['uuid'], 'state')
+                instance_uuid, 'state')
             if state['state'] in ['deleted', 'error']:
                 return
 
@@ -614,10 +599,14 @@ class Instance(Resource):
 class Instances(Resource):
     @jwt_required
     def get(self, all=False):
+        filters = [partial(virt.namespace_filter, get_jwt_identity())]
+        if not all:
+            filters.append(virt.active_states_filter)
+
         retval = []
-        for i in db.get_instances(all=all, namespace=get_jwt_identity()):
+        for i in virt.Instances(filters):
             # This forces the instance through the external view rehydration
-            retval.append(db.get_instance(i['uuid'], external_view=True))
+            retval.append(i.external_view())
         return retval
 
     @jwt_required
@@ -755,14 +744,11 @@ class Instances(Resource):
         instance.place_instance(placement)
 
         # Create a queue entry for the instance start
-        tasks = [PreflightInstanceTask(
-            instance.uuid, network)]
+        tasks = [PreflightInstanceTask(instance.uuid, network)]
         for disk in instance.disk_spec:
             if disk.get('base'):
-                tasks.append(FetchImageTask(
-                    disk['base'], instance.uuid))
-        tasks.append(StartInstanceTask(
-            instance.uuid, network))
+                tasks.append(FetchImageTask(disk['base'], instance.uuid))
+        tasks.append(StartInstanceTask(instance.uuid, network))
 
         # Enqueue creation tasks on desired node task queue
         db.enqueue(placement, {'tasks': tasks})
@@ -772,12 +758,11 @@ class Instances(Resource):
         # after a while and just return the current state
         start_time = time.time()
         while time.time() - start_time < config.get('API_ASYNC_WAIT'):
-            state = db.get_instance_attribute(
-                instance.uuid, 'state')
+            state = db.get_instance_attribute(instance.uuid, 'state')
             if state.get('state') in ['created', 'deleted', 'error']:
-                return db.get_instance(instance.uuid, external_view=True)
+                return instance.external_view()
             time.sleep(0.5)
-        return db.get_instance(instance.uuid, external_view=True)
+        return instance.external_view()
 
     @jwt_required
     def delete(self, confirm=False, namespace=None):
@@ -798,39 +783,34 @@ class Instances(Resource):
                 return error(401, 'you cannot delete other namespaces')
             namespace = get_jwt_identity()
 
-        instances_del = []
+        waiting_for = []
         tasks_by_node = {}
-        for instance in list(db.get_instances(all=all, namespace=namespace)):
-            dbstate = db.get_instance_attribute(instance['uuid'], 'state')
-            if dbstate.get('state') in ['deleted', 'error']:
-                continue
-
+        for instance in virt.Instances([partial(virt.namespace_filter, namespace),
+                                        virt.active_states_filter]):
             # If this instance is not on a node, just do the DB cleanup locally
             dbplacement = db.get_instance_attribute(
-                instance['uuid'], 'placement')
+                instance.uuid, 'placement')
             if not dbplacement.get('node'):
                 node = config.NODE_NAME
             else:
                 node = dbplacement['node']
 
             tasks_by_node.setdefault(node, [])
-            tasks_by_node[node].append(DeleteInstanceTask(instance['uuid']))
-            instances_del.append(instance['uuid'])
+            tasks_by_node[node].append(DeleteInstanceTask(instance.uuid))
+            waiting_for.append(instance)
 
         for node in tasks_by_node:
             db.enqueue(node, {'tasks': tasks_by_node[node]})
 
-        waiting_for = copy.copy(instances_del)
         start_time = time.time()
         while (waiting_for and
                (time.time() - start_time < config.get('API_ASYNC_WAIT'))):
-            for instance_uuid in copy.copy(waiting_for):
-                dbstate = db.get_instance_attribute(instance_uuid, 'state')
-                print(dbstate)
+            for instance in copy.copy(waiting_for):
+                dbstate = db.get_instance_attribute(instance.uuid, 'state')
                 if dbstate.get('state') in ['deleted', 'error']:
-                    waiting_for.remove(instance_uuid)
+                    waiting_for.remove(instance)
 
-        return instances_del
+        return waiting_for
 
 
 class InstanceInterfaces(Resource):
@@ -853,7 +833,6 @@ class InstanceSnapshot(Resource):
     @jwt_required
     @arg_is_instance_uuid
     @requires_instance_ownership
-    @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None,
              instance_from_db=None, instance_from_db_virt=None, all=None):
@@ -878,7 +857,6 @@ class InstanceRebootSoft(Resource):
     @jwt_required
     @arg_is_instance_uuid
     @requires_instance_ownership
-    @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None,
              instance_from_db=None, instance_from_db_virt=None):
@@ -893,7 +871,6 @@ class InstanceRebootHard(Resource):
     @jwt_required
     @arg_is_instance_uuid
     @requires_instance_ownership
-    @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None,
              instance_from_db=None, instance_from_db_virt=None):
@@ -908,7 +885,6 @@ class InstancePowerOff(Resource):
     @jwt_required
     @arg_is_instance_uuid
     @requires_instance_ownership
-    @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None,
              instance_from_db=None, instance_from_db_virt=None):
@@ -923,7 +899,6 @@ class InstancePowerOn(Resource):
     @jwt_required
     @arg_is_instance_uuid
     @requires_instance_ownership
-    @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None,
              instance_from_db=None, instance_from_db_virt=None):
@@ -938,7 +913,6 @@ class InstancePause(Resource):
     @jwt_required
     @arg_is_instance_uuid
     @requires_instance_ownership
-    @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None,
              instance_from_db=None, instance_from_db_virt=None):
@@ -953,7 +927,6 @@ class InstanceUnpause(Resource):
     @jwt_required
     @arg_is_instance_uuid
     @requires_instance_ownership
-    @arg_is_instance_uuid_as_virt
     @redirect_instance_request
     def post(self, instance_uuid=None,
              instance_from_db=None, instance_from_db_virt=None):
@@ -1087,7 +1060,6 @@ class InstanceMetadata(Resource):
 class InstanceConsoleData(Resource):
     @jwt_required
     @arg_is_instance_uuid
-    @arg_is_instance_uuid_as_virt
     @requires_instance_ownership
     @redirect_instance_request
     def get(self, instance_uuid=None, length=None, instance_from_db=None, instance_from_db_virt=None):

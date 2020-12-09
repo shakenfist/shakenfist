@@ -169,7 +169,8 @@ def instance_preflight(instance_uuid, network):
                            'insufficient resources: ' + str(e))
 
     # Unsuccessful placement, check if reached placement attempt limit
-    if instance.placement_attempts > 3:
+    dbplacement = db.get_instance_attribute(instance.uuid, 'placement')
+    if dbplacement['placement_attempts'] > 3:
         raise exceptions.AbortInstanceStartException(
             'Too many start attempts')
 
@@ -268,9 +269,9 @@ def instance_delete(instance_uuid, new_state, error_msg=None):
 
         # Create list of networks used by all other instances
         host_networks = []
-        for inst in list(db.get_instances(only_node=config.NODE_NAME)):
-            if not inst['uuid'] == instance_uuid:
-                for iface in db.get_instance_interfaces(inst['uuid']):
+        for inst in virt.Instances([virt.this_node_filter, virt.active_states_filter]):
+            if not inst.uuid == instance_uuid:
+                for iface in db.get_instance_interfaces(inst.uuid):
                     if not iface['network_uuid'] in host_networks:
                         host_networks.append(iface['network_uuid'])
 
