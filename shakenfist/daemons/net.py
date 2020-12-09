@@ -12,6 +12,7 @@ from shakenfist.tasks import (DeployNetworkTask,
                               RemoveDHCPNetworkTask,
                               UpdateDHCPNetworkTask)
 from shakenfist import util
+from shakenfist import virt
 
 
 LOG, _ = logutil.setup(__name__)
@@ -30,8 +31,8 @@ class Monitor(daemon.Daemon):
 
         if not util.is_network_node():
             # For normal nodes, just the ones we have instances for
-            for inst in list(db.get_instances(only_node=config.NODE_NAME)):
-                for iface in db.get_instance_interfaces(inst['uuid']):
+            for inst in virt.Instances([virt.this_node_filter, virt.active_states_filter]):
+                for iface in db.get_instance_interfaces(inst.uuid):
                     if not iface['network_uuid'] in host_networks:
                         host_networks.append(iface['network_uuid'])
         else:
@@ -58,7 +59,7 @@ class Monitor(daemon.Daemon):
                 # and delete them
                 for ni in db.get_network_interfaces(n['uuid']):
                     stray = False
-                    inst = db.get_instance(ni['instance_uuid'])
+                    inst = virt.Instance.from_db(ni['instance_uuid'])
                     if not inst:
                         stray = True
                     else:

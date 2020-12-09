@@ -10,6 +10,7 @@ from shakenfist import exceptions
 from shakenfist import images
 from shakenfist import logutil
 from shakenfist import util
+from shakenfist import virt
 
 
 LOG, _ = logutil.setup(__name__)
@@ -80,8 +81,8 @@ class Scheduler(object):
         # Find number of matching networks on each node. We need to be careful
         # how we do this to avoid repeatedly scanning the etcd repository.
         per_node = {}
-        for inst in db.get_instances():
-            node = db.get_instance_attribute(inst['uuid'], 'placement')
+        for inst in virt.Instances([]):
+            node = db.get_instance_attribute(inst.uuid, 'placement')
             if node.get('node'):
                 per_node.setdefault(node['node'], [])
                 per_node[node['node']].append(inst)
@@ -93,7 +94,7 @@ class Scheduler(object):
             # Make a list of networks for the node
             present_networks = []
             for inst in per_node.get(node, []):
-                for iface in db.get_instance_interfaces(inst['uuid']):
+                for iface in db.get_instance_interfaces(inst.uuid):
                     if not iface['network_uuid'] in present_networks:
                         present_networks.append(iface['network_uuid'])
 

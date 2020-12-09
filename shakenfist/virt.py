@@ -1,6 +1,7 @@
 # Copyright 2019 Michael Still
 
 import base64
+from functools import partial
 import jinja2
 import io
 import json
@@ -12,6 +13,7 @@ from uuid import uuid4
 
 from shakenfist.config import config
 from shakenfist import db
+from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import images
 from shakenfist.ipmanager import IPManager
@@ -139,6 +141,14 @@ class Instance(object):
             raise exceptions.InstanceBadDiskSpecification()
 
     @staticmethod
+    def _db_create_instance(instance_uuid, metadata):
+        db.set_instance_attribute(
+            instance_uuid, 'state', {'state': 'initial'})
+        db.set_instance_attribute(
+            instance_uuid, 'power_state', {'power_state': 'initial'})
+        etcd.create('instance', None, instance_uuid, metadata)
+
+    @staticmethod
     def new(name, cpus, memory, namespace, ssh_key=None, disk_spec=None,
             user_data=None, video=None, requested_placement=None, uuid=None):
 
@@ -146,7 +156,7 @@ class Instance(object):
             # uuid should only be specified in testing
             uuid = str(uuid4())
 
-        db.create_instance(
+        Instance._db_create_instance(
             uuid,
             {
                 'uuid': uuid,
@@ -168,15 +178,68 @@ class Instance(object):
         return i
 
     @staticmethod
+    def _db_get_instance(instance_uuid):
+        # NOTE(mikal): we don't do upgrades inflight. They are assumed to have been
+        # done as part of the upgrade process.
+        i = etcd.get('instance', None, instance_uuid)
+        if not i:
+            LOG.withInstance(instance_uuid).error('Instance missing')
+            return None
+
+        if i.get('version') != 2:
+            raise exceptions.BadObjectVersion(
+                'Unknown version - Instance: %s', i)
+        return i
+
+    @staticmethod
     def from_db(uuid):
         if not uuid:
             return None
 
-        static_values = db.get_instance(uuid)
+        static_values = Instance._db_get_instance(uuid)
         if not static_values:
             return None
 
         return Instance(static_values)
+
+    def external_view(self):
+        # If this is an external view, then mix back in attributes that users expect
+        i = {
+            'uuid': self.uuid,
+            'cpus': self.cpus,
+            'disk_spec': self.disk_spec,
+            'memory': self.memory,
+            'name': self.name,
+            'namespace': self.namespace,
+            'requested_placement': self.requested_placement,
+            'ssh_key': self.ssh_key,
+            'user_data': self.user_data,
+            'video': self.video,
+            'version': self.version
+        }
+
+        external_attribute_key_whitelist = [
+            'console_port',
+            'error_message',
+            'node',
+            'power_state',
+            'state',
+            'vdi_port'
+        ]
+
+        for attrname in ['placement', 'state', 'power_state', 'ports']:
+            d = db.get_instance_attribute(self.uuid, attrname)
+            for key in d:
+                if key not in external_attribute_key_whitelist:
+                    continue
+
+                # We skip keys with no value
+                if d[key] is None:
+                    continue
+
+                i[key] = d[key]
+
+        return i
 
     @property
     def uuid(self):
@@ -370,6 +433,12 @@ class Instance(object):
         db.free_console_port(ports.get('vdi_port'))
 
         self.update_instance_state('deleted')
+
+    def hard_delete(self):
+        etcd.delete('instance', None, self.uuid)
+        db.delete_metadata('instance', self.uuid)
+        etcd.delete_all('attribute/instance', self.uuid)
+        etcd.delete_all('event/instance', self.uuid)
 
     def allocate_instance_ports(self):
         with db.get_lock('attribute/instance', self.uuid, 'ports',
@@ -793,3 +862,53 @@ class Instance(object):
             'Client requested %d bytes of console log, returning %d bytes'
             % (length, len(d)))
         return d
+
+
+class Instances(object):
+    def __init__(self, filters):
+        self.filters = filters
+
+    def __iter__(self):
+        for _, i in etcd.get_all('instance', None):
+            i = Instance.from_db(i['uuid'])
+            if not i:
+                continue
+
+            skip = False
+            for f in self.filters:
+                # If a filter returns false, we remove the instance from
+                # the result set.
+                if not f(i):
+                    skip = True
+                    break
+
+            if not skip:
+                yield i
+
+
+def placement_filter(node, inst):
+    p = db.get_instance_attribute(inst.uuid, 'placement')
+    return p.get('node') == node
+
+
+this_node_filter = partial(placement_filter, config.NODE_NAME)
+
+
+def state_filter(states, inst):
+    s = db.get_instance_attribute(inst.uuid, 'state')
+    return s.get('state') in states
+
+
+active_states_filter = partial(
+    state_filter, ['initial', 'preflight', 'creating', 'created'])
+inactive_states_filter = partial(state_filter, ['error', 'deleted'])
+
+
+def state_age_filter(delay, inst):
+    now = time.time()
+    s = db.get_instance_attribute(inst.uuid, 'state')
+    return (now - s.get('state_updated', now)) > delay
+
+
+def namespace_filter(namespace, inst):
+    return inst.namespace == namespace
