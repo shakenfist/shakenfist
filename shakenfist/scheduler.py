@@ -77,14 +77,20 @@ class Scheduler(object):
         if not candidates:
             return []
 
-        # Find number of matching networks on each node
+        # Find number of matching networks on each node. We need to be careful
+        # how we do this to avoid repeatedly scanning the etcd repository.
+        per_node = {}
+        for inst in db.get_instances():
+            per_node.setdefault(inst['node'], [])
+            per_node[inst['node']].append(inst)
+
         candidates_network_matches = {}
         for node in candidates:
             candidates_network_matches[node] = 0
 
             # Make a list of networks for the node
             present_networks = []
-            for inst in list(db.get_instances(only_node=node)):
+            for inst in per_node.get(node, []):
                 for iface in db.get_instance_interfaces(inst['uuid']):
                     if not iface['network_uuid'] in present_networks:
                         present_networks.append(iface['network_uuid'])
