@@ -87,9 +87,13 @@ class Monitor(daemon.Daemon):
                     continue
 
                 if not n.is_okay():
-                    LOG.withObj(n).info('Recreating not okay network')
-                    n.create()
+                    LOG.withNetwork(n).info('Recreating not okay network')
+                    if util.is_network_node():
+                        n.create_on_network_node()
+                    else:
+                        n.create_on_hypervisor()
 
+                n.update_dhcp()
                 n.ensure_mesh()
 
             except exceptions.LockException as e:
@@ -151,7 +155,7 @@ class Monitor(daemon.Daemon):
             # networks that much?
             if isinstance(workitem, DeployNetworkTask):
                 try:
-                    n.create()
+                    n.create_on_network_node()
                     n.ensure_mesh()
                     db.add_event('network', workitem.network_uuid(),
                                  'network node', 'deploy', None, None)
@@ -161,9 +165,8 @@ class Monitor(daemon.Daemon):
 
             elif isinstance(workitem, UpdateDHCPNetworkTask):
                 try:
-                    n.create()
+                    n.create_on_network_node()
                     n.ensure_mesh()
-                    n.update_dhcp()
                     db.add_event('network', workitem.network_uuid(),
                                  'network node', 'update dhcp', None, None)
                 except exceptions.DeadNetwork as e:

@@ -221,7 +221,7 @@ def instance_start(instance_uuid, network):
             for network_uuid in nets:
                 n = nets[network_uuid]
                 try:
-                    n.create()
+                    n.create_on_hypervisor()
                     n.ensure_mesh()
                     n.update_dhcp()
                 except exceptions.DeadNetwork as e:
