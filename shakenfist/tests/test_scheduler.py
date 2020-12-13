@@ -305,9 +305,11 @@ class CorrectAllocationTestCase(SchedulerTestCase):
         self.mock_get_instances.start()
         self.addCleanup(self.mock_get_instances.stop)
 
-    @ mock.patch('shakenfist.images.Image.from_url')
-    @ mock.patch('shakenfist.db.get_image_metadata_all', return_value=None)
-    def test_any_node_but_not_network_node(self, mock_get_image_meta, mock_image_from_url):
+    @mock.patch('shakenfist.db.get_instance_attribute')
+    @mock.patch('shakenfist.images.Image.from_url')
+    @mock.patch('shakenfist.db.get_image_metadata_all', return_value=None)
+    def test_any_node_but_not_network_node(
+            self, mock_get_image_meta, mock_image_from_url, mock_attr):
         self.fake_db.set_node_metrics_same({
             'cpu_max_per_instance': 16,
             'cpu_max': 4,
@@ -330,9 +332,12 @@ class CorrectAllocationTestCase(SchedulerTestCase):
         self.assertSetEqual(set(self.fake_db.nodes)-{'node1_net', },
                             set(nodes))
 
-    @ mock.patch('shakenfist.images.Image.from_url')
-    @ mock.patch('shakenfist.db.get_image_metadata_all', return_value=None)
-    def test_single_node_that_has_network(self, mock_get_image_meta, mock_image_from_url):
+    @mock.patch('shakenfist.db.get_instance_attribute',
+                return_value={'node': 'node3'})
+    @mock.patch('shakenfist.images.Image.from_url')
+    @mock.patch('shakenfist.db.get_image_metadata_all', return_value=None)
+    def test_single_node_that_has_network(
+            self, mock_get_image_meta, mock_image_from_url, mock_attr):
         self.fake_db.set_node_metrics_same({
             'cpu_max_per_instance': 16,
             'cpu_max': 4,
@@ -382,27 +387,27 @@ class FindMostTestCase(SchedulerTestCase):
         mock_db_get_metrics.start()
         self.addCleanup(mock_db_get_metrics.stop)
 
-    @ mock.patch('shakenfist.db.get_image_metadata_all',
-                 return_value={
-                     '/sf/image/095fdd2b66625412aa/node2': {
-                         'checksum': None,
-                         'fetched': 'Tue, 20 Oct 2020 23:02:29 -0000',
-                         'file_version': 1,
-                         'modified': 'Tue, 10 Sep 2019 07:24:40 GMT',
-                         'size': 200000,
-                         'url': 'req_image1',
-                         'version': 1,
-                     },
-                     '/sf/image/aca41cefa18b052074e092/node3': {
-                         'checksum': None,
-                         'fetched': 'Tue, 20 Oct 2020 23:02:29 -0000',
-                         'file_version': 1,
-                         'modified': 'Tue, 10 Sep 2019 07:24:40 GMT',
-                         'size': 200000,
-                         'url': 'http://example.com',
-                         'version': 1,
-                     }
-                 })
+    @mock.patch('shakenfist.db.get_image_metadata_all',
+                return_value={
+                    '/sf/image/095fdd2b66625412aa/node2': {
+                        'checksum': None,
+                        'fetched': 'Tue, 20 Oct 2020 23:02:29 -0000',
+                        'file_version': 1,
+                        'modified': 'Tue, 10 Sep 2019 07:24:40 GMT',
+                        'size': 200000,
+                        'url': 'req_image1',
+                        'version': 1,
+                    },
+                    '/sf/image/aca41cefa18b052074e092/node3': {
+                        'checksum': None,
+                        'fetched': 'Tue, 20 Oct 2020 23:02:29 -0000',
+                        'file_version': 1,
+                        'modified': 'Tue, 10 Sep 2019 07:24:40 GMT',
+                        'size': 200000,
+                        'url': 'http://example.com',
+                        'version': 1,
+                    }
+                })
     def test_most_matching_images(self, mock_get_meta_all):
         req_images = ['req_image1']
         candidates = ['node1_net', 'node2', 'node3', 'node4']

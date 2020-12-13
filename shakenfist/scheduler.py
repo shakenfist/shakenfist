@@ -81,8 +81,10 @@ class Scheduler(object):
         # how we do this to avoid repeatedly scanning the etcd repository.
         per_node = {}
         for inst in db.get_instances():
-            per_node.setdefault(inst['node'], [])
-            per_node[inst['node']].append(inst)
+            node = db.get_instance_attribute(inst['uuid'], 'placement')
+            if node.get('node'):
+                per_node.setdefault(node['node'], [])
+                per_node[node['node']].append(inst)
 
         candidates_network_matches = {}
         for node in candidates:
