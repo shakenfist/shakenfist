@@ -41,7 +41,6 @@ def restore_instances():
                 LOG.withObj(n).info('Restoring network')
                 n.create()
                 n.ensure_mesh()
-                n.update_dhcp()
             except Exception as e:
                 util.ignore_exception('restore network %s' % network, e)
 
