@@ -67,6 +67,11 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self._await_login_prompt(inst1['uuid'])
         self._await_login_prompt(inst2['uuid'])
 
+        # We need to refresh our view of the instances, as it might have
+        # changed as they started up
+        inst1 = self.test_client.get_instance(inst1['uuid'])
+        inst2 = self.test_client.get_instance(inst2['uuid'])
+
         nics = self.test_client.get_instance_interfaces(inst2['uuid'])
 
         console = base.LoggingSocket(inst1['node'], inst1['console_port'])
@@ -111,6 +116,11 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self._await_login_prompt(inst1['uuid'])
         self._await_login_prompt(inst2['uuid'])
 
+        # We need to refresh our view of the instances, as it might have
+        # changed as they started up
+        inst1 = self.test_client.get_instance(inst1['uuid'])
+        inst2 = self.test_client.get_instance(inst2['uuid'])
+
         nics = self.test_client.get_instance_interfaces(inst2['uuid'])
 
         console = base.LoggingSocket(inst1['node'], inst1['console_port'])
@@ -154,6 +164,11 @@ class TestNetworking(base.BaseNamespacedTestCase):
 
         self._await_login_prompt(inst1['uuid'])
         self._await_login_prompt(inst2['uuid'])
+
+        # We need to refresh our view of the instances, as it might have
+        # changed as they started up
+        inst1 = self.test_client.get_instance(inst1['uuid'])
+        inst2 = self.test_client.get_instance(inst2['uuid'])
 
         nics = self.test_client.get_instance_interfaces(inst2['uuid'])
 
