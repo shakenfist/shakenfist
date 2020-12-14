@@ -1,3 +1,5 @@
+import time
+
 from shakenfist_client import apiclient
 
 from shakenfist_ci import base
@@ -200,8 +202,9 @@ class TestNetworking(base.BaseNamespacedTestCase):
                 }
             ], None, None)
 
-        self.assertIsNotNone(inst['uuid'])
-        self.assertIsNotNone(inst['node'])
+        while inst['state'] not in ['created', 'error']:
+            time.sleep(1)
+            inst = self.test_client.get_instance(inst['uuid'])
 
         nics = self.test_client.get_instance_interfaces(inst['uuid'])
         ips = []
@@ -246,8 +249,14 @@ class TestNetworking(base.BaseNamespacedTestCase):
                 }
             ], None, None)
 
-        self.assertIsNotNone(inst['uuid'])
-        self.assertIsNotNone(inst['node'])
+        while inst['state'] not in ['created', 'error']:
+            time.sleep(1)
+            inst = self.test_client.get_instance(inst['uuid'])
+
+        # Sometimes the console port is missing. Explicitly check for
+        # that.
+        if 'console_port' not in inst:
+            self.fail('Missing console port: %s' % inst)
 
         console = base.LoggingSocket(inst['node'], inst['console_port'])
         out = console.execute('ip link')
