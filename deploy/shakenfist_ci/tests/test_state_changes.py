@@ -34,7 +34,6 @@ class TestStateChanges(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 }
             ], None, None)
-        ip = self.test_client.get_instance_interfaces(inst['uuid'])[0]['ipv4']
         LOG.info('Started test instance %s', inst['uuid'])
 
         # We need to start a second instance on the same node / network so that
@@ -58,10 +57,16 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         # Wait for our test instance to boot
         self.assertIsNotNone(inst['uuid'])
         self._await_login_prompt(inst['uuid'])
-        LOG.info('  ping test...')
+
+        # We need to refetch the instance to get a complete view of its state.
+        # It is also now safe to fetch the instance IP.
+        inst = self.test_client.get_instance(inst['uuid'])
+        ip = self.test_client.get_instance_interfaces(inst['uuid'])[0]['ipv4']
+
         # The network can be slow to start and may not be available after the
         # instance "login prompt" event. We are willing to forgive a few fails
         # while the network starts.
+        LOG.info('  ping test...')
         self._test_ping(inst['uuid'], self.net['uuid'], ip, True, 10)
 
         # Soft reboot
