@@ -216,19 +216,30 @@ def instance_start(instance_uuid, network):
 
                 nets[netdesc['network_uuid']] = n
 
-        # Create the networks
+        # Wait for the networks to be in a created state
+        started_waiting = time.time()
         with util.RecordedOperation('ensure networks exist', instance):
-            for network_uuid in nets:
-                n = nets[network_uuid]
-                try:
-                    n.create_on_hypervisor()
-                    n.ensure_mesh()
-                    n.update_dhcp()
-                except exceptions.DeadNetwork as e:
-                    log.withField('network', n).warning(
-                        'Instance tried to use dead network')
+            while nets:
+                for network_uuid in copy.copy(nets):
+                    n = db.get_network(network_uuid)
+                    if n['state'] in ['deleted', 'error']:
+                        db.enqueue_instance_error(
+                            instance_uuid, 'tried to use network in terminal state: %s' % network_uuid)
+                        return
+
+                    if n['state'] == 'created':
+                        n = nets[network_uuid]
+                        n.ensure_mesh()
+                        n.update_dhcp()
+
+                        del nets[network_uuid]
+
+                if len(nets) > 0:
+                    time.sleep(1)
+
+                if time.time() - started_waiting > 300:
                     db.enqueue_instance_error(
-                        instance_uuid, 'tried to use dead network: %s' % e)
+                        instance_uuid, 'timed out waiting for networks: %s' % ', '.join(nets))
                     return
 
         # Allocate console and VDI ports
