@@ -113,6 +113,66 @@ class VirtMetaTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertEqual({'memory': 16384, 'model': 'cirrus'}, inst.video)
 
 
+class VirtHelperTestCase(test_shakenfist.ShakenFistTestCase):
+    def test_get_defaulted_disk_bus_set(self):
+        self.assertEqual('scsi', virt._get_defaulted_disk_bus({'bus': 'scsi'}))
+
+    def test_get_defaulted_disk_bus_none(self):
+        self.assertEqual('virtio', virt._get_defaulted_disk_bus({'bus': None}))
+
+    def test_get_defaulted_disk_bus_empty(self):
+        self.assertEqual('virtio', virt._get_defaulted_disk_bus({}))
+
+    def test_get_disk_device_base_ide(self):
+        self.assertEqual('hd', virt._get_disk_device_base('ide'))
+
+    def test_get_disk_device_base_virtio(self):
+        self.assertEqual('vd', virt._get_disk_device_base('virtio'))
+
+    def test_get_defaulted_disk_type_set(self):
+        self.assertEqual(
+            'cdrom', virt._get_defaulted_disk_type({'type': 'cdrom'}))
+
+    def test_get_defaulted_disk_type_none(self):
+        self.assertEqual('disk', virt._get_defaulted_disk_type({}))
+
+    def test_safe_cast_int(self):
+        self.assertEqual(7, virt._safe_int_cast(7))
+        self.assertEqual(7, virt._safe_int_cast('7'))
+        self.assertEqual(None, virt._safe_int_cast(None))
+
+    def test_initialize_block_devices_defaulted(self):
+        self.assertEqual(
+            {
+                'devices': [
+                    {'base': 'http://images.com/foo',
+                             'bus': 'virtio',
+                             'device': 'vda',
+                             'path': '/a/b/c/vda',
+                             'present_as': 'disk',
+                             'size': 42,
+                             'snapshot_ignores': False,
+                             'type': 'qcow2'},
+                    {'bus': 'virtio',
+                     'device': 'vdb',
+                     'path': '/a/b/c/vdb',
+                             'present_as': 'disk',
+                             'snapshot_ignores': True,
+                             'type': 'raw'},
+                    {'base': None,
+                        'bus': 'virtio',
+                        'device': 'vdc',
+                        'path': '/a/b/c/vdc',
+                        'present_as': 'disk',
+                        'size': 12,
+                        'snapshot_ignores': False,
+                        'type': 'qcow2'}
+                ],
+                'finalized': False
+            },
+            virt._initialize_block_devices('/a/b/c', [{'base': 'http://images.com/foo', 'size': 42}, {'size': 12}]))
+
+
 class VirtTestCase(test_shakenfist.ShakenFistTestCase):
     def setUp(self):
         super(VirtTestCase, self).setUp()
