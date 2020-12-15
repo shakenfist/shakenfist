@@ -206,6 +206,9 @@ class TestNetworking(base.BaseNamespacedTestCase):
             time.sleep(1)
             inst = self.test_client.get_instance(inst['uuid'])
 
+        if inst['state'] != 'created':
+            self.fail('Instance is not in created state: %s' % inst)
+
         nics = self.test_client.get_instance_interfaces(inst['uuid'])
         ips = []
         for nic in nics:
