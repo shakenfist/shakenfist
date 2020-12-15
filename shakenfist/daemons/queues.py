@@ -198,8 +198,6 @@ def instance_preflight(instance_uuid, network):
 
 
 def instance_start(instance_uuid, network):
-    log = LOG.withField('instance', instance_uuid)
-
     with db.get_lock(
             'instance', None, instance_uuid, ttl=900, timeout=120,
             op='Instance start') as lock:
