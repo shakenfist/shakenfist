@@ -210,36 +210,15 @@ def instance_start(instance_uuid, network):
             if netdesc['network_uuid'] not in nets:
                 n = net.Network.from_db(netdesc['network_uuid'])
                 if not n:
-                    db.enqueue_instance_error(instance_uuid, 'missing network')
+                    db.enqueue_instance_error(
+                        instance_uuid, 'missing network: %s' % netdesc['network_uuid'])
                     return
+
+                if n.state != 'created':
+                    db.enqueue_instance_error(
+                        instance_uuid, 'network is not active: %s' % n['uuid'])
 
                 nets[netdesc['network_uuid']] = n
-
-        # Wait for the networks to be in a created state
-        started_waiting = time.time()
-        with util.RecordedOperation('ensure networks exist', instance):
-            while nets:
-                for network_uuid in copy.copy(nets):
-                    n = db.get_network(network_uuid)
-                    if n['state'] in ['deleted', 'error']:
-                        db.enqueue_instance_error(
-                            instance_uuid, 'tried to use network in terminal state: %s' % network_uuid)
-                        return
-
-                    if n['state'] == 'created':
-                        n = nets[network_uuid]
-                        n.ensure_mesh()
-                        n.update_dhcp()
-
-                        del nets[network_uuid]
-
-                if len(nets) > 0:
-                    time.sleep(1)
-
-                if time.time() - started_waiting > 300:
-                    db.enqueue_instance_error(
-                        instance_uuid, 'timed out waiting for networks: %s' % ', '.join(nets))
-                    return
 
         # Allocate console and VDI ports
         instance.allocate_instance_ports()

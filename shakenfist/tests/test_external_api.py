@@ -860,7 +860,19 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
             resp.get_json())
         self.assertEqual(400, resp.status_code)
 
-    def test_post_instance_only_system_specifies_namespaces(self):
+    @mock.patch('shakenfist.db.get_network',
+                return_value={
+                    'uuid': '87c15186-5f73-4947-a9fb-2183c4951efc',
+                    'state': 'created',
+                    'vxid': 1,
+                    'namespace': 'nonespace',
+                    'name': 'bob',
+                    'netblock': '10.10.0.0/24',
+                })
+    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.ipmanager.IPManager.from_db')
+    def test_post_instance_only_system_specifies_namespaces(
+            self, mock_ipmanager, mock_lock, mock_net):
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'banana', 'key': 'foo'}))
         self.assertEqual(200, resp.status_code)
