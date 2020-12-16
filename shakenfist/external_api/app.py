@@ -198,8 +198,7 @@ def redirect_instance_request(func):
         if not i:
             return
 
-        placement = db.get_instance_attribute(
-            i.uuid, 'placement')
+        placement = db.get_instance_attribute(i.uuid, 'placement')
         if not placement:
             return
         if not placement.get('node'):
@@ -241,6 +240,23 @@ def requires_instance_ownership(func):
             LOG.withField('instance', kwargs['instance_uuid']).info(
                 'Instance not found, ownership test in decorator')
             return error(404, 'instance not found')
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
+def requires_instance_active(func):
+    # Requires that @arg_is_instance_uuid has already run
+    def wrapper(*args, **kwargs):
+        if not kwargs.get('instance_from_db'):
+            LOG.withField('instance', kwargs['instance_uuid']).info(
+                'Instance not found, kwarg missing')
+            return error(404, 'instance not found')
+
+        if kwargs['instance_from_db']['state'] != 'created':
+            LOG.withField('instance', kwargs['instance_uuid']).info(
+                'Instance not active')
+            return error(406, 'instance not active')
 
         return func(*args, **kwargs)
     return wrapper
@@ -302,6 +318,23 @@ def requires_network_ownership(func):
         if get_jwt_identity() not in [kwargs['network_from_db']['namespace'], 'system']:
             log.info('Network not found, ownership test in decorator')
             return error(404, 'network not found')
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
+def requires_network_active(func):
+    # Requires that @arg_is_network_uuid has already run
+    def wrapper(*args, **kwargs):
+        log = LOG.withField('network', kwargs['network_uuid'])
+
+        if not kwargs.get('network_from_db'):
+            log.info('Network not found, kwarg missing')
+            return error(404, 'network not found')
+
+        if kwargs['network_from_db']['state'] != 'created':
+            log.info('Network not active')
+            return error(406, 'network not active')
 
         return func(*args, **kwargs)
     return wrapper
@@ -642,22 +675,26 @@ class Instances(Resource):
                 return error(400, 'disk specification should contain JSON objects')
 
         if network:
-            for n in network:
-                if not isinstance(n, dict):
+            for netdesc in network:
+                if not isinstance(netdesc, dict):
                     return error(400,
                                  'network specification should contain JSON objects')
 
-                if 'network_uuid' not in n:
+                if 'network_uuid' not in netdesc:
                     return error(400, 'network specification is missing network_uuid')
 
-                if n.get('address'):
+                if netdesc.get('address'):
                     # The requested address must be within the ip range specified
                     # for that virtual network
-                    ipm = IPManager.from_db(n['network_uuid'])
-                    if not ipm.is_in_range(n['address']):
+                    ipm = IPManager.from_db(netdesc['network_uuid'])
+                    if not ipm.is_in_range(netdesc['address']):
                         return error(400,
                                      'network specification requests an address outside the '
                                      'range of the network')
+
+                n = net.Network.from_db(netdesc['network_uuid'])
+                if n.state != 'created':
+                    return error(406, 'network %s is not active' % n['uuid'])
 
         if not video:
             video = {'model': 'cirrus', 'memory': 16384}
@@ -837,6 +874,7 @@ class InstanceInterfaces(Resource):
     @jwt_required
     @arg_is_instance_uuid
     @requires_instance_ownership
+    @requires_instance_active
     def get(self, instance_uuid=None, instance_from_db=None):
         return list(db.get_instance_interfaces(instance_uuid))
 
@@ -855,6 +893,7 @@ class InstanceSnapshot(Resource):
     @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
+    @requires_instance_active
     def post(self, instance_uuid=None,
              instance_from_db=None, instance_from_db_virt=None, all=None):
         snap_uuid = instance_from_db_virt.snapshot(all=all)
@@ -880,6 +919,7 @@ class InstanceRebootSoft(Resource):
     @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
+    @requires_instance_active
     def post(self, instance_uuid=None,
              instance_from_db=None, instance_from_db_virt=None):
         with db.get_lock(
@@ -895,6 +935,7 @@ class InstanceRebootHard(Resource):
     @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
+    @requires_instance_active
     def post(self, instance_uuid=None,
              instance_from_db=None, instance_from_db_virt=None):
         with db.get_lock(
@@ -910,6 +951,7 @@ class InstancePowerOff(Resource):
     @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
+    @requires_instance_active
     def post(self, instance_uuid=None,
              instance_from_db=None, instance_from_db_virt=None):
         with db.get_lock(
@@ -925,6 +967,7 @@ class InstancePowerOn(Resource):
     @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
+    @requires_instance_active
     def post(self, instance_uuid=None,
              instance_from_db=None, instance_from_db_virt=None):
         with db.get_lock(
@@ -940,6 +983,7 @@ class InstancePause(Resource):
     @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
+    @requires_instance_active
     def post(self, instance_uuid=None,
              instance_from_db=None, instance_from_db_virt=None):
         with db.get_lock(
@@ -955,6 +999,7 @@ class InstanceUnpause(Resource):
     @requires_instance_ownership
     @arg_is_instance_uuid_as_virt
     @redirect_instance_request
+    @requires_instance_active
     def post(self, instance_uuid=None,
              instance_from_db=None, instance_from_db_virt=None):
         with db.get_lock(
@@ -1289,6 +1334,7 @@ class NetworkInterfaces(Resource):
     @jwt_required
     @arg_is_network_uuid
     @requires_network_ownership
+    @requires_network_active
     def get(self, network_uuid=None, network_from_db=None):
         return list(db.get_network_interfaces(network_uuid))
 
@@ -1337,6 +1383,7 @@ class NetworkPing(Resource):
     @arg_is_network_uuid
     @requires_network_ownership
     @redirect_to_network_node
+    @requires_network_active
     def get(self, network_uuid=None, address=None, network_from_db=None):
         ipm = IPManager.from_db(network_uuid)
         if not ipm.is_in_range(address):
