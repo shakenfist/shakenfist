@@ -122,12 +122,14 @@ class DHCPTestCase(testtools.TestCase):
                      'macaddr': '1a:91:64:d2:15:40',
                      'ipv4': '127.0.0.6'}
                 ])
-    @mock.patch('shakenfist.db.get_instance',
+    @mock.patch('shakenfist.virt.Instance._db_get_instance',
                 side_effect=[
                     {'uuid': 'instuuid1',
-                     'name': 'inst1'},
+                     'name': 'inst1',
+                     'disk_spec': [{'size': 4, 'base': 'foo'}]},
                     {'uuid': 'instuuid2',
-                     'name': 'in,,,st2'}
+                     'name': 'inst2',
+                     'disk_spec': [{'size': 4, 'base': 'foo'}]}
                 ])
     def test_make_hosts(self, mock_instances, mock_interfaces, mock_exists):
         d = dhcp.DHCP(FakeNetwork(), 'eth0')

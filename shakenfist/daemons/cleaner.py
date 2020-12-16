@@ -1,4 +1,5 @@
 import etcd3
+from functools import partial
 import json
 import os
 import random
@@ -160,17 +161,17 @@ class Monitor(daemon.Daemon):
             self._update_power_states()
 
             # Cleanup soft deleted instances and networks
-            delay = config.get('CLEANER_DELAY')
+            for i in virt.Instances([
+                    virt.inactive_states_filter,
+                    partial(virt.state_age_filter, config.get('CLEANER_DELAY'))]):
+                LOG.withInstance(i.uuid).info('Hard deleting instance')
+                i.hard_delete()
 
-            for i in db.get_stale_instances(delay):
-                LOG.withInstance(i['uuid']).info('Hard deleting instance')
-                db.hard_delete_instance(i['uuid'])
-
-            for n in db.get_stale_networks(delay):
+            for n in db.get_stale_networks(config.get('CLEANER_DELAY')):
                 LOG.withNetwork(n['uuid']).info('Hard deleting network')
                 db.hard_delete_network(n['uuid'])
 
-            for ni in db.get_stale_network_interfaces(delay):
+            for ni in db.get_stale_network_interfaces(config.get('CLEANER_DELAY')):
                 LOG.withNetworkInterface(
                     ni['uuid']).info('Hard deleting network interface')
                 db.hard_delete_network_interface(ni['uuid'])

@@ -9,6 +9,7 @@ import signal
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import util
+from shakenfist import virt
 
 
 class DHCP(object):
@@ -59,7 +60,7 @@ class DHCP(object):
 
         instances = []
         for ni in list(db.get_network_interfaces(self.network_uuid)):
-            instance = db.get_instance(ni['instance_uuid'])
+            instance = virt.Instance.from_db(ni['instance_uuid'])
             if not instance:
                 continue
 
@@ -68,7 +69,7 @@ class DHCP(object):
                     'uuid': ni['instance_uuid'],
                     'macaddr': ni['macaddr'],
                     'ipv4': ni['ipv4'],
-                    'name': instance.get('name', 'instance').replace(',', '')
+                    'name': instance.name.replace(',', '')
                 }
             )
         self.subst['instances'] = instances

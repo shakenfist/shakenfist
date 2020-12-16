@@ -257,7 +257,7 @@ def delete(objecttype, subtype, name):
 
 
 @retry_etcd_forever
-def delete_all(objecttype, subtype, sort_order=None):
+def delete_all(objecttype, subtype):
     path = _construct_key(objecttype, subtype, None)
     Etcd3Client().delete_prefix(path)
 
