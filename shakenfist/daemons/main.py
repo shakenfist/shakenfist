@@ -39,9 +39,8 @@ def restore_instances():
             try:
                 n = net.Network.from_db(network)
                 LOG.withObj(n).info('Restoring network')
-                n.create()
+                n.create_on_hypervisor()
                 n.ensure_mesh()
-                n.update_dhcp()
             except Exception as e:
                 util.ignore_exception('restore network %s' % network, e)
 
@@ -59,7 +58,7 @@ def restore_instances():
                         continue
 
                     LOG.withObj(i).info('Restoring instance')
-                    i.create()
+                    i.create_on_hypervisor()
             except Exception as e:
                 util.ignore_exception('restore instance %s' % instance, e)
                 db.enqueue_instance_error(

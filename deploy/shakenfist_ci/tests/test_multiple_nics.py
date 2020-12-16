@@ -1,4 +1,5 @@
 import base64
+import time
 
 from shakenfist_ci import base
 
@@ -43,6 +44,10 @@ sudo /etc/init.d/S40network restart"""
             ], None, str(base64.b64encode(ud.encode('utf-8')), 'utf-8'))
 
         self.assertIsNotNone(inst['uuid'])
+
+        while inst['state'] not in ['created', 'error']:
+            time.sleep(1)
+            inst = self.test_client.get_instance(inst['uuid'])
 
         self._await_login_prompt(inst['uuid'])
 
