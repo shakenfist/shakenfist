@@ -498,7 +498,6 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
             'memory': 4096,
             'name': 'banana',
             'namespace': 'foo',
-            'requested_placement': None,
             'ssh_key': None,
             'user_data': None,
             'uuid': '123',

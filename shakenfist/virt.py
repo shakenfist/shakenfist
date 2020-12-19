@@ -219,12 +219,14 @@ class Instance(object):
             'memory': self.memory,
             'name': self.name,
             'namespace': self.namespace,
-            'requested_placement': self.requested_placement,
             'ssh_key': self.ssh_key,
             'user_data': self.user_data,
             'video': self.video,
             'version': self.version
         }
+
+        if self.requested_placement:
+            i['requested_placement'] = self.requested_placement
 
         external_attribute_key_whitelist = [
             'console_port',
