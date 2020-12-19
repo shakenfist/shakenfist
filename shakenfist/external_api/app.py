@@ -31,6 +31,7 @@ import time
 import traceback
 import uuid
 
+from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import exceptions
@@ -252,7 +253,7 @@ def arg_is_network_uuid(func):
     # Method uses the network from the db
     def wrapper(*args, **kwargs):
         if 'network_uuid' in kwargs:
-            kwargs['network_from_db'] = db.get_network(
+            kwargs['network_from_db'] = net.Network.from_db(
                 kwargs['network_uuid'])
         if not kwargs.get('network_from_db'):
             LOG.withField('network', kwargs['network_uuid']).info(
@@ -301,7 +302,7 @@ def requires_network_ownership(func):
             log.info('Network not found, kwarg missing')
             return error(404, 'network not found')
 
-        if get_jwt_identity() not in [kwargs['network_from_db']['namespace'], 'system']:
+        if get_jwt_identity() not in [kwargs['network_from_db'].namespace, 'system']:
             log.info('Network not found, ownership test in decorator')
             return error(404, 'network not found')
 
@@ -318,7 +319,7 @@ def requires_network_active(func):
             log.info('Network not found, kwarg missing')
             return error(404, 'network not found')
 
-        if kwargs['network_from_db']['state'] != 'created':
+        if kwargs['network_from_db'].state['state'] != 'created':
             log.info('Network not active')
             return error(406, 'network not active')
 
@@ -462,7 +463,7 @@ class AuthNamespace(Resource):
         # The namespace must be empty
         instances = []
         deleted_instances = []
-        for i in virt.Instances([partial(virt.namespace_filter, namespace)]):
+        for i in virt.Instances([partial(baseobject.namespace_filter, namespace)]):
             state = i.state
             if state['state'] in ['deleted', 'error']:
                 deleted_instances.append(i.uuid)
@@ -472,13 +473,13 @@ class AuthNamespace(Resource):
             return error(400, 'you cannot delete a namespace with instances')
 
         networks = []
-        for n in db.get_networks(all=True, namespace=namespace):
+        for n in net.Networks([partial(baseobject.namespace_filter, namespace)]):
             # Networks in 'deleting' state are regarded as "live" networks.
             # They in a transient state. If they hang in that state we want to
             # know. They will block deletion of a namespace thus giving notice
             # of the problem.
-            if n['state'] not in ['deleted', 'error']:
-                networks.append(n['uuid'])
+            if n.state['state'] not in ['deleted', 'error']:
+                networks.append(n.uuid)
         if len(networks) > 0:
             return error(400, 'you cannot delete a namespace with networks')
 
@@ -632,9 +633,9 @@ class Instance(Resource):
 class Instances(Resource):
     @jwt_required
     def get(self, all=False):
-        filters = [partial(virt.namespace_filter, get_jwt_identity())]
+        filters = [partial(baseobject.namespace_filter, get_jwt_identity())]
         if not all:
-            filters.append(virt.active_states_filter)
+            filters.append(baseobject.active_states_filter)
 
         retval = []
         for i in virt.Instances(filters):
@@ -682,8 +683,8 @@ class Instances(Resource):
                                      'range of the network')
 
                 n = net.Network.from_db(netdesc['network_uuid'])
-                if n.state != 'created':
-                    return error(406, 'network %s is not active' % n['uuid'])
+                if n.state['state'] != 'created':
+                    return error(406, 'network %s is not active' % n.uuid)
 
         if not video:
             video = {'model': 'cirrus', 'memory': 16384}
@@ -822,8 +823,8 @@ class Instances(Resource):
 
         waiting_for = []
         tasks_by_node = {}
-        for instance in virt.Instances([partial(virt.namespace_filter, namespace),
-                                        virt.active_states_filter]):
+        for instance in virt.Instances([partial(baseobject.namespace_filter, namespace),
+                                        baseobject.active_states_filter]):
             # If this instance is not on a node, just do the DB cleanup locally
             dbplacement = instance.placement
             if not dbplacement.get('node'):
@@ -1155,19 +1156,20 @@ class ImageEvents(Resource):
 
 def _delete_network(network_from_db):
     # Load network from DB to ensure obtaining correct lock.
-    n = net.Network.from_db(network_from_db['uuid'])
+    n = net.Network.from_db(network_from_db.uuid)
     if not n:
-        LOG.withFields({'network_uuid': network_from_db['uuid'],
+        LOG.withFields({'network_uuid': n.uuid,
                         }).warning('delete_network: network does not exist')
         return error(404, 'network does not exist')
 
     with db.get_object_lock(n, ttl=120, op='Network deleting'):
         if n.is_dead():
             LOG.withFields({'network_uuid': n.uuid,
-                            'state': n.state,
+                            'state': n.state['state'],
                             }).warning('delete_network: network is dead')
             return error(404, 'network is deleted')
-        n.state = 'deleting'
+
+        n.update_state('deleting')
 
     n.add_event('api', 'delete')
     n.remove_dhcp()
@@ -1181,7 +1183,7 @@ def _delete_network(network_from_db):
             ipm.release(n.floating_gateway)
             ipm.persist()
 
-    n.state = 'deleted'
+    n.update_state('deleted')
 
 
 class Network(Resource):
@@ -1189,9 +1191,7 @@ class Network(Resource):
     @arg_is_network_uuid
     @requires_network_ownership
     def get(self, network_uuid=None, network_from_db=None):
-        if network_from_db is not None and 'ipmanager' in network_from_db:
-            del network_from_db['ipmanager']
-        return network_from_db
+        return network_from_db.external_view()
 
     @jwt_required
     @arg_is_network_uuid
@@ -1206,7 +1206,7 @@ class Network(Resource):
             return error(403, 'you cannot delete an in use network')
 
         # Check if network has already been deleted
-        if network_from_db['state'] in 'deleted':
+        if network_from_db.state['state'] in 'deleted':
             return error(404, 'network not found')
 
         return _delete_network(network_from_db)
@@ -1224,7 +1224,15 @@ class Networks(Resource):
     })
     @jwt_required
     def get(self, all=False):
-        return list(db.get_networks(all=all, namespace=get_jwt_identity()))
+        filters = [partial(baseobject.namespace_filter, get_jwt_identity())]
+        if not all:
+            filters.append(baseobject.active_states_filter)
+
+        retval = []
+        for n in net.Networks(filters):
+            # This forces the network through the external view rehydration
+            retval.append(n.external_view())
+        return retval
 
     @jwt_required
     def post(self, netblock=None, provide_dhcp=None, provide_nat=None, name=None,
@@ -1272,21 +1280,16 @@ class Networks(Resource):
 
         networks_del = []
         networks_unable = []
-        for n in list(db.get_networks(all=all, namespace=namespace)):
-            if n['uuid'] == 'floating':
-                continue
-
-            if len(list(db.get_network_interfaces(n['uuid']))) > 0:
+        for n in net.Networks([partial(baseobject.namespace_filter, namespace),
+                              baseobject.active_states_filter]):
+            if len(list(db.get_network_interfaces(n.uuid))) > 0:
                 LOG.withObj(n).warning(
                     'Network in use, cannot be deleted by delete-all')
-                networks_unable.append(n['uuid'])
-                continue
-
-            if n['state'] == 'deleted':
+                networks_unable.append(n.uuid)
                 continue
 
             _delete_network(n)
-            networks_del.append(n['uuid'])
+            networks_del.append(n.uuid)
 
         if networks_unable:
             return error(403, {'deleted': networks_del,

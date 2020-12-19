@@ -3,14 +3,15 @@
 import os
 import psutil
 import re
-import time
 from uuid import uuid4
 
 
+from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import dhcp
-from shakenfist.exceptions import DeadNetwork, BadObjectVersion, IllegalState
+from shakenfist import etcd
+from shakenfist.exceptions import DeadNetwork
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist.tasks import (DeployNetworkTask,
@@ -23,145 +24,166 @@ from shakenfist import virt
 LOG, _ = logutil.setup(__name__)
 
 
-class Network(object):
-    def __init__(self, uuid, vxid, name, namespace, netblock,
-                 provide_dhcp=False, provide_nat=False, state='created',
-                 state_updated=None, floating_gateway=None, ipm=None,
-                 physical_nic=None):
+class Network(baseobject.DatabaseBackedObject):
+    object_type = 'network'
 
-        self.floating_gateway = floating_gateway
-        self.name = name
-        self.namespace = namespace
-        self.netblock = netblock
-        self.provide_dhcp = provide_dhcp
-        self.provide_nat = provide_nat
-        self._state = state
-        self.state_updated = state_updated
-        self.uuid = uuid
-        self.vxid = vxid
+    def __init__(self, static_values):
+        super(Network, self).__init__(static_values.get('uuid'),
+                                      static_values.get('version'))
 
-        # NOTE(mikal): it should be noted that the maximum interface name length
-        # on Linux is 15 user visible characters.
+        self.__floating_gateway = static_values.get('floating_gateway')
+        self.__name = static_values.get('name')
+        self.__namespace = static_values.get('namespace')
+        self.__netblock = static_values.get('netblock')
+        self.__provide_dhcp = static_values.get('provide_dhcp')
+        self.__provide_nat = static_values.get('provide_nat')
+        self.__vxid = static_values.get('vxid')
 
-        self.physical_nic = physical_nic or config.get('NODE_EGRESS_NIC')
+        self.physical_nic = static_values.get(
+            'physical_nic', config.get('NODE_EGRESS_NIC'))
 
-        self.ipm = ipm
-        self.ipblock = ipm.network_address
-        self.router = ipm.get_address_at_index(1)
-        self.dhcp_start = ipm.get_address_at_index(2)
-        self.netmask = ipm.netmask
-        self.broadcast = ipm.broadcast_address
-        self.network_address = ipm.network_address
-
-    @property
-    def state(self):
-        return self._state
-
-    @state.setter
-    def state(self, new_state):
-        # TODO(andy): should we update from db? should we lock?
-        # TODO(andy): are networks ever set to 'error'?
-        if new_state not in ('created', 'deleting', 'deleted', 'error'):
-            raise IllegalState('Tried to set Network to state: %s' % new_state)
-        self._state = new_state
-        self._state_updated = time.time()
-        self.persist()
+        ipm = IPManager.from_db(self.uuid)
+        self.__ipblock = ipm.network_address
+        self.__router = ipm.get_address_at_index(1)
+        self.__dhcp_start = ipm.get_address_at_index(2)
+        self.__netmask = ipm.netmask
+        self.__broadcast = ipm.broadcast_address
+        self.__network_address = ipm.network_address
 
     @staticmethod
-    def new(name, namespace, netblock, provide_dhcp=False,
-            provide_nat=False, floating_gateway=None, uuid=None, vxid=None):
+    def new(name, namespace, netblock, provide_dhcp=False, provide_nat=False,
+            floating_gateway=None, uuid=None, vxid=None):
 
         if not uuid:
+            # uuid should only be specified in testing
             uuid = str(uuid4())
-        ipm = IPManager.new(uuid, netblock)
 
         if not vxid:
             vxid = db.allocate_vxid(uuid)
 
-        ipm = IPManager.new(uuid, netblock)
-        net = Network(uuid=uuid,
-                      vxid=vxid,
-                      name=name,
-                      namespace=namespace,
-                      netblock=netblock,
-                      provide_dhcp=provide_dhcp,
-                      provide_nat=provide_nat,
-                      floating_gateway=None,
-                      state_updated=time.time(),
-                      ipm=ipm)
-        net.persist()
-        net.add_event('network', 'created')
+        # Pre-create the IPManager
+        IPManager.new(uuid, netblock)
+
+        Network._db_create(
+            uuid,
+            {
+                'vxid': vxid,
+                'name': name,
+                'namespace': namespace,
+                'netblock': netblock,
+                'provide_dhcp': provide_dhcp,
+                'provide_nat': provide_nat,
+                'floating_gateway': None,
+                'version': 2
+            }
+        )
+
+        n = Network.from_db(uuid)
+        n._db_set_attribute('state', {'state': 'initial'})
+        n.add_event('db record creation', None)
 
         # Networks should immediately appear on the network node
         db.enqueue('networknode', DeployNetworkTask(uuid))
-        net.add_event('deploy', 'enqueued')
+        n.add_event('deploy', 'enqueued')
 
         # TODO(andy): Integrate metadata into each object type
         # Initialise metadata
         db.persist_metadata('network', uuid, {})
 
-        return net
+        return n
 
     @staticmethod
     def from_db(uuid):
         if not uuid:
             return None
 
-        # TODO(andy): The whole system of unlocked in-memory objects needs to
-        # be revisited. This lock avoids the network being deleted between the
-        # DB load in the get_network() call and Network.__init__() loading the
-        # IPManager from the DB. Under extreme load testing, instance starts on
-        # the same network will have multi-second start delays due to lock
-        # contention .
-        with db.get_lock('network', None, uuid,
-                         ttl=10, timeout=120, op='Object load from DB'):
+        # NOTE(mikal): we used to lock around this fetch from the database,
+        # but I am hoping that moving state into an attribute means that's
+        # not nessesary any more.
+        static_values = Network._db_get(uuid)
+        if not static_values:
+            return None
 
-            db_data = db.get_network(uuid)
-            if not db_data:
-                return None
-            if db_data.get('state') in ('deleted', 'deleting'):
-                LOG.withNetwork(uuid).info('Network is deleted.')
-                return None
+        return Network(static_values)
 
-            ipm = IPManager.from_db(uuid)
-
-        # Handle pre-versioning DB entries
-        if 'version' not in db_data:
-            version = 1
-        else:
-            version = db_data['version']
-            del db_data['version']
-
-        if version == 1:
-            return Network(ipm=ipm, **db_data)
-
-        # Version number is unknown
-        raise BadObjectVersion('Unknown version - Network: %s', db_data)
-
-    def metadata(self):
-        return {
-            "floating_gateway": self.floating_gateway,
-            "name": self.name,
-            "namespace": self.namespace,
-            "netblock": self.netblock,
-            "provide_dhcp": self.provide_dhcp,
-            "provide_nat": self.provide_nat,
-            "state": self._state,
-            "state_updated": self.state_updated,
-            "uuid": self.uuid,
-            "vxid": self.vxid,
-
-            "version": 1,
+    def external_view(self):
+        # If this is an external view, then mix back in attributes that users expect
+        n = {
+            'uuid': self.uuid,
+            'floating_gateway': self.__floating_gateway,
+            'name': self.__name,
+            'namespace': self.__namespace,
+            'netblock': self.__netblock,
+            'provide_dhcp': self.__provide_dhcp,
+            'provide_nat': self.__provide_nat,
+            'vxid': self.__vxid,
+            'version': self.version
         }
 
-    def persist(self):
-        db.persist_network(self.uuid, self.metadata())
+        for attrname in ['state']:
+            d = self._db_get_attribute(attrname)
+            for key in d:
+                # We skip keys with no value
+                if d[key] is None:
+                    continue
 
-    def __str__(self):
-        return 'network(%s, vxid %s)' % (self.uuid, self.vxid)
+                n[key] = d[key]
 
-    def unique_label(self):
-        return ('network', self.uuid)
+        return n
+
+    # Static values
+    @property
+    def floating_gateway(self):
+        return self.__floating_gateway
+
+    @property
+    def name(self):
+        return self.__name
+
+    @property
+    def namespace(self):
+        return self.__namespace
+
+    @property
+    def netblock(self):
+        return self.__netblock
+
+    @property
+    def provide_dhcp(self):
+        return self.__provide_dhcp
+
+    @property
+    def provide_nat(self):
+        return self.__provide_nat
+
+    @property
+    def vxid(self):
+        return self.__vxid
+
+    # Calculated values
+    @property
+    def ipblock(self):
+        return self.__ipblock
+
+    @property
+    def router(self):
+        return self.__router
+
+    @property
+    def dhcp_start(self):
+        return self.__dhcp_start
+
+    @property
+    def netmask(self):
+        return self.__netmask
+
+    @property
+    def broadcast(self):
+        return self.__broadcast
+
+    @property
+    def network_address(self):
+        return self.__network_address
 
     # TODO(andy) Create new class to avoid external direct access to DB
     @staticmethod
@@ -177,10 +199,9 @@ class Network(object):
         fnet.persist()
         return fnet
 
-    def add_event(self, operation, phase=None, duration=None, message=None):
-        db.add_event('network', self.uuid, operation, phase, duration, message)
-
     def subst_dict(self):
+        # NOTE(mikal): it should be noted that the maximum interface name length
+        # on Linux is 15 user visible characters.
         retval = {
             'vx_id': self.vxid,
             'vx_interface': 'vxlan-%s' % self.vxid,
@@ -233,10 +254,7 @@ class Network(object):
         callers will wait on a lock before calling this function. In this case
         we definitely need to update the in-memory object model.
         """
-        # TODO(andy): To be improved when object model mirrors Image class
-        db_net = db.get_network(self.uuid)
-
-        return db_net['state'] in ('deleted', 'deleting', 'error')
+        return self.state['state'] in ('deleted', 'deleting', 'error')
 
     def _create_common(self):
         subst = self.subst_dict()
@@ -331,7 +349,6 @@ class Network(object):
                     ipm = IPManager.from_db('floating')
                     self.floating_gateway = ipm.get_random_free_address()
                     ipm.persist()
-                    self.persist()
 
             # No lock because no data changing
             ipm = IPManager.from_db('floating')
@@ -388,6 +405,7 @@ class Network(object):
                                      '-j MASQUERADE' % subst)
 
         self.update_dhcp()
+        self.update_state('created')
 
     def delete(self):
         subst = self.subst_dict()
@@ -429,7 +447,7 @@ class Network(object):
                         ipm.persist()
 
             db.deallocate_vxid(self.vxid)
-            self.ipm.delete()
+            IPManager.from_db(self.uuid).delete()
 
     def is_dnsmasq_running(self):
         """Determine if dnsmasq process is running for this network"""
@@ -578,3 +596,29 @@ class Network(object):
                      '%(in_netns)s iptables -t nat -D PREROUTING '
                      '-d %(floating_address)s '
                      '-j DNAT --to-destination %(inner_address)s' % subst)
+
+
+# TODO(mikal): can this be refactored into baseobject?
+class Networks(object):
+    def __init__(self, filters):
+        self.filters = filters
+
+    def __iter__(self):
+        for _, n in etcd.get_all('network', None):
+            if n['uuid'] == 'floating':
+                continue
+
+            n = Network.from_db(n['uuid'])
+            if not n:
+                continue
+
+            skip = False
+            for f in self.filters:
+                # If a filter returns false, we remove the network from
+                # the result set.
+                if not f(n):
+                    skip = True
+                    break
+
+            if not skip:
+                yield n

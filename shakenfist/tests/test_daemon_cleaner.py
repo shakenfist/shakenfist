@@ -112,7 +112,7 @@ class CleanerTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.db.see_this_node')
     @mock.patch('shakenfist.db.add_event')
-    @mock.patch('shakenfist.virt.Instance._db_get_instance', side_effect=fake_instance_get)
+    @mock.patch('shakenfist.virt.Instance._db_get', side_effect=fake_instance_get)
     @mock.patch('shakenfist.virt.Instance._db_get_attribute', return_value={})
     @mock.patch('shakenfist.etcd.put', side_effect=fake_put)
     @mock.patch('os.path.exists', side_effect=fake_exists)
@@ -141,5 +141,7 @@ class CleanerTestCase(test_shakenfist.ShakenFistTestCase):
                 ('attribute/instance', 'paused',
                  'power_state', {'power_state': 'off'}),
                 ('attribute/instance', 'foo',
-                 'power_state', {'power_state': 'off'})
+                 'power_state', {'power_state': 'off'}),
+                ('attribute/instance', 'nofiles',
+                 'state', {'power_state': 'off'})
             ], result)

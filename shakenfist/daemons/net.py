@@ -1,6 +1,7 @@
 import ipaddress
 import time
 
+from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
@@ -31,13 +32,13 @@ class Monitor(daemon.Daemon):
 
         if not util.is_network_node():
             # For normal nodes, just the ones we have instances for
-            for inst in virt.Instances([virt.this_node_filter, virt.active_states_filter]):
+            for inst in virt.Instances([virt.this_node_filter, baseobject.active_states_filter]):
                 for iface in db.get_instance_interfaces(inst.uuid):
                     if not iface['network_uuid'] in host_networks:
                         host_networks.append(iface['network_uuid'])
         else:
             # For network nodes, its all networks
-            for n in db.get_networks():
+            for n in net.Networks([baseobject.active_states_filter]):
                 bad = False
                 try:
                     netblock = ipaddress.ip_network(n['netblock'])

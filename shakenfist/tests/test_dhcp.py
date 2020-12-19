@@ -122,7 +122,7 @@ class DHCPTestCase(testtools.TestCase):
                      'macaddr': '1a:91:64:d2:15:40',
                      'ipv4': '127.0.0.6'}
                 ])
-    @mock.patch('shakenfist.virt.Instance._db_get_instance',
+    @mock.patch('shakenfist.virt.Instance._db_get',
                 side_effect=[
                     {'uuid': 'instuuid1',
                      'name': 'inst1',

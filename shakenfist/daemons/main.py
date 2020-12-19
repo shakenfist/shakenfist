@@ -5,6 +5,7 @@ import time
 import os
 import psutil
 
+from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.daemons import external_api as external_api_daemon
@@ -28,7 +29,7 @@ def restore_instances():
     # Ensure all instances for this node are defined
     networks = []
     instances = []
-    for inst in virt.Instances([virt.this_node_filter, virt.active_states_filter]):
+    for inst in virt.Instances([virt.this_node_filter, baseobject.active_states_filter]):
         for iface in db.get_instance_interfaces(inst.uuid):
             if not iface['network_uuid'] in networks:
                 networks.append(iface['network_uuid'])
@@ -110,7 +111,7 @@ def main():
     # If I am the network node, I need some setup
     if util.is_network_node():
         # Bootstrap the floating network in the Networks table
-        floating_network = db.get_network('floating')
+        floating_network = net.Network.from_db('floating')
         if not floating_network:
             floating_network = net.Network.create_floating_network(
                 config.get('FLOATING_NETWORK'))

@@ -75,7 +75,8 @@ def main():
 
         elif minor == 3:
             # Find invalid networks
-            for n in db.get_networks():
+            for data, _ in etcd_client.get_prefix('/sf/network/'):
+                n = json.loads(data.decode('utf-8'))
                 bad = False
                 try:
                     netblock = ipaddress.ip_network(n['netblock'])
@@ -93,9 +94,29 @@ def main():
                     # do it properly, but we don't actually have a network delete queue
                     # task at the moment. Here's a comment to prompt that refactor when
                     # the time comes... netobj.delete()
-                    n['state'] = 'deleted'
-                    db.persist_network(n['uuid'], n)
+                    etcd_client.put(
+                        '/sf/attribute/network/%s' % n['uuid'],
+                        json.dumps({'state': 'deleted'}, indent=4, sort_keys=True))
                     print('--> Removed bad network %s' % n['uuid'])
+
+                # Upgrade networks to the new attribute style
+                network = json.loads(data.decode('utf-8'))
+                if int(network.get('version', 0)) < 2:
+                    data = {}
+                    for attr in ['state', 'state_updated', 'error_message']:
+                        if network.get(attr):
+                            data[attr] = network[attr]
+                            del network[attr]
+                    etcd_client.put(
+                        '/sf/attribute/network/%s/state' % network['uuid'],
+                        json.dumps(data, indent=4, sort_keys=True))
+
+                    network['version'] = 2
+                    etcd_client.put(
+                        '/sf/network/%s' % network['uuid'],
+                        json.dumps(network, indent=4, sort_keys=True))
+                    print('--> Upgraded network %s to version 2'
+                          % network['uuid'])
 
             # Upgrade instances to the new attribute style
             for data, _ in etcd_client.get_prefix('/sf/instance/'):

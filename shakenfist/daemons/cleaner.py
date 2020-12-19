@@ -5,6 +5,7 @@ import os
 import random
 import time
 
+from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
@@ -76,7 +77,7 @@ class Monitor(daemon.Daemon):
                 state = util.extract_power_state(libvirt, domain)
                 instance.update_power_state(state)
                 if state == 'crashed':
-                    instance.update_instance_state('error')
+                    instance.update_state('error')
 
             # Inactive VMs just have a name, and are powered off
             # in our state system.
@@ -118,7 +119,7 @@ class Monitor(daemon.Daemon):
                         # If we're inactive and our files aren't on disk,
                         # we have a problem.
                         log_ctx.info('Detected error state for instance')
-                        instance.update_instance_state('error')
+                        instance.update_state('error')
 
                     elif dbpowerstate['power_state'] != 'off':
                         log_ctx.info('Detected power off for instance')
@@ -159,8 +160,8 @@ class Monitor(daemon.Daemon):
 
             # Cleanup soft deleted instances and networks
             for i in virt.Instances([
-                    virt.inactive_states_filter,
-                    partial(virt.state_age_filter, config.get('CLEANER_DELAY'))]):
+                    baseobject.inactive_states_filter,
+                    partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))]):
                 LOG.withInstance(i.uuid).info('Hard deleting instance')
                 i.hard_delete()
 

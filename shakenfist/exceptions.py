@@ -10,12 +10,9 @@ class VersionSpecificationError(Exception):
 class ObjectException(Exception):
     pass
 
-
-class IllegalState(ObjectException):
-    pass
-
-
 # Instance
+
+
 class InstanceException(Exception):
     pass
 

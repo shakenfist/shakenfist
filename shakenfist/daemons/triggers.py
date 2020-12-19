@@ -6,6 +6,7 @@ import setproctitle
 import signal
 import time
 
+from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
@@ -81,7 +82,7 @@ class Monitor(daemon.Daemon):
             extra_instances = list(observers.keys())
 
             for inst in virt.Instances([virt.this_node_filter,
-                                        partial(virt.state_filter, ['created'])]):
+                                        partial(baseobject.state_filter, ['created'])]):
                 if inst.uuid in extra_instances:
                     extra_instances.remove(inst.uuid)
 
