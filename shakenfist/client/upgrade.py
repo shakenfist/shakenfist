@@ -95,6 +95,7 @@ def main():
                     # the time comes... netobj.delete()
                     n['state'] = 'deleted'
                     db.persist_network(n['uuid'], n)
+                    print('--> Removed bad network %s' % n['uuid'])
 
             # Upgrade instances to the new attribute style
             for data, _ in etcd_client.get_prefix('/sf/instance/'):
@@ -152,6 +153,8 @@ def main():
                     etcd_client.put(
                         '/sf/instance/%s' % instance['uuid'],
                         json.dumps(instance, indent=4, sort_keys=True))
+                    print('--> Upgraded instance %s to version 2'
+                          % instance['uuid'])
 
 
 if __name__ == '__main__':
