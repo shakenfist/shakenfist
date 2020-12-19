@@ -144,6 +144,15 @@ def main():
                         '/sf/attribute/instance/%s/power_state' % instance['uuid'],
                         json.dumps(data, indent=4, sort_keys=True))
 
+                    data = {}
+                    for attr in ['console_port', 'vdi_port']:
+                        if instance.get(attr):
+                            data[attr] = instance[attr]
+                            del instance[attr]
+                    etcd_client.put(
+                        '/sf/attribute/instance/%s/ports' % instance['uuid'],
+                        json.dumps(data, indent=4, sort_keys=True))
+
                     # These fields were set in code to v0.3.3, but never used
                     for key in ['node_history', 'requested_placement']:
                         if key in instance:
