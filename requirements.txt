@@ -18,6 +18,10 @@ bcrypt              # apache2
 gunicorn            # mit
 pylogrus            # mit
 pydantic            # mit
+fastapi             # mit
+python-multipart    # apache2
+python-jose
+cryptography
 
 # Is difficult to get install working, use system packages instead. On Ubuntu
 # those are: libvirt-daemon-system libvirt-dev python3-libvirt
