@@ -936,4 +936,6 @@ def state_age_filter(delay, inst):
 
 
 def namespace_filter(namespace, inst):
+    if namespace == 'system':
+        return True
     return inst.namespace == namespace
