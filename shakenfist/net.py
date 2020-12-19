@@ -17,6 +17,7 @@ from shakenfist.tasks import (DeployNetworkTask,
                               UpdateDHCPNetworkTask,
                               RemoveDHCPNetworkTask)
 from shakenfist import util
+from shakenfist import virt
 
 
 LOG, _ = logutil.setup(__name__)
@@ -492,7 +493,8 @@ class Network(object):
                     instances.append(iface['instance_uuid'])
 
             node_fqdns = []
-            for inst in instances:
+            for inst_uuid in instances:
+                inst = virt.Instance.from_db(inst_uuid)
                 placement = inst.placement
                 if not placement:
                     continue
