@@ -179,7 +179,7 @@ def arg_is_instance_uuid(func):
 def redirect_instance_request(func):
     # Redirect method to the hypervisor hosting the instance
     def wrapper(*args, **kwargs):
-        i = kwargs.get('instance_from_db_virt')
+        i = kwargs.get('instance_from_db')
         if not i:
             return
 
@@ -221,8 +221,9 @@ def requires_instance_ownership(func):
                 'Instance not found, kwarg missing')
             return error(404, 'instance not found')
 
-        if get_jwt_identity() not in [kwargs['instance_from_db'].namespace, 'system']:
-            LOG.withField('instance', kwargs['instance_uuid']).info(
+        i = kwargs['instance_from_db']
+        if get_jwt_identity() not in [i.namespace, 'system']:
+            LOG.withInstance(i).info(
                 'Instance not found, ownership test in decorator')
             return error(404, 'instance not found')
 
@@ -238,9 +239,9 @@ def requires_instance_active(func):
                 'Instance not found, kwarg missing')
             return error(404, 'instance not found')
 
-        if kwargs['instance_from_db']['state'] != 'created':
-            LOG.withField('instance', kwargs['instance_uuid']).info(
-                'Instance not active')
+        i = kwargs['instance_from_db']
+        if i.state['state'] != 'created':
+            LOG.withInstance(i).info('Instance not active')
             return error(406, 'instance not active')
 
         return func(*args, **kwargs)
@@ -880,11 +881,10 @@ class InstanceSnapshot(Resource):
     @requires_instance_ownership
     @redirect_instance_request
     @requires_instance_active
-    def post(self, instance_uuid=None,
-             instance_from_db=None, instance_from_db_virt=None, all=None):
-        snap_uuid = instance_from_db_virt.snapshot(all=all)
-        instance_from_db_virt.add_event('api', 'snapshot (all=%s)' % all,
-                                        None, snap_uuid)
+    def post(self, instance_uuid=None, instance_from_db=None, all=None):
+        snap_uuid = instance_from_db.snapshot(all=all)
+        instance_from_db.add_event('api', 'snapshot (all=%s)' % all,
+                                   None, snap_uuid)
         db.add_event('snapshot', snap_uuid, 'api', 'create', None, None)
         return snap_uuid
 
@@ -905,13 +905,12 @@ class InstanceRebootSoft(Resource):
     @requires_instance_ownership
     @redirect_instance_request
     @requires_instance_active
-    def post(self, instance_uuid=None,
-             instance_from_db=None, instance_from_db_virt=None):
+    def post(self, instance_uuid=None, instance_from_db=None):
         with db.get_lock(
                 'instance', None, instance_uuid, ttl=120, timeout=120,
                 op='Instance reboot soft'):
-            instance_from_db_virt.add_event('api', 'soft reboot')
-            return instance_from_db_virt.reboot(hard=False)
+            instance_from_db.add_event('api', 'soft reboot')
+            return instance_from_db.reboot(hard=False)
 
 
 class InstanceRebootHard(Resource):
@@ -920,13 +919,12 @@ class InstanceRebootHard(Resource):
     @requires_instance_ownership
     @redirect_instance_request
     @requires_instance_active
-    def post(self, instance_uuid=None,
-             instance_from_db=None, instance_from_db_virt=None):
+    def post(self, instance_uuid=None, instance_from_db=None):
         with db.get_lock(
                 'instance', None, instance_uuid, ttl=120, timeout=120,
                 op='Instance reboot hard'):
-            instance_from_db_virt.add_event('api', 'hard reboot')
-            return instance_from_db_virt.reboot(hard=True)
+            instance_from_db.add_event('api', 'hard reboot')
+            return instance_from_db.reboot(hard=True)
 
 
 class InstancePowerOff(Resource):
@@ -935,13 +933,12 @@ class InstancePowerOff(Resource):
     @requires_instance_ownership
     @redirect_instance_request
     @requires_instance_active
-    def post(self, instance_uuid=None,
-             instance_from_db=None, instance_from_db_virt=None):
+    def post(self, instance_uuid=None, instance_from_db=None):
         with db.get_lock(
                 'instance', None, instance_uuid, ttl=120, timeout=120,
                 op='Instance power off'):
-            instance_from_db_virt.add_event('api', 'poweroff')
-            return instance_from_db_virt.power_off()
+            instance_from_db.add_event('api', 'poweroff')
+            return instance_from_db.power_off()
 
 
 class InstancePowerOn(Resource):
@@ -950,13 +947,12 @@ class InstancePowerOn(Resource):
     @requires_instance_ownership
     @redirect_instance_request
     @requires_instance_active
-    def post(self, instance_uuid=None,
-             instance_from_db=None, instance_from_db_virt=None):
+    def post(self, instance_uuid=None, instance_from_db=None):
         with db.get_lock(
                 'instance', None, instance_uuid, ttl=120, timeout=120,
                 op='Instance power on'):
-            instance_from_db_virt.add_event('api', 'poweron')
-            return instance_from_db_virt.power_on()
+            instance_from_db.add_event('api', 'poweron')
+            return instance_from_db.power_on()
 
 
 class InstancePause(Resource):
@@ -965,13 +961,12 @@ class InstancePause(Resource):
     @requires_instance_ownership
     @redirect_instance_request
     @requires_instance_active
-    def post(self, instance_uuid=None,
-             instance_from_db=None, instance_from_db_virt=None):
+    def post(self, instance_uuid=None, instance_from_db=None):
         with db.get_lock(
                 'instance', None, instance_uuid, ttl=120, timeout=120,
                 op='Instance pause'):
-            instance_from_db_virt.add_event('api', 'pause')
-            return instance_from_db_virt.pause()
+            instance_from_db.add_event('api', 'pause')
+            return instance_from_db.pause()
 
 
 class InstanceUnpause(Resource):
@@ -980,13 +975,12 @@ class InstanceUnpause(Resource):
     @requires_instance_ownership
     @redirect_instance_request
     @requires_instance_active
-    def post(self, instance_uuid=None,
-             instance_from_db=None, instance_from_db_virt=None):
+    def post(self, instance_uuid=None, instance_from_db=None):
         with db.get_lock(
                 'instance', None, instance_uuid, ttl=120, timeout=120,
                 op='Instance unpause'):
-            instance_from_db_virt.add_event('api', 'unpause')
-            return instance_from_db_virt.unpause()
+            instance_from_db.add_event('api', 'unpause')
+            return instance_from_db.unpause()
 
 
 def _safe_get_network_interface(interface_uuid):
@@ -1114,7 +1108,7 @@ class InstanceConsoleData(Resource):
     @arg_is_instance_uuid
     @requires_instance_ownership
     @redirect_instance_request
-    def get(self, instance_uuid=None, length=None, instance_from_db=None, instance_from_db_virt=None):
+    def get(self, instance_uuid=None, length=None, instance_from_db=None):
         if not length:
             length = -1
         else:
@@ -1124,7 +1118,7 @@ class InstanceConsoleData(Resource):
                 return error(400, 'length is not an integer')
 
         resp = flask.Response(
-            instance_from_db_virt.get_console_data(length),
+            instance_from_db.get_console_data(length),
             mimetype='text/plain')
         resp.status_code = 200
         return resp
