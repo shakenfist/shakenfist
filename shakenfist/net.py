@@ -493,7 +493,7 @@ class Network(object):
 
             node_fqdns = []
             for inst in instances:
-                placement = db.get_instance_attribute(inst, 'placement')
+                placement = inst.placement
                 if not placement:
                     continue
                 if not placement.get('node'):

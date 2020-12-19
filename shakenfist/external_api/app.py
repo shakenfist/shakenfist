@@ -183,7 +183,7 @@ def redirect_instance_request(func):
         if not i:
             return
 
-        placement = db.get_instance_attribute(i.uuid, 'placement')
+        placement = i.placement
         if not placement:
             return
         if not placement.get('node'):
@@ -462,7 +462,7 @@ class AuthNamespace(Resource):
         instances = []
         deleted_instances = []
         for i in virt.Instances([partial(virt.namespace_filter, namespace)]):
-            state = db.get_instance_attribute(i.uuid, 'state')
+            state = i.state
             if state['state'] in ['deleted', 'error']:
                 deleted_instances.append(i.uuid)
             else:
@@ -604,12 +604,12 @@ class Instance(Resource):
     @requires_instance_ownership
     def delete(self, instance_uuid=None, instance_from_db=None):
         # Check if instance has already been deleted
-        state = db.get_instance_attribute(instance_uuid, 'state')
+        state = instance_from_db.state
         if state['state'] == 'deleted':
             return error(404, 'instance not found')
 
         # If this instance is not on a node, just do the DB cleanup locally
-        placement = db.get_instance_attribute(instance_uuid, 'placement')
+        placement = instance_from_db.placement
         if not placement.get('node'):
             node = config.NODE_NAME
         else:
@@ -619,8 +619,7 @@ class Instance(Resource):
 
         start_time = time.time()
         while time.time() - start_time < config.get('API_ASYNC_WAIT'):
-            state = db.get_instance_attribute(
-                instance_uuid, 'state')
+            state = instance_from_db.state
             if state['state'] in ['deleted', 'error']:
                 return
 
@@ -795,7 +794,7 @@ class Instances(Resource):
         # after a while and just return the current state
         start_time = time.time()
         while time.time() - start_time < config.get('API_ASYNC_WAIT'):
-            state = db.get_instance_attribute(instance.uuid, 'state')
+            state = instance.state
             if state.get('state') in ['created', 'deleted', 'error']:
                 return instance.external_view()
             time.sleep(0.5)
@@ -825,8 +824,7 @@ class Instances(Resource):
         for instance in virt.Instances([partial(virt.namespace_filter, namespace),
                                         virt.active_states_filter]):
             # If this instance is not on a node, just do the DB cleanup locally
-            dbplacement = db.get_instance_attribute(
-                instance.uuid, 'placement')
+            dbplacement = instance.placement
             if not dbplacement.get('node'):
                 node = config.NODE_NAME
             else:
@@ -843,11 +841,20 @@ class Instances(Resource):
         while (waiting_for and
                (time.time() - start_time < config.get('API_ASYNC_WAIT'))):
             for instance in copy.copy(waiting_for):
-                dbstate = db.get_instance_attribute(instance.uuid, 'state')
-                if dbstate.get('state') in ['deleted', 'error']:
+                s = instance.state.get('state')
+                if s in ['deleted', 'error']:
                     waiting_for.remove(instance)
+                else:
+                    LOG.withInstance(instance).info(
+                        'Still waiting for deletion (state is %s)' % s)
 
-        return waiting_for
+            if waiting_for:
+                time.sleep(0.2)
+
+        retval = []
+        for instance in waiting_for:
+            retval.append(instance.uuid)
+        return retval
 
 
 class InstanceInterfaces(Resource):

@@ -4,7 +4,7 @@ import json
 import mock
 
 
-from shakenfist.config import config, SFConfigBase
+from shakenfist.config import config, SFConfigBase, SFConfig
 from shakenfist.external_api import app as external_api
 from shakenfist.ipmanager import IPManager
 from shakenfist.tests import test_shakenfist
@@ -25,9 +25,23 @@ class FakeScheduler(object):
 
 
 class FakeInstance(object):
-    def __init__(self, uuid=None, namespace=None):
+    def __init__(self, uuid=None, namespace=None,
+                 state='created', power_state='on',
+                 placement='node1'):
         self.uuid = uuid
         self.namespace = namespace
+        self._state = state
+        self.power_state = {'power_state': power_state}
+        self.placement = {'node': placement}
+
+    @property
+    def state(self):
+        if isinstance(self._state, list):
+            s = self._state[0]
+            self._state = self._state[1:]
+            return {'state': s}
+        else:
+            return {'state': self._state}
 
     def unique_label(self):
         return ('instance', self.uuid)
@@ -205,6 +219,15 @@ class ExternalApiTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
         self.auth_header = 'Bearer %s' % resp.get_json()['access_token']
 
+        fake_config = SFConfig(
+            NODE_NAME='node1',
+        )
+
+        self.config = mock.patch('shakenfist.virt.config',
+                                 fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
 
 class ExternalApiGeneralTestCase(ExternalApiTestCase):
     def setUp(self):
@@ -328,7 +351,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
             },
             resp.get_json())
 
-    @mock.patch('shakenfist.db.get_instance_attribute',
+    @mock.patch('shakenfist.virt.Instance._db_get_attribute',
                 return_value={'state': 'created'})
     @mock.patch('shakenfist.virt.Instances',
                 return_value=[FakeInstance(uuid='123')])
@@ -464,7 +487,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
                               'name': 'banana',
                               'namespace': 'foo',
                               'disk_spec': [{'size': 4, 'base': 'foo'}]})
-    @mock.patch('shakenfist.db.get_instance_attribute',
+    @mock.patch('shakenfist.virt.Instance._db_get_attribute',
                 return_value={})
     def test_get_instance(self, mock_get_instance_attribute, mock_get_instance):
         resp = self.client.get(
@@ -717,20 +740,17 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
 
         self.addCleanup(self.config.stop)
 
-    @mock.patch('shakenfist.db.get_instance_attribute',
-                side_effect=[{'state': 'created'}, {'state': 'created'},
-                             {'node': 'sf-2'}, {'node': 'sf-2'},
-                             {'state': 'deleted'}, {'state': 'created'},
-                             {'state': 'deleted'}, {'state': 'deleted'}])
     @mock.patch('shakenfist.db.enqueue')
     @mock.patch('shakenfist.virt.Instances',
                 return_value=[
                     FakeInstance(
                         namespace='system',
-                        uuid='6a973b82-31b3-4780-93e4-04d99ae49f3f'),
+                        uuid='6a973b82-31b3-4780-93e4-04d99ae49f3f',
+                        state=['created', 'deleted']),
                     FakeInstance(
                         namespace='system',
-                        uuid='847b0327-9b17-4148-b4ed-be72b6722c17')])
+                        uuid='847b0327-9b17-4148-b4ed-be72b6722c17',
+                        state=['created', 'deleted'])])
     @mock.patch('shakenfist.virt.Instance._db_get_instance',
                 return_value={
                     'state': 'deleted',
@@ -739,7 +759,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
     @mock.patch('shakenfist.db.get_lock')
     def test_delete_all_instances(
             self, mock_db_get_lock, mock_etcd_put, mock_get_instance,
-            mock_get_instances, mock_enqueue, mock_get_instance_attribute):
+            mock_get_instances, mock_enqueue):
 
         resp = self.client.delete('/instances',
                                   headers={'Authorization': self.auth_header},
@@ -750,27 +770,23 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         self.assertEqual([], resp.get_json())
         self.assertEqual(200, resp.status_code)
 
-    @mock.patch('shakenfist.db.get_instance_attribute',
-                side_effect=[{'state': 'deleted'},
-                             {'state': 'created'},
-                             {'node': 'sf-2'},
-                             {'state': 'deleted'},
-                             {'state': 'deleted'},
-                             {'state': 'deleted'}])
+    @mock.patch('time.sleep')
     @mock.patch('shakenfist.db.enqueue')
     @mock.patch('shakenfist.virt.Instances',
                 return_value=[
                     FakeInstance(
                         namespace='system',
-                        uuid='6a973b82-31b3-4780-93e4-04d99ae49f3f'),
+                        uuid='6a973b82-31b3-4780-93e4-04d99ae49f3f',
+                        state=['created', 'deleted']),
                     FakeInstance(
                         namespace='system',
-                        uuid='847b0327-9b17-4148-b4ed-be72b6722c17')])
+                        uuid='847b0327-9b17-4148-b4ed-be72b6722c17',
+                        state='deleted')])
     @mock.patch('shakenfist.etcd.put')
     @mock.patch('shakenfist.db.get_lock')
     def test_delete_all_instances_one_already_deleted(
             self, mock_db_get_lock,  mock_etcd_put, mock_get_instances,
-            mock_enqueue, mock_get_instance_attribute):
+            mock_enqueue, mock_sleep):
 
         resp = self.client.delete('/instances',
                                   headers={'Authorization': self.auth_header},

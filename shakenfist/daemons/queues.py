@@ -169,7 +169,7 @@ def instance_preflight(instance_uuid, network):
                            'insufficient resources: ' + str(e))
 
     # Unsuccessful placement, check if reached placement attempt limit
-    dbplacement = db.get_instance_attribute(instance.uuid, 'placement')
+    dbplacement = instance.placement
     if dbplacement['placement_attempts'] > 3:
         raise exceptions.AbortInstanceStartException(
             'Too many start attempts')

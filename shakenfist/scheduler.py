@@ -82,7 +82,7 @@ class Scheduler(object):
         # how we do this to avoid repeatedly scanning the etcd repository.
         per_node = {}
         for inst in virt.Instances([]):
-            node = db.get_instance_attribute(inst.uuid, 'placement')
+            node = inst.placement
             if node.get('node'):
                 per_node.setdefault(node['node'], [])
                 per_node[node['node']].append(inst)

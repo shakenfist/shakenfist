@@ -169,20 +169,6 @@ def persist_ipmanager(network_uuid, data):
 def delete_ipmanager(network_uuid):
     etcd.delete('ipmanager', None, uuid)
 
-#####################################################################
-# Instances
-#####################################################################
-
-
-def get_instance_attribute(instance_uuid, attribute):
-    retval = etcd.get('attribute/instance', instance_uuid, attribute)
-    if not retval:
-        return {}
-    return retval
-
-
-def set_instance_attribute(instance_uuid, attribute, value):
-    etcd.put('attribute/instance', instance_uuid, attribute, value)
 
 #####################################################################
 # NetworkInterfaces
