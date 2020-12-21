@@ -117,13 +117,6 @@ def deallocate_vxid(vxid):
     etcd.delete('vxlan', None, vxid)
 
 
-def get_stale_networks(delay):
-    for _, n in etcd.get_all('network', None):
-        if n['state'] in ['deleted', 'error']:
-            if time.time() - n['state_updated'] > delay:
-                yield n
-
-
 def hard_delete_network(network_uuid):
     etcd.delete('network', None, network_uuid)
     etcd.delete_all('event/network', network_uuid)

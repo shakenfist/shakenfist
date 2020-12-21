@@ -41,24 +41,24 @@ class Monitor(daemon.Daemon):
             for n in net.Networks([baseobject.active_states_filter]):
                 bad = False
                 try:
-                    netblock = ipaddress.ip_network(n['netblock'])
+                    netblock = ipaddress.ip_network(n.netblock)
                     if netblock.num_addresses < 8:
                         bad = True
                 except ValueError:
                     bad = True
 
                 if bad:
-                    LOG.withNetwork(n['uuid']).error(
+                    LOG.withNetwork(n.uuid).error(
                         'Network netblock is invalid, deleting network.')
-                    netobj = net.Network.from_db(n['uuid'])
+                    netobj = net.Network.from_db(n.uuid)
                     netobj.delete()
                     continue
 
-                host_networks.append(n['uuid'])
+                host_networks.append(n.uuid)
 
                 # Network nodes also look for interfaces for absent instances
                 # and delete them
-                for ni in db.get_network_interfaces(n['uuid']):
+                for ni in db.get_network_interfaces(n.uuid):
                     stray = False
                     inst = virt.Instance.from_db(ni['instance_uuid'])
                     if not inst:
@@ -115,7 +115,7 @@ class Monitor(daemon.Daemon):
             # Determine the network uuids for those vxids
             # vxid_to_uuid = {}
             # for n in db.get_networks():
-            #     vxid_to_uuid[n['vxid']] = n['uuid']
+            #     vxid_to_uuid[n['vxid']] = n.uuid
 
             # for extra in extra_vxids:
             #     if extra in vxid_to_uuid:

@@ -10,6 +10,7 @@ from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import logutil
+from shakenfist import net
 from shakenfist import util
 from shakenfist import virt
 
@@ -165,9 +166,11 @@ class Monitor(daemon.Daemon):
                 LOG.withInstance(i.uuid).info('Hard deleting instance')
                 i.hard_delete()
 
-            for n in db.get_stale_networks(config.get('CLEANER_DELAY')):
-                LOG.withNetwork(n['uuid']).info('Hard deleting network')
-                db.hard_delete_network(n['uuid'])
+            for n in net.Networks([
+                    baseobject.inactive_states_filter,
+                    partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))]):
+                LOG.withNetwork(n).info('Hard deleting network')
+                db.hard_delete_network(n.uuid)
 
             for ni in db.get_stale_network_interfaces(config.get('CLEANER_DELAY')):
                 LOG.withNetworkInterface(
