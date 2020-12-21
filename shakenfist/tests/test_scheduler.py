@@ -280,7 +280,7 @@ class CorrectAllocationTestCase(SchedulerTestCase):
         self.mock_get_instance_interfaces.start()
         self.addCleanup(self.mock_get_instance_interfaces.stop)
 
-    @mock.patch('shakenfist.db.get_instance_attribute')
+    @mock.patch('shakenfist.virt.Instance._db_get_attribute')
     @mock.patch('shakenfist.virt.Instance._db_get_instance',
                 return_value={
                     'uuid': 'inst-1',
@@ -324,7 +324,7 @@ class CorrectAllocationTestCase(SchedulerTestCase):
         self.assertSetEqual(set(self.fake_db.nodes)-{'node1_net', },
                             set(nodes))
 
-    @mock.patch('shakenfist.db.get_instance_attribute',
+    @mock.patch('shakenfist.virt.Instance._db_get_attribute',
                 return_value={
                     'node': 'node3'
                 })

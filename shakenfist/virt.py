@@ -142,10 +142,6 @@ class Instance(object):
 
     @staticmethod
     def _db_create_instance(instance_uuid, metadata):
-        db.set_instance_attribute(
-            instance_uuid, 'state', {'state': 'initial'})
-        db.set_instance_attribute(
-            instance_uuid, 'power_state', {'power_state': 'initial'})
         etcd.create('instance', None, instance_uuid, metadata)
 
     @staticmethod
@@ -174,6 +170,9 @@ class Instance(object):
                 'version': 2
             })
         i = Instance.from_db(uuid)
+        i._db_set_attribute('state', {'state': 'initial'})
+        i._db_set_attribute('power_state', {'power_state': 'initial'})
+
         i.add_event('db record creation', None)
         return i
 
@@ -202,6 +201,15 @@ class Instance(object):
 
         return Instance(static_values)
 
+    def _db_get_attribute(self, attribute):
+        retval = etcd.get('attribute/instance', self.uuid, attribute)
+        if not retval:
+            return {}
+        return retval
+
+    def _db_set_attribute(self, attribute, value):
+        etcd.put('attribute/instance', self.uuid, attribute, value)
+
     def external_view(self):
         # If this is an external view, then mix back in attributes that users expect
         i = {
@@ -211,12 +219,14 @@ class Instance(object):
             'memory': self.memory,
             'name': self.name,
             'namespace': self.namespace,
-            'requested_placement': self.requested_placement,
             'ssh_key': self.ssh_key,
             'user_data': self.user_data,
             'video': self.video,
             'version': self.version
         }
+
+        if self.requested_placement:
+            i['requested_placement'] = self.requested_placement
 
         external_attribute_key_whitelist = [
             'console_port',
@@ -228,7 +238,7 @@ class Instance(object):
         ]
 
         for attrname in ['placement', 'state', 'power_state', 'ports']:
-            d = db.get_instance_attribute(self.uuid, attrname)
+            d = self._db_get_attribute(attrname)
             for key in d:
                 if key not in external_attribute_key_whitelist:
                     continue
@@ -241,6 +251,7 @@ class Instance(object):
 
         return i
 
+    # Static values
     @property
     def uuid(self):
         return self.__uuid
@@ -285,12 +296,43 @@ class Instance(object):
     def version(self):
         return self.__version
 
+    # Values routed to attributes, writes are via helper methods.
+    @property
+    def placement(self):
+        return self._db_get_attribute('placement')
+
+    @property
+    def state(self):
+        return self._db_get_attribute('state')
+
+    @property
+    def power_state(self):
+        return self._db_get_attribute('power_state')
+
+    @property
+    def ports(self):
+        return self._db_get_attribute('ports')
+
+    @ports.setter
+    def ports(self, ports):
+        self._db_set_attribute('ports', ports)
+
+    @property
+    def enforced_deletes(self):
+        return self._db_get_attribute('enforced_deletes')
+
+    @property
+    def block_devices(self):
+        return self._db_get_attribute('block_devices')
+
+    # Convenience methods
     def __str__(self):
         return 'instance(%s)' % self.uuid
 
     def unique_label(self):
         return ('instance', self.uuid)
 
+    # Implementation
     def add_event(self, operation, phase, duration=None, msg=None):
         db.add_event(
             'instance', self.uuid, operation, phase, duration, msg)
@@ -299,33 +341,28 @@ class Instance(object):
         with db.get_lock('attribute/instance', self.uuid, 'placement',
                          op='Instance placement'):
             # We don't write unchanged things to the database
-            placement = db.get_instance_attribute(
-                self.uuid, 'placement')
+            placement = self.placement
             if placement.get('node') == location:
                 return
 
             placement['node'] = location
             placement['placement_attempts'] = placement.get(
                 'placement_attempts', 0) + 1
-            db.set_instance_attribute(
-                self.uuid, 'placement', placement)
+            self._db_set_attribute('placement', placement)
             self.add_event('placement', None, None, location)
 
     def enforced_deletes_increment(self):
         with db.get_lock('attribute/instance', self.uuid, 'enforced_deletes',
                          op='Instance enforced deletes increment'):
-            enforced_deletes = db.get_instance_attribute(
-                self.uuid, 'enforced_deletes')
+            enforced_deletes = self.enforced_deletes
             enforced_deletes['count'] = enforced_deletes.get('count', 0) + 1
-            db.set_instance_attribute(
-                self.uuid, 'enforced_deletes', enforced_deletes)
+            self._db_set_attribute('enforced_deletes', enforced_deletes)
 
     def update_instance_state(self, state, error_message=None):
         with db.get_lock('attribute/instance', self.uuid, 'state',
                          op='Instance state update'):
             # We don't write unchanged things to the database
-            dbstate = db.get_instance_attribute(
-                self.uuid, 'state')
+            dbstate = self.state
             if dbstate.get('state') == state:
                 return
 
@@ -336,16 +373,14 @@ class Instance(object):
             if error_message:
                 dbstate['error_message'] = error_message
 
-            db.set_instance_attribute(
-                self.uuid, 'state', dbstate)
+            self._db_set_attribute('state', dbstate)
             self.add_event('state changed', '%s -> %s' % (orig_state, state))
 
     def update_power_state(self, state):
         with db.get_lock('attribute/instance', self.uuid, 'power_state',
                          op='Instance power state update'):
             # We don't write unchanged things to the database
-            dbstate = db.get_instance_attribute(
-                self.uuid, 'power_state')
+            dbstate = self.power_state
             if dbstate.get('power_state') == state:
                 return
 
@@ -362,8 +397,7 @@ class Instance(object):
             dbstate['power_state_previous'] = dbstate.get('power_state')
             dbstate['power_state'] = state
             dbstate['power_state_updated'] = time.time()
-            db.set_instance_attribute(
-                self.uuid, 'power_state', dbstate)
+            self._db_set_attribute('power_state', dbstate)
             self.add_event('power state changed', '%s -> %s' %
                            (dbstate['power_state_previous'], state))
 
@@ -428,7 +462,7 @@ class Instance(object):
                     ipm.release(ni['ipv4'])
                     ipm.persist()
 
-        ports = db.get_instance_attribute(self.uuid, 'ports')
+        ports = self.ports
         db.free_console_port(ports.get('console_port'))
         db.free_console_port(ports.get('vdi_port'))
 
@@ -443,22 +477,18 @@ class Instance(object):
     def allocate_instance_ports(self):
         with db.get_lock('attribute/instance', self.uuid, 'ports',
                          op='Instance port allocation'):
-            ports = db.get_instance_attribute(
-                self.uuid, 'ports')
+            ports = self.ports
             if not ports:
-                db.set_instance_attribute(
-                    self.uuid, 'ports',
-                    {
-                        'console_port': db.allocate_console_port(self.uuid),
-                        'vdi_port': db.allocate_console_port(self.uuid)
-                    })
+                self.ports = {
+                    'console_port': db.allocate_console_port(self.uuid),
+                    'vdi_port': db.allocate_console_port(self.uuid)
+                }
 
     def _configure_block_devices(self, lock):
         with db.get_lock('attribute/instance', self.uuid, 'block_devices',
                          op='Instance initialize block devices'):
             # Create block devices if required
-            block_devices = db.get_instance_attribute(
-                self.uuid, 'block_devices')
+            block_devices = self.block_devices
             if not block_devices:
                 block_devices = _initialize_block_devices(
                     instance_path(self.uuid), self.disk_spec)
@@ -545,8 +575,7 @@ class Instance(object):
 
                 block_devices['devices'] = modified_disks
                 block_devices['finalized'] = True
-                db.set_instance_attribute(
-                    self.uuid, 'block_devices', block_devices)
+                self._db_set_attribute('block_devices', block_devices)
 
     def _make_config_drive(self, disk_path):
         """Create a config drive"""
@@ -703,9 +732,8 @@ class Instance(object):
         # NOTE(mikal): the database stores memory allocations in MB, but the
         # domain XML takes them in KB. That wouldn't be worth a comment here if
         # I hadn't spent _ages_ finding a bug related to it.
-        block_devices = db.get_instance_attribute(
-            self.uuid, 'block_devices')
-        ports = db.get_instance_attribute(self.uuid, 'ports')
+        block_devices = self.block_devices
+        ports = self.ports
         xml = t.render(
             uuid=self.uuid,
             memory=self.memory * 1024,
@@ -788,8 +816,7 @@ class Instance(object):
         images.snapshot(None, source, destination)
 
     def snapshot(self, all=False):
-        disks = db.get_instance_attribute(
-            self.uuid, 'block_devices')['devices']
+        disks = self.block_devices['devices']
         if not all:
             disks = [disks[0]]
 
@@ -887,7 +914,7 @@ class Instances(object):
 
 
 def placement_filter(node, inst):
-    p = db.get_instance_attribute(inst.uuid, 'placement')
+    p = inst.placement
     return p.get('node') == node
 
 
@@ -895,7 +922,7 @@ this_node_filter = partial(placement_filter, config.NODE_NAME)
 
 
 def state_filter(states, inst):
-    s = db.get_instance_attribute(inst.uuid, 'state')
+    s = inst.state
     return s.get('state') in states
 
 
@@ -906,9 +933,11 @@ inactive_states_filter = partial(state_filter, ['error', 'deleted'])
 
 def state_age_filter(delay, inst):
     now = time.time()
-    s = db.get_instance_attribute(inst.uuid, 'state')
+    s = inst.state
     return (now - s.get('state_updated', now)) > delay
 
 
 def namespace_filter(namespace, inst):
+    if namespace == 'system':
+        return True
     return inst.namespace == namespace

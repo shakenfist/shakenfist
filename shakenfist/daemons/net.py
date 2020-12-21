@@ -63,8 +63,7 @@ class Monitor(daemon.Daemon):
                     if not inst:
                         stray = True
                     else:
-                        dbstate = db.get_instance_attribute(
-                            ni['instance_uuid'], 'state')
+                        dbstate = inst.state
                         if dbstate.get('state') in ['deleted', 'error', 'unknown']:
                             stray = True
 

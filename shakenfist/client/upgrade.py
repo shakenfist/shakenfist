@@ -95,6 +95,7 @@ def main():
                     # the time comes... netobj.delete()
                     n['state'] = 'deleted'
                     db.persist_network(n['uuid'], n)
+                    print('--> Removed bad network %s' % n['uuid'])
 
             # Upgrade instances to the new attribute style
             for data, _ in etcd_client.get_prefix('/sf/instance/'):
@@ -143,6 +144,15 @@ def main():
                         '/sf/attribute/instance/%s/power_state' % instance['uuid'],
                         json.dumps(data, indent=4, sort_keys=True))
 
+                    data = {}
+                    for attr in ['console_port', 'vdi_port']:
+                        if instance.get(attr):
+                            data[attr] = instance[attr]
+                            del instance[attr]
+                    etcd_client.put(
+                        '/sf/attribute/instance/%s/ports' % instance['uuid'],
+                        json.dumps(data, indent=4, sort_keys=True))
+
                     # These fields were set in code to v0.3.3, but never used
                     for key in ['node_history', 'requested_placement']:
                         if key in instance:
@@ -152,6 +162,8 @@ def main():
                     etcd_client.put(
                         '/sf/instance/%s' % instance['uuid'],
                         json.dumps(instance, indent=4, sort_keys=True))
+                    print('--> Upgraded instance %s to version 2'
+                          % instance['uuid'])
 
 
 if __name__ == '__main__':
