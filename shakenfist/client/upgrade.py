@@ -90,14 +90,10 @@ def main():
                         db.enqueue_instance_error(
                             ni['instance_uuid'], 'Instance was on invalid network at upgrade.')
 
-                    # NOTE(mikal): I feel like I _should_ queue a network delete here to
-                    # do it properly, but we don't actually have a network delete queue
-                    # task at the moment. Here's a comment to prompt that refactor when
-                    # the time comes... netobj.delete()
-                    etcd_client.put(
-                        '/sf/attribute/network/%s' % n['uuid'],
-                        json.dumps({'state': 'deleted'}, indent=4, sort_keys=True))
-                    print('--> Removed bad network %s' % n['uuid'])
+                    # NOTE(mikal): we have to hard delete this network here, or
+                    # it will cause a crash later in the Networks iterator.
+                    etcd_client.delete('/sf/network/%s' % n['uuid'])
+                    etcd_client.delete('/sf/attribute/network/%s/state' % n['uuid'])
 
                 # Upgrade networks to the new attribute style
                 network = json.loads(data.decode('utf-8'))
