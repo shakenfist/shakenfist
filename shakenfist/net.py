@@ -26,6 +26,7 @@ LOG, _ = logutil.setup(__name__)
 
 class Network(baseobject.DatabaseBackedObject):
     object_type = 'network'
+    current_version = 2
 
     def __init__(self, static_values):
         super(Network, self).__init__(static_values.get('uuid'),
@@ -50,8 +51,8 @@ class Network(baseobject.DatabaseBackedObject):
         self.__broadcast = ipm.broadcast_address
         self.__network_address = ipm.network_address
 
-    @staticmethod
-    def new(name, namespace, netblock, provide_dhcp=False, provide_nat=False,
+    @classmethod
+    def new(cls, name, namespace, netblock, provide_dhcp=False, provide_nat=False,
             floating_gateway=None, uuid=None, vxid=None):
 
         if not uuid:
@@ -74,7 +75,7 @@ class Network(baseobject.DatabaseBackedObject):
                 'provide_dhcp': provide_dhcp,
                 'provide_nat': provide_nat,
                 'floating_gateway': None,
-                'version': 2
+                'version': cls.current_version
             }
         )
 

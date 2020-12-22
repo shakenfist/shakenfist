@@ -122,6 +122,7 @@ def _xml_file(instance_uuid):
 
 class Instance(baseobject.DatabaseBackedObject):
     object_type = 'instance'
+    current_version = 2
 
     def __init__(self, static_values):
         super(Instance, self).__init__(static_values.get('uuid'),
@@ -145,8 +146,8 @@ class Instance(baseobject.DatabaseBackedObject):
             LOG.withObj(self).error('Found disk spec empty')
             raise exceptions.InstanceBadDiskSpecification()
 
-    @staticmethod
-    def new(name, cpus, memory, namespace, ssh_key=None, disk_spec=None,
+    @classmethod
+    def new(cls, name, cpus, memory, namespace, ssh_key=None, disk_spec=None,
             user_data=None, video=None, requested_placement=None, uuid=None):
 
         if not uuid:
@@ -166,7 +167,7 @@ class Instance(baseobject.DatabaseBackedObject):
                 'user_data': user_data,
                 'video': video,
 
-                'version': 2
+                'version': cls.current_version
             })
         i = Instance.from_db(uuid)
         i._db_set_attribute('state', {'state': 'initial'})

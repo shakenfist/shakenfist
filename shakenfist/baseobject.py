@@ -13,6 +13,7 @@ LOG, _ = logutil.setup(__name__)
 
 class DatabaseBackedObject(object):
     object_type = 'unknown'
+    current_version = None
 
     def __init__(self, object_uuid, version=None):
         self.__uuid = object_uuid
