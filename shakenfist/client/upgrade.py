@@ -94,6 +94,9 @@ def main():
                     # it will cause a crash later in the Networks iterator.
                     etcd_client.delete('/sf/network/%s' % n['uuid'])
                     etcd_client.delete('/sf/attribute/network/%s/state' % n['uuid'])
+                    print('--> Deleted invalid network %s (netblock too small)'
+                          % n['uuid'])
+                    continue
 
                 # Upgrade networks to the new attribute style
                 network = json.loads(data.decode('utf-8'))
