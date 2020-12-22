@@ -1255,7 +1255,7 @@ class Networks(Resource):
 
         network = net.Network.new(name, namespace, netblock, provide_dhcp,
                                   provide_nat)
-        return net.external_view()
+        return network.external_view()
 
     @jwt_required
     @redirect_to_network_node
