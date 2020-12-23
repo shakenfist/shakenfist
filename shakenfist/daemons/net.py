@@ -83,7 +83,7 @@ class Monitor(daemon.Daemon):
 
                 seen_vxids.append(n.vxid)
 
-                if time.time() - n.state_updated < 60:
+                if time.time() - n.state.get('state_updated', time.time()) < 60:
                     # Network state changed in the last minute, punt for now
                     continue
 
