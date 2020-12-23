@@ -1174,15 +1174,6 @@ def _delete_network(network_from_db):
     n.add_event('api', 'delete')
     n.remove_dhcp()
     n.delete()
-
-    # TODO(andy): consolidate to one function
-    if n.floating_gateway:
-        with db.get_lock(
-                'ipmanager', None, 'floating', ttl=120, op='Network delete'):
-            ipm = IPManager.from_db('floating')
-            ipm.release(n.floating_gateway)
-            ipm.persist()
-
     n.update_state('deleted')
 
 

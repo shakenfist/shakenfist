@@ -69,15 +69,13 @@ class FakeNetwork(BaseFakeObject):
     object_type = 'network'
 
     def __init__(self, uuid=None, vxid=None, namespace=None,
-                 name=None, netblock=None, state='created',
-                 floating_gateway=None):
+                 name=None, netblock=None, state='created'):
         super(FakeNetwork, self).__init__(state)
         self.uuid = uuid
         self.vxid = vxid
         self.namespace = namespace
         self.name = name
         self.netblock = netblock
-        self.floating_gateway = floating_gateway
         self.version = 2
 
     def is_dead(self):

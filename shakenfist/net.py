@@ -32,7 +32,6 @@ class Network(baseobject.DatabaseBackedObject):
         super(Network, self).__init__(static_values.get('uuid'),
                                       static_values.get('version'))
 
-        self.__floating_gateway = static_values.get('floating_gateway')
         self.__name = static_values.get('name')
         self.__namespace = static_values.get('namespace')
         self.__netblock = static_values.get('netblock')
@@ -53,7 +52,7 @@ class Network(baseobject.DatabaseBackedObject):
 
     @classmethod
     def new(cls, name, namespace, netblock, provide_dhcp=False, provide_nat=False,
-            floating_gateway=None, uuid=None, vxid=None):
+            uuid=None, vxid=None):
 
         if not uuid:
             # uuid should only be specified in testing
@@ -74,7 +73,6 @@ class Network(baseobject.DatabaseBackedObject):
                 'netblock': netblock,
                 'provide_dhcp': provide_dhcp,
                 'provide_nat': provide_nat,
-                'floating_gateway': None,
                 'version': cls.current_version
             }
         )
@@ -111,7 +109,6 @@ class Network(baseobject.DatabaseBackedObject):
         # If this is an external view, then mix back in attributes that users expect
         n = {
             'uuid': self.uuid,
-            'floating_gateway': self.__floating_gateway,
             'name': self.__name,
             'namespace': self.__namespace,
             'netblock': self.__netblock,
@@ -121,7 +118,7 @@ class Network(baseobject.DatabaseBackedObject):
             'version': self.version
         }
 
-        for attrname in ['state']:
+        for attrname in ['routing', 'state']:
             d = self._db_get_attribute(attrname)
             for key in d:
                 # We skip keys with no value
@@ -135,7 +132,11 @@ class Network(baseobject.DatabaseBackedObject):
     # Static values
     @property
     def floating_gateway(self):
-        return self.__floating_gateway
+        return self._db_get_attribute('routing').get('floating_gateway')
+
+    @property
+    def routing(self):
+        return self._db_get_attribute('routing')
 
     @property
     def name(self):
@@ -195,10 +196,16 @@ class Network(baseobject.DatabaseBackedObject):
                            provide_dhcp=False,
                            provide_nat=False,
                            namespace=None,
-                           floating_gateway=None,
                            name='floating')
         fnet.persist()
         return fnet
+
+    def update_floating_gateway(self, gateway):
+        with db.get_lock('attribute/instance', self.uuid, 'routing',
+                         op='Update floating gateway'):
+            routing = self.routing
+            routing['floating_gateway'] = gateway
+            self._db_set_attribute('routing', routing)
 
     def subst_dict(self):
         # NOTE(mikal): it should be noted that the maximum interface name length
@@ -345,10 +352,10 @@ class Network(baseobject.DatabaseBackedObject):
 
         if self.provide_nat:
             if not self.floating_gateway:
-                with db.get_lock('ipmanager', None,
-                                 'floating', ttl=120, op='Network deploy NAT'):
+                with db.get_lock('ipmanager', None, 'floating', ttl=120,
+                                 op='Network deploy NAT'):
                     ipm = IPManager.from_db('floating')
-                    self.floating_gateway = ipm.get_random_free_address()
+                    self.update_floating_gateway(ipm.get_random_free_address())
                     ipm.persist()
 
             # No lock because no data changing
@@ -446,6 +453,7 @@ class Network(baseobject.DatabaseBackedObject):
                         ipm = IPManager.from_db('floating')
                         ipm.release(self.floating_gateway)
                         ipm.persist()
+                        self.update_floating_gateway(None)
 
             db.deallocate_vxid(self.vxid)
             IPManager.from_db(self.uuid).delete()

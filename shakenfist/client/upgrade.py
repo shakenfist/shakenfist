@@ -110,6 +110,13 @@ def main():
                         '/sf/attribute/network/%s/state' % network['uuid'],
                         json.dumps(data, indent=4, sort_keys=True))
 
+                    if 'floating_gateway' in network:
+                        etcd_client.put(
+                            '/sf/attribute/network/%s/routing' % network['uuid'],
+                            json.dumps({'floating_gateway': network['floating_gateway']},
+                                       indent=4, sort_keys=True))
+                        del network['floating_gateway']
+
                     network['version'] = 2
                     etcd_client.put(
                         '/sf/network/%s' % network['uuid'],
