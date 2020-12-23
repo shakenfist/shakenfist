@@ -107,9 +107,9 @@ def get_existing_locks():
 
 
 def allocate_vxid(net_id):
-    vxid = 1
+    vxid = random.randint(1, 16777215)
     while not etcd.create('vxlan', None, vxid, {'network_uuid': net_id}):
-        vxid += 1
+        vxid = random.randint(1, 16777215)
     return vxid
 
 

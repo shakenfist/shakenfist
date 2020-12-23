@@ -211,16 +211,16 @@ class Network(baseobject.DatabaseBackedObject):
         # NOTE(mikal): it should be noted that the maximum interface name length
         # on Linux is 15 user visible characters.
         retval = {
-            'vx_id': self.vxid,
-            'vx_interface': 'vxlan-%s' % self.vxid,
-            'vx_bridge': 'br-vxlan-%s' % self.vxid,
-            'vx_veth_outer': 'veth-%s-o' % self.vxid,
-            'vx_veth_inner': 'veth-%s-i' % self.vxid,
+            'vx_id': '%06x' % self.vxid,
+            'vx_interface': 'vxlan-%06x' % self.vxid,
+            'vx_bridge': 'br-vxlan-%06x' % self.vxid,
+            'vx_veth_outer': 'veth-%06x-o' % self.vxid,
+            'vx_veth_inner': 'veth-%06x-i' % self.vxid,
 
             'physical_interface': self.physical_nic,
             'physical_bridge': 'phy-br-%s' % config.get('NODE_EGRESS_NIC'),
-            'physical_veth_outer': 'phy-%s-o' % self.vxid,
-            'physical_veth_inner': 'phy-%s-i' % self.vxid,
+            'physical_veth_outer': 'phy-%06x-o' % self.vxid,
+            'physical_veth_inner': 'phy-%06x-i' % self.vxid,
 
             'netns': self.uuid,
             'in_netns': 'ip netns exec %s' % self.uuid,
