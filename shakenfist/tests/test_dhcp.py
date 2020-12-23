@@ -122,7 +122,7 @@ class DHCPTestCase(testtools.TestCase):
                      'macaddr': '1a:91:64:d2:15:40',
                      'ipv4': '127.0.0.6'}
                 ])
-    @mock.patch('shakenfist.virt.Instance._db_get_instance',
+    @mock.patch('shakenfist.virt.Instance._db_get',
                 side_effect=[
                     {'uuid': 'instuuid1',
                      'name': 'inst1',
@@ -195,12 +195,13 @@ class DHCPTestCase(testtools.TestCase):
         mock_remove_config.assert_called()
         mock_signal.assert_called_with(signal.SIGKILL)
 
+    @mock.patch('os.path.exists', return_value=True)
     @mock.patch('shakenfist.dhcp.DHCP._send_signal', return_value=False)
     @mock.patch('shakenfist.dhcp.DHCP._make_config')
     @mock.patch('shakenfist.dhcp.DHCP._make_hosts')
     @mock.patch('shakenfist.util.execute')
     def test_restart_dhcpd(self, mock_execute, mock_hosts, mock_config,
-                           mock_signal):
+                           mock_signal, mock_exists):
         d = dhcp.DHCP(FakeNetwork(), 'eth0')
         d.restart_dhcpd()
         mock_signal.assert_called_with(signal.SIGHUP)

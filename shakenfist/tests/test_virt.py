@@ -7,6 +7,7 @@ import pycdlib
 import tempfile
 import time
 
+from shakenfist import baseobject
 from shakenfist.ipmanager import IPManager
 from shakenfist import virt
 from shakenfist.config import SFConfig
@@ -14,6 +15,8 @@ from shakenfist.tests import test_shakenfist
 
 
 class FakeNetwork(object):
+    object_type = 'network'
+
     def __init__(self):
         self.ipmanager = IPManager('uuid', '127.0.0.0/8')
         self.router = self.ipmanager.get_address_at_index(1)
@@ -138,8 +141,8 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
         self.mock_put = self.put.start()
         self.addCleanup(self.put.stop)
 
-    @mock.patch('shakenfist.virt.Instance._db_create_instance')
-    @mock.patch('shakenfist.virt.Instance._db_get_instance',
+    @mock.patch('shakenfist.virt.Instance._db_create')
+    @mock.patch('shakenfist.virt.Instance._db_get',
                 return_value={
                     'uuid': 'fakeuuid',
                     'cpus': 1,
@@ -175,7 +178,7 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
                 new_callable=mock.PropertyMock)
     @mock.patch('shakenfist.virt.Instance._db_set_attribute')
     @mock.patch('shakenfist.etcd.put')
-    def test_update_instance_state(
+    def test_update_state(
             self, mock_put, mock_attribute_set, mock_state_get, mock_lock):
         mock_state_get.return_value = {
             'state': 'initial',
@@ -183,7 +186,7 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
         }
 
         i = self._make_instance()
-        i.update_instance_state('created')
+        i.update_state('created')
 
         etcd_write = mock_attribute_set.mock_calls[2]
         self.assertTrue(time.time() - etcd_write[1][1]['state_updated'] < 3)
@@ -194,7 +197,7 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
                 new_callable=mock.PropertyMock)
     @mock.patch('shakenfist.virt.Instance._db_set_attribute')
     @mock.patch('shakenfist.etcd.put')
-    def test_update_instance_state_duplicate(
+    def test_update_state_duplicate(
             self, mock_put, mock_attribute_set, mock_state_get, mock_lock):
         mock_state_get.return_value = {
             'state': 'created',
@@ -202,8 +205,8 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
         }
 
         i = self._make_instance()
-        i.update_instance_state('created')
-        self.assertEqual(2, mock_attribute_set.call_count)
+        i.update_state('created')
+        self.assertEqual(3, mock_attribute_set.call_count)
 
     @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.virt.Instance.power_state',
@@ -305,11 +308,8 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
 
     # create, delete
 
-    @mock.patch('shakenfist.db.get_network',
-                return_value={
-                    'uuid': 'netuuid',
-                    'netblock': '127.0.0.0/8'
-                })
+    @mock.patch('shakenfist.net.Network.from_db',
+                return_value=FakeNetwork())
     @mock.patch('shakenfist.db.get_instance_interfaces',
                 return_value=[
                     {
@@ -576,7 +576,7 @@ class InstancesTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
     def test_state_filter_all(self, mock_get_all, mock_get, mock_attr):
         uuids = []
-        for i in virt.Instances([partial(virt.state_filter, 'created')]):
+        for i in virt.Instances([partial(baseobject.state_filter, 'created')]):
             uuids.append(i.uuid)
 
         self.assertEqual(['373a165e-9720-4e14-bd0e-9612de79ff15',
@@ -588,7 +588,7 @@ class InstancesTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
     def test_state_filter_none(self, mock_get_all, mock_get, mock_attr):
         uuids = []
-        for i in virt.Instances([partial(virt.state_filter, 'created')]):
+        for i in virt.Instances([partial(baseobject.state_filter, 'created')]):
             uuids.append(i.uuid)
 
         self.assertEqual([], uuids)
@@ -599,7 +599,7 @@ class InstancesTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
     def test_state_filter_active(self, mock_get_all, mock_get, mock_attr):
         uuids = []
-        for i in virt.Instances([virt.active_states_filter]):
+        for i in virt.Instances([baseobject.active_states_filter]):
             uuids.append(i.uuid)
 
         self.assertEqual(['a7c5ecec-c3a9-4774-ad1b-249d9e90e806'], uuids)
@@ -610,7 +610,7 @@ class InstancesTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
     def test_state_filter_inactive(self, mock_get_all, mock_get, mock_attr):
         uuids = []
-        for i in virt.Instances([virt.inactive_states_filter]):
+        for i in virt.Instances([baseobject.inactive_states_filter]):
             uuids.append(i.uuid)
 
         self.assertEqual(['373a165e-9720-4e14-bd0e-9612de79ff15'], uuids)
@@ -623,8 +623,8 @@ class InstancesTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
     def test_state_hard_delete_later(self, mock_get_all, mock_get, mock_attr):
         uuids = []
-        for i in virt.Instances([virt.inactive_states_filter,
-                                 partial(virt.state_age_filter, 500)]):
+        for i in virt.Instances([baseobject.inactive_states_filter,
+                                 partial(baseobject.state_age_filter, 500)]):
             uuids.append(i.uuid)
 
         self.assertEqual([], uuids)
@@ -637,8 +637,8 @@ class InstancesTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
     def test_state_hard_delete_now(self, mock_get_all, mock_get, mock_attr):
         uuids = []
-        for i in virt.Instances([virt.inactive_states_filter,
-                                 partial(virt.state_age_filter, 500)]):
+        for i in virt.Instances([baseobject.inactive_states_filter,
+                                 partial(baseobject.state_age_filter, 500)]):
             uuids.append(i.uuid)
 
         self.assertEqual(['373a165e-9720-4e14-bd0e-9612de79ff15'], uuids)
@@ -647,7 +647,7 @@ class InstancesTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
     def test_namespace_filter(self, mock_get_all, mock_get):
         uuids = []
-        for i in virt.Instances([partial(virt.namespace_filter, 'gerkin')]):
+        for i in virt.Instances([partial(baseobject.namespace_filter, 'gerkin')]):
             uuids.append(i.uuid)
 
         self.assertEqual(['373a165e-9720-4e14-bd0e-9612de79ff15'], uuids)

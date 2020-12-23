@@ -1,6 +1,7 @@
 import ipaddress
 import time
 
+from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
@@ -31,33 +32,33 @@ class Monitor(daemon.Daemon):
 
         if not util.is_network_node():
             # For normal nodes, just the ones we have instances for
-            for inst in virt.Instances([virt.this_node_filter, virt.active_states_filter]):
+            for inst in virt.Instances([virt.this_node_filter, baseobject.active_states_filter]):
                 for iface in db.get_instance_interfaces(inst.uuid):
                     if not iface['network_uuid'] in host_networks:
                         host_networks.append(iface['network_uuid'])
         else:
             # For network nodes, its all networks
-            for n in db.get_networks():
+            for n in net.Networks([baseobject.active_states_filter]):
                 bad = False
                 try:
-                    netblock = ipaddress.ip_network(n['netblock'])
+                    netblock = ipaddress.ip_network(n.netblock)
                     if netblock.num_addresses < 8:
                         bad = True
                 except ValueError:
                     bad = True
 
                 if bad:
-                    LOG.withNetwork(n['uuid']).error(
+                    LOG.withNetwork(n.uuid).error(
                         'Network netblock is invalid, deleting network.')
-                    netobj = net.Network.from_db(n['uuid'])
+                    netobj = net.Network.from_db(n.uuid)
                     netobj.delete()
                     continue
 
-                host_networks.append(n['uuid'])
+                host_networks.append(n.uuid)
 
                 # Network nodes also look for interfaces for absent instances
                 # and delete them
-                for ni in db.get_network_interfaces(n['uuid']):
+                for ni in db.get_network_interfaces(n.uuid):
                     stray = False
                     inst = virt.Instance.from_db(ni['instance_uuid'])
                     if not inst:
@@ -82,7 +83,7 @@ class Monitor(daemon.Daemon):
 
                 seen_vxids.append(n.vxid)
 
-                if time.time() - n.state_updated < 60:
+                if time.time() - n.state.get('state_updated', time.time()) < 60:
                     # Network state changed in the last minute, punt for now
                     continue
 
@@ -114,7 +115,7 @@ class Monitor(daemon.Daemon):
             # Determine the network uuids for those vxids
             # vxid_to_uuid = {}
             # for n in db.get_networks():
-            #     vxid_to_uuid[n['vxid']] = n['uuid']
+            #     vxid_to_uuid[n['vxid']] = n.uuid
 
             # for extra in extra_vxids:
             #     if extra in vxid_to_uuid:

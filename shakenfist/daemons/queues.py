@@ -5,6 +5,7 @@ import requests
 import setproctitle
 import time
 
+from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
@@ -156,7 +157,7 @@ def instance_preflight(instance_uuid, network):
     if not instance:
         raise exceptions.InstanceNotInDBException(instance_uuid)
 
-    instance.update_instance_state('preflight')
+    instance.update_state('preflight')
 
     # Try to place on this node
     s = scheduler.Scheduler()
@@ -214,9 +215,9 @@ def instance_start(instance_uuid, network):
                         instance_uuid, 'missing network: %s' % netdesc['network_uuid'])
                     return
 
-                if n.state != 'created':
+                if n.state['state'] != 'created':
                     db.enqueue_instance_error(
-                        instance_uuid, 'network is not active: %s' % n['uuid'])
+                        instance_uuid, 'network is not active: %s' % n.uuid)
 
                 nets[netdesc['network_uuid']] = n
 
@@ -241,7 +242,7 @@ def instance_start(instance_uuid, network):
         for iface in db.get_instance_interfaces(instance_uuid):
             db.update_network_interface_state(iface['uuid'], 'created')
 
-        instance.update_instance_state('created')
+        instance.update_state('created')
 
 
 def instance_delete(instance_uuid, new_state, error_msg=None):
@@ -257,7 +258,7 @@ def instance_delete(instance_uuid, new_state, error_msg=None):
 
         # Create list of networks used by all other instances
         host_networks = []
-        for inst in virt.Instances([virt.this_node_filter, virt.active_states_filter]):
+        for inst in virt.Instances([virt.this_node_filter, baseobject.active_states_filter]):
             if not inst.uuid == instance_uuid:
                 for iface in db.get_instance_interfaces(inst.uuid):
                     if not iface['network_uuid'] in host_networks:
@@ -266,7 +267,7 @@ def instance_delete(instance_uuid, new_state, error_msg=None):
         instance = virt.Instance.from_db(instance_uuid)
         if instance:
             instance.delete()
-            instance.update_instance_state(new_state, error_message=error_msg)
+            instance.update_state(new_state, error_message=error_msg)
 
         # Check each network used by the deleted instance
         for network in instance_networks:

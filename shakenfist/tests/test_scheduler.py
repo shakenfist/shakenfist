@@ -281,7 +281,7 @@ class CorrectAllocationTestCase(SchedulerTestCase):
         self.addCleanup(self.mock_get_instance_interfaces.stop)
 
     @mock.patch('shakenfist.virt.Instance._db_get_attribute')
-    @mock.patch('shakenfist.virt.Instance._db_get_instance',
+    @mock.patch('shakenfist.virt.Instance._db_get',
                 return_value={
                     'uuid': 'inst-1',
                     'cpus': 1,
@@ -328,7 +328,7 @@ class CorrectAllocationTestCase(SchedulerTestCase):
                 return_value={
                     'node': 'node3'
                 })
-    @mock.patch('shakenfist.virt.Instance._db_get_instance',
+    @mock.patch('shakenfist.virt.Instance._db_get',
                 return_value={
                     'uuid': 'inst-1',
                     'cpus': 1,

@@ -11,6 +11,7 @@ import shutil
 import time
 from uuid import uuid4
 
+from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import etcd
@@ -119,8 +120,14 @@ def _xml_file(instance_uuid):
     return os.path.join(instance_path(instance_uuid), 'libvirt.xml')
 
 
-class Instance(object):
+class Instance(baseobject.DatabaseBackedObject):
+    object_type = 'instance'
+    current_version = 2
+
     def __init__(self, static_values):
+        super(Instance, self).__init__(static_values.get('uuid'),
+                                       static_values.get('version'))
+
         # This dictionary contains values which will never change for this
         # instance. It is therefore safe to cache forever.
         self.__uuid = static_values.get('uuid')
@@ -133,30 +140,23 @@ class Instance(object):
         self.__ssh_key = static_values.get('ssh_key')
         self.__user_data = static_values.get('user_data')
         self.__video = static_values.get('video')
-        self.__version = static_values.get('version')
 
         if not self.__disk_spec:
             # This should not occur since the API will filter for zero disks.
             LOG.withObj(self).error('Found disk spec empty')
             raise exceptions.InstanceBadDiskSpecification()
 
-    @staticmethod
-    def _db_create_instance(instance_uuid, metadata):
-        etcd.create('instance', None, instance_uuid, metadata)
-
-    @staticmethod
-    def new(name, cpus, memory, namespace, ssh_key=None, disk_spec=None,
+    @classmethod
+    def new(cls, name, cpus, memory, namespace, ssh_key=None, disk_spec=None,
             user_data=None, video=None, requested_placement=None, uuid=None):
 
         if not uuid:
             # uuid should only be specified in testing
             uuid = str(uuid4())
 
-        Instance._db_create_instance(
+        Instance._db_create(
             uuid,
             {
-                'uuid': uuid,
-
                 'cpus': cpus,
                 'disk_spec': disk_spec,
                 'memory': memory,
@@ -167,27 +167,12 @@ class Instance(object):
                 'user_data': user_data,
                 'video': video,
 
-                'version': 2
+                'version': cls.current_version
             })
         i = Instance.from_db(uuid)
         i._db_set_attribute('state', {'state': 'initial'})
         i._db_set_attribute('power_state', {'power_state': 'initial'})
-
         i.add_event('db record creation', None)
-        return i
-
-    @staticmethod
-    def _db_get_instance(instance_uuid):
-        # NOTE(mikal): we don't do upgrades inflight. They are assumed to have been
-        # done as part of the upgrade process.
-        i = etcd.get('instance', None, instance_uuid)
-        if not i:
-            LOG.withInstance(instance_uuid).error('Instance missing')
-            return None
-
-        if i.get('version') != 2:
-            raise exceptions.BadObjectVersion(
-                'Unknown version - Instance: %s', i)
         return i
 
     @staticmethod
@@ -195,20 +180,11 @@ class Instance(object):
         if not uuid:
             return None
 
-        static_values = Instance._db_get_instance(uuid)
+        static_values = Instance._db_get(uuid)
         if not static_values:
             return None
 
         return Instance(static_values)
-
-    def _db_get_attribute(self, attribute):
-        retval = etcd.get('attribute/instance', self.uuid, attribute)
-        if not retval:
-            return {}
-        return retval
-
-    def _db_set_attribute(self, attribute, value):
-        etcd.put('attribute/instance', self.uuid, attribute, value)
 
     def external_view(self):
         # If this is an external view, then mix back in attributes that users expect
@@ -253,10 +229,6 @@ class Instance(object):
 
     # Static values
     @property
-    def uuid(self):
-        return self.__uuid
-
-    @property
     def cpus(self):
         return self.__cpus
 
@@ -292,18 +264,10 @@ class Instance(object):
     def video(self):
         return self.__video
 
-    @property
-    def version(self):
-        return self.__version
-
     # Values routed to attributes, writes are via helper methods.
     @property
     def placement(self):
         return self._db_get_attribute('placement')
-
-    @property
-    def state(self):
-        return self._db_get_attribute('state')
 
     @property
     def power_state(self):
@@ -325,18 +289,7 @@ class Instance(object):
     def block_devices(self):
         return self._db_get_attribute('block_devices')
 
-    # Convenience methods
-    def __str__(self):
-        return 'instance(%s)' % self.uuid
-
-    def unique_label(self):
-        return ('instance', self.uuid)
-
     # Implementation
-    def add_event(self, operation, phase, duration=None, msg=None):
-        db.add_event(
-            'instance', self.uuid, operation, phase, duration, msg)
-
     def place_instance(self, location):
         with db.get_lock('attribute/instance', self.uuid, 'placement',
                          op='Instance placement'):
@@ -357,24 +310,6 @@ class Instance(object):
             enforced_deletes = self.enforced_deletes
             enforced_deletes['count'] = enforced_deletes.get('count', 0) + 1
             self._db_set_attribute('enforced_deletes', enforced_deletes)
-
-    def update_instance_state(self, state, error_message=None):
-        with db.get_lock('attribute/instance', self.uuid, 'state',
-                         op='Instance state update'):
-            # We don't write unchanged things to the database
-            dbstate = self.state
-            if dbstate.get('state') == state:
-                return
-
-            orig_state = dbstate.get('state')
-            dbstate['state'] = state
-            dbstate['state_updated'] = time.time()
-
-            if error_message:
-                dbstate['error_message'] = error_message
-
-            self._db_set_attribute('state', dbstate)
-            self.add_event('state changed', '%s -> %s' % (orig_state, state))
 
     def update_power_state(self, state):
         with db.get_lock('attribute/instance', self.uuid, 'power_state',
@@ -406,7 +341,7 @@ class Instance(object):
     # has been transcoded to the right format. This has been done to facilitate
     # moving to a queue and task based creation mechanism.
     def create(self, lock=None):
-        self.update_instance_state('creating')
+        self.update_state('creating')
 
         # Ensure we have state on disk
         os.makedirs(instance_path(self.uuid), exist_ok=True)
@@ -433,7 +368,7 @@ class Instance(object):
             LOG.withObj(self).info('Instance now powered on')
         else:
             LOG.withObj(self).info('Instance failed to power on')
-        self.update_instance_state('created')
+        self.update_state('created')
 
     def delete(self):
         with util.RecordedOperation('delete domain', self):
@@ -466,7 +401,7 @@ class Instance(object):
         db.free_console_port(ports.get('console_port'))
         db.free_console_port(ports.get('vdi_port'))
 
-        self.update_instance_state('deleted')
+        self.update_state('deleted')
 
     def hard_delete(self):
         etcd.delete('instance', None, self.uuid)
@@ -891,6 +826,7 @@ class Instance(object):
         return d
 
 
+# TODO(mikal): can this be refactored into baseobject?
 class Instances(object):
     def __init__(self, filters):
         self.filters = filters
@@ -919,25 +855,3 @@ def placement_filter(node, inst):
 
 
 this_node_filter = partial(placement_filter, config.NODE_NAME)
-
-
-def state_filter(states, inst):
-    s = inst.state
-    return s.get('state') in states
-
-
-active_states_filter = partial(
-    state_filter, ['initial', 'preflight', 'creating', 'created'])
-inactive_states_filter = partial(state_filter, ['error', 'deleted'])
-
-
-def state_age_filter(delay, inst):
-    now = time.time()
-    s = inst.state
-    return (now - s.get('state_updated', now)) > delay
-
-
-def namespace_filter(namespace, inst):
-    if namespace == 'system':
-        return True
-    return inst.namespace == namespace

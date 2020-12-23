@@ -106,43 +106,15 @@ def get_existing_locks():
 #####################################################################
 
 
-def get_network(network_uuid):
-    return etcd.get('network', None, network_uuid)
-
-
-def persist_network(network_uuid, data):
-    etcd.put('network', None, network_uuid, data)
-
-
-def get_networks(all=False, namespace=None):
-    for _, n in etcd.get_all('network', None):
-        if n['uuid'] == 'floating':
-            continue
-        if not all:
-            if n['state'] in ['deleted', 'error']:
-                continue
-        if namespace:
-            if namespace not in [n['namespace'], 'system']:
-                continue
-        yield n
-
-
 def allocate_vxid(net_id):
-    vxid = 1
+    vxid = random.randint(1, 16777215)
     while not etcd.create('vxlan', None, vxid, {'network_uuid': net_id}):
-        vxid += 1
+        vxid = random.randint(1, 16777215)
     return vxid
 
 
 def deallocate_vxid(vxid):
     etcd.delete('vxlan', None, vxid)
-
-
-def get_stale_networks(delay):
-    for _, n in etcd.get_all('network', None):
-        if n['state'] in ['deleted', 'error']:
-            if time.time() - n['state_updated'] > delay:
-                yield n
 
 
 def hard_delete_network(network_uuid):

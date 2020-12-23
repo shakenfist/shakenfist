@@ -75,7 +75,8 @@ def main():
 
         elif minor == 3:
             # Find invalid networks
-            for n in db.get_networks():
+            for data, _ in etcd_client.get_prefix('/sf/network/'):
+                n = json.loads(data.decode('utf-8'))
                 bad = False
                 try:
                     netblock = ipaddress.ip_network(n['netblock'])
@@ -89,13 +90,39 @@ def main():
                         db.enqueue_instance_error(
                             ni['instance_uuid'], 'Instance was on invalid network at upgrade.')
 
-                    # NOTE(mikal): I feel like I _should_ queue a network delete here to
-                    # do it properly, but we don't actually have a network delete queue
-                    # task at the moment. Here's a comment to prompt that refactor when
-                    # the time comes... netobj.delete()
-                    n['state'] = 'deleted'
-                    db.persist_network(n['uuid'], n)
-                    print('--> Removed bad network %s' % n['uuid'])
+                    # NOTE(mikal): we have to hard delete this network here, or
+                    # it will cause a crash later in the Networks iterator.
+                    etcd_client.delete('/sf/network/%s' % n['uuid'])
+                    etcd_client.delete('/sf/attribute/network/%s/state' % n['uuid'])
+                    print('--> Deleted invalid network %s (netblock too small)'
+                          % n['uuid'])
+                    continue
+
+                # Upgrade networks to the new attribute style
+                network = json.loads(data.decode('utf-8'))
+                if int(network.get('version', 0)) < 2:
+                    data = {}
+                    for attr in ['state', 'state_updated', 'error_message']:
+                        if network.get(attr):
+                            data[attr] = network[attr]
+                            del network[attr]
+                    etcd_client.put(
+                        '/sf/attribute/network/%s/state' % network['uuid'],
+                        json.dumps(data, indent=4, sort_keys=True))
+
+                    if 'floating_gateway' in network:
+                        etcd_client.put(
+                            '/sf/attribute/network/%s/routing' % network['uuid'],
+                            json.dumps({'floating_gateway': network['floating_gateway']},
+                                       indent=4, sort_keys=True))
+                        del network['floating_gateway']
+
+                    network['version'] = 2
+                    etcd_client.put(
+                        '/sf/network/%s' % network['uuid'],
+                        json.dumps(network, indent=4, sort_keys=True))
+                    print('--> Upgraded network %s to version 2'
+                          % network['uuid'])
 
             # Upgrade instances to the new attribute style
             for data, _ in etcd_client.get_prefix('/sf/instance/'):

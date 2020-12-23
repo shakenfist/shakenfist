@@ -26,6 +26,7 @@ class DHCP(object):
             'netmask': network.netmask,
             'broadcast': network.broadcast,
 
+            'netns': self.network_uuid,
             'in_netns': 'ip netns exec %s' % self.network_uuid,
             'interface': interface
         }
@@ -105,6 +106,9 @@ class DHCP(object):
         self._remove_config()
 
     def restart_dhcpd(self):
+        if not os.path.exists('/var/run/netns/%(netns)s' % self.subst):
+            return
+
         self._make_config()
         self._make_hosts()
         if not self._send_signal(signal.SIGHUP):
