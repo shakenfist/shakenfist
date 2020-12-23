@@ -351,18 +351,18 @@ class Network(baseobject.DatabaseBackedObject):
                              'netns %(netns)s' % subst)
 
         if self.provide_nat:
-            if not self.floating_gateway:
-                with db.get_lock('ipmanager', None, 'floating', ttl=120,
-                                 op='Network deploy NAT'):
-                    ipm = IPManager.from_db('floating')
+            # We don't always need this lock, but acquiring it here means we don't
+            # need to construct two idential ipmanagers one after the other.
+            with db.get_lock('ipmanager', None, 'floating', ttl=120,
+                             op='Network deploy NAT'):
+                ipm = IPManager.from_db('floating')
+                if not self.floating_gateway:
                     self.update_floating_gateway(ipm.get_random_free_address())
                     ipm.persist()
 
-            # No lock because no data changing
-            ipm = IPManager.from_db('floating')
-            subst['floating_router'] = ipm.get_address_at_index(1)
-            subst['floating_gateway'] = self.floating_gateway
-            subst['floating_netmask'] = ipm.netmask
+                subst['floating_router'] = ipm.get_address_at_index(1)
+                subst['floating_gateway'] = self.floating_gateway
+                subst['floating_netmask'] = ipm.netmask
 
             with db.get_object_lock(self, ttl=120, op='Network deploy NAT'):
                 # Ensure network was not deleted whilst waiting for the lock.
