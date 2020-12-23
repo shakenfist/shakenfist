@@ -209,9 +209,12 @@ class Network(baseobject.DatabaseBackedObject):
 
     def subst_dict(self):
         # NOTE(mikal): it should be noted that the maximum interface name length
-        # on Linux is 15 user visible characters.
+        # on Linux is 15 user visible characters, we therefore use hex for vxids
+        # where they appear in an interface name. Note that vx_id does not appear
+        # in an interface name and is therefore in decimal (as required by) the
+        # "ip" command.
         retval = {
-            'vx_id': '%06x' % self.vxid,
+            'vx_id': self.vxid,
             'vx_interface': 'vxlan-%06x' % self.vxid,
             'vx_bridge': 'br-vxlan-%06x' % self.vxid,
             'vx_veth_outer': 'veth-%06x-o' % self.vxid,
