@@ -241,7 +241,7 @@ def requires_instance_active(func):
             return error(404, 'instance not found')
 
         i = kwargs['instance_from_db']
-        if i.state['state'] != 'created':
+        if i.state['state'] in ['initial', 'preflight', 'creating']:
             LOG.withInstance(i).info('Instance not active')
             return error(406, 'instance not active')
 
@@ -319,7 +319,7 @@ def requires_network_active(func):
             log.info('Network not found, kwarg missing')
             return error(404, 'network not found')
 
-        if kwargs['network_from_db'].state['state'] != 'created':
+        if kwargs['network_from_db'].state['state'] in ['initial', 'preflight', 'creating']:
             log.info('Network not active')
             return error(406, 'network not active')
 
@@ -683,7 +683,7 @@ class Instances(Resource):
                                      'range of the network')
 
                 n = net.Network.from_db(netdesc['network_uuid'])
-                if n.state['state'] != 'created':
+                if n.state['state'] in ['initial', 'preflight', 'creating']:
                     return error(406, 'network %s is not active' % n.uuid)
 
         if not video:
