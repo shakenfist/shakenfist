@@ -1158,19 +1158,17 @@ def _delete_network(network_from_db):
     # Load network from DB to ensure obtaining correct lock.
     n = net.Network.from_db(network_from_db.uuid)
     if not n:
-        LOG.withFields({'network_uuid': n.uuid,
-                        }).warning('delete_network: network does not exist')
+        LOG.withFields({'network_uuid': n.uuid}).warning(
+            'delete_network: network does not exist')
         return error(404, 'network does not exist')
 
-    with db.get_object_lock(n, ttl=120, op='Network deleting'):
-        if n.is_dead():
-            LOG.withFields({'network_uuid': n.uuid,
-                            'state': n.state['state'],
-                            }).warning('delete_network: network is dead')
-            return error(404, 'network is deleted')
+    if n.is_dead():
+        LOG.withFields({'network_uuid': n.uuid,
+                        'state': n.state['state']
+                        }).warning('delete_network: network is dead')
+        return error(404, 'network is deleted')
 
-        n.update_state('deleting')
-
+    n.update_state('deleting')
     n.add_event('api', 'delete')
     n.remove_dhcp()
     n.delete()
