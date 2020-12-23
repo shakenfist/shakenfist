@@ -215,9 +215,9 @@ def instance_start(instance_uuid, network):
                         instance_uuid, 'missing network: %s' % netdesc['network_uuid'])
                     return
 
-                if n.state != 'created':
+                if n.state['state'] != 'created':
                     db.enqueue_instance_error(
-                        instance_uuid, 'network is not active: %s' % n['uuid'])
+                        instance_uuid, 'network is not active: %s' % n.uuid)
 
                 nets[netdesc['network_uuid']] = n
 
