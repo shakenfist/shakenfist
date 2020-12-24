@@ -99,6 +99,14 @@ class ErrorInstanceTask(InstanceTask):
         return self._error_msg
 
 
+class SnapshotInstanceTask(InstanceTask):
+    _name = 'instance_snapshot'
+
+    def __init__(self, instance_uuid, snap_uuid):
+        super(SnapshotInstanceTask, self).__init__(instance_uuid)
+        self.snap_uuid = snap_uuid
+
+
 #
 # Network Tasks
 #

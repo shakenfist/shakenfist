@@ -46,6 +46,7 @@ from shakenfist.tasks import (DeleteInstanceTask,
                               FetchImageTask,
                               PreflightInstanceTask,
                               StartInstanceTask,
+                              SnapshotInstanceTask,
                               )
 
 
@@ -880,13 +881,11 @@ class InstanceSnapshot(Resource):
     @jwt_required
     @arg_is_instance_uuid
     @requires_instance_ownership
-    @redirect_instance_request
     @requires_instance_active
     def post(self, instance_uuid=None, instance_from_db=None, all=None):
-        snap_uuid = instance_from_db.snapshot(all=all)
-        instance_from_db.add_event('api', 'snapshot (all=%s)' % all,
-                                   None, snap_uuid)
-        db.add_event('snapshot', snap_uuid, 'api', 'create', None, None)
+        snap_uuid = str(uuid.uuid4())
+        snapshot_task = SnapshotInstanceTask(instance_uuid, snap_uuid)
+        db.enqueue(instance_from_db.placement, snapshot_task)
         return snap_uuid
 
     @jwt_required

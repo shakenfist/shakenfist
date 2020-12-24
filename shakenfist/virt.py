@@ -750,12 +750,14 @@ class Instance(baseobject.DatabaseBackedObject):
     def _snapshot_device(self, source, destination):
         images.snapshot(None, source, destination)
 
-    def snapshot(self, all=False):
+    def snapshot(self, all=False, snapshot_uuid=None):
         disks = self.block_devices['devices']
         if not all:
             disks = [disks[0]]
 
-        snapshot_uuid = str(uuid4())
+        if snapshot_uuid is None:
+            snapshot_uuid = str(uuid4())
+
         snappath = os.path.join(_snapshot_path(
             self.uuid), snapshot_uuid)
         if not os.path.exists(snappath):
@@ -776,10 +778,12 @@ class Instance(baseobject.DatabaseBackedObject):
                 continue
 
             with util.RecordedOperation('snapshot %s' % d['device'], self):
+                created_at = time.time()
+                db.create_snapshot(snapshot_uuid, d['device'], self.uuid,
+                                   created_at)
                 self._snapshot_device(
                     d['path'], os.path.join(snappath, d['device']))
-                db.create_snapshot(snapshot_uuid, d['device'], self.uuid,
-                                   time.time())
+                db.finalize_snapshot(snapshot_uuid, d['device'], created_at)
 
         return snapshot_uuid
 

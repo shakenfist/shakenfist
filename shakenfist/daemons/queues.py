@@ -23,6 +23,7 @@ from shakenfist.tasks import (QueueTask,
                               InstanceTask,
                               PreflightInstanceTask,
                               StartInstanceTask,
+                              SnapshotInstanceTask,
                               )
 
 
@@ -94,6 +95,17 @@ def handle(jobname, workitem):
                     db.enqueue('%s-metrics' % config.NODE_NAME, {})
                 except Exception as e:
                     util.ignore_exception(daemon.process_name('queues'), e)
+
+            elif isinstance(task, SnapshotInstanceTask):
+                snap_uuid = task.snap_uuid
+                instance = virt.Instance.from_db(instance_uuid)
+                if instance is None or instance.status != 'created':
+                    log_i.error('Instance not ready, unable to snapshot')
+                    return
+                instance.snapshot(all=all, snapshot_uuid=snap_uuid)
+                instance.add_event('api', 'snapshot (all=%s)' % all,
+                                   None, snap_uuid)
+                db.add_event('snapshot', snap_uuid, 'api', 'create', None, None)
 
             else:
                 log_i.withField('task', task).error('Unhandled task - dropped')

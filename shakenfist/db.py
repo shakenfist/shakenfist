@@ -235,8 +235,16 @@ def create_snapshot(snapshot_uuid, device, instance_uuid, created):
             'uuid': snapshot_uuid,
             'device': device,
             'instance_uuid': instance_uuid,
-            'created': created
+            'created': created,
+            'status': 'creating'
         })
+
+
+def finalize_snapshot(snapshot_uuid, instance_uuid, created):
+    snapshot = etcd.get('snapshot', instance_uuid, created)
+    snapshot['status'] = 'created'
+    etcd.put(
+        'snapshot', instance_uuid, created, snapshot)
 
 
 def get_instance_snapshots(instance_uuid):
