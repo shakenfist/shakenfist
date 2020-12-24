@@ -257,7 +257,7 @@ def discover_interfaces():
             iface_to_mac[iface_name] = link_ether
 
             if iface_name.startswith('vxlan-'):
-                vxid = int(iface_name.split('-')[1])
+                vxid = int(iface_name.split('-')[1], 16)
                 vxid_to_mac[vxid] = link_ether
 
     return mac_to_iface, iface_to_mac, vxid_to_mac
