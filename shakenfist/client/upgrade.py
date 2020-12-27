@@ -1,6 +1,6 @@
 # Copyright 2020 Michael Still
 
-import etcd3
+from etcd3gw.client import Etcd3Client
 import ipaddress
 import json
 
@@ -44,7 +44,7 @@ def clean_events_mesh_operations(etcd_client):
 
 
 def main():
-    etcd_client = etcd3.client()
+    etcd_client = Etcd3Client()
 
     versions = {}
     for node in db.get_nodes():
@@ -93,7 +93,8 @@ def main():
                     # NOTE(mikal): we have to hard delete this network here, or
                     # it will cause a crash later in the Networks iterator.
                     etcd_client.delete('/sf/network/%s' % n['uuid'])
-                    etcd_client.delete('/sf/attribute/network/%s/state' % n['uuid'])
+                    etcd_client.delete(
+                        '/sf/attribute/network/%s/state' % n['uuid'])
                     print('--> Deleted invalid network %s (netblock too small)'
                           % n['uuid'])
                     continue
