@@ -118,7 +118,8 @@ class Network(baseobject.DatabaseBackedObject):
         return Network(static_values)
 
     def external_view(self):
-        # If this is an external view, then mix back in attributes that users expect
+        # If this is an external view, then mix back in attributes that users
+        # expect
         n = {
             'uuid': self.uuid,
             'name': self.__name,
@@ -126,6 +127,7 @@ class Network(baseobject.DatabaseBackedObject):
             'netblock': self.__netblock,
             'provide_dhcp': self.__provide_dhcp,
             'provide_nat': self.__provide_nat,
+            'floating_gateway': self.floating_gateway,
             'vxid': self.__vxid,
             'version': self.version
         }
