@@ -252,7 +252,7 @@ class Scheduler(object):
             requested_images = []
             for disk in instance.disk_spec:
                 if disk.get('base'):
-                    img = images.Image.from_url(disk['base'])
+                    img = images.Image.new(disk['base'])
                     requested_images = img.url
 
             candidates = self._find_most_matching_images(

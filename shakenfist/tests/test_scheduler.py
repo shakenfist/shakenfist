@@ -204,7 +204,7 @@ class LowResourceTestCase(SchedulerTestCase):
                                 [])
         self.assertEqual('No nodes with enough idle RAM', str(exc))
 
-    @mock.patch('shakenfist.images.Image.from_url')
+    @mock.patch('shakenfist.images.Image.new')
     @mock.patch('shakenfist.db.get_image_metadata_all', return_value=None)
     def test_not_enough_disk(self, mock_get_image_meta, mock_image_from_url):
         self.fake_db.set_node_metrics_same({
@@ -230,7 +230,7 @@ class LowResourceTestCase(SchedulerTestCase):
                                 [])
         self.assertEqual('No nodes with enough disk space', str(exc))
 
-    @mock.patch('shakenfist.images.Image.from_url')
+    @mock.patch('shakenfist.images.Image.new')
     @mock.patch('shakenfist.db.get_image_metadata_all', return_value=None)
     def test_ok(self, mock_get_image_meta, mock_image_from_url):
         self.fake_db.set_node_metrics_same({
@@ -297,7 +297,7 @@ class CorrectAllocationTestCase(SchedulerTestCase):
                     'node': 'node3',
                     'disk_spec': [{'base': 'cirros', 'size': 21}]
                 })])
-    @mock.patch('shakenfist.images.Image.from_url')
+    @mock.patch('shakenfist.images.Image.new')
     @mock.patch('shakenfist.db.get_image_metadata_all', return_value=None)
     def test_any_node_but_not_network_node(
             self, mock_get_image_meta, mock_image_from_url, mock_get_instances,
@@ -342,7 +342,7 @@ class CorrectAllocationTestCase(SchedulerTestCase):
                     'memory': 1024,
                     'disk_spec': [{'base': 'cirros', 'size': 21}]
                 })])
-    @mock.patch('shakenfist.images.Image.from_url')
+    @mock.patch('shakenfist.images.Image.new')
     @mock.patch('shakenfist.db.get_image_metadata_all', return_value=None)
     def test_single_node_that_has_network(
             self, mock_get_image_meta, mock_image_from_url, mock_get_instances,

@@ -442,8 +442,6 @@ def restart_queues():
 #####################################################################
 # Images
 #####################################################################
-def get_image_metadata(url_hash, node=None):
-    return etcd.get('image', url_hash, node)
 
 
 def get_image_metadata_all(only_node=None):
@@ -455,7 +453,3 @@ def get_image_metadata_all(only_node=None):
                 del key_val[k]
 
     return key_val
-
-
-def persist_image_metadata(url_hash, node, metadata):
-    etcd.put('image', url_hash, node, metadata)

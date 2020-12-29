@@ -7,6 +7,7 @@ import re
 import requests
 import time
 
+from shakenfist import baseobject
 from shakenfist import db
 from shakenfist.config import config
 from shakenfist import exceptions
@@ -26,33 +27,100 @@ resolvers = {
 }
 
 
-def _get_cache_path():
-    image_cache_path = os.path.join(config.get('STORAGE_PATH'), 'image_cache')
-    if not os.path.exists(image_cache_path):
-        LOG.withField('image_cache_path',
-                      image_cache_path).debug('Creating image cache')
-        os.makedirs(image_cache_path, exist_ok=True)
-    return image_cache_path
+class Image(baseobject.DatabaseBackedObject):
+    object_type = 'image'
+    current_version = 2
 
+    def __init__(self, static_values):
+        # NOTE(mikal): we call the unique_ref the "uuid" for the rest of this
+        # class because that's what the base object does. Note that the
+        # checksum is not in fact a UUID and is in fact intended to collide
+        # when URLs are identical.
+        self.__unique_ref = self.calc_unique_ref(static_values['url'])
+        uuid = self.__unique_ref + '/' + config.NODE_NAME
+        super(Image, self).__init__(uuid, static_values['version'])
 
-class Image(object):
-    def __init__(self, url, checksum, size, modified, fetched, file_version):
-        self.url = url
-        self.checksum = checksum
-        self.size = size
-        self.modified = modified
-        self.fetched = fetched
-        self.file_version = file_version
+        self.__url = static_values['url']
 
-        # Derive extra parameters
-        self.unique_ref = self.calc_unique_ref(self.url)
-        self.image_path = os.path.join(_get_cache_path(), self.unique_ref)
+    @classmethod
+    def new(cls, url, checksum=None):
+        # Handle URL shortcut with built-in resolvers
+        url, resolver_checksum = Image._resolve(url)
+        if not checksum:
+            checksum = resolver_checksum
 
-        self.log = LOG.withImage(self)
+        uuid = '%s/%s' % (Image.calc_unique_ref(url), config.NODE_NAME)
 
-    def unique_label(self):
-        return ('image', self.unique_ref)
+        # Check for existing metadata in DB
+        i = Image.from_db(uuid)
+        if i:
+            i.update_checksum(checksum)
+            return i
 
+        Image._db_create(uuid, {'url': url})
+        i = Image.from_db(uuid)
+        i._db_set_attribute('state', {'state': 'initial'})
+        i.add_event('db record creation', None)
+        i.update_checksum(checksum)
+        return i
+
+    @staticmethod
+    def from_db(uuid):
+        if not uuid:
+            return None
+
+        static_values = Image._db_get(uuid)
+        if not static_values:
+            return None
+
+        return Image(static_values)
+
+    # Static values
+    @property
+    def url(self):
+        return self.__url
+
+    @property
+    def unique_ref(self):
+        return self.__unique_ref
+
+    # Values routed to attributes
+    @property
+    def checksum(self):
+        checksum = self._db_get_attribute('latest_checksum')
+        if not checksum:
+            return None
+        return checksum.get('checksum')
+
+    def update_checksum(self, checksum):
+        old_checksum = self.checksum
+        if checksum and checksum != old_checksum:
+            self._db_set_attribute('latest_checksum', {'checksum': checksum})
+            self.add_event('checksum has changed',
+                           '%s -> %s' % (old_checksum, checksum))
+
+    @property
+    def latest_download_version(self):
+        versions = {}
+        for key, data in self._db_get_attributes('download_'):
+            versions[int(key.split('_')[1])] = data
+        if not versions:
+            return {}
+        return versions[sorted(versions)[-1]]
+
+    def _add_download_version(self, size, modified, fetched_at):
+        with db.get_lock('attribute/image', self.uuid, 'download',
+                         op='Image version creation'):
+            new_version = self.latest_download_version['sequence'] + 1
+            self._db_set_attribute('download_%d' % new_version,
+                                   {
+                                       'size': size,
+                                       'modified': modified,
+                                       'fetched_at': fetched_at,
+                                       'sequence': new_version
+                                   })
+
+    # Implementation
     @staticmethod
     def _resolve(url):
         for resolver in resolvers:
@@ -75,50 +143,6 @@ class Image(object):
         h.update(url.encode('utf-8'))
         return h.hexdigest()
 
-    @staticmethod
-    def from_url(url, checksum=None):
-        # Handle URL shortcut with built-in resolvers
-        url, resolver_checksum = Image._resolve(url)
-        if not checksum:
-            checksum = resolver_checksum
-
-        # Check for existing metadata in DB
-        db_data = db.get_image_metadata(Image.calc_unique_ref(url),
-                                        config.NODE_NAME)
-
-        # Load DB data into new Image object
-        if db_data:
-            db_data['checksum'] = checksum
-            return Image.from_db_data(db_data)
-
-        # Create new object since not found in database
-        return Image(url, checksum, None, None, None, 0)
-
-    @staticmethod
-    def from_db_data(db_data):
-        ver = db_data['version']
-        del db_data['version']
-
-        # Check version of DB metadata packet
-        if ver == 1:
-            return Image(**db_data)
-        else:
-            raise exceptions.BadObjectVersion(
-                'Unknown version - Image: %s', db_data)
-
-    def persist(self):
-        metadata = {
-            'url': self.url,
-            'checksum': self.checksum,
-            'size': self.size,
-            'modified': self.modified,
-            'fetched': self.fetched,
-            'file_version': self.file_version,
-            'version': 1,
-        }
-        db.persist_image_metadata(self.unique_ref, config.NODE_NAME,
-                                  metadata)
-
     def get(self, locks, related_object):
         """Wrap three retries around the image get.
 
@@ -134,8 +158,16 @@ class Image(object):
                 exc = e
         raise exc
 
-    def version_image_path(self):
-        return '%s.v%03d' % (self.image_path, self.file_version)
+    def version_image_path(self, inc=0):
+        image_cache_path = os.path.join(
+            config.get('STORAGE_PATH'), 'image_cache')
+        if not os.path.exists(image_cache_path):
+            LOG.withField('image_cache_path',
+                          image_cache_path).debug('Creating image cache')
+            os.makedirs(image_cache_path, exist_ok=True)
+
+        return '%s/%s.v%03d' % (image_cache_path, self.unique_ref,
+                                self.latest_download_version['sequence'] + inc)
 
     def _get(self, locks, related_object):
         """Fetch image if not downloaded and return image path."""
@@ -146,7 +178,7 @@ class Image(object):
 
             diff_field = self._new_image_available(resp)
             if diff_field:
-                self.log.withField('diff_field', diff_field).info(
+                LOG.withImage(self).withField('diff_field', diff_field).info(
                     'Fetch required due HTTP field change')
                 if related_object:
                     t, u = related_object.unique_label()
@@ -164,10 +196,9 @@ class Image(object):
                 # Only persist values after the file has been verified.
                 # Otherwise diff_field will not trigger a new download in the
                 # case of a checksum verification failure.
-                self.fetched = email.utils.formatdate()
-                self.modified = resp.headers.get('Last-Modified')
-                self.size = resp.headers.get('Content-Length')
-                self.persist()
+                self._add_download_version(resp.headers.get('Content-Length'),
+                                           resp.headers.get('Last-Modified'),
+                                           email.utils.formatdate())
 
         _transcode(locks, actual_image, related_object)
 
@@ -184,23 +215,24 @@ class Image(object):
 
     def _new_image_available(self, resp):
         """Check if HTTP headers indicate the image file has changed."""
+        latest = self.latest_download_version
+
         modified = resp.headers.get('Last-Modified')
-        if self.modified != modified:
-            return ('modified', self.modified, modified)
+        if latest.get('modified') != modified:
+            return ('modified', latest.get('modified'), modified)
 
         size = resp.headers.get('Content-Length')
-        if self.size != size:
-            return ('size', self.size, size)
+        if latest.get('size') != size:
+            return ('size', latest.get('size'), size)
 
         return False
 
     def _fetch(self, resp, locks=None):
         """Download the image if the latest version is not in the cache."""
         fetched = 0
-        self.file_version += 1
 
         last_refresh = 0
-        with open(self.version_image_path(), 'wb') as f:
+        with open(self.version_image_path(inc=1), 'wb') as f:
             for chunk in resp.iter_content(chunk_size=8192):
                 fetched += len(chunk)
                 f.write(chunk)
@@ -213,7 +245,7 @@ class Image(object):
                                       fetched).info('Fetch complete')
 
         # Check if decompression not required
-        fn = self.version_image_path()
+        fn = self.version_image_path(inc=1)
         if not self.url.endswith('.gz'):
             return fn
 
