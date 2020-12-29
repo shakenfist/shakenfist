@@ -803,7 +803,7 @@ class Instance(baseobject.DatabaseBackedObject):
         self.add_event('unpause', 'complete')
 
     def get_console_data(self, length):
-        console_path = os.path.join(self.instance_path(), 'console.log')
+        console_path = os.path.join(self.instance_path, 'console.log')
         if not os.path.exists(console_path):
             return ''
 
