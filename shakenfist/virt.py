@@ -108,16 +108,8 @@ def _initialize_block_devices(instance_path, disk_spec):
     return block_devices
 
 
-def instance_path(instance_uuid):
-    return os.path.join(config.get('STORAGE_PATH'), 'instances', instance_uuid)
-
-
-def _snapshot_path(instance_uuid):
+def _snapshot_path():
     return os.path.join(config.get('STORAGE_PATH'), 'snapshots')
-
-
-def _xml_file(instance_uuid):
-    return os.path.join(instance_path(instance_uuid), 'libvirt.xml')
 
 
 class Instance(baseobject.DatabaseBackedObject):
@@ -184,7 +176,8 @@ class Instance(baseobject.DatabaseBackedObject):
         return Instance(static_values)
 
     def external_view(self):
-        # If this is an external view, then mix back in attributes that users expect
+        # If this is an external view, then mix back in attributes that users
+        # expect
         i = {
             'uuid': self.uuid,
             'cpus': self.cpus,
@@ -261,6 +254,14 @@ class Instance(baseobject.DatabaseBackedObject):
     def video(self):
         return self.__video
 
+    @property
+    def instance_path(self):
+        return os.path.join(config.get('STORAGE_PATH'), 'instances', self.uuid)
+
+    @property
+    def xml_file(self):
+        return os.path.join(self.instance_path, 'libvirt.xml')
+
     # Values routed to attributes, writes are via helper methods.
     @property
     def placement(self):
@@ -287,9 +288,11 @@ class Instance(baseobject.DatabaseBackedObject):
         return self._db_get_attribute('block_devices')
 
     # Implementation
+    def get_lock(self, name, op):
+        return db.get_lock('attribute/instance', self.uuid, name, op=op)
+
     def place_instance(self, location):
-        with db.get_lock('attribute/instance', self.uuid, 'placement',
-                         op='Instance placement'):
+        with self.get_lock('placement', 'Instance placement'):
             # We don't write unchanged things to the database
             placement = self.placement
             if placement.get('node') == location:
@@ -302,15 +305,14 @@ class Instance(baseobject.DatabaseBackedObject):
             self.add_event('placement', None, None, location)
 
     def enforced_deletes_increment(self):
-        with db.get_lock('attribute/instance', self.uuid, 'enforced_deletes',
-                         op='Instance enforced deletes increment'):
+        with self.get_lock('enforced_deletes',
+                           'Instance enforced deletes increment'):
             enforced_deletes = self.enforced_deletes
             enforced_deletes['count'] = enforced_deletes.get('count', 0) + 1
             self._db_set_attribute('enforced_deletes', enforced_deletes)
 
     def update_power_state(self, state):
-        with db.get_lock('attribute/instance', self.uuid, 'power_state',
-                         op='Instance power state update'):
+        with self.get_lock('power_state', 'Instance power state update'):
             # We don't write unchanged things to the database
             dbstate = self.power_state
             if dbstate.get('power_state') == state:
@@ -341,7 +343,7 @@ class Instance(baseobject.DatabaseBackedObject):
         self.update_state('creating')
 
         # Ensure we have state on disk
-        os.makedirs(instance_path(self.uuid), exist_ok=True)
+        os.makedirs(self.instance_path, exist_ok=True)
 
         # Configure block devices, include config drive creation
         self._configure_block_devices(lock)
@@ -380,8 +382,8 @@ class Instance(baseobject.DatabaseBackedObject):
 
         with util.RecordedOperation('delete disks', self):
             try:
-                if os.path.exists(instance_path(self.uuid)):
-                    shutil.rmtree(instance_path(self.uuid))
+                if os.path.exists(self.instance_path):
+                    shutil.rmtree(self.instance_path)
             except Exception as e:
                 util.ignore_exception('instance delete', e)
 
@@ -407,8 +409,7 @@ class Instance(baseobject.DatabaseBackedObject):
         etcd.delete_all('event/instance', self.uuid)
 
     def allocate_instance_ports(self):
-        with db.get_lock('attribute/instance', self.uuid, 'ports',
-                         op='Instance port allocation'):
+        with self.get_lock('ports', 'Instance port allocation'):
             ports = self.ports
             if not ports:
                 self.ports = {
@@ -417,18 +418,17 @@ class Instance(baseobject.DatabaseBackedObject):
                 }
 
     def _configure_block_devices(self, lock):
-        with db.get_lock('attribute/instance', self.uuid, 'block_devices',
-                         op='Instance initialize block devices'):
+        with self.get_lock('block_devices', 'Initialize block devices'):
             # Create block devices if required
             block_devices = self.block_devices
             if not block_devices:
-                block_devices = _initialize_block_devices(
-                    instance_path(self.uuid), self.disk_spec)
+                block_devices = _initialize_block_devices(self.instance_path,
+                                                          self.disk_spec)
 
             # Generate a config drive
             with util.RecordedOperation('make config drive', self):
                 self._make_config_drive(
-                    os.path.join(instance_path(self.uuid),
+                    os.path.join(self.instance_path,
                                  block_devices['devices'][1]['path']))
 
             # Prepare disks
@@ -644,7 +644,7 @@ class Instance(baseobject.DatabaseBackedObject):
     def _create_domain_xml(self):
         """Create the domain XML for the instance."""
 
-        if os.path.exists(_xml_file(self.uuid)):
+        if os.path.exists(self.xml_file):
             return
 
         with open(os.path.join(config.get('STORAGE_PATH'), 'libvirt.tmpl')) as f:
@@ -672,14 +672,14 @@ class Instance(baseobject.DatabaseBackedObject):
             vcpus=self.cpus,
             disks=block_devices.get('devices'),
             networks=networks,
-            instance_path=instance_path(self.uuid),
+            instance_path=self.instance_path,
             console_port=ports.get('console_port'),
             vdi_port=ports.get('vdi_port'),
             video_model=self.video['model'],
             video_memory=self.video['memory']
         )
 
-        with open(_xml_file(self.uuid), 'w') as f:
+        with open(self.xml_file, 'w') as f:
             f.write(xml)
 
     def _get_domain(self):
@@ -700,12 +700,12 @@ class Instance(baseobject.DatabaseBackedObject):
         return util.extract_power_state(libvirt, instance)
 
     def power_on(self):
-        if not os.path.exists(_xml_file(self.uuid)):
+        if not os.path.exists(self.xml_file):
             db.enqueue_instance_error(self.uuid,
                                       'missing domain file in power on')
 
         libvirt = util.get_libvirt()
-        with open(_xml_file(self.uuid)) as f:
+        with open(self.xml_file) as f:
             xml = f.read()
 
         instance = self._get_domain()
@@ -753,13 +753,12 @@ class Instance(baseobject.DatabaseBackedObject):
             disks = [disks[0]]
 
         snapshot_uuid = str(uuid4())
-        snappath = os.path.join(_snapshot_path(
-            self.uuid), snapshot_uuid)
+        snappath = os.path.join(_snapshot_path(), snapshot_uuid)
         if not os.path.exists(snappath):
             LOG.withObj(self).debug(
                 'Creating snapshot storage at %s' % snappath)
             os.makedirs(snappath, exist_ok=True)
-            with open(os.path.join(_snapshot_path(self.uuid), 'index.html'), 'w') as f:
+            with open(os.path.join(_snapshot_path(), 'index.html'), 'w') as f:
                 f.write('<html></html>')
 
         for d in disks:
@@ -804,8 +803,7 @@ class Instance(baseobject.DatabaseBackedObject):
         self.add_event('unpause', 'complete')
 
     def get_console_data(self, length):
-        console_path = os.path.join(instance_path(
-            self.uuid), 'console.log')
+        console_path = os.path.join(self.instance_path(), 'console.log')
         if not os.path.exists(console_path):
             return ''
 

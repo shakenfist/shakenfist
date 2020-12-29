@@ -116,6 +116,8 @@ class VirtMetaTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertEqual('uuid42', inst.uuid)
         self.assertEqual(2, inst.version)
         self.assertEqual({'memory': 16384, 'model': 'cirrus'}, inst.video)
+        self.assertEqual('/a/b/c/instances/uuid42', inst.instance_path)
+        self.assertEqual('/a/b/c/instances/uuid42/libvirt.xml', inst.xml_file)
 
 
 class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
@@ -294,12 +296,7 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
                          etcd_write[1]['power_state_previous'])
 
     def test_helpers(self):
-        self.assertEqual('/a/b/c/instances/fakeuuid',
-                         virt.instance_path('fakeuuid'))
-        self.assertEqual('/a/b/c/snapshots',
-                         virt._snapshot_path('fakeuuid'))
-        self.assertEqual('/a/b/c/instances/fakeuuid/libvirt.xml',
-                         virt._xml_file('fakeuuid'))
+        self.assertEqual('/a/b/c/snapshots', virt._snapshot_path())
 
     def test_str(self):
         i = self._make_instance()
