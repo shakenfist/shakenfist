@@ -28,14 +28,14 @@ class DatabaseBackedObject(object):
         return self.__version
 
     def __str__(self):
-        return '%s(%s)' % (type(self).object_type, self.__uuid)
+        return '%s(%s)' % (self.object_type, self.__uuid)
 
     def unique_label(self):
-        return (type(self).object_type, self.__uuid)
+        return (self.object_type, self.__uuid)
 
     def add_event(self, operation, phase, duration=None, msg=None):
         db.add_event(
-            type(self).object_type, self.__uuid, operation, phase, duration, msg)
+            self.object_type, self.__uuid, operation, phase, duration, msg)
 
     @classmethod
     def _db_create(cls, object_uuid, metadata):
@@ -44,12 +44,11 @@ class DatabaseBackedObject(object):
 
     @classmethod
     def _db_get(cls, object_uuid):
-        # NOTE(mikal): we don't do upgrades inflight. They are assumed to have been
-        # done as part of the upgrade process.
+        # NOTE(mikal): we don't do upgrades inflight. They are assumed to have
+        # been done as part of the upgrade process.
         o = etcd.get(cls.object_type, None, object_uuid)
         if not o:
-            LOG.withField(cls.object_type, object_uuid).error(
-                'Object missing')
+            LOG.withField(cls.object_type, object_uuid).error('Object missing')
             return None
 
         if o.get('version', 0) != cls.current_version:
@@ -58,8 +57,7 @@ class DatabaseBackedObject(object):
         return o
 
     def _db_get_attribute(self, attribute):
-        retval = etcd.get('attribute/%s' % type(self).object_type,
-                          self.__uuid, attribute)
+        retval = etcd.get('attribute/%s' % self.object_type, self.__uuid, attribute)
         if not retval:
             return {}
         return retval
@@ -70,8 +68,7 @@ class DatabaseBackedObject(object):
             yield key, data
 
     def _db_set_attribute(self, attribute, value):
-        etcd.put('attribute/%s' % type(self).object_type,
-                 self.__uuid, attribute, value)
+        etcd.put('attribute/%s' % self.object_type, self.__uuid, attribute, value)
 
     # Properties common to all objects which are routed to attributes
     @property
@@ -79,7 +76,7 @@ class DatabaseBackedObject(object):
         return self._db_get_attribute('state')
 
     def update_state(self, state, error_message=None):
-        with db.get_lock('attribute/%s' % type(self).object_type, self.__uuid, 'state',
+        with db.get_lock('attribute/%s' % self.object_type, self.__uuid, 'state',
                          op='State update'):
             dbstate = self.state
             orig_state = dbstate.get('state')
