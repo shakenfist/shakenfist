@@ -195,7 +195,8 @@ def main():
 
             # Upgrade images to the new attribute style
             for data, metadata in etcd_client.get_prefix('/sf/image/'):
-                image_node = '/'.join(metadata['key'].split('/')[-2:])
+                image_node = '/'.join(
+                    metadata['key'].decode('utf-8').split('/')[-2:])
                 image = json.loads(data.decode('utf-8'))
                 if int(image.get('version', 0)) < 2:
                     data = {}
@@ -218,6 +219,10 @@ def main():
                             json.dumps({'checksum': image.get('checksum')},
                                        indent=4, sort_keys=True))
                         del image['checksum']
+
+                    etcd_client.put(
+                        '/sf/attribute/image/%s/state' % image_node,
+                        json.dumps({'state': 'created'}, indent=4, sort_keys=True))
 
                     image['version'] = 2
                     etcd_client.put(metadata['key'],

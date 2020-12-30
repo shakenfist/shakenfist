@@ -259,6 +259,7 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertEqual([mock.call('latest_checksum', {'checksum': '1abab'})],
                          mock_set_attr.mock_calls)
 
+    @mock.patch('shakenfist.images.Image.update_state')
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get',
                 side_effect=[None,
                              {
@@ -271,7 +272,8 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.images.Image.checksum',
                 new_callable=mock.PropertyMock)
     def test_image_persist(
-            self, mock_checksum, mock_create, mock_set_attr, mock_mkdirs, mock_get):
+            self, mock_checksum, mock_create, mock_set_attr, mock_mkdirs, mock_get,
+            mock_update_state):
         images.Image.new('http://example.com', '1abab')
         self.assertEqual([
             mock.call('f0e6a6a97042a4f1f1c87f5f7d44315b2d852c2df5c7991cc66241'
@@ -397,6 +399,7 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
         dirty_fields = img._new_image_available(img._open_connection())
         self.assertEqual(('size', 200000, 16338944), dirty_fields)
 
+    @mock.patch('shakenfist.images.Image.update_state')
     @mock.patch('requests.get',
                 return_value=FakeResponse(
                     200, '',
@@ -415,7 +418,7 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
                 new_callable=mock.PropertyMock)
     def test_fetch_image_new(
             self, mock_version, mock_checksum, mock_mkdirs, mock_get,
-            mock_request_head):
+            mock_request_head, mock_update_state):
         mock_version.return_value = {}
 
         img = images.Image.new('http://example.com')
@@ -715,6 +718,7 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertFalse(image.correct_checksum(ret))
 
     # Data matches checksum
+    @mock.patch('shakenfist.images.Image.update_state')
     @mock.patch('shakenfist.images.Image._add_download_version')
     @mock.patch('shakenfist.images.Image.latest_download_version',
                 new_callable=mock.PropertyMock)
@@ -729,7 +733,7 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.db.refresh_locks')
     def test_get(
             self, mock_refresh_locks, mock_put, mock_open, mock_transcode,
-            mock_version, mock_add_version):
+            mock_version, mock_add_version, mock_update_state):
         mock_version.return_value = {
             'size': 200000,
             'modified': 'Tue, 10 Sep 2019 07:24:40 GMT',
@@ -754,6 +758,7 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
             mock_add_version.mock_calls)
 
     # First download attempt corrupted, second download matches checksum
+    @mock.patch('shakenfist.images.Image.update_state')
     @mock.patch('shakenfist.images.Image._add_download_version')
     @mock.patch('shakenfist.images.Image.latest_download_version',
                 new_callable=mock.PropertyMock)
@@ -770,7 +775,7 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.db.refresh_locks')
     def test_get_one_corrupt(
             self, mock_refresh_locks, mock_put, mock_open, mock_transcode,
-            mock_version, mock_add_version):
+            mock_version, mock_add_version, mock_update_state):
         mock_version.return_value = {
             'size': 200000,
             'modified': 'Tue, 10 Sep 2019 07:24:40 GMT',
@@ -791,6 +796,7 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertTrue(image.correct_checksum(ret))
 
     # All download attempts not matching checksum
+    @mock.patch('shakenfist.images.Image.update_state')
     @mock.patch('shakenfist.images.Image._add_download_version')
     @mock.patch('shakenfist.images.Image.latest_download_version',
                 new_callable=mock.PropertyMock)
@@ -807,7 +813,7 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.db.refresh_locks')
     def test_get_always_corrupt(
             self, mock_refresh_locks, mock_put, mock_open,
-            mock_version, mock_add_version):
+            mock_version, mock_add_version, mock_update_state):
         mock_version.return_value = {
             'size': 200000,
             'modified': 'Tue, 10 Sep 2019 07:24:40 GMT',

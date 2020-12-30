@@ -60,8 +60,9 @@ class Image(baseobject.DatabaseBackedObject):
         Image._db_create(uuid, {'url': url})
         i = Image.from_db(uuid)
         i._db_set_attribute('state', {'state': 'initial'})
-        i.add_event('db record creation', None)
+        i.update_state('initial')
         i.update_checksum(checksum)
+        i.add_event('db record creation', None)
         return i
 
     @staticmethod
@@ -143,6 +144,13 @@ class Image(baseobject.DatabaseBackedObject):
         h.update(url.encode('utf-8'))
         return h.hexdigest()
 
+    def delete(self):
+        # NOTE(mikal): it isn't actually safe to remove the image from the cache
+        # without verifying that no instance is using it, so we just mark the
+        # image as deleted in the database and move on without removing things
+        # from the cache. We will probably want to revisit this in the future.
+        self.update_state('deleted')
+
     def get(self, locks, related_object):
         """Wrap three retries around the image get.
 
@@ -155,6 +163,9 @@ class Image(baseobject.DatabaseBackedObject):
                 return self._get(locks, related_object)
             except exceptions.BadCheckSum as e:
                 LOG.warning('Bad checksum while downloading image: %s' % e)
+                self.update_state(
+                    'error',
+                    error_message='Bad checksum while downloading image: %s' % e)
                 exc = e
         raise exc
 
@@ -172,6 +183,7 @@ class Image(baseobject.DatabaseBackedObject):
     def _get(self, locks, related_object):
         """Fetch image if not downloaded and return image path."""
         actual_image = self.version_image_path()
+        self.update_state('creating')
 
         with util.RecordedOperation('fetch image', related_object):
             resp = self._open_connection()
@@ -201,7 +213,7 @@ class Image(baseobject.DatabaseBackedObject):
                                            email.utils.formatdate())
 
         _transcode(locks, actual_image, related_object)
-
+        self.update_state('created')
         return actual_image
 
     def _open_connection(self):
