@@ -2,6 +2,7 @@
 
 import os
 import psutil
+import random
 import re
 from uuid import uuid4
 
@@ -50,6 +51,17 @@ class Network(baseobject.DatabaseBackedObject):
         self.__broadcast = ipm.broadcast_address
         self.__network_address = ipm.network_address
 
+    @staticmethod
+    def allocate_vxid(net_id):
+        vxid = random.randint(1, 16777215)
+        while not etcd.create('vxlan', None, vxid, {'network_uuid': net_id}):
+            vxid = random.randint(1, 16777215)
+        return vxid
+
+    @staticmethod
+    def deallocate_vxid(vxid):
+        etcd.delete('vxlan', None, vxid)
+
     @classmethod
     def new(cls, name, namespace, netblock, provide_dhcp=False, provide_nat=False,
             uuid=None, vxid=None):
@@ -59,7 +71,7 @@ class Network(baseobject.DatabaseBackedObject):
             uuid = str(uuid4())
 
         if not vxid:
-            vxid = db.allocate_vxid(uuid)
+            vxid = Network.allocate_vxid(uuid)
 
         # Pre-create the IPManager
         IPManager.new(uuid, netblock)
@@ -458,8 +470,13 @@ class Network(baseobject.DatabaseBackedObject):
                         ipm.persist()
                         self.update_floating_gateway(None)
 
-            db.deallocate_vxid(self.vxid)
+            Network.deallocate_vxid(self.vxid)
             IPManager.from_db(self.uuid).delete()
+
+    def hard_delete(self):
+        etcd.delete('network', None, self.uuid)
+        etcd.delete_all('event/network', self.uuid)
+        db.delete_metadata('network', self.uuid)
 
     def is_dnsmasq_running(self):
         """Determine if dnsmasq process is running for this network"""
