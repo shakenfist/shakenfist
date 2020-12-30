@@ -288,11 +288,11 @@ class Instance(baseobject.DatabaseBackedObject):
         return self._db_get_attribute('block_devices')
 
     # Implementation
-    def get_lock(self, name, op):
+    def get_lock_attr(self, name, op):
         return db.get_lock('attribute/instance', self.uuid, name, op=op)
 
     def place_instance(self, location):
-        with self.get_lock('placement', 'Instance placement'):
+        with self.get_lock_attr('placement', 'Instance placement'):
             # We don't write unchanged things to the database
             placement = self.placement
             if placement.get('node') == location:
@@ -305,14 +305,14 @@ class Instance(baseobject.DatabaseBackedObject):
             self.add_event('placement', None, None, location)
 
     def enforced_deletes_increment(self):
-        with self.get_lock('enforced_deletes',
-                           'Instance enforced deletes increment'):
+        with self.get_lock_attr('enforced_deletes',
+                                'Instance enforced deletes increment'):
             enforced_deletes = self.enforced_deletes
             enforced_deletes['count'] = enforced_deletes.get('count', 0) + 1
             self._db_set_attribute('enforced_deletes', enforced_deletes)
 
     def update_power_state(self, state):
-        with self.get_lock('power_state', 'Instance power state update'):
+        with self.get_lock_attr('power_state', 'Instance power state update'):
             # We don't write unchanged things to the database
             dbstate = self.power_state
             if dbstate.get('power_state') == state:
@@ -409,7 +409,7 @@ class Instance(baseobject.DatabaseBackedObject):
         etcd.delete_all('event/instance', self.uuid)
 
     def allocate_instance_ports(self):
-        with self.get_lock('ports', 'Instance port allocation'):
+        with self.get_lock_attr('ports', 'Instance port allocation'):
             ports = self.ports
             if not ports:
                 self.ports = {
@@ -418,7 +418,7 @@ class Instance(baseobject.DatabaseBackedObject):
                 }
 
     def _configure_block_devices(self, lock):
-        with self.get_lock('block_devices', 'Initialize block devices'):
+        with self.get_lock_attr('block_devices', 'Initialize block devices'):
             # Create block devices if required
             block_devices = self.block_devices
             if not block_devices:
