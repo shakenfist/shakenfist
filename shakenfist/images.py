@@ -261,6 +261,9 @@ class Image(baseobject.DatabaseBackedObject):
             log.info('No checksum comparison available')
             return True
 
+        if not os.path.exists(image_name):
+            return False
+
         # MD5 chosen because cirros 90% of the time has MD5SUMS available...
         md5_hash = hashlib.md5()
         with open(image_name, 'rb') as f:

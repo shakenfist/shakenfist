@@ -2,6 +2,7 @@ import mock
 import os
 import testtools
 from pydantic import AnyHttpUrl
+import shutil
 
 
 from shakenfist import exceptions
@@ -653,6 +654,9 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
         super().setUp()
 
         fake_config = FakeConfigTmpFile()
+        if not os.path.exists('/tmp/image_cache'):
+            os.mkdir('/tmp/image_cache')
+            self.addCleanup(shutil.rmtree, '/tmp/image_cache')
 
         self.config = mock.patch('shakenfist.images.config', fake_config)
         self.mock_config = self.config.start()

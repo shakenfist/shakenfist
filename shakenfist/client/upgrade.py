@@ -193,6 +193,37 @@ def main():
                     print('--> Upgraded instance %s to version 2'
                           % instance['uuid'])
 
+            # Upgrade images to the new attribute style
+            for data, metadata in etcd_client.get_prefix('/sf/image/'):
+                image_node = '/'.join(metadata['key'].split('/')[-2:])
+                image = json.loads(data.decode('utf-8'))
+                if int(image.get('version', 0)) < 2:
+                    data = {}
+                    RENAMES = {
+                        'fetched': 'fetched_at',
+                        'file_version': 'sequence'
+                    }
+                    for attr in ['size', 'modified', 'fetched', 'file_version']:
+                        if image.get(attr):
+                            data[RENAMES.get(attr, attr)] = image[attr]
+                            del image[attr]
+                    etcd_client.put(
+                        ('/sf/attribute/image/%s/download_%d'
+                         % (image_node, image.get('sequence', 0))),
+                        json.dumps(data, indent=4, sort_keys=True))
+
+                    if image.get('checksum'):
+                        etcd_client.put(
+                            '/sf/attribute/image/%s/latest_checksum' % image_node,
+                            json.dumps({'checksum': image.get('checksum')},
+                                       indent=4, sort_keys=True))
+                        del image['checksum']
+
+                    image['version'] = 2
+                    etcd_client.put(metadata['key'],
+                                    json.dumps(image, indent=4, sort_keys=True))
+                    print('--> Upgraded image %s to version 2' % image_node)
+
 
 if __name__ == '__main__':
     main()
