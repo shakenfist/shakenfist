@@ -57,7 +57,7 @@ class Image(baseobject.DatabaseBackedObject):
             i.update_checksum(checksum)
             return i
 
-        Image._db_create(uuid, {'url': url})
+        Image._db_create(uuid, {'url': url, 'version': cls.current_version})
         i = Image.from_db(uuid)
         i._db_set_attribute('state', {'state': 'initial'})
         i.update_state('initial')

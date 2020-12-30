@@ -277,7 +277,8 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
         images.Image.new('http://example.com', '1abab')
         self.assertEqual([
             mock.call('f0e6a6a97042a4f1f1c87f5f7d44315b2d852c2df5c7991cc66241'
-                      'bf7072d1c4/sf-245', {'url': 'http://example.com'})
+                      'bf7072d1c4/sf-245',
+                      {'url': 'http://example.com', 'version': 2})
         ], mock_create.mock_calls)
         self.assertEqual([
             mock.call('state', {'state': 'initial'}),
