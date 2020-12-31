@@ -92,6 +92,8 @@ class ImageUtilsTestCase(test_shakenfist.ShakenFistTestCase):
         i = images.Image({
             'url': 'https://www.shakenfist.com',
             'checksum': None,
+            'ref': 'hdjkhghjsdfjkhfdghk',
+            'node': 'sf-245',
             'version': 2
         })
         p = i.version_image_path()
@@ -106,6 +108,8 @@ class ImageUtilsTestCase(test_shakenfist.ShakenFistTestCase):
         i = images.Image({
             'url': 'https://www.shakenfist.com',
             'checksum': None,
+            'ref': 'hdjkhghjsdfjkhfdghk',
+            'node': 'sf-245',
             'version': 2
         })
         p = i.version_image_path()
@@ -247,6 +251,9 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get',
                 return_value={
                     'url': 'http://example.com',
+                    'ref': ('f0e6a6a97042a4f1f1c87f5f7d44315b2d'
+                            '852c2df5c7991cc66241bf7072d1c4'),
+                    'node': 'sf-245',
                     'version': 2
                 })
     @mock.patch('os.makedirs')
@@ -264,6 +271,9 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
                 side_effect=[None,
                              {
                                  'url': 'http://example.com',
+                                 'ref': ('f0e6a6a97042a4f1f1c87f5f7d44315b2d'
+                                         '852c2df5c7991cc66241bf7072d1c4'),
+                                 'node': 'sf-245',
                                  'version': 2
                              }])
     @mock.patch('os.makedirs')
@@ -278,7 +288,15 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertEqual([
             mock.call('f0e6a6a97042a4f1f1c87f5f7d44315b2d852c2df5c7991cc66241'
                       'bf7072d1c4/sf-245',
-                      {'url': 'http://example.com', 'version': 2})
+                      {
+                          'uuid': ('f0e6a6a97042a4f1f1c87f5f7d44315b2d852c2df'
+                                   '5c7991cc66241bf7072d1c4/sf-245'),
+                          'url': 'http://example.com',
+                          'ref': ('f0e6a6a97042a4f1f1c87f5f7d44315b2d'
+                                  '852c2df5c7991cc66241bf7072d1c4'),
+                          'node': 'sf-245',
+                          'version': 2
+                      })
         ], mock_create.mock_calls)
         self.assertEqual([
             mock.call('state', {'state': 'initial'}),
@@ -288,6 +306,9 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get',
                 return_value={
                     'url': 'http://some.com',
+                    'ref': ('bbf155338660b47643506f35a6f92eba'
+                            'ef11e630b17d33da88b8638d267763f4'),
+                    'node': 'sf-245',
                     'version': 2
                 })
     @mock.patch('os.makedirs')
@@ -318,6 +339,9 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get',
                 return_value={
                     'url': 'http://example.com',
+                    'ref': ('f0e6a6a97042a4f1f1c87f5f7d44315b2d'
+                            '852c2df5c7991cc66241bf7072d1c4'),
+                    'node': 'sf-245',
                     'version': 2
                 })
     @mock.patch('os.makedirs')
@@ -347,6 +371,9 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get',
                 return_value={
                     'url': 'http://example.com',
+                    'ref': ('f0e6a6a97042a4f1f1c87f5f7d44315b2d'
+                            '852c2df5c7991cc66241bf7072d1c4'),
+                    'node': 'sf-245',
                     'version': 2
                 })
     @mock.patch('os.makedirs')
@@ -379,6 +406,9 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get',
                 return_value={
                     'url': 'http://example.com',
+                    'ref': ('f0e6a6a97042a4f1f1c87f5f7d44315b2d'
+                            '852c2df5c7991cc66241bf7072d1c4'),
+                    'node': 'sf-245',
                     'version': 2
                 })
     @mock.patch('os.makedirs')
@@ -410,6 +440,9 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
                 side_effect=[None,
                              {
                                  'url': 'http://example.com',
+                                 'ref': ('f0e6a6a97042a4f1f1c87f5f7d44315b2d'
+                                         '852c2df5c7991cc66241bf7072d1c4'),
+                                 'node': 'sf-245',
                                  'version': 2
                              }])
     @mock.patch('os.makedirs')
@@ -469,6 +502,9 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get',
                 return_value={
                     'url': 'http://example.com',
+                    'ref': ('f0e6a6a97042a4f1f1c87f5f7d44315b2d'
+                            '852c2df5c7991cc66241bf7072d1c4'),
+                    'node': 'sf-245',
                     'version': 2
                 })
     @mock.patch('os.makedirs')
@@ -501,6 +537,9 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get',
                 return_value={
                     'url': 'http://example.com',
+                    'ref': ('f0e6a6a97042a4f1f1c87f5f7d44315b2d'
+                            '852c2df5c7991cc66241bf7072d1c4'),
+                    'node': 'sf-245',
                     'version': 2
                 })
     @mock.patch('os.makedirs')
@@ -537,6 +576,9 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get',
                 return_value={
                     'url': 'http://example.com',
+                    'ref': ('f0e6a6a97042a4f1f1c87f5f7d44315b2d'
+                            '852c2df5c7991cc66241bf7072d1c4'),
+                    'node': 'sf-245',
                     'version': 2
                 })
     @mock.patch('os.makedirs')
@@ -670,7 +712,12 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
         test_file = '/tmp/' + self.id()
         test_checksum = 'a5890ace30a3e84d9118196c161aeec2'
 
-        image = FakeImageChecksum({'url': 'testurl', 'version': 2})
+        image = FakeImageChecksum({
+            'url': 'testurl',
+            'ref': 'hdjkhghjsdfjkhfdghk',
+            'node': 'sf-245',
+            'version': 2
+        })
         image.update_checksum(test_checksum)
 
         with open(test_file, 'w') as f:
@@ -696,7 +743,12 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
         }
 
         test_checksum = '097c42989a9e5d9dcced7b35ec4b0486'
-        image = FakeImageChecksum({'url': 'testurl', 'version': 2})
+        image = FakeImageChecksum({
+            'url': 'testurl',
+            'ref': '67066e685b94da02c9b7bb3840a9624b306755f7e1e5453dee8f3e665f34ff8f',
+            'node': 'sf-245',
+            'version': 2
+        })
         image.update_checksum(test_checksum)
 
         # Data matching checksum
@@ -743,7 +795,12 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
         }
 
         test_checksum = '097c42989a9e5d9dcced7b35ec4b0486'
-        image = FakeImageChecksum({'url': 'testurl', 'version': 2})
+        image = FakeImageChecksum({
+            'url': 'testurl',
+            'ref': '67066e685b94da02c9b7bb3840a9624b306755f7e1e5453dee8f3e665f34ff8f',
+            'node': 'sf-245',
+            'version': 2
+        })
         image.update_checksum(test_checksum)
 
         ret = image.get(None, None)
@@ -785,7 +842,12 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
         }
 
         test_checksum = '097c42989a9e5d9dcced7b35ec4b0486'
-        image = FakeImageChecksum({'url': 'testurl', 'version': 2})
+        image = FakeImageChecksum({
+            'url': 'testurl',
+            'ref': '67066e685b94da02c9b7bb3840a9624b306755f7e1e5453dee8f3e665f34ff8f',
+            'node': 'sf-245',
+            'version': 2
+        })
         image.update_checksum(test_checksum)
 
         ret = image.get(None, None)
@@ -823,7 +885,12 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
         }
 
         test_checksum = '097c42989a9e5d9dcced7b35ec4b0486'
-        image = FakeImageChecksum({'url': 'testurl', 'version': 2})
+        image = FakeImageChecksum({
+            'url': 'testurl',
+            'ref': 'hdjkhghjsdfjkhfdghk',
+            'node': 'sf-245',
+            'version': 2
+        })
         image.update_checksum(test_checksum)
 
         self.assertRaises(exceptions.BadCheckSum, image.get, None, None)

@@ -8,8 +8,9 @@ import requests
 import time
 
 from shakenfist import baseobject
-from shakenfist import db
 from shakenfist.config import config
+from shakenfist import db
+from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import image_resolver_cirros
 from shakenfist import image_resolver_ubuntu
@@ -36,11 +37,12 @@ class Image(baseobject.DatabaseBackedObject):
         # class because that's what the base object does. Note that the
         # checksum is not in fact a UUID and is in fact intended to collide
         # when URLs are identical.
-        self.__unique_ref = self.calc_unique_ref(static_values['url'])
-        uuid = self.__unique_ref + '/' + config.NODE_NAME
+        self.__unique_ref = static_values['ref']
+        uuid = self.__unique_ref + '/' + static_values['node']
         super(Image, self).__init__(uuid, static_values['version'])
 
         self.__url = static_values['url']
+        self.__node = static_values['node']
 
     @classmethod
     def new(cls, url, checksum=None):
@@ -49,7 +51,8 @@ class Image(baseobject.DatabaseBackedObject):
         if not checksum:
             checksum = resolver_checksum
 
-        uuid = '%s/%s' % (Image.calc_unique_ref(url), config.NODE_NAME)
+        unique_ref = Image.calc_unique_ref(url)
+        uuid = '%s/%s' % (unique_ref, config.NODE_NAME)
 
         # Check for existing metadata in DB
         i = Image.from_db(uuid)
@@ -57,7 +60,13 @@ class Image(baseobject.DatabaseBackedObject):
             i.update_checksum(checksum)
             return i
 
-        Image._db_create(uuid, {'url': url, 'version': cls.current_version})
+        Image._db_create(uuid, {
+            'uuid': uuid,
+            'url': url,
+            'node': config.NODE_NAME,
+            'ref': unique_ref,
+            'version': cls.current_version
+        })
         i = Image.from_db(uuid)
         i._db_set_attribute('state', {'state': 'initial'})
         i.update_state('initial')
@@ -84,6 +93,10 @@ class Image(baseobject.DatabaseBackedObject):
     @property
     def unique_ref(self):
         return self.__unique_ref
+
+    @property
+    def node(self):
+        return self.__node
 
     # Values routed to attributes
     @property
@@ -120,6 +133,35 @@ class Image(baseobject.DatabaseBackedObject):
                                        'fetched_at': fetched_at,
                                        'sequence': new_version
                                    })
+
+    def external_view(self):
+        # If this is an external view, then mix back in attributes that users expect
+        i = {
+            'uuid': self.uuid,
+            'url': self.url,
+            'node': self.node,
+            'ref': self.unique_ref,
+            'version': self.version
+        }
+
+        for attrname in ['state', 'latest_checksum']:
+            d = self._db_get_attribute(attrname)
+            for key in d:
+                # We skip keys with no value
+                if d[key] is None:
+                    continue
+
+                i[key] = d[key]
+
+        d = self.latest_download_version
+        for key in d:
+            # We skip keys with no value
+            if d[key] is None:
+                continue
+
+            i[key] = d[key]
+
+        return i
 
     # Implementation
     @staticmethod
@@ -307,6 +349,37 @@ class Image(baseobject.DatabaseBackedObject):
                      % (image_path, backing_file, size))
 
         return backing_file
+
+
+# TODO(mikal): can this be refactored into baseobject?
+class Images(object):
+    def __init__(self, filters):
+        self.filters = filters
+
+    def __iter__(self):
+        for _, i in etcd.get_all('image', None):
+            i = Image.from_db(i['uuid'])
+            if not i:
+                continue
+
+            skip = False
+            for f in self.filters:
+                # If a filter returns false, we remove the image from
+                # the result set.
+                if not f(i):
+                    skip = True
+                    break
+
+            if not skip:
+                yield i
+
+
+def url_filter(url, i):
+    return i.url == url
+
+
+def placement_filter(node, i):
+    return i.node == node
 
 
 def _transcode(locks, actual_image, related_object):

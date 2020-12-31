@@ -1,6 +1,7 @@
 # Make scheduling decisions
 
 import copy
+from functools import partial
 import random
 import time
 
@@ -124,26 +125,14 @@ class Scheduler(object):
         return candidates_by_network_matches[max_matches]
 
     def _find_most_matching_images(self, requested_images, candidates):
-        candidates_image_matches = {}
-
-        img_meta = db.get_image_metadata_all()
-        if not img_meta:
-            # No images in the cluster so return the original candidate list
-            return candidates
-
         # Determine number of matching images per node
+        candidates_image_matches = {}
         for node in candidates:
             candidates_image_matches[node] = 0
 
-            present_images = []
-            for key, meta in img_meta.items():
-                if not key.endswith('/' + node):
-                    continue
-                present_images.append(meta['url'])
-
-            for image in present_images:
-                if image in requested_images:
-                    candidates_image_matches[node] += 1
+        for image in requested_images:
+            for i in images.Images(filters=[partial(images.url_filter, image)]):
+                candidates_image_matches[i.node] += 1
 
         # Create dict of candidate lists keyed by number of image matches
         candidates_by_image_matches = {}

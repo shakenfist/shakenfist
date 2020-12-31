@@ -1,6 +1,5 @@
 # Copyright 2020 Michael Still
 
-import copy
 import random
 import socket
 import time
@@ -437,19 +436,3 @@ def get_queue_length(queuename):
 
 def restart_queues():
     etcd.restart_queues()
-
-
-#####################################################################
-# Images
-#####################################################################
-
-
-def get_image_metadata_all(only_node=None):
-    key_val = etcd.get_all_dict('image')
-
-    if only_node:
-        for k in copy.copy(key_val):
-            if not k.endswith('/' + only_node):
-                del key_val[k]
-
-    return key_val
