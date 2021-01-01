@@ -392,6 +392,8 @@ class FindMostTestCase(SchedulerTestCase):
         mock_db_get_metrics.start()
         self.addCleanup(mock_db_get_metrics.stop)
 
+    @mock.patch('shakenfist.images.Image.state',
+                new_callable=mock.PropertyMock)
     @mock.patch('shakenfist.etcd.get_all',
                 return_value=[
                     (None, {'uuid': '095fdd2b66625412aa/node2'}),
@@ -414,7 +416,13 @@ class FindMostTestCase(SchedulerTestCase):
                         'version': 2
                     })
                 ])
-    def test_most_matching_images(self, mock_from_db, mock_get_meta_all):
+    def test_most_matching_images(
+            self, mock_from_db, mock_get_meta_all, mock_state_get):
+        mock_state_get.return_value = {
+            'state': 'created',
+            'state_updated': 0
+        }
+
         req_images = ['req_image1']
         candidates = ['node1_net', 'node2', 'node3', 'node4']
 
@@ -422,6 +430,8 @@ class FindMostTestCase(SchedulerTestCase):
             req_images, candidates)
         self.assertSetEqual(set(['node2']), set(finalists))
 
+    @mock.patch('shakenfist.images.Image.state',
+                new_callable=mock.PropertyMock)
     @mock.patch('shakenfist.etcd.get_all',
                 return_value=[
                     (None, {'uuid': '095fdd2b66625412aa/node1_net'}),
@@ -476,13 +486,21 @@ class FindMostTestCase(SchedulerTestCase):
                         'version': 2
                     })
                 ])
-    def test_most_matching_images_big_one(self, mock_from_db, mock_get_meta_all):
+    def test_most_matching_images_big_one(
+            self, mock_from_db, mock_get_meta_all, mock_state_get):
+        mock_state_get.return_value = {
+            'state': 'created',
+            'state_updated': 0
+        }
+
         candidates = ['node1_net', 'node2', 'node3', 'node4']
 
         finalists = scheduler.Scheduler()._find_most_matching_images(
             ['req_image1'], candidates)
         self.assertSetEqual(set(['node1_net']), set(finalists))
 
+    @mock.patch('shakenfist.images.Image.state',
+                new_callable=mock.PropertyMock)
     @mock.patch('shakenfist.etcd.get_all',
                 return_value=[
                     (None, {'uuid': '095fdd2b66625412aa/node1_net'}),
@@ -579,13 +597,21 @@ class FindMostTestCase(SchedulerTestCase):
                         'version': 2
                     })
                 ])
-    def test_most_matching_images_big_two(self, mock_from_db, mock_get_meta_all):
+    def test_most_matching_images_big_two(
+            self, mock_from_db, mock_get_meta_all, mock_state_get):
+        mock_state_get.return_value = {
+            'state': 'created',
+            'state_updated': 0
+        }
+
         candidates = ['node1_net', 'node2', 'node3', 'node4']
 
         finalists = scheduler.Scheduler()._find_most_matching_images(
             ['req_image1', 'req_image2'], candidates)
         self.assertSetEqual(set(['node1_net']), set(finalists))
 
+    @mock.patch('shakenfist.images.Image.state',
+                new_callable=mock.PropertyMock)
     @mock.patch('shakenfist.etcd.get_all',
                 return_value=[
                     (None, {'uuid': '095fdd2b66625412aa/node1_net'}),
@@ -640,7 +666,13 @@ class FindMostTestCase(SchedulerTestCase):
                         'version': 2
                     })
                 ])
-    def test_most_matching_images_big_three(self, mock_from_db, mock_get_meta_all):
+    def test_most_matching_images_big_three(
+            self, mock_from_db, mock_get_meta_all, mock_state_get):
+        mock_state_get.return_value = {
+            'state': 'created',
+            'state_updated': 0
+        }
+
         candidates = ['node1_net', 'node2', 'node3', 'node4']
 
         finalists = scheduler.Scheduler()._find_most_matching_images(

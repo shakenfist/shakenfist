@@ -5,6 +5,7 @@ from functools import partial
 import random
 import time
 
+from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import exceptions
@@ -131,7 +132,8 @@ class Scheduler(object):
             candidates_image_matches[node] = 0
 
         for image in requested_images:
-            for i in images.Images(filters=[partial(images.url_filter, image)]):
+            for i in images.Images(filters=[partial(images.url_filter, image),
+                                            baseobject.active_states_filter]):
                 candidates_image_matches[i.node] += 1
 
         # Create dict of candidate lists keyed by number of image matches
