@@ -3,6 +3,7 @@
 from etcd3gw.client import Etcd3Client
 import ipaddress
 import json
+import time
 
 from shakenfist import db
 from shakenfist import util
@@ -222,8 +223,16 @@ def main():
 
                     etcd_client.put(
                         '/sf/attribute/image/%s/state' % image_node,
+                        json.dumps({
+                            'state': 'created',
+                            'state_updated': time.time()
+                        }, indent=4, sort_keys=True))
+
+                    etcd_client.put(
+                        '/sf/attribute/image/%s/state' % image_node,
                         json.dumps({'state': 'created'}, indent=4, sort_keys=True))
 
+                    image['uuid'], image['node'] = image_node.split('/')
                     image['version'] = 2
                     etcd_client.put(metadata['key'],
                                     json.dumps(image, indent=4, sort_keys=True))
