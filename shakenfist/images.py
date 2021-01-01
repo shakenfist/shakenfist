@@ -119,7 +119,7 @@ class Image(baseobject.DatabaseBackedObject):
         for key, data in self._db_get_attributes('download_'):
             versions[int(key.split('_')[1])] = data
         if not versions:
-            return {}
+            return {'sequence': 0}
         return versions[sorted(versions)[-1]]
 
     def _add_download_version(self, size, modified, fetched_at):

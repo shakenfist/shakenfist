@@ -238,7 +238,7 @@ def get(objecttype, subtype, name):
 def get_all(objecttype, subtype, prefix=None, sort_order=None):
     path = _construct_key(objecttype, subtype, prefix)
     for data, metadata in Etcd3Client().get_prefix(path, sort_order=sort_order, sort_target='key'):
-        yield str(metadata['key']), json.loads(data)
+        yield str(metadata['key'].decode('utf-8')), json.loads(data)
 
 
 @retry_etcd_forever
