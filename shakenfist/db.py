@@ -101,26 +101,6 @@ def clear_stale_locks():
 def get_existing_locks():
     return etcd.get_existing_locks()
 
-#####################################################################
-# Networks
-#####################################################################
-
-
-def allocate_vxid(net_id):
-    vxid = random.randint(1, 16777215)
-    while not etcd.create('vxlan', None, vxid, {'network_uuid': net_id}):
-        vxid = random.randint(1, 16777215)
-    return vxid
-
-
-def deallocate_vxid(vxid):
-    etcd.delete('vxlan', None, vxid)
-
-
-def hard_delete_network(network_uuid):
-    etcd.delete('network', None, network_uuid)
-    etcd.delete_all('event/network', network_uuid)
-    delete_metadata('network', network_uuid)
 
 #####################################################################
 # IPManagers
