@@ -1,7 +1,5 @@
 # Copyright 2020 Michael Still
 
-import random
-import socket
 import time
 import uuid
 
@@ -280,44 +278,6 @@ def get_metrics(fqdn):
         return {}
     return d.get('metrics', {})
 
-#####################################################################
-# Console ports
-#####################################################################
-
-
-def allocate_console_port(instance_uuid):
-    node = config.NODE_NAME
-    consumed = {value['port'] for _, value in etcd.get_all('console', node)}
-    while True:
-        port = random.randint(30000, 50000)
-        # avoid hitting etcd if it's probably in use
-        if port in consumed:
-            continue
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            # We hold this port open until it's in etcd to prevent
-            # anyone else needing to hit etcd to find out they can't
-            # use it as well as to verify we can use it
-            s.bind(('0.0.0.0', port))
-            allocatedPort = etcd.create(
-                'console', node, port,
-                {
-                    'instance_uuid': instance_uuid,
-                    'port': port,
-                })
-            if allocatedPort:
-
-                return port
-        except socket.error as e:
-            LOG.withField('instance', instance_uuid).info(
-                "Exception during port allocation: %s" % e)
-        finally:
-            s.close()
-
-
-def free_console_port(port):
-    if port:
-        etcd.delete('console', config.NODE_NAME, port)
 
 #####################################################################
 # Namespaces

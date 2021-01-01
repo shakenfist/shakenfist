@@ -7,7 +7,9 @@ import io
 import json
 import os
 import pycdlib
+import random
 import shutil
+import socket
 import time
 from uuid import uuid4
 
@@ -395,8 +397,8 @@ class Instance(baseobject.DatabaseBackedObject):
                     ipm.persist()
 
         ports = self.ports
-        db.free_console_port(ports.get('console_port'))
-        db.free_console_port(ports.get('vdi_port'))
+        self._free_console_port(ports.get('console_port'))
+        self._free_console_port(ports.get('vdi_port'))
 
         self.update_state('deleted')
 
@@ -406,14 +408,48 @@ class Instance(baseobject.DatabaseBackedObject):
         etcd.delete_all('attribute/instance', self.uuid)
         etcd.delete_all('event/instance', self.uuid)
 
+    def _allocate_console_port(self):
+        node = config.NODE_NAME
+        consumed = {value['port']
+                    for _, value in etcd.get_all('console', node)}
+        while True:
+            port = random.randint(30000, 50000)
+            # avoid hitting etcd if it's probably in use
+            if port in consumed:
+                continue
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                # We hold this port open until it's in etcd to prevent
+                # anyone else needing to hit etcd to find out they can't
+                # use it as well as to verify we can use it
+                s.bind(('0.0.0.0', port))
+                allocatedPort = etcd.create(
+                    'console', node, port,
+                    {
+                        'instance_uuid': self.uuid,
+                        'port': port,
+                    })
+                if allocatedPort:
+
+                    return port
+            except socket.error as e:
+                LOG.withField('instance', self.uuid).info(
+                    'Exception during port allocation: %s' % e)
+            finally:
+                s.close()
+
+    def _free_console_port(self, port):
+        if port:
+            etcd.delete('console', config.NODE_NAME, port)
+
     def allocate_instance_ports(self):
         with db.get_lock('attribute/instance', self.uuid, 'ports',
                          op='Instance port allocation'):
             ports = self.ports
             if not ports:
                 self.ports = {
-                    'console_port': db.allocate_console_port(self.uuid),
-                    'vdi_port': db.allocate_console_port(self.uuid)
+                    'console_port': self._allocate_console_port(),
+                    'vdi_port': self._allocate_console_port()
                 }
 
     def _configure_block_devices(self, lock):
