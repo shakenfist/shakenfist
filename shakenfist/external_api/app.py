@@ -1129,12 +1129,15 @@ class Images(Resource):
         if node:
             f.append(partial(images.placement_filter, node))
 
+        retval = []
         for i in images.Images(filters=f):
-            yield i.external_view()
+            retval.append(i.external_view())
+        return retval
 
     @jwt_required
     def post(self, url=None):
         db.add_event('image', url, 'api', 'cache', None, None)
+        img = images.Image.new(url)
         db.enqueue(config.NODE_NAME, {
             'tasks': [FetchImageTask(url)],
         })
