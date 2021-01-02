@@ -233,7 +233,8 @@ def main():
                         '/sf/attribute/image/%s/state' % image_node,
                         json.dumps({'state': 'created'}, indent=4, sort_keys=True))
 
-                    image['uuid'], image['node'] = image_node.split('/')
+                    image['uuid'] = image_node
+                    image['ref'], image['node'] = image_node.split('/')
                     image['version'] = 2
                     etcd_client.put(metadata['key'],
                                     json.dumps(image, indent=4, sort_keys=True))
