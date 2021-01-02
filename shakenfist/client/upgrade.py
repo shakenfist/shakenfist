@@ -3,6 +3,7 @@
 from etcd3gw.client import Etcd3Client
 import ipaddress
 import json
+import time
 
 from shakenfist import db
 from shakenfist import util
@@ -192,6 +193,50 @@ def main():
                         json.dumps(instance, indent=4, sort_keys=True))
                     print('--> Upgraded instance %s to version 2'
                           % instance['uuid'])
+
+            # Upgrade images to the new attribute style
+            for data, metadata in etcd_client.get_prefix('/sf/image/'):
+                image_node = '/'.join(
+                    metadata['key'].decode('utf-8').split('/')[-2:])
+                image = json.loads(data.decode('utf-8'))
+                if int(image.get('version', 0)) < 2:
+                    data = {}
+                    RENAMES = {
+                        'fetched': 'fetched_at',
+                        'file_version': 'sequence'
+                    }
+                    for attr in ['size', 'modified', 'fetched', 'file_version']:
+                        if image.get(attr):
+                            data[RENAMES.get(attr, attr)] = image[attr]
+                            del image[attr]
+                    etcd_client.put(
+                        ('/sf/attribute/image/%s/download_%d'
+                         % (image_node, image.get('sequence', 0))),
+                        json.dumps(data, indent=4, sort_keys=True))
+
+                    if image.get('checksum'):
+                        etcd_client.put(
+                            '/sf/attribute/image/%s/latest_checksum' % image_node,
+                            json.dumps({'checksum': image.get('checksum')},
+                                       indent=4, sort_keys=True))
+                        del image['checksum']
+
+                    etcd_client.put(
+                        '/sf/attribute/image/%s/state' % image_node,
+                        json.dumps({
+                            'state': 'created',
+                            'state_updated': time.time()
+                        }, indent=4, sort_keys=True))
+
+                    etcd_client.put(
+                        '/sf/attribute/image/%s/state' % image_node,
+                        json.dumps({'state': 'created'}, indent=4, sort_keys=True))
+
+                    image['uuid'], image['node'] = image_node.split('/')
+                    image['version'] = 2
+                    etcd_client.put(metadata['key'],
+                                    json.dumps(image, indent=4, sort_keys=True))
+                    print('--> Upgraded image %s to version 2' % image_node)
 
 
 if __name__ == '__main__':

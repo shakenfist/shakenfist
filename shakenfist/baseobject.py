@@ -52,19 +52,26 @@ class DatabaseBackedObject(object):
                 'Object missing')
             return None
 
-        if o.get('version', 0) != 2:
+        if o.get('version', 0) != cls.current_version:
             raise exceptions.BadObjectVersion(
                 'Unknown version - %s: %s' % (cls.object_type, o))
         return o
 
     def _db_get_attribute(self, attribute):
-        retval = etcd.get('attribute/%s' % type(self).object_type, self.__uuid, attribute)
+        retval = etcd.get('attribute/%s' % type(self).object_type,
+                          self.__uuid, attribute)
         if not retval:
             return {}
         return retval
 
+    def _db_get_attributes(self, attribute_prefix):
+        for key, data in etcd.get_all('attribute/%s' % type(self).object_type,
+                                      self.__uuid, prefix=attribute_prefix):
+            yield key, data
+
     def _db_set_attribute(self, attribute, value):
-        etcd.put('attribute/%s' % type(self).object_type, self.__uuid, attribute, value)
+        etcd.put('attribute/%s' % type(self).object_type,
+                 self.__uuid, attribute, value)
 
     # Properties common to all objects which are routed to attributes
     @property

@@ -1,6 +1,7 @@
 import mock
 
 from shakenfist import exceptions
+from shakenfist import images
 from shakenfist import scheduler
 from shakenfist.tests import test_shakenfist
 from shakenfist.config import SFConfig
@@ -204,8 +205,8 @@ class LowResourceTestCase(SchedulerTestCase):
                                 [])
         self.assertEqual('No nodes with enough idle RAM', str(exc))
 
-    @mock.patch('shakenfist.images.Image.from_url')
-    @mock.patch('shakenfist.db.get_image_metadata_all', return_value=None)
+    @mock.patch('shakenfist.images.Image.new')
+    @mock.patch('shakenfist.images.Images', return_value=[])
     def test_not_enough_disk(self, mock_get_image_meta, mock_image_from_url):
         self.fake_db.set_node_metrics_same({
             'cpu_max_per_instance': 16,
@@ -230,8 +231,8 @@ class LowResourceTestCase(SchedulerTestCase):
                                 [])
         self.assertEqual('No nodes with enough disk space', str(exc))
 
-    @mock.patch('shakenfist.images.Image.from_url')
-    @mock.patch('shakenfist.db.get_image_metadata_all', return_value=None)
+    @mock.patch('shakenfist.images.Image.new')
+    @mock.patch('shakenfist.images.Images', return_value=[])
     def test_ok(self, mock_get_image_meta, mock_image_from_url):
         self.fake_db.set_node_metrics_same({
             'cpu_max_per_instance': 16,
@@ -297,8 +298,8 @@ class CorrectAllocationTestCase(SchedulerTestCase):
                     'node': 'node3',
                     'disk_spec': [{'base': 'cirros', 'size': 21}]
                 })])
-    @mock.patch('shakenfist.images.Image.from_url')
-    @mock.patch('shakenfist.db.get_image_metadata_all', return_value=None)
+    @mock.patch('shakenfist.images.Image.new')
+    @mock.patch('shakenfist.images.Images', return_value=[])
     def test_any_node_but_not_network_node(
             self, mock_get_image_meta, mock_image_from_url, mock_get_instances,
             mock_get_instance, mock_instance_attribute):
@@ -342,8 +343,8 @@ class CorrectAllocationTestCase(SchedulerTestCase):
                     'memory': 1024,
                     'disk_spec': [{'base': 'cirros', 'size': 21}]
                 })])
-    @mock.patch('shakenfist.images.Image.from_url')
-    @mock.patch('shakenfist.db.get_image_metadata_all', return_value=None)
+    @mock.patch('shakenfist.images.Image.new')
+    @mock.patch('shakenfist.images.Images', return_value=[])
     def test_single_node_that_has_network(
             self, mock_get_image_meta, mock_image_from_url, mock_get_instances,
             mock_get_instance, mock_instance_attribute):
@@ -391,28 +392,37 @@ class FindMostTestCase(SchedulerTestCase):
         mock_db_get_metrics.start()
         self.addCleanup(mock_db_get_metrics.stop)
 
-    @mock.patch('shakenfist.db.get_image_metadata_all',
-                return_value={
-                    '/sf/image/095fdd2b66625412aa/node2': {
-                        'checksum': None,
-                        'fetched': 'Tue, 20 Oct 2020 23:02:29 -0000',
-                        'file_version': 1,
-                        'modified': 'Tue, 10 Sep 2019 07:24:40 GMT',
-                        'size': 200000,
+    @mock.patch('shakenfist.images.Image.state',
+                new_callable=mock.PropertyMock)
+    @mock.patch('shakenfist.etcd.get_all',
+                return_value=[
+                    (None, {'uuid': '095fdd2b66625412aa/node2'}),
+                    (None, {'uuid': 'aca41cefa18b052074e092/node3'})
+                ])
+    @mock.patch('shakenfist.images.Image.from_db',
+                side_effect=[
+                    images.Image({
+                        'uuid': '095fdd2b66625412aa/node2',
                         'url': 'req_image1',
-                        'version': 1,
-                    },
-                    '/sf/image/aca41cefa18b052074e092/node3': {
-                        'checksum': None,
-                        'fetched': 'Tue, 20 Oct 2020 23:02:29 -0000',
-                        'file_version': 1,
-                        'modified': 'Tue, 10 Sep 2019 07:24:40 GMT',
-                        'size': 200000,
+                        'node': 'node2',
+                        'ref': '095fdd2b66625412aa',
+                        'version': 2
+                    }),
+                    images.Image({
+                        'uuid': 'aca41cefa18b052074e092/node3',
                         'url': 'http://example.com',
-                        'version': 1,
-                    }
-                })
-    def test_most_matching_images(self, mock_get_meta_all):
+                        'node': 'node3',
+                        'ref': 'aca41cefa18b052074e092',
+                        'version': 2
+                    })
+                ])
+    def test_most_matching_images(
+            self, mock_from_db, mock_get_meta_all, mock_state_get):
+        mock_state_get.return_value = {
+            'state': 'created',
+            'state_updated': 0
+        }
+
         req_images = ['req_image1']
         candidates = ['node1_net', 'node2', 'node3', 'node4']
 
@@ -420,37 +430,250 @@ class FindMostTestCase(SchedulerTestCase):
             req_images, candidates)
         self.assertSetEqual(set(['node2']), set(finalists))
 
-    @mock.patch('shakenfist.db.get_image_metadata_all',
-                return_value={
-                    '/sf/image/095fdd2b66625412aa/node1_net': {
+    @mock.patch('shakenfist.images.Image.state',
+                new_callable=mock.PropertyMock)
+    @mock.patch('shakenfist.etcd.get_all',
+                return_value=[
+                    (None, {'uuid': '095fdd2b66625412aa/node1_net'}),
+                    (None, {'uuid': '095fdd2b66635412aa/node1_net'}),
+                    (None, {'uuid': '095fdd2b66625412aa/node2'}),
+                    (None, {'uuid': '095fdd2b66625712a/node3'}),
+                    (None, {'uuid': '095fdd2b66625482aa/node4'}),
+                    (None, {'uuid': 'aca41cefa18b052974e092/node4'})
+                ])
+    @mock.patch('shakenfist.images.Image.from_db',
+                side_effect=[
+                    images.Image({
+                        'uuid': '095fdd2b66625412aa/node1_net',
                         'url': 'req_image1',
-                    },
-                    '/sf/image/095fdd2b66635412aa/node1_net': {
+                        'node': 'node1_net',
+                        'ref': '095fdd2b66625412aa',
+                        'version': 2
+                    }),
+                    images.Image({
+                        'uuid': '095fdd2b66635412aa/node1_net',
                         'url': 'req_image2',
-                    },
-                    '/sf/image/095fdd2b66625412aa/node2': {
+                        'node': 'node1_net',
+                        'ref': '095fdd2b66635412aa',
+                        'version': 2
+                    }),
+                    images.Image({
+                        'uuid': '095fdd2b66625412aa/node2',
                         'url': 'req_image2',
-                    },
-                    '/sf/image/095fdd2b66625712aa/node3': {
+                        'node': 'node2',
+                        'ref': '095fdd2b66625412aa',
+                        'version': 2
+                    }),
+                    images.Image({
+                        'uuid': '095fdd2b66625712a/node3',
                         'url': 'req_image2',
-                    },
-                    '/sf/image/095fdd2b66625482aa/node4': {
+                        'node': 'node3',
+                        'ref': '095fdd2b66625712a',
+                        'version': 2
+                    }),
+                    images.Image({
+                        'uuid': '095fdd2b66625482aa/node4',
                         'url': 'req_image4',
-                    },
-                    '/sf/image/aca41cefa18b052974e092/node4': {
+                        'node': 'node4',
+                        'ref': '095fdd2b66625482aa',
+                        'version': 2
+                    }),
+                    images.Image({
+                        'uuid': 'aca41cefa18b052974e092/node4',
                         'url': 'req_image5',
-                    }
-                })
-    def test_most_matching_images_big(self, mock_get_meta_all):
+                        'node': 'node4',
+                        'ref': 'aca41cefa18b052974e092',
+                        'version': 2
+                    })
+                ])
+    def test_most_matching_images_big_one(
+            self, mock_from_db, mock_get_meta_all, mock_state_get):
+        mock_state_get.return_value = {
+            'state': 'created',
+            'state_updated': 0
+        }
+
         candidates = ['node1_net', 'node2', 'node3', 'node4']
 
         finalists = scheduler.Scheduler()._find_most_matching_images(
             ['req_image1'], candidates)
         self.assertSetEqual(set(['node1_net']), set(finalists))
 
+    @mock.patch('shakenfist.images.Image.state',
+                new_callable=mock.PropertyMock)
+    @mock.patch('shakenfist.etcd.get_all',
+                return_value=[
+                    (None, {'uuid': '095fdd2b66625412aa/node1_net'}),
+                    (None, {'uuid': '095fdd2b66635412aa/node1_net'}),
+                    (None, {'uuid': '095fdd2b66625412aa/node2'}),
+                    (None, {'uuid': '095fdd2b66625712a/node3'}),
+                    (None, {'uuid': '095fdd2b66625482aa/node4'}),
+                    (None, {'uuid': 'aca41cefa18b052974e092/node4'})
+                ])
+    @mock.patch('shakenfist.images.Image.from_db',
+                side_effect=[
+                    images.Image({
+                        'uuid': '095fdd2b66625412aa/node1_net',
+                        'url': 'req_image1',
+                        'node': 'node1_net',
+                        'ref': '095fdd2b66625412aa',
+                        'version': 2
+                    }),
+                    images.Image({
+                        'uuid': '095fdd2b66635412aa/node1_net',
+                        'url': 'req_image2',
+                        'node': 'node1_net',
+                        'ref': '095fdd2b66635412aa',
+                        'version': 2
+                    }),
+                    images.Image({
+                        'uuid': '095fdd2b66625412aa/node2',
+                        'url': 'req_image2',
+                        'node': 'node2',
+                        'ref': '095fdd2b66625412aa',
+                        'version': 2
+                    }),
+                    images.Image({
+                        'uuid': '095fdd2b66625712a/node3',
+                        'url': 'req_image2',
+                        'node': 'node3',
+                        'ref': '095fdd2b66625712a',
+                        'version': 2
+                    }),
+                    images.Image({
+                        'uuid': '095fdd2b66625482aa/node4',
+                        'url': 'req_image4',
+                        'node': 'node4',
+                        'ref': '095fdd2b66625482aa',
+                        'version': 2
+                    }),
+                    images.Image({
+                        'uuid': 'aca41cefa18b052974e092/node4',
+                        'url': 'req_image5',
+                        'node': 'node4',
+                        'ref': 'aca41cefa18b052974e092',
+                        'version': 2
+                    }),
+                    images.Image({
+                        'uuid': '095fdd2b66625412aa/node1_net',
+                        'url': 'req_image1',
+                        'node': 'node1_net',
+                        'ref': '095fdd2b66625412aa',
+                        'version': 2
+                    }),
+                    images.Image({
+                        'uuid': '095fdd2b66635412aa/node1_net',
+                        'url': 'req_image2',
+                        'node': 'node1_net',
+                        'ref': '095fdd2b66635412aa',
+                        'version': 2
+                    }),
+                    images.Image({
+                        'uuid': '095fdd2b66625412aa/node2',
+                        'url': 'req_image2',
+                        'node': 'node2',
+                        'ref': '095fdd2b66625412aa',
+                        'version': 2
+                    }),
+                    images.Image({
+                        'uuid': '095fdd2b66625712a/node3',
+                        'url': 'req_image2',
+                        'node': 'node3',
+                        'ref': '095fdd2b66625712a',
+                        'version': 2
+                    }),
+                    images.Image({
+                        'uuid': '095fdd2b66625482aa/node4',
+                        'url': 'req_image4',
+                        'node': 'node4',
+                        'ref': '095fdd2b66625482aa',
+                        'version': 2
+                    }),
+                    images.Image({
+                        'uuid': 'aca41cefa18b052974e092/node4',
+                        'url': 'req_image5',
+                        'node': 'node4',
+                        'ref': 'aca41cefa18b052974e092',
+                        'version': 2
+                    })
+                ])
+    def test_most_matching_images_big_two(
+            self, mock_from_db, mock_get_meta_all, mock_state_get):
+        mock_state_get.return_value = {
+            'state': 'created',
+            'state_updated': 0
+        }
+
+        candidates = ['node1_net', 'node2', 'node3', 'node4']
+
         finalists = scheduler.Scheduler()._find_most_matching_images(
             ['req_image1', 'req_image2'], candidates)
         self.assertSetEqual(set(['node1_net']), set(finalists))
+
+    @mock.patch('shakenfist.images.Image.state',
+                new_callable=mock.PropertyMock)
+    @mock.patch('shakenfist.etcd.get_all',
+                return_value=[
+                    (None, {'uuid': '095fdd2b66625412aa/node1_net'}),
+                    (None, {'uuid': '095fdd2b66635412aa/node1_net'}),
+                    (None, {'uuid': '095fdd2b66625412aa/node2'}),
+                    (None, {'uuid': '095fdd2b66625712a/node3'}),
+                    (None, {'uuid': '095fdd2b66625482aa/node4'}),
+                    (None, {'uuid': 'aca41cefa18b052974e092/node4'})
+                ])
+    @mock.patch('shakenfist.images.Image.from_db',
+                side_effect=[
+                    images.Image({
+                        'uuid': '095fdd2b66625412aa/node1_net',
+                        'url': 'req_image1',
+                        'node': 'node1_net',
+                        'ref': '095fdd2b66625412aa',
+                        'version': 2
+                    }),
+                    images.Image({
+                        'uuid': '095fdd2b66635412aa/node1_net',
+                        'url': 'req_image2',
+                        'node': 'node1_net',
+                        'ref': '095fdd2b66635412aa',
+                        'version': 2
+                    }),
+                    images.Image({
+                        'uuid': '095fdd2b66625412aa/node2',
+                        'url': 'req_image2',
+                        'node': 'node2',
+                        'ref': '095fdd2b66625412aa',
+                        'version': 2
+                    }),
+                    images.Image({
+                        'uuid': '095fdd2b66625712a/node3',
+                        'url': 'req_image2',
+                        'node': 'node3',
+                        'ref': '095fdd2b66625712a',
+                        'version': 2
+                    }),
+                    images.Image({
+                        'uuid': '095fdd2b66625482aa/node4',
+                        'url': 'req_image4',
+                        'node': 'node4',
+                        'ref': '095fdd2b66625482aa',
+                        'version': 2
+                    }),
+                    images.Image({
+                        'uuid': 'aca41cefa18b052974e092/node4',
+                        'url': 'req_image5',
+                        'node': 'node4',
+                        'ref': 'aca41cefa18b052974e092',
+                        'version': 2
+                    })
+                ])
+    def test_most_matching_images_big_three(
+            self, mock_from_db, mock_get_meta_all, mock_state_get):
+        mock_state_get.return_value = {
+            'state': 'created',
+            'state_updated': 0
+        }
+
+        candidates = ['node1_net', 'node2', 'node3', 'node4']
 
         finalists = scheduler.Scheduler()._find_most_matching_images(
             ['req_image2'], candidates)

@@ -130,7 +130,7 @@ def image_fetch(url, instance_uuid):
         # "waiting_image_fetch" queue but this works now.
         with db.get_lock('image', config.NODE_NAME, Image.calc_unique_ref(url),
                          timeout=15*60, op='Image fetch') as lock:
-            img = Image.from_url(url)
+            img = Image.new(url)
             img.get([lock], instance)
             db.add_event('image', url, 'fetch', None, None, 'success')
 

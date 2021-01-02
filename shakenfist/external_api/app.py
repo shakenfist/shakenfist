@@ -35,6 +35,7 @@ from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import exceptions
+from shakenfist import images
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
@@ -1128,16 +1129,12 @@ class InstanceConsoleData(Resource):
 class Images(Resource):
     @jwt_required
     def get(self, node=None):
-        db_data = db.get_image_metadata_all(only_node=node)
+        f = []
+        if node:
+            f.append(partial(images.placement_filter, node))
 
-        # Clean up DB references to be user relevant
-        images = []
-        for db_name, meta in db_data.items():
-            name_split = db_name.split('/')
-            images.append({**meta,
-                           'ref': name_split[-2],
-                           'node': name_split[-1]})
-        return images
+        for i in images.Images(filters=f):
+            yield i.external_view()
 
     @jwt_required
     def post(self, url=None):
@@ -1269,7 +1266,7 @@ class Networks(Resource):
         networks_del = []
         networks_unable = []
         for n in net.Networks([partial(baseobject.namespace_filter, namespace),
-                              baseobject.active_states_filter]):
+                               baseobject.active_states_filter]):
             if len(list(db.get_network_interfaces(n.uuid))) > 0:
                 LOG.withObj(n).warning(
                     'Network in use, cannot be deleted by delete-all')

@@ -128,9 +128,6 @@ class Instance(baseobject.DatabaseBackedObject):
         super(Instance, self).__init__(static_values.get('uuid'),
                                        static_values.get('version'))
 
-        # This dictionary contains values which will never change for this
-        # instance. It is therefore safe to cache forever.
-        self.__uuid = static_values.get('uuid')
         self.__cpus = static_values.get('cpus')
         self.__disk_spec = static_values.get('disk_spec')
         self.__memory = static_values.get('memory')
@@ -439,7 +436,7 @@ class Instance(baseobject.DatabaseBackedObject):
                 modified_disks = []
                 for disk in block_devices['devices']:
                     if disk.get('base'):
-                        img = images.Image.from_url(disk['base'])
+                        img = images.Image.new(disk['base'])
                         hashed_image_path = img.version_image_path()
 
                         with util.RecordedOperation('detect cdrom images', self):

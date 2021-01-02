@@ -15,6 +15,7 @@ from shakenfist.daemons import net as net_daemon
 from shakenfist.daemons import resources as resource_daemon
 from shakenfist.daemons import triggers as trigger_daemon
 from shakenfist import db
+from shakenfist import images
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
@@ -30,10 +31,28 @@ def restore_instances():
     networks = []
     instances = []
     for inst in virt.Instances([virt.this_node_filter, baseobject.active_states_filter]):
+        instance_problems = []
         for iface in db.get_instance_interfaces(inst.uuid):
             if not iface['network_uuid'] in networks:
                 networks.append(iface['network_uuid'])
-        instances.append(inst.uuid)
+
+        for disk in inst.disk_spec:
+            if 'base' in disk:
+                img = images.Image.from_url(disk['base'])
+                # NOTE(mikal): this check isn't great -- it checks for the original
+                # downloaded image, not the post transcode version
+                if (img.state in ['deleted', 'error'] or
+                        not os.path.exists(img.version_image_path)):
+                    instance_problems.append(
+                        '%s missing from image cache' % disk['base'])
+                    img.delete()
+
+        if instance_problems:
+            db.enqueue_instance_error(
+                inst.uuid,
+                'instance bad on startup: %s' % '; '.join(instance_problems))
+        else:
+            instances.append(inst.uuid)
 
     with util.RecordedOperation('restore networks', None):
         for network in networks:
