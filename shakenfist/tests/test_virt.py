@@ -8,6 +8,7 @@ import tempfile
 import time
 
 from shakenfist import baseobject
+from shakenfist import exceptions
 from shakenfist.ipmanager import IPManager
 from shakenfist import virt
 from shakenfist.config import SFConfig
@@ -188,11 +189,11 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
         }
 
         i = self._make_instance()
-        i.update_state('created')
+        i.update_state('preflight')
 
         etcd_write = mock_attribute_set.mock_calls[2]
         self.assertTrue(time.time() - etcd_write[1][1]['state_updated'] < 3)
-        self.assertEqual('created', etcd_write[1][1]['state'])
+        self.assertEqual('preflight', etcd_write[1][1]['state'])
 
     @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.virt.Instance.state',
@@ -207,8 +208,56 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
         }
 
         i = self._make_instance()
+        self.assertRaises(exceptions.InvalidStateException,
+                          i.update_state, 'created')
+        self.assertEqual(2, mock_attribute_set.call_count)
+
+    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.virt.Instance.state',
+                new_callable=mock.PropertyMock)
+    @mock.patch('shakenfist.virt.Instance._db_set_attribute')
+    @mock.patch('shakenfist.etcd.put')
+    def test_update_state_valid1(
+            self, mock_put, mock_attribute_set, mock_state_get, mock_lock):
+        mock_state_get.side_effect = [
+            {'state': 'initial', 'state_updated': 0},
+            {'state': 'preflight', 'state_updated': 0},
+            {'state': 'preflight', 'state_updated': 0},
+            {'state': 'preflight', 'state_updated': 0},
+            {'state': 'creating', 'state_updated': 0},
+            {'state': 'created', 'state_updated': 0},
+            {'state': 'error', 'state_updated': 0},
+        ]
+
+        i = self._make_instance()
+        i.update_state('preflight')
+        self.assertRaises(exceptions.InvalidStateException,
+                          i.update_state, 'initial')
+        self.assertRaises(exceptions.InvalidStateException,
+                          i.update_state, 'created')
+        i.update_state('creating')
         i.update_state('created')
-        self.assertEqual(3, mock_attribute_set.call_count)
+        i.update_state('error')
+        i.update_state('deleted')
+
+    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.virt.Instance.state',
+                new_callable=mock.PropertyMock)
+    @mock.patch('shakenfist.virt.Instance._db_set_attribute')
+    @mock.patch('shakenfist.etcd.put')
+    def test_update_state_valid2(
+            self, mock_put, mock_attribute_set, mock_state_get, mock_lock):
+        mock_state_get.side_effect = [
+            {'state': 'initial', 'state_updated': 0},
+            {'state': 'preflight', 'state_updated': 0},
+            {'state': 'error', 'state_updated': 0},
+        ]
+
+        i = self._make_instance()
+        i.update_state('preflight')
+        i.update_state('error')
+        self.assertRaises(exceptions.InvalidStateException,
+                          i.update_state, 'created')
 
     @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.virt.Instance.power_state',

@@ -1,5 +1,6 @@
 import mock
 
+from shakenfist import exceptions
 from shakenfist import net
 from shakenfist.config import SFConfig
 from shakenfist.tests import test_shakenfist
@@ -244,3 +245,41 @@ link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
             'netblock': '192.168.1.0/24'
         })
         self.assertFalse(n.is_created())
+
+    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.net.Network.state',
+                new_callable=mock.PropertyMock)
+    @mock.patch('shakenfist.net.Network._db_set_attribute')
+    @mock.patch('shakenfist.etcd.put')
+    def test_update_state_valid(
+            self, mock_put, mock_attribute_set, mock_state_get, mock_lock):
+        mock_state_get.side_effect = [
+            {'state': 'created', 'state_updated': 0},
+            {'state': 'created', 'state_updated': 0},
+            {'state': 'created', 'state_updated': 0},
+            {'state': 'created', 'state_updated': 0},
+            {'state': 'deleting', 'state_updated': 0},
+            {'state': 'error', 'state_updated': 0},
+            {'state': 'deleted', 'state_updated': 0},
+            {'state': 'deleted', 'state_updated': 0},
+        ]
+
+        n = net.Network({
+            'uuid': '8abbc9a6-d923-4441-b498-4f8e3c166804',
+            'vxid': 5,
+            'name': 'bobnet',
+            'namespace': 'finitespace',
+            'provide_dhcp': True,
+            'provide_nat': True,
+            'physical_nic': 'eth0',
+            'netblock': '192.168.1.0/24'
+        })
+        self.assertRaises(exceptions.InvalidStateException,
+                          n.update_state, 'deleted')
+        self.assertRaises(exceptions.InvalidStateException,
+                          n.update_state, 'created')
+        n.update_state('deleting')
+        n.update_state('error')
+        n.update_state('deleted')
+        self.assertRaises(exceptions.InvalidStateException,
+                          n.update_state, 'created')

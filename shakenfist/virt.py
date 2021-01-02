@@ -117,6 +117,15 @@ def _snapshot_path():
 class Instance(baseobject.DatabaseBackedObject):
     object_type = 'instance'
     current_version = 2
+    state_targets = {
+        None: ('initial', 'error'),
+        'initial': ('preflight', 'deleted', 'error'),
+        'preflight': ('creating', 'deleted', 'error'),
+        'creating': ('created', 'deleted', 'error'),
+        'created': ('deleted', 'error'),
+        'error': ('deleted', 'error'),
+        'deleted': ('error'),
+    }
 
     def __init__(self, static_values):
         super(Instance, self).__init__(static_values.get('uuid'),

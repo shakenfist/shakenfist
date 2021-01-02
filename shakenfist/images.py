@@ -31,6 +31,14 @@ resolvers = {
 class Image(baseobject.DatabaseBackedObject):
     object_type = 'image'
     current_version = 2
+    state_targets = {
+        None: ('initial', 'error'),
+        'initial': ('creating', 'error'),
+        'creating': ('created', 'deleted', 'error'),
+        'created': ('creating', 'deleted', 'error'),
+        'error': ('deleted', 'error'),
+        'deleted': ('error'),
+    }
 
     def __init__(self, static_values):
         # NOTE(mikal): we call the unique_ref the "uuid" for the rest of this
@@ -68,7 +76,7 @@ class Image(baseobject.DatabaseBackedObject):
             'version': cls.current_version
         })
         i = Image.from_db(uuid)
-        i._db_set_attribute('state', {'state': 'initial'})
+        i._db_set_attribute('state', {'state': None})
         i.update_state('initial')
         i.update_checksum(checksum)
         i.add_event('db record creation', None)

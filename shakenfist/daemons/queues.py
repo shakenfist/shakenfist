@@ -242,8 +242,6 @@ def instance_start(instance_uuid, network):
         for iface in db.get_instance_interfaces(instance_uuid):
             db.update_network_interface_state(iface['uuid'], 'created')
 
-        instance.update_state('created')
-
 
 def instance_delete(instance_uuid, new_state, error_msg=None):
     with db.get_lock('instance', None, instance_uuid, timeout=120,
