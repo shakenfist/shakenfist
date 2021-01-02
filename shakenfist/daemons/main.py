@@ -42,7 +42,7 @@ def restore_instances():
                 # NOTE(mikal): this check isn't great -- it checks for the original
                 # downloaded image, not the post transcode version
                 if (img.state in ['deleted', 'error'] or
-                        not os.path.exists(img.version_image_path)):
+                        not os.path.exists(img.version_image_path())):
                     instance_problems.append(
                         '%s missing from image cache' % disk['base'])
                     img.delete()
