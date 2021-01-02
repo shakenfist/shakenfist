@@ -38,7 +38,7 @@ def restore_instances():
 
         for disk in inst.disk_spec:
             if 'base' in disk:
-                img = images.Image.from_url(disk['base'])
+                img = images.Image.new(disk['base'])
                 # NOTE(mikal): this check isn't great -- it checks for the original
                 # downloaded image, not the post transcode version
                 if (img.state in ['deleted', 'error'] or
