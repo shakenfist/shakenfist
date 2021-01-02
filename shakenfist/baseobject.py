@@ -70,14 +70,17 @@ class DatabaseBackedObject(object):
     def _db_set_attribute(self, attribute, value):
         etcd.put('attribute/%s' % self.object_type, self.__uuid, attribute, value)
 
+    def get_lock_attr(self, name, op):
+        return db.get_lock('attribute/%s' % self.object_type,
+                           self.__uuid, name, op=op)
+
     # Properties common to all objects which are routed to attributes
     @property
     def state(self):
         return self._db_get_attribute('state')
 
     def update_state(self, state, error_message=None):
-        with db.get_lock('attribute/%s' % self.object_type, self.__uuid, 'state',
-                         op='State update'):
+        with self.get_lock_attr('state', 'State update'):
             dbstate = self.state
             orig_state = dbstate.get('state')
             dbstate['state'] = state

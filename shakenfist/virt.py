@@ -288,9 +288,6 @@ class Instance(baseobject.DatabaseBackedObject):
         return self._db_get_attribute('block_devices')
 
     # Implementation
-    def get_lock_attr(self, name, op):
-        return db.get_lock('attribute/instance', self.uuid, name, op=op)
-
     def place_instance(self, location):
         with self.get_lock_attr('placement', 'Instance placement'):
             # We don't write unchanged things to the database
