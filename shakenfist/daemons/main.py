@@ -127,6 +127,32 @@ def main():
     # might happen quite early on.
     _start_daemon('resources')
 
+    # We changed the naming scheme for network interfaces between v0.3 and v0.4.
+    # Check if we have any old style names and do the renaming... No locking
+    # required here because we don't have anything else running yet and we don't
+    # want to lock a network across the cluster for a local rename.
+    for n in net.Networks(filters=[baseobject.active_states_filter]):
+        if util.check_for_interface('vxlan-%d' % n.vxid):
+            LOG.withNetwork(n).warning(
+                'Network requires interface renaming...')
+            for iface in ['vxlan-%s', 'br-vxlan-%s', 'veth-%s-0',
+                          'veth-%s-i', 'phy-%s-o', 'phy-%s-i']:
+                old_name_format = iface % '%d'
+                old_name = old_name_format % n.vxid
+                new_name_format = iface % '%06x'
+                new_name = new_name_format % n.vxid
+
+                if util.check_for_interface(old_name):
+                    LOG.withNetwork(n).warning(
+                        'Renaming %s to %s' % (old_name, new_name))
+
+                    util.execute(None, 'ip link set %s down' % old_name)
+                    util.execute(None, 'ip link set %s name %s'
+                                 % (old_name, new_name))
+                    util.execute(None, 'ip link set %s up' % new_name)
+                    LOG.withNetwork(n).warning(
+                        'Renamed %s to %s' % (old_name, new_name))
+
     # If I am the network node, I need some setup
     if util.is_network_node():
         # Bootstrap the floating network in the Networks table
