@@ -1,6 +1,8 @@
 import ipaddress
 import time
 
+from oslo_concurrency import processutils
+
 from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist.daemons import daemon
@@ -103,6 +105,8 @@ class Monitor(daemon.Daemon):
             except exceptions.DeadNetwork as e:
                 LOG.withField('exception', e).info(
                     'maintain_network attempted on dead network')
+            except processutils.ProcessExecutionError as e:
+                LOG.error('Network maintenance failure: %s', e)
 
         # Determine if there are any extra vxids
         extra_vxids = set(vxid_to_mac.keys()) - set(seen_vxids)

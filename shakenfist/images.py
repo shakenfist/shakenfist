@@ -123,8 +123,7 @@ class Image(baseobject.DatabaseBackedObject):
         return versions[sorted(versions)[-1]]
 
     def _add_download_version(self, size, modified, fetched_at):
-        with db.get_lock('attribute/image', self.uuid, 'download',
-                         op='Image version creation'):
+        with self.get_lock_attr('download', 'Image version creation'):
             new_version = self.latest_download_version['sequence'] + 1
             self._db_set_attribute('download_%d' % new_version,
                                    {

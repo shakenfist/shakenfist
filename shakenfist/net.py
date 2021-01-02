@@ -118,7 +118,8 @@ class Network(baseobject.DatabaseBackedObject):
         return Network(static_values)
 
     def external_view(self):
-        # If this is an external view, then mix back in attributes that users expect
+        # If this is an external view, then mix back in attributes that users
+        # expect
         n = {
             'uuid': self.uuid,
             'name': self.__name,
@@ -126,6 +127,7 @@ class Network(baseobject.DatabaseBackedObject):
             'netblock': self.__netblock,
             'provide_dhcp': self.__provide_dhcp,
             'provide_nat': self.__provide_nat,
+            'floating_gateway': self.floating_gateway,
             'vxid': self.__vxid,
             'version': self.version
         }
@@ -213,8 +215,7 @@ class Network(baseobject.DatabaseBackedObject):
         return fnet
 
     def update_floating_gateway(self, gateway):
-        with db.get_lock('attribute/instance', self.uuid, 'routing',
-                         op='Update floating gateway'):
+        with self.get_lock_attr('routing', 'Update floating gateway'):
             routing = self.routing
             routing['floating_gateway'] = gateway
             self._db_set_attribute('routing', routing)

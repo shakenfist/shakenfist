@@ -89,7 +89,8 @@ def main():
                 if bad:
                     for ni in db.get_network_interfaces(n['uuid']):
                         db.enqueue_instance_error(
-                            ni['instance_uuid'], 'Instance was on invalid network at upgrade.')
+                            ni['instance_uuid'],
+                            'Instance was on invalid network at upgrade.')
 
                     # NOTE(mikal): we have to hard delete this network here, or
                     # it will cause a crash later in the Networks iterator.
