@@ -357,8 +357,9 @@ class Images(object):
         self.filters = filters
 
     def __iter__(self):
-        for _, i in etcd.get_all('image', None):
-            i = Image.from_db(i['uuid'])
+        for key, i in etcd.get_all('image', None):
+            image_node = '/'.join(key.split('/')[-2:])
+            i = Image.from_db(image_node)
             if not i:
                 continue
 
