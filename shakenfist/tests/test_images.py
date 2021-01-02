@@ -333,7 +333,6 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
                       })
         ], mock_create.mock_calls)
         self.assertEqual([
-            mock.call('state', {'state': None}),
             mock.call('latest_checksum', {'checksum': '1abab'})
         ], mock_set_attr.mock_calls)
 

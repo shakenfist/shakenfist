@@ -88,7 +88,8 @@ class DatabaseBackedObject(object):
             # Ensure state change is valid
             if state not in self.state_targets[orig_state]:
                 raise exceptions.InvalidStateException(
-                    'Invalid state change from %s to %s', orig_state, state)
+                    'Invalid state change from %s to %s for object %s',
+                    orig_state, state, self.object_type)
 
             dbstate['state'] = state
             dbstate['state_updated'] = time.time()

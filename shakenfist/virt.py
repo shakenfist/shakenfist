@@ -124,7 +124,8 @@ class Instance(baseobject.DatabaseBackedObject):
         'creating': ('created', 'deleted', 'error'),
         'created': ('deleted', 'error'),
         'error': ('deleted', 'error'),
-        'deleted': ('error'),
+        # TODO(andy): Instances should not be repeated deleted
+        'deleted': ('deleted', 'error'),
     }
 
     def __init__(self, static_values):

@@ -257,7 +257,6 @@ link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
             {'state': 'created', 'state_updated': 0},
             {'state': 'created', 'state_updated': 0},
             {'state': 'created', 'state_updated': 0},
-            {'state': 'created', 'state_updated': 0},
             {'state': 'deleting', 'state_updated': 0},
             {'state': 'error', 'state_updated': 0},
             {'state': 'deleted', 'state_updated': 0},
@@ -275,9 +274,7 @@ link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
             'netblock': '192.168.1.0/24'
         })
         self.assertRaises(exceptions.InvalidStateException,
-                          n.update_state, 'deleted')
-        self.assertRaises(exceptions.InvalidStateException,
-                          n.update_state, 'created')
+                          n.update_state, 'initial')
         n.update_state('deleting')
         n.update_state('error')
         n.update_state('deleted')

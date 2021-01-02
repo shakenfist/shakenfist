@@ -29,9 +29,11 @@ class Network(baseobject.DatabaseBackedObject):
     object_type = 'network'
     current_version = 2
     state_targets = {
-        None: ('created', 'error'),
-        'created': ('deleting', 'error'),
-        'deleting': ('deleted', 'error'),
+        'initial': ('created', 'deleting', 'error'),
+        # TODO(andy): Investigate whether networks should created->deleted
+        'created': ('created', 'deleting', 'deleted', 'error'),
+        # TODO(andy): Remove deleting->created. Example occurs during CI.
+        'deleting': ('deleted', 'created', 'error'),
         'error': ('deleting', 'error'),
         'deleted': (),
     }
