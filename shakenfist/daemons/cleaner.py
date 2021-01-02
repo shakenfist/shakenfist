@@ -170,7 +170,7 @@ class Monitor(daemon.Daemon):
                     baseobject.inactive_states_filter,
                     partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))]):
                 LOG.withNetwork(n).info('Hard deleting network')
-                n.hard_delete_network()
+                n.hard_delete()
 
             for ni in db.get_stale_network_interfaces(config.get('CLEANER_DELAY')):
                 LOG.withNetworkInterface(
