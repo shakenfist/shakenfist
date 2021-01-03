@@ -204,6 +204,9 @@ class Instance(baseobject.DatabaseBackedObject):
             'state',
             'vdi_port'
         ]
+        # Ensure that missing attributes still get reported
+        for attr in external_attribute_key_whitelist:
+            i[attr] = None
 
         for attrname in ['placement', 'state', 'power_state', 'ports']:
             d = self._db_get_attribute(attrname)

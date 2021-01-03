@@ -57,6 +57,7 @@ class TestUpgrades(base.BaseTestCase):
                         'type': 'disk'
                     }
                 ],
+                'error_message': None,
                 'memory': 1024,
                 'name': 'inst1',
                 'namespace': 'system',
@@ -88,6 +89,7 @@ class TestUpgrades(base.BaseTestCase):
                         'type': 'disk'
                     }
                 ],
+                'error_message': None,
                 'memory': 1024,
                 'name': 'inst2',
                 'namespace': 'system',
@@ -109,6 +111,7 @@ class TestUpgrades(base.BaseTestCase):
         # Third instance
         self.assertEqual(
             {
+                'console_port': None,
                 'cpus': 2,
                 'disk_spec': [
                     {
@@ -118,6 +121,7 @@ class TestUpgrades(base.BaseTestCase):
                         'type': 'disk'
                     }
                 ],
+                'error_message': None,
                 'memory': 2048,
                 'name': 'ubuntu',
                 'namespace': 'nstest',
@@ -127,6 +131,7 @@ class TestUpgrades(base.BaseTestCase):
                 'state': 'preflight',
                 'user_data': None,
                 'uuid': 'a13ce821-adcb-45a4-9260-1b18b5250ad3',
+                'vdi_port': None,
                 'version': 2,
                 'video': {
                     'memory': 16384,
@@ -148,6 +153,7 @@ class TestUpgrades(base.BaseTestCase):
                         'type': 'disk'
                     }
                 ],
+                'error_message': None,
                 'memory': 1024,
                 'name': 'inst4',
                 'namespace': 'banana',
