@@ -531,15 +531,21 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         resp = self.client.get(
             '/instances/foo', headers={'Authorization': self.auth_header})
         self.assertEqual({
+            'console_port': None,
             'cpus': 2,
             'disk_spec': [{'base': 'foo', 'size': 4}],
+            'error_message': None,
             'memory': 4096,
             'name': 'banana',
             'namespace': 'foo',
+            'node': None,
+            'power_state': None,
             'ssh_key': None,
+            'state': None,
             'user_data': None,
             'uuid': '123',
             'version': None,
+            'vdi_port': None,
             'video': None
         }, resp.get_json())
         self.assertEqual(200, resp.status_code)
