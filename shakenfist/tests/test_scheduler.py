@@ -396,8 +396,10 @@ class FindMostTestCase(SchedulerTestCase):
                 new_callable=mock.PropertyMock)
     @mock.patch('shakenfist.etcd.get_all',
                 return_value=[
-                    (None, {'uuid': '095fdd2b66625412aa/node2'}),
-                    (None, {'uuid': 'aca41cefa18b052074e092/node3'})
+                    ('/sf/image/095fdd2b66625412aa/node2',
+                     {'uuid': '095fdd2b66625412aa/node2'}),
+                    ('/sf/image/aca41cefa18b052074e092/node3',
+                     {'uuid': 'aca41cefa18b052074e092/node3'})
                 ])
     @mock.patch('shakenfist.images.Image.from_db',
                 side_effect=[
@@ -434,12 +436,18 @@ class FindMostTestCase(SchedulerTestCase):
                 new_callable=mock.PropertyMock)
     @mock.patch('shakenfist.etcd.get_all',
                 return_value=[
-                    (None, {'uuid': '095fdd2b66625412aa/node1_net'}),
-                    (None, {'uuid': '095fdd2b66635412aa/node1_net'}),
-                    (None, {'uuid': '095fdd2b66625412aa/node2'}),
-                    (None, {'uuid': '095fdd2b66625712a/node3'}),
-                    (None, {'uuid': '095fdd2b66625482aa/node4'}),
-                    (None, {'uuid': 'aca41cefa18b052974e092/node4'})
+                    ('/sf/image/095fdd2b66625412aa/node1_net',
+                     {'uuid': '095fdd2b66625412aa/node1_net'}),
+                    ('/sf/image/095fdd2b66635412aa/node1_net',
+                     {'uuid': '095fdd2b66635412aa/node1_net'}),
+                    ('/sf/image/095fdd2b66625412aa/node2',
+                     {'uuid': '095fdd2b66625412aa/node2'}),
+                    ('/sf/image/095fdd2b66625712a/node3',
+                     {'uuid': '095fdd2b66625712a/node3'}),
+                    ('/sf/image/095fdd2b66625482aa/node4',
+                     {'uuid': '095fdd2b66625482aa/node4'}),
+                    ('/sf/image/aca41cefa18b052974e092/node4',
+                     {'uuid': 'aca41cefa18b052974e092/node4'})
                 ])
     @mock.patch('shakenfist.images.Image.from_db',
                 side_effect=[
@@ -503,12 +511,18 @@ class FindMostTestCase(SchedulerTestCase):
                 new_callable=mock.PropertyMock)
     @mock.patch('shakenfist.etcd.get_all',
                 return_value=[
-                    (None, {'uuid': '095fdd2b66625412aa/node1_net'}),
-                    (None, {'uuid': '095fdd2b66635412aa/node1_net'}),
-                    (None, {'uuid': '095fdd2b66625412aa/node2'}),
-                    (None, {'uuid': '095fdd2b66625712a/node3'}),
-                    (None, {'uuid': '095fdd2b66625482aa/node4'}),
-                    (None, {'uuid': 'aca41cefa18b052974e092/node4'})
+                    ('/sf/image/095fdd2b66625412aa/node1_net',
+                     {'uuid': '095fdd2b66625412aa/node1_net'}),
+                    ('/sf/image/095fdd2b66635412aa/node1_net',
+                     {'uuid': '095fdd2b66635412aa/node1_net'}),
+                    ('/sf/image/095fdd2b66625412aa/node2',
+                     {'uuid': '095fdd2b66625412aa/node2'}),
+                    ('/sf/image/095fdd2b66625712a/node3',
+                     {'uuid': '095fdd2b66625712a/node3'}),
+                    ('/sf/image/095fdd2b66625482aa/node4',
+                     {'uuid': '095fdd2b66625482aa/node4'}),
+                    ('/sf/image/aca41cefa18b052974e092/node4',
+                     {'uuid': 'aca41cefa18b052974e092/node4'})
                 ])
     @mock.patch('shakenfist.images.Image.from_db',
                 side_effect=[
@@ -614,12 +628,18 @@ class FindMostTestCase(SchedulerTestCase):
                 new_callable=mock.PropertyMock)
     @mock.patch('shakenfist.etcd.get_all',
                 return_value=[
-                    (None, {'uuid': '095fdd2b66625412aa/node1_net'}),
-                    (None, {'uuid': '095fdd2b66635412aa/node1_net'}),
-                    (None, {'uuid': '095fdd2b66625412aa/node2'}),
-                    (None, {'uuid': '095fdd2b66625712a/node3'}),
-                    (None, {'uuid': '095fdd2b66625482aa/node4'}),
-                    (None, {'uuid': 'aca41cefa18b052974e092/node4'})
+                    ('/sf/image/095fdd2b66625412aa/node1_net',
+                     {'uuid': '095fdd2b66625412aa/node1_net'}),
+                    ('/sf/image/095fdd2b66635412aa/node1_net',
+                     {'uuid': '095fdd2b66635412aa/node1_net'}),
+                    ('/sf/image/095fdd2b66625412aa/node2',
+                     {'uuid': '095fdd2b66625412aa/node2'}),
+                    ('/sf/image/095fdd2b66625712a/node3',
+                     {'uuid': '095fdd2b66625712a/node3'}),
+                    ('/sf/image/095fdd2b66625482aa/node4',
+                     {'uuid': '095fdd2b66625482aa/node4'}),
+                    ('/sf/image/aca41cefa18b052974e092/node4',
+                     {'uuid': 'aca41cefa18b052974e092/node4'})
                 ])
     @mock.patch('shakenfist.images.Image.from_db',
                 side_effect=[
