@@ -346,7 +346,8 @@ class Network(baseobject.DatabaseBackedObject):
                     util.execute(
                         None,
                         'brctl addif %(vx_bridge)s %(vx_veth_outer)s' % subst)
-                    util.execute(None, 'ip link set %(vx_veth_outer)s up' % subst)
+                    util.execute(
+                        None, 'ip link set %(vx_veth_outer)s up' % subst)
                     util.execute(
                         None,
                         '%(in_netns)s ip link set %(vx_veth_inner)s up' % subst)
@@ -411,24 +412,8 @@ class Network(baseobject.DatabaseBackedObject):
                                      '%(in_netns)s route add default '
                                      'gw %(floating_router)s' % subst)
 
-                if not util.nat_rules_for_ipblock(self.network_address):
-                    with util.RecordedOperation('enable nat', self):
-                        util.execute(None,
-                                     'echo 1 > /proc/sys/net/ipv4/ip_forward')
-                        util.execute(None,
-                                     '%(in_netns)s iptables -A FORWARD '
-                                     '-o %(physical_veth_inner)s '
-                                     '-i %(vx_veth_inner)s -j ACCEPT' % subst)
-                        util.execute(None,
-                                     '%(in_netns)s iptables -A FORWARD '
-                                     '-i %(physical_veth_inner)s '
-                                     '-o %(vx_veth_inner)s -j ACCEPT' % subst)
-                        util.execute(None,
-                                     '%(in_netns)s iptables -t nat -A POSTROUTING '
-                                     '-s %(ipblock)s/%(netmask)s '
-                                     '-o %(physical_veth_inner)s '
-                                     '-j MASQUERADE' % subst)
-            self.state = 'created'
+                self.enable_nat()
+
         self.update_dhcp()
 
     def delete(self):
@@ -529,6 +514,29 @@ class Network(baseobject.DatabaseBackedObject):
         else:
             db.enqueue('networknode', RemoveDHCPNetworkTask(self.uuid))
             self.add_event('remove dhcp', 'enqueued')
+
+    def enable_nat(self):
+        if not util.is_network_node():
+            return
+
+        subst = self.subst_dict()
+        if not util.nat_rules_for_ipblock(self.network_address):
+            with util.RecordedOperation('enable nat', self):
+                util.execute(None,
+                             'echo 1 > /proc/sys/net/ipv4/ip_forward')
+                util.execute(None,
+                             '%(in_netns)s iptables -A FORWARD '
+                             '-o %(physical_veth_inner)s '
+                             '-i %(vx_veth_inner)s -j ACCEPT' % subst)
+                util.execute(None,
+                             '%(in_netns)s iptables -A FORWARD '
+                             '-i %(physical_veth_inner)s '
+                             '-o %(vx_veth_inner)s -j ACCEPT' % subst)
+                util.execute(None,
+                             '%(in_netns)s iptables -t nat -A POSTROUTING '
+                             '-s %(ipblock)s/%(netmask)s '
+                             '-o %(physical_veth_inner)s '
+                             '-j MASQUERADE' % subst)
 
     def discover_mesh(self):
         mesh_re = re.compile(r'00:00:00:00:00:00 dst (.*) self permanent')

@@ -3,6 +3,7 @@
 import importlib
 import json
 import multiprocessing
+import os
 from pbr.version import VersionInfo
 import random
 import re
@@ -68,9 +69,17 @@ def is_network_node():
     return config.NODE_IP == config.NETWORK_NODE_IP
 
 
-def check_for_interface(name, up=False):
-    stdout, stderr = execute(None,
-                             'ip link show %s' % name, check_exit_code=[0, 1])
+def check_for_interface(name, namespace=None, up=False):
+    in_netns = ''
+    if namespace:
+        if not os.path.exists('/var/run/netns/%s' % namespace):
+            return False
+
+        in_netns = 'ip netns exec %s ' % namespace
+
+    stdout, stderr = execute(
+        None, '%sip link show %s' % (in_netns, name),
+        check_exit_code=[0, 1])
 
     if stderr.rstrip('\n').endswith(' does not exist.'):
         return False

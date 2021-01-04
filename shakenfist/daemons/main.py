@@ -131,23 +131,37 @@ def main():
         if util.check_for_interface('vxlan-%d' % n.vxid):
             LOG.with_network(n).warning(
                 'Network requires interface renaming...')
-            for iface in ['vxlan-%s', 'br-vxlan-%s', 'veth-%s-0',
+            for iface in ['vxlan-%s', 'br-vxlan-%s', 'veth-%s-o',
                           'veth-%s-i', 'phy-%s-o', 'phy-%s-i']:
                 old_name_format = iface % '%d'
                 old_name = old_name_format % n.vxid
                 new_name_format = iface % '%06x'
                 new_name = new_name_format % n.vxid
 
-                if util.check_for_interface(old_name):
+                in_netns = ''
+                namespace = None
+                if iface.endswith('-i'):
+                    in_netns = 'ip netns exec %s' % n.uuid
+                    namespace = str(n.uuid)
+
+                if util.check_for_interface(old_name, namespace=namespace):
                     LOG.with_network(n).warning(
                         'Renaming %s to %s' % (old_name, new_name))
 
-                    util.execute(None, 'ip link set %s down' % old_name)
-                    util.execute(None, 'ip link set %s name %s'
-                                 % (old_name, new_name))
-                    util.execute(None, 'ip link set %s up' % new_name)
+                    util.execute(None, '%s ip link set %s down'
+                                 % (in_netns, old_name))
+                    util.execute(None, '%s ip link set %s name %s'
+                                 % (in_netns, old_name, new_name))
+                    util.execute(None, '%s ip link set %s up'
+                                 % (in_netns, new_name))
                     LOG.with_network(n).warning(
                         'Renamed %s to %s' % (old_name, new_name))
+
+            # If this is the network node, then renaming interfaces will
+            # have broken DHCP and possibly iptables...
+            if util.is_network_node():
+                n.enable_nat()
+                n.update_dhcp()
 
     # If I am the network node, I need some setup
     if util.is_network_node():
