@@ -248,6 +248,40 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
                          '852c2df5c7991cc66241bf7072d1c4',
                          images.Image.calc_unique_ref('http://example.com'))
 
+    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.images.Image.state',
+                new_callable=mock.PropertyMock)
+    @mock.patch('shakenfist.images.Image._db_set_attribute')
+    @mock.patch('shakenfist.etcd.put')
+    def test_update_state_valid(
+            self, mock_put, mock_attribute_set, mock_state_get, mock_lock):
+        mock_state_get.side_effect = [
+            {'state': None, 'state_updated': 0},
+            {'state': 'initial', 'state_updated': 0},
+            {'state': 'initial', 'state_updated': 0},
+            {'state': 'creating', 'state_updated': 0},
+            {'state': 'created', 'state_updated': 0},
+            {'state': 'error', 'state_updated': 0},
+            {'state': 'deleted', 'state_updated': 0},
+        ]
+
+        i = images.Image({
+            'ref': 'ref',
+            'node': 'bod',
+            'version': 1,
+            'url': 'a'
+            })
+        i.update_state('initial')
+        self.assertRaises(exceptions.InvalidStateException,
+                          i.update_state, 'created')
+        self.assertRaises(exceptions.InvalidStateException,
+                          i.update_state, 'created')
+        i.update_state('deleted')
+        i.update_state('error')
+        i.update_state('deleted')
+        self.assertRaises(exceptions.InvalidStateException,
+                          i.update_state, 'created')
+
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get',
                 return_value={
                     'url': 'http://example.com',
@@ -299,7 +333,6 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
                       })
         ], mock_create.mock_calls)
         self.assertEqual([
-            mock.call('state', {'state': 'initial'}),
             mock.call('latest_checksum', {'checksum': '1abab'})
         ], mock_set_attr.mock_calls)
 

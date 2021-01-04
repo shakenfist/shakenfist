@@ -31,6 +31,16 @@ resolvers = {
 class Image(baseobject.DatabaseBackedObject):
     object_type = 'image'
     current_version = 2
+    state_targets = {
+        None: ('initial', 'error'),
+        'initial': ('creating', 'error'),
+        # TODO(andy): This is broken but will be accepted until Image class is
+        # refactored. (hey, at least the state names will be valid)
+        'creating': ('initial', 'creating', 'created', 'deleted', 'error'),
+        'created': ('initial', 'creating', 'created', 'deleted', 'error'),
+        'error': ('deleted', 'error'),
+        'deleted': ('error'),
+    }
 
     def __init__(self, static_values):
         # NOTE(mikal): we call the unique_ref the "uuid" for the rest of this
@@ -68,7 +78,6 @@ class Image(baseobject.DatabaseBackedObject):
             'version': cls.current_version
         })
         i = Image.from_db(uuid)
-        i._db_set_attribute('state', {'state': 'initial'})
         i.update_state('initial')
         i.update_checksum(checksum)
         i.add_event('db record creation', None)
@@ -200,9 +209,12 @@ class Image(baseobject.DatabaseBackedObject):
         download, the locks will be refreshed. Any lock error should abort the
         get, since the lock will have been lost.
         """
+        self.update_state('creating')
         for _ in range(3):
             try:
-                return self._get(locks, related_object)
+                image_path = self._get(locks, related_object)
+                self.update_state('created')
+                return image_path
             except exceptions.BadCheckSum as e:
                 LOG.warning('Bad checksum while downloading image: %s' % e)
                 self.update_state(
@@ -225,7 +237,6 @@ class Image(baseobject.DatabaseBackedObject):
     def _get(self, locks, related_object):
         """Fetch image if not downloaded and return image path."""
         actual_image = self.version_image_path()
-        self.update_state('creating')
 
         with util.RecordedOperation('fetch image', related_object):
             resp = self._open_connection()
@@ -255,7 +266,6 @@ class Image(baseobject.DatabaseBackedObject):
                                            email.utils.formatdate())
 
         _transcode(locks, actual_image, related_object)
-        self.update_state('created')
         return actual_image
 
     def _open_connection(self):

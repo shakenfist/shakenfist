@@ -28,6 +28,15 @@ LOG, _ = logutil.setup(__name__)
 class Network(baseobject.DatabaseBackedObject):
     object_type = 'network'
     current_version = 2
+    state_targets = {
+        'initial': ('created', 'deleting', 'error'),
+        # TODO(andy): Investigate whether networks should created->deleted
+        'created': ('created', 'deleting', 'deleted', 'error'),
+        # TODO(andy): Remove deleting->created. Example occurs during CI.
+        'deleting': ('deleted', 'created', 'error'),
+        'error': ('deleting', 'error'),
+        'deleted': (),
+    }
 
     def __init__(self, static_values):
         super(Network, self).__init__(static_values.get('uuid'),
@@ -63,8 +72,8 @@ class Network(baseobject.DatabaseBackedObject):
         etcd.delete('vxlan', None, vxid)
 
     @classmethod
-    def new(cls, name, namespace, netblock, provide_dhcp=False, provide_nat=False,
-            uuid=None, vxid=None):
+    def new(cls, name, namespace, netblock, provide_dhcp=False,
+            provide_nat=False, uuid=None, vxid=None):
 
         if not uuid:
             # uuid should only be specified in testing

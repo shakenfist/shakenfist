@@ -10,6 +10,10 @@ class VersionSpecificationError(Exception):
 class ObjectException(Exception):
     pass
 
+
+class InvalidStateException(ObjectException):
+    pass
+
 # Instance
 
 

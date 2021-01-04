@@ -14,6 +14,7 @@ LOG, _ = logutil.setup(__name__)
 class DatabaseBackedObject(object):
     object_type = 'unknown'
     current_version = None
+    state_targets = None
 
     def __init__(self, object_uuid, version=None):
         self.__uuid = object_uuid
@@ -83,6 +84,13 @@ class DatabaseBackedObject(object):
         with self.get_lock_attr('state', 'State update'):
             dbstate = self.state
             orig_state = dbstate.get('state')
+
+            # Ensure state change is valid
+            if state not in self.state_targets[orig_state]:
+                raise exceptions.InvalidStateException(
+                    'Invalid state change from %s to %s for object %s',
+                    orig_state, state, self.object_type)
+
             dbstate['state'] = state
             dbstate['state_updated'] = time.time()
 
