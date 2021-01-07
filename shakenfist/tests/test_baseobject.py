@@ -29,18 +29,9 @@ class StateTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertEqual(s.obj_dict(), {
             'value': 'state1',
             'update_time': 3,
-            'error_msg': 'error msg',
         })
 
         self.assertEqual(s, State('state1', 3, 'error msg'))
 
         self.assertEqual(str(s),
-                         "State({'value': 'state1', 'update_time': 3, "
-                         "'error_msg': 'error msg'})")
-
-    def _test_state_object_def(self):
-        s = State('state1', 4)
-
-        self.assertEqual(s.value, 'state1')
-        self.assertEqual(s.update_time, 4)
-        self.assertEqual(s.error_msg, None)
+                         "State({'value': 'state1', 'update_time': 3})")

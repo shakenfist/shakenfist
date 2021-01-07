@@ -44,7 +44,7 @@ class BaseFakeObject(object):
     def add_event(self, operation, phase, duration=None, msg=None):
         pass
 
-    def update_state(self, state, error_message=None):
+    def update_state(self, state):
         self._state = state
 
     def delete(self):

@@ -201,7 +201,8 @@ class Instance(baseobject.DatabaseBackedObject):
             'state': self.state.value,
             'user_data': self.user_data,
             'video': self.video,
-            'version': self.version
+            'version': self.version,
+            'error_message': self.error_msg,
         }
 
         if self.requested_placement:
@@ -209,7 +210,6 @@ class Instance(baseobject.DatabaseBackedObject):
 
         external_attribute_key_whitelist = [
             'console_port',
-            'error_message',
             'node',
             'power_state',
             'vdi_port'
