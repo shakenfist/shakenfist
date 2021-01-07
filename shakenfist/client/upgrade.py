@@ -7,6 +7,7 @@ import time
 
 from shakenfist import db
 from shakenfist import util
+from shakenfist import baseobject
 
 # Very simple data upgrader
 
@@ -120,6 +121,11 @@ def main():
                                        indent=4, sort_keys=True))
                         del network['floating_gateway']
 
+                    new = baseobject.State('created', time.time())
+                    etcd_client.put(
+                        '/sf/attribute/network/%s/state' % n['uuid'],
+                        json.dumps(new.json_dump(), indent=4, sort_keys=True))
+
                     network['version'] = 2
                     etcd_client.put(
                         '/sf/network/%s' % network['uuid'],
@@ -155,14 +161,14 @@ def main():
                             '/sf/attribute/instance/%s/block_devices' % instance['uuid'],
                             json.dumps(data, indent=4, sort_keys=True))
 
-                    data = {}
+                    state = baseobject.State(instance.get('state'),
+                                             instance.get('state_updated'),
+                                             instance.get('error_message'))
                     for attr in ['state', 'state_updated', 'error_message']:
-                        if instance.get(attr):
-                            data[attr] = instance[attr]
-                            del instance[attr]
+                        instance.pop(attr, None)
                     etcd_client.put(
                         '/sf/attribute/instance/%s/state' % instance['uuid'],
-                        json.dumps(data, indent=4, sort_keys=True))
+                        json.dumps(state.json_dump(), indent=4, sort_keys=True))
 
                     data = {}
                     for attr in ['power_state', 'power_state_previous',
@@ -229,9 +235,10 @@ def main():
                             'state_updated': time.time()
                         }, indent=4, sort_keys=True))
 
+                    new = baseobject.State('created', time.time())
                     etcd_client.put(
                         '/sf/attribute/image/%s/state' % image_node,
-                        json.dumps({'state': 'created'}, indent=4, sort_keys=True))
+                        json.dumps(new.json_dump(), indent=4, sort_keys=True))
 
                     image['uuid'] = image_node
                     image['ref'], image['node'] = image_node.split('/')

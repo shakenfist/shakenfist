@@ -242,7 +242,7 @@ def requires_instance_active(func):
             return error(404, 'instance not found')
 
         i = kwargs['instance_from_db']
-        if i.state['state'] in ['initial', 'preflight', 'creating']:
+        if i.state.state in ['initial', 'preflight', 'creating']:
             LOG.withInstance(i).info('Instance not active')
             return error(406, 'instance not active')
 
@@ -320,7 +320,7 @@ def requires_network_active(func):
             log.info('Network not found, kwarg missing')
             return error(404, 'network not found')
 
-        if kwargs['network_from_db'].state['state'] in ['initial', 'preflight', 'creating']:
+        if kwargs['network_from_db'].state.state in ['initial', 'preflight', 'creating']:
             log.info('Network not active')
             return error(406, 'network not active')
 
@@ -465,8 +465,7 @@ class AuthNamespace(Resource):
         instances = []
         deleted_instances = []
         for i in virt.Instances([partial(baseobject.namespace_filter, namespace)]):
-            state = i.state
-            if state['state'] in ['deleted', 'error']:
+            if i.state.state in ['deleted', 'error']:
                 deleted_instances.append(i.uuid)
             else:
                 instances.append(i.uuid)
@@ -479,7 +478,7 @@ class AuthNamespace(Resource):
             # They in a transient state. If they hang in that state we want to
             # know. They will block deletion of a namespace thus giving notice
             # of the problem.
-            if n.state['state'] not in ['deleted', 'error']:
+            if n.state.state not in ['deleted', 'error']:
                 networks.append(n.uuid)
         if len(networks) > 0:
             return error(400, 'you cannot delete a namespace with networks')
@@ -607,8 +606,7 @@ class Instance(Resource):
     @requires_instance_ownership
     def delete(self, instance_uuid=None, instance_from_db=None):
         # Check if instance has already been deleted
-        state = instance_from_db.state
-        if state['state'] == 'deleted':
+        if instance_from_db.state.state == 'deleted':
             return error(404, 'instance not found')
 
         # If this instance is not on a node, just do the DB cleanup locally
@@ -622,8 +620,7 @@ class Instance(Resource):
 
         start_time = time.time()
         while time.time() - start_time < config.get('API_ASYNC_WAIT'):
-            state = instance_from_db.state
-            if state['state'] in ['deleted', 'error']:
+            if instance_from_db.state.state in ['deleted', 'error']:
                 return
 
             time.sleep(0.5)
@@ -684,7 +681,7 @@ class Instances(Resource):
                                      'range of the network')
 
                 n = net.Network.from_db(netdesc['network_uuid'])
-                if n.state['state'] in ['initial', 'preflight', 'creating']:
+                if n.state.state in ['initial', 'preflight', 'creating']:
                     return error(406, 'network %s is not active' % n.uuid)
 
         if not video:
@@ -797,8 +794,7 @@ class Instances(Resource):
         # after a while and just return the current state
         start_time = time.time()
         while time.time() - start_time < config.get('API_ASYNC_WAIT'):
-            state = instance.state
-            if state.get('state') in ['created', 'deleted', 'error']:
+            if instance.state.state in ['created', 'deleted', 'error']:
                 return instance.external_view()
             time.sleep(0.5)
         return instance.external_view()
@@ -844,7 +840,7 @@ class Instances(Resource):
         while (waiting_for and
                (time.time() - start_time < config.get('API_ASYNC_WAIT'))):
             for instance in copy.copy(waiting_for):
-                s = instance.state.get('state')
+                s = instance.state.state
                 if s in ['deleted', 'error']:
                     waiting_for.remove(instance)
                 else:
@@ -1161,7 +1157,7 @@ def _delete_network(network_from_db):
 
     if n.is_dead():
         LOG.withFields({'network_uuid': n.uuid,
-                        'state': n.state['state']
+                        'state': n.state.state
                         }).warning('delete_network: network is dead')
         return error(404, 'network is deleted')
 
@@ -1192,7 +1188,7 @@ class Network(Resource):
             return error(403, 'you cannot delete an in use network')
 
         # Check if network has already been deleted
-        if network_from_db.state['state'] in 'deleted':
+        if network_from_db.state.state in 'deleted':
             return error(404, 'network not found')
 
         return _delete_network(network_from_db)

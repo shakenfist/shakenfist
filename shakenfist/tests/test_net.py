@@ -2,6 +2,7 @@ import mock
 
 from shakenfist import exceptions
 from shakenfist import net
+from shakenfist.baseobject import State
 from shakenfist.config import SFConfig
 from shakenfist.tests import test_shakenfist
 
@@ -254,13 +255,13 @@ link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
     def test_update_state_valid(
             self, mock_put, mock_attribute_set, mock_state_get, mock_lock):
         mock_state_get.side_effect = [
-            {'state': 'created', 'state_updated': 0},
-            {'state': 'created', 'state_updated': 0},
-            {'state': 'created', 'state_updated': 0},
-            {'state': 'deleting', 'state_updated': 0},
-            {'state': 'error', 'state_updated': 0},
-            {'state': 'deleted', 'state_updated': 0},
-            {'state': 'deleted', 'state_updated': 0},
+            State('created', 0),
+            State('created', 0),
+            State('created', 0),
+            State('deleting', 0),
+            State('error', 0),
+            State('deleted', 0),
+            State('deleted', 0),
         ]
 
         n = net.Network({

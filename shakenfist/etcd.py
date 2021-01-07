@@ -13,6 +13,7 @@ from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist import util
 from shakenfist.tasks import QueueTask
+from shakenfist import baseobject
 
 
 ####################################################################
@@ -207,6 +208,8 @@ def _construct_key(objecttype, subtype, name):
 class JSONEncoderTasks(json.JSONEncoder):
     def default(self, obj):
         if QueueTask.__subclasscheck__(type(obj)):
+            return obj.json_dump()
+        if type(obj) is baseobject.State:
             return obj.json_dump()
         return json.JSONEncoder.default(self, obj)
 

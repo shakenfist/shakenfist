@@ -32,8 +32,8 @@ class Image(baseobject.DatabaseBackedObject):
     object_type = 'image'
     current_version = 2
     state_targets = {
-        None: ('initial', 'error'),
-        'initial': ('creating', 'error'),
+        None: ('initial', ),
+        'initial': ('initial', 'creating', 'error'),
         # TODO(andy): This is broken but will be accepted until Image class is
         # refactored. (hey, at least the state names will be valid)
         'creating': ('initial', 'creating', 'created', 'deleted', 'error'),
@@ -217,9 +217,8 @@ class Image(baseobject.DatabaseBackedObject):
                 return image_path
             except exceptions.BadCheckSum as e:
                 LOG.warning('Bad checksum while downloading image: %s' % e)
-                self.update_state(
-                    'error',
-                    error_message='Bad checksum while downloading image: %s' % e)
+                self.update_state('error')
+                self.error_msg = 'Bad checksum while downloading image: %s' % e
                 exc = e
         raise exc
 

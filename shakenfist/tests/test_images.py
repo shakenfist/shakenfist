@@ -10,6 +10,7 @@ from shakenfist import images
 from shakenfist import image_resolver_cirros
 from shakenfist import image_resolver_ubuntu
 from shakenfist import logutil
+from shakenfist.baseobject import State
 from shakenfist.tests import test_shakenfist
 from shakenfist.config import SFConfigBase
 
@@ -256,13 +257,13 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
     def test_update_state_valid(
             self, mock_put, mock_attribute_set, mock_state_get, mock_lock):
         mock_state_get.side_effect = [
-            {'state': None, 'state_updated': 0},
-            {'state': 'initial', 'state_updated': 0},
-            {'state': 'initial', 'state_updated': 0},
-            {'state': 'creating', 'state_updated': 0},
-            {'state': 'created', 'state_updated': 0},
-            {'state': 'error', 'state_updated': 0},
-            {'state': 'deleted', 'state_updated': 0},
+            State(None, 0),
+            State('initial', 0),
+            State('initial', 0),
+            State('creating', 0),
+            State('created', 0),
+            State('error', 0),
+            State('deleted', 0),
         ]
 
         i = images.Image({

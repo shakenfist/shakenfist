@@ -78,31 +78,29 @@ class DatabaseBackedObject(object):
     # Properties common to all objects which are routed to attributes
     @property
     def state(self):
-        return self._db_get_attribute('state')
+        db_data = self._db_get_attribute('state')
+        if not db_data:
+            return State(None, 0)
+        return State(**db_data)
 
     def update_state(self, state, error_message=None):
+        LOG.withField('state', state).error('update_state()')
         with self.get_lock_attr('state', 'State update'):
-            dbstate = self.state
-            orig_state = dbstate.get('state')
+            orig = self.state
 
             # Ensure state change is valid
-            if state not in self.state_targets[orig_state]:
+            if state not in self.state_targets[orig.state]:
                 raise exceptions.InvalidStateException(
                     'Invalid state change from %s to %s for object=%s uuid=%s',
                     orig_state, state, self.object_type, self.uuid)
 
-            dbstate['state'] = state
-            dbstate['state_updated'] = time.time()
-
-            if error_message:
-                dbstate['error_message'] = error_message
-
-            self._db_set_attribute('state', dbstate)
-            self.add_event('state changed', '%s -> %s' % (orig_state, state))
+            new = State(state, time.time(), error_message)
+            self._db_set_attribute('state', new)
+            self.add_event('state changed', '%s -> %s' % (orig.state, state))
 
 
 def state_filter(states, o):
-    return o.state.get('state') in states
+    return o.state.state in states
 
 
 active_states_filter = partial(
@@ -111,11 +109,45 @@ inactive_states_filter = partial(state_filter, ['error', 'deleted'])
 
 
 def state_age_filter(delay, o):
-    now = time.time()
-    return (now - o.state.get('state_updated', now)) > delay
+    return (time.time() - o.state.update_time) > delay
 
 
 def namespace_filter(namespace, o):
     if namespace == 'system':
         return True
     return o.namespace == namespace
+
+
+class State(object):
+    def __init__(self, state, update_time, error_msg=None):
+        self.__state = state
+        self.__update_time = update_time
+        self.__error_msg = error_msg
+
+    def __repr__(self):
+        return 'State(' + str(self.json_dump()) + ')'
+
+    def __eq__(self, other):
+        return self.__hash__() == other.__hash__()
+
+    def __hash__(self):
+        return hash(str(self.json_dump()))
+
+    @property
+    def state(self):
+        return self.__state
+
+    @property
+    def update_time(self):
+        return self.__update_time
+
+    @property
+    def error_msg(self):
+        return self.__error_msg
+
+    def json_dump(self):
+        return {
+            'state': self.__state,
+            'update_time': self.__update_time,
+            'error_msg': self.__error_msg,
+        }

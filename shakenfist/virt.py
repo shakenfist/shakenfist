@@ -118,7 +118,7 @@ class Instance(baseobject.DatabaseBackedObject):
     object_type = 'instance'
     current_version = 2
     state_targets = {
-        None: ('initial', 'error'),
+        None: ('initial', ),
         'initial': ('preflight', 'deleted', 'error'),
         'preflight': ('creating', 'deleted', 'error'),
         'creating': ('created', 'deleted', 'error'),
@@ -171,7 +171,7 @@ class Instance(baseobject.DatabaseBackedObject):
                 'version': cls.current_version
             })
         i = Instance.from_db(uuid)
-        i._db_set_attribute('state', {'state': 'initial'})
+        i.update_state('initial')
         i._db_set_attribute('power_state', {'power_state': 'initial'})
         i.add_event('db record creation', None)
         return i

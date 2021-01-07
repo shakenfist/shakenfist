@@ -4,6 +4,7 @@ from shakenfist import exceptions
 from shakenfist import images
 from shakenfist import scheduler
 from shakenfist.tests import test_shakenfist
+from shakenfist.baseobject import State
 from shakenfist.config import SFConfig
 from shakenfist.virt import Instance
 
@@ -420,10 +421,7 @@ class FindMostTestCase(SchedulerTestCase):
                 ])
     def test_most_matching_images(
             self, mock_from_db, mock_get_meta_all, mock_state_get):
-        mock_state_get.return_value = {
-            'state': 'created',
-            'state_updated': 0
-        }
+        mock_state_get.return_value = State('created', 0)
 
         req_images = ['req_image1']
         candidates = ['node1_net', 'node2', 'node3', 'node4']
@@ -496,10 +494,7 @@ class FindMostTestCase(SchedulerTestCase):
                 ])
     def test_most_matching_images_big_one(
             self, mock_from_db, mock_get_meta_all, mock_state_get):
-        mock_state_get.return_value = {
-            'state': 'created',
-            'state_updated': 0
-        }
+        mock_state_get.return_value = State('created', 1)
 
         candidates = ['node1_net', 'node2', 'node3', 'node4']
 
@@ -613,10 +608,7 @@ class FindMostTestCase(SchedulerTestCase):
                 ])
     def test_most_matching_images_big_two(
             self, mock_from_db, mock_get_meta_all, mock_state_get):
-        mock_state_get.return_value = {
-            'state': 'created',
-            'state_updated': 0
-        }
+        mock_state_get.return_value = State('created', 1)
 
         candidates = ['node1_net', 'node2', 'node3', 'node4']
 
@@ -688,10 +680,7 @@ class FindMostTestCase(SchedulerTestCase):
                 ])
     def test_most_matching_images_big_three(
             self, mock_from_db, mock_get_meta_all, mock_state_get):
-        mock_state_get.return_value = {
-            'state': 'created',
-            'state_updated': 0
-        }
+        mock_state_get.return_value = State('created', 1)
 
         candidates = ['node1_net', 'node2', 'node3', 'node4']
 
