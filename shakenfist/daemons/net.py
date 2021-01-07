@@ -148,16 +148,31 @@ class Monitor(daemon.Daemon):
                 raise exceptions.UnknownTaskException(
                     'Network workitem was not decoded: %s' % workitem)
 
+            log_ctx = log_ctx.withNetwork(workitem.network_uuid())
             n = net.Network.from_db(workitem.network_uuid())
             if not n:
-                log_ctx.withNetwork(workitem.network_uuid()).warning(
-                    'Received work item for non-existent network')
+                log_ctx.warning('Received work item for non-existent network')
                 return
 
             # NOTE(mikal): there's really nothing stopping us from processing a bunch
             # of these jobs in parallel with a pool of workers, but I am not sure its
             # worth the complexity right now. Are we really going to be changing
             # networks that much?
+
+            # Tasks valid for a network in any state
+            if isinstance(workitem, RemoveDHCPNetworkTask):
+                n.remove_dhcp()
+                db.add_event('network', workitem.network_uuid(),
+                             'network node', 'remove dhcp', None, None)
+                return
+
+            # Tasks that should not operate on a dead network
+            if n.is_dead():
+                log_ctx.withFields({'state': n.state,
+                                    'workitem': workitem}).info(
+                    'Received work item for a dead network')
+                return
+
             if isinstance(workitem, DeployNetworkTask):
                 try:
                     n.create_on_network_node()
@@ -177,11 +192,6 @@ class Monitor(daemon.Daemon):
                 except exceptions.DeadNetwork as e:
                     log_ctx.withField('exception', e).warning(
                         'UpdateDHCPNetworkTask on dead network')
-
-            elif isinstance(workitem, RemoveDHCPNetworkTask):
-                n.remove_dhcp()
-                db.add_event('network', workitem.network_uuid(),
-                             'network node', 'remove dhcp', None, None)
 
         finally:
             if jobname:
