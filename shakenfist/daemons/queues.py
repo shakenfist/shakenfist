@@ -265,7 +265,9 @@ def instance_delete(instance_uuid, new_state, error_msg=None):
         instance = virt.Instance.from_db(instance_uuid)
         if instance:
             instance.delete()
-            instance.update_state(new_state, error_message=error_msg)
+            instance.update_state(new_state)
+            if error_msg:
+                instance.error_msg = error_msg
 
         # Check each network used by the deleted instance
         for network in instance_networks:

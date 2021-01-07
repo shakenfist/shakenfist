@@ -16,9 +16,10 @@ class DatabaseBackedObject(object):
     current_version = None
     state_targets = None
 
-    def __init__(self, object_uuid, version=None):
+    def __init__(self, object_uuid, version=None, error_msg=None):
         self.__uuid = object_uuid
         self.__version = version
+        self.__error_msg = error_msg
 
     @property
     def uuid(self):
@@ -98,6 +99,21 @@ class DatabaseBackedObject(object):
             self.add_event('state changed',
                            '%s -> %s' % (orig.value, new_value))
 
+    @property
+    def error_msg(self):
+        db_data = self._db_get_attribute('error_msg')
+        if not db_data:
+            return None
+        return db_data
+
+    @error_msg.setter
+    def error_msg(self, msg):
+        if self.state.state != 'error':
+            raise exceptions.InvalidStateException(
+                'Object not in error state (state=%s, object=%s)' % (
+                    self.state, self.object_type))
+        self._db_set_attribute('error_msg', msg)
+
 
 def state_filter(states, o):
     return o.state.value in states
@@ -149,5 +165,4 @@ class State(object):
         return {
             'value': self.__value,
             'update_time': self.__update_time,
-            'error_msg': self.__error_msg,
         }

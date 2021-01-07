@@ -893,6 +893,8 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertTrue(image.correct_checksum(ret))
 
     # All download attempts not matching checksum
+    @mock.patch('shakenfist.images.Image._db_get_attribute',
+                return_value={'state': 'error', 'update_time': 123})
     @mock.patch('shakenfist.images.Image.update_state')
     @mock.patch('shakenfist.images.Image._add_download_version')
     @mock.patch('shakenfist.images.Image.latest_download_version',
@@ -910,14 +912,14 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.db.refresh_locks')
     def test_get_always_corrupt(
             self, mock_refresh_locks, mock_put, mock_open,
-            mock_version, mock_add_version, mock_update_state):
+            mock_version, mock_add_version, mock_update_state,
+            mock_db_get_attribute):
         mock_version.return_value = {
             'size': 200000,
             'modified': 'Tue, 10 Sep 2019 07:24:40 GMT',
             'fetched_at': 'Tue, 20 Oct 2020 23:02:29 -0000',
             'sequence': 1
         }
-
         test_checksum = '097c42989a9e5d9dcced7b35ec4b0486'
         image = FakeImageChecksum({
             'url': 'testurl',
