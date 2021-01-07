@@ -118,6 +118,21 @@ class DatabaseBackedObject(object):
                         s, self.object_type))
         self._db_set_attribute('error', {'message': msg})
 
+    @property
+    def error_msg(self):
+        db_data = self._db_get_attribute('error_msg')
+        if not db_data:
+            return None
+        return db_data
+
+    @error_msg.setter
+    def error_msg(self, msg):
+        if self.state.state != 'error':
+            raise exceptions.InvalidStateException(
+                'Object not in error state (state=%s, object=%s)' % (
+                    self.state, self.object_type))
+        self._db_set_attribute('error_msg', msg)
+
 
 def state_filter(states, o):
     return o.state.value in states
