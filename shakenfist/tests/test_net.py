@@ -3,6 +3,7 @@ import testtools
 
 from shakenfist import exceptions
 from shakenfist import net
+from shakenfist.baseobject import State
 from shakenfist.config import SFConfig
 from shakenfist.tests import test_shakenfist
 
