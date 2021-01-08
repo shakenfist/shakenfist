@@ -118,7 +118,7 @@ class Instance(baseobject.DatabaseBackedObject):
     object_type = 'instance'
     current_version = 2
     state_targets = {
-        None: ('initial', ),
+        None: ('initial', 'error'),
         'initial': ('preflight', 'deleted', 'error'),
         'preflight': ('creating', 'deleted', 'error'),
         'creating': ('created', 'deleted', 'error'),
@@ -171,7 +171,7 @@ class Instance(baseobject.DatabaseBackedObject):
                 'version': cls.current_version
             })
         i = Instance.from_db(uuid)
-        i.update_state('initial')
+        i.state = 'initial'
         i._db_set_attribute('power_state', {'power_state': 'initial'})
         i.add_event('db record creation', None)
         return i
@@ -352,7 +352,7 @@ class Instance(baseobject.DatabaseBackedObject):
     # has been transcoded to the right format. This has been done to facilitate
     # moving to a queue and task based creation mechanism.
     def create(self, lock=None):
-        self.update_state('creating')
+        self.state = 'creating'
 
         # Ensure we have state on disk
         os.makedirs(self.instance_path, exist_ok=True)
@@ -379,7 +379,7 @@ class Instance(baseobject.DatabaseBackedObject):
             LOG.withObj(self).info('Instance now powered on')
         else:
             LOG.withObj(self).info('Instance failed to power on')
-        self.update_state('created')
+        self.state = 'created'
 
     def delete(self):
         with util.RecordedOperation('delete domain', self):
@@ -412,7 +412,7 @@ class Instance(baseobject.DatabaseBackedObject):
         self._free_console_port(ports.get('console_port'))
         self._free_console_port(ports.get('vdi_port'))
 
-        self.update_state('deleted')
+        self.state = 'deleted'
 
     def hard_delete(self):
         etcd.delete('instance', None, self.uuid)

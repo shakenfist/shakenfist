@@ -1,8 +1,8 @@
 import mock
+import testtools
 
 from shakenfist import exceptions
 from shakenfist import net
-from shakenfist.baseobject import State
 from shakenfist.config import SFConfig
 from shakenfist.tests import test_shakenfist
 
@@ -248,21 +248,20 @@ link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
         self.assertFalse(n.is_created())
 
     @mock.patch('shakenfist.db.get_lock')
-    @mock.patch('shakenfist.net.Network.state',
-                new_callable=mock.PropertyMock)
+    @mock.patch('shakenfist.net.Network._db_get_attribute',
+                side_effect=[
+                    {'value': 'created', 'update_time': 0},
+                    {'value': 'created', 'update_time': 0},
+                    {'value': 'created', 'update_time': 0},
+                    {'value': 'deleting', 'update_time': 0},
+                    {'value': 'error', 'update_time': 0},
+                    {'value': 'deleted', 'update_time': 0},
+                    {'value': 'deleted', 'update_time': 0},
+                    ])
     @mock.patch('shakenfist.net.Network._db_set_attribute')
     @mock.patch('shakenfist.etcd.put')
-    def test_update_state_valid(
+    def test_set_state_valid(
             self, mock_put, mock_attribute_set, mock_state_get, mock_lock):
-        mock_state_get.side_effect = [
-            State('created', 0),
-            State('created', 0),
-            State('created', 0),
-            State('deleting', 0),
-            State('error', 0),
-            State('deleted', 0),
-            State('deleted', 0),
-        ]
 
         n = net.Network({
             'uuid': '8abbc9a6-d923-4441-b498-4f8e3c166804',
@@ -274,10 +273,10 @@ link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
             'physical_nic': 'eth0',
             'netblock': '192.168.1.0/24'
         })
-        self.assertRaises(exceptions.InvalidStateException,
-                          n.update_state, 'initial')
-        n.update_state('deleting')
-        n.update_state('error')
-        n.update_state('deleted')
-        self.assertRaises(exceptions.InvalidStateException,
-                          n.update_state, 'created')
+        with testtools.ExpectedException(exceptions.InvalidStateException):
+            n.state = 'initial'
+        n.state = 'deleting'
+        n.state = 'error'
+        n.state = 'deleted'
+        with testtools.ExpectedException(exceptions.InvalidStateException):
+            n.state = 'created'

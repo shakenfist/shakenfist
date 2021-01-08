@@ -162,13 +162,17 @@ def main():
                             json.dumps(data, indent=4, sort_keys=True))
 
                     state = baseobject.State(instance.get('state'),
-                                             instance.get('state_updated'),
-                                             instance.get('error_message'))
+                                             instance.get('state_updated'))
                     for attr in ['state', 'state_updated', 'error_message']:
                         instance.pop(attr, None)
                     etcd_client.put(
                         '/sf/attribute/instance/%s/state' % instance['uuid'],
                         json.dumps(state.obj_dict(), indent=4, sort_keys=True))
+
+                    err_msg = instance.get('error_message')
+                    etcd_client.put(
+                        '/sf/attribute/instance/%s/error_msg' % instance['uuid'],
+                        json.dumps(err_msg, indent=4, sort_keys=True))
 
                     data = {}
                     for attr in ['power_state', 'power_state_previous',
