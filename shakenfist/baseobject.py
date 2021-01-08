@@ -83,24 +83,24 @@ class DatabaseBackedObject(object):
             return State(None, 0)
         return State(**db_data)
 
-    def update_state(self, state, error_message=None):
-        LOG.withField('state', state).error('update_state()')
+    def update_state(self, new_value, error_message=None):
         with self.get_lock_attr('state', 'State update'):
             orig = self.state
 
             # Ensure state change is valid
-            if state not in self.state_targets[orig.state]:
+            if new_value not in self.state_targets[orig.value]:
                 raise exceptions.InvalidStateException(
                     'Invalid state change from %s to %s for object=%s uuid=%s',
-                    orig_state, state, self.object_type, self.uuid)
+                    orig.value, new_value, self.object_type, self.uuid)
 
-            new = State(state, time.time(), error_message)
-            self._db_set_attribute('state', new)
-            self.add_event('state changed', '%s -> %s' % (orig.state, state))
+            new_state = State(new_value, time.time(), error_message)
+            self._db_set_attribute('state', new_state)
+            self.add_event('state changed',
+                           '%s -> %s' % (orig.value, new_value))
 
 
 def state_filter(states, o):
-    return o.state.state in states
+    return o.state.value in states
 
 
 active_states_filter = partial(
@@ -119,8 +119,8 @@ def namespace_filter(namespace, o):
 
 
 class State(object):
-    def __init__(self, state, update_time, error_msg=None):
-        self.__state = state
+    def __init__(self, value, update_time, error_msg=None):
+        self.__value = value
         self.__update_time = update_time
         self.__error_msg = error_msg
 
@@ -134,8 +134,8 @@ class State(object):
         return hash(str(self.json_dump()))
 
     @property
-    def state(self):
-        return self.__state
+    def value(self):
+        return self.__value
 
     @property
     def update_time(self):
@@ -147,7 +147,7 @@ class State(object):
 
     def json_dump(self):
         return {
-            'state': self.__state,
+            'value': self.__value,
             'update_time': self.__update_time,
             'error_msg': self.__error_msg,
         }

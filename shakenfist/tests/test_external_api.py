@@ -391,7 +391,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
             resp.get_json())
 
     @mock.patch('shakenfist.virt.Instance._db_get_attribute',
-                return_value={'state': 'created', 'update_time': 2})
+                return_value={'value': 'created', 'update_time': 2})
     @mock.patch('shakenfist.virt.Instances',
                 return_value=[FakeInstance(uuid='123')])
     def test_delete_namespace_with_instances(self, mock_get_instances,
@@ -926,7 +926,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         self.assertEqual(400, resp.status_code)
 
     @mock.patch('shakenfist.net.Network._db_get_attribute',
-                return_value={'state': 'created', 'update_time': 2})
+                return_value={'value': 'created', 'update_time': 2})
     @mock.patch('shakenfist.net.Network.from_db',
                 return_value=FakeNetwork(
                     uuid='87c15186-5f73-4947-a9fb-2183c4951efc',
@@ -988,7 +988,7 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
         self.addCleanup(self.config.stop)
 
     @mock.patch('shakenfist.net.Network._db_get_attribute',
-                return_value={'state': 'created', 'update_time': 2})
+                return_value={'value': 'created', 'update_time': 2})
     @mock.patch('shakenfist.ipmanager.IPManager.from_db')
     @mock.patch('shakenfist.net.Network.from_db',
                 return_value=FakeNetwork(

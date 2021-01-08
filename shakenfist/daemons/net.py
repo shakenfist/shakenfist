@@ -66,7 +66,7 @@ class Monitor(daemon.Daemon):
                     if not inst:
                         stray = True
                     else:
-                        if inst.state.state in ['deleted', 'error', 'unknown']:
+                        if inst.state.value in ['deleted', 'error', 'unknown']:
                             stray = True
 
                     if stray:

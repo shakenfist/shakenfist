@@ -32,7 +32,7 @@ class Image(baseobject.DatabaseBackedObject):
     object_type = 'image'
     current_version = 2
     state_targets = {
-        None: ('initial', ),
+        None: ('initial', 'creating'),
         'initial': ('initial', 'creating', 'error'),
         # TODO(andy): This is broken but will be accepted until Image class is
         # refactored. (hey, at least the state names will be valid)
@@ -150,10 +150,11 @@ class Image(baseobject.DatabaseBackedObject):
             'url': self.url,
             'node': self.node,
             'ref': self.unique_ref,
+            'state': self.state.value,
             'version': self.version
         }
 
-        for attrname in ['state', 'latest_checksum']:
+        for attrname in ['latest_checksum']:
             d = self._db_get_attribute(attrname)
             for key in d:
                 # We skip keys with no value

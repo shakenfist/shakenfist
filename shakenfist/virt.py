@@ -198,6 +198,7 @@ class Instance(baseobject.DatabaseBackedObject):
             'name': self.name,
             'namespace': self.namespace,
             'ssh_key': self.ssh_key,
+            'state': self.state.value,
             'user_data': self.user_data,
             'video': self.video,
             'version': self.version
@@ -211,7 +212,6 @@ class Instance(baseobject.DatabaseBackedObject):
             'error_message',
             'node',
             'power_state',
-            'state',
             'vdi_port'
         ]
         # Ensure that missing attributes still get reported

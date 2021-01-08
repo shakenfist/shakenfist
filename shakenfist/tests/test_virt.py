@@ -64,7 +64,7 @@ class VirtMetaTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.etcd.put')
     @mock.patch('shakenfist.etcd.create')
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get_attribute',
-                return_value={'state': None, 'update_time': 0})
+                return_value={'value': None, 'update_time': 0})
     @mock.patch('shakenfist.db.get_lock')
     @mock.patch('time.time', return_value=1234)
     def test_instance_new(self, mock_time, mock_get_lock, mock_get_attribute,
@@ -196,7 +196,7 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
 
         etcd_write = mock_attribute_set.mock_calls[2]
         self.assertTrue(time.time() - etcd_write[1][1].update_time < 3)
-        self.assertEqual('preflight', etcd_write[1][1].state)
+        self.assertEqual('preflight', etcd_write[1][1].value)
 
     @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.virt.Instance.state',
@@ -620,7 +620,7 @@ class InstancesTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertEqual([], uuids)
 
     @mock.patch('shakenfist.virt.Instance._db_get_attribute',
-                return_value={'state': 'created', 'update_time': 1})
+                return_value={'value': 'created', 'update_time': 1})
     @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
     def test_state_filter_all(self, mock_get_all, mock_get, mock_attr):
@@ -632,7 +632,7 @@ class InstancesTestCase(test_shakenfist.ShakenFistTestCase):
                           'a7c5ecec-c3a9-4774-ad1b-249d9e90e806'], uuids)
 
     @mock.patch('shakenfist.virt.Instance._db_get_attribute',
-                return_value={'state': 'deleted', 'update_time': 1})
+                return_value={'value': 'deleted', 'update_time': 1})
     @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
     def test_state_filter_none(self, mock_get_all, mock_get, mock_attr):
@@ -643,8 +643,8 @@ class InstancesTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertEqual([], uuids)
 
     @mock.patch('shakenfist.virt.Instance._db_get_attribute',
-                side_effect=[{'state': 'deleted', 'update_time': 1},
-                             {'state': 'initial', 'update_time': 1}])
+                side_effect=[{'value': 'deleted', 'update_time': 1},
+                             {'value': 'initial', 'update_time': 1}])
     @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
     def test_state_filter_active(self, mock_get_all, mock_get, mock_attr):
@@ -655,8 +655,8 @@ class InstancesTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertEqual(['a7c5ecec-c3a9-4774-ad1b-249d9e90e806'], uuids)
 
     @mock.patch('shakenfist.virt.Instance._db_get_attribute',
-                side_effect=[{'state': 'deleted', 'update_time': 1},
-                             {'state': 'initial', 'update_time': 1}])
+                side_effect=[{'value': 'deleted', 'update_time': 1},
+                             {'value': 'initial', 'update_time': 1}])
     @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
     def test_state_filter_inactive(self, mock_get_all, mock_get, mock_attr):
@@ -667,9 +667,9 @@ class InstancesTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertEqual(['373a165e-9720-4e14-bd0e-9612de79ff15'], uuids)
 
     @mock.patch('shakenfist.virt.Instance._db_get_attribute',
-                side_effect=[{'state': 'deleted', 'update_time': time.time()},
-                             {'state': 'deleted', 'update_time': time.time()},
-                             {'state': 'initial', 'update_time': 1}])
+                side_effect=[{'value': 'deleted', 'update_time': time.time()},
+                             {'value': 'deleted', 'update_time': time.time()},
+                             {'value': 'initial', 'update_time': 1}])
     @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
     def test_state_hard_delete_later(self, mock_get_all, mock_get, mock_attr):
@@ -682,9 +682,9 @@ class InstancesTestCase(test_shakenfist.ShakenFistTestCase):
 
     @mock.patch('shakenfist.virt.Instance._db_get_attribute',
                 side_effect=[
-                    {'state': 'deleted', 'update_time': time.time() - 1000},
-                    {'state': 'deleted', 'update_time': time.time() - 1000},
-                    {'state': 'initial', 'update_time': 1}])
+                    {'value': 'deleted', 'update_time': time.time() - 1000},
+                    {'value': 'deleted', 'update_time': time.time() - 1000},
+                    {'value': 'initial', 'update_time': 1}])
     @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
     def test_state_hard_delete_now(self, mock_get_all, mock_get, mock_attr):
