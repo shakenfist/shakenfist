@@ -84,7 +84,8 @@ class DatabaseBackedObject(object):
             return State(None, 0)
         return State(**db_data)
 
-    def update_state(self, new_value, error_message=None):
+    @state.setter
+    def state(self, new_value):
         with self.get_lock_attr('state', 'State update'):
             orig = self.state
 
@@ -94,7 +95,7 @@ class DatabaseBackedObject(object):
                     'Invalid state change from %s to %s for object=%s uuid=%s',
                     orig.value, new_value, self.object_type, self.uuid)
 
-            new_state = State(new_value, time.time(), error_message)
+            new_state = State(new_value, time.time())
             self._db_set_attribute('state', new_state)
             self.add_event('state changed',
                            '%s -> %s' % (orig.value, new_value))
@@ -108,10 +109,11 @@ class DatabaseBackedObject(object):
 
     @error_msg.setter
     def error_msg(self, msg):
-        if self.state.state != 'error':
+        s = self.state
+        if s.value != 'error':
             raise exceptions.InvalidStateException(
                 'Object not in error state (state=%s, object=%s)' % (
-                    self.state, self.object_type))
+                    s, self.object_type))
         self._db_set_attribute('error_msg', msg)
 
 
@@ -135,10 +137,9 @@ def namespace_filter(namespace, o):
 
 
 class State(object):
-    def __init__(self, value, update_time, error_msg=None):
+    def __init__(self, value, update_time):
         self.__value = value
         self.__update_time = update_time
-        self.__error_msg = error_msg
 
     def __repr__(self):
         return 'State(' + str(self.obj_dict()) + ')'
@@ -156,10 +157,6 @@ class State(object):
     @property
     def update_time(self):
         return self.__update_time
-
-    @property
-    def error_msg(self):
-        return self.__error_msg
 
     def obj_dict(self):
         return {

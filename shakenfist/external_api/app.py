@@ -1162,11 +1162,11 @@ def _delete_network(network_from_db):
                         }).warning('delete_network: network is dead')
         return error(404, 'network is deleted')
 
-    n.update_state('deleting')
+    n.state = 'deleting'
     n.add_event('api', 'delete')
     n.remove_dhcp()
     n.delete()
-    n.update_state('deleted')
+    n.state = 'deleted'
 
 
 class Network(Resource):
