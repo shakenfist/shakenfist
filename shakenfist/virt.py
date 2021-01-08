@@ -118,7 +118,7 @@ class Instance(baseobject.DatabaseBackedObject):
     object_type = 'instance'
     current_version = 2
     state_targets = {
-        None: ('initial', ),
+        None: ('initial', 'error'),
         'initial': ('preflight', 'deleted', 'error'),
         'preflight': ('creating', 'deleted', 'error'),
         'creating': ('created', 'deleted', 'error'),
