@@ -78,7 +78,7 @@ class Monitor(daemon.Daemon):
                 state = util.extract_power_state(libvirt, domain)
                 instance.update_power_state(state)
                 if state == 'crashed':
-                    instance.update_state('error')
+                    instance.state = 'error'
 
             # Inactive VMs just have a name, and are powered off
             # in our state system.
@@ -115,14 +115,14 @@ class Monitor(daemon.Daemon):
 
                     instance.place_instance(config.NODE_NAME)
 
-                    dbpowerstate = instance.power_state
+                    db_power = instance.power_state
                     if not os.path.exists(instance.instance_path):
                         # If we're inactive and our files aren't on disk,
                         # we have a problem.
                         log_ctx.info('Detected error state for instance')
-                        instance.update_state('error')
+                        instance.state = 'error'
 
-                    elif dbpowerstate['power_state'] != 'off':
+                    elif not db_power or db_power['power_state'] != 'off':
                         log_ctx.info('Detected power off for instance')
                         instance.update_power_state('off')
                         instance.add_event('detected poweroff', 'complete')

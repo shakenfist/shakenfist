@@ -100,7 +100,7 @@ class Network(baseobject.DatabaseBackedObject):
         )
 
         n = Network.from_db(uuid)
-        n.update_state('initial')
+        n.state = 'initial'
         n.add_event('db record creation', None)
 
         # Networks should immediately appear on the network node
@@ -440,7 +440,7 @@ class Network(baseobject.DatabaseBackedObject):
                                      '-j MASQUERADE' % subst)
 
         self.update_dhcp()
-        self.update_state('created')
+        self.state = 'created'
 
     def delete(self):
         subst = self.subst_dict()
