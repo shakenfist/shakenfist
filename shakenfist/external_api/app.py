@@ -864,7 +864,6 @@ class InstanceInterfaces(Resource):
     @jwt_required
     @arg_is_instance_uuid
     @requires_instance_ownership
-    @requires_instance_active
     def get(self, instance_uuid=None, instance_from_db=None):
         return list(db.get_instance_interfaces(instance_uuid))
 
