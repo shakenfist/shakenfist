@@ -125,13 +125,13 @@ class State(object):
         self.__error_msg = error_msg
 
     def __repr__(self):
-        return 'State(' + str(self.json_dump()) + ')'
+        return 'State(' + str(self.obj_dict()) + ')'
 
     def __eq__(self, other):
         return self.__hash__() == other.__hash__()
 
     def __hash__(self):
-        return hash(str(self.json_dump()))
+        return hash(str(self.obj_dict()))
 
     @property
     def value(self):
@@ -145,7 +145,7 @@ class State(object):
     def error_msg(self):
         return self.__error_msg
 
-    def json_dump(self):
+    def obj_dict(self):
         return {
             'value': self.__value,
             'update_time': self.__update_time,

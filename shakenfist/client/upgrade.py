@@ -124,7 +124,7 @@ def main():
                     new = baseobject.State('created', time.time())
                     etcd_client.put(
                         '/sf/attribute/network/%s/state' % n['uuid'],
-                        json.dumps(new.json_dump(), indent=4, sort_keys=True))
+                        json.dumps(new.obj_dict(), indent=4, sort_keys=True))
 
                     network['version'] = 2
                     etcd_client.put(
@@ -168,7 +168,7 @@ def main():
                         instance.pop(attr, None)
                     etcd_client.put(
                         '/sf/attribute/instance/%s/state' % instance['uuid'],
-                        json.dumps(state.json_dump(), indent=4, sort_keys=True))
+                        json.dumps(state.obj_dict(), indent=4, sort_keys=True))
 
                     data = {}
                     for attr in ['power_state', 'power_state_previous',
@@ -238,7 +238,7 @@ def main():
                     new = baseobject.State('created', time.time())
                     etcd_client.put(
                         '/sf/attribute/image/%s/state' % image_node,
-                        json.dumps(new.json_dump(), indent=4, sort_keys=True))
+                        json.dumps(new.obj_dict(), indent=4, sort_keys=True))
 
                     image['uuid'] = image_node
                     image['ref'], image['node'] = image_node.split('/')

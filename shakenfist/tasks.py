@@ -19,9 +19,9 @@ class QueueTask(object):
         return self._name.replace('_', ' ')
 
     def __repr__(self):
-        # All subclasses define json_dump()
+        # All subclasses define obj_dict()
         r = 'QueueTask:' + self.__class__.__name__ + ': '
-        r += str(self.json_dump())
+        r += str(self.obj_dict())
         return r
 
     def __eq__(self, other):
@@ -31,9 +31,9 @@ class QueueTask(object):
         return self.__hash__() == other.__hash__()
 
     def __hash__(self):
-        return hash(str(self.json_dump()))
+        return hash(str(self.obj_dict()))
 
-    def json_dump(self):
+    def obj_dict(self):
         return {'task': self._name,
                 'version': self._version}
 
@@ -66,8 +66,8 @@ class InstanceTask(QueueTask):
     def network(self):
         return self._network
 
-    def json_dump(self):
-        return {**super(InstanceTask, self).json_dump(),
+    def obj_dict(self):
+        return {**super(InstanceTask, self).obj_dict(),
                 'instance_uuid': self._instance_uuid,
                 'network': self._network}
 
@@ -91,8 +91,8 @@ class ErrorInstanceTask(InstanceTask):
         super(ErrorInstanceTask, self).__init__(instance_uuid)
         self._error_msg = error_msg
 
-    def json_dump(self):
-        return {**super(ErrorInstanceTask, self).json_dump(),
+    def obj_dict(self):
+        return {**super(ErrorInstanceTask, self).obj_dict(),
                 'error_msg': self._error_msg}
 
     def error_msg(self):
@@ -117,8 +117,8 @@ class NetworkTask(QueueTask):
     def network_uuid(self):
         return self._network_uuid
 
-    def json_dump(self):
-        return {**super(NetworkTask, self).json_dump(),
+    def obj_dict(self):
+        return {**super(NetworkTask, self).obj_dict(),
                 'network_uuid': self._network_uuid}
 
 
@@ -145,8 +145,8 @@ class ImageTask(QueueTask):
         if not isinstance(url, str):
             raise NoURLImageFetchTaskException
 
-    def json_dump(self):
-        return {**super(ImageTask, self).json_dump(),
+    def obj_dict(self):
+        return {**super(ImageTask, self).obj_dict(),
                 'url': self._url}
 
     # Data methods
@@ -161,8 +161,8 @@ class FetchImageTask(ImageTask):
         super(FetchImageTask, self).__init__(url)
         self._instance_uuid = instance_uuid
 
-    def json_dump(self):
-        return {**super(FetchImageTask, self).json_dump(),
+    def obj_dict(self):
+        return {**super(FetchImageTask, self).obj_dict(),
                 'instance_uuid': self._instance_uuid}
 
     # Data methods

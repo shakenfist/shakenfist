@@ -26,7 +26,7 @@ class StateTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertEqual(s.update_time, 3)
         self.assertEqual(s.error_msg, 'error msg')
 
-        self.assertEqual(s.json_dump(), {
+        self.assertEqual(s.obj_dict(), {
             'value': 'state1',
             'update_time': 3,
             'error_msg': 'error msg',

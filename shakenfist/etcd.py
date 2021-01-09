@@ -208,9 +208,9 @@ def _construct_key(objecttype, subtype, name):
 class JSONEncoderTasks(json.JSONEncoder):
     def default(self, obj):
         if QueueTask.__subclasscheck__(type(obj)):
-            return obj.json_dump()
+            return obj.obj_dict()
         if type(obj) is baseobject.State:
-            return obj.json_dump()
+            return obj.obj_dict()
         return json.JSONEncoder.default(self, obj)
 
 
