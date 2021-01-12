@@ -200,11 +200,8 @@ def instance_preflight(instance_uuid, network):
 
 
 def instance_start(instance_uuid, network):
-    with db.get_lock(
-            'instance', None, instance_uuid, ttl=900, timeout=120,
-            op='Instance start') as lock:
-        instance = virt.Instance.from_db(instance_uuid)
-
+    instance = virt.Instance.from_db(instance_uuid)
+    with instance.get_lock(ttl=900, timeout=120, op='Instance start') as lock:
         # Collect the networks
         nets = {}
         for netdesc in network:
@@ -277,8 +274,8 @@ def instance_delete(instance_uuid):
                         n.update_dhcp()
                 else:
                     # Network not used by any other instance therefore delete
-                    with util.RecordedOperation('remove network', n):
-                        n.delete()
+                    with util.RecordedOperation('remove network from node', n):
+                        n.delete_on_node_with_lock()
         return instance
 
 

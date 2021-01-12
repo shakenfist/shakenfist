@@ -72,6 +72,12 @@ class DatabaseBackedObject(object):
     def _db_set_attribute(self, attribute, value):
         etcd.put('attribute/%s' % self.object_type, self.__uuid, attribute, value)
 
+    def get_lock(self, subtype=None, ttl=60, timeout=db.ETCD_ATTEMPT_TIMEOUT,
+                 relatedobjects=None, log_ctx=LOG, op=None):
+        return db.get_lock(self.object_type, subtype, self.uuid, ttl=ttl,
+                           timeout=timeout, relatedobjects=relatedobjects,
+                           log_ctx=log_ctx, op=op)
+
     def get_lock_attr(self, name, op):
         return db.get_lock('attribute/%s' % self.object_type,
                            self.__uuid, name, op=op)
