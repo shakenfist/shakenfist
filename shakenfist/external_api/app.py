@@ -1162,16 +1162,14 @@ def _delete_network(network_from_db):
         return error(404, 'network does not exist')
 
     if n.is_dead():
+        # The network has been deleted. No need to attempt further effort.
         LOG.withFields({'network_uuid': n.uuid,
                         'state': n.state.value
                         }).warning('delete_network: network is dead')
         return error(404, 'network is deleted')
 
-    n.state = 'deleting'
     n.add_event('api', 'delete')
-    n.remove_dhcp()
     n.delete()
-    n.state = 'deleted'
 
 
 class Network(Resource):
@@ -1356,15 +1354,14 @@ class NetworkPing(Resource):
         if not n:
             return error(404, 'network %s not found' % network_uuid)
 
-        with db.get_object_lock(n, ttl=120, op='Network ping via API'):
-            out, err = util.execute(
-                None, 'ip netns exec %s ping -c 10 %s' % (
-                    network_uuid, address),
-                check_exit_code=[0, 1])
-            return {
-                'stdout': out,
-                'stderr': err
-            }
+        out, err = util.execute(
+            None, 'ip netns exec %s ping -c 10 %s' % (
+                network_uuid, address),
+            check_exit_code=[0, 1])
+        return {
+            'stdout': out,
+            'stderr': err
+        }
 
 
 class Nodes(Resource):
