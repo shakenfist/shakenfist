@@ -475,11 +475,7 @@ class AuthNamespace(Resource):
 
         networks = []
         for n in net.Networks([partial(baseobject.namespace_filter, namespace)]):
-            # Networks in 'deleting' state are regarded as "live" networks.
-            # They in a transient state. If they hang in that state we want to
-            # know. They will block deletion of a namespace thus giving notice
-            # of the problem.
-            if n.state.value not in ['deleted', 'error']:
+            if not n.is_dead():
                 networks.append(n.uuid)
         if len(networks) > 0:
             return error(400, 'you cannot delete a namespace with networks')

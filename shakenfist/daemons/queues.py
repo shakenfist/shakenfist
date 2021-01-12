@@ -191,23 +191,28 @@ def instance_preflight(instance, network):
             'Unable to find suitable node')
 
 
-def instance_start(instance, network):
-    with instance.get_lock(ttl=900, timeout=120, op='Instance start') as lock:
-        # Collect the networks
+def instance_start(instance_uuid, network):
+    instance = virt.Instance.from_db(instance_uuid)
+    with instance.get_lock(ttl=900, op='Instance start') as lock:
+        # Ensure networks are connected to this node
         nets = {}
         for netdesc in network:
             if netdesc['network_uuid'] not in nets:
                 n = net.Network.from_db(netdesc['network_uuid'])
                 if not n:
-                    instance.enqueue_delete_due_error(
+                    db.enqueue_instance_error(
+                        instance_uuid,
                         'missing network: %s' % netdesc['network_uuid'])
                     return
 
                 if n.state.value != 'created':
-                    instance.enqueue_delete_due_error(
-                        'network is not active: %s' % n.uuid)
+                    db.enqueue_instance_error(
+                        instance_uuid, 'network is not active: %s' % n.uuid)
+                    return
 
-                nets[netdesc['network_uuid']] = n
+                n.create_on_hypervisor()
+                n.ensure_mesh()
+                n.update_dhcp()
 
         # Allocate console and VDI ports
         instance.allocate_instance_ports()
@@ -231,9 +236,9 @@ def instance_start(instance, network):
             db.update_network_interface_state(iface['uuid'], 'created')
 
 
-def instance_delete(instance):
-    with instance.get_lock(op='Instance delete'):
-        db.add_event('instance', instance.uuid, 'queued', 'delete', None, None)
+def instance_delete(instance_uuid):
+    with db.get_lock('instance', None, instance_uuid, op='Instance delete'):
+        db.add_event('instance', instance_uuid, 'queued', 'delete', None, None)
 
         # Create list of networks used by instance
         instance_networks = []
