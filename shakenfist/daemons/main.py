@@ -58,9 +58,10 @@ def restore_instances():
         for network in networks:
             try:
                 n = net.Network.from_db(network)
-                LOG.withObj(n).info('Restoring network')
-                n.create_on_hypervisor()
-                n.ensure_mesh()
+                if not n.is_dead():
+                    LOG.withObj(n).info('Restoring network')
+                    n.create_on_hypervisor()
+                    n.ensure_mesh()
             except Exception as e:
                 util.ignore_exception('restore network %s' % network, e)
 
