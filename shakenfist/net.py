@@ -30,12 +30,9 @@ class Network(baseobject.DatabaseBackedObject):
     current_version = 2
     state_targets = {
         None: ('initial', ),
-        'initial': ('created', 'deleting', 'error'),
-        # TODO(andy): Investigate whether networks should created->deleted
-        'created': ('created', 'deleting', 'deleted', 'error'),
-        # TODO(andy): Remove deleting->created. Example occurs during CI.
-        'deleting': ('deleted', 'created', 'error'),
-        'error': ('deleting', 'error'),
+        'initial': ('created', 'deleted', 'error'),
+        'created': ('created', 'deleted', 'deleted', 'error'),
+        'error': ('deleted', 'error'),
         'deleted': (),
     }
 
@@ -289,7 +286,7 @@ class Network(baseobject.DatabaseBackedObject):
         callers will wait on a lock before calling this function. In this case
         we definitely need to update the in-memory object model.
         """
-        return self.state.value in ('deleted', 'deleting', 'error')
+        return self.state.value in ('deleted', 'error')
 
     def _create_common(self):
         subst = self.subst_dict()
