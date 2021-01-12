@@ -201,22 +201,26 @@ def instance_preflight(instance_uuid, network):
 
 def instance_start(instance_uuid, network):
     instance = virt.Instance.from_db(instance_uuid)
-    with instance.get_lock(ttl=900, timeout=120, op='Instance start') as lock:
-        # Collect the networks
+    with instance.get_lock(ttl=900, op='Instance start') as lock:
+        # Ensure networks are connected to this node
         nets = {}
         for netdesc in network:
             if netdesc['network_uuid'] not in nets:
                 n = net.Network.from_db(netdesc['network_uuid'])
                 if not n:
                     db.enqueue_instance_error(
-                        instance_uuid, 'missing network: %s' % netdesc['network_uuid'])
+                        instance_uuid,
+                        'missing network: %s' % netdesc['network_uuid'])
                     return
 
                 if n.state.value != 'created':
                     db.enqueue_instance_error(
                         instance_uuid, 'network is not active: %s' % n.uuid)
+                    return
 
-                nets[netdesc['network_uuid']] = n
+                n.create_on_hypervisor()
+                n.ensure_mesh()
+                n.update_dhcp()
 
         # Allocate console and VDI ports
         instance.allocate_instance_ports()
@@ -241,8 +245,7 @@ def instance_start(instance_uuid, network):
 
 
 def instance_delete(instance_uuid):
-    with db.get_lock('instance', None, instance_uuid, timeout=120,
-                     op='Instance delete'):
+    with db.get_lock('instance', None, instance_uuid, op='Instance delete'):
         db.add_event('instance', instance_uuid, 'queued', 'delete', None, None)
 
         # Create list of networks used by instance

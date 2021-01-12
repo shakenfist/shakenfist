@@ -30,12 +30,9 @@ class Network(baseobject.DatabaseBackedObject):
     current_version = 2
     state_targets = {
         None: ('initial', ),
-        'initial': ('created', 'deleting', 'error'),
-        # TODO(andy): Investigate whether networks should created->deleted
-        'created': ('created', 'deleting', 'deleted', 'error'),
-        # TODO(andy): Remove deleting->created. Example occurs during CI.
-        'deleting': ('deleted', 'created', 'error'),
-        'error': ('deleting', 'error'),
+        'initial': ('created', 'deleted', 'error'),
+        'created': ('created', 'deleted', 'error'),
+        'error': ('deleted', 'error'),
         'deleted': (),
     }
 
@@ -321,6 +318,8 @@ class Network(baseobject.DatabaseBackedObject):
             if self.is_dead():
                 raise DeadNetwork('network=%s' % self)
             self._create_common()
+
+            # TODO(andy): Check with mikal: is this task required here?
             db.enqueue('networknode', DeployNetworkTask(self.uuid))
             self.add_event('deploy', 'enqueued')
 
