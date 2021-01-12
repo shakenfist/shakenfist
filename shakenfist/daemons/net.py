@@ -66,8 +66,7 @@ class Monitor(daemon.Daemon):
                     if not inst:
                         stray = True
                     else:
-                        dbstate = inst.state
-                        if dbstate.get('state') in ['deleted', 'error', 'unknown']:
+                        if inst.state.value in ['deleted', 'error', 'unknown']:
                             stray = True
 
                     if stray:
@@ -85,7 +84,7 @@ class Monitor(daemon.Daemon):
 
                 seen_vxids.append(n.vxid)
 
-                if time.time() - n.state.get('state_updated', time.time()) < 60:
+                if time.time() - n.state.update_time < 60:
                     # Network state changed in the last minute, punt for now
                     continue
 

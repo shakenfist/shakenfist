@@ -29,6 +29,7 @@ class Network(baseobject.DatabaseBackedObject):
     object_type = 'network'
     current_version = 2
     state_targets = {
+        None: ('initial', ),
         'initial': ('created', 'deleting', 'error'),
         # TODO(andy): Investigate whether networks should created->deleted
         'created': ('created', 'deleting', 'deleted', 'error'),
@@ -99,7 +100,7 @@ class Network(baseobject.DatabaseBackedObject):
         )
 
         n = Network.from_db(uuid)
-        n._db_set_attribute('state', {'state': 'initial'})
+        n.update_state('initial')
         n.add_event('db record creation', None)
 
         # Networks should immediately appear on the network node
@@ -137,11 +138,12 @@ class Network(baseobject.DatabaseBackedObject):
             'provide_dhcp': self.__provide_dhcp,
             'provide_nat': self.__provide_nat,
             'floating_gateway': self.floating_gateway,
+            'state': self.state.value,
             'vxid': self.__vxid,
             'version': self.version
         }
 
-        for attrname in ['routing', 'state']:
+        for attrname in ['routing']:
             d = self._db_get_attribute(attrname)
             for key in d:
                 # We skip keys with no value
@@ -287,7 +289,7 @@ class Network(baseobject.DatabaseBackedObject):
         callers will wait on a lock before calling this function. In this case
         we definitely need to update the in-memory object model.
         """
-        return self.state['state'] in ('deleted', 'deleting', 'error')
+        return self.state.value in ('deleted', 'deleting', 'error')
 
     def _create_common(self):
         subst = self.subst_dict()

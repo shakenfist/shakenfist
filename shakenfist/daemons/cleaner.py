@@ -46,12 +46,12 @@ class Monitor(daemon.Daemon):
                 instance.place_instance(config.NODE_NAME)
                 seen.append(domain.name())
 
-                dbstate = instance.state
-                if dbstate.get('state') == 'deleted':
+                db_state = instance.state
+                if db_state.value == 'deleted':
                     # NOTE(mikal): a delete might be in-flight in the queue.
                     # We only worry about instances which should have gone
                     # away five minutes ago.
-                    if time.time() - dbstate['state_updated'] < 300:
+                    if time.time() - db_state.update_time < 300:
                         continue
 
                     instance.enforced_deletes_increment()
@@ -99,12 +99,12 @@ class Monitor(daemon.Daemon):
                         domain.undefine()
                         continue
 
-                    dbstate = instance.state
-                    if dbstate.get('state') == 'deleted':
+                    db_state = instance.state
+                    if db_state.value == 'deleted':
                         # NOTE(mikal): a delete might be in-flight in the queue.
                         # We only worry about instances which should have gone
                         # away five minutes ago.
-                        if time.time() - instance['state_updated'] < 300:
+                        if time.time() - db_state.update_time < 300:
                             continue
 
                         domain = conn.lookupByName(domain_name)

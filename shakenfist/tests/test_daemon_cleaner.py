@@ -1,5 +1,6 @@
 import mock
 
+from shakenfist.baseobject import State
 from shakenfist.config import SFConfigBase
 from shakenfist.daemons import cleaner
 from shakenfist.tests import test_shakenfist
@@ -109,6 +110,8 @@ class CleanerTestCase(test_shakenfist.ShakenFistTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
+    @mock.patch('shakenfist.virt.Instance.state',
+                new_callable=mock.PropertyMock)
     @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.db.see_this_node')
     @mock.patch('shakenfist.db.add_event')
@@ -119,12 +122,20 @@ class CleanerTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('time.time', return_value=7)
     def test_update_power_states(self, mock_time, mock_exists, mock_put,
                                  mock_get_instance_attribute, mock_get_instance,
-                                 mock_event, mock_see, mock_lock):
+                                 mock_event, mock_see, mock_lock,
+                                 mock_state_get):
+        mock_state_get.return_value = State('initial', 0)
+
         m = cleaner.Monitor('cleaner')
         m._update_power_states()
 
-        result = [(c[1][0], c[1][1], c[1][2], {'power_state': c[1][3]['power_state']}
-                   ) for c in mock_put.mock_calls]
+        result = []
+        for c in mock_put.mock_calls:
+            if type(c[1][3]) is State:
+                val = c[1][3]
+            else:
+                val = {'power_state': c[1][3]['power_state']}
+            result.append((c[1][0], c[1][1], c[1][2], val))
 
         self.assertEqual(
             [
@@ -137,11 +148,11 @@ class CleanerTestCase(test_shakenfist.ShakenFistTestCase):
                 ('attribute/instance', 'crashed',
                  'power_state', {'power_state': 'off'}),
                 ('attribute/instance', 'crashed',
-                 'state', {'power_state': 'off'}),
+                 'state', State('error', 7)),
                 ('attribute/instance', 'paused',
                  'power_state', {'power_state': 'off'}),
                 ('attribute/instance', 'foo',
                  'power_state', {'power_state': 'off'}),
                 ('attribute/instance', 'nofiles',
-                 'state', {'power_state': 'off'})
+                 'state', State('error', 7))
             ], result)
