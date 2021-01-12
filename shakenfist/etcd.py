@@ -116,6 +116,7 @@ class ActualLock(Lock):
                                          'threshold': threshold,
                                          'holder-pid': pid,
                                          'holder-node': node,
+                                         'requesting-op': self.operation,
                                          }).info('Waiting for lock')
                 slow_warned = True
 
@@ -130,6 +131,7 @@ class ActualLock(Lock):
         self.log_ctx.withFields({'duration': duration,
                                  'holder-pid': pid,
                                  'holder-node': node,
+                                 'requesting-op': self.operation,
                                  }).info('Failed to acquire lock')
 
         raise exceptions.LockException(
@@ -138,6 +140,10 @@ class ActualLock(Lock):
 
     def __exit__(self, _exception_type, _exception_value, _traceback):
         if not self.release():
+            locks = list(get_all(LOCK_PREFIX, None))
+            self.log_ctx.withFields({'locks': locks,
+                                     'key': self.name,
+                                     }).error('Cannot release lock')
             raise exceptions.LockException(
                 'Cannot release lock: %s' % self.name)
 
