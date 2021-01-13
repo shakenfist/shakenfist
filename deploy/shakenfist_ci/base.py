@@ -234,6 +234,11 @@ class BaseNamespacedTestCase(BaseTestCase):
                 break
             time.sleep(5)
 
+        remaining_instances = list(self.test_client.get_instances())
+        if remaining_instances:
+            self.fail('Failed to delete instances: %s'
+                      % ', '.join(remaining_instances))
+
         for net in self.test_client.get_networks():
             self.test_client.delete_network(net['uuid'])
         self._remove_namespace(self.namespace)

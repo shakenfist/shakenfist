@@ -1129,12 +1129,19 @@ class Images(Resource):
         if node:
             f.append(partial(images.placement_filter, node))
 
+        retval = []
         for i in images.Images(filters=f):
-            yield i.external_view()
+            retval.append(i.external_view())
+        return retval
 
     @jwt_required
     def post(self, url=None):
         db.add_event('image', url, 'api', 'cache', None, None)
+
+        # We ensure that the image exists in the database in an initial state
+        # here so that it will show up in image list requests. The image is
+        # fetched by the queued job later.
+        images.Image.new(url)
         db.enqueue(config.NODE_NAME, {
             'tasks': [FetchImageTask(url)],
         })

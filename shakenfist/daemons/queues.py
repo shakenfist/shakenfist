@@ -130,6 +130,10 @@ def image_fetch(url, instance_uuid):
         # "waiting_image_fetch" queue but this works now.
         with db.get_lock('image', config.NODE_NAME, Image.calc_unique_ref(url),
                          timeout=15*60, op='Image fetch') as lock:
+            # Note that the image might already exist in the database as the API
+            # creates a records so that the image is included in listings before
+            # it is fetched. However, the new() call here handles that case and
+            # will just return the previous entry if one exists.
             img = Image.new(url)
             img.get([lock], instance)
             db.add_event('image', url, 'fetch', None, None, 'success')
