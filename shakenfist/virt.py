@@ -23,6 +23,7 @@ from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
 from shakenfist import util
+from shakenfist.tasks import DeleteInstanceTask
 
 
 LOG, _ = logutil.setup(__name__)
@@ -412,7 +413,8 @@ class Instance(baseobject.DatabaseBackedObject):
         self._free_console_port(ports.get('console_port'))
         self._free_console_port(ports.get('vdi_port'))
 
-        self.state = 'deleted'
+        if self.state.value != 'error':
+            self.state = 'deleted'
 
     def hard_delete(self):
         etcd.delete('instance', None, self.uuid)
@@ -747,8 +749,7 @@ class Instance(baseobject.DatabaseBackedObject):
 
     def power_on(self):
         if not os.path.exists(self.xml_file):
-            db.enqueue_instance_error(self.uuid,
-                                      'missing domain file in power on')
+            self.enqueue_delete_due_error('missing domain file in power on')
 
         libvirt = util.get_libvirt()
         with open(self.xml_file) as f:
@@ -759,8 +760,8 @@ class Instance(baseobject.DatabaseBackedObject):
             conn = libvirt.open('qemu:///system')
             instance = conn.defineXML(xml)
             if not instance:
-                db.enqueue_instance_error(self.uuid,
-                                          'power on failed to create domain')
+                self.enqueue_delete_due_error(
+                    'power on failed to create domain')
                 raise exceptions.NoDomainException()
 
         try:
@@ -865,6 +866,24 @@ class Instance(baseobject.DatabaseBackedObject):
             'Client requested %d bytes of console log, returning %d bytes'
             % (length, len(d)))
         return d
+
+    def enqueue_delete(self):
+        self.enqueue_delete_remote(config.NODE_NAME)
+
+    def enqueue_delete_remote(self, node):
+        db.enqueue(node, {
+            'tasks': [DeleteInstanceTask(self.uuid)]
+            })
+
+    def enqueue_delete_due_error(self, error_msg):
+        LOG.withObj(self).info('enqueue_instance_error')
+
+        # Error needs to be set immediately so that API clients get
+        # correct information. The VM and network tear down can be delayed.
+        self.state = 'error'
+        self.error_msg = error_msg
+
+        self.enqueue_delete()
 
 
 # TODO(mikal): can this be refactored into baseobject?

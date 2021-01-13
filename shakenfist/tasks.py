@@ -27,7 +27,7 @@ class QueueTask(object):
     def __eq__(self, other):
         if not QueueTask.__subclasscheck__(type(other)):
             raise NotImplementedError(
-                'Objects must be subclasses of QueueTask')
+                'Objects must be subclasses of QueueTask not %s', type(other))
         return self.__hash__() == other.__hash__()
 
     def __hash__(self):
@@ -82,21 +82,6 @@ class StartInstanceTask(InstanceTask):
 
 class DeleteInstanceTask(InstanceTask):
     _name = 'instance_delete'
-
-
-class ErrorInstanceTask(InstanceTask):
-    _name = 'instance_error'
-
-    def __init__(self, instance_uuid, error_msg=None, network=None):
-        super(ErrorInstanceTask, self).__init__(instance_uuid)
-        self._error_msg = error_msg
-
-    def obj_dict(self):
-        return {**super(ErrorInstanceTask, self).obj_dict(),
-                'error_msg': self._error_msg}
-
-    def error_msg(self):
-        return self._error_msg
 
 
 #

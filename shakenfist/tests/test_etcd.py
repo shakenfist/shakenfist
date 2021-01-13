@@ -165,21 +165,6 @@ class TaskEncodingETCDtestCase(test_shakenfist.ShakenFistTestCase):
         mock_put.assert_called_with(path, encoded, lease=None)
 
     @mock.patch('etcd3gw.Etcd3Client.put')
-    def test_put_ErrorInstanceTask(self, mock_put):
-        etcd.put('objecttype', 'subtype', 'name',
-                 tasks.ErrorInstanceTask('fake_uuid', 'dunno'))
-
-        path = '/sf/objecttype/subtype/name'
-        encoded = '''{
-    "error_msg": "dunno",
-    "instance_uuid": "fake_uuid",
-    "network": [],
-    "task": "instance_error",
-    "version": 1
-}'''
-        mock_put.assert_called_with(path, encoded, lease=None)
-
-    @mock.patch('etcd3gw.Etcd3Client.put')
     def test_put_DeployNetworkTask(self, mock_put):
         etcd.put('objecttype', 'subtype', 'name',
                  tasks.DeployNetworkTask('fake_uuid'))
@@ -331,7 +316,7 @@ class TaskDequeueTestCase(test_shakenfist.ShakenFistTestCase):
                         {
                             "network": [],
                             "instance_uuid": "fake_uuid",
-                            "task": "instance_error",
+                            "task": "instance_delete",
                             "version": 1
                         }
                     ]
@@ -348,7 +333,7 @@ class TaskDequeueTestCase(test_shakenfist.ShakenFistTestCase):
         jobname, workitem = etcd.dequeue('node01')
         self.assertEqual('somejob', jobname)
         expected = [
-            tasks.ErrorInstanceTask('fake_uuid'),
+            tasks.DeleteInstanceTask('fake_uuid'),
         ]
         self.assertCountEqual(expected, workitem['tasks'])
         self.assertSequenceEqual(expected, workitem['tasks'])
@@ -369,7 +354,7 @@ class TaskDequeueTestCase(test_shakenfist.ShakenFistTestCase):
                         {
                             "network": [],
                             "instance_uuid": "fake_uuid",
-                            "task": "instance_error",
+                            "task": "instance_delete",
                             "version": 1
                         }
                     ]
@@ -388,7 +373,7 @@ class TaskDequeueTestCase(test_shakenfist.ShakenFistTestCase):
         expected = [
             tasks.PreflightInstanceTask('diff_uuid'),
             tasks.StartInstanceTask('fake_uuid'),
-            tasks.ErrorInstanceTask('fake_uuid'),
+            tasks.DeleteInstanceTask('fake_uuid'),
         ]
         self.assertCountEqual(expected, workitem['tasks'])
         self.assertSequenceEqual(expected, workitem['tasks'])

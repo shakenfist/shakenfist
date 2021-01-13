@@ -39,7 +39,7 @@ class Image(baseobject.DatabaseBackedObject):
         'creating': ('initial', 'creating', 'created', 'deleted', 'error'),
         'created': ('initial', 'creating', 'created', 'deleted', 'error'),
         'error': ('deleted', 'error'),
-        'deleted': ('error'),
+        'deleted': ('deleted', 'error', 'creating'),
     }
 
     def __init__(self, static_values):

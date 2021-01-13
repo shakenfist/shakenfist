@@ -617,7 +617,7 @@ class Instance(Resource):
         else:
             node = placement['node']
 
-        db.enqueue_instance_delete_remote(node, instance_uuid)
+        instance_from_db.enqueue_delete_remote(node)
 
         start_time = time.time()
         while time.time() - start_time < config.get('API_ASYNC_WAIT'):
@@ -723,8 +723,7 @@ class Instances(Resource):
                 if not n:
                     m = 'missing network %s during IP allocation phase' % (
                         netdesc['network_uuid'])
-                    db.enqueue_instance_error(
-                        instance.uuid, m)
+                    instance.enqueue_delete_due_error(m)
                     return error(
                         404, 'network %s not found' % netdesc['network_uuid'])
 
@@ -739,8 +738,7 @@ class Instances(Resource):
                         if not ipm.reserve(netdesc['address']):
                             m = 'failed to reserve an IP on network %s' % (
                                 netdesc['network_uuid'])
-                            db.enqueue_instance_error(
-                                instance.uuid, m)
+                            instance.enqueue_delete_due_error(m)
                             return error(409, 'address %s in use' %
                                          netdesc['address'])
 
@@ -769,15 +767,13 @@ class Instances(Resource):
         except exceptions.LowResourceException as e:
             instance.add_event('schedule', 'failed', None,
                                'Insufficient resources: ' + str(e))
-            db.enqueue_instance_error(
-                instance.uuid, 'scheduling failed')
+            instance.enqueue_delete_due_error('scheduling failed')
             return error(507, str(e))
 
         except exceptions.CandidateNodeNotFoundException as e:
             instance.add_event('schedule', 'failed', None,
                                'Candidate node not found: ' + str(e))
-            db.enqueue_instance_error(
-                instance.uuid, 'scheduling failed')
+            instance.enqueue_delete_due_error('scheduling failed')
             return error(404, 'node not found: %s' % e)
 
         # Record placement

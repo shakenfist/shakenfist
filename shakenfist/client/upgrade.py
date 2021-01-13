@@ -5,9 +5,10 @@ import ipaddress
 import json
 import time
 
+from shakenfist import baseobject
 from shakenfist import db
 from shakenfist import util
-from shakenfist import baseobject
+from shakenfist import virt
 
 # Very simple data upgrader
 
@@ -89,9 +90,13 @@ def main():
 
                 if bad:
                     for ni in db.get_network_interfaces(n['uuid']):
-                        db.enqueue_instance_error(
-                            ni['instance_uuid'],
-                            'Instance was on invalid network at upgrade.')
+                        inst = virt.Instance.from_db(ni['instance_uuid'])
+                        if inst:
+                            inst.enqueue_delete_due_error(
+                                'Instance was on invalid network at upgrade.')
+                        else:
+                            print(f"--> Instance ({ni['instance_uuid']}) on "
+                                  "invalid network, does not exist in DB")
 
                     # NOTE(mikal): we have to hard delete this network here, or
                     # it will cause a crash later in the Networks iterator.
