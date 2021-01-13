@@ -250,21 +250,20 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
                          images.Image.calc_unique_ref('http://example.com'))
 
     @mock.patch('shakenfist.db.get_lock')
-    @mock.patch('shakenfist.images.Image.state',
-                new_callable=mock.PropertyMock)
+    @mock.patch('shakenfist.images.Image._db_get_attribute',
+                side_effect=[
+                    {'value': None, 'update_time': 0},
+                    {'value': 'initial', 'update_time': 0},
+                    {'value': 'initial', 'update_time': 0},
+                    {'value': 'creating', 'update_time': 0},
+                    {'value': 'created', 'update_time': 0},
+                    {'value': 'error', 'update_time': 0},
+                    {'value': 'deleted', 'update_time': 0},
+                ])
     @mock.patch('shakenfist.images.Image._db_set_attribute')
     @mock.patch('shakenfist.etcd.put')
-    def test_update_state_valid(
+    def test_state_property_valid(
             self, mock_put, mock_attribute_set, mock_state_get, mock_lock):
-        mock_state_get.side_effect = [
-            State(None, 0),
-            State('initial', 0),
-            State('initial', 0),
-            State('creating', 0),
-            State('created', 0),
-            State('error', 0),
-            State('deleted', 0),
-        ]
 
         i = images.Image({
             'ref': 'ref',
@@ -272,16 +271,16 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
             'version': 1,
             'url': 'a'
             })
-        i.update_state('initial')
-        self.assertRaises(exceptions.InvalidStateException,
-                          i.update_state, 'created')
-        self.assertRaises(exceptions.InvalidStateException,
-                          i.update_state, 'created')
-        i.update_state('deleted')
-        i.update_state('error')
-        i.update_state('deleted')
-        self.assertRaises(exceptions.InvalidStateException,
-                          i.update_state, 'created')
+        i.state = 'initial'
+        with testtools.ExpectedException(exceptions.InvalidStateException):
+            i.state = 'created'
+        with testtools.ExpectedException(exceptions.InvalidStateException):
+            i.state = 'created'
+        i.state = 'deleted'
+        i.state = 'error'
+        i.state = 'deleted'
+        with testtools.ExpectedException(exceptions.InvalidStateException):
+            i.state = 'created'
 
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get',
                 return_value={
@@ -301,7 +300,7 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertEqual([mock.call('latest_checksum', {'checksum': '1abab'})],
                          mock_set_attr.mock_calls)
 
-    @mock.patch('shakenfist.images.Image.update_state')
+    @mock.patch('shakenfist.images.Image.state')
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get',
                 side_effect=[None,
                              {
@@ -318,7 +317,8 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
                 new_callable=mock.PropertyMock)
     def test_image_persist(
             self, mock_checksum, mock_create, mock_set_attr, mock_mkdirs, mock_get,
-            mock_update_state):
+            mock_state):
+        mock_state.setter.return_value = State(None, 1)
         images.Image.new('http://example.com', '1abab')
         self.assertEqual([
             mock.call('f0e6a6a97042a4f1f1c87f5f7d44315b2d852c2df5c7991cc66241'
@@ -464,7 +464,7 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
         dirty_fields = img._new_image_available(img._open_connection())
         self.assertEqual(('size', 200000, 16338944), dirty_fields)
 
-    @mock.patch('shakenfist.images.Image.update_state')
+    @mock.patch('shakenfist.images.Image.state')
     @mock.patch('requests.get',
                 return_value=FakeResponse(
                     200, '',
@@ -486,8 +486,9 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
                 new_callable=mock.PropertyMock)
     def test_fetch_image_new(
             self, mock_version, mock_checksum, mock_mkdirs, mock_get,
-            mock_request_head, mock_update_state):
+            mock_request_head, mock_state):
         mock_version.return_value = {}
+        mock_state.setter.return_value = State(None, 1)
 
         img = images.Image.new('http://example.com')
         dirty_fields = img._new_image_available(img._open_connection())
@@ -805,7 +806,7 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertFalse(image.correct_checksum(ret))
 
     # Data matches checksum
-    @mock.patch('shakenfist.images.Image.update_state')
+    @mock.patch('shakenfist.images.Image.state')
     @mock.patch('shakenfist.images.Image._add_download_version')
     @mock.patch('shakenfist.images.Image.latest_download_version',
                 new_callable=mock.PropertyMock)
@@ -820,7 +821,8 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.db.refresh_locks')
     def test_get(
             self, mock_refresh_locks, mock_put, mock_open, mock_transcode,
-            mock_version, mock_add_version, mock_update_state):
+            mock_version, mock_add_version, mock_state):
+        mock_state.setter.return_value = State(None, 1)
         mock_version.return_value = {
             'size': 200000,
             'modified': 'Tue, 10 Sep 2019 07:24:40 GMT',
@@ -850,7 +852,7 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
             mock_add_version.mock_calls)
 
     # First download attempt corrupted, second download matches checksum
-    @mock.patch('shakenfist.images.Image.update_state')
+    @mock.patch('shakenfist.images.Image.state')
     @mock.patch('shakenfist.images.Image._add_download_version')
     @mock.patch('shakenfist.images.Image.latest_download_version',
                 new_callable=mock.PropertyMock)
@@ -867,7 +869,8 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.db.refresh_locks')
     def test_get_one_corrupt(
             self, mock_refresh_locks, mock_put, mock_open, mock_transcode,
-            mock_version, mock_add_version, mock_update_state):
+            mock_version, mock_add_version, mock_state):
+        mock_state.setter.return_value = State(None, 1)
         mock_version.return_value = {
             'size': 200000,
             'modified': 'Tue, 10 Sep 2019 07:24:40 GMT',
@@ -893,7 +896,20 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertTrue(image.correct_checksum(ret))
 
     # All download attempts not matching checksum
-    @mock.patch('shakenfist.images.Image.update_state')
+    @mock.patch('shakenfist.images.Image._db_get_attribute',
+                side_effect=[
+                    {'value': 'creating', 'update_time': 123},
+                    {'value': 'error', 'update_time': 123},
+                    {'value': 'error', 'update_time': 123},
+                    {'value': 'error', 'update_time': 123},
+                    {'value': 'error', 'update_time': 123},
+                    {'value': 'error', 'update_time': 123},
+                    {'value': 'error', 'update_time': 123},
+                    {'value': 'error', 'update_time': 123},
+                    {'value': 'error', 'update_time': 123},
+                    {'value': 'error', 'update_time': 123},
+                    ])
+    @mock.patch('shakenfist.images.Image.get_lock_attr')
     @mock.patch('shakenfist.images.Image._add_download_version')
     @mock.patch('shakenfist.images.Image.latest_download_version',
                 new_callable=mock.PropertyMock)
@@ -910,14 +926,14 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.db.refresh_locks')
     def test_get_always_corrupt(
             self, mock_refresh_locks, mock_put, mock_open,
-            mock_version, mock_add_version, mock_update_state):
+            mock_version, mock_add_version, get_lock_attr,
+            mock_db_get_attribute):
         mock_version.return_value = {
             'size': 200000,
             'modified': 'Tue, 10 Sep 2019 07:24:40 GMT',
             'fetched_at': 'Tue, 20 Oct 2020 23:02:29 -0000',
             'sequence': 1
         }
-
         test_checksum = '097c42989a9e5d9dcced7b35ec4b0486'
         image = FakeImageChecksum({
             'url': 'testurl',

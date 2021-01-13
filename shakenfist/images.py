@@ -78,7 +78,7 @@ class Image(baseobject.DatabaseBackedObject):
             'version': cls.current_version
         })
         i = Image.from_db(uuid)
-        i.update_state('initial')
+        i.state = 'initial'
         i.update_checksum(checksum)
         i.add_event('db record creation', None)
         return i
@@ -201,7 +201,7 @@ class Image(baseobject.DatabaseBackedObject):
         # without verifying that no instance is using it, so we just mark the
         # image as deleted in the database and move on without removing things
         # from the cache. We will probably want to revisit this in the future.
-        self.update_state('deleted')
+        self.state = 'deleted'
 
     def get(self, locks, related_object):
         """Wrap three retries around the image get.
@@ -210,16 +210,16 @@ class Image(baseobject.DatabaseBackedObject):
         download, the locks will be refreshed. Any lock error should abort the
         get, since the lock will have been lost.
         """
-        self.update_state('creating')
+        self.state = 'creating'
         for _ in range(3):
             try:
                 image_path = self._get(locks, related_object)
-                self.update_state('created')
+                self.state = 'created'
                 return image_path
             except exceptions.BadCheckSum as e:
                 LOG.warning('Bad checksum while downloading image: %s' % e)
-                self.update_state('error')
-                self.error_msg = 'Bad checksum while downloading image: %s' % e
+                self.state = 'error'
+                self.error = 'Bad checksum while downloading image: %s' % e
                 exc = e
         raise exc
 

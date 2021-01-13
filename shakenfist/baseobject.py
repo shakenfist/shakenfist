@@ -16,9 +16,10 @@ class DatabaseBackedObject(object):
     current_version = None
     state_targets = None
 
-    def __init__(self, object_uuid, version=None):
+    def __init__(self, object_uuid, version=None, error_msg=None):
         self.__uuid = object_uuid
         self.__version = version
+        self.__error_msg = error_msg
 
     @property
     def uuid(self):
@@ -83,7 +84,8 @@ class DatabaseBackedObject(object):
             return State(None, 0)
         return State(**db_data)
 
-    def update_state(self, new_value, error_message=None):
+    @state.setter
+    def state(self, new_value):
         with self.get_lock_attr('state', 'State update'):
             orig = self.state
 
@@ -93,10 +95,28 @@ class DatabaseBackedObject(object):
                     'Invalid state change from %s to %s for object=%s uuid=%s',
                     orig.value, new_value, self.object_type, self.uuid)
 
-            new_state = State(new_value, time.time(), error_message)
+            new_state = State(new_value, time.time())
             self._db_set_attribute('state', new_state)
             self.add_event('state changed',
                            '%s -> %s' % (orig.value, new_value))
+            self.error = None
+
+    @property
+    def error(self):
+        db_data = self._db_get_attribute('error')
+        if not db_data:
+            return None
+        return db_data.get('message')
+
+    @error.setter
+    def error(self, msg):
+        if msg:
+            s = self.state
+            if s.value != 'error':
+                raise exceptions.InvalidStateException(
+                    'Object not in error state (state=%s, object=%s)' % (
+                        s, self.object_type))
+        self._db_set_attribute('error', {'message': msg})
 
 
 def state_filter(states, o):
@@ -119,10 +139,9 @@ def namespace_filter(namespace, o):
 
 
 class State(object):
-    def __init__(self, value, update_time, error_msg=None):
+    def __init__(self, value, update_time):
         self.__value = value
         self.__update_time = update_time
-        self.__error_msg = error_msg
 
     def __repr__(self):
         return 'State(' + str(self.obj_dict()) + ')'
@@ -141,13 +160,8 @@ class State(object):
     def update_time(self):
         return self.__update_time
 
-    @property
-    def error_msg(self):
-        return self.__error_msg
-
     def obj_dict(self):
         return {
             'value': self.__value,
             'update_time': self.__update_time,
-            'error_msg': self.__error_msg,
         }

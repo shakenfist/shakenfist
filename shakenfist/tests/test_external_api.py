@@ -38,14 +38,15 @@ class BaseFakeObject(object):
         else:
             return State(self._state, 1)
 
+    @state.setter
+    def state(self, state):
+        self._state = state
+
     def unique_label(self):
         return ('instance', self.uuid)
 
     def add_event(self, operation, phase, duration=None, msg=None):
         pass
-
-    def update_state(self, state, error_message=None):
-        self._state = state
 
     def delete(self):
         pass

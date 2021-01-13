@@ -84,13 +84,13 @@ def handle(jobname, workitem):
 
             elif isinstance(task, DeleteInstanceTask):
                 try:
-                    instance_delete(instance_uuid, 'deleted')
+                    instance_delete(instance_uuid)
                 except Exception as e:
                     util.ignore_exception(daemon.process_name('queues'), e)
 
             elif isinstance(task, ErrorInstanceTask):
                 try:
-                    instance_delete(instance_uuid, 'error', task.error_msg())
+                    instance_error(instance_uuid, task.error_msg())
                     db.enqueue('%s-metrics' % config.NODE_NAME, {})
                 except Exception as e:
                     util.ignore_exception(daemon.process_name('queues'), e)
@@ -157,7 +157,7 @@ def instance_preflight(instance_uuid, network):
     if not instance:
         raise exceptions.InstanceNotInDBException(instance_uuid)
 
-    instance.update_state('preflight')
+    instance.state = 'preflight'
 
     # Try to place on this node
     s = scheduler.Scheduler()
@@ -243,7 +243,7 @@ def instance_start(instance_uuid, network):
             db.update_network_interface_state(iface['uuid'], 'created')
 
 
-def instance_delete(instance_uuid, new_state, error_msg=None):
+def instance_delete(instance_uuid):
     with db.get_lock('instance', None, instance_uuid, timeout=120,
                      op='Instance delete'):
         db.add_event('instance', instance_uuid, 'queued', 'delete', None, None)
@@ -265,7 +265,6 @@ def instance_delete(instance_uuid, new_state, error_msg=None):
         instance = virt.Instance.from_db(instance_uuid)
         if instance:
             instance.delete()
-            instance.update_state(new_state, error_message=error_msg)
 
         # Check each network used by the deleted instance
         for network in instance_networks:
@@ -280,6 +279,14 @@ def instance_delete(instance_uuid, new_state, error_msg=None):
                     # Network not used by any other instance therefore delete
                     with util.RecordedOperation('remove network', n):
                         n.delete()
+        return instance
+
+
+def instance_error(instance_uuid, error_msg):
+    instance = instance_delete(instance_uuid)
+    if instance:
+        instance.state = 'error'
+        instance.error = error_msg
 
 
 class Monitor(daemon.Daemon):
