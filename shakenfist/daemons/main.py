@@ -48,11 +48,10 @@ def restore_instances():
                     img.delete()
 
         if instance_problems:
-            db.enqueue_instance_error(
-                inst.uuid,
+            inst.enqueue_delete_due_error(
                 'instance bad on startup: %s' % '; '.join(instance_problems))
         else:
-            instances.append(inst.uuid)
+            instances.append(inst)
 
     with util.RecordedOperation('restore networks', None):
         for network in networks:
@@ -65,24 +64,20 @@ def restore_instances():
                 util.ignore_exception('restore network %s' % network, e)
 
     with util.RecordedOperation('restore instances', None):
-        for instance in instances:
+        for inst in instances:
             try:
                 with db.get_lock(
-                        'instance', None, instance, ttl=120, timeout=120,
+                        'instance', None, inst.uuid, ttl=120, timeout=120,
                         op='Instance restore'):
-                    i = virt.Instance.from_db(instance)
-                    if not i:
-                        continue
                     started = ['on', 'transition-to-on', 'initial', 'unknown']
-                    if i.power_state not in started:
+                    if inst.power_state not in started:
                         continue
 
-                    LOG.withObj(i).info('Restoring instance')
-                    i.create_on_hypervisor()
+                    LOG.withObj(inst).info('Restoring instance')
+                    inst.create_on_hypervisor()
             except Exception as e:
-                util.ignore_exception('restore instance %s' % instance, e)
-                db.enqueue_instance_error(
-                    instance,
+                util.ignore_exception('restore instance %s' % inst.uuid, e)
+                inst.db.enqueue_delete_due_error(
                     'exception while restoring instance on daemon restart')
 
 

@@ -8,7 +8,6 @@ from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist import util
-from shakenfist.tasks import DeleteInstanceTask, ErrorInstanceTask
 
 
 # TODO(andy): Change back to 5 once network bugs fixed
@@ -335,26 +334,6 @@ def get_node_vxid_mapping(node):
 
 def enqueue(queuename, workitem):
     etcd.enqueue(queuename, workitem)
-
-
-def enqueue_instance_delete(instance_uuid):
-    enqueue_instance_delete_remote(config.NODE_NAME, instance_uuid)
-
-
-def enqueue_instance_delete_remote(node, instance_uuid):
-    enqueue(node, {
-        'tasks': [
-            DeleteInstanceTask(instance_uuid)
-        ],
-    })
-
-
-def enqueue_instance_error(instance_uuid, error_msg):
-    enqueue(config.NODE_NAME, {
-        'tasks': [
-            ErrorInstanceTask(instance_uuid, error_msg)
-        ],
-    })
 
 
 def dequeue(queuename):

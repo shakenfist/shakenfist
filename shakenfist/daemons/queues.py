@@ -18,7 +18,6 @@ from shakenfist import util
 from shakenfist import virt
 from shakenfist.tasks import (QueueTask,
                               DeleteInstanceTask,
-                              ErrorInstanceTask,
                               FetchImageTask,
                               InstanceTask,
                               PreflightInstanceTask,
@@ -36,7 +35,7 @@ def handle(jobname, workitem):
     setproctitle.setproctitle(
         '%s-%s' % (daemon.process_name('queues'), jobname))
 
-    instance_uuid = None
+    instance = None
     task = None
     try:
         for task in workitem.get('tasks', []):
@@ -44,12 +43,17 @@ def handle(jobname, workitem):
                 raise exceptions.UnknownTaskException(
                     'Task was not decoded: %s' % task)
 
-            if (InstanceTask.__subclasscheck__(type(task)) or
-                    isinstance(task, FetchImageTask)):
-                instance_uuid = task.instance_uuid()
+            if InstanceTask.__subclasscheck__(type(task)):
+                instance = virt.Instance.from_db(task.instance_uuid())
+                if not instance:
+                    raise exceptions.InstanceNotInDBException(
+                        task.instance_uuid())
 
-            if instance_uuid:
-                log_i = log.withInstance(instance_uuid)
+            if isinstance(task, FetchImageTask):
+                instance = virt.Instance.from_db(task.instance_uuid())
+
+            if instance:
+                log_i = log.withInstance(instance)
             else:
                 log_i = log
 
@@ -62,16 +66,16 @@ def handle(jobname, workitem):
             # dequeued in the DB. Currently it's reporting action on the item
             # and calling it 'dequeue'.
 
-            if instance_uuid:
+            if instance:
                 # TODO(andy) move to QueueTask
-                db.add_event('instance', instance_uuid, task.pretty_task_name(),
+                db.add_event('instance', instance.uuid, task.pretty_task_name(),
                              'dequeued', None, 'Work item %s' % jobname)
 
             if isinstance(task, FetchImageTask):
-                image_fetch(task.url(), instance_uuid)
+                image_fetch(task.url(), instance)
 
             elif isinstance(task, PreflightInstanceTask):
-                redirect_to = instance_preflight(instance_uuid, task.network())
+                redirect_to = instance_preflight(instance, task.network())
                 if redirect_to:
                     log_i.info('Redirecting instance start to %s'
                                % redirect_to)
@@ -79,18 +83,12 @@ def handle(jobname, workitem):
                     return
 
             elif isinstance(task, StartInstanceTask):
-                instance_start(instance_uuid, task.network())
+                instance_start(instance, task.network())
                 db.enqueue('%s-metrics' % config.NODE_NAME, {})
 
             elif isinstance(task, DeleteInstanceTask):
                 try:
-                    instance_delete(instance_uuid)
-                except Exception as e:
-                    util.ignore_exception(daemon.process_name('queues'), e)
-
-            elif isinstance(task, ErrorInstanceTask):
-                try:
-                    instance_error(instance_uuid, task.error_msg())
+                    instance_delete(instance)
                     db.enqueue('%s-metrics' % config.NODE_NAME, {})
                 except Exception as e:
                     util.ignore_exception(daemon.process_name('queues'), e)
@@ -103,27 +101,24 @@ def handle(jobname, workitem):
     except exceptions.ImageFetchTaskFailedException as e:
         # Usually caused by external issue and not an application error
         log.info('Fetch Image Error: %s', e)
-        if instance_uuid:
-            db.enqueue_instance_error(instance_uuid,
-                                      'failed queue task: %s' % e)
+        if instance:
+            instance.enqueue_delete_due_error('Failed queue task: %s' % e)
 
     except Exception as e:
+        # Logging ignored exception - this should be investigated
         util.ignore_exception(daemon.process_name('queues'), e)
-        if instance_uuid:
-            db.enqueue_instance_error(instance_uuid,
-                                      'failed queue task: %s' % e)
+        if instance:
+            instance.enqueue_delete_due_error('Failed queue task: %s' % e)
 
     finally:
         db.resolve(config.NODE_NAME, jobname)
-        if instance_uuid:
-            db.add_event('instance', instance_uuid, 'tasks complete',
-                         'dequeued', None, 'Work item %s' % jobname)
+        if instance:
+            instance.add_event('tasks complete', 'dequeued',
+                               msg='Work item %s' % jobname)
         log.info('Completed workitem')
 
 
-def image_fetch(url, instance_uuid):
-    instance = virt.Instance.from_db(instance_uuid)
-
+def image_fetch(url, instance):
     try:
         # TODO(andy): Wait up to 15 mins for another queue process to download
         # the required image. This will be changed to queue on a
@@ -140,9 +135,6 @@ def image_fetch(url, instance_uuid):
 
     except (exceptions.HTTPError, requests.exceptions.RequestException) as e:
         LOG.withField('image', url).info('Failed to fetch image')
-        if instance_uuid:
-            db.enqueue_instance_error(instance_uuid,
-                                      'Image fetch failed: %s' % e)
 
         # Clean common problems to store in events
         msg = str(e)
@@ -153,14 +145,10 @@ def image_fetch(url, instance_uuid):
         db.add_event('image', url, 'fetch', None, None, 'Error: '+msg)
 
         raise exceptions.ImageFetchTaskFailedException(
-            'Failed to fetch image %s' % url)
+            'Failed to fetch image: %s Exception: %s' % (url, e))
 
 
-def instance_preflight(instance_uuid, network):
-    instance = virt.Instance.from_db(instance_uuid)
-    if not instance:
-        raise exceptions.InstanceNotInDBException(instance_uuid)
-
+def instance_preflight(instance, network):
     instance.state = 'preflight'
 
     # Try to place on this node
@@ -174,8 +162,8 @@ def instance_preflight(instance_uuid, network):
                            'insufficient resources: ' + str(e))
 
     # Unsuccessful placement, check if reached placement attempt limit
-    dbplacement = instance.placement
-    if dbplacement['placement_attempts'] > 3:
+    db_placement = instance.placement
+    if db_placement['placement_attempts'] > 3:
         raise exceptions.AbortInstanceStartException(
             'Too many start attempts')
 
@@ -203,11 +191,10 @@ def instance_preflight(instance_uuid, network):
             'Unable to find suitable node')
 
 
-def instance_start(instance_uuid, network):
+def instance_start(instance, network):
     with db.get_lock(
-            'instance', None, instance_uuid, ttl=900, timeout=120,
+            'instance', None, instance.uuid, ttl=900, timeout=120,
             op='Instance start') as lock:
-        instance = virt.Instance.from_db(instance_uuid)
 
         # Collect the networks
         nets = {}
@@ -215,13 +202,13 @@ def instance_start(instance_uuid, network):
             if netdesc['network_uuid'] not in nets:
                 n = net.Network.from_db(netdesc['network_uuid'])
                 if not n:
-                    db.enqueue_instance_error(
-                        instance_uuid, 'missing network: %s' % netdesc['network_uuid'])
+                    instance.enqueue_delete_due_error(
+                        'missing network: %s' % netdesc['network_uuid'])
                     return
 
                 if n.state.value != 'created':
-                    db.enqueue_instance_error(
-                        instance_uuid, 'network is not active: %s' % n.uuid)
+                    instance.enqueue_delete_due_error(
+                        'network is not active: %s' % n.uuid)
 
                 nets[netdesc['network_uuid']] = n
 
@@ -239,36 +226,34 @@ def instance_start(instance_uuid, network):
             code = e.get_error_code()
             if code in (libvirt.VIR_ERR_CONFIG_UNSUPPORTED,
                         libvirt.VIR_ERR_XML_ERROR):
-                db.enqueue_instance_error(instance_uuid,
-                                          'instance failed to start: %s' % e)
+                instance.enqueue_delete_due_error(
+                    'instance failed to start: %s' % e)
                 return
 
-        for iface in db.get_instance_interfaces(instance_uuid):
+        for iface in db.get_instance_interfaces(instance.uuid):
             db.update_network_interface_state(iface['uuid'], 'created')
 
 
-def instance_delete(instance_uuid):
-    with db.get_lock('instance', None, instance_uuid, timeout=120,
+def instance_delete(instance):
+    with db.get_lock('instance', None, instance.uuid, timeout=120,
                      op='Instance delete'):
-        db.add_event('instance', instance_uuid, 'queued', 'delete', None, None)
+        db.add_event('instance', instance.uuid, 'queued', 'delete', None, None)
 
         # Create list of networks used by instance
         instance_networks = []
-        for iface in list(db.get_instance_interfaces(instance_uuid)):
+        for iface in list(db.get_instance_interfaces(instance.uuid)):
             if not iface['network_uuid'] in instance_networks:
                 instance_networks.append(iface['network_uuid'])
 
         # Create list of networks used by all other instances
         host_networks = []
         for inst in virt.Instances([virt.this_node_filter, baseobject.active_states_filter]):
-            if not inst.uuid == instance_uuid:
+            if not inst.uuid == instance.uuid:
                 for iface in db.get_instance_interfaces(inst.uuid):
                     if not iface['network_uuid'] in host_networks:
                         host_networks.append(iface['network_uuid'])
 
-        instance = virt.Instance.from_db(instance_uuid)
-        if instance:
-            instance.delete()
+        instance.delete()
 
         # Check each network used by the deleted instance
         for network in instance_networks:
@@ -284,13 +269,6 @@ def instance_delete(instance_uuid):
                     with util.RecordedOperation('remove network', n):
                         n.delete()
         return instance
-
-
-def instance_error(instance_uuid, error_msg):
-    instance = instance_delete(instance_uuid)
-    if instance:
-        instance.state = 'error'
-        instance.error = error_msg
 
 
 class Monitor(daemon.Daemon):
