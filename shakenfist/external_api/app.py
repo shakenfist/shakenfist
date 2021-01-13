@@ -1137,7 +1137,7 @@ class Images(Resource):
     @jwt_required
     def post(self, url=None):
         db.add_event('image', url, 'api', 'cache', None, None)
-        img = images.Image.new(url)
+        images.Image.new(url)
         db.enqueue(config.NODE_NAME, {
             'tasks': [FetchImageTask(url)],
         })
