@@ -102,11 +102,13 @@ All callers of await_instance_event call get_instance(). *However, more testing 
 
 ## cache_image
 
-* TestCacheImage.test_cache_image
+* TestImages.test_cache_image
 
-## get_image_meta
+## get_images
 
-*Not tested.*
+(Formerly get_image_meta, old name to be removed in 0.5).
+
+* TestImages.test_cache_image
 
 ## get_image_events
 
