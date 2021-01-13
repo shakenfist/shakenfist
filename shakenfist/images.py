@@ -219,7 +219,7 @@ class Image(baseobject.DatabaseBackedObject):
             except exceptions.BadCheckSum as e:
                 LOG.warning('Bad checksum while downloading image: %s' % e)
                 self.state = 'error'
-                self.error_msg = 'Bad checksum while downloading image: %s' % e
+                self.error = 'Bad checksum while downloading image: %s' % e
                 exc = e
         raise exc
 

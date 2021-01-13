@@ -286,7 +286,7 @@ def instance_error(instance_uuid, error_msg):
     instance = instance_delete(instance_uuid)
     if instance:
         instance.state = 'error'
-        instance.error_msg = error_msg
+        instance.error = error_msg
 
 
 class Monitor(daemon.Daemon):

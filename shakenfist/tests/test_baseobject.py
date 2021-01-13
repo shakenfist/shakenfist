@@ -38,17 +38,17 @@ class DatabaseBackedObjectTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get_attribute',
                 side_effect=[
                     None,
-                    'bad error',
+                    {'message': 'bad error'},
                     {'value': 'initial', 'update_time': 4},
                     {'value': 'error', 'update_time': 4},
-                    'real bad',
+                    {'message': 'real bad'},
                 ])
     def test_property_error_msg(self, mock_get_attribute, mock_set_attribute):
         d = DatabaseBackedObject('uuid')
-        self.assertEqual(d.error_msg, None)
-        self.assertEqual(d.error_msg, 'bad error')
+        self.assertEqual(d.error, None)
+        self.assertEqual(d.error, 'bad error')
 
         with testtools.ExpectedException(exceptions.InvalidStateException):
-            d.error_msg = 'real bad'
+            d.error = 'real bad'
 
-        d.error_msg = 'real bad'
+        d.error = 'real bad'

@@ -116,6 +116,8 @@ class CleanerTestCase(test_shakenfist.ShakenFistTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
+    @mock.patch('shakenfist.virt.Instance.error',
+                new_callable=mock.PropertyMock)
     @mock.patch('shakenfist.etcd.get', side_effect=fake_get)
     @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.db.see_this_node')
@@ -126,7 +128,7 @@ class CleanerTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('time.time', return_value=7)
     def test_update_power_states(self, mock_time, mock_exists, mock_put,
                                  mock_get_instance, mock_event, mock_see,
-                                 mock_lock, mock_etcd_get):
+                                 mock_lock, mock_etcd_get, mock_error):
 
         m = cleaner.Monitor('cleaner')
         m._update_power_states()

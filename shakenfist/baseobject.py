@@ -99,22 +99,24 @@ class DatabaseBackedObject(object):
             self._db_set_attribute('state', new_state)
             self.add_event('state changed',
                            '%s -> %s' % (orig.value, new_value))
+            self.error = None
 
     @property
-    def error_msg(self):
-        db_data = self._db_get_attribute('error_msg')
+    def error(self):
+        db_data = self._db_get_attribute('error')
         if not db_data:
             return None
-        return db_data
+        return db_data.get('message')
 
-    @error_msg.setter
-    def error_msg(self, msg):
-        s = self.state
-        if s.value != 'error':
-            raise exceptions.InvalidStateException(
-                'Object not in error state (state=%s, object=%s)' % (
-                    s, self.object_type))
-        self._db_set_attribute('error_msg', msg)
+    @error.setter
+    def error(self, msg):
+        if msg:
+            s = self.state
+            if s.value != 'error':
+                raise exceptions.InvalidStateException(
+                    'Object not in error state (state=%s, object=%s)' % (
+                        s, self.object_type))
+        self._db_set_attribute('error', {'message': msg})
 
 
 def state_filter(states, o):

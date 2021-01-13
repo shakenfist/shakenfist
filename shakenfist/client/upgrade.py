@@ -163,16 +163,19 @@ def main():
 
                     state = baseobject.State(instance.get('state'),
                                              instance.get('state_updated'))
-                    for attr in ['state', 'state_updated', 'error_message']:
+                    for attr in ['state', 'state_updated']:
                         instance.pop(attr, None)
                     etcd_client.put(
                         '/sf/attribute/instance/%s/state' % instance['uuid'],
                         json.dumps(state.obj_dict(), indent=4, sort_keys=True))
 
                     err_msg = instance.get('error_message')
-                    etcd_client.put(
-                        '/sf/attribute/instance/%s/error_msg' % instance['uuid'],
-                        json.dumps(err_msg, indent=4, sort_keys=True))
+                    if err_msg:
+                        instance.pop('error_message', None)
+                        etcd_client.put(
+                            '/sf/attribute/instance/%s/error' % instance['uuid'],
+                            json.dumps({'message': err_msg},
+                                       indent=4, sort_keys=True))
 
                     data = {}
                     for attr in ['power_state', 'power_state_previous',

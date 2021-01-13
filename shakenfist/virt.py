@@ -202,7 +202,7 @@ class Instance(baseobject.DatabaseBackedObject):
             'user_data': self.user_data,
             'video': self.video,
             'version': self.version,
-            'error_message': self.error_msg,
+            'error_message': self.error,
         }
 
         if self.requested_placement:
