@@ -672,18 +672,21 @@ class Instances(Resource):
                 if 'network_uuid' not in netdesc:
                     return error(400, 'network specification is missing network_uuid')
 
+                net_uuid = netdesc['network_uuid']
                 if netdesc.get('address'):
                     # The requested address must be within the ip range specified
                     # for that virtual network
-                    ipm = IPManager.from_db(netdesc['network_uuid'])
+                    ipm = IPManager.from_db(net_uuid)
                     if not ipm.is_in_range(netdesc['address']):
                         return error(400,
                                      'network specification requests an address outside the '
                                      'range of the network')
 
-                n = net.Network.from_db(netdesc['network_uuid'])
+                n = net.Network.from_db(net_uuid)
+                if not n:
+                    return error(404, 'network %s does not exist' % net_uuid)
                 if n.state.value in ['initial', 'preflight', 'creating']:
-                    return error(406, 'network %s is not active' % n.uuid)
+                    return error(406, 'network %s is not active' % net_uuid)
 
         if not video:
             video = {'model': 'cirrus', 'memory': 16384}
