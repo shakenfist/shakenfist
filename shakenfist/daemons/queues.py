@@ -11,6 +11,7 @@ from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import exceptions
 from shakenfist.images import Image
+from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
 from shakenfist import scheduler
@@ -254,6 +255,16 @@ def instance_delete(instance):
                         host_networks.append(iface['network_uuid'])
 
         instance.delete()
+
+        # Delete the instance's interfaces
+        with util.RecordedOperation('release network addresses', instance):
+            for ni in db.get_instance_interfaces(instance.uuid):
+                db.update_network_interface_state(ni['uuid'], 'deleted')
+                with db.get_lock('ipmanager', None, ni['network_uuid'],
+                                 ttl=120, op='Instance delete'):
+                    ipm = IPManager.from_db(ni['network_uuid'])
+                    ipm.release(ni['ipv4'])
+                    ipm.persist()
 
         # Check each network used by the deleted instance
         for network in instance_networks:
