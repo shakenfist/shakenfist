@@ -27,7 +27,7 @@ def resolve(name):
             m = dir_re.match(line)
             if m:
                 versions.append(m.group(1))
-        LOG.withField('versions', versions).info('Found cirros versions')
+        LOG.with_field('versions', versions).info('Found cirros versions')
         vernum = versions[-1]
     else:
         try:
@@ -38,14 +38,14 @@ def resolve(name):
                 'Cannot parse version: %s' % name)
 
     url = config.get('DOWNLOAD_URL_CIRROS') % {'vernum': vernum}
-    log = LOG.withField('url', url)
+    log = LOG.with_field('url', url)
 
     # Retrieve check sum file
     checksum_url = CIRROS_URL + '/' + vernum + '/MD5SUMS'
     resp = requests.get(checksum_url,
                         headers={'User-Agent': util.get_user_agent()})
-    log.withField('checksum_url', checksum_url
-                  ).withField('resp', resp).debug("Checksum request response")
+    log.with_field('checksum_url', checksum_url
+                   ).with_field('resp', resp).debug("Checksum request response")
     if resp.status_code != 200:
         # Cirros does not always have a checksum file available
         log.info('Unable to retrieve MD5SUMS for cirros image')
@@ -61,6 +61,6 @@ def resolve(name):
     if not checksum_url:
         log.warning('Did not find checksum')
 
-    log.withField('checksum', checksum).info('Checksum retrieval')
+    log.with_field('checksum', checksum).info('Checksum retrieval')
 
     return (url, checksum)

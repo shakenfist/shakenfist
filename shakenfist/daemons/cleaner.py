@@ -33,7 +33,7 @@ class Monitor(daemon.Daemon):
                     continue
 
                 instance_uuid = domain.name().split(':')[1]
-                log_ctx = LOG.withInstance(instance_uuid)
+                log_ctx = LOG.with_instance(instance_uuid)
 
                 instance = virt.Instance.from_db(instance_uuid)
                 if not instance:
@@ -70,7 +70,7 @@ class Monitor(daemon.Daemon):
                     else:
                         instance.delete()
 
-                    log_ctx.withField('attempt', attempts).warning(
+                    log_ctx.with_field('attempt', attempts).warning(
                         'Deleting stray instance')
 
                     continue
@@ -88,7 +88,7 @@ class Monitor(daemon.Daemon):
 
                 if domain_name not in seen:
                     instance_uuid = domain_name.split(':')[1]
-                    log_ctx = LOG.withInstance(instance_uuid)
+                    log_ctx = LOG.with_instance(instance_uuid)
                     instance = virt.Instance.from_db(instance_uuid)
 
                     if not instance:
@@ -163,17 +163,17 @@ class Monitor(daemon.Daemon):
             for i in virt.Instances([
                     baseobject.inactive_states_filter,
                     partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))]):
-                LOG.withInstance(i.uuid).info('Hard deleting instance')
+                LOG.with_object(i).info('Hard deleting instance')
                 i.hard_delete()
 
             for n in net.Networks([
                     baseobject.inactive_states_filter,
                     partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))]):
-                LOG.withNetwork(n).info('Hard deleting network')
+                LOG.with_network(n).info('Hard deleting network')
                 n.hard_delete()
 
             for ni in db.get_stale_network_interfaces(config.get('CLEANER_DELAY')):
-                LOG.withNetworkInterface(
+                LOG.with_networkinterface(
                     ni['uuid']).info('Hard deleting network interface')
                 db.hard_delete_network_interface(ni['uuid'])
 

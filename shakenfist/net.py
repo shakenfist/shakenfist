@@ -274,7 +274,7 @@ class Network(baseobject.DatabaseBackedObject):
 
         subst = self.subst_dict()
         if not util.check_for_interface(subst['vx_bridge'], up=True):
-            LOG.withObj(self).warning('%s is not up' % subst['vx_bridge'])
+            LOG.with_object(self).warning('%s is not up' % subst['vx_bridge'])
             return False
 
         return True
@@ -434,7 +434,8 @@ class Network(baseobject.DatabaseBackedObject):
     def delete(self):
         with self.get_lock(op='Network delete'):
             if self.is_dead():
-                LOG.withObj(self).info('Network died whilst waiting for lock')
+                LOG.with_object(self).info(
+                    'Network died whilst waiting for lock')
                 return
             self._delete_on_node()
             self.state = 'deleted'
@@ -443,13 +444,14 @@ class Network(baseobject.DatabaseBackedObject):
     def delete_on_node_with_lock(self):
         with self.get_lock(op='Network delete on node'):
             if self.is_dead():
-                LOG.withObj(self).info('Network died whilst waiting for lock')
+                LOG.with_object(self).info(
+                    'Network died whilst waiting for lock')
                 return
             self._delete_on_node()
 
     def _delete_on_node(self):
         subst = self.subst_dict()
-        LOG.withFields(subst).debug('net.delete_on_node()')
+        LOG.with_fields(subst).debug('net.delete_on_node()')
 
         # Cleanup local node
         if util.check_for_interface(subst['vx_bridge']):
@@ -502,7 +504,7 @@ class Network(baseobject.DatabaseBackedObject):
         if pid and psutil.pid_exists(pid):
             return True
 
-        LOG.withObj(self).warning('dnsmasq is not running')
+        LOG.with_object(self).warning('dnsmasq is not running')
         return False
 
     def update_dhcp(self):
@@ -577,7 +579,7 @@ class Network(baseobject.DatabaseBackedObject):
                     node_ips.append(ip)
 
             discovered = list(self.discover_mesh())
-            LOG.withObj(self).withField(
+            LOG.with_object(self).with_field(
                 'discovered', discovered).debug('Discovered mesh elements')
 
             for node in discovered:
@@ -597,7 +599,7 @@ class Network(baseobject.DatabaseBackedObject):
                 self.add_event('add mesh elements', ' '.join(added))
 
     def _add_mesh_element(self, node):
-        LOG.withObj(self).info('Adding new mesh element %s' % node)
+        LOG.with_object(self).info('Adding new mesh element %s' % node)
         subst = self.subst_dict()
         subst['node'] = node
         util.execute(None,
@@ -605,7 +607,7 @@ class Network(baseobject.DatabaseBackedObject):
                      'dst %(node)s dev %(vx_interface)s' % subst)
 
     def _remove_mesh_element(self, node):
-        LOG.withObj(self).info('Removing excess mesh element %s' % node)
+        LOG.with_object(self).info('Removing excess mesh element %s' % node)
         subst = self.subst_dict()
         subst['node'] = node
         util.execute(None,
@@ -613,8 +615,8 @@ class Network(baseobject.DatabaseBackedObject):
                      'dev %(vx_interface)s' % subst)
 
     def add_floating_ip(self, floating_address, inner_address):
-        LOG.withObj(self).info('Adding floating ip %s -> %s'
-                               % (floating_address, inner_address))
+        LOG.with_object(self).info('Adding floating ip %s -> %s'
+                                   % (floating_address, inner_address))
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
         subst['inner_address'] = inner_address
@@ -628,8 +630,8 @@ class Network(baseobject.DatabaseBackedObject):
                      '-j DNAT --to-destination %(inner_address)s' % subst)
 
     def remove_floating_ip(self, floating_address, inner_address):
-        LOG.withObj(self).info('Removing floating ip %s -> %s'
-                               % (floating_address, inner_address))
+        LOG.with_object(self).info('Removing floating ip %s -> %s'
+                                   % (floating_address, inner_address))
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
         subst['inner_address'] = inner_address

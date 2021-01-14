@@ -58,7 +58,7 @@ def restore_instances():
             try:
                 n = net.Network.from_db(network)
                 if not n.is_dead():
-                    LOG.withObj(n).info('Restoring network')
+                    LOG.with_object(n).info('Restoring network')
                     n.create_on_hypervisor()
                     n.ensure_mesh()
             except Exception as e:
@@ -74,7 +74,7 @@ def restore_instances():
                     if inst.power_state not in started:
                         continue
 
-                    LOG.withObj(inst).info('Restoring instance')
+                    LOG.with_object(inst).info('Restoring instance')
                     inst.create_on_hypervisor()
             except Exception as e:
                 util.ignore_exception('restore instance %s' % inst.uuid, e)
@@ -117,7 +117,7 @@ def main():
         if pid == 0:
             DAEMON_IMPLEMENTATIONS[d].Monitor(d).run()
         DAEMON_PIDS[pid] = d
-        LOG.withField('pid', pid).info('Started %s' % d)
+        LOG.with_field('pid', pid).info('Started %s' % d)
 
     # Resource usage publisher, we need this early because scheduling decisions
     # might happen quite early on.
@@ -129,7 +129,7 @@ def main():
     # want to lock a network across the cluster for a local rename.
     for n in net.Networks(filters=[baseobject.active_states_filter]):
         if util.check_for_interface('vxlan-%d' % n.vxid):
-            LOG.withNetwork(n).warning(
+            LOG.with_network(n).warning(
                 'Network requires interface renaming...')
             for iface in ['vxlan-%s', 'br-vxlan-%s', 'veth-%s-0',
                           'veth-%s-i', 'phy-%s-o', 'phy-%s-i']:
@@ -139,14 +139,14 @@ def main():
                 new_name = new_name_format % n.vxid
 
                 if util.check_for_interface(old_name):
-                    LOG.withNetwork(n).warning(
+                    LOG.with_network(n).warning(
                         'Renaming %s to %s' % (old_name, new_name))
 
                     util.execute(None, 'ip link set %s down' % old_name)
                     util.execute(None, 'ip link set %s name %s'
                                  % (old_name, new_name))
                     util.execute(None, 'ip link set %s up' % new_name)
-                    LOG.withNetwork(n).warning(
+                    LOG.with_network(n).warning(
                         'Renamed %s to %s' % (old_name, new_name))
 
     # If I am the network node, I need some setup

@@ -20,22 +20,28 @@ class SFPyLogrus(logging.Logger, PyLogrusBase):
         super(SFPyLogrus, self).__init__(*args, **kwargs)
 
     def withPrefix(self, prefix=None):
-        return SFCustomAdapter(self, None, prefix)
+        return self.with_prefix(prefix)
 
     def withFields(self, fields=None):
+        return self.with_fields(fields)
+
+    def with_prefix(self, prefix=None):
+        return SFCustomAdapter(self, None, prefix)
+
+    def with_fields(self, fields=None):
         return SFCustomAdapter(self, fields)
 
-    def withField(self, key, value):
+    def with_field(self, key, value):
         return SFCustomAdapter(self, {key: value})
 
     #
     # Convenience methods
     #
-    def withObj(self, object):
-        if not object:
+    def with_object(self, obj):
+        if not obj:
             return SFCustomAdapter(self, {})
         try:
-            label, value = object.unique_label()
+            label, value = obj.unique_label()
         except Exception as e:
             raise Exception('Bad object - no unique_label() function: %s' % e)
         return SFCustomAdapter(self, {label: value})
@@ -44,22 +50,22 @@ class SFPyLogrus(logging.Logger, PyLogrusBase):
     # Use labelled convenience methods when ID is a string (not object)
     # Note: the helper method still handles objects
     #
-    def withInstance(self, inst):
+    def with_instance(self, inst):
         if not isinstance(inst, str):
             inst = inst.uuid
         return SFCustomAdapter(self, {'instance': inst})
 
-    def withNetwork(self, inst):
+    def with_network(self, inst):
         if not isinstance(inst, str):
             inst = inst.uuid
         return SFCustomAdapter(self, {'network': inst})
 
-    def withNetworkInterface(self, inst):
+    def with_networkinterface(self, inst):
         if not isinstance(inst, str):
             inst = inst.uuid
         return SFCustomAdapter(self, {'networkinterface': inst})
 
-    def withImage(self, inst):
+    def with_image(self, inst):
         if not isinstance(inst, str):
             inst = inst.unique_ref
         return SFCustomAdapter(self, {'image': inst})
@@ -87,17 +93,23 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
     def _normalize(fields):
         return {k.lower(): v for k, v in fields.items()} if isinstance(fields, dict) else {}
 
+    def withPrefix(self, prefix=None):
+        return self.with_prefix(prefix)
+
     def withFields(self, fields=None):
+        return self.with_fields(fields)
+
+    def with_fields(self, fields=None):
         extra = copy.deepcopy(self._extra)
         extra.update(self._normalize(fields))
         return SFCustomAdapter(self._logger, extra, self._prefix)
 
-    def withField(self, key, value):
+    def with_field(self, key, value):
         extra = copy.deepcopy(self._extra)
         extra.update(self._normalize({key: value}))
         return SFCustomAdapter(self._logger, extra, self._prefix)
 
-    def withPrefix(self, prefix=None):
+    def with_prefix(self, prefix=None):
         return self if prefix is None else SFCustomAdapter(self._logger, self._extra, prefix)
 
     FILENAME_RE = re.compile('.*/dist-packages/shakenfist/(.*)')
@@ -122,11 +134,11 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
     #
     # Convenience methods
     #
-    def withObj(self, object):
+    def with_object(self, obj):
         extra = copy.deepcopy(self._extra)
-        if object:
+        if obj:
             try:
-                label, value = object.unique_label()
+                label, value = obj.unique_label()
             except Exception as e:
                 raise Exception(
                     'Bad object - no unique_label() function: %s' % e)
@@ -137,28 +149,28 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
     # Use labelled convenience methods when ID is a string (not object)
     # Note: the helper method still handles objects
     #
-    def withInstance(self, inst):
+    def with_instance(self, inst):
         extra = copy.deepcopy(self._extra)
         if not isinstance(inst, str):
             inst = inst.uuid
         extra.update({'instance': inst})
         return SFCustomAdapter(self._logger, extra, self._prefix)
 
-    def withNetwork(self, inst):
+    def with_network(self, inst):
         extra = copy.deepcopy(self._extra)
         if not isinstance(inst, str):
             inst = inst.uuid
         extra.update({'network': inst})
         return SFCustomAdapter(self._logger, extra, self._prefix)
 
-    def withNetworkInterface(self, inst):
+    def with_networkinterface(self, inst):
         extra = copy.deepcopy(self._extra)
         if not isinstance(inst, str):
             inst = inst.uuid
         extra.update({'networkinterface': inst})
         return SFCustomAdapter(self._logger, extra, self._prefix)
 
-    def withImage(self, inst):
+    def with_image(self, inst):
         extra = copy.deepcopy(self._extra)
         if not isinstance(inst, str):
             inst = inst.unique_ref
@@ -187,4 +199,4 @@ def setup(name):
             fmt='%(levelname)s %(message)s', colorize=False))
         log.addHandler(handler)
 
-    return log.withPrefix(), handler
+    return log.with_prefix(), handler

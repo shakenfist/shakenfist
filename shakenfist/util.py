@@ -44,10 +44,10 @@ class RecordedOperation():
             if object_type:
                 db.add_event(object_type, object_uuid,
                              self.operation, 'finish', duration, None)
-                log = LOG.withObj(self.object)
+                log = LOG.with_object(self.object)
             else:
-                log = LOG.withField({'label', self.object})
-        log.withField('duration', duration).info('Finish %s', self.operation)
+                log = LOG.with_field({'label', self.object})
+        log.with_field('duration', duration).info('Finish %s', self.operation)
 
     def unique_label(self):
         if self.object:

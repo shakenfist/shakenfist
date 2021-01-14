@@ -61,7 +61,7 @@ class ActualLock(Lock):
         self.objecttype = objecttype
         self.objectname = name
         self.timeout = min(timeout, 1000000000)
-        self.log_ctx = log_ctx.withField('path', self.path)
+        self.log_ctx = log_ctx.with_field('path', self.path)
         self.operation = op
 
         # We override the UUID of the lock with something more helpful to debugging
@@ -101,8 +101,8 @@ class ActualLock(Lock):
                     db.add_event(self.objecttype, self.objectname,
                                  'lock', 'acquired', None,
                                  'Waited %d seconds for lock' % duration)
-                    self.log_ctx.withField('duration', duration
-                                           ).info('Acquiring a lock was slow')
+                    self.log_ctx.with_field('duration', duration
+                                            ).info('Acquiring a lock was slow')
                 return self
 
             duration = time.time() - start_time
@@ -112,12 +112,12 @@ class ActualLock(Lock):
                              'Waiting for lock more than threshold')
 
                 node, pid = self.get_holder()
-                self.log_ctx.withFields({'duration': duration,
-                                         'threshold': threshold,
-                                         'holder-pid': pid,
-                                         'holder-node': node,
-                                         'requesting-op': self.operation,
-                                         }).info('Waiting for lock')
+                self.log_ctx.with_fields({'duration': duration,
+                                          'threshold': threshold,
+                                          'holder-pid': pid,
+                                          'holder-node': node,
+                                          'requesting-op': self.operation,
+                                          }).info('Waiting for lock')
                 slow_warned = True
 
             time.sleep(1)
@@ -128,11 +128,11 @@ class ActualLock(Lock):
                      'Failed to acquire lock after %.02f seconds' % duration)
 
         node, pid = self.get_holder()
-        self.log_ctx.withFields({'duration': duration,
-                                 'holder-pid': pid,
-                                 'holder-node': node,
-                                 'requesting-op': self.operation,
-                                 }).info('Failed to acquire lock')
+        self.log_ctx.with_fields({'duration': duration,
+                                  'holder-pid': pid,
+                                  'holder-node': node,
+                                  'requesting-op': self.operation,
+                                  }).info('Failed to acquire lock')
 
         raise exceptions.LockException(
             'Cannot acquire lock %s, timed out after %.02f seconds'
@@ -162,13 +162,13 @@ def get_lock(objecttype, subtype, name, ttl=60, timeout=10, log_ctx=LOG,
 
 def refresh_lock(lock, log_ctx=LOG):
     if not lock.is_acquired():
-        log_ctx.withField('lock', lock.name).info(
+        log_ctx.with_field('lock', lock.name).info(
             'Attempt to refresh an expired lock')
         raise exceptions.LockException(
             'The lock on %s has expired.' % lock.path)
 
     lock.refresh()
-    log_ctx.withField('lock', lock.name).debug('Refreshed lock')
+    log_ctx.with_field('lock', lock.name).debug('Refreshed lock')
 
 
 @retry_etcd_forever
@@ -187,10 +187,10 @@ def clear_stale_locks():
 
         if node == config.NODE_NAME and not psutil.pid_exists(pid):
             client.delete(metadata['key'])
-            LOG.withFields({'lock': lockname,
-                            'old-pid': pid,
-                            'old-node': node,
-                            }).warning('Removed stale lock')
+            LOG.with_fields({'lock': lockname,
+                             'old-pid': pid,
+                             'old-node': node,
+                             }).warning('Removed stale lock')
 
 
 @retry_etcd_forever
@@ -282,10 +282,10 @@ def enqueue(queuename, workitem):
             jobname = '%s-%03d' % (entry_time, i)
 
         put('queue', queuename, jobname, workitem)
-        LOG.withFields({'jobname': jobname,
-                        'queuename': queuename,
-                        'workitem': workitem,
-                        }).info('Enqueued workitem')
+        LOG.with_fields({'jobname': jobname,
+                         'queuename': queuename,
+                         'workitem': workitem,
+                         }).info('Enqueued workitem')
 
 
 def _all_subclasses(cls):
@@ -342,10 +342,10 @@ def dequeue(queuename):
             workitem = json.loads(data, object_hook=decodeTasks)
             put('processing', queuename, jobname, workitem)
             client.delete(metadata['key'])
-            LOG.withFields({'jobname': jobname,
-                            'queuename': queuename,
-                            'workitem': workitem,
-                            }).info('Moved workitem from queue to processing')
+            LOG.with_fields({'jobname': jobname,
+                             'queuename': queuename,
+                             'workitem': workitem,
+                             }).info('Moved workitem from queue to processing')
 
             return jobname, workitem
 
@@ -355,9 +355,9 @@ def dequeue(queuename):
 def resolve(queuename, jobname):
     with get_lock('queue', None, queuename, op='Resolve'):
         delete('processing', queuename, jobname)
-        LOG.withFields({'jobname': jobname,
-                        'queuename': queuename,
-                        }).info('Resolved workitem')
+        LOG.with_fields({'jobname': jobname,
+                         'queuename': queuename,
+                         }).info('Resolved workitem')
 
 
 def get_queue_length(queuename):
@@ -375,9 +375,9 @@ def _restart_queue(queuename):
             workitem = json.loads(data)
             put('queue', queuename, jobname, workitem)
             delete('processing', queuename, jobname)
-            LOG.withFields({'jobname': jobname,
-                            'queuename': queuename,
-                            }).warning('Reset workitem')
+            LOG.with_fields({'jobname': jobname,
+                             'queuename': queuename,
+                             }).warning('Reset workitem')
 
 
 def restart_queues():

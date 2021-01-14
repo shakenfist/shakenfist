@@ -30,7 +30,7 @@ LOG, _ = logutil.setup(__name__)
 
 
 def handle(jobname, workitem):
-    log = LOG.withField('workitem', jobname)
+    log = LOG.with_field('workitem', jobname)
     log.info('Processing workitem')
 
     setproctitle.setproctitle(
@@ -54,11 +54,11 @@ def handle(jobname, workitem):
                 instance = virt.Instance.from_db(task.instance_uuid())
 
             if instance:
-                log_i = log.withInstance(instance)
+                log_i = log.with_instance(instance)
             else:
                 log_i = log
 
-            log_i.withField('task_name', task.name()).info('Starting task')
+            log_i.with_field('task_name', task.name()).info('Starting task')
 
             # TODO(andy) Should network events also come through here eventually?
             # Then this can be generalised to record events on networks/instances
@@ -95,7 +95,7 @@ def handle(jobname, workitem):
                     util.ignore_exception(daemon.process_name('queues'), e)
 
             else:
-                log_i.withField('task', task).error('Unhandled task - dropped')
+                log_i.with_field('task', task).error('Unhandled task - dropped')
 
             log_i.info('Task complete')
 
@@ -135,7 +135,7 @@ def image_fetch(url, instance):
             db.add_event('image', url, 'fetch', None, None, 'success')
 
     except (exceptions.HTTPError, requests.exceptions.RequestException) as e:
-        LOG.withField('image', url).info('Failed to fetch image')
+        LOG.with_field('image', url).info('Failed to fetch image')
 
         # Clean common problems to store in events
         msg = str(e)

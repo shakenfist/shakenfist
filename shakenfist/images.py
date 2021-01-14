@@ -227,8 +227,8 @@ class Image(baseobject.DatabaseBackedObject):
         image_cache_path = os.path.join(
             config.get('STORAGE_PATH'), 'image_cache')
         if not os.path.exists(image_cache_path):
-            LOG.withField('image_cache_path',
-                          image_cache_path).debug('Creating image cache')
+            LOG.with_field('image_cache_path',
+                           image_cache_path).debug('Creating image cache')
             os.makedirs(image_cache_path, exist_ok=True)
 
         return '%s/%s.v%03d' % (image_cache_path, self.unique_ref,
@@ -243,7 +243,7 @@ class Image(baseobject.DatabaseBackedObject):
 
             diff_field = self._new_image_available(resp)
             if diff_field:
-                LOG.withImage(self).withField('diff_field', diff_field).info(
+                LOG.with_image(self).with_field('diff_field', diff_field).info(
                     'Fetch required due HTTP field change')
                 if related_object:
                     t, u = related_object.unique_label()
@@ -305,8 +305,8 @@ class Image(baseobject.DatabaseBackedObject):
                     db.refresh_locks(locks)
                     last_refresh = time.time()
 
-        LOG.withImage(self).withField('bytes_fetched',
-                                      fetched).info('Fetch complete')
+        LOG.with_image(self).with_field('bytes_fetched',
+                                        fetched).info('Fetch complete')
 
         # Check if decompression not required
         fn = self.version_image_path(inc=1)
@@ -319,7 +319,7 @@ class Image(baseobject.DatabaseBackedObject):
         return fn + '.orig'
 
     def correct_checksum(self, image_name):
-        log = LOG.withField('image', image_name)
+        log = LOG.with_field('image', image_name)
 
         if not self.checksum:
             log.info('No checksum comparison available')
@@ -334,10 +334,10 @@ class Image(baseobject.DatabaseBackedObject):
             for byte_block in iter(lambda: f.read(4096), b''):
                 md5_hash.update(byte_block)
         calc = md5_hash.hexdigest()
-        log.withField('calc', calc).debug('Calc from image download')
+        log.with_field('calc', calc).debug('Calc from image download')
 
         correct = calc == self.checksum
-        log.withField('correct', correct).info('Image checksum verification')
+        log.with_field('correct', correct).info('Image checksum verification')
         return correct
 
     def resize(self, locks, size):

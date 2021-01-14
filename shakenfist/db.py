@@ -216,7 +216,7 @@ def get_instance_snapshots(instance_uuid):
 
 def add_event(object_type, object_uuid, operation, phase, duration, message):
     t = time.time()
-    LOG.withFields(
+    LOG.with_fields(
         {
             object_type: object_uuid,
             'fqdn': config.NODE_NAME,
