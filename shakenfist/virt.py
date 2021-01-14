@@ -19,7 +19,6 @@ from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import images
-from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
 from shakenfist import util
@@ -399,15 +398,6 @@ class Instance(baseobject.DatabaseBackedObject):
                     shutil.rmtree(self.instance_path)
             except Exception as e:
                 util.ignore_exception('instance delete', e)
-
-        with util.RecordedOperation('release network addresses', self):
-            for ni in db.get_instance_interfaces(self.uuid):
-                db.update_network_interface_state(ni['uuid'], 'deleted')
-                with db.get_lock('ipmanager', None, ni['network_uuid'],
-                                 ttl=120, op='Instance delete'):
-                    ipm = IPManager.from_db(ni['network_uuid'])
-                    ipm.release(ni['ipv4'])
-                    ipm.persist()
 
         ports = self.ports
         self._free_console_port(ports.get('console_port'))
@@ -873,7 +863,7 @@ class Instance(baseobject.DatabaseBackedObject):
     def enqueue_delete_remote(self, node):
         db.enqueue(node, {
             'tasks': [DeleteInstanceTask(self.uuid)]
-            })
+        })
 
     def enqueue_delete_due_error(self, error_msg):
         LOG.withObj(self).info('enqueue_instance_error')
