@@ -881,7 +881,7 @@ class Instance(baseobject.DatabaseBackedObject):
         # Error needs to be set immediately so that API clients get
         # correct information. The VM and network tear down can be delayed.
         self.state = 'error'
-        self.error_msg = error_msg
+        self.error = error_msg
 
         self.enqueue_delete()
 

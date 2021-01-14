@@ -16,10 +16,9 @@ class DatabaseBackedObject(object):
     current_version = None
     state_targets = None
 
-    def __init__(self, object_uuid, version=None, error_msg=None):
+    def __init__(self, object_uuid, version=None):
         self.__uuid = object_uuid
         self.__version = version
-        self.__error_msg = error_msg
 
     @property
     def uuid(self):
