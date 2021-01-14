@@ -747,8 +747,11 @@ class Instances(Resource):
                 if 'model' not in netdesc or not netdesc['model']:
                     netdesc['model'] = 'virtio'
 
+                iface_uuid = str(uuid.uuid4())
+                LOG.withObj(instance).withObj(n).withFields(
+                    {'networkinterface': iface_uuid}).info('Interface allocated')
                 db.create_network_interface(
-                    str(uuid.uuid4()), netdesc, instance.uuid, order)
+                    iface_uuid, netdesc, instance.uuid, order)
 
         if not SCHEDULER:
             SCHEDULER = scheduler.Scheduler()
