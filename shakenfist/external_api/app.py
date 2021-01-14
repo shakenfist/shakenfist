@@ -1190,7 +1190,11 @@ class Network(Resource):
             return error(403, 'you cannot delete the floating network')
 
         # We only delete unused networks
-        if len(list(db.get_network_interfaces(network_uuid))) > 0:
+        ifaces = list(db.get_network_interfaces(network_uuid))
+        if len(ifaces) > 0:
+            for iface in ifaces:
+                LOG.withFields({'network_interface': iface['uuid'],
+                                'state': iface['state']}).info('Blocks network delete')
             return error(403, 'you cannot delete an in use network')
 
         # Check if network has already been deleted
