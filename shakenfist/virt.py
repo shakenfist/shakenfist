@@ -117,15 +117,31 @@ def _snapshot_path():
 class Instance(baseobject.DatabaseBackedObject):
     object_type = 'instance'
     current_version = 2
+
+    # docs/development/state_machine.md has a description of these states.
+    STATE_INITIAL = 'initial'
+    STATE_INITIAL_ERROR = 'initial-error'
+    STATE_PREFLIGHT = 'preflight'
+    STATE_PREFLIGHT_ERROR = 'preflight-error'
+    STATE_CREATING = 'creating'
+    STATE_CREATING_ERROR = 'creating-error'
+    STATE_CREATED = 'created'
+    STATE_CREATED_ERROR = 'created-error'
+    STATE_ERROR = 'error'
+    STATE_DELETED = 'deleted'
+
     state_targets = {
-        None: ('initial', 'error'),
-        'initial': ('preflight', 'deleted', 'error'),
-        'preflight': ('creating', 'deleted', 'error'),
-        'creating': ('created', 'deleted', 'error'),
-        'created': ('deleted', 'error'),
-        'error': ('deleted', 'error'),
-        # TODO(andy): Instances should not be repeated deleted
-        'deleted': ('deleted', 'error'),
+        None: (STATE_INITIAL, STATE_ERROR),
+        STATE_INITIAL: (STATE_PREFLIGHT, STATE_DELETED, STATE_INITIAL_ERROR),
+        STATE_PREFLIGHT: (STATE_CREATING, STATE_DELETED, STATE_PREFLIGHT_ERROR),
+        STATE_CREATING: (STATE_CREATED, STATE_DELETED, STATE_CREATING_ERROR),
+        STATE_CREATED: (STATE_DELETED, STATE_CREATED_ERROR),
+        STATE_INITIAL_ERROR: (STATE_ERROR),
+        STATE_PREFLIGHT_ERROR: (STATE_ERROR),
+        STATE_CREATING_ERROR: (STATE_ERROR),
+        STATE_CREATED_ERROR: (STATE_ERROR),
+        STATE_ERROR: (STATE_DELETED, STATE_ERROR),
+        STATE_DELETED: None,
     }
 
     def __init__(self, static_values):
@@ -171,8 +187,9 @@ class Instance(baseobject.DatabaseBackedObject):
                 'version': cls.current_version
             })
         i = Instance.from_db(uuid)
-        i.state = 'initial'
-        i._db_set_attribute('power_state', {'power_state': 'initial'})
+        i.state = cls.STATE_INITIAL
+        i._db_set_attribute(
+            'power_state', {'power_state': cls.STATE_INITIAL})
         i.add_event('db record creation', None)
         return i
 
@@ -352,7 +369,7 @@ class Instance(baseobject.DatabaseBackedObject):
     # has been transcoded to the right format. This has been done to facilitate
     # moving to a queue and task based creation mechanism.
     def create(self, lock=None):
-        self.state = 'creating'
+        self.state = self.STATE_CREATING
 
         # Ensure we have state on disk
         os.makedirs(self.instance_path, exist_ok=True)
@@ -379,7 +396,7 @@ class Instance(baseobject.DatabaseBackedObject):
             self.log.info('Instance now powered on')
         else:
             self.log.info('Instance failed to power on')
-        self.state = 'created'
+        self.state = self.STATE_CREATED
 
     def delete(self):
         with util.RecordedOperation('delete domain', self):
@@ -403,8 +420,10 @@ class Instance(baseobject.DatabaseBackedObject):
         self._free_console_port(ports.get('console_port'))
         self._free_console_port(ports.get('vdi_port'))
 
-        if self.state.value != 'error':
-            self.state = 'deleted'
+        if self.state.value.endswith('-%s' % self.STATE_ERROR):
+            self.state = self.STATE_ERROR
+        else:
+            self.state = self.STATE_DELETED
 
     def hard_delete(self):
         etcd.delete('instance', None, self.uuid)
@@ -869,9 +888,8 @@ class Instance(baseobject.DatabaseBackedObject):
 
         # Error needs to be set immediately so that API clients get
         # correct information. The VM and network tear down can be delayed.
-        self.state = 'error'
+        self.state = '%s-error' % self.state.value
         self.error = error_msg
-
         self.enqueue_delete()
 
 
@@ -904,3 +922,18 @@ def placement_filter(node, inst):
 
 
 this_node_filter = partial(placement_filter, config.NODE_NAME)
+
+
+active_states_filter = partial(
+    baseobject.state_filter, [Instance.STATE_INITIAL, Instance.STATE_INITIAL_ERROR,
+                              Instance.STATE_PREFLIGHT, Instance.STATE_PREFLIGHT_ERROR,
+                              Instance.STATE_CREATING, Instance.STATE_CREATING_ERROR,
+                              Instance.STATE_CREATED, Instance.STATE_CREATED_ERROR,
+                              Instance.STATE_ERROR])
+
+healthy_states_filter = partial(
+    baseobject.state_filter, [Instance.STATE_INITIAL, Instance.STATE_PREFLIGHT,
+                              Instance.STATE_CREATING, Instance.STATE_CREATED])
+
+inactive_states_filter = partial(
+    baseobject.state_filter, [Instance.STATE_DELETED])

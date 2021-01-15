@@ -30,7 +30,7 @@ def restore_instances():
     # Ensure all instances for this node are defined
     networks = []
     instances = []
-    for inst in virt.Instances([virt.this_node_filter, baseobject.active_states_filter]):
+    for inst in virt.Instances([virt.this_node_filter, virt.healthy_states_filter]):
         instance_problems = []
         for iface in db.get_instance_interfaces(inst.uuid):
             if not iface['network_uuid'] in networks:

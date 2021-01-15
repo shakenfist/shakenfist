@@ -5,7 +5,6 @@ import requests
 import setproctitle
 import time
 
-from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
@@ -95,7 +94,8 @@ def handle(jobname, workitem):
                     util.ignore_exception(daemon.process_name('queues'), e)
 
             else:
-                log_i.with_field('task', task).error('Unhandled task - dropped')
+                log_i.with_field('task', task).error(
+                    'Unhandled task - dropped')
 
             log_i.info('Task complete')
 
@@ -248,7 +248,7 @@ def instance_delete(instance):
         # Create list of networks used by all other instances
         host_networks = []
         for inst in virt.Instances([virt.this_node_filter,
-                                    baseobject.active_states_filter]):
+                                    virt.active_states_filter]):
             if not inst.uuid == instance.uuid:
                 for iface in db.get_instance_interfaces(inst.uuid):
                     if not iface['network_uuid'] in host_networks:

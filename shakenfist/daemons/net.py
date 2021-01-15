@@ -34,7 +34,7 @@ class Monitor(daemon.Daemon):
 
         if not util.is_network_node():
             # For normal nodes, just the ones we have instances for
-            for inst in virt.Instances([virt.this_node_filter, baseobject.active_states_filter]):
+            for inst in virt.Instances([virt.this_node_filter, virt.active_states_filter]):
                 for iface in db.get_instance_interfaces(inst.uuid):
                     if not iface['network_uuid'] in host_networks:
                         host_networks.append(iface['network_uuid'])
@@ -168,7 +168,7 @@ class Monitor(daemon.Daemon):
             # Tasks that should not operate on a dead network
             if n.is_dead():
                 log_ctx.with_fields({'state': n.state,
-                                    'workitem': workitem}).info(
+                                     'workitem': workitem}).info(
                     'Received work item for a dead network')
                 return
 

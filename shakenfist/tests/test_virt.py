@@ -234,8 +234,9 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
                     {'value': 'preflight', 'update_time': 0},
                     {'value': 'creating', 'update_time': 0},
                     {'value': 'created', 'update_time': 0},
+                    {'value': 'created-error', 'update_time': 0},
                     {'value': 'error', 'update_time': 0},
-                    ])
+                ])
     @mock.patch('shakenfist.virt.Instance._db_set_attribute')
     @mock.patch('shakenfist.etcd.put')
     def test_set_state_valid1(
@@ -249,6 +250,7 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
             i.state = 'created'
         i.state = 'creating'
         i.state = 'created'
+        i.state = 'created-error'
         i.state = 'error'
         i.state = 'deleted'
 
@@ -259,7 +261,7 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
                     {'value': 'initial', 'update_time': 0},
                     {'value': 'preflight', 'update_time': 0},
                     {'value': 'error', 'update_time': 0},
-                    ])
+                ])
     @mock.patch('shakenfist.virt.Instance._db_set_attribute')
     @mock.patch('shakenfist.etcd.put')
     def test_set_state_valid2(
@@ -267,7 +269,7 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
 
         i = self._make_instance()
         i.state = 'preflight'
-        i.state = 'error'
+        i.state = 'preflight-error'
         with testtools.ExpectedException(exceptions.InvalidStateException):
             i.state = 'created'
 
@@ -354,7 +356,8 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
         i.update_power_state('on')
 
         etcd_write = mock_attribute_set.mock_calls[1][1]
-        self.assertTrue(time.time() - etcd_write[1]['power_state_updated'] < 30)
+        self.assertTrue(
+            time.time() - etcd_write[1]['power_state_updated'] < 30)
         self.assertEqual('on', etcd_write[1]['power_state'])
         self.assertEqual('transition-to-off',
                          etcd_write[1]['power_state_previous'])
@@ -665,7 +668,7 @@ class InstancesTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
     def test_state_filter_active(self, mock_get_all, mock_get, mock_attr):
         uuids = []
-        for i in virt.Instances([baseobject.active_states_filter]):
+        for i in virt.Instances([virt.active_states_filter]):
             uuids.append(i.uuid)
 
         self.assertEqual(['a7c5ecec-c3a9-4774-ad1b-249d9e90e806'], uuids)
@@ -677,7 +680,7 @@ class InstancesTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
     def test_state_filter_inactive(self, mock_get_all, mock_get, mock_attr):
         uuids = []
-        for i in virt.Instances([baseobject.inactive_states_filter]):
+        for i in virt.Instances([virt.inactive_states_filter]):
             uuids.append(i.uuid)
 
         self.assertEqual(['373a165e-9720-4e14-bd0e-9612de79ff15'], uuids)
@@ -690,7 +693,7 @@ class InstancesTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
     def test_state_hard_delete_later(self, mock_get_all, mock_get, mock_attr):
         uuids = []
-        for i in virt.Instances([baseobject.inactive_states_filter,
+        for i in virt.Instances([virt.inactive_states_filter,
                                  partial(baseobject.state_age_filter, 500)]):
             uuids.append(i.uuid)
 
@@ -705,7 +708,7 @@ class InstancesTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
     def test_state_hard_delete_now(self, mock_get_all, mock_get, mock_attr):
         uuids = []
-        for i in virt.Instances([baseobject.inactive_states_filter,
+        for i in virt.Instances([virt.inactive_states_filter,
                                  partial(baseobject.state_age_filter, 500)]):
             uuids.append(i.uuid)
 
