@@ -10,8 +10,7 @@ from shakenfist import logutil
 from shakenfist import util
 
 
-# TODO(andy): Change back to 5 once network bugs fixed
-ETCD_ATTEMPT_TIMEOUT = 15
+ETCD_ATTEMPT_TIMEOUT = 60
 
 
 LOG, _ = logutil.setup(__name__)
@@ -66,17 +65,7 @@ def get_network_node():
 def get_lock(objecttype, subtype, name, ttl=60, timeout=ETCD_ATTEMPT_TIMEOUT,
              relatedobjects=None, log_ctx=LOG, op=None):
     return etcd.get_lock(objecttype, subtype, name, ttl=ttl, timeout=timeout,
-                         log_ctx=log_ctx, op=None)
-
-
-def get_object_lock(obj, ttl=60, timeout=ETCD_ATTEMPT_TIMEOUT,
-                    relatedobjects=None, log_ctx=LOG, op=None):
-    obj_type, obj_name = obj.unique_label()
-    if not (obj_type and obj_name):
-        raise exceptions.LockException(
-            'Could not derive lock name from %s' % obj)
-    return get_lock(obj_type, None, obj_name, ttl=ttl, timeout=timeout,
-                    relatedobjects=relatedobjects, log_ctx=log_ctx, op=op)
+                         log_ctx=log_ctx, op=op)
 
 
 def refresh_lock(lock, relatedobjects=None, log_ctx=LOG):

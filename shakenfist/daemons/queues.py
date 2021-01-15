@@ -193,11 +193,8 @@ def instance_preflight(instance, network):
 
 
 def instance_start(instance, network):
-    with db.get_lock(
-            'instance', None, instance.uuid, ttl=900, timeout=120,
-            op='Instance start') as lock:
-
-        # Collect the networks
+    with instance.get_lock(ttl=900, op='Instance start') as lock:
+        # Ensure networks are connected to this node
         nets = {}
         for netdesc in network:
             if netdesc['network_uuid'] not in nets:
@@ -210,8 +207,11 @@ def instance_start(instance, network):
                 if n.state.value != 'created':
                     instance.enqueue_delete_due_error(
                         'network is not active: %s' % n.uuid)
+                    return
 
-                nets[netdesc['network_uuid']] = n
+                n.create_on_hypervisor()
+                n.ensure_mesh()
+                n.update_dhcp()
 
         # Allocate console and VDI ports
         instance.allocate_instance_ports()
@@ -236,8 +236,7 @@ def instance_start(instance, network):
 
 
 def instance_delete(instance):
-    with db.get_lock('instance', None, instance.uuid, timeout=120,
-                     op='Instance delete'):
+    with instance.get_lock(op='Instance delete'):
         db.add_event('instance', instance.uuid, 'queued', 'delete', None, None)
 
         # Create list of networks used by instance
@@ -248,7 +247,8 @@ def instance_delete(instance):
 
         # Create list of networks used by all other instances
         host_networks = []
-        for inst in virt.Instances([virt.this_node_filter, baseobject.active_states_filter]):
+        for inst in virt.Instances([virt.this_node_filter,
+                                    baseobject.active_states_filter]):
             if not inst.uuid == instance.uuid:
                 for iface in db.get_instance_interfaces(inst.uuid):
                     if not iface['network_uuid'] in host_networks:
@@ -277,8 +277,8 @@ def instance_delete(instance):
                         n.update_dhcp()
                 else:
                     # Network not used by any other instance therefore delete
-                    with util.RecordedOperation('remove network', n):
-                        n.delete()
+                    with util.RecordedOperation('remove network from node', n):
+                        n.delete_on_node_with_lock()
         return instance
 
 

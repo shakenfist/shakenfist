@@ -16,10 +16,9 @@ class DatabaseBackedObject(object):
     current_version = None
     state_targets = None
 
-    def __init__(self, object_uuid, version=None, error_msg=None):
+    def __init__(self, object_uuid, version=None):
         self.__uuid = object_uuid
         self.__version = version
-        self.__error_msg = error_msg
 
     @property
     def uuid(self):
@@ -71,6 +70,12 @@ class DatabaseBackedObject(object):
 
     def _db_set_attribute(self, attribute, value):
         etcd.put('attribute/%s' % self.object_type, self.__uuid, attribute, value)
+
+    def get_lock(self, subtype=None, ttl=60, relatedobjects=None, log_ctx=LOG,
+                 op=None):
+        return db.get_lock(self.object_type, subtype, self.uuid, ttl=ttl,
+                           relatedobjects=relatedobjects, log_ctx=log_ctx,
+                           op=op)
 
     def get_lock_attr(self, name, op):
         return db.get_lock('attribute/%s' % self.object_type,

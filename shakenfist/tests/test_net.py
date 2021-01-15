@@ -253,7 +253,6 @@ link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
                     {'value': 'created', 'update_time': 0},
                     {'value': 'created', 'update_time': 0},
                     {'value': 'created', 'update_time': 0},
-                    {'value': 'deleting', 'update_time': 0},
                     {'value': 'error', 'update_time': 0},
                     {'value': 'deleted', 'update_time': 0},
                     {'value': 'deleted', 'update_time': 0},
@@ -275,7 +274,6 @@ link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
         })
         with testtools.ExpectedException(exceptions.InvalidStateException):
             n.state = 'initial'
-        n.state = 'deleting'
         n.state = 'error'
         n.state = 'deleted'
         with testtools.ExpectedException(exceptions.InvalidStateException):

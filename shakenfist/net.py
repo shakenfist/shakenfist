@@ -30,12 +30,9 @@ class Network(baseobject.DatabaseBackedObject):
     current_version = 2
     state_targets = {
         None: ('initial', ),
-        'initial': ('created', 'deleting', 'error'),
-        # TODO(andy): Investigate whether networks should created->deleted
-        'created': ('created', 'deleting', 'deleted', 'error'),
-        # TODO(andy): Remove deleting->created. Example occurs during CI.
-        'deleting': ('deleted', 'created', 'error'),
-        'error': ('deleting', 'error'),
+        'initial': ('created', 'deleted', 'error'),
+        'created': ('created', 'deleted', 'error'),
+        'error': ('deleted', 'error'),
         'deleted': (),
     }
 
@@ -289,112 +286,105 @@ class Network(baseobject.DatabaseBackedObject):
         callers will wait on a lock before calling this function. In this case
         we definitely need to update the in-memory object model.
         """
-        return self.state.value in ('deleted', 'deleting', 'error')
+        return self.state.value in ('deleted', 'error')
 
     def _create_common(self):
         subst = self.subst_dict()
 
-        with db.get_object_lock(self, ttl=120, op='Network create'):
-            # Ensure network was not deleted whilst waiting for the lock.
+        if not util.check_for_interface(subst['vx_interface']):
+            with util.RecordedOperation('create vxlan interface', self):
+                util.create_interface(
+                    subst['vx_interface'], 'vxlan',
+                    'id %(vx_id)s dev %(physical_interface)s dstport 0'
+                    % subst)
+                util.execute(None, 'sysctl -w net.ipv4.conf.'
+                                   '%(vx_interface)s.arp_notify=1' % subst)
+
+        if not util.check_for_interface(subst['vx_bridge']):
+            with util.RecordedOperation('create vxlan bridge', self):
+                util.create_interface(subst['vx_bridge'], 'bridge', '')
+                util.execute(None, 'ip link set %(vx_interface)s '
+                                   'master %(vx_bridge)s' % subst)
+                util.execute(None, 'ip link set %(vx_interface)s up' % subst)
+                util.execute(None, 'ip link set %(vx_bridge)s up' % subst)
+                util.execute(None, 'sysctl -w net.ipv4.conf.'
+                                   '%(vx_bridge)s.arp_notify=1' % subst)
+                util.execute(None, 'brctl setfd %(vx_bridge)s 0' % subst)
+                util.execute(None, 'brctl stp %(vx_bridge)s off' % subst)
+                util.execute(None, 'brctl setageing %(vx_bridge)s 0' % subst)
+
+    def create_on_hypervisor(self):
+        with self.get_lock(op='create_on_hypervisor'):
+            if self.is_dead():
+                raise DeadNetwork('network=%s' % self)
+            self._create_common()
+
+            # TODO(andy): Check with mikal: is this task required here?
+            db.enqueue('networknode', DeployNetworkTask(self.uuid))
+            self.add_event('deploy', 'enqueued')
+
+    def create_on_network_node(self):
+        with self.get_lock(op='create_on_network_node'):
             if self.is_dead():
                 raise DeadNetwork('network=%s' % self)
 
-            if not util.check_for_interface(subst['vx_interface']):
-                with util.RecordedOperation('create vxlan interface', self):
+            self._create_common()
+
+            subst = self.subst_dict()
+            if not os.path.exists('/var/run/netns/%(netns)s' % subst):
+                with util.RecordedOperation('create netns', self):
+                    util.execute(None, 'ip netns add %(netns)s' % subst)
+
+            if not util.check_for_interface(subst['vx_veth_outer']):
+                with util.RecordedOperation('create router veth', self):
                     util.create_interface(
-                        subst['vx_interface'], 'vxlan',
-                        'id %(vx_id)s dev %(physical_interface)s dstport 0'
-                        % subst)
+                        subst['vx_veth_outer'], 'veth',
+                        'peer name %(vx_veth_inner)s' % subst)
+                    util.execute(
+                        None,
+                        'ip link set %(vx_veth_inner)s netns %(netns)s' % subst)
+                    util.execute(
+                        None,
+                        'brctl addif %(vx_bridge)s %(vx_veth_outer)s' % subst)
+                    util.execute(None, 'ip link set %(vx_veth_outer)s up' % subst)
+                    util.execute(
+                        None,
+                        '%(in_netns)s ip link set %(vx_veth_inner)s up' % subst)
+                    util.execute(
+                        None,
+                        '%(in_netns)s ip addr add %(router)s/%(netmask)s '
+                        'dev %(vx_veth_inner)s' % subst)
+
+            if not util.check_for_interface(subst['physical_veth_outer']):
+                with util.RecordedOperation('create physical veth', self):
+                    util.create_interface(
+                        subst['physical_veth_outer'], 'veth',
+                        'peer name %(physical_veth_inner)s' % subst)
                     util.execute(None,
-                                 'sysctl -w net.ipv4.conf.'
-                                 '%(vx_interface)s.arp_notify=1' % subst)
-
-            if not util.check_for_interface(subst['vx_bridge']):
-                with util.RecordedOperation('create vxlan bridge', self):
-                    util.create_interface(subst['vx_bridge'], 'bridge', '')
+                                 'brctl addif %(physical_bridge)s '
+                                 '%(physical_veth_outer)s' % subst)
                     util.execute(None,
-                                 'ip link set %(vx_interface)s '
-                                 'master %(vx_bridge)s' % subst)
+                                 'ip link set %(physical_veth_outer)s up'
+                                 % subst)
                     util.execute(None,
-                                 'ip link set %(vx_interface)s up' % subst)
-                    util.execute(None,
-                                 'ip link set %(vx_bridge)s up' % subst)
-                    util.execute(None,
-                                 'sysctl -w net.ipv4.conf.'
-                                 '%(vx_bridge)s.arp_notify=1' % subst)
-                    util.execute(None,
-                                 'brctl setfd %(vx_bridge)s 0' % subst)
-                    util.execute(None,
-                                 'brctl stp %(vx_bridge)s off' % subst)
-                    util.execute(None,
-                                 'brctl setageing %(vx_bridge)s 0' % subst)
+                                 'ip link set %(physical_veth_inner)s '
+                                 'netns %(netns)s' % subst)
 
-    def create_on_hypervisor(self):
-        self._create_common()
-        db.enqueue('networknode', DeployNetworkTask(self.uuid))
-        self.add_event('deploy', 'enqueued')
+            if self.provide_nat:
+                # We don't always need this lock, but acquiring it here means
+                # we don't need to construct two identical ipmanagers one after
+                # the other.
+                with db.get_lock('ipmanager', None, 'floating', ttl=120,
+                                 op='Network deploy NAT'):
+                    ipm = IPManager.from_db('floating')
+                    if not self.floating_gateway:
+                        self.update_floating_gateway(
+                            ipm.get_random_free_address())
+                        ipm.persist()
 
-    def create_on_network_node(self):
-        self._create_common()
-        subst = self.subst_dict()
-
-        if not os.path.exists('/var/run/netns/%(netns)s' % subst):
-            with util.RecordedOperation('create netns', self):
-                util.execute(None, 'ip netns add %(netns)s' % subst)
-
-        if not util.check_for_interface(subst['vx_veth_outer']):
-            with util.RecordedOperation('create router veth', self):
-                util.create_interface(
-                    subst['vx_veth_outer'], 'veth',
-                    'peer name %(vx_veth_inner)s' % subst)
-                util.execute(
-                    None,
-                    'ip link set %(vx_veth_inner)s netns %(netns)s' % subst)
-                util.execute(
-                    None,
-                    'brctl addif %(vx_bridge)s %(vx_veth_outer)s' % subst)
-                util.execute(None, 'ip link set %(vx_veth_outer)s up' % subst)
-                util.execute(
-                    None,
-                    '%(in_netns)s ip link set %(vx_veth_inner)s up' % subst)
-                util.execute(
-                    None,
-                    '%(in_netns)s ip addr add %(router)s/%(netmask)s '
-                    'dev %(vx_veth_inner)s' % subst)
-
-        if not util.check_for_interface(subst['physical_veth_outer']):
-            with util.RecordedOperation('create physical veth', self):
-                util.create_interface(
-                    subst['physical_veth_outer'], 'veth',
-                    'peer name %(physical_veth_inner)s' % subst)
-                util.execute(None,
-                             'brctl addif %(physical_bridge)s '
-                             '%(physical_veth_outer)s' % subst)
-                util.execute(None,
-                             'ip link set %(physical_veth_outer)s up'
-                             % subst)
-                util.execute(None,
-                             'ip link set %(physical_veth_inner)s '
-                             'netns %(netns)s' % subst)
-
-        if self.provide_nat:
-            # We don't always need this lock, but acquiring it here means we don't
-            # need to construct two idential ipmanagers one after the other.
-            with db.get_lock('ipmanager', None, 'floating', ttl=120,
-                             op='Network deploy NAT'):
-                ipm = IPManager.from_db('floating')
-                if not self.floating_gateway:
-                    self.update_floating_gateway(ipm.get_random_free_address())
-                    ipm.persist()
-
-                subst['floating_router'] = ipm.get_address_at_index(1)
-                subst['floating_gateway'] = self.floating_gateway
-                subst['floating_netmask'] = ipm.netmask
-
-            with db.get_object_lock(self, ttl=120, op='Network deploy NAT'):
-                # Ensure network was not deleted whilst waiting for the lock.
-                if self.is_dead():
-                    raise DeadNetwork('network=%s' % self)
+                    subst['floating_router'] = ipm.get_address_at_index(1)
+                    subst['floating_gateway'] = self.floating_gateway
+                    subst['floating_netmask'] = ipm.netmask
 
                 with util.RecordedOperation('enable virtual routing', self):
                     addresses = util.get_interface_addresses(
@@ -438,52 +428,66 @@ class Network(baseobject.DatabaseBackedObject):
                                      '-s %(ipblock)s/%(netmask)s '
                                      '-o %(physical_veth_inner)s '
                                      '-j MASQUERADE' % subst)
-
+            self.state = 'created'
         self.update_dhcp()
-        self.state = 'created'
 
     def delete(self):
+        with self.get_lock(op='Network delete'):
+            if self.is_dead():
+                LOG.withObj(self).info('Network died whilst waiting for lock')
+                return
+            self._delete_on_node()
+            self.state = 'deleted'
+        self.remove_dhcp()
+
+    def delete_on_node_with_lock(self):
+        with self.get_lock(op='Network delete on node'):
+            if self.is_dead():
+                LOG.withObj(self).info('Network died whilst waiting for lock')
+                return
+            self._delete_on_node()
+
+    def _delete_on_node(self):
         subst = self.subst_dict()
-        LOG.withFields(subst).debug('net.delete()')
+        LOG.withFields(subst).debug('net.delete_on_node()')
 
         # Cleanup local node
-        with db.get_object_lock(self, ttl=120, op='Network delete'):
-            if util.check_for_interface(subst['vx_bridge']):
-                with util.RecordedOperation('delete vxlan bridge', self):
-                    util.execute(None, 'ip link delete %(vx_bridge)s' % subst)
+        if util.check_for_interface(subst['vx_bridge']):
+            with util.RecordedOperation('delete vxlan bridge', self):
+                util.execute(None, 'ip link delete %(vx_bridge)s' % subst)
 
-            if util.check_for_interface(subst['vx_interface']):
-                with util.RecordedOperation('delete vxlan interface', self):
+        if util.check_for_interface(subst['vx_interface']):
+            with util.RecordedOperation('delete vxlan interface', self):
+                util.execute(
+                    None, 'ip link delete %(vx_interface)s' % subst)
+
+        # If this is the network node do additional cleanup
+        if util.is_network_node():
+            if util.check_for_interface(subst['vx_veth_outer']):
+                with util.RecordedOperation('delete router veth', self):
                     util.execute(
-                        None, 'ip link delete %(vx_interface)s' % subst)
+                        None, 'ip link delete %(vx_veth_outer)s' % subst)
 
-            # If this is the network node do additional cleanup
-            if util.is_network_node():
-                if util.check_for_interface(subst['vx_veth_outer']):
-                    with util.RecordedOperation('delete router veth', self):
-                        util.execute(
-                            None, 'ip link delete %(vx_veth_outer)s' % subst)
+            if util.check_for_interface(subst['physical_veth_outer']):
+                with util.RecordedOperation('delete physical veth', self):
+                    util.execute(
+                        None,
+                        'ip link delete %(physical_veth_outer)s' % subst)
 
-                if util.check_for_interface(subst['physical_veth_outer']):
-                    with util.RecordedOperation('delete physical veth', self):
-                        util.execute(
-                            None,
-                            'ip link delete %(physical_veth_outer)s' % subst)
+            if os.path.exists('/var/run/netns/%(netns)s' % subst):
+                with util.RecordedOperation('delete netns', self):
+                    util.execute(None, 'ip netns del %(netns)s' % subst)
 
-                if os.path.exists('/var/run/netns/%(netns)s' % subst):
-                    with util.RecordedOperation('delete netns', self):
-                        util.execute(None, 'ip netns del %(netns)s' % subst)
+            if self.floating_gateway:
+                with db.get_lock('ipmanager', None, 'floating', ttl=120,
+                                 op='Network delete'):
+                    ipm = IPManager.from_db('floating')
+                    ipm.release(self.floating_gateway)
+                    ipm.persist()
+                    self.update_floating_gateway(None)
 
-                if self.floating_gateway:
-                    with db.get_lock('ipmanager', None, 'floating', ttl=120,
-                                     op='Network delete'):
-                        ipm = IPManager.from_db('floating')
-                        ipm.release(self.floating_gateway)
-                        ipm.persist()
-                        self.update_floating_gateway(None)
-
-            Network.deallocate_vxid(self.vxid)
-            IPManager.from_db(self.uuid).delete()
+        Network.deallocate_vxid(self.vxid)
+        IPManager.from_db(self.uuid).delete()
 
     def hard_delete(self):
         etcd.delete('network', None, self.uuid)
@@ -508,7 +512,7 @@ class Network(baseobject.DatabaseBackedObject):
         if util.is_network_node():
             subst = self.subst_dict()
             with util.RecordedOperation('update dhcp', self):
-                with db.get_object_lock(self, ttl=120, op='Network update DHCP'):
+                with self.get_lock(op='Network update DHCP'):
                     d = dhcp.DHCP(self, subst['vx_veth_inner'])
                     d.restart_dhcpd()
         else:
@@ -519,7 +523,7 @@ class Network(baseobject.DatabaseBackedObject):
         if util.is_network_node():
             subst = self.subst_dict()
             with util.RecordedOperation('remove dhcp', self):
-                with db.get_object_lock(self, ttl=120, op='Network remove DHCP'):
+                with self.get_lock(op='Network remove DHCP'):
                     d = dhcp.DHCP(self, subst['vx_veth_inner'])
                     d.remove_dhcpd()
         else:
@@ -538,7 +542,7 @@ class Network(baseobject.DatabaseBackedObject):
                 yield m.group(1)
 
     def ensure_mesh(self):
-        with db.get_object_lock(self, ttl=120, op='Network ensure mesh'):
+        with self.get_lock(op='Network ensure mesh'):
             # Ensure network was not deleted whilst waiting for the lock.
             if self.is_dead():
                 raise DeadNetwork('network=%s' % self)
