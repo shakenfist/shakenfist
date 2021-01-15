@@ -1,10 +1,10 @@
 - name: Create instance storage directory
   file:
-    path: /srv/shakenfist/isntances
+    path: /srv/shakenfist/instances
     state: directory
     mode: "0755"
 
-- name: Mount glusterfs to /srv/shakenfist/isntances
+- name: Mount glusterfs to /srv/shakenfist/instances
   mount:
     path: /srv/shakenfist/instances
     src: localhost:/shakenfist
