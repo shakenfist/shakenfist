@@ -47,6 +47,7 @@ then
     exit 1
   fi
   VARIABLES="$VARIABLES,project=$GCP_PROJECT"
+  IGNORE_MTU="1"
 
   if [ -n "$GCP_SSH_KEY_FILENAME" ]
   then
@@ -108,10 +109,11 @@ then
   VARIABLES="$VARIABLES,metal_ip_sf3=$METAL_IP_SF3"
 fi
 
-### Localhost
+#### Localhost
 if [ "$CLOUD" == "localhost" ]
 then
   VARIABLES="$VARIABLES,ram_system_reservation=1.0"
+  IGNORE_MTU="1"
 fi
 
 #### Shakenfist
@@ -232,6 +234,7 @@ KSM_ENABLED="${KSM_ENABLED:-1}"
 GLUSTER_ENABLED="${GLUSTER_ENABLED:-0}"
 DEPLOY_NAME="sf"
 RESTORE_BACKUP="${RESTORE_BACKUP:-}"
+IGNORE_MTU="${IGNORE_MTU:-0}"
 
 # Setup variables for consumption by ansible and terraform
 cwd=`pwd`
@@ -248,6 +251,7 @@ VARIABLES="$VARIABLES,ksm_enabled=$KSM_ENABLED"
 VARIABLES="$VARIABLES,gluster_enabled=$GLUSTER_ENABLED"
 VARIABLES="$VARIABLES,deploy_name=$DEPLOY_NAME"
 VARIABLES="$VARIABLES,restore_backup=\"$RESTORE_BACKUP\""
+VARIABLES="$VARIABLES,ignore_mtu=\"$IGNORE_MTU\""
 
 echo "VARIABLES: $VARIABLES"
 TERRAFORM_VARS=""

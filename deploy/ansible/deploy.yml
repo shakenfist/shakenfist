@@ -212,7 +212,7 @@
     - name: Abort if default interface MTU is too low
       fail:
         msg: "Node MTU is too low."
-      when: mode == "deploy" and cloud != "gcp" and cloud != "gcp-xl" and cloud != "localhost" and node_mtu|int < 2000
+      when: mode == "deploy" and ignore_mtu != "1" and node_mtu|int < 2000
 
     - name: Make /srv/shakenfist/
       file:
