@@ -50,7 +50,7 @@ class Monitor(daemon.Daemon):
                     bad = True
 
                 if bad:
-                    LOG.withNetwork(n.uuid).error(
+                    LOG.with_network(n.uuid).error(
                         'Network netblock is invalid, deleting network.')
                     netobj = net.Network.from_db(n.uuid)
                     netobj.delete()
@@ -71,8 +71,8 @@ class Monitor(daemon.Daemon):
 
                     if stray:
                         db.hard_delete_network_interface(ni['uuid'])
-                        LOG.withInstance(
-                            ni['instance_uuid']).withNetworkInterface(
+                        LOG.with_instance(
+                            ni['instance_uuid']).with_networkinterface(
                             ni['uuid']).info('Hard deleted stray network interface')
 
         # Ensure we are on every network we have a host for
@@ -89,7 +89,7 @@ class Monitor(daemon.Daemon):
                     continue
 
                 if not n.is_okay():
-                    LOG.withNetwork(n).info('Recreating not okay network')
+                    LOG.with_network(n).info('Recreating not okay network')
                     if util.is_network_node():
                         n.create_on_network_node()
                     else:
@@ -102,7 +102,7 @@ class Monitor(daemon.Daemon):
                 LOG.warning(
                     'Failed to acquire lock while maintaining networks: %s' % e)
             except exceptions.DeadNetwork as e:
-                LOG.withField('exception', e).info(
+                LOG.with_field('exception', e).info(
                     'maintain_network attempted on dead network')
             except processutils.ProcessExecutionError as e:
                 LOG.error('Network maintenance failure: %s', e)
@@ -112,7 +112,7 @@ class Monitor(daemon.Daemon):
 
         # Delete "deleted" SF networks and log unknown vxlans
         if extra_vxids:
-            LOG.withField('vxids', extra_vxids).warning(
+            LOG.with_field('vxids', extra_vxids).warning(
                 'Extra vxlans present!')
 
             # Determine the network uuids for those vxids
@@ -142,12 +142,12 @@ class Monitor(daemon.Daemon):
                 time.sleep(0.2)
                 return
 
-            log_ctx = LOG.withField('workitem', workitem)
+            log_ctx = LOG.with_field('workitem', workitem)
             if not NetworkTask.__subclasscheck__(type(workitem)):
                 raise exceptions.UnknownTaskException(
                     'Network workitem was not decoded: %s' % workitem)
 
-            log_ctx = log_ctx.withNetwork(workitem.network_uuid())
+            log_ctx = log_ctx.with_network(workitem.network_uuid())
             n = net.Network.from_db(workitem.network_uuid())
             if not n:
                 log_ctx.warning('Received work item for non-existent network')
@@ -167,7 +167,7 @@ class Monitor(daemon.Daemon):
 
             # Tasks that should not operate on a dead network
             if n.is_dead():
-                log_ctx.withFields({'state': n.state,
+                log_ctx.with_fields({'state': n.state,
                                     'workitem': workitem}).info(
                     'Received work item for a dead network')
                 return
@@ -179,7 +179,7 @@ class Monitor(daemon.Daemon):
                     db.add_event('network', workitem.network_uuid(),
                                  'network node', 'deploy', None, None)
                 except exceptions.DeadNetwork as e:
-                    log_ctx.withField('exception', e).warning(
+                    log_ctx.with_field('exception', e).warning(
                         'DeployNetworkTask on dead network')
 
             elif isinstance(workitem, UpdateDHCPNetworkTask):
@@ -189,7 +189,7 @@ class Monitor(daemon.Daemon):
                     db.add_event('network', workitem.network_uuid(),
                                  'network node', 'update dhcp', None, None)
                 except exceptions.DeadNetwork as e:
-                    log_ctx.withField('exception', e).warning(
+                    log_ctx.with_field('exception', e).warning(
                         'UpdateDHCPNetworkTask on dead network')
 
         finally:

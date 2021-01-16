@@ -170,7 +170,7 @@ def arg_is_instance_uuid(func):
             kwargs['instance_from_db'] = virt.Instance.from_db(
                 kwargs['instance_uuid'])
         if not kwargs.get('instance_from_db'):
-            LOG.withInstance(kwargs['instance_uuid']).info(
+            LOG.with_instance(kwargs['instance_uuid']).info(
                 'Instance not found, genuinely missing')
             return error(404, 'instance not found')
 
@@ -219,13 +219,13 @@ def requires_instance_ownership(func):
     # Requires that @arg_is_instance_uuid has already run
     def wrapper(*args, **kwargs):
         if not kwargs.get('instance_from_db'):
-            LOG.withField('instance', kwargs['instance_uuid']).info(
+            LOG.with_field('instance', kwargs['instance_uuid']).info(
                 'Instance not found, kwarg missing')
             return error(404, 'instance not found')
 
         i = kwargs['instance_from_db']
         if get_jwt_identity() not in [i.namespace, 'system']:
-            LOG.withInstance(i).info(
+            LOG.with_instance(i).info(
                 'Instance not found, ownership test in decorator')
             return error(404, 'instance not found')
 
@@ -237,13 +237,13 @@ def requires_instance_active(func):
     # Requires that @arg_is_instance_uuid has already run
     def wrapper(*args, **kwargs):
         if not kwargs.get('instance_from_db'):
-            LOG.withField('instance', kwargs['instance_uuid']).info(
+            LOG.with_field('instance', kwargs['instance_uuid']).info(
                 'Instance not found, kwarg missing')
             return error(404, 'instance not found')
 
         i = kwargs['instance_from_db']
         if i.state.value in ['initial', 'preflight', 'creating']:
-            LOG.withInstance(i).info('Instance not active')
+            LOG.with_instance(i).info('Instance not active')
             return error(406, 'instance not active')
 
         return func(*args, **kwargs)
@@ -257,7 +257,7 @@ def arg_is_network_uuid(func):
             kwargs['network_from_db'] = net.Network.from_db(
                 kwargs['network_uuid'])
         if not kwargs.get('network_from_db'):
-            LOG.withField('network', kwargs['network_uuid']).info(
+            LOG.with_field('network', kwargs['network_uuid']).info(
                 'Network not found, missing or deleted')
             return error(404, 'network not found')
 
@@ -297,7 +297,7 @@ def redirect_to_network_node(func):
 def requires_network_ownership(func):
     # Requires that @arg_is_network_uuid has already run
     def wrapper(*args, **kwargs):
-        log = LOG.withField('network', kwargs['network_uuid'])
+        log = LOG.with_field('network', kwargs['network_uuid'])
 
         if not kwargs.get('network_from_db'):
             log.info('Network not found, kwarg missing')
@@ -314,7 +314,7 @@ def requires_network_ownership(func):
 def requires_network_active(func):
     # Requires that @arg_is_network_uuid has already run
     def wrapper(*args, **kwargs):
-        log = LOG.withField('network', kwargs['network_uuid'])
+        log = LOG.with_field('network', kwargs['network_uuid'])
 
         if not kwargs.get('network_from_db'):
             log.info('Network not found, kwarg missing')
@@ -744,8 +744,9 @@ class Instances(Resource):
                     netdesc['model'] = 'virtio'
 
                 iface_uuid = str(uuid.uuid4())
-                LOG.withObj(instance).withObj(n).withFields(
-                    {'networkinterface': iface_uuid}).info('Interface allocated')
+                LOG.with_object(instance).with_object(n).withFields({
+                    'networkinterface': iface_uuid
+                    }).info('Interface allocated')
                 db.create_network_interface(
                     iface_uuid, netdesc, instance.uuid, order)
 
@@ -843,7 +844,7 @@ class Instances(Resource):
                 if s in ['deleted', 'error']:
                     waiting_for.remove(instance)
                 else:
-                    LOG.withInstance(instance).info(
+                    LOG.with_instance(instance).info(
                         'Still waiting for deletion (state is %s)' % s)
 
             if waiting_for:
@@ -984,8 +985,8 @@ def _safe_get_network_interface(interface_uuid):
     if not ni:
         return None, None, error(404, 'interface not found')
 
-    log = LOG.withFields({'network': ni['network_uuid'],
-                          'networkinterface': ni['uuid']})
+    log = LOG.with_fields({'network': ni['network_uuid'],
+                           'networkinterface': ni['uuid']})
 
     n = net.Network.from_db(ni['network_uuid'])
     if not n:
@@ -998,7 +999,7 @@ def _safe_get_network_interface(interface_uuid):
 
     i = virt.Instance.from_db(ni['instance_uuid'])
     if get_jwt_identity() not in [i.namespace, 'system']:
-        log.withObj(i).info('Instance not found, failed ownership test')
+        log.with_object(i).info('Instance not found, failed ownership test')
         return None, None, error(404, 'interface not found')
 
     return ni, n, None
@@ -1156,15 +1157,15 @@ def _delete_network(network_from_db):
     # Load network from DB to ensure obtaining correct lock.
     n = net.Network.from_db(network_from_db.uuid)
     if not n:
-        LOG.withFields({'network_uuid': n.uuid}).warning(
+        LOG.with_fields({'network_uuid': n.uuid}).warning(
             'delete_network: network does not exist')
         return error(404, 'network does not exist')
 
     if n.is_dead():
         # The network has been deleted. No need to attempt further effort.
-        LOG.withFields({'network_uuid': n.uuid,
-                        'state': n.state.value
-                        }).warning('delete_network: network is dead')
+        LOG.with_fields({'network_uuid': n.uuid,
+                         'state': n.state.value
+                         }).warning('delete_network: network is dead')
         return error(404, 'network is deleted')
 
     n.add_event('api', 'delete')
@@ -1271,7 +1272,7 @@ class Networks(Resource):
         for n in net.Networks([partial(baseobject.namespace_filter, namespace),
                                baseobject.active_states_filter]):
             if len(list(db.get_network_interfaces(n.uuid))) > 0:
-                LOG.withObj(n).warning(
+                LOG.with_object(n).warning(
                     'Network in use, cannot be deleted by delete-all')
                 networks_unable.append(n.uuid)
                 continue
