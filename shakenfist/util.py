@@ -130,8 +130,8 @@ def get_safe_interface_name(interface):
     if len(interface) > 15:
         orig_interface = interface
         interface = interface[:15]
-        LOG.info('Interface name truncated from %s to %s'
-                 % (orig_interface, interface))
+        LOG.info('Interface name truncated from %s to %s',
+                 orig_interface, interface)
     return interface
 
 
@@ -191,7 +191,7 @@ def get_api_token(base_url, namespace='system'):
     with db.get_lock('namespace', None, namespace,
                      op='Get API token'):
         auth_url = base_url + '/auth'
-        LOG.info('Fetching %s auth token from %s' % (namespace, auth_url))
+        LOG.info('Fetching %s auth token from %s', namespace, auth_url)
         ns = db.get_namespace(namespace)
         if 'service_key' in ns:
             key = ns['service_key']
@@ -279,7 +279,7 @@ def _lock_refresher(locks):
 
 
 def execute(locks, command, check_exit_code=[0], env_variables=None):
-    LOG.info('Executing %s with locks %s' % (command, locks))
+    LOG.info('Executing %s with locks %s', command, locks)
 
     if not locks:
         return processutils.execute(

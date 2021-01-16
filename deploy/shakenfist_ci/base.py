@@ -259,7 +259,9 @@ class LoggingSocket(object):
                 print('!! Connection refused, retrying')
                 time.sleep(5)
 
-        raise ConnectionRefusedError('Repeated connection attempts failed')
+        raise ConnectionRefusedError(
+            'Repeated telnet connection attempts failed: host=%s port=%s' %
+            (host, port))
 
     def ensure_fresh(self):
         for d in [self.ctrlc, self.ctrlc, '\nexit\n', 'cirros\n', 'gocubsgo\n']:

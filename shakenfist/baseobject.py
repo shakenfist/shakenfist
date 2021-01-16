@@ -20,6 +20,8 @@ class DatabaseBackedObject(object):
         self.__uuid = object_uuid
         self.__version = version
 
+        self.log = LOG.with_object(self)
+
     @property
     def uuid(self):
         return self.__uuid
@@ -49,7 +51,7 @@ class DatabaseBackedObject(object):
         # been done as part of the upgrade process.
         o = etcd.get(cls.object_type, None, object_uuid)
         if not o:
-            LOG.with_field(cls.object_type, object_uuid).error('Object missing')
+            LOG.with_field(cls.object_type, object_uuid).info('Object missing')
             return None
 
         if o.get('version', 0) != cls.current_version:
@@ -71,8 +73,10 @@ class DatabaseBackedObject(object):
     def _db_set_attribute(self, attribute, value):
         etcd.put('attribute/%s' % self.object_type, self.__uuid, attribute, value)
 
-    def get_lock(self, subtype=None, ttl=60, relatedobjects=None, log_ctx=LOG,
+    def get_lock(self, subtype=None, ttl=60, relatedobjects=None, log_ctx=None,
                  op=None):
+        if not log_ctx:
+            log_ctx = self.log
         return db.get_lock(self.object_type, subtype, self.uuid, ttl=ttl,
                            relatedobjects=relatedobjects, log_ctx=log_ctx,
                            op=op)

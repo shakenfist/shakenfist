@@ -144,7 +144,7 @@ class Instance(baseobject.DatabaseBackedObject):
 
         if not self.__disk_spec:
             # This should not occur since the API will filter for zero disks.
-            LOG.with_object(self).error('Found disk spec empty')
+            self.log.error('Found disk spec empty')
             raise exceptions.InstanceBadDiskSpecification()
 
     @classmethod
@@ -370,15 +370,15 @@ class Instance(baseobject.DatabaseBackedObject):
             if not self.power_on():
                 attempts = 0
                 while not self.power_on() and attempts < 100:
-                    LOG.with_object(self).warning(
+                    self.log.warning(
                         'Instance required an additional attempt to power on')
                     time.sleep(5)
                     attempts += 1
 
         if self.is_powered_on():
-            LOG.with_object(self).info('Instance now powered on')
+            self.log.info('Instance now powered on')
         else:
-            LOG.with_object(self).info('Instance failed to power on')
+            self.log.info('Instance failed to power on')
         self.state = 'created'
 
     def delete(self):
@@ -759,7 +759,7 @@ class Instance(baseobject.DatabaseBackedObject):
         except libvirt.libvirtError as e:
             err = 'Requested operation is not valid: domain is already running'
             if not str(e).startswith(err):
-                LOG.with_object(self).warning('Instance start error: %s' % e)
+                self.log.warning('Instance start error: %s', e)
                 return False
 
         instance.setAutostart(1)
@@ -776,7 +776,7 @@ class Instance(baseobject.DatabaseBackedObject):
         try:
             instance.destroy()
         except libvirt.libvirtError as e:
-            LOG.with_object(self).error('Failed to delete domain: %s' % e)
+            self.log.error('Failed to delete domain: %s', e)
 
         self.update_power_state('off')
         self.add_event('poweroff', 'complete')
@@ -792,8 +792,7 @@ class Instance(baseobject.DatabaseBackedObject):
         snapshot_uuid = str(uuid4())
         snappath = os.path.join(_snapshot_path(), snapshot_uuid)
         if not os.path.exists(snappath):
-            LOG.with_object(self).debug(
-                'Creating snapshot storage at %s' % snappath)
+            self.log.debug('Creating snapshot storage at %s', snappath)
             os.makedirs(snappath, exist_ok=True)
             with open(os.path.join(_snapshot_path(), 'index.html'), 'w') as f:
                 f.write('<html></html>')
@@ -852,9 +851,9 @@ class Instance(baseobject.DatabaseBackedObject):
                 f.seek(offset)
             d = f.read()
 
-        LOG.with_object(self).info(
-            'Client requested %d bytes of console log, returning %d bytes'
-            % (length, len(d)))
+        self.log.info(
+            'Client requested %d bytes of console log, returning %d bytes',
+            length, len(d))
         return d
 
     def enqueue_delete(self):
@@ -866,7 +865,7 @@ class Instance(baseobject.DatabaseBackedObject):
         })
 
     def enqueue_delete_due_error(self, error_msg):
-        LOG.with_object(self).info('enqueue_instance_error')
+        self.log.info('enqueue_instance_error')
 
         # Error needs to be set immediately so that API clients get
         # correct information. The VM and network tear down can be delayed.

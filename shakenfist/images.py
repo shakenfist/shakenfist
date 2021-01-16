@@ -217,7 +217,7 @@ class Image(baseobject.DatabaseBackedObject):
                 self.state = 'created'
                 return image_path
             except exceptions.BadCheckSum as e:
-                LOG.warning('Bad checksum while downloading image: %s' % e)
+                self.log.warning('Bad checksum while downloading image: %s', e)
                 self.state = 'error'
                 self.error = 'Bad checksum while downloading image: %s' % e
                 exc = e
@@ -227,8 +227,8 @@ class Image(baseobject.DatabaseBackedObject):
         image_cache_path = os.path.join(
             config.get('STORAGE_PATH'), 'image_cache')
         if not os.path.exists(image_cache_path):
-            LOG.with_field('image_cache_path',
-                           image_cache_path).debug('Creating image cache')
+            self.log.with_field('image_cache_path',
+                                image_cache_path).debug('Creating image cache')
             os.makedirs(image_cache_path, exist_ok=True)
 
         return '%s/%s.v%03d' % (image_cache_path, self.unique_ref,
@@ -243,7 +243,7 @@ class Image(baseobject.DatabaseBackedObject):
 
             diff_field = self._new_image_available(resp)
             if diff_field:
-                LOG.with_image(self).with_field('diff_field', diff_field).info(
+                self.log.with_field('diff_field', diff_field).info(
                     'Fetch required due HTTP field change')
                 if related_object:
                     t, u = related_object.unique_label()
@@ -305,8 +305,7 @@ class Image(baseobject.DatabaseBackedObject):
                     db.refresh_locks(locks)
                     last_refresh = time.time()
 
-        LOG.with_image(self).with_field('bytes_fetched',
-                                        fetched).info('Fetch complete')
+        self.log.with_field('bytes_fetched', fetched).info('Fetch complete')
 
         # Check if decompression not required
         fn = self.version_image_path(inc=1)
@@ -319,7 +318,7 @@ class Image(baseobject.DatabaseBackedObject):
         return fn + '.orig'
 
     def correct_checksum(self, image_name):
-        log = LOG.with_field('image', image_name)
+        log = self.log.with_field('image', image_name)
 
         if not self.checksum:
             log.info('No checksum comparison available')
