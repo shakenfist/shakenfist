@@ -1,6 +1,11 @@
 - name: Install glusterfs dependencies
   apt:
-    name: ["glusterfs-server", "libvirt-daemon-driver-storage-gluster"]
+    name:
+      [
+        "glusterfs-server",
+        "libvirt-daemon-driver-storage-gluster",
+        "qemu-block-extra",
+      ]
     state: latest
 
 - name: Write glusterd volume configuration
