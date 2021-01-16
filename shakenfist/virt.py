@@ -492,6 +492,9 @@ class Instance(baseobject.DatabaseBackedObject):
             if not block_devices['finalized']:
                 modified_disks = []
                 for disk in block_devices['devices']:
+                    disk['source'] = "<source file='%s'/>" % disk['path']
+                    disk['source_type'] = 'file'
+
                     if disk.get('base'):
                         img = images.Image.new(disk['base'])
                         hashed_image_path = img.version_image_path()
@@ -557,8 +560,19 @@ class Instance(baseobject.DatabaseBackedObject):
                                 raise Exception('Unknown disk format')
 
                     elif not os.path.exists(disk['path']):
-                        util.execute(None, 'qemu-img create -f qcow2 %s %sG'
-                                     % (disk['path'], disk['size']))
+                        images.create_blank(disk['path'], disk['size'])
+
+                    # Tweak the disk if we're using gluster
+                    if config.GLUSTER_ENABLED:
+                        disk['path'] = disk['path'].replace(
+                            os.path.join(config.STORAGE_PATH, 'instances'),
+                            'shakenfist'
+                        )
+                        disk['source'] = ("<source protocol='gluster' name='%s'>"
+                                          "<host name='%s' port='24007' />"
+                                          "</source>"
+                                          % (disk['path'], config.NODE_NAME))
+                        disk['source_type'] = 'network'
 
                     modified_disks.append(disk)
 

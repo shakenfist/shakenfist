@@ -27,6 +27,12 @@ Environment=SHAKENFIST_DOWNLOAD_URL_CIRROS="http://sf-1/mirrors/download.cirros-
 Environment=SHAKENFIST_DOWNLOAD_URL_UBUNTU="http://sf-1/mirrors/cloud-images.ubuntu.com/%(vername)s/current/%(vername)s-server-cloudimg-amd64.img"
 {% endif %}
 
+# Is glusterfs enabled? If so, we fast path some disk accesses straight
+# to gluster.
+{% if gluster_enabled == "1" %}
+Environment=SHAKENFIST_GLUSTER_ENABLED="true"
+{% endif %}
+
 ExecStart=/bin/sh -c 'sf-daemon'
 
 Restart=on-failure

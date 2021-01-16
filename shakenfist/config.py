@@ -113,6 +113,10 @@ class SFConfig(SFConfigBase):
     )
 
     # Other options
+    GLUSTER_ENABLED: bool = Field(
+        False,
+        description='If we are using gluster for shared block storage.',
+    )
     ZONE: str = Field(
         'shaken', description='What nova called an availability zone'
     )
