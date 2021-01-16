@@ -9,4 +9,4 @@
     path: /srv/shakenfist/instances
     src: localhost:/shakenfist
     fstype: glusterfs
-    state: present
+    state: mounted
