@@ -26,3 +26,16 @@
     path: /srv/glusterfs
     state: directory
     mode: "0755"
+
+- name: Add gluster permissions to apparmor
+  copy:
+    src: files/usr.lib.libvirt.virt-aa-helper
+    dest: /etc/apparmor.d/local/usr.lib.libvirt.virt-aa-helper
+    owner: root
+    mode: u=r,g=r,o=r
+
+- name: Restart apparmor
+  service:
+    name: apparmor
+    enabled: yes
+    state: restarted
