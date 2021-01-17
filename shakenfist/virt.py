@@ -560,7 +560,7 @@ class Instance(baseobject.DatabaseBackedObject):
                                 raise Exception('Unknown disk format')
 
                     elif not os.path.exists(disk['path']):
-                        images.create_blank(disk['path'], disk['size'])
+                        images.create_blank([lock], disk['path'], disk['size'])
 
                     # Tweak the disk if we're using gluster
                     if config.GLUSTER_ENABLED:
