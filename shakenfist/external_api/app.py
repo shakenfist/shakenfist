@@ -242,9 +242,10 @@ def requires_instance_active(func):
             return error(404, 'instance not found')
 
         i = kwargs['instance_from_db']
-        if i.state.value in ['initial', 'preflight', 'creating']:
-            LOG.with_instance(i).info('Instance not active')
-            return error(406, 'instance not active')
+        if i.state.value != virt.Instance.STATE_CREATED:
+            LOG.with_instance(i).info(
+                'Instance not ready (%s)' % i.state.value)
+            return error(406, 'instance %s is not ready (%s)' % (i.uuid, i.state.value))
 
         return func(*args, **kwargs)
     return wrapper
@@ -321,9 +322,11 @@ def requires_network_active(func):
             return error(404, 'network not found')
 
         state = kwargs['network_from_db'].state
-        if state.value in ['initial', 'preflight', 'creating']:
-            log.info('Network not active')
-            return error(406, 'network not active')
+        if state.value != 'created':
+            log.info('Network not ready (%s)' % state.value)
+            return error(406,
+                         'network %s is not ready (%s)'
+                         % (kwargs['network_from_db'].uuid, state.value))
 
         return func(*args, **kwargs)
     return wrapper
@@ -681,8 +684,8 @@ class Instances(Resource):
                 n = net.Network.from_db(net_uuid)
                 if not n:
                     return error(404, 'network %s does not exist' % net_uuid)
-                if n.state.value in ['initial', 'preflight', 'creating']:
-                    return error(406, 'network %s is not active' % net_uuid)
+                if n.state.value != 'created':
+                    return error(406, 'network %s is not ready (%s)' % (n.uuid, n.state.value))
 
         if not video:
             video = {'model': 'cirrus', 'memory': 16384}
