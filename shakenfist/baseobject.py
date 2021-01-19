@@ -60,7 +60,8 @@ class DatabaseBackedObject(object):
         return o
 
     def _db_get_attribute(self, attribute):
-        retval = etcd.get('attribute/%s' % self.object_type, self.__uuid, attribute)
+        retval = etcd.get('attribute/%s' %
+                          self.object_type, self.__uuid, attribute)
         if not retval:
             return {}
         return retval
@@ -71,7 +72,8 @@ class DatabaseBackedObject(object):
             yield key, data
 
     def _db_set_attribute(self, attribute, value):
-        etcd.put('attribute/%s' % self.object_type, self.__uuid, attribute, value)
+        etcd.put('attribute/%s' % self.object_type,
+                 self.__uuid, attribute, value)
 
     def get_lock(self, subtype=None, ttl=60, relatedobjects=None, log_ctx=None,
                  op=None):
@@ -121,10 +123,10 @@ class DatabaseBackedObject(object):
     def error(self, msg):
         if msg:
             s = self.state
-            if s.value != 'error':
+            if not s.value.endswith('error'):
                 raise exceptions.InvalidStateException(
-                    'Object not in error state (state=%s, object=%s)' % (
-                        s, self.object_type))
+                    'Object not in error state (state=%s, object=%s)'
+                    % (s, self.object_type))
         self._db_set_attribute('error', {'message': msg})
 
 
@@ -132,8 +134,9 @@ def state_filter(states, o):
     return o.state.value in states
 
 
+# Do not use these filters for instances, use the ones in virt.py instead
 active_states_filter = partial(
-    state_filter, ['initial', 'preflight', 'creating', 'created'])
+    state_filter, ['initial', 'creating', 'created'])
 inactive_states_filter = partial(state_filter, ['error', 'deleted'])
 
 

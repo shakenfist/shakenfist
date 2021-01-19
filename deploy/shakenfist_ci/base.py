@@ -237,7 +237,7 @@ class BaseNamespacedTestCase(BaseTestCase):
         remaining_instances = list(self.test_client.get_instances())
         if remaining_instances:
             self.fail('Failed to delete instances: %s'
-                      % ', '.join(remaining_instances))
+                      % remaining_instances)
 
         for net in self.test_client.get_networks():
             self.test_client.delete_network(net['uuid'])

@@ -15,6 +15,7 @@ nav:
         - Community: community.md
         - User Guide:
                   - "Installation": installation.md
+                  - "State machine": development/state_machine.md
                   - "Usage": usage.md
         - Developer Guide:
                   - "CI API coverage": development/ci_api_coverage.md
@@ -22,6 +23,7 @@ nav:
                   - "Namespace Authentication": development/namespace_auth.md
                   - "Releases": development/release_process.md
                   - "Standards": development/standards.md
+                  - "State machine": development/state_machine.md
                   - "Website": development/updating_docs.md
                   - "Workflow": development/git_usage.md
         - Operator Guide:

@@ -161,7 +161,7 @@ class Monitor(daemon.Daemon):
 
             # Cleanup soft deleted instances and networks
             for i in virt.Instances([
-                    baseobject.inactive_states_filter,
+                    virt.inactive_states_filter,
                     partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))]):
                 LOG.with_object(i).info('Hard deleting instance')
                 i.hard_delete()

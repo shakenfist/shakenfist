@@ -630,7 +630,7 @@ class Instances(Resource):
     def get(self, all=False):
         filters = [partial(baseobject.namespace_filter, get_jwt_identity())]
         if not all:
-            filters.append(baseobject.active_states_filter)
+            filters.append(virt.active_states_filter)
 
         retval = []
         for i in virt.Instances(filters):
@@ -746,7 +746,7 @@ class Instances(Resource):
                 iface_uuid = str(uuid.uuid4())
                 LOG.with_object(instance).with_object(n).withFields({
                     'networkinterface': iface_uuid
-                    }).info('Interface allocated')
+                }).info('Interface allocated')
                 db.create_network_interface(
                     iface_uuid, netdesc, instance.uuid, order)
 
@@ -821,7 +821,7 @@ class Instances(Resource):
         waiting_for = []
         tasks_by_node = {}
         for instance in virt.Instances([partial(baseobject.namespace_filter, namespace),
-                                        baseobject.active_states_filter]):
+                                        virt.active_states_filter]):
             # If this instance is not on a node, just do the DB cleanup locally
             dbplacement = instance.placement
             if not dbplacement.get('node'):
