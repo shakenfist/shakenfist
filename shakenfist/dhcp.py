@@ -9,11 +9,12 @@ import signal
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import util
+from shakenfist import virt
 
 
 class DHCP(object):
     def __init__(self, network, interface):
-        self.network_uuid = network.db_entry['uuid']
+        self.network_uuid = network.uuid
 
         self.subst = {
             'config_dir': os.path.join(
@@ -25,6 +26,7 @@ class DHCP(object):
             'netmask': network.netmask,
             'broadcast': network.broadcast,
 
+            'netns': self.network_uuid,
             'in_netns': 'ip netns exec %s' % self.network_uuid,
             'interface': interface
         }
@@ -59,7 +61,7 @@ class DHCP(object):
 
         instances = []
         for ni in list(db.get_network_interfaces(self.network_uuid)):
-            instance = db.get_instance(ni['instance_uuid'])
+            instance = virt.Instance.from_db(ni['instance_uuid'])
             if not instance:
                 continue
 
@@ -68,7 +70,7 @@ class DHCP(object):
                     'uuid': ni['instance_uuid'],
                     'macaddr': ni['macaddr'],
                     'ipv4': ni['ipv4'],
-                    'name': instance.get('name', 'instance').replace(',', '')
+                    'name': instance.name.replace(',', '')
                 }
             )
         self.subst['instances'] = instances
@@ -104,6 +106,9 @@ class DHCP(object):
         self._remove_config()
 
     def restart_dhcpd(self):
+        if not os.path.exists('/var/run/netns/%(netns)s' % self.subst):
+            return
+
         self._make_config()
         self._make_hosts()
         if not self._send_signal(signal.SIGHUP):

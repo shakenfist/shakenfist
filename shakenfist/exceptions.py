@@ -6,12 +6,26 @@ class VersionSpecificationError(Exception):
     pass
 
 
+# Objects
+class ObjectException(Exception):
+    pass
+
+
+class InvalidStateException(ObjectException):
+    pass
+
 # Instance
+
+
 class InstanceException(Exception):
     pass
 
 
 class InstanceNotInDBException(InstanceException):
+    pass
+
+
+class InstanceBadDiskSpecification(InstanceException):
     pass
 
 
@@ -48,7 +62,7 @@ class ReadException(DatabaseException):
     pass
 
 
-class BadMetadataPacket(DatabaseException):
+class BadObjectVersion(DatabaseException):
     pass
 
 

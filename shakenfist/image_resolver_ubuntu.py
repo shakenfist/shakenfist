@@ -30,7 +30,7 @@ def resolve(name):
         if m:
             num_to_name[m.group(2)] = m.group(1)
             name_to_num[m.group(1)] = m.group(2)
-    LOG.withField('versions', num_to_name).info('Found ubuntu versions')
+    LOG.with_field('versions', num_to_name).info('Found ubuntu versions')
 
     vernum = None
     vername = None
@@ -54,7 +54,7 @@ def resolve(name):
 
     url = (config.get('DOWNLOAD_URL_UBUNTU') % {'vernum': vernum,
                                                 'vername': vername})
-    log = LOG.withField('url', url)
+    log = LOG.with_field('url', url)
 
     # Retrieve check sum file
     checksum_url = UBUNTU_URL + '/' + vername + '/current/MD5SUMS'
@@ -75,5 +75,5 @@ def resolve(name):
         log.warning('Did not find checksum')
     checksum = checksum.strip()
 
-    log.withField('checksum', checksum).info('Checksum check')
+    log.with_field('checksum', checksum).info('Checksum check')
     return (url, checksum)

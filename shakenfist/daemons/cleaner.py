@@ -1,13 +1,16 @@
 import etcd3
+from functools import partial
 import json
 import os
 import random
 import time
 
+from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import logutil
+from shakenfist import net
 from shakenfist import util
 from shakenfist import virt
 
@@ -18,7 +21,7 @@ LOG, _ = logutil.setup(__name__)
 class Monitor(daemon.Daemon):
     def _update_power_states(self):
         libvirt = util.get_libvirt()
-        conn = libvirt.open(None)
+        conn = libvirt.open('qemu:///system')
         try:
             seen = []
 
@@ -30,7 +33,7 @@ class Monitor(daemon.Daemon):
                     continue
 
                 instance_uuid = domain.name().split(':')[1]
-                log_ctx = LOG.withInstance(instance_uuid)
+                log_ctx = LOG.with_instance(instance_uuid)
 
                 instance = virt.Instance.from_db(instance_uuid)
                 if not instance:
@@ -43,15 +46,17 @@ class Monitor(daemon.Daemon):
                 instance.place_instance(config.NODE_NAME)
                 seen.append(domain.name())
 
-                if instance.state == 'deleted':
+                db_state = instance.state
+                if db_state.value == 'deleted':
                     # NOTE(mikal): a delete might be in-flight in the queue.
                     # We only worry about instances which should have gone
                     # away five minutes ago.
-                    if time.time() - instance.state_updated < 300:
+                    if time.time() - db_state.update_time < 300:
                         continue
 
                     instance.enforced_deletes_increment()
-                    attempts = instance.enforced_deletes
+                    attempts = instance._db_get_attribute(
+                        'enforced_deletes')['count']
 
                     if attempts > 5:
                         # Sometimes we just can't delete the VM. Try the big
@@ -65,7 +70,7 @@ class Monitor(daemon.Daemon):
                     else:
                         instance.delete()
 
-                    log_ctx.withField('attempt', attempts).warning(
+                    log_ctx.with_field('attempt', attempts).warning(
                         'Deleting stray instance')
 
                     continue
@@ -73,7 +78,7 @@ class Monitor(daemon.Daemon):
                 state = util.extract_power_state(libvirt, domain)
                 instance.update_power_state(state)
                 if state == 'crashed':
-                    instance.update_instance_state('error')
+                    instance.state = 'error'
 
             # Inactive VMs just have a name, and are powered off
             # in our state system.
@@ -83,7 +88,7 @@ class Monitor(daemon.Daemon):
 
                 if domain_name not in seen:
                     instance_uuid = domain_name.split(':')[1]
-                    log_ctx = LOG.withInstance(instance_uuid)
+                    log_ctx = LOG.with_instance(instance_uuid)
                     instance = virt.Instance.from_db(instance_uuid)
 
                     if not instance:
@@ -94,11 +99,12 @@ class Monitor(daemon.Daemon):
                         domain.undefine()
                         continue
 
-                    if instance.state == 'deleted':
+                    db_state = instance.state
+                    if db_state.value == 'deleted':
                         # NOTE(mikal): a delete might be in-flight in the queue.
                         # We only worry about instances which should have gone
                         # away five minutes ago.
-                        if time.time() - instance['state_updated'] < 300:
+                        if time.time() - db_state.update_time < 300:
                             continue
 
                         domain = conn.lookupByName(domain_name)
@@ -109,13 +115,14 @@ class Monitor(daemon.Daemon):
 
                     instance.place_instance(config.NODE_NAME)
 
-                    if not os.path.exists(instance.instance_path()):
+                    db_power = instance.power_state
+                    if not os.path.exists(instance.instance_path):
                         # If we're inactive and our files aren't on disk,
                         # we have a problem.
                         log_ctx.info('Detected error state for instance')
-                        instance.update_instance_state('error')
+                        instance.state = 'error'
 
-                    elif instance.power_state != 'off':
+                    elif not db_power or db_power['power_state'] != 'off':
                         log_ctx.info('Detected power off for instance')
                         instance.update_power_state('off')
                         instance.add_event('detected poweroff', 'complete')
@@ -153,18 +160,20 @@ class Monitor(daemon.Daemon):
             self._update_power_states()
 
             # Cleanup soft deleted instances and networks
-            delay = config.get('CLEANER_DELAY')
+            for i in virt.Instances([
+                    virt.inactive_states_filter,
+                    partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))]):
+                LOG.with_object(i).info('Hard deleting instance')
+                i.hard_delete()
 
-            for i in db.get_stale_instances(delay):
-                LOG.withInstance(i['uuid']).info('Hard deleting instance')
-                db.hard_delete_instance(i['uuid'])
+            for n in net.Networks([
+                    baseobject.inactive_states_filter,
+                    partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))]):
+                LOG.with_network(n).info('Hard deleting network')
+                n.hard_delete()
 
-            for n in db.get_stale_networks(delay):
-                LOG.withNetwork(n['uuid']).info('Hard deleting network')
-                db.hard_delete_network(n['uuid'])
-
-            for ni in db.get_stale_network_interfaces(delay):
-                LOG.withNetworkInterface(
+            for ni in db.get_stale_network_interfaces(config.get('CLEANER_DELAY')):
+                LOG.with_networkinterface(
                     ni['uuid']).info('Hard deleting network interface')
                 db.hard_delete_network_interface(ni['uuid'])
 

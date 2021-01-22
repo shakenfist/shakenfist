@@ -230,6 +230,7 @@ FLOATING_IP_BLOCK="${FLOATING_IP_BLOCK:-10.10.0.0/24}"
 UNIQIFIER="${UNIQIFIER:-$USER"-"`date "+%y%m%d"`"-"`pwgen --no-capitalize -n1`"-"}"
 KSM_ENABLED="${KSM_ENABLED:-1}"
 DEPLOY_NAME="sf"
+RESTORE_BACKUP="${RESTORE_BACKUP:-}"
 
 # Setup variables for consumption by ansible and terraform
 cwd=`pwd`
@@ -244,6 +245,7 @@ VARIABLES="$VARIABLES,floating_network_ipblock=$FLOATING_IP_BLOCK"
 VARIABLES="$VARIABLES,mode=$MODE"
 VARIABLES="$VARIABLES,ksm_enabled=$KSM_ENABLED"
 VARIABLES="$VARIABLES,deploy_name=$DEPLOY_NAME"
+VARIABLES="$VARIABLES,restore_backup=\"$RESTORE_BACKUP\""
 
 echo "VARIABLES: $VARIABLES"
 TERRAFORM_VARS=""

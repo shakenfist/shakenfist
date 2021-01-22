@@ -234,6 +234,11 @@ class BaseNamespacedTestCase(BaseTestCase):
                 break
             time.sleep(5)
 
+        remaining_instances = list(self.test_client.get_instances())
+        if remaining_instances:
+            self.fail('Failed to delete instances: %s'
+                      % remaining_instances)
+
         for net in self.test_client.get_networks():
             self.test_client.delete_network(net['uuid'])
         self._remove_namespace(self.namespace)
@@ -254,7 +259,9 @@ class LoggingSocket(object):
                 print('!! Connection refused, retrying')
                 time.sleep(5)
 
-        raise ConnectionRefusedError('Repeated connection attempts failed')
+        raise ConnectionRefusedError(
+            'Repeated telnet connection attempts failed: host=%s port=%s' %
+            (host, port))
 
     def ensure_fresh(self):
         for d in [self.ctrlc, self.ctrlc, '\nexit\n', 'cirros\n', 'gocubsgo\n']:

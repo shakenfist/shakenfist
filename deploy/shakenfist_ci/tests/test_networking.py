@@ -1,3 +1,5 @@
+import time
+
 from shakenfist_client import apiclient
 
 from shakenfist_ci import base
@@ -18,6 +20,17 @@ class TestNetworking(base.BaseNamespacedTestCase):
             '192.168.242.0/24', True, True, '%s-net-three' % self.namespace)
         self.net_four = self.test_client.allocate_network(
             '192.168.10.0/24', True, True, '%s-net-four' % self.namespace)
+
+    def test_network_validity(self):
+        self.assertRaises(apiclient.APIException, self.test_client.allocate_network,
+                          '192.168.242.2', True, True, '%s-validity1' % self.namespace)
+        self.assertRaises(apiclient.APIException, self.test_client.allocate_network,
+                          '192.168.242.2/32', True, True, '%s-validity2' % self.namespace)
+        self.assertRaises(apiclient.APIException, self.test_client.allocate_network,
+                          '192.168.242.0/30', True, True, '%s-validity3' % self.namespace)
+        n = self.test_client.allocate_network(
+            '192.168.10.0/29', True, True, '%s-validity2' % self.namespace)
+        self.test_client.delete_network(n['uuid'])
 
     def test_virtual_networks_are_separate(self):
         inst1 = self.test_client.create_instance(
@@ -55,6 +68,11 @@ class TestNetworking(base.BaseNamespacedTestCase):
 
         self._await_login_prompt(inst1['uuid'])
         self._await_login_prompt(inst2['uuid'])
+
+        # We need to refresh our view of the instances, as it might have
+        # changed as they started up
+        inst1 = self.test_client.get_instance(inst1['uuid'])
+        inst2 = self.test_client.get_instance(inst2['uuid'])
 
         nics = self.test_client.get_instance_interfaces(inst2['uuid'])
 
@@ -100,6 +118,11 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self._await_login_prompt(inst1['uuid'])
         self._await_login_prompt(inst2['uuid'])
 
+        # We need to refresh our view of the instances, as it might have
+        # changed as they started up
+        inst1 = self.test_client.get_instance(inst1['uuid'])
+        inst2 = self.test_client.get_instance(inst2['uuid'])
+
         nics = self.test_client.get_instance_interfaces(inst2['uuid'])
 
         console = base.LoggingSocket(inst1['node'], inst1['console_port'])
@@ -144,6 +167,11 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self._await_login_prompt(inst1['uuid'])
         self._await_login_prompt(inst2['uuid'])
 
+        # We need to refresh our view of the instances, as it might have
+        # changed as they started up
+        inst1 = self.test_client.get_instance(inst1['uuid'])
+        inst2 = self.test_client.get_instance(inst2['uuid'])
+
         nics = self.test_client.get_instance_interfaces(inst2['uuid'])
 
         # Ping the other instance on this network
@@ -174,8 +202,12 @@ class TestNetworking(base.BaseNamespacedTestCase):
                 }
             ], None, None)
 
-        self.assertIsNotNone(inst['uuid'])
-        self.assertIsNotNone(inst['node'])
+        while inst['state'] not in ['created', 'error']:
+            time.sleep(1)
+            inst = self.test_client.get_instance(inst['uuid'])
+
+        if inst['state'] != 'created':
+            self.fail('Instance is not in created state: %s' % inst)
 
         nics = self.test_client.get_instance_interfaces(inst['uuid'])
         ips = []
@@ -220,8 +252,14 @@ class TestNetworking(base.BaseNamespacedTestCase):
                 }
             ], None, None)
 
-        self.assertIsNotNone(inst['uuid'])
-        self.assertIsNotNone(inst['node'])
+        while inst['state'] not in ['created', 'error']:
+            time.sleep(1)
+            inst = self.test_client.get_instance(inst['uuid'])
+
+        # Sometimes the console port is missing. Explicitly check for
+        # that.
+        if 'console_port' not in inst:
+            self.fail('Missing console port: %s' % inst)
 
         console = base.LoggingSocket(inst['node'], inst['console_port'])
         out = console.execute('ip link')

@@ -7,7 +7,7 @@ import testtools
 from pydantic import AnyHttpUrl, IPvAnyAddress
 
 from shakenfist import dhcp
-from shakenfist import ipmanager
+from shakenfist.ipmanager import IPManager
 from shakenfist.config import SFConfigBase
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -15,8 +15,8 @@ TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 
 class FakeNetwork(object):
     def __init__(self):
-        self.db_entry = {'uuid': 'notauuid'}
-        self.ipmanager = ipmanager.NetBlock('10.0.0.0/8')
+        self.uuid = 'notauuid'
+        self.ipmanager = IPManager('uuid', '10.0.0.0/8')
         self.router = self.ipmanager.get_address_at_index(1)
         self.dhcp_start = '10.0.0.2'
         self.netmask = '255.0.0.0'
@@ -122,12 +122,14 @@ class DHCPTestCase(testtools.TestCase):
                      'macaddr': '1a:91:64:d2:15:40',
                      'ipv4': '127.0.0.6'}
                 ])
-    @mock.patch('shakenfist.db.get_instance',
+    @mock.patch('shakenfist.virt.Instance._db_get',
                 side_effect=[
                     {'uuid': 'instuuid1',
-                     'name': 'inst1'},
+                     'name': 'inst1',
+                     'disk_spec': [{'size': 4, 'base': 'foo'}]},
                     {'uuid': 'instuuid2',
-                     'name': 'in,,,st2'}
+                     'name': 'inst2',
+                     'disk_spec': [{'size': 4, 'base': 'foo'}]}
                 ])
     def test_make_hosts(self, mock_instances, mock_interfaces, mock_exists):
         d = dhcp.DHCP(FakeNetwork(), 'eth0')
@@ -193,12 +195,13 @@ class DHCPTestCase(testtools.TestCase):
         mock_remove_config.assert_called()
         mock_signal.assert_called_with(signal.SIGKILL)
 
+    @mock.patch('os.path.exists', return_value=True)
     @mock.patch('shakenfist.dhcp.DHCP._send_signal', return_value=False)
     @mock.patch('shakenfist.dhcp.DHCP._make_config')
     @mock.patch('shakenfist.dhcp.DHCP._make_hosts')
     @mock.patch('shakenfist.util.execute')
     def test_restart_dhcpd(self, mock_execute, mock_hosts, mock_config,
-                           mock_signal):
+                           mock_signal, mock_exists):
         d = dhcp.DHCP(FakeNetwork(), 'eth0')
         d.restart_dhcpd()
         mock_signal.assert_called_with(signal.SIGHUP)

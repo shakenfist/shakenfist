@@ -8,6 +8,7 @@
 import base64
 import bcrypt
 import copy
+from functools import partial
 import flask
 from flask_jwt_extended import create_access_token
 from flask_jwt_extended import get_jwt_identity
@@ -30,9 +31,12 @@ import time
 import traceback
 import uuid
 
+from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import exceptions
+from shakenfist import images
+from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
 from shakenfist import scheduler
@@ -40,7 +44,6 @@ from shakenfist import util
 from shakenfist import virt
 from shakenfist.daemons import daemon
 from shakenfist.tasks import (DeleteInstanceTask,
-                              DeployNetworkTask,
                               FetchImageTask,
                               PreflightInstanceTask,
                               StartInstanceTask,
@@ -164,26 +167,10 @@ def arg_is_instance_uuid(func):
     # Method uses the instance from the db
     def wrapper(*args, **kwargs):
         if 'instance_uuid' in kwargs:
-            kwargs['instance_from_db'] = db.get_instance(
+            kwargs['instance_from_db'] = virt.Instance.from_db(
                 kwargs['instance_uuid'])
         if not kwargs.get('instance_from_db'):
-            LOG.withInstance(kwargs['instance_uuid']).info(
-                'Instance not found, genuinely missing')
-            return error(404, 'instance not found')
-
-        return func(*args, **kwargs)
-    return wrapper
-
-
-def arg_is_instance_uuid_as_virt(func):
-    # Method uses the rehydrated instance
-    def wrapper(*args, **kwargs):
-        if 'instance_uuid' in kwargs:
-            kwargs['instance_from_db_virt'] = virt.Instance.from_db(
-                kwargs['instance_uuid']
-            )
-        if not kwargs.get('instance_from_db_virt'):
-            LOG.withField('instance', kwargs['instance_uuid']).info(
+            LOG.with_instance(kwargs['instance_uuid']).info(
                 'Instance not found, genuinely missing')
             return error(404, 'instance not found')
 
@@ -194,12 +181,21 @@ def arg_is_instance_uuid_as_virt(func):
 def redirect_instance_request(func):
     # Redirect method to the hypervisor hosting the instance
     def wrapper(*args, **kwargs):
-        i = kwargs.get('instance_from_db_virt')
-        if i and i.node != config.NODE_NAME:
-            url = 'http://%s:%d%s' % (i.node, config.get('API_PORT'),
+        i = kwargs.get('instance_from_db')
+        if not i:
+            return
+
+        placement = i.placement
+        if not placement:
+            return
+        if not placement.get('node'):
+            return
+
+        if placement.get('node') != config.NODE_NAME:
+            url = 'http://%s:%d%s' % (placement['node'], config.get('API_PORT'),
                                       flask.request.environ['PATH_INFO'])
             api_token = util.get_api_token(
-                'http://%s:%d' % (i.node, config.get('API_PORT')),
+                'http://%s:%d' % (placement['node'], config.get('API_PORT')),
                 namespace=get_jwt_identity())
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'], url,
@@ -223,14 +219,32 @@ def requires_instance_ownership(func):
     # Requires that @arg_is_instance_uuid has already run
     def wrapper(*args, **kwargs):
         if not kwargs.get('instance_from_db'):
-            LOG.withField('instance', kwargs['instance_uuid']).info(
+            LOG.with_field('instance', kwargs['instance_uuid']).info(
                 'Instance not found, kwarg missing')
             return error(404, 'instance not found')
 
-        if get_jwt_identity() not in [kwargs['instance_from_db']['namespace'], 'system']:
-            LOG.withField('instance', kwargs['instance_uuid']).info(
+        i = kwargs['instance_from_db']
+        if get_jwt_identity() not in [i.namespace, 'system']:
+            LOG.with_instance(i).info(
                 'Instance not found, ownership test in decorator')
             return error(404, 'instance not found')
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
+def requires_instance_active(func):
+    # Requires that @arg_is_instance_uuid has already run
+    def wrapper(*args, **kwargs):
+        if not kwargs.get('instance_from_db'):
+            LOG.with_field('instance', kwargs['instance_uuid']).info(
+                'Instance not found, kwarg missing')
+            return error(404, 'instance not found')
+
+        i = kwargs['instance_from_db']
+        if i.state.value in ['initial', 'preflight', 'creating']:
+            LOG.with_instance(i).info('Instance not active')
+            return error(406, 'instance not active')
 
         return func(*args, **kwargs)
     return wrapper
@@ -240,10 +254,10 @@ def arg_is_network_uuid(func):
     # Method uses the network from the db
     def wrapper(*args, **kwargs):
         if 'network_uuid' in kwargs:
-            kwargs['network_from_db'] = db.get_network(
+            kwargs['network_from_db'] = net.Network.from_db(
                 kwargs['network_uuid'])
         if not kwargs.get('network_from_db'):
-            LOG.withField('network', kwargs['network_uuid']).info(
+            LOG.with_field('network', kwargs['network_uuid']).info(
                 'Network not found, missing or deleted')
             return error(404, 'network not found')
 
@@ -283,15 +297,33 @@ def redirect_to_network_node(func):
 def requires_network_ownership(func):
     # Requires that @arg_is_network_uuid has already run
     def wrapper(*args, **kwargs):
-        log = LOG.withField('network', kwargs['network_uuid'])
+        log = LOG.with_field('network', kwargs['network_uuid'])
 
         if not kwargs.get('network_from_db'):
             log.info('Network not found, kwarg missing')
             return error(404, 'network not found')
 
-        if get_jwt_identity() not in [kwargs['network_from_db']['namespace'], 'system']:
+        if get_jwt_identity() not in [kwargs['network_from_db'].namespace, 'system']:
             log.info('Network not found, ownership test in decorator')
             return error(404, 'network not found')
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
+def requires_network_active(func):
+    # Requires that @arg_is_network_uuid has already run
+    def wrapper(*args, **kwargs):
+        log = LOG.with_field('network', kwargs['network_uuid'])
+
+        if not kwargs.get('network_from_db'):
+            log.info('Network not found, kwarg missing')
+            return error(404, 'network not found')
+
+        state = kwargs['network_from_db'].state
+        if state.value in ['initial', 'preflight', 'creating']:
+            log.info('Network not active')
+            return error(406, 'network not active')
 
         return func(*args, **kwargs)
     return wrapper
@@ -433,22 +465,18 @@ class AuthNamespace(Resource):
         # The namespace must be empty
         instances = []
         deleted_instances = []
-        for i in db.get_instances(all=True, namespace=namespace):
-            if i['state'] in ['deleted', 'error']:
-                deleted_instances.append(i['uuid'])
+        for i in virt.Instances([partial(baseobject.namespace_filter, namespace)]):
+            if i.state.value in ['deleted', 'error']:
+                deleted_instances.append(i.uuid)
             else:
-                instances.append(i['uuid'])
+                instances.append(i.uuid)
         if len(instances) > 0:
             return error(400, 'you cannot delete a namespace with instances')
 
         networks = []
-        for n in db.get_networks(all=True, namespace=namespace):
-            # Networks in 'deleting' state are regarded as "live" networks.
-            # They in a transient state. If they hang in that state we want to
-            # know. They will block deletion of a namespace thus giving notice
-            # of the problem.
-            if n['state'] not in ['deleted', 'error']:
-                networks.append(n['uuid'])
+        for n in net.Networks([partial(baseobject.namespace_filter, namespace)]):
+            if not n.is_dead():
+                networks.append(n.uuid)
         if len(networks) > 0:
             return error(400, 'you cannot delete a namespace with networks')
 
@@ -568,29 +596,28 @@ class Instance(Resource):
     @arg_is_instance_uuid
     @requires_instance_ownership
     def get(self, instance_uuid=None, instance_from_db=None):
-        return instance_from_db
+        return instance_from_db.external_view()
 
     @jwt_required
     @arg_is_instance_uuid
     @requires_instance_ownership
     def delete(self, instance_uuid=None, instance_from_db=None):
-
         # Check if instance has already been deleted
-        if instance_from_db['state'] == 'deleted':
+        if instance_from_db.state.value == 'deleted':
             return error(404, 'instance not found')
 
         # If this instance is not on a node, just do the DB cleanup locally
-        if not instance_from_db['node']:
+        placement = instance_from_db.placement
+        if not placement.get('node'):
             node = config.NODE_NAME
         else:
-            node = instance_from_db['node']
+            node = placement['node']
 
-        db.enqueue_instance_delete_remote(node, instance_from_db['uuid'])
+        instance_from_db.enqueue_delete_remote(node)
 
         start_time = time.time()
         while time.time() - start_time < config.get('API_ASYNC_WAIT'):
-            i = db.get_instance(instance_uuid)
-            if i['state'] in ['deleted', 'error']:
+            if instance_from_db.state.value in ['deleted', 'error']:
                 return
 
             time.sleep(0.5)
@@ -601,7 +628,15 @@ class Instance(Resource):
 class Instances(Resource):
     @jwt_required
     def get(self, all=False):
-        return list(db.get_instances(all=all, namespace=get_jwt_identity()))
+        filters = [partial(baseobject.namespace_filter, get_jwt_identity())]
+        if not all:
+            filters.append(virt.active_states_filter)
+
+        retval = []
+        for i in virt.Instances(filters):
+            # This forces the instance through the external view rehydration
+            retval.append(i.external_view())
+        return retval
 
     @jwt_required
     def post(self, name=None, cpus=None, memory=None, network=None, disk=None,
@@ -614,7 +649,7 @@ class Instances(Resource):
             return error(400, 'instance name must be useable as a DNS host name')
 
         # If we are placed, make sure that node exists
-        if placed_on and not db.get_node(placed_on):
+        if placed_on and not db.get_node(placed_on, seen_recently=True):
             return error(404, 'Specified node does not exist')
 
         # Sanity check
@@ -625,22 +660,29 @@ class Instances(Resource):
                 return error(400, 'disk specification should contain JSON objects')
 
         if network:
-            for n in network:
-                if not isinstance(n, dict):
+            for netdesc in network:
+                if not isinstance(netdesc, dict):
                     return error(400,
                                  'network specification should contain JSON objects')
 
-                if 'network_uuid' not in n:
+                if 'network_uuid' not in netdesc:
                     return error(400, 'network specification is missing network_uuid')
 
-                if n.get('address'):
+                net_uuid = netdesc['network_uuid']
+                if netdesc.get('address'):
                     # The requested address must be within the ip range specified
                     # for that virtual network
-                    ipm = db.get_ipmanager(n['network_uuid'])
-                    if not ipm.is_in_range(n['address']):
+                    ipm = IPManager.from_db(net_uuid)
+                    if not ipm.is_in_range(netdesc['address']):
                         return error(400,
                                      'network specification requests an address outside the '
                                      'range of the network')
+
+                n = net.Network.from_db(net_uuid)
+                if not n:
+                    return error(404, 'network %s does not exist' % net_uuid)
+                if n.state.value in ['initial', 'preflight', 'creating']:
+                    return error(406, 'network %s is not active' % net_uuid)
 
         if not video:
             video = {'model': 'cirrus', 'memory': 16384}
@@ -673,11 +715,11 @@ class Instances(Resource):
         order = 0
         if network:
             for netdesc in network:
-                n = net.from_db(netdesc['network_uuid'])
+                n = net.Network.from_db(netdesc['network_uuid'])
                 if not n:
                     m = 'missing network %s during IP allocation phase' % (
                         netdesc['network_uuid'])
-                    db.enqueue_instance_error(instance.uuid, m)
+                    instance.enqueue_delete_due_error(m)
                     return error(
                         404, 'network %s not found' % netdesc['network_uuid'])
 
@@ -685,24 +727,28 @@ class Instances(Resource):
                                  ttl=120, op='Network allocate IP'):
                     db.add_event('network', netdesc['network_uuid'], 'allocate address',
                                  None, None, instance.uuid)
-                    ipm = db.get_ipmanager(netdesc['network_uuid'])
+                    ipm = IPManager.from_db(netdesc['network_uuid'])
                     if 'address' not in netdesc or not netdesc['address']:
                         netdesc['address'] = ipm.get_random_free_address()
                     else:
                         if not ipm.reserve(netdesc['address']):
                             m = 'failed to reserve an IP on network %s' % (
                                 netdesc['network_uuid'])
-                            db.enqueue_instance_error(instance.uuid, m)
+                            instance.enqueue_delete_due_error(m)
                             return error(409, 'address %s in use' %
                                          netdesc['address'])
 
-                    db.persist_ipmanager(netdesc['network_uuid'], ipm.save())
+                    ipm.persist()
 
                 if 'model' not in netdesc or not netdesc['model']:
                     netdesc['model'] = 'virtio'
 
+                iface_uuid = str(uuid.uuid4())
+                LOG.with_object(instance).with_object(n).withFields({
+                    'networkinterface': iface_uuid
+                }).info('Interface allocated')
                 db.create_network_interface(
-                    str(uuid.uuid4()), netdesc, instance.uuid, order)
+                    iface_uuid, netdesc, instance.uuid, order)
 
         if not SCHEDULER:
             SCHEDULER = scheduler.Scheduler()
@@ -721,13 +767,13 @@ class Instances(Resource):
         except exceptions.LowResourceException as e:
             instance.add_event('schedule', 'failed', None,
                                'Insufficient resources: ' + str(e))
-            db.enqueue_instance_error(instance.uuid, 'scheduling failed')
+            instance.enqueue_delete_due_error('scheduling failed')
             return error(507, str(e))
 
         except exceptions.CandidateNodeNotFoundException as e:
             instance.add_event('schedule', 'failed', None,
                                'Candidate node not found: ' + str(e))
-            db.enqueue_instance_error(instance.uuid, 'scheduling failed')
+            instance.enqueue_delete_due_error('scheduling failed')
             return error(404, 'node not found: %s' % e)
 
         # Record placement
@@ -735,8 +781,8 @@ class Instances(Resource):
 
         # Create a queue entry for the instance start
         tasks = [PreflightInstanceTask(instance.uuid, network)]
-        for disk in instance.block_devices['devices']:
-            if 'base' in disk and disk['base']:
+        for disk in instance.disk_spec:
+            if disk.get('base'):
                 tasks.append(FetchImageTask(disk['base'], instance.uuid))
         tasks.append(StartInstanceTask(instance.uuid, network))
 
@@ -748,11 +794,10 @@ class Instances(Resource):
         # after a while and just return the current state
         start_time = time.time()
         while time.time() - start_time < config.get('API_ASYNC_WAIT'):
-            i = db.get_instance(instance.uuid)
-            if i['state'] in ['created', 'deleted', 'error']:
-                return i
+            if instance.state.value in ['created', 'deleted', 'error']:
+                return instance.external_view()
             time.sleep(0.5)
-        return i
+        return instance.external_view()
 
     @jwt_required
     def delete(self, confirm=False, namespace=None):
@@ -773,35 +818,42 @@ class Instances(Resource):
                 return error(401, 'you cannot delete other namespaces')
             namespace = get_jwt_identity()
 
-        instances_del = []
+        waiting_for = []
         tasks_by_node = {}
-        for instance in list(db.get_instances(all=all, namespace=namespace)):
-            if instance['state'] in ['deleted', 'error']:
-                continue
-
+        for instance in virt.Instances([partial(baseobject.namespace_filter, namespace),
+                                        virt.active_states_filter]):
             # If this instance is not on a node, just do the DB cleanup locally
-            if not instance['node']:
+            dbplacement = instance.placement
+            if not dbplacement.get('node'):
                 node = config.NODE_NAME
             else:
-                node = instance['node']
+                node = dbplacement['node']
 
             tasks_by_node.setdefault(node, [])
-            tasks_by_node[node].append(DeleteInstanceTask(instance['uuid']))
-            instances_del.append(instance['uuid'])
+            tasks_by_node[node].append(DeleteInstanceTask(instance.uuid))
+            waiting_for.append(instance)
 
         for node in tasks_by_node:
             db.enqueue(node, {'tasks': tasks_by_node[node]})
 
-        waiting_for = copy.copy(instances_del)
         start_time = time.time()
         while (waiting_for and
                (time.time() - start_time < config.get('API_ASYNC_WAIT'))):
-            for instance_uuid in copy.copy(waiting_for):
-                i = db.get_instance(instance_uuid)
-                if i['state'] in ['deleted', 'error']:
-                    waiting_for.remove(instance_uuid)
+            for instance in copy.copy(waiting_for):
+                s = instance.state.value
+                if s in ['deleted', 'error']:
+                    waiting_for.remove(instance)
+                else:
+                    LOG.with_instance(instance).info(
+                        'Still waiting for deletion (state is %s)' % s)
 
-        return instances_del
+            if waiting_for:
+                time.sleep(0.2)
+
+        retval = []
+        for instance in waiting_for:
+            retval.append(instance.uuid)
+        return retval
 
 
 class InstanceInterfaces(Resource):
@@ -824,13 +876,12 @@ class InstanceSnapshot(Resource):
     @jwt_required
     @arg_is_instance_uuid
     @requires_instance_ownership
-    @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None,
-             instance_from_db=None, instance_from_db_virt=None, all=None):
-        snap_uuid = instance_from_db_virt.snapshot(all=all)
-        instance_from_db_virt.add_event('api', 'snapshot (all=%s)' % all,
-                                        None, snap_uuid)
+    @requires_instance_active
+    def post(self, instance_uuid=None, instance_from_db=None, all=None):
+        snap_uuid = instance_from_db.snapshot(all=all)
+        instance_from_db.add_event('api', 'snapshot (all=%s)' % all,
+                                   None, snap_uuid)
         db.add_event('snapshot', snap_uuid, 'api', 'create', None, None)
         return snap_uuid
 
@@ -849,90 +900,84 @@ class InstanceRebootSoft(Resource):
     @jwt_required
     @arg_is_instance_uuid
     @requires_instance_ownership
-    @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None,
-             instance_from_db=None, instance_from_db_virt=None):
+    @requires_instance_active
+    def post(self, instance_uuid=None, instance_from_db=None):
         with db.get_lock(
                 'instance', None, instance_uuid, ttl=120, timeout=120,
                 op='Instance reboot soft'):
-            instance_from_db_virt.add_event('api', 'soft reboot')
-            return instance_from_db_virt.reboot(hard=False)
+            instance_from_db.add_event('api', 'soft reboot')
+            return instance_from_db.reboot(hard=False)
 
 
 class InstanceRebootHard(Resource):
     @jwt_required
     @arg_is_instance_uuid
     @requires_instance_ownership
-    @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None,
-             instance_from_db=None, instance_from_db_virt=None):
+    @requires_instance_active
+    def post(self, instance_uuid=None, instance_from_db=None):
         with db.get_lock(
                 'instance', None, instance_uuid, ttl=120, timeout=120,
                 op='Instance reboot hard'):
-            instance_from_db_virt.add_event('api', 'hard reboot')
-            return instance_from_db_virt.reboot(hard=True)
+            instance_from_db.add_event('api', 'hard reboot')
+            return instance_from_db.reboot(hard=True)
 
 
 class InstancePowerOff(Resource):
     @jwt_required
     @arg_is_instance_uuid
     @requires_instance_ownership
-    @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None,
-             instance_from_db=None, instance_from_db_virt=None):
+    @requires_instance_active
+    def post(self, instance_uuid=None, instance_from_db=None):
         with db.get_lock(
                 'instance', None, instance_uuid, ttl=120, timeout=120,
                 op='Instance power off'):
-            instance_from_db_virt.add_event('api', 'poweroff')
-            return instance_from_db_virt.power_off()
+            instance_from_db.add_event('api', 'poweroff')
+            return instance_from_db.power_off()
 
 
 class InstancePowerOn(Resource):
     @jwt_required
     @arg_is_instance_uuid
     @requires_instance_ownership
-    @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None,
-             instance_from_db=None, instance_from_db_virt=None):
+    @requires_instance_active
+    def post(self, instance_uuid=None, instance_from_db=None):
         with db.get_lock(
                 'instance', None, instance_uuid, ttl=120, timeout=120,
                 op='Instance power on'):
-            instance_from_db_virt.add_event('api', 'poweron')
-            return instance_from_db_virt.power_on()
+            instance_from_db.add_event('api', 'poweron')
+            return instance_from_db.power_on()
 
 
 class InstancePause(Resource):
     @jwt_required
     @arg_is_instance_uuid
     @requires_instance_ownership
-    @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None,
-             instance_from_db=None, instance_from_db_virt=None):
+    @requires_instance_active
+    def post(self, instance_uuid=None, instance_from_db=None):
         with db.get_lock(
                 'instance', None, instance_uuid, ttl=120, timeout=120,
                 op='Instance pause'):
-            instance_from_db_virt.add_event('api', 'pause')
-            return instance_from_db_virt.pause()
+            instance_from_db.add_event('api', 'pause')
+            return instance_from_db.pause()
 
 
 class InstanceUnpause(Resource):
     @jwt_required
     @arg_is_instance_uuid
     @requires_instance_ownership
-    @arg_is_instance_uuid_as_virt
     @redirect_instance_request
-    def post(self, instance_uuid=None,
-             instance_from_db=None, instance_from_db_virt=None):
+    @requires_instance_active
+    def post(self, instance_uuid=None, instance_from_db=None):
         with db.get_lock(
                 'instance', None, instance_uuid, ttl=120, timeout=120,
                 op='Instance unpause'):
-            instance_from_db_virt.add_event('api', 'unpause')
-            return instance_from_db_virt.unpause()
+            instance_from_db.add_event('api', 'unpause')
+            return instance_from_db.unpause()
 
 
 def _safe_get_network_interface(interface_uuid):
@@ -940,21 +985,21 @@ def _safe_get_network_interface(interface_uuid):
     if not ni:
         return None, None, error(404, 'interface not found')
 
-    log = LOG.withFields({'network': ni['network_uuid'],
-                          'networkinterface': ni['uuid']})
+    log = LOG.with_fields({'network': ni['network_uuid'],
+                           'networkinterface': ni['uuid']})
 
-    n = net.from_db(ni['network_uuid'])
+    n = net.Network.from_db(ni['network_uuid'])
     if not n:
         log.info('Network not found or deleted')
         return None, None, error(404, 'interface network not found')
 
-    if get_jwt_identity() not in [n.db_entry['namespace'], 'system']:
+    if get_jwt_identity() not in [n.namespace, 'system']:
         log.info('Interface not found, failed ownership test')
         return None, None, error(404, 'interface not found')
 
     i = virt.Instance.from_db(ni['instance_uuid'])
     if get_jwt_identity() not in [i.namespace, 'system']:
-        log.withObj(i).info('Instance not found, failed ownership test')
+        log.with_object(i).info('Instance not found, failed ownership test')
         return None, None, error(404, 'interface not found')
 
     return ni, n, None
@@ -978,16 +1023,16 @@ class InterfaceFloat(Resource):
         if err:
             return err
 
-        float_net = net.from_db('floating')
+        float_net = net.Network.from_db('floating')
         if not float_net:
             return error(404, 'floating network not found')
 
         db.add_event('interface', interface_uuid,
                      'api', 'float', None, None)
         with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Interface float'):
-            ipm = db.get_ipmanager('floating')
+            ipm = IPManager.from_db('floating')
             addr = ipm.get_random_free_address()
-            db.persist_ipmanager('floating', ipm.save())
+            ipm.persist()
 
         db.add_floating_to_interface(ni['uuid'], addr)
         n.add_floating_ip(addr, ni['ipv4'])
@@ -1001,16 +1046,16 @@ class InterfaceDefloat(Resource):
         if err:
             return err
 
-        float_net = net.from_db('floating')
+        float_net = net.Network.from_db('floating')
         if not float_net:
             return error(404, 'floating network not found')
 
         db.add_event('interface', interface_uuid,
                      'api', 'defloat', None, None)
         with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Instance defloat'):
-            ipm = db.get_ipmanager('floating')
+            ipm = IPManager.from_db('floating')
             ipm.release(ni['floating'])
-            db.persist_ipmanager('floating', ipm.save())
+            ipm.persist()
 
         db.remove_floating_from_interface(ni['uuid'])
         n.remove_floating_ip(ni['floating'], ni['ipv4'])
@@ -1058,10 +1103,9 @@ class InstanceMetadata(Resource):
 class InstanceConsoleData(Resource):
     @jwt_required
     @arg_is_instance_uuid
-    @arg_is_instance_uuid_as_virt
     @requires_instance_ownership
     @redirect_instance_request
-    def get(self, instance_uuid=None, length=None, instance_from_db=None, instance_from_db_virt=None):
+    def get(self, instance_uuid=None, length=None, instance_from_db=None):
         if not length:
             length = -1
         else:
@@ -1071,7 +1115,7 @@ class InstanceConsoleData(Resource):
                 return error(400, 'length is not an integer')
 
         resp = flask.Response(
-            instance_from_db_virt.get_console_data(length),
+            instance_from_db.get_console_data(length),
             mimetype='text/plain')
         resp.status_code = 200
         return resp
@@ -1080,20 +1124,23 @@ class InstanceConsoleData(Resource):
 class Images(Resource):
     @jwt_required
     def get(self, node=None):
-        db_data = db.get_image_metadata_all(only_node=node)
+        f = []
+        if node:
+            f.append(partial(images.placement_filter, node))
 
-        # Clean up DB references to be user relevant
-        images = []
-        for db_name, meta in db_data.items():
-            name_split = db_name.split('/')
-            images.append({**meta,
-                           'ref': name_split[-2],
-                           'node': name_split[-1]})
-        return images
+        retval = []
+        for i in images.Images(filters=f):
+            retval.append(i.external_view())
+        return retval
 
     @jwt_required
     def post(self, url=None):
         db.add_event('image', url, 'api', 'cache', None, None)
+
+        # We ensure that the image exists in the database in an initial state
+        # here so that it will show up in image list requests. The image is
+        # fetched by the queued job later.
+        images.Image.new(url)
         db.enqueue(config.NODE_NAME, {
             'tasks': [FetchImageTask(url)],
         })
@@ -1108,29 +1155,21 @@ class ImageEvents(Resource):
 
 def _delete_network(network_from_db):
     # Load network from DB to ensure obtaining correct lock.
-    n = net.from_db(network_from_db['uuid'])
+    n = net.Network.from_db(network_from_db.uuid)
+    if not n:
+        LOG.with_fields({'network_uuid': n.uuid}).warning(
+            'delete_network: network does not exist')
+        return error(404, 'network does not exist')
 
-    with db.get_object_lock(n, ttl=120, op='Network deleting'):
-        if not n or n.is_dead():
-            LOG.withFields({'network_uuid': n.db_entry['uuid'],
-                            'state': n.db_entry['state']}).warning(
-                                'delete_network: network does not exist')
-            return error(404, 'network is deleted')
-        db.update_network_state(n.db_entry['uuid'], 'deleting')
+    if n.is_dead():
+        # The network has been deleted. No need to attempt further effort.
+        LOG.with_fields({'network_uuid': n.uuid,
+                         'state': n.state.value
+                         }).warning('delete_network: network is dead')
+        return error(404, 'network is deleted')
 
-    db.add_event('network', n.db_entry['uuid'], 'api', 'delete', None, None)
-
-    n.remove_dhcp()
+    n.add_event('api', 'delete')
     n.delete()
-
-    if n.db_entry.get('floating_gateway'):
-        with db.get_lock(
-                'ipmanager', None, 'floating', ttl=120, op='Network delete'):
-            ipm = db.get_ipmanager('floating')
-            ipm.release(n.db_entry['floating_gateway'])
-            db.persist_ipmanager('floating', ipm.save())
-
-    db.update_network_state(n.db_entry['uuid'], 'deleted')
 
 
 class Network(Resource):
@@ -1138,9 +1177,7 @@ class Network(Resource):
     @arg_is_network_uuid
     @requires_network_ownership
     def get(self, network_uuid=None, network_from_db=None):
-        if network_from_db is not None and 'ipmanager' in network_from_db:
-            del network_from_db['ipmanager']
-        return network_from_db
+        return network_from_db.external_view()
 
     @jwt_required
     @arg_is_network_uuid
@@ -1151,11 +1188,15 @@ class Network(Resource):
             return error(403, 'you cannot delete the floating network')
 
         # We only delete unused networks
-        if len(list(db.get_network_interfaces(network_uuid))) > 0:
+        ifaces = list(db.get_network_interfaces(network_uuid))
+        if len(ifaces) > 0:
+            for iface in ifaces:
+                LOG.withFields({'network_interface': iface['uuid'],
+                                'state': iface['state']}).info('Blocks network delete')
             return error(403, 'you cannot delete an in use network')
 
         # Check if network has already been deleted
-        if network_from_db['state'] in 'deleted':
+        if network_from_db.state.value in 'deleted':
             return error(404, 'network not found')
 
         return _delete_network(network_from_db)
@@ -1173,13 +1214,23 @@ class Networks(Resource):
     })
     @jwt_required
     def get(self, all=False):
-        return list(db.get_networks(all=all, namespace=get_jwt_identity()))
+        filters = [partial(baseobject.namespace_filter, get_jwt_identity())]
+        if not all:
+            filters.append(baseobject.active_states_filter)
+
+        retval = []
+        for n in net.Networks(filters):
+            # This forces the network through the external view rehydration
+            retval.append(n.external_view())
+        return retval
 
     @jwt_required
     def post(self, netblock=None, provide_dhcp=None, provide_nat=None, name=None,
              namespace=None):
         try:
-            ipaddress.ip_network(netblock)
+            n = ipaddress.ip_network(netblock)
+            if n.num_addresses < 8:
+                return error(400, 'network is below minimum size of /29')
         except ValueError as e:
             return error(400, 'cannot parse netblock: %s' % e)
 
@@ -1192,24 +1243,9 @@ class Networks(Resource):
                 401,
                 'only admins can create resources in a different namespace')
 
-        network = db.allocate_network(netblock, provide_dhcp,
-                                      provide_nat, name, namespace)
-        db.add_event('network', network['uuid'],
-                     'api', 'create', None, None)
-
-        # Networks should immediately appear on the network node
-        db.enqueue('networknode', DeployNetworkTask(network['uuid']))
-
-        db.add_event('network', network['uuid'],
-                     'deploy', 'enqueued', None, None)
-        db.add_event('network', network['uuid'],
-                     'api', 'created', None, None)
-        db.update_network_state(network['uuid'], 'created')
-
-        # Initialise metadata
-        db.persist_metadata('network', network['uuid'], {})
-
-        return network
+        network = net.Network.new(name, namespace, netblock, provide_dhcp,
+                                  provide_nat)
+        return network.external_view()
 
     @jwt_required
     @redirect_to_network_node
@@ -1233,21 +1269,16 @@ class Networks(Resource):
 
         networks_del = []
         networks_unable = []
-        for n in list(db.get_networks(all=all, namespace=namespace)):
-            if n['uuid'] == 'floating':
-                continue
-
-            if len(list(db.get_network_interfaces(n['uuid']))) > 0:
-                LOG.withObj(n).warning(
+        for n in net.Networks([partial(baseobject.namespace_filter, namespace),
+                               baseobject.active_states_filter]):
+            if len(list(db.get_network_interfaces(n.uuid))) > 0:
+                LOG.with_object(n).warning(
                     'Network in use, cannot be deleted by delete-all')
-                networks_unable.append(n['uuid'])
-                continue
-
-            if n['state'] == 'deleted':
+                networks_unable.append(n.uuid)
                 continue
 
             _delete_network(n)
-            networks_del.append(n['uuid'])
+            networks_del.append(n.uuid)
 
         if networks_unable:
             return error(403, {'deleted': networks_del,
@@ -1268,6 +1299,7 @@ class NetworkInterfaces(Resource):
     @jwt_required
     @arg_is_network_uuid
     @requires_network_ownership
+    @requires_network_active
     def get(self, network_uuid=None, network_from_db=None):
         return list(db.get_network_interfaces(network_uuid))
 
@@ -1316,24 +1348,24 @@ class NetworkPing(Resource):
     @arg_is_network_uuid
     @requires_network_ownership
     @redirect_to_network_node
+    @requires_network_active
     def get(self, network_uuid=None, address=None, network_from_db=None):
-        ipm = db.get_ipmanager(network_uuid)
+        ipm = IPManager.from_db(network_uuid)
         if not ipm.is_in_range(address):
             return error(400, 'ping request for address outside network block')
 
-        n = net.from_db(network_uuid)
+        n = net.Network.from_db(network_uuid)
         if not n:
             return error(404, 'network %s not found' % network_uuid)
 
-        with db.get_object_lock(n, ttl=120, op='Network ping via API'):
-            out, err = util.execute(
-                None, 'ip netns exec %s ping -c 10 %s' % (
-                    network_uuid, address),
-                check_exit_code=[0, 1])
-            return {
-                'stdout': out,
-                'stderr': err
-            }
+        out, err = util.execute(
+            None, 'ip netns exec %s ping -c 10 %s' % (
+                network_uuid, address),
+            check_exit_code=[0, 1])
+        return {
+            'stdout': out,
+            'stderr': err
+        }
 
 
 class Nodes(Resource):

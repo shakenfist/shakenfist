@@ -1,27 +1,24 @@
 # Copyright 2020 Michael Still
 
-import copy
-import random
-import socket
 import time
 import uuid
 
 from shakenfist.config import config
 from shakenfist import etcd
 from shakenfist import exceptions
-from shakenfist import ipmanager
 from shakenfist import logutil
 from shakenfist import util
-from shakenfist.tasks import DeleteInstanceTask, ErrorInstanceTask
 
 
-# TODO(andy): Change back to 5 once network bugs fixed
-ETCD_ATTEMPT_TIMEOUT = 15
+ETCD_ATTEMPT_TIMEOUT = 60
 
 
 LOG, _ = logutil.setup(__name__)
 
 
+#####################################################################
+# Nodes
+#####################################################################
 def see_this_node():
     etcd.put(
         'node', None, config.NODE_NAME,
@@ -34,20 +31,41 @@ def see_this_node():
         ttl=120)
 
 
+def get_node_ips():
+    for _, value in etcd.get_all('node', None):
+        yield value['ip']
+
+
+def get_node(fqdn, seen_recently=False):
+    node = etcd.get('node', None, fqdn)
+    if not node:
+        return None
+    if seen_recently and (time.time() - node.get('lastseen', 0) > 300):
+        return None
+    return node
+
+
+def get_nodes(seen_recently=False):
+    for _, value in etcd.get_all('node', None):
+        if seen_recently and (time.time() - value.get('lastseen', 0) > 300):
+            continue
+        yield value
+
+
+def get_network_node():
+    for n in get_nodes():
+        if n['ip'] == config.NETWORK_NODE_IP:
+            return n
+
+#####################################################################
+# Locks
+#####################################################################
+
+
 def get_lock(objecttype, subtype, name, ttl=60, timeout=ETCD_ATTEMPT_TIMEOUT,
              relatedobjects=None, log_ctx=LOG, op=None):
     return etcd.get_lock(objecttype, subtype, name, ttl=ttl, timeout=timeout,
-                         log_ctx=log_ctx, op=None)
-
-
-def get_object_lock(obj, ttl=60, timeout=ETCD_ATTEMPT_TIMEOUT,
-                    relatedobjects=None, log_ctx=LOG, op=None):
-    obj_type, obj_name = obj.unique_label()
-    if not (obj_type and obj_name):
-        raise exceptions.LockException(
-            'Could not derive lock name from %s' % obj)
-    return get_lock(obj_type, None, obj_name, ttl=ttl, timeout=timeout,
-                    relatedobjects=relatedobjects, log_ctx=log_ctx, op=op)
+                         log_ctx=log_ctx, op=op)
 
 
 def refresh_lock(lock, relatedobjects=None, log_ctx=LOG):
@@ -69,166 +87,29 @@ def get_existing_locks():
     return etcd.get_existing_locks()
 
 
-def get_node_ips():
-    for value in etcd.get_all('node', None):
-        yield value['ip']
-
-
-def get_node(fqdn):
-    return etcd.get('node', None, fqdn)
-
-
-def get_nodes():
-    return etcd.get_all('node', None)
-
-
-def get_network_node():
-    for n in get_nodes():
-        if n['ip'] == config.NETWORK_NODE_IP:
-            return n
-
-
-def get_network(network_uuid):
-    return etcd.get('network', None, network_uuid)
-
-
-def get_networks(all=False, namespace=None):
-    for n in etcd.get_all('network', None):
-        if n['uuid'] == 'floating':
-            continue
-        if not all:
-            if n['state'] in ['deleted', 'error']:
-                continue
-        if namespace:
-            if namespace not in [n['namespace'], 'system']:
-                continue
-        yield n
-
-
-def allocate_network(netblock, provide_dhcp=True, provide_nat=False, name=None,
-                     namespace=None):
-
-    net_id = str(uuid.uuid4())
-    ipm = ipmanager.NetBlock(netblock)
-    etcd.put('ipmanager', None, net_id, ipm.save())
-
-    vxid = 1
-    while not etcd.create('vxlan', None, vxid, {'network_uuid': net_id}):
-        vxid += 1
-
-    d = {
-        'uuid': net_id,
-        'vxid': vxid,
-        'netblock': netblock,
-        'provide_dhcp': provide_dhcp,
-        'provide_nat': provide_nat,
-        'namespace': namespace,
-        'floating_gateway': None,
-        'name': name,
-        'state': 'initial',
-        'state_updated': time.time()
-    }
-    etcd.put('network', None, net_id, d)
-    return d
-
-
-def update_network_state(network_uuid, state):
-    n = get_network(network_uuid)
-    n['state'] = state
-    n['state_updated'] = time.time()
-    etcd.put('network', None, network_uuid, n)
-
-    if state == 'deleted':
-        etcd.delete('vxlan', None, n['vxid'])
-        etcd.delete('ipmanager', None, n['uuid'])
-
-
-def get_stale_networks(delay):
-    for n in etcd.get_all('network', None):
-        if n['state'] in ['deleted', 'error']:
-            if time.time() - n['state_updated'] > delay:
-                yield n
-
-
-def hard_delete_network(network_uuid):
-    etcd.delete('network', None, network_uuid)
-    etcd.delete_all('event/network', network_uuid)
-    delete_metadata('network', network_uuid)
-
-
-def create_floating_network(netblock):
-    ipm = ipmanager.NetBlock(netblock)
-    etcd.put('ipmanager', None, 'floating', ipm.save())
-    etcd.put('network', None, 'floating',
-             {
-                 'uuid': 'floating',
-                 'vxid': 0,
-                 'netblock': netblock,
-                 'provide_dhcp': False,
-                 'provide_nat': False,
-                 'namespace': None,
-                 'floating_gateway': None,
-                 'name': 'floating',
-                 'state': 'initial',
-                 'state_updated': time.time()
-             })
+#####################################################################
+# IPManagers
+#####################################################################
 
 
 def get_ipmanager(network_uuid):
     ipm = etcd.get('ipmanager', None, network_uuid)
     if not ipm:
         raise Exception('IP Manager not found for network %s' % network_uuid)
-    return ipmanager.from_db(ipm)
+    return ipm
 
 
 def persist_ipmanager(network_uuid, data):
     etcd.put('ipmanager', None, network_uuid, data)
 
 
-def persist_floating_gateway(network_uuid, gateway):
-    n = get_network(network_uuid)
-    n['floating_gateway'] = gateway
-    etcd.put('network', None, network_uuid, n)
+def delete_ipmanager(network_uuid):
+    etcd.delete('ipmanager', None, uuid)
 
 
-def get_instance(instance_uuid):
-    return etcd.get('instance', None, instance_uuid)
-
-
-def get_instances(only_node=None, all=False, namespace=None):
-    for i in etcd.get_all('instance', None):
-        if only_node and i['node'] != only_node:
-            continue
-        if not all:
-            if i['state'] in ['deleted', 'error']:
-                continue
-        if namespace:
-            if namespace not in [i['namespace'], 'system']:
-                continue
-
-        if 'video' not in i:
-            i['video'] = {'model': 'cirrus', 'memory': 16384}
-        if 'error_message' not in i:
-            i['error_message'] = None
-
-        yield i
-
-
-def persist_instance_metadata(instance_uuid, metadata):
-    etcd.put('instance', None, instance_uuid, metadata)
-
-
-def hard_delete_instance(instance_uuid):
-    etcd.delete('instance', None, instance_uuid)
-    etcd.delete_all('event/instance', instance_uuid)
-    delete_metadata('instance', instance_uuid)
-
-
-def get_stale_instances(delay):
-    for i in etcd.get_all('instance', None):
-        if i['state'] in ['deleted', 'error']:
-            if time.time() - i['state_updated'] > delay:
-                yield i
+#####################################################################
+# NetworkInterfaces
+#####################################################################
 
 
 def create_network_interface(interface_uuid, netdesc, instance_uuid, order):
@@ -255,7 +136,7 @@ def create_network_interface(interface_uuid, netdesc, instance_uuid, order):
 
 
 def get_stale_network_interfaces(delay):
-    for n in etcd.get_all('networkinterface', None):
+    for _, n in etcd.get_all('networkinterface', None):
         if n['state'] in ['deleted', 'error']:
             if time.time() - n['state_updated'] > delay:
                 yield n
@@ -267,7 +148,7 @@ def hard_delete_network_interface(interface_uuid):
 
 
 def get_instance_interfaces(instance_uuid):
-    for ni in etcd.get_all('networkinterface', None):
+    for _, ni in etcd.get_all('networkinterface', None):
         if ni['state'] == 'deleted':
             continue
         if ni['instance_uuid'] == instance_uuid:
@@ -275,7 +156,7 @@ def get_instance_interfaces(instance_uuid):
 
 
 def get_network_interfaces(network_uuid):
-    for ni in etcd.get_all('networkinterface', None):
+    for _, ni in etcd.get_all('networkinterface', None):
         if ni['state'] == 'deleted':
             continue
         if ni['network_uuid'] == network_uuid:
@@ -307,6 +188,10 @@ def remove_floating_from_interface(interface_uuid):
     ni['floating'] = None
     etcd.put('networkinterface', None, interface_uuid, ni)
 
+#####################################################################
+# Snapshots
+#####################################################################
+
 
 def create_snapshot(snapshot_uuid, device, instance_uuid, created):
     etcd.put(
@@ -320,14 +205,18 @@ def create_snapshot(snapshot_uuid, device, instance_uuid, created):
 
 
 def get_instance_snapshots(instance_uuid):
-    for m in etcd.get_all('snapshot', instance_uuid,
-                          sort_order='ascend'):
+    for _, m in etcd.get_all('snapshot', instance_uuid,
+                             sort_order='ascend'):
         yield m
+
+#####################################################################
+# Events
+#####################################################################
 
 
 def add_event(object_type, object_uuid, operation, phase, duration, message):
     t = time.time()
-    LOG.withFields(
+    LOG.with_fields(
         {
             object_type: object_uuid,
             'fqdn': config.NODE_NAME,
@@ -351,9 +240,13 @@ def add_event(object_type, object_uuid, operation, phase, duration, message):
 
 
 def get_events(object_type, object_uuid):
-    for m in etcd.get_all('event/%s' % object_type, object_uuid,
-                          sort_order='ascend'):
+    for _, m in etcd.get_all('event/%s' % object_type, object_uuid,
+                             sort_order='ascend'):
         yield m
+
+#####################################################################
+# Metrics
+#####################################################################
 
 
 def update_metrics_bulk(metrics):
@@ -374,41 +267,14 @@ def get_metrics(fqdn):
     return d.get('metrics', {})
 
 
-def allocate_console_port(instance_uuid):
-    node = config.NODE_NAME
-    consumed = {value['port'] for value in etcd.get_all('console', node)}
-    while True:
-        port = random.randint(30000, 50000)
-        # avoid hitting etcd if it's probably in use
-        if port in consumed:
-            continue
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            # We hold this port open until it's in etcd to prevent
-            # anyone else needing to hit etcd to find out they can't
-            # use it as well as to verify we can use it
-            s.bind(('0.0.0.0', port))
-            allocatedPort = etcd.create(
-                'console', node, port,
-                {
-                    'instance_uuid': instance_uuid,
-                    'port': port,
-                })
-            if allocatedPort:
-                return port
-        except socket.error as e:
-            LOG.withField('instance', instance_uuid).info(
-                "Exception during port allocation: %s" % e)
-        finally:
-            s.close()
-
-
-def free_console_port(port):
-    etcd.delete('console', config.NODE_NAME, port)
+#####################################################################
+# Namespaces
+#####################################################################
 
 
 def list_namespaces():
-    return etcd.get_all('namespace', None)
+    for _, value in etcd.get_all('namespace', None):
+        yield value
 
 
 def get_namespace(namespace):
@@ -422,6 +288,10 @@ def persist_namespace(namespace, data):
 def delete_namespace(namespace):
     etcd.delete('namespace', None, namespace)
 
+#####################################################################
+# Metadata
+#####################################################################
+
 
 def get_metadata(object_type, name):
     return etcd.get('metadata', object_type, name)
@@ -434,6 +304,10 @@ def persist_metadata(object_type, name, metadata):
 def delete_metadata(object_type, name):
     etcd.delete('metadata', object_type, name)
 
+#####################################################################
+# vxid mappings
+#####################################################################
+
 
 def persist_node_vxid_mapping(node, vxid_to_mac):
     etcd.put('vxid_mapping', None, node, vxid_to_mac)
@@ -442,29 +316,13 @@ def persist_node_vxid_mapping(node, vxid_to_mac):
 def get_node_vxid_mapping(node):
     etcd.get('vxid_mapping', None, node)
 
+#####################################################################
+# Queues
+#####################################################################
+
 
 def enqueue(queuename, workitem):
     etcd.enqueue(queuename, workitem)
-
-
-def enqueue_instance_delete(instance_uuid):
-    enqueue_instance_delete_remote(config.NODE_NAME, instance_uuid)
-
-
-def enqueue_instance_delete_remote(node, instance_uuid):
-    enqueue(node, {
-        'tasks': [
-            DeleteInstanceTask(instance_uuid)
-        ],
-    })
-
-
-def enqueue_instance_error(instance_uuid, error_msg):
-    enqueue(config.NODE_NAME, {
-        'tasks': [
-            ErrorInstanceTask(instance_uuid, error_msg)
-        ],
-    })
 
 
 def dequeue(queuename):
@@ -486,24 +344,3 @@ def get_queue_length(queuename):
 
 def restart_queues():
     etcd.restart_queues()
-
-
-# Image
-
-def get_image_metadata(url_hash, node=None):
-    return etcd.get('image', url_hash, node)
-
-
-def get_image_metadata_all(only_node=None):
-    key_val = etcd.get_all_dict('image')
-
-    if only_node:
-        for k in copy.copy(key_val):
-            if not k.endswith('/' + only_node):
-                del key_val[k]
-
-    return key_val
-
-
-def persist_image_metadata(url_hash, node, metadata):
-    etcd.put('image', url_hash, node, metadata)

@@ -5,6 +5,7 @@ import time
 import os
 import psutil
 
+from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.daemons import external_api as external_api_daemon
@@ -14,6 +15,8 @@ from shakenfist.daemons import net as net_daemon
 from shakenfist.daemons import resources as resource_daemon
 from shakenfist.daemons import triggers as trigger_daemon
 from shakenfist import db
+from shakenfist import images
+from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
 from shakenfist import util
@@ -27,42 +30,55 @@ def restore_instances():
     # Ensure all instances for this node are defined
     networks = []
     instances = []
-    for inst in list(db.get_instances(only_node=config.NODE_NAME)):
-        for iface in db.get_instance_interfaces(inst['uuid']):
+    for inst in virt.Instances([virt.this_node_filter, virt.healthy_states_filter]):
+        instance_problems = []
+        for iface in db.get_instance_interfaces(inst.uuid):
             if not iface['network_uuid'] in networks:
                 networks.append(iface['network_uuid'])
-        instances.append(inst['uuid'])
+
+        for disk in inst.disk_spec:
+            if 'base' in disk:
+                img = images.Image.new(disk['base'])
+                # NOTE(mikal): this check isn't great -- it checks for the original
+                # downloaded image, not the post transcode version
+                if (img.state in ['deleted', 'error'] or
+                        not os.path.exists(img.version_image_path())):
+                    instance_problems.append(
+                        '%s missing from image cache' % disk['base'])
+                    img.delete()
+
+        if instance_problems:
+            inst.enqueue_delete_due_error(
+                'instance bad on startup: %s' % '; '.join(instance_problems))
+        else:
+            instances.append(inst)
 
     with util.RecordedOperation('restore networks', None):
         for network in networks:
             try:
-                n = net.from_db(network)
-                LOG.withObj(n).info('Restoring network')
-                n.create()
-                n.ensure_mesh()
-                n.update_dhcp()
+                n = net.Network.from_db(network)
+                if not n.is_dead():
+                    LOG.with_object(n).info('Restoring network')
+                    n.create_on_hypervisor()
+                    n.ensure_mesh()
             except Exception as e:
                 util.ignore_exception('restore network %s' % network, e)
 
     with util.RecordedOperation('restore instances', None):
-        for instance in instances:
+        for inst in instances:
             try:
                 with db.get_lock(
-                        'instance', None, instance, ttl=120, timeout=120,
+                        'instance', None, inst.uuid, ttl=120, timeout=120,
                         op='Instance restore'):
-                    i = virt.Instance.from_db(instance)
-                    if not i:
-                        continue
                     started = ['on', 'transition-to-on', 'initial', 'unknown']
-                    if i.power_state not in started:
+                    if inst.power_state not in started:
                         continue
 
-                    LOG.withObj(i).info('Restoring instance')
-                    i.create()
+                    LOG.with_object(inst).info('Restoring instance')
+                    inst.create_on_hypervisor()
             except Exception as e:
-                util.ignore_exception('restore instance %s' % instance, e)
-                db.enqueue_instance_error(
-                    instance,
+                util.ignore_exception('restore instance %s' % inst.uuid, e)
+                inst.db.enqueue_delete_due_error(
                     'exception while restoring instance on daemon restart')
 
 
@@ -101,19 +117,45 @@ def main():
         if pid == 0:
             DAEMON_IMPLEMENTATIONS[d].Monitor(d).run()
         DAEMON_PIDS[pid] = d
-        LOG.withField('pid', pid).info('Started %s' % d)
+        LOG.with_field('pid', pid).info('Started %s' % d)
 
     # Resource usage publisher, we need this early because scheduling decisions
     # might happen quite early on.
     _start_daemon('resources')
 
+    # We changed the naming scheme for network interfaces between v0.3 and v0.4.
+    # Check if we have any old style names and do the renaming... No locking
+    # required here because we don't have anything else running yet and we don't
+    # want to lock a network across the cluster for a local rename.
+    for n in net.Networks(filters=[baseobject.active_states_filter]):
+        if util.check_for_interface('vxlan-%d' % n.vxid):
+            LOG.with_network(n).warning(
+                'Network requires interface renaming...')
+            for iface in ['vxlan-%s', 'br-vxlan-%s', 'veth-%s-0',
+                          'veth-%s-i', 'phy-%s-o', 'phy-%s-i']:
+                old_name_format = iface % '%d'
+                old_name = old_name_format % n.vxid
+                new_name_format = iface % '%06x'
+                new_name = new_name_format % n.vxid
+
+                if util.check_for_interface(old_name):
+                    LOG.with_network(n).warning(
+                        'Renaming %s to %s' % (old_name, new_name))
+
+                    util.execute(None, 'ip link set %s down' % old_name)
+                    util.execute(None, 'ip link set %s name %s'
+                                 % (old_name, new_name))
+                    util.execute(None, 'ip link set %s up' % new_name)
+                    LOG.with_network(n).warning(
+                        'Renamed %s to %s' % (old_name, new_name))
+
     # If I am the network node, I need some setup
     if util.is_network_node():
         # Bootstrap the floating network in the Networks table
-        floating_network = db.get_network('floating')
+        floating_network = net.Network.from_db('floating')
         if not floating_network:
-            db.create_floating_network(config.get('FLOATING_NETWORK'))
-            floating_network = net.from_db('floating')
+            floating_network = net.Network.create_floating_network(
+                config.get('FLOATING_NETWORK'))
 
         subst = {
             'physical_bridge': util.get_safe_interface_name(
@@ -130,7 +172,7 @@ def main():
             # floating IPs don't work.
             with util.RecordedOperation('create physical bridge', None):
                 # No locking as read only
-                ipm = db.get_ipmanager('floating')
+                ipm = IPManager.from_db('floating')
                 subst['master_float'] = ipm.get_address_at_index(1)
                 subst['netmask'] = ipm.netmask
 

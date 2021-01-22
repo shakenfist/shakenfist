@@ -1,20 +1,27 @@
 import base64
+from functools import partial
 import json
 import mock
 import os
 import pycdlib
 import tempfile
+import testtools
 import time
 
-from shakenfist import ipmanager
+from shakenfist import baseobject
+from shakenfist.baseobject import State
+from shakenfist import exceptions
+from shakenfist.ipmanager import IPManager
 from shakenfist import virt
 from shakenfist.config import SFConfig
 from shakenfist.tests import test_shakenfist
 
 
 class FakeNetwork(object):
+    object_type = 'network'
+
     def __init__(self):
-        self.ipmanager = ipmanager.NetBlock('127.0.0.0/8')
+        self.ipmanager = IPManager('uuid', '127.0.0.0/8')
         self.router = self.ipmanager.get_address_at_index(1)
         self.netmask = '255.0.0.0'
         self.dhcp_start = '127.0.0.2'
@@ -37,140 +44,96 @@ class VirtMetaTestCase(test_shakenfist.ShakenFistTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
+    @mock.patch('shakenfist.etcd.get',
+                return_value={
+                    'uuid': 'uuid42',
+                    'cpus': 1,
+                    'disk_spec': [{
+                        'base': 'cirros',
+                        'size': 8
+                    }],
+                    'memory': 1024,
+                    'name': 'cirros',
+                    'namespace': 'namespace',
+                    'requested_placement': None,
+                    'ssh_key': 'thisisasshkey',
+                    'user_data': str(base64.b64encode(
+                        'thisisuserdata'.encode('utf-8')), 'utf-8'),
+                    'video': {'model': 'cirrus', 'memory': 16384},
+                    'version': 2
+                })
     @mock.patch('shakenfist.etcd.put')
-    def test_instance_new(self, mock_put):
+    @mock.patch('shakenfist.etcd.create')
+    @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get_attribute',
+                return_value={'value': None, 'update_time': 0})
+    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('time.time', return_value=1234)
+    def test_instance_new(self, mock_time, mock_get_lock, mock_get_attribute,
+                          mock_create, mock_put, mock_get):
         virt.Instance.new('barry', 1, 2048, 'namespace', 'sshkey',
-                          [{}],
-                          'userdata', {'memory': 16384, 'model': 'cirrus'},
+                          [{}], 'userdata', {'memory': 16384, 'model': 'cirrus'},
                           uuid='uuid42',)
 
-        etcd_write = mock_put.mock_calls[0][1]
-        del etcd_write[3]['node']
-        del etcd_write[3]['state_updated']
+        self.assertEqual(
+            ('attribute/instance', 'uuid42', 'state', State('initial', 1234)),
+            mock_put.mock_calls[0][1])
+        self.assertEqual(
+            ('attribute/instance', 'uuid42', 'error', {'message': None}),
+            mock_put.mock_calls[2][1])
+        self.assertEqual(
+            ('attribute/instance', 'uuid42',
+             'power_state', {'power_state': 'initial'}),
+            mock_put.mock_calls[3][1])
 
         self.assertEqual(
             ('instance', None, 'uuid42',
-             {
-                 'version': 1,
-                 'uuid': 'uuid42',
-                 'name': 'barry',
-                 'cpus': 1,
-                 'memory': 2048,
-                 'disk_spec': [{}],
-                 'ssh_key': 'sshkey',
-                 'console_port': 0,
-                 'vdi_port': 0,
-                 'user_data': 'userdata',
-                 'state': 'initial',
-                 'namespace': 'namespace',
-                 'power_state': 'initial',
-                 'video': {'memory': 16384, 'model': 'cirrus'},
-                 'node_history': [],
-                 'error_message': None,
-                 'requested_placement': None,
-                 'placement_attempts': 0,
-                 'devices': None,
-                 'power_state_previous': None,
-                 'power_state_updated': 0,
-                 'block_devices': {'devices': [
-                     {
-                        'base': None,
-                        'bus': 'virtio',
-                        'device': 'vda',
-                        'path': '/a/b/c/instances/uuid42/vda',
-                        'present_as': 'disk',
-                        'size': None,
-                        'snapshot_ignores': False,
-                        'type': 'qcow2'
-                        },
-                     {
-                        'bus': 'virtio',
-                        'device': 'vdb',
-                        'path': '/a/b/c/instances/uuid42/vdb',
-                        'present_as': 'disk',
-                        'snapshot_ignores': True,
-                        'type': 'raw',
-                        }
-                     ],
-                    'finalized': False},
-             }),
-            etcd_write)
+             {'cpus': 1,
+              'disk_spec': [{}],
+              'memory': 2048,
+              'name': 'barry',
+              'namespace': 'namespace',
+              'requested_placement': None,
+              'ssh_key': 'sshkey',
+              'user_data': 'userdata',
+              'uuid': 'uuid42',
+              'version': 2,
+              'video': {'memory': 16384, 'model': 'cirrus'}}),
+            mock_create.mock_calls[0][1])
 
-    @mock.patch(
-        'shakenfist.etcd.get', return_value={
-            'version': 1,
-            'uuid': 'uuid42',
-            'name': 'barry',
-            'cpus': 1,
-            'memory': 2048,
-            'disk_spec': [{}],
-            'ssh_key': 'sshkey',
-            'console_port': 0,
-            'vdi_port': 0,
-            'user_data': 'userdata',
-            'state': 'initial',
-            'namespace': 'namespace',
-            'power_state': 'initial',
-            'video': {'memory': 16384, 'model': 'cirrus'},
-            'node_history': [],
-            'error_message': None,
-            'requested_placement': None,
-            'placement_attempts': 0,
-            'devices': None,
-            'power_state_previous': None,
-            'power_state_updated': 0,
-            'block_devices': {
-                'devices': [
-                    {
-                        'base': None,
-                        'bus': 'virtio',
-                        'device': 'vda',
-                        'path': '/a/b/c/instances/uuid42/vda',
-                        'present_as': 'disk',
-                        'size': None,
-                        'snapshot_ignores': False,
-                        'type': 'qcow2'
-                        },
-                    {
-                        'bus': 'virtio',
-                        'device': 'vdb',
-                        'path': '/a/b/c/instances/uuid42/vdb',
-                        'present_as': 'disk',
-                        'snapshot_ignores': True,
-                        'type': 'raw',
-                        }
-                ],
-                'finalized': False
-            },
-        },
-    )
+    @mock.patch('shakenfist.etcd.get',
+                return_value={
+                    'cpus': 1,
+                    'disk_spec': [{}],
+                    'memory': 2048,
+                    'name': 'barry',
+                    'namespace': 'namespace',
+                    'requested_placement': None,
+                    'ssh_key': 'sshkey',
+                    'user_data': 'userdata',
+                    'uuid': 'uuid42',
+                    'version': 2,
+                    'video': {'memory': 16384, 'model': 'cirrus'}
+                })
     def test_from_db(self, mock_get):
         inst = virt.Instance.from_db('uuid42')
-        self.assertEqual('uuid42', inst.uuid)
-        self.assertEqual('barry', inst.name)
         self.assertEqual(1, inst.cpus)
-        self.assertEqual(2048, inst.memory)
         self.assertEqual([{}], inst.disk_spec)
-        self.assertEqual('sshkey', inst.ssh_key)
-        self.assertEqual(0, inst.console_port)
-        self.assertEqual(0, inst.vdi_port)
-        self.assertEqual('userdata', inst.user_data)
-        self.assertEqual('initial', inst.state)
+        self.assertEqual(2048, inst.memory)
+        self.assertEqual('barry', inst.name)
         self.assertEqual('namespace', inst.namespace)
-        self.assertEqual('initial', inst.power_state)
-        self.assertEqual({'memory': 16384, 'model': 'cirrus'}, inst.video)
-        self.assertEqual([], inst.node_history)
-        self.assertEqual(None, inst.error_message)
         self.assertEqual(None, inst.requested_placement)
-        self.assertEqual(0, inst.placement_attempts)
-        self.assertEqual(None, inst.devices)
-        self.assertEqual(None, inst.power_state_previous)
-        self.assertEqual(0, inst.power_state_updated)
+        self.assertEqual('sshkey', inst.ssh_key)
+        self.assertEqual('userdata', inst.user_data)
+        self.assertEqual('uuid42', inst.uuid)
+        self.assertEqual(2, inst.version)
+        self.assertEqual({'memory': 16384, 'model': 'cirrus'}, inst.video)
+        self.assertEqual('/a/b/c/instances/uuid42', inst.instance_path)
+        self.assertEqual('/a/b/c/instances/uuid42/libvirt.xml', inst.xml_file)
 
 
-class VirtTestCase(test_shakenfist.ShakenFistTestCase):
+class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
     def setUp(self):
-        super(VirtTestCase, self).setUp()
+        super(InstanceTestCase, self).setUp()
         fake_config = SFConfig(
             STORAGE_PATH="/a/b/c",
             DISK_BUS="virtio",
@@ -191,7 +154,26 @@ class VirtTestCase(test_shakenfist.ShakenFistTestCase):
         self.mock_put = self.put.start()
         self.addCleanup(self.put.stop)
 
-    def _make_instance(self):
+    @mock.patch('shakenfist.virt.Instance._db_create')
+    @mock.patch('shakenfist.virt.Instance._db_get',
+                return_value={
+                    'uuid': 'fakeuuid',
+                    'cpus': 1,
+                    'disk_spec': [{
+                        'base': 'cirros',
+                        'size': 8
+                    }],
+                    'memory': 1024,
+                    'name': 'cirros',
+                    'namespace': 'namespace',
+                    'requested_placement': None,
+                    'ssh_key': 'thisisasshkey',
+                    'user_data': str(base64.b64encode(
+                        'thisisuserdata'.encode('utf-8')), 'utf-8'),
+                    'video': {'model': 'cirrus', 'memory': 16384},
+                    'version': 2
+                })
+    def _make_instance(self, mock_get_instance, mock_create_instance):
         return virt.Instance.new(
             'cirros', 1, 1024,  'namespace',
             uuid='fakeuuid',
@@ -204,172 +186,196 @@ class VirtTestCase(test_shakenfist.ShakenFistTestCase):
                 'thisisuserdata'.encode('utf-8')), 'utf-8'),
         )
 
+    @mock.patch('shakenfist.virt.Instance.error',
+                new_callable=mock.PropertyMock)
+    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.virt.Instance._db_get_attribute',
+                side_effect=[
+                    {'value': None, 'update_time': 0},
+                    {'value': 'initial', 'update_time': 0},
+                ])
+    @mock.patch('shakenfist.virt.Instance._db_set_attribute')
     @mock.patch('shakenfist.etcd.put')
-    def test_update_instance_state(self, mock_put):
+    def test_set_state(
+            self, mock_put, mock_attribute_set, mock_state_get, mock_lock,
+            mock_error):
         i = self._make_instance()
-        i.state = 'initial'
-        i.update_instance_state('created')
+        i.state = 'preflight'
 
-        etcd_write = mock_put.mock_calls[2][1]
-        self.assertEqual(('instance', None, 'fakeuuid'), etcd_write[0:3])
-        self.assertTrue(time.time() - etcd_write[3]['state_updated'] < 3)
-        self.assertEqual('created', etcd_write[3]['state'])
-        self.assertEqual('fakeuuid', etcd_write[3]['uuid'])
+        etcd_write = mock_attribute_set.mock_calls[2]
+        self.assertTrue(time.time() - etcd_write[1][1].update_time < 3)
+        self.assertEqual('preflight', etcd_write[1][1].value)
 
+    @mock.patch('shakenfist.virt.Instance.error',
+                new_callable=mock.PropertyMock)
+    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.virt.Instance._db_get_attribute',
+                side_effect=[
+                    {'value': None, 'update_time': 0},
+                    {'value': 'created', 'update_time': 1},
+                ])
+    @mock.patch('shakenfist.virt.Instance._db_set_attribute')
     @mock.patch('shakenfist.etcd.put')
-    def test_update_instance_state_duplicate(self, mock_put):
+    def test_set_state_duplicate(
+            self, mock_put, mock_attribute_set, mock_state_get, mock_lock,
+            mock_error):
         i = self._make_instance()
+        with testtools.ExpectedException(exceptions.InvalidStateException):
+            i.state = 'created'
+        self.assertEqual(2, mock_attribute_set.call_count)
+
+    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.virt.Instance._db_get_attribute',
+                side_effect=[
+                    {'value': None, 'update_time': 0},
+                    {'value': 'initial', 'update_time': 0},
+                    {'value': 'preflight', 'update_time': 0},
+                    {'value': 'preflight', 'update_time': 0},
+                    {'value': 'preflight', 'update_time': 0},
+                    {'value': 'creating', 'update_time': 0},
+                    {'value': 'created', 'update_time': 0},
+                    {'value': 'created-error', 'update_time': 0},
+                    {'value': 'error', 'update_time': 0},
+                ])
+    @mock.patch('shakenfist.virt.Instance._db_set_attribute')
+    @mock.patch('shakenfist.etcd.put')
+    def test_set_state_valid1(
+            self, mock_put, mock_attribute_set, mock_state_get, mock_lock):
+
+        i = self._make_instance()
+        i.state = 'preflight'
+        with testtools.ExpectedException(exceptions.InvalidStateException):
+            i.state = 'initial'
+        with testtools.ExpectedException(exceptions.InvalidStateException):
+            i.state = 'created'
+        i.state = 'creating'
         i.state = 'created'
-        i.update_instance_state('created')
-        self.assertEqual(2, mock_put.call_count)
+        i.state = 'created-error'
+        i.state = 'error'
+        i.state = 'deleted'
 
+    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.virt.Instance._db_get_attribute',
+                side_effect=[
+                    {'value': None, 'update_time': 0},
+                    {'value': 'initial', 'update_time': 0},
+                    {'value': 'preflight', 'update_time': 0},
+                    {'value': 'error', 'update_time': 0},
+                ])
+    @mock.patch('shakenfist.virt.Instance._db_set_attribute')
     @mock.patch('shakenfist.etcd.put')
-    def test_update_power_state(self, mock_put):
+    def test_set_state_valid2(
+            self, mock_put, mock_attribute_set, mock_state_get, mock_lock):
+
         i = self._make_instance()
-        i.power_state = 'on'
+        i.state = 'preflight'
+        i.state = 'preflight-error'
+        with testtools.ExpectedException(exceptions.InvalidStateException):
+            i.state = 'created'
+
+    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.virt.Instance.power_state',
+                new_callable=mock.PropertyMock)
+    @mock.patch('shakenfist.virt.Instance._db_set_attribute')
+    @mock.patch('shakenfist.baseobject.DatabaseBackedObject.state',
+                new_callable=mock.PropertyMock)
+    def test_update_power_state(self, mock_update, mock_attribute_set,
+                                mock_power_state_get, mock_lock):
+        mock_power_state_get.return_value = {
+            'power_state_previous': 'off',
+            'power_state': 'on',
+            'power_state_updated': 0
+        }
+
+        i = self._make_instance()
         i.update_power_state('off')
 
-        etcd_write = mock_put.mock_calls[2][1]
-        self.assertEqual(('instance', None, 'fakeuuid'), etcd_write[0:3])
-        self.assertTrue(time.time() - etcd_write[3]['power_state_updated'] < 3)
-        self.assertEqual('off', etcd_write[3]['power_state'])
-        self.assertEqual('on', etcd_write[3]['power_state_previous'])
-        self.assertEqual('fakeuuid', etcd_write[3]['uuid'])
+        etcd_write = mock_attribute_set.mock_calls[1][1]
+        self.assertTrue(time.time() - etcd_write[1]['power_state_updated'] < 3)
+        self.assertEqual('off', etcd_write[1]['power_state'])
+        self.assertEqual('on', etcd_write[1]['power_state_previous'])
 
-    @mock.patch('shakenfist.etcd.put')
-    def test_update_power_state_duplicate(self, mock_put):
+    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.virt.Instance.power_state',
+                new_callable=mock.PropertyMock)
+    @mock.patch('shakenfist.virt.Instance._db_set_attribute')
+    @mock.patch('shakenfist.baseobject.DatabaseBackedObject.state',
+                new_callable=mock.PropertyMock)
+    def test_update_power_state_duplicate(self, mock_get, mock_attribute_set,
+                                          mock_power_state_get, mock_lock):
+        mock_power_state_get.return_value = {
+            'power_state_previous': 'off',
+            'power_state': 'on',
+            'power_state_updated': time.time()
+        }
+
         i = self._make_instance()
-        i.power_state = 'on'
         i.update_power_state('on')
-        self.assertEqual(2, mock_put.call_count)
-
-    @mock.patch('shakenfist.etcd.put')
-    def test_update_power_state_transition_new(self, mock_put):
-        i = self._make_instance()
-        i.power_state_previous = 'on'
-        i.power_state = 'transition-to-off'
-        i.power_state_updated = time.time()
-        i.update_power_state('on')
-        self.assertEqual(2, mock_put.call_count)
-
-    @mock.patch('shakenfist.etcd.put')
-    def test_update_power_state_transition_old(self, mock_put):
-        i = self._make_instance()
-        i.power_state_previous = 'on'
-        i.power_state = 'transition-to-off'
-        i.power_state_updated = time.time() - 71
-        i.update_power_state('on')
-
-        etcd_write = mock_put.mock_calls[2][1]
-        self.assertEqual(('instance', None, 'fakeuuid'), etcd_write[0:3])
-        self.assertTrue(time.time() - etcd_write[3]['power_state_updated'] < 3)
-        self.assertEqual('on', etcd_write[3]['power_state'])
-        self.assertEqual('transition-to-off', etcd_write[3]['power_state_previous'])
-        self.assertEqual('fakeuuid', etcd_write[3]['uuid'])
-
-    def test_init(self):
-        i = self._make_instance()
-
-        self.assertEqual('/a/b/c/instances/fakeuuid', i.instance_path())
-        self.assertEqual('/a/b/c/snapshots', i.snapshot_path())
-        self.assertEqual('/a/b/c/instances/fakeuuid/libvirt.xml', i.xml_file())
         self.assertEqual(
-            [
-                {
-                    'base': 'cirros',
-                    'device': 'vda',
-                    'bus': 'virtio',
-                    'path': '/a/b/c/instances/fakeuuid/vda',
-                    'size': 8,
-                    'type': 'qcow2',
-                    'present_as': 'disk',
-                    'snapshot_ignores': False
-                },
-                {
-                    'device': 'vdb',
-                    'bus': 'virtio',
-                    'path': '/a/b/c/instances/fakeuuid/vdb',
-                    'type': 'raw',
-                    'present_as': 'disk',
-                    'snapshot_ignores': True
-                }
-            ], i.block_devices['devices'])
+            [mock.call('power_state', {'power_state': 'initial'})],
+            mock_attribute_set.mock_calls)
 
-    def test_init_multiple_disks(self):
-        i = virt.Instance.new(
-            'cirros', 1, 1024, 'namespace',
-            uuid='fakeuuid',
-            disk_spec=[
-                {
-                    'base': 'cirros',
-                    'size': 8
-                },
-                {
-                    'size': 16
-                },
-                {
-                    'size': 24
-                }
-            ],
-        )
+    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.virt.Instance.power_state',
+                new_callable=mock.PropertyMock)
+    @mock.patch('shakenfist.virt.Instance._db_set_attribute')
+    @mock.patch('shakenfist.baseobject.DatabaseBackedObject.state',
+                new_callable=mock.PropertyMock)
+    def test_update_power_state_transition_new(
+            self, mock_update,
+            mock_attribute_set, mock_power_state_get, mock_lock):
+        mock_power_state_get.return_value = {
+            'power_state_previous': 'on',
+            'power_state': 'transition-to-off',
+            'power_state_updated': time.time()
+        }
 
-        self.assertEqual('/a/b/c/instances/fakeuuid', i.instance_path())
-        self.assertEqual('/a/b/c/snapshots', i.snapshot_path())
-        self.assertEqual('/a/b/c/instances/fakeuuid/libvirt.xml', i.xml_file())
+        i = self._make_instance()
+        i.update_power_state('on')
         self.assertEqual(
-            [
-                {
-                    'base': 'cirros',
-                    'device': 'vda',
-                    'bus': 'virtio',
-                    'path': '/a/b/c/instances/fakeuuid/vda',
-                    'size': 8,
-                    'type': 'qcow2',
-                    'present_as': 'disk',
-                    'snapshot_ignores': False
-                },
-                {
-                    'device': 'vdb',
-                    'bus': 'virtio',
-                    'path': '/a/b/c/instances/fakeuuid/vdb',
-                    'type': 'raw',
-                    'present_as': 'disk',
-                    'snapshot_ignores': True
-                },
-                {
-                    'base': None,
-                    'device': 'vdc',
-                    'bus': 'virtio',
-                    'path': '/a/b/c/instances/fakeuuid/vdc',
-                    'size': 16,
-                    'type': 'qcow2',
-                    'present_as': 'disk',
-                    'snapshot_ignores': False
-                },
-                {
-                    'base': None,
-                    'device': 'vdd',
-                    'bus': 'virtio',
-                    'path': '/a/b/c/instances/fakeuuid/vdd',
-                    'size': 24,
-                    'type': 'qcow2',
-                    'present_as': 'disk',
-                    'snapshot_ignores': False
-                }
-            ], i.block_devices['devices'])
+            [mock.call('power_state', {'power_state': 'initial'})],
+            mock_attribute_set.mock_calls)
 
-    def test_str(self):
+    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.virt.Instance.power_state',
+                new_callable=mock.PropertyMock)
+    @mock.patch('shakenfist.virt.Instance._db_set_attribute')
+    @mock.patch('shakenfist.etcd.put')
+    @mock.patch('shakenfist.baseobject.DatabaseBackedObject.state',
+                new_callable=mock.PropertyMock)
+    def test_update_power_state_transition_old(
+            self, mock_update, mock_put, mock_attribute_set,
+            mock_power_state_get, mock_lock):
+        mock_power_state_get.return_value = {
+            'power_state_previous': 'on',
+            'power_state': 'transition-to-off',
+            'power_state_updated': time.time() - 71
+        }
+
+        i = self._make_instance()
+        i.update_power_state('on')
+
+        etcd_write = mock_attribute_set.mock_calls[1][1]
+        self.assertTrue(
+            time.time() - etcd_write[1]['power_state_updated'] < 30)
+        self.assertEqual('on', etcd_write[1]['power_state'])
+        self.assertEqual('transition-to-off',
+                         etcd_write[1]['power_state_previous'])
+
+    def test_helpers(self):
+        self.assertEqual('/a/b/c/snapshots', virt._snapshot_path())
+
+    @mock.patch('shakenfist.baseobject.DatabaseBackedObject.state',
+                new_callable=mock.PropertyMock)
+    def test_str(self, mock_update):
         i = self._make_instance()
         s = str(i)
         self.assertEqual('instance(fakeuuid)', s)
 
     # create, delete
 
-    @mock.patch('shakenfist.db.get_network',
-                return_value={
-                    'uuid': 'netuuid',
-                    'netblock': '127.0.0.0/8'
-                })
+    @mock.patch('shakenfist.net.Network.from_db',
+                return_value=FakeNetwork())
     @mock.patch('shakenfist.db.get_instance_interfaces',
                 return_value=[
                     {
@@ -389,10 +395,12 @@ class VirtTestCase(test_shakenfist.ShakenFistTestCase):
                         'order': 1
                     }
                 ])
-    @mock.patch('shakenfist.net.from_db',
+    @mock.patch('shakenfist.net.Network.from_db',
                 return_value=FakeNetwork())
-    def test_make_config_drive(self, mock_net_from_db, mock_interfaces,
-                               mock_network):
+    @mock.patch('shakenfist.baseobject.DatabaseBackedObject.state',
+                new_callable=mock.PropertyMock)
+    def test_make_config_drive(self, mock_update, mock_net_from_db,
+                               mock_interfaces, mock_network):
         i = self._make_instance()
 
         (fd, cd_file) = tempfile.mkstemp()
@@ -504,3 +512,213 @@ class VirtTestCase(test_shakenfist.ShakenFistTestCase):
         finally:
             if os.path.exists(cd_file):
                 os.unlink(cd_file)
+
+
+GET_ALL_INSTANCES = [
+    # Present here, and in the get
+    (None, {
+        'uuid': '373a165e-9720-4e14-bd0e-9612de79ff15',
+        'cpus': 1,
+        'disk_spec': [{
+            'base': 'cirros',
+            'size': 8
+        }],
+        'memory': 1024,
+        'name': 'cirros',
+        'namespace': 'gerkin',
+        'requested_placement': None,
+        'ssh_key': 'thisisasshkey',
+        'user_data': None,
+        'video': {'model': 'cirrus', 'memory': 16384},
+        'version': 2
+    }),
+    # Present here, but not in the get (a race?)
+    (None, {
+        'uuid': 'b078cb4e-857c-4f04-b011-751742ef5817',
+        'cpus': 1,
+        'disk_spec': [{
+            'base': 'cirros',
+            'size': 8
+        }],
+        'memory': 1024,
+        'name': 'cirros',
+        'namespace': 'namespace',
+        'requested_placement': None,
+        'ssh_key': 'thisisasshkey',
+        'user_data': None,
+        'video': {'model': 'cirrus', 'memory': 16384},
+        'version': 2
+    }),
+    (None, {
+        'uuid': 'a7c5ecec-c3a9-4774-ad1b-249d9e90e806',
+        'cpus': 1,
+        'disk_spec': [{
+            'base': 'cirros',
+            'size': 8
+        }],
+        'memory': 1024,
+        'name': 'cirros',
+        'namespace': 'namespace',
+        'requested_placement': None,
+        'ssh_key': 'thisisasshkey',
+        'user_data': None,
+        'video': {'model': 'cirrus', 'memory': 16384},
+        'version': 2
+    })
+]
+
+JUST_INSTANCES = [
+    {
+        'uuid': '373a165e-9720-4e14-bd0e-9612de79ff15',
+        'cpus': 1,
+        'disk_spec': [{
+            'base': 'cirros',
+            'size': 8
+        }],
+        'memory': 1024,
+        'name': 'cirros',
+        'namespace': 'gerkin',
+        'requested_placement': None,
+        'ssh_key': 'thisisasshkey',
+        'user_data': None,
+        'video': {'model': 'cirrus', 'memory': 16384},
+        'version': 2
+    },
+    None,
+    {
+        'uuid': 'a7c5ecec-c3a9-4774-ad1b-249d9e90e806',
+        'cpus': 1,
+        'disk_spec': [{
+            'base': 'cirros',
+            'size': 8
+        }],
+        'memory': 1024,
+        'name': 'cirros',
+        'namespace': 'namespace',
+        'requested_placement': None,
+        'ssh_key': 'thisisasshkey',
+        'user_data': None,
+        'video': {'model': 'cirrus', 'memory': 16384},
+        'version': 2
+    }
+]
+
+
+class InstancesTestCase(test_shakenfist.ShakenFistTestCase):
+    @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
+    @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
+    def test_base_iteration(self, mock_get_all, mock_get):
+        uuids = []
+        for i in virt.Instances([]):
+            uuids.append(i.uuid)
+
+        self.assertEqual(['373a165e-9720-4e14-bd0e-9612de79ff15',
+                          'a7c5ecec-c3a9-4774-ad1b-249d9e90e806'], uuids)
+
+    @mock.patch('shakenfist.virt.Instance._db_get_attribute',
+                return_value={'node': 'node1'})
+    @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
+    @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
+    def test_placement_filter_all(self, mock_get_all, mock_get, mock_attr):
+        uuids = []
+        for i in virt.Instances([partial(virt.placement_filter, 'node1')]):
+            uuids.append(i.uuid)
+
+        self.assertEqual(['373a165e-9720-4e14-bd0e-9612de79ff15',
+                          'a7c5ecec-c3a9-4774-ad1b-249d9e90e806'], uuids)
+
+    @mock.patch('shakenfist.virt.Instance._db_get_attribute',
+                return_value={'node': 'node2'})
+    @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
+    @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
+    def test_placement_filter_none(self, mock_get_all, mock_get, mock_attr):
+        uuids = []
+        for i in virt.Instances([partial(virt.placement_filter, 'node1')]):
+            uuids.append(i.uuid)
+
+        self.assertEqual([], uuids)
+
+    @mock.patch('shakenfist.virt.Instance._db_get_attribute',
+                return_value={'value': 'created', 'update_time': 1})
+    @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
+    @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
+    def test_state_filter_all(self, mock_get_all, mock_get, mock_attr):
+        uuids = []
+        for i in virt.Instances([partial(baseobject.state_filter, 'created')]):
+            uuids.append(i.uuid)
+
+        self.assertEqual(['373a165e-9720-4e14-bd0e-9612de79ff15',
+                          'a7c5ecec-c3a9-4774-ad1b-249d9e90e806'], uuids)
+
+    @mock.patch('shakenfist.virt.Instance._db_get_attribute',
+                return_value={'value': 'deleted', 'update_time': 1})
+    @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
+    @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
+    def test_state_filter_none(self, mock_get_all, mock_get, mock_attr):
+        uuids = []
+        for i in virt.Instances([partial(baseobject.state_filter, 'created')]):
+            uuids.append(i.uuid)
+
+        self.assertEqual([], uuids)
+
+    @mock.patch('shakenfist.virt.Instance._db_get_attribute',
+                side_effect=[{'value': 'deleted', 'update_time': 1},
+                             {'value': 'initial', 'update_time': 1}])
+    @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
+    @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
+    def test_state_filter_active(self, mock_get_all, mock_get, mock_attr):
+        uuids = []
+        for i in virt.Instances([virt.active_states_filter]):
+            uuids.append(i.uuid)
+
+        self.assertEqual(['a7c5ecec-c3a9-4774-ad1b-249d9e90e806'], uuids)
+
+    @mock.patch('shakenfist.virt.Instance._db_get_attribute',
+                side_effect=[{'value': 'deleted', 'update_time': 1},
+                             {'value': 'initial', 'update_time': 1}])
+    @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
+    @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
+    def test_state_filter_inactive(self, mock_get_all, mock_get, mock_attr):
+        uuids = []
+        for i in virt.Instances([virt.inactive_states_filter]):
+            uuids.append(i.uuid)
+
+        self.assertEqual(['373a165e-9720-4e14-bd0e-9612de79ff15'], uuids)
+
+    @mock.patch('shakenfist.virt.Instance._db_get_attribute',
+                side_effect=[{'value': 'deleted', 'update_time': time.time()},
+                             {'value': 'deleted', 'update_time': time.time()},
+                             {'value': 'initial', 'update_time': 1}])
+    @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
+    @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
+    def test_state_hard_delete_later(self, mock_get_all, mock_get, mock_attr):
+        uuids = []
+        for i in virt.Instances([virt.inactive_states_filter,
+                                 partial(baseobject.state_age_filter, 500)]):
+            uuids.append(i.uuid)
+
+        self.assertEqual([], uuids)
+
+    @mock.patch('shakenfist.virt.Instance._db_get_attribute',
+                side_effect=[
+                    {'value': 'deleted', 'update_time': time.time() - 1000},
+                    {'value': 'deleted', 'update_time': time.time() - 1000},
+                    {'value': 'initial', 'update_time': 1}])
+    @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
+    @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
+    def test_state_hard_delete_now(self, mock_get_all, mock_get, mock_attr):
+        uuids = []
+        for i in virt.Instances([virt.inactive_states_filter,
+                                 partial(baseobject.state_age_filter, 500)]):
+            uuids.append(i.uuid)
+
+        self.assertEqual(['373a165e-9720-4e14-bd0e-9612de79ff15'], uuids)
+
+    @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
+    @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
+    def test_namespace_filter(self, mock_get_all, mock_get):
+        uuids = []
+        for i in virt.Instances([partial(baseobject.namespace_filter, 'gerkin')]):
+            uuids.append(i.uuid)
+
+        self.assertEqual(['373a165e-9720-4e14-bd0e-9612de79ff15'], uuids)

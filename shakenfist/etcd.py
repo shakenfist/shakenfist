@@ -4,6 +4,7 @@ import psutil
 import time
 
 from etcd3gw.client import Etcd3Client
+from etcd3gw.exceptions import InternalServerError
 from etcd3gw.lock import Lock
 
 from shakenfist.config import config
@@ -12,6 +13,7 @@ from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist import util
 from shakenfist.tasks import QueueTask
+from shakenfist import baseobject
 
 
 ####################################################################
@@ -25,6 +27,29 @@ LOG, _ = logutil.setup(__name__)
 LOCK_PREFIX = '/sflocks'
 
 
+def retry_etcd_forever(func):
+    """Retry the Etcd server forever.
+
+    If the DB is unable to process the request then SF cannot operate,
+    therefore wait until it comes back online. If the DB falls out of sync with
+    the system then we will have bigger problems than a small delay.
+
+    If the etcd server is not running, then a ConnectionFailedError exception
+    will occur. This is deliberately allowed to cause an SF daemon failure to
+    bring attention to the deeper problem.
+    """
+    def wrapper(*args, **kwargs):
+        count = 0
+        while True:
+            try:
+                return func(*args, **kwargs)
+            except InternalServerError as e:
+                LOG.error('Etcd3gw Internal Server Error: %s' % e)
+            time.sleep(count/10.0)
+            count += 1
+    return wrapper
+
+
 class ActualLock(Lock):
     def __init__(self, objecttype, subtype, name, ttl=120,
                  client=None, timeout=1000000000, log_ctx=LOG,
@@ -36,7 +61,7 @@ class ActualLock(Lock):
         self.objecttype = objecttype
         self.objectname = name
         self.timeout = min(timeout, 1000000000)
-        self.log_ctx = log_ctx.withField('path', self.path)
+        self.log_ctx = log_ctx.with_field('path', self.path)
         self.operation = op
 
         # We override the UUID of the lock with something more helpful to debugging
@@ -51,6 +76,7 @@ class ActualLock(Lock):
         # We also override the location of the lock so that we're in our own spot
         self.key = LOCK_PREFIX + self.path
 
+    @retry_etcd_forever
     def get_holder(self):
         value = Etcd3Client().get(self.key, metadata=True)
         if value is None or len(value) == 0:
@@ -75,8 +101,8 @@ class ActualLock(Lock):
                     db.add_event(self.objecttype, self.objectname,
                                  'lock', 'acquired', None,
                                  'Waited %d seconds for lock' % duration)
-                    self.log_ctx.withField('duration', duration
-                                           ).info('Acquiring a lock was slow')
+                    self.log_ctx.with_field('duration', duration
+                                            ).info('Acquiring a lock was slow')
                 return self
 
             duration = time.time() - start_time
@@ -86,11 +112,12 @@ class ActualLock(Lock):
                              'Waiting for lock more than threshold')
 
                 node, pid = self.get_holder()
-                self.log_ctx.withFields({'duration': duration,
-                                         'threshold': threshold,
-                                         'holder-pid': pid,
-                                         'holder-node': node,
-                                         }).info('Waiting for lock')
+                self.log_ctx.with_fields({'duration': duration,
+                                          'threshold': threshold,
+                                          'holder-pid': pid,
+                                          'holder-node': node,
+                                          'requesting-op': self.operation,
+                                          }).info('Waiting for lock')
                 slow_warned = True
 
             time.sleep(1)
@@ -101,10 +128,11 @@ class ActualLock(Lock):
                      'Failed to acquire lock after %.02f seconds' % duration)
 
         node, pid = self.get_holder()
-        self.log_ctx.withFields({'duration': duration,
-                                 'holder-pid': pid,
-                                 'holder-node': node,
-                                 }).info('Failed to acquire lock')
+        self.log_ctx.with_fields({'duration': duration,
+                                  'holder-pid': pid,
+                                  'holder-node': node,
+                                  'requesting-op': self.operation,
+                                  }).info('Failed to acquire lock')
 
         raise exceptions.LockException(
             'Cannot acquire lock %s, timed out after %.02f seconds'
@@ -112,6 +140,10 @@ class ActualLock(Lock):
 
     def __exit__(self, _exception_type, _exception_value, _traceback):
         if not self.release():
+            locks = list(get_all(LOCK_PREFIX, None))
+            self.log_ctx.withFields({'locks': locks,
+                                     'key': self.name,
+                                     }).error('Cannot release lock')
             raise exceptions.LockException(
                 'Cannot release lock: %s' % self.name)
 
@@ -130,15 +162,16 @@ def get_lock(objecttype, subtype, name, ttl=60, timeout=10, log_ctx=LOG,
 
 def refresh_lock(lock, log_ctx=LOG):
     if not lock.is_acquired():
-        log_ctx.withField('lock', lock.name).info(
+        log_ctx.with_field('lock', lock.name).info(
             'Attempt to refresh an expired lock')
         raise exceptions.LockException(
             'The lock on %s has expired.' % lock.path)
 
     lock.refresh()
-    log_ctx.withField('lock', lock.name).debug('Refreshed lock')
+    log_ctx.with_field('lock', lock.name).debug('Refreshed lock')
 
 
+@retry_etcd_forever
 def clear_stale_locks():
     # Remove all locks held by former processes on this node. This is required
     # after an unclean restart, otherwise we need to wait for these locks to
@@ -154,12 +187,13 @@ def clear_stale_locks():
 
         if node == config.NODE_NAME and not psutil.pid_exists(pid):
             client.delete(metadata['key'])
-            LOG.withFields({'lock': lockname,
-                            'old-pid': pid,
-                            'old-node': node,
-                            }).warning('Removed stale lock')
+            LOG.with_fields({'lock': lockname,
+                             'old-pid': pid,
+                             'old-node': node,
+                             }).warning('Removed stale lock')
 
 
+@retry_etcd_forever
 def get_existing_locks():
     key_val = {}
     for value in Etcd3Client().get_prefix(LOCK_PREFIX + '/'):
@@ -180,22 +214,27 @@ def _construct_key(objecttype, subtype, name):
 class JSONEncoderTasks(json.JSONEncoder):
     def default(self, obj):
         if QueueTask.__subclasscheck__(type(obj)):
-            return obj.json_dump()
+            return obj.obj_dict()
+        if type(obj) is baseobject.State:
+            return obj.obj_dict()
         return json.JSONEncoder.default(self, obj)
 
 
+@retry_etcd_forever
 def put(objecttype, subtype, name, data, ttl=None):
     path = _construct_key(objecttype, subtype, name)
     encoded = json.dumps(data, indent=4, sort_keys=True, cls=JSONEncoderTasks)
     Etcd3Client().put(path, encoded, lease=None)
 
 
+@retry_etcd_forever
 def create(objecttype, subtype, name, data, ttle=None):
     path = _construct_key(objecttype, subtype, name)
     encoded = json.dumps(data, indent=4, sort_keys=True, cls=JSONEncoderTasks)
     return Etcd3Client().create(path, encoded, lease=None)
 
 
+@retry_etcd_forever
 def get(objecttype, subtype, name):
     path = _construct_key(objecttype, subtype, name)
     value = Etcd3Client().get(path, metadata=True)
@@ -204,26 +243,30 @@ def get(objecttype, subtype, name):
     return json.loads(value[0][0])
 
 
-def get_all(objecttype, subtype, sort_order=None):
-    path = _construct_key(objecttype, subtype, None)
-    for value in Etcd3Client().get_prefix(path, sort_order=sort_order):
-        yield json.loads(value[0])
+@retry_etcd_forever
+def get_all(objecttype, subtype, prefix=None, sort_order=None):
+    path = _construct_key(objecttype, subtype, prefix)
+    for data, metadata in Etcd3Client().get_prefix(path, sort_order=sort_order, sort_target='key'):
+        yield str(metadata['key'].decode('utf-8')), json.loads(data)
 
 
+@retry_etcd_forever
 def get_all_dict(objecttype, subtype=None, sort_order=None):
     path = _construct_key(objecttype, subtype, None)
     key_val = {}
-    for value in Etcd3Client().get_prefix(path, sort_order=sort_order):
+    for value in Etcd3Client().get_prefix(path, sort_order=sort_order, sort_target='key'):
         key_val[value[1]['key'].decode('utf-8')] = json.loads(value[0])
     return key_val
 
 
+@retry_etcd_forever
 def delete(objecttype, subtype, name):
     path = _construct_key(objecttype, subtype, name)
     Etcd3Client().delete(path)
 
 
-def delete_all(objecttype, subtype, sort_order=None):
+@retry_etcd_forever
+def delete_all(objecttype, subtype):
     path = _construct_key(objecttype, subtype, None)
     Etcd3Client().delete_prefix(path)
 
@@ -239,10 +282,10 @@ def enqueue(queuename, workitem):
             jobname = '%s-%03d' % (entry_time, i)
 
         put('queue', queuename, jobname, workitem)
-        LOG.withFields({'jobname': jobname,
-                        'queuename': queuename,
-                        'workitem': workitem,
-                        }).info('Enqueued workitem')
+        LOG.with_fields({'jobname': jobname,
+                         'queuename': queuename,
+                         'workitem': workitem,
+                         }).info('Enqueued workitem')
 
 
 def _all_subclasses(cls):
@@ -284,6 +327,7 @@ def decodeTasks(obj):
     return obj
 
 
+@retry_etcd_forever
 def dequeue(queuename):
     queue_path = _construct_key('queue', queuename, None)
     client = Etcd3Client()
@@ -298,10 +342,10 @@ def dequeue(queuename):
             workitem = json.loads(data, object_hook=decodeTasks)
             put('processing', queuename, jobname, workitem)
             client.delete(metadata['key'])
-            LOG.withFields({'jobname': jobname,
-                            'queuename': queuename,
-                            'workitem': workitem,
-                            }).info('Moved workitem from queue to processing')
+            LOG.with_fields({'jobname': jobname,
+                             'queuename': queuename,
+                             'workitem': workitem,
+                             }).info('Moved workitem from queue to processing')
 
             return jobname, workitem
 
@@ -311,9 +355,9 @@ def dequeue(queuename):
 def resolve(queuename, jobname):
     with get_lock('queue', None, queuename, op='Resolve'):
         delete('processing', queuename, jobname)
-        LOG.withFields({'jobname': jobname,
-                        'queuename': queuename,
-                        }).info('Resolved workitem')
+        LOG.with_fields({'jobname': jobname,
+                         'queuename': queuename,
+                         }).info('Resolved workitem')
 
 
 def get_queue_length(queuename):
@@ -322,6 +366,7 @@ def get_queue_length(queuename):
     return processing, queued
 
 
+@retry_etcd_forever
 def _restart_queue(queuename):
     queue_path = _construct_key('processing', queuename, None)
     with get_lock('queue', None, queuename, op='Restart'):
@@ -330,9 +375,9 @@ def _restart_queue(queuename):
             workitem = json.loads(data)
             put('queue', queuename, jobname, workitem)
             delete('processing', queuename, jobname)
-            LOG.withFields({'jobname': jobname,
-                            'queuename': queuename,
-                            }).warning('Reset workitem')
+            LOG.with_fields({'jobname': jobname,
+                             'queuename': queuename,
+                             }).warning('Reset workitem')
 
 
 def restart_queues():

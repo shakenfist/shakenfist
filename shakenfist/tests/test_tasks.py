@@ -32,15 +32,6 @@ class TasksEqTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertEqual(tasks.DeleteInstanceTask('abcd'),
                          tasks.DeleteInstanceTask('abcd'))
 
-        self.assertEqual(tasks.ErrorInstanceTask('abcd', 'someExcuse'),
-                         tasks.ErrorInstanceTask('abcd', 'someExcuse'))
-
-        self.assertNotEqual(tasks.ErrorInstanceTask('abcd', 'someExcuse'),
-                            tasks.ErrorInstanceTask('abcd', 'something'))
-
-        self.assertEqual(tasks.ErrorInstanceTask('abcd', 'dunno'),
-                         tasks.ErrorInstanceTask('abcd', 'dunno'))
-
         self.assertEqual(tasks.ImageTask('http://someurl'),
                          tasks.ImageTask('http://someurl'))
 
@@ -73,14 +64,6 @@ class InstanceTasksTestCase(test_shakenfist.ShakenFistTestCase):
 
         with testtools.ExpectedException(exceptions.NetworkNotListTaskException):
             tasks.InstanceTask('uuid', 'not a list')
-
-    def test_ErrorInstanceTask(self):
-        self.assertIsNone(
-            tasks.ErrorInstanceTask('uuid', None).error_msg())
-
-        self.assertEqual(
-            'broken',
-            tasks.ErrorInstanceTask('uuid', 'broken').error_msg())
 
     def test_FetchImageTask(self):
         with testtools.ExpectedException(exceptions.NoURLImageFetchTaskException):

@@ -49,6 +49,10 @@ sudo echo 'banana' >  /tmp/output"""
         self.assertIsNotNone(inst['uuid'])
         self._await_login_prompt(inst['uuid'])
 
+        # We need to refresh our view of the instance, as it might have
+        # changed as it started up
+        inst = self.test_client.get_instance(inst['uuid'])
+
         console = base.LoggingSocket(inst['node'], inst['console_port'])
         out = console.execute('cat /tmp/output')
         if not out.find('banana'):
