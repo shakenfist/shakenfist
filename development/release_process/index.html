@@ -751,11 +751,14 @@ For reference, they are at <code>deploy/ansible/terraform</code>. At the time of
 cloud specific values for each cloud. Unfortunately I can't tell you those because they vary
 with your specific cloud accounts.</p>
 <h2 id="step-2-shakenfistshakenfist">Step 2: <code>shakenfist/shakenfist</code></h2>
-<p>Test that pypi will accept Markdown formatted README.</p>
+<p>Create a pull request to merge develop into master for shakenfist/shakenfist. As a releaser you do not need human review of that pull request (as they are so big and have already been reviewed in individual elements), but you do need to ensure that CI is passing before merging the change.</p>
+<p>Tag the release, update github, and then test that pypi will accept Markdown formatted README.</p>
 <p>In the shakenfist/shakenfist repo:</p>
 <pre><code>pip install --upgrade readme-renderer
 pip install --upgrade twine
 rm -f dist/*
+git checkout master
+git pull
 git tag -s v0.1.0 -m &quot;Release v0.1.0&quot;
 python3 setup.py sdist bdist_wheel
 twine check dist/*
@@ -763,7 +766,7 @@ git push origin v0.1.0
 twine upload dist/*
 </code></pre>
 <h2 id="step-3-shakenfistclient-python">Step 3: <code>shakenfist/client-python</code></h2>
-<p>Test that pypi will accept Markdown formatted README.</p>
+<p>Tag the release, update github, and then test that pypi will accept Markdown formatted README.</p>
 <p>In the shakenfist/client-python repo:</p>
 <pre><code>pip install --upgrade readme-renderer
 pip install --upgrade twine
