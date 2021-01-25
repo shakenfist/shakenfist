@@ -219,7 +219,6 @@ class Network(baseobject.DatabaseBackedObject):
                            provide_nat=False,
                            namespace=None,
                            name='floating')
-        fnet.persist()
         return fnet
 
     def update_floating_gateway(self, gateway):
