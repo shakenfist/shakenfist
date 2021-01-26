@@ -21,3 +21,11 @@ In terms of new features, we also added:
 * we are smarter about what networks we restore on startup, and don't restore dead networks.
 
 We also now require python 3.8.
+
+Changes between v0.4.0 and v0.4.1
+=================================
+
+v0.4.1 was released on 26 January 2021.
+
+* Remove stray persist() call from floating network setup. shakenfist#667
+* Networks should enter the 'created' state once setup on the network node. shakenfist#669
