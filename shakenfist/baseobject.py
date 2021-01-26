@@ -130,6 +130,18 @@ class DatabaseBackedObject(object):
         self._db_set_attribute('error', {'message': msg})
 
 
+class DatabaseBackedObjectIterator(object):
+    def __init__(self, filters):
+        self.filters = filters
+
+    def apply_filters(self, o):
+        for f in self.filters:
+            if not f(o):
+                return None
+
+        return o
+
+
 def state_filter(states, o):
     return o.state.value in states
 

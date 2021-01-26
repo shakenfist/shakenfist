@@ -682,11 +682,7 @@ class Network(baseobject.DatabaseBackedObject):
                      % subst)
 
 
-# TODO(mikal): can this be refactored into baseobject?
-class Networks(object):
-    def __init__(self, filters):
-        self.filters = filters
-
+class Networks(baseobject.DatabaseBackedObjectIterator):
     def __iter__(self):
         for _, n in etcd.get_all('network', None):
             if n['uuid'] == 'floating':
@@ -696,13 +692,6 @@ class Networks(object):
             if not n:
                 continue
 
-            skip = False
-            for f in self.filters:
-                # If a filter returns false, we remove the network from
-                # the result set.
-                if not f(n):
-                    skip = True
-                    break
-
-            if not skip:
-                yield n
+            out = self.apply_filters(n)
+            if out:
+                yield out

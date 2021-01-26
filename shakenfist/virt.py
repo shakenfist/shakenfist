@@ -893,27 +893,16 @@ class Instance(baseobject.DatabaseBackedObject):
         self.enqueue_delete()
 
 
-# TODO(mikal): can this be refactored into baseobject?
-class Instances(object):
-    def __init__(self, filters):
-        self.filters = filters
-
+class Instances(baseobject.DatabaseBackedObjectIterator):
     def __iter__(self):
         for _, i in etcd.get_all('instance', None):
             i = Instance.from_db(i['uuid'])
             if not i:
                 continue
 
-            skip = False
-            for f in self.filters:
-                # If a filter returns false, we remove the instance from
-                # the result set.
-                if not f(i):
-                    skip = True
-                    break
-
-            if not skip:
-                yield i
+            out = self.apply_filters(i)
+            if out:
+                yield out
 
 
 def placement_filter(node, inst):
