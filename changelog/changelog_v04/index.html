@@ -18,7 +18,7 @@
     
     
       
-        <title>Changelog v04 - Shaken Fist</title>
+        <title>v0.4 - Shaken Fist</title>
       
     
     
@@ -94,7 +94,7 @@
         <div class="md-header-nav__topic">
           <span class="md-ellipsis">
             
-              Changelog v04
+              v0.4
             
           </span>
         </div>
@@ -539,12 +539,14 @@
 
   
   
+    
+  
   
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
       
-        <input class="md-nav__toggle md-toggle" data-md-toggle="nav-7" type="checkbox" id="nav-7" >
+        <input class="md-nav__toggle md-toggle" data-md-toggle="nav-7" type="checkbox" id="nav-7" checked>
       
       <label class="md-nav__link" for="nav-7">
         Change Log
@@ -557,6 +559,27 @@
         </label>
         <ul class="md-nav__list" data-md-scrollfix>
           
+          
+            
+  
+  
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+      
+        
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        v0.4
+      </a>
+      
+    </li>
+  
+
           
             
   
@@ -642,6 +665,12 @@
 <li>we are smarter about what networks we restore on startup, and don't restore dead networks.</li>
 </ul>
 <p>We also now require python 3.8.</p>
+<h1 id="changes-between-v040-and-v041">Changes between v0.4.0 and v0.4.1</h1>
+<p>v0.4.1 was released on 26 January 2021.</p>
+<ul>
+<li>Remove stray persist() call from floating network setup. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/667" title="GitHub Issue: shakenfist/shakenfist#667">shakenfist#667</a></li>
+<li>Networks should enter the 'created' state once setup on the network node. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/669" title="GitHub Issue: shakenfist/shakenfist#669">shakenfist#669</a></li>
+</ul>
                 
               
               
@@ -656,6 +685,41 @@
       
         
 <footer class="md-footer">
+  
+    <div class="md-footer-nav">
+      <nav class="md-footer-nav__inner md-grid" aria-label="Footer">
+        
+          <a href="../../power_states/" class="md-footer-nav__link md-footer-nav__link--prev" rel="prev">
+            <div class="md-footer-nav__button md-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
+            </div>
+            <div class="md-footer-nav__title">
+              <div class="md-ellipsis">
+                <span class="md-footer-nav__direction">
+                  Previous
+                </span>
+                Power States
+              </div>
+            </div>
+          </a>
+        
+        
+          <a href="../changelog_v03/" class="md-footer-nav__link md-footer-nav__link--next" rel="next">
+            <div class="md-footer-nav__title">
+              <div class="md-ellipsis">
+                <span class="md-footer-nav__direction">
+                  Next
+                </span>
+                v0.3
+              </div>
+            </div>
+            <div class="md-footer-nav__button md-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11H4z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    </div>
   
   <div class="md-footer-meta md-typeset">
     <div class="md-footer-meta__inner md-grid">
