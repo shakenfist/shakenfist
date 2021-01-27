@@ -23,7 +23,9 @@ with your specific cloud accounts.
 
 ## Step 2: ```shakenfist/shakenfist```
 
-Test that pypi will accept Markdown formatted README.
+Create a pull request to merge develop into master for shakenfist/shakenfist. As a releaser you do not need human review of that pull request (as they are so big and have already been reviewed in individual elements), but you do need to ensure that CI is passing before merging the change.
+
+Tag the release, update github, and then test that pypi will accept Markdown formatted README.
 
 In the shakenfist/shakenfist repo:
 
@@ -31,6 +33,8 @@ In the shakenfist/shakenfist repo:
 pip install --upgrade readme-renderer
 pip install --upgrade twine
 rm -f dist/*
+git checkout master
+git pull
 git tag -s v0.1.0 -m "Release v0.1.0"
 python3 setup.py sdist bdist_wheel
 twine check dist/*
@@ -40,7 +44,7 @@ twine upload dist/*
 
 ## Step 3: ```shakenfist/client-python```
 
-Test that pypi will accept Markdown formatted README.
+Tag the release, update github, and then test that pypi will accept Markdown formatted README.
 
 In the shakenfist/client-python repo:
 
