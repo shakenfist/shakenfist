@@ -148,8 +148,8 @@ def state_filter(states, o):
 
 # Do not use these filters for instances, use the ones in virt.py instead
 active_states_filter = partial(
-    state_filter, ['initial', 'creating', 'created'])
-inactive_states_filter = partial(state_filter, ['error', 'deleted'])
+    state_filter, ['initial', 'creating', 'created', 'error'])
+inactive_states_filter = partial(state_filter, ['deleted'])
 
 
 def state_age_filter(delay, o):

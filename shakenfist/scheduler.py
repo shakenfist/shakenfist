@@ -11,6 +11,7 @@ from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import images
 from shakenfist import logutil
+from shakenfist import node
 from shakenfist import util
 from shakenfist import virt
 
@@ -18,15 +19,37 @@ from shakenfist import virt
 LOG, _ = logutil.setup(__name__)
 
 
+# Lookup of the FQDN (called a UUID by the node object) is expensive,
+# and the network node doesn't move around, so just do it once here
+# and cache the result. This can't be done until config is loaded, so
+# the cache is populated by the first caller.
+CACHED_NETWORK_NODE = None
+
+
+def get_network_node():
+    global CACHED_NETWORK_NODE
+
+    if CACHED_NETWORK_NODE:
+        return CACHED_NETWORK_NODE
+
+    for n in node.Nodes([baseobject.active_states_filter]):
+        if n.ip == config.NETWORK_NODE_IP:
+            CACHED_NETWORK_NODE = n
+            return CACHED_NETWORK_NODE
+
+    return None
+
+
 class Scheduler(object):
     def __init__(self):
+        self.metrics = {}
         self.refresh_metrics()
 
     def refresh_metrics(self):
         metrics = {}
 
-        for node in db.get_nodes(seen_recently=True):
-            node_name = node['fqdn']
+        for n in node.Nodes([baseobject.active_states_filter]):
+            node_name = n.uuid
             try:
                 metrics[node_name] = db.get_metrics(node_name)
             except exceptions.ReadException:
@@ -84,18 +107,18 @@ class Scheduler(object):
         # how we do this to avoid repeatedly scanning the etcd repository.
         per_node = {}
         for inst in virt.Instances([]):
-            node = inst.placement
-            if node.get('node'):
-                per_node.setdefault(node['node'], [])
-                per_node[node['node']].append(inst)
+            n = inst.placement
+            if n.get('node'):
+                per_node.setdefault(n['node'], [])
+                per_node[n['node']].append(inst)
 
         candidates_network_matches = {}
-        for node in candidates:
-            candidates_network_matches[node] = 0
+        for n in candidates:
+            candidates_network_matches[n] = 0
 
             # Make a list of networks for the node
             present_networks = []
-            for inst in per_node.get(node, []):
+            for inst in per_node.get(n, []):
                 for iface in db.get_instance_interfaces(inst.uuid):
                     if not iface['network_uuid'] in present_networks:
                         present_networks.append(iface['network_uuid'])
@@ -103,22 +126,22 @@ class Scheduler(object):
             # Count the requested networks present on this node
             for network in present_networks:
                 if network in requested_networks:
-                    candidates_network_matches[node] += 1
+                    candidates_network_matches[n] += 1
 
         # Store candidate nodes keyed by number of matches
         candidates_by_network_matches = {}
-        for node in candidates:
-            matches = candidates_network_matches[node]
-            candidates_by_network_matches.setdefault(matches, []).append(node)
+        for n in candidates:
+            matches = candidates_network_matches[n]
+            candidates_by_network_matches.setdefault(matches, []).append(n)
 
         # Find maximum matches of networks on a node
         max_matches = max(candidates_by_network_matches.keys())
 
         # Check that the maximum is not just the network node.
         # (Network node always has every network.)
-        net_node = db.get_network_node()['fqdn']
+        net_node = get_network_node()
         if (max_matches == 1 and
-                candidates_by_network_matches[max_matches][0] == net_node):
+                candidates_by_network_matches[max_matches][0] == net_node.uuid):
             # No preference, all candidates are a reasonable choice
             return candidates
 
@@ -128,8 +151,8 @@ class Scheduler(object):
     def _find_most_matching_images(self, requested_images, candidates):
         # Determine number of matching images per node
         candidates_image_matches = {}
-        for node in candidates:
-            candidates_image_matches[node] = 0
+        for n in candidates:
+            candidates_image_matches[n] = 0
 
         for image in requested_images:
             for i in images.Images(filters=[partial(images.url_filter, image),
@@ -138,10 +161,10 @@ class Scheduler(object):
 
         # Create dict of candidate lists keyed by number of image matches
         candidates_by_image_matches = {}
-        for node in candidates:
-            matches = candidates_image_matches[node]
+        for n in candidates:
+            matches = candidates_image_matches[n]
             candidates_by_image_matches.setdefault(matches, [])
-            candidates_by_image_matches[matches].append(node)
+            candidates_by_image_matches[matches].append(n)
 
         # If no matches, return the original candidate list
         if len(candidates_by_image_matches) == 0:
@@ -164,13 +187,13 @@ class Scheduler(object):
                     'Scheduling: forced candidates')
                 instance.add_event('schedule',
                                    'Forced candidates', None, str(candidates))
-                for node in candidates:
-                    if node not in self.metrics:
-                        raise exceptions.CandidateNodeNotFoundException(node)
+                for n in candidates:
+                    if n not in self.metrics:
+                        raise exceptions.CandidateNodeNotFoundException(n)
             else:
                 candidates = []
-                for node in self.metrics.keys():
-                    candidates.append(node)
+                for n in self.metrics.keys():
+                    candidates.append(n)
             log_ctx.with_field('candidates', candidates).info(
                 'Scheduling: Initial candidates')
             instance.add_event('schedule',
@@ -179,10 +202,10 @@ class Scheduler(object):
                 raise exceptions.LowResourceException('No nodes with metrics')
 
             # Can we host that many vCPUs?
-            for node in copy.copy(candidates):
-                max_cpu = self.metrics[node].get('cpu_max_per_instance', 0)
+            for n in copy.copy(candidates):
+                max_cpu = self.metrics[n].get('cpu_max_per_instance', 0)
                 if instance.cpus > max_cpu:
-                    candidates.remove(node)
+                    candidates.remove(n)
             log_ctx.with_field('candidates', candidates).info(
                 'Scheduling: have enough actual CPU')
             instance.add_event('schedule',
@@ -192,10 +215,10 @@ class Scheduler(object):
                     'Requested vCPUs exceeds vCPU limit')
 
             # Do we have enough idle CPU?
-            for node in copy.copy(candidates):
+            for n in copy.copy(candidates):
                 if not self._has_sufficient_cpu(
-                        instance.cpus, node):
-                    candidates.remove(node)
+                        instance.cpus, n):
+                    candidates.remove(n)
             log_ctx.with_field('candidates', candidates).info(
                 'Scheduling: have enough idle CPU')
             instance.add_event('schedule',
@@ -205,10 +228,10 @@ class Scheduler(object):
                     'No nodes with enough idle CPU')
 
             # Do we have enough idle RAM?
-            for node in copy.copy(candidates):
+            for n in copy.copy(candidates):
                 if not self._has_sufficient_ram(
-                        instance.memory, node):
-                    candidates.remove(node)
+                        instance.memory, n):
+                    candidates.remove(n)
             log_ctx.with_field('candidates', candidates).info(
                 'Scheduling: Have enough idle RAM')
             instance.add_event('schedule',
@@ -218,9 +241,9 @@ class Scheduler(object):
                     'No nodes with enough idle RAM')
 
             # Do we have enough idle disk?
-            for node in copy.copy(candidates):
-                if not self._has_sufficient_disk(instance, node):
-                    candidates.remove(node)
+            for n in copy.copy(candidates):
+                if not self._has_sufficient_disk(instance, n):
+                    candidates.remove(n)
             log_ctx.with_field('candidates', candidates).info(
                 'Scheduling: Have enough idle disk')
             instance.add_event('schedule',
@@ -259,9 +282,9 @@ class Scheduler(object):
                                None, str(candidates))
 
             # Avoid allocating to network node if possible
-            net_node = db.get_network_node()
-            if len(candidates) > 1 and net_node['fqdn'] in candidates:
-                candidates.remove(net_node['fqdn'])
+            net_node = get_network_node()
+            if len(candidates) > 1 and net_node.uuid in candidates:
+                candidates.remove(net_node.uuid)
                 log_ctx.with_field('candidates', candidates).info(
                     'Scheduling: Are non-network nodes')
                 instance.add_event('schedule', 'Are non-network nodes',

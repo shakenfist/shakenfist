@@ -7,6 +7,7 @@ import time
 
 from shakenfist import baseobject
 from shakenfist import db
+from shakenfist import node
 from shakenfist import util
 from shakenfist import virt
 
@@ -50,9 +51,9 @@ def main():
     etcd_client = Etcd3Client()
 
     versions = {}
-    for node in db.get_nodes():
+    for n in node.Nodes([baseobject.active_states_filter]):
         versions.setdefault(node.get('version', 'unknown'), 0)
-        versions[node.get('version', 'unknown')] += 1
+        versions[n.installed_version] += 1
 
     print('Deployed versions:')
     for version in sorted(versions):

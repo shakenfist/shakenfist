@@ -120,7 +120,7 @@ class CleanerTestCase(test_shakenfist.ShakenFistTestCase):
                 new_callable=mock.PropertyMock)
     @mock.patch('shakenfist.etcd.get', side_effect=fake_get)
     @mock.patch('shakenfist.db.get_lock')
-    @mock.patch('shakenfist.db.see_this_node')
+    @mock.patch('shakenfist.node.Node.observe')
     @mock.patch('shakenfist.db.add_event')
     @mock.patch('shakenfist.virt.Instance._db_get', side_effect=fake_instance_get)
     @mock.patch('shakenfist.etcd.put', side_effect=fake_put)

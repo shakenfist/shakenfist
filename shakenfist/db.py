@@ -15,48 +15,6 @@ ETCD_ATTEMPT_TIMEOUT = 60
 
 LOG, _ = logutil.setup(__name__)
 
-
-#####################################################################
-# Nodes
-#####################################################################
-def see_this_node():
-    etcd.put(
-        'node', None, config.NODE_NAME,
-        {
-            'fqdn': config.NODE_NAME,
-            'ip': config.NODE_IP,
-            'lastseen': time.time(),
-            'version': util.get_version()
-        },
-        ttl=120)
-
-
-def get_node_ips():
-    for _, value in etcd.get_all('node', None):
-        yield value['ip']
-
-
-def get_node(fqdn, seen_recently=False):
-    node = etcd.get('node', None, fqdn)
-    if not node:
-        return None
-    if seen_recently and (time.time() - node.get('lastseen', 0) > 300):
-        return None
-    return node
-
-
-def get_nodes(seen_recently=False):
-    for _, value in etcd.get_all('node', None):
-        if seen_recently and (time.time() - value.get('lastseen', 0) > 300):
-            continue
-        yield value
-
-
-def get_network_node():
-    for n in get_nodes():
-        if n['ip'] == config.NETWORK_NODE_IP:
-            return n
-
 #####################################################################
 # Locks
 #####################################################################

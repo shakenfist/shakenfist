@@ -11,7 +11,15 @@ from shakenfist.virt import Instance
 
 class FakeInstance(Instance):
     def add_event(self, operation, phase, duration=None, message=None):
-        pass
+        print('op = %s, phase = %s, message = %s'
+              % (operation, phase, message))
+
+
+class FakeNode(object):
+    def __init__(self, fqdn, ip):
+        self.uuid = fqdn
+        self.ip = ip
+        self.state = 'created'
 
 
 class FakeDB(object):
@@ -23,14 +31,6 @@ class FakeDB(object):
     def set_node_metrics_same(self, metrics):
         for n in self.nodes:
             self.metrics[n] = metrics
-
-    # Faked methods from the db class
-    def get_nodes(self, seen_recently=False):
-        node_data = []
-        for i in range(len(self.nodes)):
-            n = self.nodes[i]
-            node_data.append({'fqdn': n, 'ip': '10.0.0.'+str(i+1)})
-        return node_data
 
     def get_instance_interfaces(self, inst_uuid):
         return self.interfaces[inst_uuid]
@@ -61,11 +61,12 @@ class SchedulerTestCase(test_shakenfist.ShakenFistTestCase):
         self.recorded_op.start()
         self.addCleanup(self.recorded_op.stop)
 
-        self.mock_config = mock.patch('shakenfist.db.config', fake_config)
+        self.mock_config = mock.patch(
+            'shakenfist.scheduler.config', fake_config)
         self.mock_config.start()
         self.addCleanup(self.mock_config.stop)
 
-        self.mock_see_this_node = mock.patch('shakenfist.db.see_this_node')
+        self.mock_see_this_node = mock.patch('shakenfist.node.Node.observe')
         self.mock_see_this_node.start()
         self.addCleanup(self.mock_see_this_node.stop)
 
@@ -82,15 +83,24 @@ class LowResourceTestCase(SchedulerTestCase):
 
         self.fake_db = FakeDB(['node1_net', 'node2', 'node3', 'node4'])
 
-        mock_db_get_nodes = mock.patch('shakenfist.db.get_nodes',
-                                       side_effect=self.fake_db.get_nodes)
-        mock_db_get_nodes.start()
-        self.addCleanup(mock_db_get_nodes.stop)
-
         mock_db_get_metrics = mock.patch('shakenfist.db.get_metrics',
                                          side_effect=self.fake_db.get_metrics)
         mock_db_get_metrics.start()
         self.addCleanup(mock_db_get_metrics.stop)
+
+        self.mock_config = mock.patch(
+            'shakenfist.scheduler.config', fake_config)
+        self.mock_config.start()
+        self.addCleanup(self.mock_config.stop)
+
+        mock_get_nodes = mock.patch(
+            'shakenfist.node.Nodes',
+            return_value=[FakeNode('node1_net', '10.0.0.1'),
+                          FakeNode('node2', '10.0.0.2'),
+                          FakeNode('node3', '10.0.0.3'),
+                          FakeNode('node4', '10.0.0.4')])
+        mock_get_nodes.start()
+        self.addCleanup(mock_get_nodes.stop)
 
         self.mock_get_instances = mock.patch('shakenfist.virt.Instances')
         self.mock_get_instances.start()
@@ -266,15 +276,24 @@ class CorrectAllocationTestCase(SchedulerTestCase):
         self.fake_db = FakeDB(['node1_net', 'node2', 'node3', 'node4'],
                               {'inst-1': [{'network_uuid': 'uuid-net1'}]})
 
-        mock_db_get_nodes = mock.patch('shakenfist.db.get_nodes',
-                                       side_effect=self.fake_db.get_nodes)
-        mock_db_get_nodes.start()
-        self.addCleanup(mock_db_get_nodes.stop)
-
         mock_db_get_metrics = mock.patch('shakenfist.db.get_metrics',
                                          side_effect=self.fake_db.get_metrics)
         mock_db_get_metrics.start()
         self.addCleanup(mock_db_get_metrics.stop)
+
+        self.mock_config = mock.patch(
+            'shakenfist.scheduler.config', fake_config)
+        self.mock_config.start()
+        self.addCleanup(self.mock_config.stop)
+
+        mock_get_nodes = mock.patch(
+            'shakenfist.node.Nodes',
+            return_value=[FakeNode('node1_net', '10.0.0.1'),
+                          FakeNode('node2', '10.0.0.2'),
+                          FakeNode('node3', '10.0.0.3'),
+                          FakeNode('node4', '10.0.0.4')])
+        mock_get_nodes.start()
+        self.addCleanup(mock_get_nodes.stop)
 
         self.mock_get_instance_interfaces = mock.patch(
             'shakenfist.db.get_instance_interfaces',
@@ -383,10 +402,19 @@ class FindMostTestCase(SchedulerTestCase):
                                          ],
                                })
 
-        mock_db_get_nodes = mock.patch('shakenfist.db.get_nodes',
-                                       side_effect=self.fake_db.get_nodes)
-        mock_db_get_nodes.start()
-        self.addCleanup(mock_db_get_nodes.stop)
+        self.mock_config = mock.patch(
+            'shakenfist.scheduler.config', fake_config)
+        self.mock_config.start()
+        self.addCleanup(self.mock_config.stop)
+
+        mock_get_nodes = mock.patch(
+            'shakenfist.node.Nodes',
+            return_value=[FakeNode('node1_net', '10.0.0.1'),
+                          FakeNode('node2', '10.0.0.2'),
+                          FakeNode('node3', '10.0.0.3'),
+                          FakeNode('node4', '10.0.0.4')])
+        mock_get_nodes.start()
+        self.addCleanup(mock_get_nodes.stop)
 
         mock_db_get_metrics = mock.patch('shakenfist.db.get_metrics',
                                          side_effect=self.fake_db.get_metrics)

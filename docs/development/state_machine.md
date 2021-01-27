@@ -14,3 +14,10 @@ Instances
 * Deleted -> None: the instance has been hard deleted after sitting deleted for some period of time.
 
 * Any instance may enter the Error state, which happens when something bad has happened. That process involves the instance being moved to a transition state named for the instance's previous state, so for example an instance which was Created that went into Error would transition through Created-Error. This is done because the Error transition is a queue job and happens sometime later. Instances in the Error state are not removed like those in the deleted state, as we assume a caller must acknowledge an error occured. To remove them, delete the instance in Error state.
+
+Nodes
+-----
+
+* None -> Created: on first check in, a node is created in the "created" state.
+* Created -> Deleted: the node was manually evacuated and removed.
+* Created -> Error: the node has not check in for a while, and all instances on this node have been declared to be in an error state. **This is not yet implemented.**
