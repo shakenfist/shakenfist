@@ -25,7 +25,7 @@ class TestImages(base.BaseTestCase):
                 cache.setdefault(img['url'], [])
                 cache[img['url']].append(img)
 
-            self.assertEqual(1, len(cache.get(url)))
+            self.assertIn(url, cache)
             if cache[url][0]['state'] == 'created':
                 return
 
