@@ -6,7 +6,7 @@ pipeline {
   }
 
   stages {
-    stage('Dependancies') {
+    stage('Dependencies') {
       steps {
         sh '''  echo "Wait for apt to finish its on-boot work"
                 sleep 60
