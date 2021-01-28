@@ -43,6 +43,8 @@ def get_network_node():
 class Scheduler(object):
     def __init__(self):
         self.metrics = {}
+        self.metrics_updated = 0
+
         self.refresh_metrics()
 
     def refresh_metrics(self):

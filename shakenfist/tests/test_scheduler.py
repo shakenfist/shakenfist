@@ -1,4 +1,5 @@
 import mock
+import time
 
 from shakenfist import exceptions
 from shakenfist import images
@@ -716,3 +717,175 @@ class FindMostTestCase(SchedulerTestCase):
             ['req_image2'], candidates)
         self.assertSetEqual(
             set(['node1_net', 'node2', 'node3']), set(finalists))
+
+
+class ForcedCandidatesTestCase(SchedulerTestCase):
+    """Test when we force candidates."""
+
+    def setUp(self):
+        super(ForcedCandidatesTestCase, self).setUp()
+
+        self.fake_db = FakeDB(['node1_net', 'node2', 'node3', 'node4'])
+
+        mock_db_get_metrics = mock.patch('shakenfist.db.get_metrics',
+                                         side_effect=self.fake_db.get_metrics)
+        mock_db_get_metrics.start()
+        self.addCleanup(mock_db_get_metrics.stop)
+
+        self.mock_config = mock.patch(
+            'shakenfist.scheduler.config', fake_config)
+        self.mock_config.start()
+        self.addCleanup(self.mock_config.stop)
+
+        mock_get_nodes = mock.patch(
+            'shakenfist.node.Nodes',
+            return_value=[FakeNode('node1_net', '10.0.0.1'),
+                          FakeNode('node2', '10.0.0.2'),
+                          FakeNode('node3', '10.0.0.3'),
+                          FakeNode('node4', '10.0.0.4')])
+        mock_get_nodes.start()
+        self.addCleanup(mock_get_nodes.stop)
+
+        self.mock_get_instances = mock.patch('shakenfist.virt.Instances')
+        self.mock_get_instances.start()
+        self.addCleanup(self.mock_get_instances.stop)
+
+    @mock.patch('shakenfist.images.Image.new')
+    @mock.patch('shakenfist.images.Images', return_value=[])
+    def test_only_network_node(self, mock_get_image_meta, mock_image_from_url):
+        self.fake_db.set_node_metrics_same({
+            'cpu_max_per_instance': 16,
+            'cpu_max': 4,
+            'memory_available': 22000,
+            'memory_max': 24000,
+            'disk_free': 2000*1024*1024*1024
+        })
+
+        fake_inst = FakeInstance({
+            'uuid': 'fakeuuid',
+            'cpus': 1,
+            'memory': 1024,
+            'disk_spec': [{
+                'base': 'cirros',
+                        'size': 8
+            }]})
+
+        nodes = scheduler.Scheduler().place_instance(
+            fake_inst, [], candidates=['node1_net'])
+        self.assertSetEqual({'node1_net', }, set(nodes))
+
+    @mock.patch('shakenfist.images.Image.new')
+    @mock.patch('shakenfist.images.Images', return_value=[])
+    def test_only_two(self, mock_get_image_meta, mock_image_from_url):
+        self.fake_db.set_node_metrics_same({
+            'cpu_max_per_instance': 16,
+            'cpu_max': 4,
+            'memory_available': 22000,
+            'memory_max': 24000,
+            'disk_free': 2000*1024*1024*1024
+        })
+
+        fake_inst = FakeInstance({
+            'uuid': 'fakeuuid',
+            'cpus': 1,
+            'memory': 1024,
+            'disk_spec': [{
+                'base': 'cirros',
+                        'size': 8
+            }]})
+
+        nodes = scheduler.Scheduler().place_instance(
+            fake_inst, [], candidates=['node1_net', 'node2'])
+        self.assertSetEqual({'node2', }, set(nodes))
+
+    @mock.patch('shakenfist.images.Image.new')
+    @mock.patch('shakenfist.images.Images', return_value=[])
+    def test_no_such_node(self, mock_get_image_meta, mock_image_from_url):
+        self.fake_db.set_node_metrics_same({
+            'cpu_max_per_instance': 16,
+            'cpu_max': 4,
+            'memory_available': 22000,
+            'memory_max': 24000,
+            'disk_free': 2000*1024*1024*1024
+        })
+
+        fake_inst = FakeInstance({
+            'uuid': 'fakeuuid',
+            'cpus': 1,
+            'memory': 1024,
+            'disk_spec': [{
+                'base': 'cirros',
+                        'size': 8
+            }]})
+
+        self.assertRaises(
+            exceptions.CandidateNodeNotFoundException,
+            scheduler.Scheduler().place_instance,
+            fake_inst, [], candidates=['barry'])
+
+
+class MetricsRefreshTestCase(SchedulerTestCase):
+    """Test that we refresh metrics."""
+
+    def setUp(self):
+        super(MetricsRefreshTestCase, self).setUp()
+
+        self.fake_db = FakeDB(['node1_net', 'node2', 'node3', 'node4'])
+
+        mock_db_get_metrics = mock.patch('shakenfist.db.get_metrics',
+                                         side_effect=self.fake_db.get_metrics)
+        mock_db_get_metrics.start()
+        self.addCleanup(mock_db_get_metrics.stop)
+
+        self.mock_config = mock.patch(
+            'shakenfist.scheduler.config', fake_config)
+        self.mock_config.start()
+        self.addCleanup(self.mock_config.stop)
+
+        mock_get_nodes = mock.patch(
+            'shakenfist.node.Nodes',
+            return_value=[FakeNode('node1_net', '10.0.0.1'),
+                          FakeNode('node2', '10.0.0.2'),
+                          FakeNode('node3', '10.0.0.3'),
+                          FakeNode('node4', '10.0.0.4')])
+        mock_get_nodes.start()
+        self.addCleanup(mock_get_nodes.stop)
+
+        self.mock_get_instances = mock.patch('shakenfist.virt.Instances')
+        self.mock_get_instances.start()
+        self.addCleanup(self.mock_get_instances.stop)
+
+    @mock.patch('shakenfist.images.Image.new')
+    @mock.patch('shakenfist.images.Images', return_value=[])
+    def test_refresh(self, mock_get_image_meta, mock_image_from_url):
+        fake_inst = FakeInstance({
+            'uuid': 'fakeuuid',
+            'cpus': 1,
+            'memory': 1024,
+            'disk_spec': [{
+                'base': 'cirros',
+                        'size': 8
+            }]})
+
+        self.fake_db.set_node_metrics_same({
+            'cpu_max_per_instance': 16,
+            'cpu_max': 4,
+            'memory_available': 22000,
+            'memory_max': 24000,
+            'disk_free': 2000*1024*1024*1024
+        })
+
+        s = scheduler.Scheduler()
+        s.place_instance(fake_inst, [])
+        self.assertEqual(22000, s.metrics['node1_net']['memory_available'])
+
+        self.fake_db.set_node_metrics_same({
+            'cpu_max_per_instance': 16,
+            'cpu_max': 4,
+            'memory_available': 11000,
+            'memory_max': 24000,
+            'disk_free': 2000*1024*1024*1024
+        })
+        s.metrics_updated = time.time() - 400
+        s.place_instance(fake_inst, [])
+        self.assertEqual(11000, s.metrics['node1_net']['memory_available'])
