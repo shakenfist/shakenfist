@@ -609,34 +609,34 @@ class Network(baseobject.DatabaseBackedObject):
             self.log.with_field(
                 'discovered', discovered).debug('Discovered mesh elements')
 
-            for node in discovered:
-                if node in node_ips:
-                    node_ips.remove(node)
+            for n in discovered:
+                if n in node_ips:
+                    node_ips.remove(n)
                 else:
-                    self._remove_mesh_element(node)
-                    removed.append(node)
+                    self._remove_mesh_element(n)
+                    removed.append(n)
 
-            for node in node_ips:
-                self._add_mesh_element(node)
-                added.append(node)
+            for n in node_ips:
+                self._add_mesh_element(n)
+                added.append(n)
 
             if removed:
                 self.add_event('remove mesh elements', ' '.join(removed))
             if added:
                 self.add_event('add mesh elements', ' '.join(added))
 
-    def _add_mesh_element(self, node):
-        self.log.info('Adding new mesh element %s', node)
+    def _add_mesh_element(self, n):
+        self.log.info('Adding new mesh element %s', n)
         subst = self.subst_dict()
-        subst['node'] = node
+        subst['node'] = n
         util.execute(None,
                      'bridge fdb append to 00:00:00:00:00:00 '
                      'dst %(node)s dev %(vx_interface)s' % subst)
 
-    def _remove_mesh_element(self, node):
-        self.log.info('Removing excess mesh element %s', node)
+    def _remove_mesh_element(self, n):
+        self.log.info('Removing excess mesh element %s', n)
         subst = self.subst_dict()
-        subst['node'] = node
+        subst['node'] = n
         util.execute(None,
                      'bridge fdb del to 00:00:00:00:00:00 dst %(node)s '
                      'dev %(vx_interface)s' % subst)
