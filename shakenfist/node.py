@@ -1,7 +1,7 @@
+from functools import partial
 import time
 
 from shakenfist import baseobject
-from shakenfist.config import config
 from shakenfist import etcd
 from shakenfist import logutil
 from shakenfist import util
@@ -15,13 +15,15 @@ class Node(baseobject.DatabaseBackedObject):
     current_version = 2
     state_targets = {
         None: ('created'),
-        'created': ('deleted', 'error')
+        'created': ('deleted', 'error', 'missing'),
+        'missing': ('created', 'error')
     }
 
     # docs/development/state_machine.md has a description of these states.
     STATE_CREATED = 'created'
     STATE_ERROR = 'error'
     STATE_DELETED = 'deleted'
+    STATE_MISSING = 'missing'
 
     def __init__(self, static_values):
         # We treat a node name as a UUID here for historical reasons
@@ -57,6 +59,18 @@ class Node(baseobject.DatabaseBackedObject):
 
         return Node(static_values)
 
+    def external_view(self):
+        # If this is an external view, then mix back in attributes that users
+        # expect
+        return {
+            'uuid': self.uuid,
+            'fqdn': self.fqdn,
+            'ip': self.ip,
+            'state': self.state.value,
+            'lastseen': self.last_seen,
+            'release': self.installed_version
+        }
+
     # Static values
     @property
     def ip(self):
@@ -89,3 +103,9 @@ class Nodes(baseobject.DatabaseBackedObjectIterator):
             out = self.apply_filters(n)
             if out:
                 yield out
+
+
+active_states_filter = partial(
+    baseobject.state_filter, ['created'])
+inactive_states_filter = partial(
+    baseobject.state_filter, ['deleted', 'error', 'missing'])

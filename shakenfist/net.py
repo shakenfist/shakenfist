@@ -16,7 +16,7 @@ from shakenfist import etcd
 from shakenfist.exceptions import DeadNetwork
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
-from shakenfist import node
+from shakenfist.node import Node
 from shakenfist.tasks import (DeployNetworkTask,
                               UpdateDHCPNetworkTask,
                               RemoveDHCPNetworkTask,
@@ -599,7 +599,7 @@ class Network(baseobject.DatabaseBackedObject):
             # as an overlay cloud...
             node_ips = [config.NETWORK_NODE_IP]
             for fqdn in node_fqdns:
-                n = node.Node.from_db(fqdn)
+                n = Node.from_db(fqdn)
                 if n:
                     ip = n.ip
                     if ip not in node_ips:

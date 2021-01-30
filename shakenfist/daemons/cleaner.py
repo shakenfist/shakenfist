@@ -11,6 +11,10 @@ from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import logutil
 from shakenfist import net
+from shakenfist.node import (
+    Node, Nodes,
+    active_states_filter as node_active_states_filter,
+    inactive_states_filter as node_inactive_states_filter)
 from shakenfist import util
 from shakenfist import virt
 
@@ -176,6 +180,26 @@ class Monitor(daemon.Daemon):
                 LOG.with_networkinterface(
                     ni['uuid']).info('Hard deleting network interface')
                 db.hard_delete_network_interface(ni['uuid'])
+
+            # Find ndoes which have been offline for a long time
+            for n in Nodes([node_inactive_states_filter]):
+                age = time.time() - n.last_seen
+                if age > config.NODE_CHECKIN_MAXIMUM * 10:
+                    n.state = Node.STATE_ERROR
+                    for i in virt.Instances([
+                            virt.active_states_filter,
+                            partial(virt.placement_filter, n.uuid)]):
+                        LOG.with_object(i).with_object(n).info(
+                            'Node in error state, erroring instance')
+                        # Note, this queue job is just in case the node comes
+                        # back.
+                        i.enqueue_delete_due_error('Node in error state')
+
+            # Find nodes which haven't checked in recently
+            for n in Nodes([node_active_states_filter]):
+                age = time.time() - n.last_seen
+                if age > config.NODE_CHECKIN_MAXIMUM:
+                    n.state = Node.STATE_MISSING
 
             # Perform etcd maintenance
             if time.time() - last_compaction > 1800:

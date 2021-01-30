@@ -106,6 +106,11 @@ class SFConfig(SFConfigBase):
         description='How long to wait before removing old data from the '
                     'database',
     )
+    NODE_CHECKIN_MAXIMUM: int = Field(
+        300,
+        description='How long to wait before declaring a node to be offline '
+                    'due to failure to check in',
+    )
 
     # Other options
     ZONE: str = Field(

@@ -11,7 +11,8 @@ from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import images
 from shakenfist import logutil
-from shakenfist import node
+from shakenfist.node import (
+    Nodes, active_states_filter as node_active_states_filter)
 from shakenfist import util
 from shakenfist import virt
 
@@ -32,7 +33,7 @@ def get_network_node():
     if CACHED_NETWORK_NODE:
         return CACHED_NETWORK_NODE
 
-    for n in node.Nodes([baseobject.active_states_filter]):
+    for n in Nodes([node_active_states_filter]):
         if n.ip == config.NETWORK_NODE_IP:
             CACHED_NETWORK_NODE = n
             return CACHED_NETWORK_NODE
@@ -50,7 +51,7 @@ class Scheduler(object):
     def refresh_metrics(self):
         metrics = {}
 
-        for n in node.Nodes([baseobject.active_states_filter]):
+        for n in Nodes([node_active_states_filter]):
             node_name = n.uuid
             try:
                 metrics[node_name] = db.get_metrics(node_name)

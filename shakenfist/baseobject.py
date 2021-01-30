@@ -146,7 +146,8 @@ def state_filter(states, o):
     return o.state.value in states
 
 
-# Do not use these filters for instances, use the ones in virt.py instead
+# Do not use these filters for instances or nodes, use the more
+# specific ones instead
 active_states_filter = partial(
     state_filter, ['initial', 'creating', 'created', 'error'])
 inactive_states_filter = partial(state_filter, ['deleted'])

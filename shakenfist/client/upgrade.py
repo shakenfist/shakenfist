@@ -7,7 +7,7 @@ import time
 
 from shakenfist import baseobject
 from shakenfist import db
-from shakenfist import node
+from shakenfist.node import Node
 from shakenfist import util
 from shakenfist import virt
 
@@ -284,7 +284,7 @@ def main():
                 data = etcd_client.get('/sf/node/%s' % old_name)
                 old_node = json.loads(data.decode('utf-8'))
 
-                n = node.Node.new(old_node['fqdn'], old_node['ip'])
+                n = Node.new(old_node['fqdn'], old_node['ip'])
                 n._db_set_attribute('observed', {
                     'at': old_node['lastseen'],
                     'release': old_node['version']

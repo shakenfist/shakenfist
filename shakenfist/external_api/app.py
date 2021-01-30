@@ -39,7 +39,7 @@ from shakenfist import images
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
-from shakenfist import node
+from shakenfist.node import Node, Nodes
 from shakenfist import scheduler
 from shakenfist import util
 from shakenfist import virt
@@ -667,10 +667,10 @@ class Instances(Resource):
 
         # If we are placed, make sure that node exists
         if placed_on:
-            n = node.Node.from_db(placed_on)
+            n = Node.from_db(placed_on)
             if not n:
                 return error(404, 'Specified node does not exist')
-            if n.state.value != node.Node.STATE_CREATED:
+            if n.state.value != Node.STATE_CREATED:
                 return error(404, 'Specified node not ready')
 
         # Sanity check
@@ -1391,7 +1391,7 @@ class NetworkPing(Resource):
         }
 
 
-class Nodes(Resource):
+class NodesEndpoint(Resource):
     @jwt_required
     @caller_is_admin
     @marshal_with({
@@ -1402,7 +1402,7 @@ class Nodes(Resource):
     })
     def get(self):
         out = []
-        for n in node.Nodes([]):
+        for n in Nodes([]):
             out.append(n.external_view())
         return out
 
@@ -1455,4 +1455,4 @@ api.add_resource(NetworkMetadata,
 api.add_resource(NetworkPing,
                  '/networks/<network_uuid>/ping/<address>')
 
-api.add_resource(Nodes, '/nodes')
+api.add_resource(NodesEndpoint, '/nodes')

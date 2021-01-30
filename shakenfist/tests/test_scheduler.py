@@ -95,7 +95,7 @@ class LowResourceTestCase(SchedulerTestCase):
         self.addCleanup(self.mock_config.stop)
 
         mock_get_nodes = mock.patch(
-            'shakenfist.node.Nodes',
+            'shakenfist.scheduler.Nodes',
             return_value=[FakeNode('node1_net', '10.0.0.1'),
                           FakeNode('node2', '10.0.0.2'),
                           FakeNode('node3', '10.0.0.3'),
@@ -288,7 +288,7 @@ class CorrectAllocationTestCase(SchedulerTestCase):
         self.addCleanup(self.mock_config.stop)
 
         mock_get_nodes = mock.patch(
-            'shakenfist.node.Nodes',
+            'shakenfist.scheduler.Nodes',
             return_value=[FakeNode('node1_net', '10.0.0.1'),
                           FakeNode('node2', '10.0.0.2'),
                           FakeNode('node3', '10.0.0.3'),
@@ -409,7 +409,7 @@ class FindMostTestCase(SchedulerTestCase):
         self.addCleanup(self.mock_config.stop)
 
         mock_get_nodes = mock.patch(
-            'shakenfist.node.Nodes',
+            'shakenfist.scheduler.Nodes',
             return_value=[FakeNode('node1_net', '10.0.0.1'),
                           FakeNode('node2', '10.0.0.2'),
                           FakeNode('node3', '10.0.0.3'),
@@ -738,7 +738,7 @@ class ForcedCandidatesTestCase(SchedulerTestCase):
         self.addCleanup(self.mock_config.stop)
 
         mock_get_nodes = mock.patch(
-            'shakenfist.node.Nodes',
+            'shakenfist.scheduler.Nodes',
             return_value=[FakeNode('node1_net', '10.0.0.1'),
                           FakeNode('node2', '10.0.0.2'),
                           FakeNode('node3', '10.0.0.3'),
@@ -843,7 +843,7 @@ class MetricsRefreshTestCase(SchedulerTestCase):
         self.addCleanup(self.mock_config.stop)
 
         mock_get_nodes = mock.patch(
-            'shakenfist.node.Nodes',
+            'shakenfist.scheduler.Nodes',
             return_value=[FakeNode('node1_net', '10.0.0.1'),
                           FakeNode('node2', '10.0.0.2'),
                           FakeNode('node3', '10.0.0.3'),

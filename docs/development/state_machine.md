@@ -20,4 +20,5 @@ Nodes
 
 * None -> Created: on first check in, a node is created in the "created" state.
 * Created -> Deleted: the node was manually evacuated and removed.
-* Created -> Error: the node has not check in for a while, and all instances on this node have been declared to be in an error state. **This is not yet implemented.**
+* Created -> Missing: the node has not checked in within the NODE_CHECKIN_MAXIMUM deadline.
+* Created -> Error: the node has not check in for ten times NODE_CHECKIN_MAXIMUM, and all instances on this node have been declared to be in an error state.
