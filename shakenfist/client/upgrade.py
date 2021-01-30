@@ -60,12 +60,12 @@ def main():
             '/sf/attribute/node/%s/observed' % n['fqdn'])
         if observed:
             # New style node
-            observed = json.loads(observed.decode('utf-8'))
+            observed = json.loads(observed[0].decode('utf-8'))
             release = observed['release']
-            old_style_nodes.append(n['fqdn'])
         else:
             # Old style node
             release = n.get('version', 'unknown')
+            old_style_nodes.append(n['fqdn'])
 
         releases.setdefault(release, 0)
         releases[release] += 1
@@ -282,13 +282,15 @@ def main():
                 # because we might not be running on that node and might
                 # get the details wrong. Let the node do that thing.
                 data = etcd_client.get('/sf/node/%s' % old_name)
-                old_node = json.loads(data.decode('utf-8'))
+                old_node = json.loads(data[0].decode('utf-8'))
+                etcd_client.delete('/sf/node/%s' % old_name)
 
                 n = Node.new(old_node['fqdn'], old_node['ip'])
                 n._db_set_attribute('observed', {
                     'at': old_node['lastseen'],
                     'release': old_node['version']
                 })
+                print('--> Upgraded node %s to version 2' % old_name)
 
 
 if __name__ == '__main__':

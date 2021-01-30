@@ -27,7 +27,7 @@ class Node(baseobject.DatabaseBackedObject):
 
     def __init__(self, static_values):
         # We treat a node name as a UUID here for historical reasons
-        super(Node, self).__init__(static_values['name'],
+        super(Node, self).__init__(static_values['fqdn'],
                                    static_values.get('version'))
 
         self.__ip = static_values['ip']
@@ -49,11 +49,11 @@ class Node(baseobject.DatabaseBackedObject):
         return n
 
     @staticmethod
-    def from_db(name):
-        if not name:
+    def from_db(fqdn):
+        if not fqdn:
             return None
 
-        static_values = Node._db_get(name)
+        static_values = Node._db_get(fqdn)
         if not static_values:
             return None
 

@@ -112,7 +112,7 @@ def main():
     # here because it acts like a "upsert". It will create the node object if it
     # doesn't already exist.
     db.clear_stale_locks()
-    Node.new(config.NODE_NAME, config.NODE_IP).checkin()
+    Node.new(config.NODE_NAME, config.NODE_IP).observe()
     db.restart_queues()
 
     def _start_daemon(d):
@@ -241,4 +241,4 @@ def main():
 
         # Checkin. We use Node.new here because it acts like a "upsert". It will
         # create the node object if it doesn't already exist.
-        Node.new(config.NODE_NAME, config.NODE_IP).checkin()
+        Node.new(config.NODE_NAME, config.NODE_IP).observe()
