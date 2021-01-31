@@ -1,5 +1,6 @@
 import base64
-import urllib
+import requests
+import time
 
 from shakenfist_ci import base
 
@@ -61,7 +62,7 @@ echo 'Floating IPs work!' > /var/www/html/index.html
         ifaces = self.test_client.get_instance_interfaces(inst['uuid'])
         self.assertNotEqual(None, ifaces[0]['floating'])
 
-        data = urllib.request.urlopen(
-            'http://%s/' % ifaces[0]['floating']).read()
-        if not data.find('Floating IPs work!'):
-            self.fail('HTTP request did not return correct results!\n\n%s' % out)
+        time.sleep(120)
+        r = requests.request('GET', 'http://%s/' % ifaces[0]['floating'])
+        self.assertEqual(200, r.status_code)
+        self.assertEqual('Floating IPs work!\n', r.text)
