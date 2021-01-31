@@ -153,6 +153,11 @@ pipeline {
           '''
         }
       }
+    stage('Re-run upgrade to make sure that its a noop') {
+      steps {
+        sh '''  sf-upgrade'''
+      }
+    }
     stage('Run CI tests') {
       steps {
         sh '''  # Run the nextgen CI
