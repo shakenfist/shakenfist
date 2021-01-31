@@ -181,13 +181,13 @@ class Monitor(daemon.Daemon):
                     ni['uuid']).info('Hard deleting network interface')
                 db.hard_delete_network_interface(ni['uuid'])
 
-            # Find ndoes which have been offline for a long time
+            # Find nodes which have been offline for a long time
             for n in Nodes([node_inactive_states_filter]):
                 age = time.time() - n.last_seen
                 if age > config.NODE_CHECKIN_MAXIMUM * 10:
                     n.state = Node.STATE_ERROR
                     for i in virt.Instances([
-                            virt.active_states_filter,
+                            virt.healthy_states_filter,
                             partial(virt.placement_filter, n.uuid)]):
                         LOG.with_object(i).with_object(n).info(
                             'Node in error state, erroring instance')

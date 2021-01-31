@@ -101,7 +101,7 @@ class DatabaseBackedObject(object):
             orig = self.state
 
             # Ensure state change is valid
-            if new_value not in self.state_targets[orig.value]:
+            if new_value not in self.state_targets.get(orig.value, []):
                 raise exceptions.InvalidStateException(
                     'Invalid state change from %s to %s for object=%s uuid=%s',
                     orig.value, new_value, self.object_type, self.uuid)

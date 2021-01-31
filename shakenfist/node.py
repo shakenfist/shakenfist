@@ -14,8 +14,9 @@ class Node(baseobject.DatabaseBackedObject):
     object_type = 'node'
     current_version = 2
     state_targets = {
-        None: ('created'),
+        None: ('created', 'error', 'missing'),
         'created': ('deleted', 'error', 'missing'),
+        'error': ('error', 'deleted'),
         'missing': ('created', 'error')
     }
 
