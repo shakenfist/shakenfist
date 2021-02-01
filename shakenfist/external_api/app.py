@@ -58,7 +58,7 @@ TESTING = False
 SCHEDULER = None
 
 
-def error(status_code, message):
+def error(status_code, message, suppress_traceback=False):
     global TESTING
 
     body = {
@@ -66,15 +66,25 @@ def error(status_code, message):
         'status': status_code
     }
 
+    _, _, tb = sys.exc_info()
+    formatted_trace = traceback.format_exc()
+
     if TESTING or config.get('INCLUDE_TRACEBACKS'):
-        _, _, tb = sys.exc_info()
         if tb:
-            body['traceback'] = traceback.format_exc()
+            body['traceback'] = formatted_trace
 
     resp = flask.Response(json.dumps(body),
                           mimetype='application/json')
     resp.status_code = status_code
-    LOG.info('Returning API error: %d, %s' % (status_code, message))
+
+    if not suppress_traceback:
+        LOG.info('Returning API error: %d, %s\n    %s'
+                 % (status_code, message,
+                    '\n    '.join(formatted_trace.split('\n'))))
+    else:
+        LOG.info('Returning API error: %d, %s (traceback suppressed by caller)'
+                 % (status_code, message))
+
     return resp
 
 
@@ -129,7 +139,8 @@ def generic_wrapper(func):
 
         except DecodeError:
             # Send a more informative message than 'Not enough segments'
-            return error(401, 'invalid JWT in Authorization header')
+            return error(401, 'invalid JWT in Authorization header',
+                         suppress_traceback=True)
 
         except (JWTDecodeError,
                 NoAuthorizationError,
@@ -140,7 +151,7 @@ def generic_wrapper(func):
                 CSRFError,
                 PyJWTError,
                 ) as e:
-            return error(401, str(e))
+            return error(401, str(e), suppress_traceback=True)
 
         except Exception as e:
             LOG.exception('Server error')
@@ -1109,16 +1120,23 @@ class InstanceConsoleData(Resource):
     @requires_instance_ownership
     @redirect_instance_request
     def get(self, instance_uuid=None, length=None, instance_from_db=None):
+        parsed_length = None
+
         if not length:
-            length = -1
+            parsed_length = -1
         else:
             try:
-                length = int(length)
+                parsed_length = int(length)
             except ValueError:
+                pass
+
+            # This is done this way so that there is no active traceback for
+            # the error call, otherwise it would be logged.
+            if parsed_length is None:
                 return error(400, 'length is not an integer')
 
         resp = flask.Response(
-            instance_from_db.get_console_data(length),
+            instance_from_db.get_console_data(parsed_length),
             mimetype='text/plain')
         resp.status_code = 200
         return resp
