@@ -18,7 +18,8 @@ from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist.tasks import (DeployNetworkTask,
                               UpdateDHCPNetworkTask,
-                              RemoveDHCPNetworkTask)
+                              RemoveDHCPNetworkTask,
+                              RemoveNATNetworkTask)
 from shakenfist import util
 from shakenfist import virt
 
@@ -423,7 +424,12 @@ class Network(baseobject.DatabaseBackedObject):
                 return
             self._delete_on_node()
             self.state = 'deleted'
+
         self.remove_dhcp()
+        self.remove_nat()
+
+        ipm = IPManager.from_db(self.uuid)
+        ipm.delete()
 
     def delete_on_node_with_lock(self):
         with self.get_lock(op='Network delete on node'):
@@ -537,6 +543,18 @@ class Network(baseobject.DatabaseBackedObject):
                              '-s %(ipblock)s/%(netmask)s '
                              '-o %(physical_veth_inner)s '
                              '-j MASQUERADE' % subst)
+
+    def remove_nat(self):
+        if util.is_network_node():
+            if self.floating_gateway:
+                ipm = IPManager.from_db('floating')
+                ipm.release(self.floating_gateway)
+                ipm.persist()
+                self.update_floating_gateway(None)
+
+        else:
+            db.enqueue('networknode', RemoveNATNetworkTask(self.uuid))
+            self.add_event('remove dhcp', 'enqueued')
 
     def discover_mesh(self):
         mesh_re = re.compile(r'00:00:00:00:00:00 dst (.*) self permanent')

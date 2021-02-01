@@ -22,6 +22,7 @@ from shakenfist.tasks import (QueueTask,
                               InstanceTask,
                               PreflightInstanceTask,
                               StartInstanceTask,
+                              DefloatNetworkInterfaceTask
                               )
 
 
@@ -260,11 +261,9 @@ def instance_delete(instance):
         with util.RecordedOperation('release network addresses', instance):
             for ni in db.get_instance_interfaces(instance.uuid):
                 if ni.get('floating'):
-                    with db.get_lock('ipmanager', None, 'floating',
-                                     ttl=120, op='Instance delete'):
-                        ipm = IPManager.from_db('floating')
-                        ipm.release(ni['floating'])
-                        ipm.persist()
+                    db.enqueue(
+                        'networknode',
+                        DefloatNetworkInterfaceTask(ni['network_uuid'], ni['uuid']))
 
                 with db.get_lock('ipmanager', None, ni['network_uuid'],
                                  ttl=120, op='Instance delete'):

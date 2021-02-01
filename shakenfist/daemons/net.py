@@ -8,12 +8,17 @@ from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import exceptions
+from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
 from shakenfist.tasks import (DeployNetworkTask,
                               NetworkTask,
                               RemoveDHCPNetworkTask,
-                              UpdateDHCPNetworkTask)
+                              RemoveNATNetworkTask,
+                              UpdateDHCPNetworkTask,
+                              NetworkInterfaceTask,
+                              FloatNetworkInterfaceTask,
+                              DefloatNetworkInterfaceTask)
 from shakenfist import util
 from shakenfist import virt
 
@@ -135,6 +140,92 @@ class Monitor(daemon.Daemon):
         # And record vxids in the database
         db.persist_node_vxid_mapping(config.NODE_NAME, vxid_to_mac)
 
+    def _process_network_workitem(self, log_ctx, workitem):
+        log_ctx = log_ctx.with_network(workitem.network_uuid())
+        n = net.Network.from_db(workitem.network_uuid())
+        if not n:
+            log_ctx.warning('Received work item for non-existent network')
+            return
+
+        # NOTE(mikal): there's really nothing stopping us from processing a bunch
+        # of these jobs in parallel with a pool of workers, but I am not sure its
+        # worth the complexity right now. Are we really going to be changing
+        # networks that much?
+
+        # Tasks valid for a network in any state
+        if isinstance(workitem, RemoveDHCPNetworkTask):
+            n.remove_dhcp()
+            db.add_event('network', workitem.network_uuid(),
+                         'network node', 'remove dhcp', None, None)
+            return
+
+        if isinstance(workitem, RemoveNATNetworkTask):
+            n.remove_nat()
+            db.add_event('network', workitem.network_uuid(),
+                         'network node', 'remove nat', None, None)
+            return
+
+        # Tasks that should not operate on a dead network
+        if n.is_dead():
+            log_ctx.with_fields({'state': n.state,
+                                 'workitem': workitem}).info(
+                'Received work item for a dead network')
+            return
+
+        if isinstance(workitem, DeployNetworkTask):
+            try:
+                n.create_on_network_node()
+                n.ensure_mesh()
+                n.state = 'created'
+                db.add_event('network', workitem.network_uuid(),
+                             'network node', 'deploy', None, None)
+            except exceptions.DeadNetwork as e:
+                log_ctx.with_field('exception', e).warning(
+                    'DeployNetworkTask on dead network')
+
+        elif isinstance(workitem, UpdateDHCPNetworkTask):
+            try:
+                n.create_on_network_node()
+                n.ensure_mesh()
+                db.add_event('network', workitem.network_uuid(),
+                             'network node', 'update dhcp', None, None)
+            except exceptions.DeadNetwork as e:
+                log_ctx.with_field('exception', e).warning(
+                    'UpdateDHCPNetworkTask on dead network')
+
+    def _process_networkinterface_workitem(self, log_ctx, workitem):
+        log_ctx = log_ctx.with_networkinterface(workitem.interface_uuid())
+        n = net.Network.from_db(workitem.network_uuid())
+        if not n:
+            log_ctx.warning('Received work item for non-existent network')
+            return
+
+        ni = db.get_network_interface(workitem.interface_uuid())
+        if not ni:
+            log_ctx.warning(
+                'Received work item for non-existent network interface')
+            return
+
+        # Tasks that should not operate on a dead network
+        if n.is_dead():
+            log_ctx.with_fields({'state': n.state,
+                                 'workitem': workitem}).info(
+                'Received work item for a dead network')
+            return
+
+        if isinstance(workitem, FloatNetworkInterfaceTask):
+            n.add_floating_ip(ni['floating'], ni['ipv4'])
+
+        elif isinstance(workitem, DefloatNetworkInterfaceTask):
+            n.remove_floating_ip(ni['floating'], ni['ipv4'])
+            db.remove_floating_from_interface(ni['uuid'])
+
+            db.add_event('interface', ni['uuid'], 'api', 'defloat', None, None)
+            with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Instance defloat'):
+                ipm = IPManager.from_db('floating')
+                ipm.release(ni['floating'])
+                ipm.persist()
+
     def _process_network_node_workitems(self):
         jobname, workitem = db.dequeue('networknode')
         try:
@@ -143,55 +234,13 @@ class Monitor(daemon.Daemon):
                 return
 
             log_ctx = LOG.with_field('workitem', workitem)
-            if not NetworkTask.__subclasscheck__(type(workitem)):
+            if NetworkTask.__subclasscheck__(type(workitem)):
+                self._process_network_workitem(log_ctx, workitem)
+            elif NetworkInterfaceTask.__subclasscheck__(type(workitem)):
+                self._process_networkinterface_workitem(log_ctx, workitem)
+            else:
                 raise exceptions.UnknownTaskException(
                     'Network workitem was not decoded: %s' % workitem)
-
-            log_ctx = log_ctx.with_network(workitem.network_uuid())
-            n = net.Network.from_db(workitem.network_uuid())
-            if not n:
-                log_ctx.warning('Received work item for non-existent network')
-                return
-
-            # NOTE(mikal): there's really nothing stopping us from processing a bunch
-            # of these jobs in parallel with a pool of workers, but I am not sure its
-            # worth the complexity right now. Are we really going to be changing
-            # networks that much?
-
-            # Tasks valid for a network in any state
-            if isinstance(workitem, RemoveDHCPNetworkTask):
-                n.remove_dhcp()
-                db.add_event('network', workitem.network_uuid(),
-                             'network node', 'remove dhcp', None, None)
-                return
-
-            # Tasks that should not operate on a dead network
-            if n.is_dead():
-                log_ctx.with_fields({'state': n.state,
-                                     'workitem': workitem}).info(
-                    'Received work item for a dead network')
-                return
-
-            if isinstance(workitem, DeployNetworkTask):
-                try:
-                    n.create_on_network_node()
-                    n.ensure_mesh()
-                    n.state = 'created'
-                    db.add_event('network', workitem.network_uuid(),
-                                 'network node', 'deploy', None, None)
-                except exceptions.DeadNetwork as e:
-                    log_ctx.with_field('exception', e).warning(
-                        'DeployNetworkTask on dead network')
-
-            elif isinstance(workitem, UpdateDHCPNetworkTask):
-                try:
-                    n.create_on_network_node()
-                    n.ensure_mesh()
-                    db.add_event('network', workitem.network_uuid(),
-                                 'network node', 'update dhcp', None, None)
-                except exceptions.DeadNetwork as e:
-                    log_ctx.with_field('exception', e).warning(
-                        'UpdateDHCPNetworkTask on dead network')
 
         finally:
             if jobname:

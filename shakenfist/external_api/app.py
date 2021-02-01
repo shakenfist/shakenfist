@@ -47,6 +47,8 @@ from shakenfist.tasks import (DeleteInstanceTask,
                               FetchImageTask,
                               PreflightInstanceTask,
                               StartInstanceTask,
+                              FloatNetworkInterfaceTask,
+                              DefloatNetworkInterfaceTask
                               )
 
 
@@ -1031,7 +1033,6 @@ class Interface(Resource):
 
 class InterfaceFloat(Resource):
     @jwt_required
-    @redirect_to_network_node
     def post(self, interface_uuid=None):
         ni, n, err = _safe_get_network_interface(interface_uuid)
         if err:
@@ -1041,6 +1042,7 @@ class InterfaceFloat(Resource):
         if not float_net:
             return error(404, 'floating network not found')
 
+        # Address is allocated and added to the record here, so the job has it later.
         db.add_event('interface', interface_uuid,
                      'api', 'float', None, None)
         with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Interface float'):
@@ -1049,12 +1051,12 @@ class InterfaceFloat(Resource):
             ipm.persist()
 
         db.add_floating_to_interface(ni['uuid'], addr)
-        n.add_floating_ip(addr, ni['ipv4'])
+        db.enqueue('networknode',
+                   FloatNetworkInterfaceTask(n.uuid, interface_uuid))
 
 
 class InterfaceDefloat(Resource):
     @jwt_required
-    @redirect_to_network_node
     def post(self, interface_uuid=None):
         ni, n, err = _safe_get_network_interface(interface_uuid)
         if err:
@@ -1064,15 +1066,10 @@ class InterfaceDefloat(Resource):
         if not float_net:
             return error(404, 'floating network not found')
 
-        db.add_event('interface', interface_uuid,
-                     'api', 'defloat', None, None)
-        with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Instance defloat'):
-            ipm = IPManager.from_db('floating')
-            ipm.release(ni['floating'])
-            ipm.persist()
-
-        db.remove_floating_from_interface(ni['uuid'])
-        n.remove_floating_ip(ni['floating'], ni['ipv4'])
+        # Address is freed as part of the job, so code is "unbalanced" compared
+        # to above for reasons.
+        db.enqueue('networknode',
+                   DefloatNetworkInterfaceTask(n.uuid, interface_uuid))
 
 
 class InstanceMetadatas(Resource):
