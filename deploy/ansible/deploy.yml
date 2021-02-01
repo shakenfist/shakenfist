@@ -257,6 +257,11 @@
         path: /srv/shakenfist/shakenfist*-py3-none-any.whl
         state: absent
 
+    # We use a shell command here because the service might not exist and
+    # that's ok.
+    - name: Stop the SF daemon
+      shell: systemctl stop sf || true
+
     - name: Copy shakenfist
       synchronize:
         src: ../../dist/{{hostvars['localhost']['shakenfist_wheel_path']}}
