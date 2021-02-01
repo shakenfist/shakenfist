@@ -169,6 +169,9 @@ def get_interface(interface_uuid):
 
 def update_network_interface_state(interface_uuid, state):
     ni = get_interface(interface_uuid)
+    if not ni:
+        return
+
     ni['state'] = state
     ni['state_updated'] = time.time()
     etcd.put('networkinterface', None, interface_uuid, ni)
