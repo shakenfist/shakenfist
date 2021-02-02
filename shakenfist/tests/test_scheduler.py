@@ -67,7 +67,8 @@ class SchedulerTestCase(test_shakenfist.ShakenFistTestCase):
         self.mock_config.start()
         self.addCleanup(self.mock_config.stop)
 
-        self.mock_see_this_node = mock.patch('shakenfist.node.Node.observe')
+        self.mock_see_this_node = mock.patch(
+            'shakenfist.node.Node.observe_this_node')
         self.mock_see_this_node.start()
         self.addCleanup(self.mock_see_this_node.stop)
 

@@ -2,6 +2,7 @@ from functools import partial
 import time
 
 from shakenfist import baseobject
+from shakenfist.config import config
 from shakenfist import etcd
 from shakenfist import logutil
 from shakenfist import util
@@ -13,18 +14,19 @@ LOG, _ = logutil.setup(__name__)
 class Node(baseobject.DatabaseBackedObject):
     object_type = 'node'
     current_version = 2
-    state_targets = {
-        None: ('created', 'error', 'missing'),
-        'created': ('deleted', 'error', 'missing'),
-        'error': ('error', 'deleted'),
-        'missing': ('created', 'error')
-    }
 
     # docs/development/state_machine.md has a description of these states.
     STATE_CREATED = 'created'
     STATE_ERROR = 'error'
     STATE_DELETED = 'deleted'
     STATE_MISSING = 'missing'
+
+    state_targets = {
+        None: (STATE_CREATED, STATE_ERROR, STATE_MISSING),
+        STATE_CREATED: (STATE_DELETED, STATE_ERROR, STATE_MISSING),
+        STATE_ERROR: (STATE_ERROR, STATE_DELETED),
+        STATE_MISSING: (STATE_CREATED, STATE_ERROR)
+    }
 
     def __init__(self, static_values):
         # We treat a node name as a UUID here for historical reasons
@@ -48,6 +50,18 @@ class Node(baseobject.DatabaseBackedObject):
         n.state = cls.STATE_CREATED
         n.add_event('db record creation', None)
         return n
+
+    @classmethod
+    def observe_this_node(cls):
+        # We use Node.new here because it acts like a "upsert". It will create
+        # the node object if it doesn't already exist, and otherwise use the
+        # existing one.
+        n = cls.new(config.NODE_NAME, config.NODE_IP)
+        n._db_set_attribute('observed',
+                            {
+                                'at': time.time(),
+                                'release': util.get_version()
+                            })
 
     @staticmethod
     def from_db(fqdn):
@@ -85,13 +99,6 @@ class Node(baseobject.DatabaseBackedObject):
     @property
     def installed_version(self):
         return self._db_get_attribute('observed')['release']
-
-    def observe(self):
-        self._db_set_attribute('observed',
-                               {
-                                   'at': time.time(),
-                                   'release': util.get_version()
-                               })
 
 
 class Nodes(baseobject.DatabaseBackedObjectIterator):

@@ -597,13 +597,11 @@ class Network(baseobject.DatabaseBackedObject):
             # NOTE(mikal): why not use DNS here? Well, DNS might be outside
             # the control of the deployer if we're running in a public cloud
             # as an overlay cloud...
-            node_ips = [config.NETWORK_NODE_IP]
+            node_ips = set(config.NETWORK_NODE_IP)
             for fqdn in node_fqdns:
                 n = Node.from_db(fqdn)
                 if n:
-                    ip = n.ip
-                    if ip not in node_ips:
-                        node_ips.append(ip)
+                    node_ips.add(n.ip)
 
             discovered = list(self.discover_mesh())
             self.log.with_field(

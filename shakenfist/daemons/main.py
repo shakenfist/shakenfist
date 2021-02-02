@@ -108,11 +108,9 @@ def main():
 
     daemon.set_log_level(LOG, 'main')
 
-    # Check in early and often, also reset processing queue items. We use Node.new
-    # here because it acts like a "upsert". It will create the node object if it
-    # doesn't already exist.
+    # Check in early and often, also reset processing queue items.
     db.clear_stale_locks()
-    Node.new(config.NODE_NAME, config.NODE_IP).observe()
+    Node.observe_this_node()
     db.restart_queues()
 
     def _start_daemon(d):
@@ -238,7 +236,4 @@ def main():
             wpid, _ = os.waitpid(-1, os.WNOHANG)
 
         _audit_daemons()
-
-        # Checkin. We use Node.new here because it acts like a "upsert". It will
-        # create the node object if it doesn't already exist.
-        Node.new(config.NODE_NAME, config.NODE_IP).observe()
+        Node.observe_this_node()
