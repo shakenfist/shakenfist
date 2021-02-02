@@ -32,5 +32,6 @@ nav:
                             - "Single Instance": "networking/single_instance.md"
                   - "Power States": "power_states.md"
         - Change Log:
+                  - v0.4: "changelog/changelog_v04.md"
                   - v0.3: "changelog/changelog_v03.md"
                   - v0.2: "changelog/changelog_v02.md"
