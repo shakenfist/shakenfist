@@ -163,12 +163,15 @@ def get_network_interfaces(network_uuid):
             yield ni
 
 
-def get_interface(interface_uuid):
+def get_network_interface(interface_uuid):
     return etcd.get('networkinterface', None, interface_uuid)
 
 
 def update_network_interface_state(interface_uuid, state):
-    ni = get_interface(interface_uuid)
+    ni = get_network_interface(interface_uuid)
+    if not ni:
+        return
+
     ni['state'] = state
     ni['state_updated'] = time.time()
     etcd.put('networkinterface', None, interface_uuid, ni)
@@ -178,13 +181,13 @@ def update_network_interface_state(interface_uuid, state):
 
 
 def add_floating_to_interface(interface_uuid, addr):
-    ni = get_interface(interface_uuid)
+    ni = get_network_interface(interface_uuid)
     ni['floating'] = addr
     etcd.put('networkinterface', None, interface_uuid, ni)
 
 
 def remove_floating_from_interface(interface_uuid):
-    ni = get_interface(interface_uuid)
+    ni = get_network_interface(interface_uuid)
     ni['floating'] = None
     etcd.put('networkinterface', None, interface_uuid, ni)
 

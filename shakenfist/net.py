@@ -1,5 +1,6 @@
 # Copyright 2020 Michael Still
 
+import ipaddress
 import os
 import psutil
 import random
@@ -17,7 +18,8 @@ from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist.tasks import (DeployNetworkTask,
                               UpdateDHCPNetworkTask,
-                              RemoveDHCPNetworkTask)
+                              RemoveDHCPNetworkTask,
+                              RemoveNATNetworkTask)
 from shakenfist import util
 from shakenfist import virt
 
@@ -422,7 +424,12 @@ class Network(baseobject.DatabaseBackedObject):
                 return
             self._delete_on_node()
             self.state = 'deleted'
+
         self.remove_dhcp()
+        self.remove_nat()
+
+        ipm = IPManager.from_db(self.uuid)
+        ipm.delete()
 
     def delete_on_node_with_lock(self):
         with self.get_lock(op='Network delete on node'):
@@ -537,6 +544,18 @@ class Network(baseobject.DatabaseBackedObject):
                              '-o %(physical_veth_inner)s '
                              '-j MASQUERADE' % subst)
 
+    def remove_nat(self):
+        if util.is_network_node():
+            if self.floating_gateway:
+                ipm = IPManager.from_db('floating')
+                ipm.release(self.floating_gateway)
+                ipm.persist()
+                self.update_floating_gateway(None)
+
+        else:
+            db.enqueue('networknode', RemoveNATNetworkTask(self.uuid))
+            self.add_event('remove dhcp', 'enqueued')
+
     def discover_mesh(self):
         mesh_re = re.compile(r'00:00:00:00:00:00 dst (.*) self permanent')
 
@@ -619,35 +638,48 @@ class Network(baseobject.DatabaseBackedObject):
                      'bridge fdb del to 00:00:00:00:00:00 dst %(node)s '
                      'dev %(vx_interface)s' % subst)
 
+    # NOTE(mikal): this call only works on the network node, the API
+    # server redirects there.
     def add_floating_ip(self, floating_address, inner_address):
         self.log.info('Adding floating ip %s -> %s',
                       floating_address, inner_address)
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
+        subst['floating_address_as_hex'] = '%08x' % int(
+            ipaddress.IPv4Address(floating_address))
         subst['inner_address'] = inner_address
 
         util.execute(None,
-                     'ip addr add %(floating_address)s/%(netmask)s '
-                     'dev %(physical_veth_outer)s' % subst)
+                     'ip link add flt-%(floating_address_as_hex)s-o type veth '
+                     'peer name flt-%(floating_address_as_hex)s-i'
+                     % subst)
+        util.execute(None,
+                     'ip link set flt-%(floating_address_as_hex)s-i netns %(netns)s'
+                     % subst)
+        util.execute(None,
+                     '%(in_netns)s ip addr add %(floating_address)s/32 '
+                     'dev flt-%(floating_address_as_hex)s-i'
+                     % subst)
         util.execute(None,
                      '%(in_netns)s iptables -t nat -A PREROUTING '
-                     '-d %(floating_address)s '
-                     '-j DNAT --to-destination %(inner_address)s' % subst)
+                     '-d %(floating_address)s -j DNAT '
+                     '--to-destination %(inner_address)s'
+                     % subst)
 
+    # NOTE(mikal): this call only works on the network node, the API
+    # server redirects there.
     def remove_floating_ip(self, floating_address, inner_address):
         self.log.info('Removing floating ip %s -> %s',
                       floating_address, inner_address)
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
+        subst['floating_address_as_hex'] = '%08x' % int(
+            ipaddress.IPv4Address(floating_address))
         subst['inner_address'] = inner_address
 
         util.execute(None,
-                     'ip addr del %(floating_address)s/%(netmask)s '
-                     'dev %(physical_veth_outer)s' % subst)
-        util.execute(None,
-                     '%(in_netns)s iptables -t nat -D PREROUTING '
-                     '-d %(floating_address)s '
-                     '-j DNAT --to-destination %(inner_address)s' % subst)
+                     'ip link del flt-%(floating_address_as_hex)s-o'
+                     % subst)
 
 
 # TODO(mikal): can this be refactored into baseobject?

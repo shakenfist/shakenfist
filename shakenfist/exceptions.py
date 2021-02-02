@@ -108,6 +108,10 @@ class NoNetworkTaskException(TaskException):
     pass
 
 
+class NoNetworkInterfaceTaskException(TaskException):
+    pass
+
+
 class NetworkNotListTaskException(TaskException):
     pass
 
