@@ -39,6 +39,7 @@ from shakenfist import images
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
+from shakenfist.node import Node, Nodes
 from shakenfist import scheduler
 from shakenfist import util
 from shakenfist import virt
@@ -665,8 +666,12 @@ class Instances(Resource):
             return error(400, 'instance name must be useable as a DNS host name')
 
         # If we are placed, make sure that node exists
-        if placed_on and not db.get_node(placed_on, seen_recently=True):
-            return error(404, 'Specified node does not exist')
+        if placed_on:
+            n = Node.from_db(placed_on)
+            if not n:
+                return error(404, 'Specified node does not exist')
+            if n.state.value != Node.STATE_CREATED:
+                return error(404, 'Specified node not ready')
 
         # Sanity check
         if not disk:
@@ -1386,7 +1391,7 @@ class NetworkPing(Resource):
         }
 
 
-class Nodes(Resource):
+class NodesEndpoint(Resource):
     @jwt_required
     @caller_is_admin
     @marshal_with({
@@ -1396,7 +1401,10 @@ class Nodes(Resource):
         'version': fields.String,
     })
     def get(self):
-        return list(db.get_nodes())
+        out = []
+        for n in Nodes([]):
+            out.append(n.external_view())
+        return out
 
 
 api.add_resource(Root, '/')
@@ -1447,4 +1455,4 @@ api.add_resource(NetworkMetadata,
 api.add_resource(NetworkPing,
                  '/networks/<network_uuid>/ping/<address>')
 
-api.add_resource(Nodes, '/nodes')
+api.add_resource(NodesEndpoint, '/nodes')

@@ -16,6 +16,7 @@ from shakenfist import etcd
 from shakenfist.exceptions import DeadNetwork
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
+from shakenfist.node import Node
 from shakenfist.tasks import (DeployNetworkTask,
                               UpdateDHCPNetworkTask,
                               RemoveDHCPNetworkTask,
@@ -596,44 +597,44 @@ class Network(baseobject.DatabaseBackedObject):
             # NOTE(mikal): why not use DNS here? Well, DNS might be outside
             # the control of the deployer if we're running in a public cloud
             # as an overlay cloud...
-            node_ips = [config.NETWORK_NODE_IP]
+            node_ips = set([config.NETWORK_NODE_IP])
             for fqdn in node_fqdns:
-                ip = db.get_node(fqdn)['ip']
-                if ip not in node_ips:
-                    node_ips.append(ip)
+                n = Node.from_db(fqdn)
+                if n:
+                    node_ips.add(n.ip)
 
             discovered = list(self.discover_mesh())
-            self.log.with_field(
-                'discovered', discovered).debug('Discovered mesh elements')
+            self.log.with_field('discovered', discovered).with_field(
+                'node_ips', node_ips).debug('Discovered mesh elements')
 
-            for node in discovered:
-                if node in node_ips:
-                    node_ips.remove(node)
+            for n in discovered:
+                if n in node_ips:
+                    node_ips.remove(n)
                 else:
-                    self._remove_mesh_element(node)
-                    removed.append(node)
+                    self._remove_mesh_element(n)
+                    removed.append(n)
 
-            for node in node_ips:
-                self._add_mesh_element(node)
-                added.append(node)
+            for n in node_ips:
+                self._add_mesh_element(n)
+                added.append(n)
 
             if removed:
                 self.add_event('remove mesh elements', ' '.join(removed))
             if added:
                 self.add_event('add mesh elements', ' '.join(added))
 
-    def _add_mesh_element(self, node):
-        self.log.info('Adding new mesh element %s', node)
+    def _add_mesh_element(self, n):
+        self.log.info('Adding new mesh element %s', n)
         subst = self.subst_dict()
-        subst['node'] = node
+        subst['node'] = n
         util.execute(None,
                      'bridge fdb append to 00:00:00:00:00:00 '
                      'dst %(node)s dev %(vx_interface)s' % subst)
 
-    def _remove_mesh_element(self, node):
-        self.log.info('Removing excess mesh element %s', node)
+    def _remove_mesh_element(self, n):
+        self.log.info('Removing excess mesh element %s', n)
         subst = self.subst_dict()
-        subst['node'] = node
+        subst['node'] = n
         util.execute(None,
                      'bridge fdb del to 00:00:00:00:00:00 dst %(node)s '
                      'dev %(vx_interface)s' % subst)
@@ -682,11 +683,7 @@ class Network(baseobject.DatabaseBackedObject):
                      % subst)
 
 
-# TODO(mikal): can this be refactored into baseobject?
-class Networks(object):
-    def __init__(self, filters):
-        self.filters = filters
-
+class Networks(baseobject.DatabaseBackedObjectIterator):
     def __iter__(self):
         for _, n in etcd.get_all('network', None):
             if n['uuid'] == 'floating':
@@ -696,13 +693,6 @@ class Networks(object):
             if not n:
                 continue
 
-            skip = False
-            for f in self.filters:
-                # If a filter returns false, we remove the network from
-                # the result set.
-                if not f(n):
-                    skip = True
-                    break
-
-            if not skip:
-                yield n
+            out = self.apply_filters(n)
+            if out:
+                yield out

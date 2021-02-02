@@ -19,6 +19,7 @@ from shakenfist import images
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
+from shakenfist.node import Node
 from shakenfist import util
 from shakenfist import virt
 
@@ -107,9 +108,9 @@ def main():
 
     daemon.set_log_level(LOG, 'main')
 
-    # Check in early and often, also reset processing queue items
+    # Check in early and often, also reset processing queue items.
     db.clear_stale_locks()
-    db.see_this_node()
+    Node.observe_this_node()
     db.restart_queues()
 
     def _start_daemon(d):
@@ -235,4 +236,4 @@ def main():
             wpid, _ = os.waitpid(-1, os.WNOHANG)
 
         _audit_daemons()
-        db.see_this_node()
+        Node.observe_this_node()

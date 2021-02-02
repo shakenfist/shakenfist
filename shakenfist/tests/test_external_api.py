@@ -734,38 +734,6 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
                          resp.get_json())
         self.assertEqual(404, resp.status_code)
 
-    @mock.patch('shakenfist.db.get_nodes',
-                return_value=[{
-                    'fqdn': 'sf-1',
-                    'ip': '192.168.72.240',
-                    'lastseen': 1594952905.2100437,
-                    'version': '0.0.1'
-                },
-                    {
-                    'fqdn': 'sf-2',
-                    'ip': '192.168.72.230',
-                    'lastseen': 1594952904.8870885,
-                    'version': '0.0.1'
-                }])
-    def test_get_node(self, mock_md_get):
-        resp = self.client.get('/nodes',
-                               headers={'Authorization': self.auth_header})
-        self.assertEqual([{
-            'name': 'sf-1',
-            'ip': '192.168.72.240',
-            'lastseen': 1594952905.2100437,
-            'version': '0.0.1'
-        },
-            {
-            'name': 'sf-2',
-            'ip': '192.168.72.230',
-            'lastseen': 1594952904.8870885,
-            'version': '0.0.1'
-        }],
-            resp.get_json())
-        self.assertEqual(200, resp.status_code)
-        self.assertEqual('application/json', resp.content_type)
-
 
 class ExternalApiInstanceTestCase(ExternalApiTestCase):
     def setUp(self):
@@ -998,7 +966,7 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
                     namespace='nonespace',
                     name='bob',
                     netblock='10.10.0.0/24'
-                    ))
+                ))
     @mock.patch('shakenfist.net.Networks',
                 return_value=[FakeNetwork(
                     uuid='30f6da44-look-i-am-uuid',
@@ -1006,7 +974,7 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
                     namespace='nonespace',
                     name='bob',
                     netblock='10.10.0.0/24'
-                    )])
+                )])
     @mock.patch('shakenfist.db.get_network_interfaces', return_value=[])
     @mock.patch('shakenfist.ipmanager.IPManager.from_db',
                 return_value=IPManager('uuid', '10.0.0.0/24'))
@@ -1046,7 +1014,7 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
                     name='bob',
                     netblock='10.10.0.0/24',
                     state='deleted'
-                    ))
+                ))
     @mock.patch('shakenfist.etcd.get_all',
                 return_value=[(None, {'uuid': '30f6da44-look-i-am-uuid'})])
     @mock.patch('shakenfist.db.get_network_interfaces', return_value=[])
