@@ -995,7 +995,7 @@ class InstanceUnpause(Resource):
 
 
 def _safe_get_network_interface(interface_uuid):
-    ni = db.get_interface(interface_uuid)
+    ni = db.get_network_interface(interface_uuid)
     if not ni:
         return None, None, error(404, 'interface not found')
 
