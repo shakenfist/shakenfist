@@ -63,6 +63,19 @@ echo 'Floating IPs work!' > /var/www/html/index.html
         self.assertNotEqual(None, ifaces[0]['floating'])
 
         time.sleep(120)
-        r = requests.request('GET', 'http://%s/' % ifaces[0]['floating'])
-        self.assertEqual(200, r.status_code)
-        self.assertEqual('Floating IPs work!\n', r.text)
+
+        attempts = 0
+        for _ in range(6):
+            attempts += 1
+            try:
+                r = requests.request(
+                    'GET', 'http://%s/' % ifaces[0]['floating'])
+                self.assertEqual(200, r.status_code)
+                self.assertEqual('Floating IPs work!\n', r.text)
+                return
+
+            except Exception as e:
+                if attempts < 5:
+                    pass
+                else:
+                    raise e
