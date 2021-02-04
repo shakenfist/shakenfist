@@ -114,7 +114,7 @@ class SFConfig(SFConfigBase):
 
     # Other options
     ZONE: str = Field(
-        'shaken', description='What nova called an availability zone'
+        'shakenfist', description='What nova called an availability zone'
     )
     DOWNLOAD_URL_CIRROS: AnyHttpUrl = Field(
         (
