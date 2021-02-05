@@ -42,18 +42,16 @@ class IPManager(object):
         return ipm
 
     def persist(self):
-        in_use = []
+        in_use = set()
         for ip in self.in_use:
-            ip_str = str(ip)
-            if ip_str not in in_use:
-                in_use.append(ip_str)
+            in_use.add(str(ip))
 
         d = {
-                'ipmanager.v1': {
-                    'ipblock': self.ipblock,
-                    'in_use': in_use
-                }
+            'ipmanager.v1': {
+                'ipblock': self.ipblock,
+                'in_use': list(in_use)
             }
+        }
         db.persist_ipmanager(self.uuid, d)
 
     def delete(self):
