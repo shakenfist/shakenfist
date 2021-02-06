@@ -14,7 +14,7 @@
         <link rel="canonical" href="https://shakenfist.com/development/ci_api_coverage/">
       
       <link rel="shortcut icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.1.2, mkdocs-material-6.2.5">
+      <meta name="generator" content="mkdocs-1.1.2, mkdocs-material-6.2.8">
     
     
       
@@ -22,10 +22,10 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.15aa0b43.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.cb6bc1d0.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.75751829.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.39b8e14a.min.css">
         
       
     
@@ -196,7 +196,6 @@
       
       
 
-
   
   
   
@@ -211,7 +210,6 @@
       
       
       
-
 
   
   
@@ -228,7 +226,6 @@
       
       
 
-
   
   
   
@@ -243,7 +240,6 @@
       
       
       
-
 
   
   
@@ -311,7 +307,6 @@
       
       
       
-
 
   
   
@@ -498,8 +493,8 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#get_image_meta" class="md-nav__link">
-    get_image_meta
+  <a href="#get_images" class="md-nav__link">
+    get_images
   </a>
   
 </li>
@@ -795,7 +790,6 @@
       
       
 
-
   
   
   
@@ -890,7 +884,6 @@
       
       
       
-
 
   
   
@@ -1106,8 +1099,8 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#get_image_meta" class="md-nav__link">
-    get_image_meta
+  <a href="#get_images" class="md-nav__link">
+    get_images
   </a>
   
 </li>
@@ -1408,10 +1401,13 @@
 <p>All callers of await_instance_event call get_instance(). <em>However, more testing of this method is required.</em></p>
 <h2 id="cache_image">cache_image</h2>
 <ul>
-<li>TestCacheImage.test_cache_image</li>
+<li>TestImages.test_cache_image</li>
 </ul>
-<h2 id="get_image_meta">get_image_meta</h2>
-<p><em>Not tested.</em></p>
+<h2 id="get_images">get_images</h2>
+<p>(Formerly get_image_meta, old name to be removed in 0.5).</p>
+<ul>
+<li>TestImages.test_cache_image</li>
+</ul>
 <h2 id="get_image_events">get_image_events</h2>
 <p><em>Not tested.</em></p>
 <h2 id="get_networks">get_networks</h2>
@@ -1553,15 +1549,15 @@
       
     </div>
     
-      <script src="../../assets/javascripts/vendor.93c04032.min.js"></script>
-      <script src="../../assets/javascripts/bundle.83e5331e.min.js"></script><script id="__lang" type="application/json">{"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing"}</script>
+      <script src="../../assets/javascripts/vendor.18f0862e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.994580cf.min.js"></script><script id="__lang" type="application/json">{"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing"}</script>
       
       <script>
         app = initialize({
           base: "../..",
           features: [],
           search: Object.assign({
-            worker: "../../assets/javascripts/worker/search.8c7e0a7e.min.js"
+            worker: "../../assets/javascripts/worker/search.9c0e82ba.min.js"
           }, typeof search !== "undefined" && search)
         })
       </script>

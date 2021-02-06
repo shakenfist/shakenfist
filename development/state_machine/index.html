@@ -14,7 +14,7 @@
         <link rel="canonical" href="https://shakenfist.com/development/state_machine/">
       
       <link rel="shortcut icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.1.2, mkdocs-material-6.2.5">
+      <meta name="generator" content="mkdocs-1.1.2, mkdocs-material-6.2.8">
     
     
       
@@ -22,10 +22,10 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.15aa0b43.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.cb6bc1d0.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.75751829.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.39b8e14a.min.css">
         
       
     
@@ -196,7 +196,6 @@
       
       
 
-
   
   
   
@@ -211,7 +210,6 @@
       
       
       
-
 
   
   
@@ -228,7 +226,6 @@
       
       
 
-
   
   
   
@@ -243,7 +240,6 @@
       
       
       
-
 
   
   
@@ -318,6 +314,13 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#nodes" class="md-nav__link">
+    Nodes
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -347,7 +350,6 @@
       
       
       
-
 
   
   
@@ -474,6 +476,13 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#nodes" class="md-nav__link">
+    Nodes
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -515,7 +524,6 @@
       
       
       
-
 
   
   
@@ -612,7 +620,6 @@
       
       
 
-
   
   
   
@@ -707,6 +714,13 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#nodes" class="md-nav__link">
+    Nodes
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -739,6 +753,13 @@
 <li>
 <p>Any instance may enter the Error state, which happens when something bad has happened. That process involves the instance being moved to a transition state named for the instance's previous state, so for example an instance which was Created that went into Error would transition through Created-Error. This is done because the Error transition is a queue job and happens sometime later. Instances in the Error state are not removed like those in the deleted state, as we assume a caller must acknowledge an error occured. To remove them, delete the instance in Error state.</p>
 </li>
+</ul>
+<h2 id="nodes">Nodes</h2>
+<ul>
+<li>None -&gt; Created: on first check in, a node is created in the "created" state.</li>
+<li>Created -&gt; Deleted: the node was manually evacuated and removed.</li>
+<li>Created -&gt; Missing: the node has not checked in within the NODE_CHECKIN_MAXIMUM deadline.</li>
+<li>Created -&gt; Error: the node has not check in for ten times NODE_CHECKIN_MAXIMUM, and all instances on this node have been declared to be in an error state.</li>
 </ul>
                 
               
@@ -806,15 +827,15 @@
       
     </div>
     
-      <script src="../../assets/javascripts/vendor.93c04032.min.js"></script>
-      <script src="../../assets/javascripts/bundle.83e5331e.min.js"></script><script id="__lang" type="application/json">{"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing"}</script>
+      <script src="../../assets/javascripts/vendor.18f0862e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.994580cf.min.js"></script><script id="__lang" type="application/json">{"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing"}</script>
       
       <script>
         app = initialize({
           base: "../..",
           features: [],
           search: Object.assign({
-            worker: "../../assets/javascripts/worker/search.8c7e0a7e.min.js"
+            worker: "../../assets/javascripts/worker/search.9c0e82ba.min.js"
           }, typeof search !== "undefined" && search)
         })
       </script>
