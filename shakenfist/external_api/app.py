@@ -39,6 +39,7 @@ from shakenfist import images
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
+from shakenfist.node import Node, Nodes
 from shakenfist import scheduler
 from shakenfist import util
 from shakenfist import virt
@@ -47,6 +48,8 @@ from shakenfist.tasks import (DeleteInstanceTask,
                               FetchImageTask,
                               PreflightInstanceTask,
                               StartInstanceTask,
+                              FloatNetworkInterfaceTask,
+                              DefloatNetworkInterfaceTask
                               )
 
 
@@ -58,7 +61,7 @@ TESTING = False
 SCHEDULER = None
 
 
-def error(status_code, message):
+def error(status_code, message, suppress_traceback=False):
     global TESTING
 
     body = {
@@ -66,15 +69,25 @@ def error(status_code, message):
         'status': status_code
     }
 
+    _, _, tb = sys.exc_info()
+    formatted_trace = traceback.format_exc()
+
     if TESTING or config.get('INCLUDE_TRACEBACKS'):
-        _, _, tb = sys.exc_info()
         if tb:
-            body['traceback'] = traceback.format_exc()
+            body['traceback'] = formatted_trace
 
     resp = flask.Response(json.dumps(body),
                           mimetype='application/json')
     resp.status_code = status_code
-    LOG.info('Returning API error: %d, %s' % (status_code, message))
+
+    if not suppress_traceback:
+        LOG.info('Returning API error: %d, %s\n    %s'
+                 % (status_code, message,
+                    '\n    '.join(formatted_trace.split('\n'))))
+    else:
+        LOG.info('Returning API error: %d, %s (traceback suppressed by caller)'
+                 % (status_code, message))
+
     return resp
 
 
@@ -129,7 +142,8 @@ def generic_wrapper(func):
 
         except DecodeError:
             # Send a more informative message than 'Not enough segments'
-            return error(401, 'invalid JWT in Authorization header')
+            return error(401, 'invalid JWT in Authorization header',
+                         suppress_traceback=True)
 
         except (JWTDecodeError,
                 NoAuthorizationError,
@@ -140,7 +154,7 @@ def generic_wrapper(func):
                 CSRFError,
                 PyJWTError,
                 ) as e:
-            return error(401, str(e))
+            return error(401, str(e), suppress_traceback=True)
 
         except Exception as e:
             LOG.exception('Server error')
@@ -242,9 +256,10 @@ def requires_instance_active(func):
             return error(404, 'instance not found')
 
         i = kwargs['instance_from_db']
-        if i.state.value in ['initial', 'preflight', 'creating']:
-            LOG.with_instance(i).info('Instance not active')
-            return error(406, 'instance not active')
+        if i.state.value != virt.Instance.STATE_CREATED:
+            LOG.with_instance(i).info(
+                'Instance not ready (%s)' % i.state.value)
+            return error(406, 'instance %s is not ready (%s)' % (i.uuid, i.state.value))
 
         return func(*args, **kwargs)
     return wrapper
@@ -321,9 +336,11 @@ def requires_network_active(func):
             return error(404, 'network not found')
 
         state = kwargs['network_from_db'].state
-        if state.value in ['initial', 'preflight', 'creating']:
-            log.info('Network not active')
-            return error(406, 'network not active')
+        if state.value != 'created':
+            log.info('Network not ready (%s)' % state.value)
+            return error(406,
+                         'network %s is not ready (%s)'
+                         % (kwargs['network_from_db'].uuid, state.value))
 
         return func(*args, **kwargs)
     return wrapper
@@ -649,8 +666,12 @@ class Instances(Resource):
             return error(400, 'instance name must be useable as a DNS host name')
 
         # If we are placed, make sure that node exists
-        if placed_on and not db.get_node(placed_on, seen_recently=True):
-            return error(404, 'Specified node does not exist')
+        if placed_on:
+            n = Node.from_db(placed_on)
+            if not n:
+                return error(404, 'Specified node does not exist')
+            if n.state.value != Node.STATE_CREATED:
+                return error(404, 'Specified node not ready')
 
         # Sanity check
         if not disk:
@@ -681,8 +702,8 @@ class Instances(Resource):
                 n = net.Network.from_db(net_uuid)
                 if not n:
                     return error(404, 'network %s does not exist' % net_uuid)
-                if n.state.value in ['initial', 'preflight', 'creating']:
-                    return error(406, 'network %s is not active' % net_uuid)
+                if n.state.value != 'created':
+                    return error(406, 'network %s is not ready (%s)' % (n.uuid, n.state.value))
 
         if not video:
             video = {'model': 'cirrus', 'memory': 16384}
@@ -981,7 +1002,7 @@ class InstanceUnpause(Resource):
 
 
 def _safe_get_network_interface(interface_uuid):
-    ni = db.get_interface(interface_uuid)
+    ni = db.get_network_interface(interface_uuid)
     if not ni:
         return None, None, error(404, 'interface not found')
 
@@ -1017,7 +1038,6 @@ class Interface(Resource):
 
 class InterfaceFloat(Resource):
     @jwt_required
-    @redirect_to_network_node
     def post(self, interface_uuid=None):
         ni, n, err = _safe_get_network_interface(interface_uuid)
         if err:
@@ -1027,6 +1047,7 @@ class InterfaceFloat(Resource):
         if not float_net:
             return error(404, 'floating network not found')
 
+        # Address is allocated and added to the record here, so the job has it later.
         db.add_event('interface', interface_uuid,
                      'api', 'float', None, None)
         with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Interface float'):
@@ -1035,12 +1056,12 @@ class InterfaceFloat(Resource):
             ipm.persist()
 
         db.add_floating_to_interface(ni['uuid'], addr)
-        n.add_floating_ip(addr, ni['ipv4'])
+        db.enqueue('networknode',
+                   FloatNetworkInterfaceTask(n.uuid, interface_uuid))
 
 
 class InterfaceDefloat(Resource):
     @jwt_required
-    @redirect_to_network_node
     def post(self, interface_uuid=None):
         ni, n, err = _safe_get_network_interface(interface_uuid)
         if err:
@@ -1050,15 +1071,10 @@ class InterfaceDefloat(Resource):
         if not float_net:
             return error(404, 'floating network not found')
 
-        db.add_event('interface', interface_uuid,
-                     'api', 'defloat', None, None)
-        with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Instance defloat'):
-            ipm = IPManager.from_db('floating')
-            ipm.release(ni['floating'])
-            ipm.persist()
-
-        db.remove_floating_from_interface(ni['uuid'])
-        n.remove_floating_ip(ni['floating'], ni['ipv4'])
+        # Address is freed as part of the job, so code is "unbalanced" compared
+        # to above for reasons.
+        db.enqueue('networknode',
+                   DefloatNetworkInterfaceTask(n.uuid, interface_uuid))
 
 
 class InstanceMetadatas(Resource):
@@ -1106,16 +1122,23 @@ class InstanceConsoleData(Resource):
     @requires_instance_ownership
     @redirect_instance_request
     def get(self, instance_uuid=None, length=None, instance_from_db=None):
+        parsed_length = None
+
         if not length:
-            length = -1
+            parsed_length = -1
         else:
             try:
-                length = int(length)
+                parsed_length = int(length)
             except ValueError:
+                pass
+
+            # This is done this way so that there is no active traceback for
+            # the error call, otherwise it would be logged.
+            if parsed_length is None:
                 return error(400, 'length is not an integer')
 
         resp = flask.Response(
-            instance_from_db.get_console_data(length),
+            instance_from_db.get_console_data(parsed_length),
             mimetype='text/plain')
         resp.status_code = 200
         return resp
@@ -1368,7 +1391,7 @@ class NetworkPing(Resource):
         }
 
 
-class Nodes(Resource):
+class NodesEndpoint(Resource):
     @jwt_required
     @caller_is_admin
     @marshal_with({
@@ -1378,7 +1401,10 @@ class Nodes(Resource):
         'version': fields.String,
     })
     def get(self):
-        return list(db.get_nodes())
+        out = []
+        for n in Nodes([]):
+            out.append(n.external_view())
+        return out
 
 
 api.add_resource(Root, '/')
@@ -1429,4 +1455,4 @@ api.add_resource(NetworkMetadata,
 api.add_resource(NetworkPing,
                  '/networks/<network_uuid>/ping/<address>')
 
-api.add_resource(Nodes, '/nodes')
+api.add_resource(NodesEndpoint, '/nodes')

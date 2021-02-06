@@ -2,6 +2,7 @@ from shakenfist.exceptions import (NoURLImageFetchTaskException,
                                    NetworkNotListTaskException,
                                    NoInstanceTaskException,
                                    NoNetworkTaskException,
+                                   NoNetworkInterfaceTaskException
                                    )
 
 
@@ -117,6 +118,53 @@ class UpdateDHCPNetworkTask(NetworkTask):
 
 class RemoveDHCPNetworkTask(NetworkTask):
     _name = 'network_remove_dhcp'
+
+
+class RemoveNATNetworkTask(NetworkTask):
+    _name = 'network_remove_nat'
+
+
+#
+# NetworkInterface Tasks
+#
+class NetworkInterfaceTask(QueueTask):
+    def __init__(self, network_uuid, interface_uuid):
+        super(NetworkInterfaceTask, self).__init__()
+        self._network_uuid = network_uuid
+        self._interface_uuid = interface_uuid
+
+        # General checks
+        if not network_uuid:
+            raise NoNetworkTaskException(
+                'No network specified for NetworkTask')
+        if not isinstance(network_uuid, str):
+            raise NoNetworkTaskException('Network UUID is not a string')
+
+        if not interface_uuid:
+            raise NoNetworkInterfaceTaskException(
+                'No network interface specified for NetworkInterfaceTask')
+        if not isinstance(interface_uuid, str):
+            raise NoNetworkInterfaceTaskException(
+                'Network interface UUID is not a string')
+
+    def network_uuid(self):
+        return self._network_uuid
+
+    def interface_uuid(self):
+        return self._interface_uuid
+
+    def obj_dict(self):
+        return {**super(NetworkInterfaceTask, self).obj_dict(),
+                'network_uuid': self._network_uuid,
+                'interface_uuid': self._interface_uuid}
+
+
+class FloatNetworkInterfaceTask(NetworkInterfaceTask):
+    _name = 'network_interface_float'
+
+
+class DefloatNetworkInterfaceTask(NetworkInterfaceTask):
+    _name = 'network_interface_defloat'
 
 
 #

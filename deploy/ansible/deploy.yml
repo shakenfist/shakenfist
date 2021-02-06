@@ -1,4 +1,5 @@
---- # Install shakenfist on a series of Ubuntu machines
+---
+# Install shakenfist on a series of Ubuntu machines
 - hosts: localhost
   gather_facts: yes
   connection: ssh
@@ -212,7 +213,7 @@
     - name: Abort if default interface MTU is too low
       fail:
         msg: "Node MTU is too low."
-      when: mode == "deploy" and cloud != "gcp" and cloud != "gcp-xl" and cloud != "localhost" and node_mtu|int < 2000
+      when: mode == "deploy" and ignore_mtu != "1" and node_mtu|int < 2000
 
     - name: Make /srv/shakenfist/
       file:
@@ -256,6 +257,11 @@
       file:
         path: /srv/shakenfist/shakenfist*-py3-none-any.whl
         state: absent
+
+    # We use a shell command here because the service might not exist and
+    # that's ok.
+    - name: Stop the SF daemon
+      shell: systemctl stop sf || true
 
     - name: Copy shakenfist
       synchronize:
@@ -583,9 +589,6 @@
     mode: deploy
 
   tasks:
-    - include: includes/ansible.yml
-      when: mode == "deploy"
-
     - name: Clear out old terraform providers
       file:
         path: /srv/shakenfist/terraform-provider-shakenfist

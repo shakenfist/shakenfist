@@ -1,5 +1,6 @@
 # Copyright 2020 Michael Still
 
+import ipaddress
 import os
 import psutil
 import random
@@ -15,9 +16,11 @@ from shakenfist import etcd
 from shakenfist.exceptions import DeadNetwork
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
+from shakenfist.node import Node
 from shakenfist.tasks import (DeployNetworkTask,
                               UpdateDHCPNetworkTask,
-                              RemoveDHCPNetworkTask)
+                              RemoveDHCPNetworkTask,
+                              RemoveNATNetworkTask)
 from shakenfist import util
 from shakenfist import virt
 
@@ -345,7 +348,8 @@ class Network(baseobject.DatabaseBackedObject):
                     util.execute(
                         None,
                         'brctl addif %(vx_bridge)s %(vx_veth_outer)s' % subst)
-                    util.execute(None, 'ip link set %(vx_veth_outer)s up' % subst)
+                    util.execute(
+                        None, 'ip link set %(vx_veth_outer)s up' % subst)
                     util.execute(
                         None,
                         '%(in_netns)s ip link set %(vx_veth_inner)s up' % subst)
@@ -410,24 +414,8 @@ class Network(baseobject.DatabaseBackedObject):
                                      '%(in_netns)s route add default '
                                      'gw %(floating_router)s' % subst)
 
-                if not util.nat_rules_for_ipblock(self.network_address):
-                    with util.RecordedOperation('enable nat', self):
-                        util.execute(None,
-                                     'echo 1 > /proc/sys/net/ipv4/ip_forward')
-                        util.execute(None,
-                                     '%(in_netns)s iptables -A FORWARD '
-                                     '-o %(physical_veth_inner)s '
-                                     '-i %(vx_veth_inner)s -j ACCEPT' % subst)
-                        util.execute(None,
-                                     '%(in_netns)s iptables -A FORWARD '
-                                     '-i %(physical_veth_inner)s '
-                                     '-o %(vx_veth_inner)s -j ACCEPT' % subst)
-                        util.execute(None,
-                                     '%(in_netns)s iptables -t nat -A POSTROUTING '
-                                     '-s %(ipblock)s/%(netmask)s '
-                                     '-o %(physical_veth_inner)s '
-                                     '-j MASQUERADE' % subst)
-            self.state = 'created'
+                self.enable_nat()
+
         self.update_dhcp()
 
     def delete(self):
@@ -437,7 +425,12 @@ class Network(baseobject.DatabaseBackedObject):
                 return
             self._delete_on_node()
             self.state = 'deleted'
+
         self.remove_dhcp()
+        self.remove_nat()
+
+        ipm = IPManager.from_db(self.uuid)
+        ipm.delete()
 
     def delete_on_node_with_lock(self):
         with self.get_lock(op='Network delete on node'):
@@ -529,6 +522,41 @@ class Network(baseobject.DatabaseBackedObject):
             db.enqueue('networknode', RemoveDHCPNetworkTask(self.uuid))
             self.add_event('remove dhcp', 'enqueued')
 
+    def enable_nat(self):
+        if not util.is_network_node():
+            return
+
+        subst = self.subst_dict()
+        if not util.nat_rules_for_ipblock(self.network_address):
+            with util.RecordedOperation('enable nat', self):
+                util.execute(None,
+                             'echo 1 > /proc/sys/net/ipv4/ip_forward')
+                util.execute(None,
+                             '%(in_netns)s iptables -A FORWARD '
+                             '-o %(physical_veth_inner)s '
+                             '-i %(vx_veth_inner)s -j ACCEPT' % subst)
+                util.execute(None,
+                             '%(in_netns)s iptables -A FORWARD '
+                             '-i %(physical_veth_inner)s '
+                             '-o %(vx_veth_inner)s -j ACCEPT' % subst)
+                util.execute(None,
+                             '%(in_netns)s iptables -t nat -A POSTROUTING '
+                             '-s %(ipblock)s/%(netmask)s '
+                             '-o %(physical_veth_inner)s '
+                             '-j MASQUERADE' % subst)
+
+    def remove_nat(self):
+        if util.is_network_node():
+            if self.floating_gateway:
+                ipm = IPManager.from_db('floating')
+                ipm.release(self.floating_gateway)
+                ipm.persist()
+                self.update_floating_gateway(None)
+
+        else:
+            db.enqueue('networknode', RemoveNATNetworkTask(self.uuid))
+            self.add_event('remove dhcp', 'enqueued')
+
     def discover_mesh(self):
         mesh_re = re.compile(r'00:00:00:00:00:00 dst (.*) self permanent')
 
@@ -569,84 +597,93 @@ class Network(baseobject.DatabaseBackedObject):
             # NOTE(mikal): why not use DNS here? Well, DNS might be outside
             # the control of the deployer if we're running in a public cloud
             # as an overlay cloud...
-            node_ips = [config.NETWORK_NODE_IP]
+            node_ips = set([config.NETWORK_NODE_IP])
             for fqdn in node_fqdns:
-                ip = db.get_node(fqdn)['ip']
-                if ip not in node_ips:
-                    node_ips.append(ip)
+                n = Node.from_db(fqdn)
+                if n:
+                    node_ips.add(n.ip)
 
             discovered = list(self.discover_mesh())
-            self.log.with_field(
-                'discovered', discovered).debug('Discovered mesh elements')
+            self.log.with_field('discovered', discovered).with_field(
+                'node_ips', node_ips).debug('Discovered mesh elements')
 
-            for node in discovered:
-                if node in node_ips:
-                    node_ips.remove(node)
+            for n in discovered:
+                if n in node_ips:
+                    node_ips.remove(n)
                 else:
-                    self._remove_mesh_element(node)
-                    removed.append(node)
+                    self._remove_mesh_element(n)
+                    removed.append(n)
 
-            for node in node_ips:
-                self._add_mesh_element(node)
-                added.append(node)
+            for n in node_ips:
+                self._add_mesh_element(n)
+                added.append(n)
 
             if removed:
                 self.add_event('remove mesh elements', ' '.join(removed))
             if added:
                 self.add_event('add mesh elements', ' '.join(added))
 
-    def _add_mesh_element(self, node):
-        self.log.info('Adding new mesh element %s', node)
+    def _add_mesh_element(self, n):
+        self.log.info('Adding new mesh element %s', n)
         subst = self.subst_dict()
-        subst['node'] = node
+        subst['node'] = n
         util.execute(None,
                      'bridge fdb append to 00:00:00:00:00:00 '
                      'dst %(node)s dev %(vx_interface)s' % subst)
 
-    def _remove_mesh_element(self, node):
-        self.log.info('Removing excess mesh element %s', node)
+    def _remove_mesh_element(self, n):
+        self.log.info('Removing excess mesh element %s', n)
         subst = self.subst_dict()
-        subst['node'] = node
+        subst['node'] = n
         util.execute(None,
                      'bridge fdb del to 00:00:00:00:00:00 dst %(node)s '
                      'dev %(vx_interface)s' % subst)
 
+    # NOTE(mikal): this call only works on the network node, the API
+    # server redirects there.
     def add_floating_ip(self, floating_address, inner_address):
         self.log.info('Adding floating ip %s -> %s',
                       floating_address, inner_address)
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
+        subst['floating_address_as_hex'] = '%08x' % int(
+            ipaddress.IPv4Address(floating_address))
         subst['inner_address'] = inner_address
 
         util.execute(None,
-                     'ip addr add %(floating_address)s/%(netmask)s '
-                     'dev %(physical_veth_outer)s' % subst)
+                     'ip link add flt-%(floating_address_as_hex)s-o type veth '
+                     'peer name flt-%(floating_address_as_hex)s-i'
+                     % subst)
+        util.execute(None,
+                     'ip link set flt-%(floating_address_as_hex)s-i netns %(netns)s'
+                     % subst)
+        util.execute(None,
+                     '%(in_netns)s ip addr add %(floating_address)s/32 '
+                     'dev flt-%(floating_address_as_hex)s-i'
+                     % subst)
         util.execute(None,
                      '%(in_netns)s iptables -t nat -A PREROUTING '
-                     '-d %(floating_address)s '
-                     '-j DNAT --to-destination %(inner_address)s' % subst)
+                     '-d %(floating_address)s -j DNAT '
+                     '--to-destination %(inner_address)s'
+                     % subst)
 
+    # NOTE(mikal): this call only works on the network node, the API
+    # server redirects there.
     def remove_floating_ip(self, floating_address, inner_address):
         self.log.info('Removing floating ip %s -> %s',
                       floating_address, inner_address)
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
+        subst['floating_address_as_hex'] = '%08x' % int(
+            ipaddress.IPv4Address(floating_address))
         subst['inner_address'] = inner_address
 
         util.execute(None,
-                     'ip addr del %(floating_address)s/%(netmask)s '
-                     'dev %(physical_veth_outer)s' % subst)
-        util.execute(None,
-                     '%(in_netns)s iptables -t nat -D PREROUTING '
-                     '-d %(floating_address)s '
-                     '-j DNAT --to-destination %(inner_address)s' % subst)
+                     'ip link del flt-%(floating_address_as_hex)s-o'
+                     % subst)
 
 
-# TODO(mikal): can this be refactored into baseobject?
-class Networks(object):
-    def __init__(self, filters):
-        self.filters = filters
-
+class Networks(baseobject.DatabaseBackedObjectIterator):
     def __iter__(self):
         for _, n in etcd.get_all('network', None):
             if n['uuid'] == 'floating':
@@ -656,13 +693,6 @@ class Networks(object):
             if not n:
                 continue
 
-            skip = False
-            for f in self.filters:
-                # If a filter returns false, we remove the network from
-                # the result set.
-                if not f(n):
-                    skip = True
-                    break
-
-            if not skip:
-                yield n
+            out = self.apply_filters(n)
+            if out:
+                yield out

@@ -27,6 +27,7 @@ class SFConfigBase(BaseSettings):
     """
     Separated from SFConfig for ease of testing
     """
+
     def get(self, key):
         return self.dict()[key]
 
@@ -105,6 +106,11 @@ class SFConfig(SFConfigBase):
         description='How long to wait before removing old data from the '
                     'database',
     )
+    NODE_CHECKIN_MAXIMUM: int = Field(
+        300,
+        description='How long to wait before declaring a node to be offline '
+                    'due to failure to check in',
+    )
 
     # Other options
     ZONE: str = Field(
@@ -146,7 +152,8 @@ class SFConfig(SFConfigBase):
     NODE_NAME: str = Field(
         default_factory=get_node_name, description='FQDN of this node'
     )
-    NODE_EGRESS_NIC: str = Field('eth0', description='NIC for outbound traffic')
+    NODE_EGRESS_NIC: str = Field(
+        'eth0', description='NIC for outbound traffic')
     STORAGE_PATH: str = Field(
         '/srv/shakenfist', description='Where on disk instances are stored'
     )

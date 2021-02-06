@@ -101,7 +101,7 @@ class DatabaseBackedObject(object):
             orig = self.state
 
             # Ensure state change is valid
-            if new_value not in self.state_targets[orig.value]:
+            if new_value not in self.state_targets.get(orig.value, []):
                 raise exceptions.InvalidStateException(
                     'Invalid state change from %s to %s for object=%s uuid=%s',
                     orig.value, new_value, self.object_type, self.uuid)
@@ -130,14 +130,27 @@ class DatabaseBackedObject(object):
         self._db_set_attribute('error', {'message': msg})
 
 
+class DatabaseBackedObjectIterator(object):
+    def __init__(self, filters):
+        self.filters = filters
+
+    def apply_filters(self, o):
+        for f in self.filters:
+            if not f(o):
+                return None
+
+        return o
+
+
 def state_filter(states, o):
     return o.state.value in states
 
 
-# Do not use these filters for instances, use the ones in virt.py instead
+# Do not use these filters for instances or nodes, use the more
+# specific ones instead
 active_states_filter = partial(
-    state_filter, ['initial', 'creating', 'created'])
-inactive_states_filter = partial(state_filter, ['error', 'deleted'])
+    state_filter, ['initial', 'creating', 'created', 'error'])
+inactive_states_filter = partial(state_filter, ['deleted'])
 
 
 def state_age_filter(delay, o):
