@@ -29,3 +29,16 @@ v0.4.1 was released on 26 January 2021.
 
 * Remove stray persist() call from floating network setup. shakenfist#667
 * Networks should enter the 'created' state once setup on the network node. shakenfist#669
+
+Changes between v0.4.1 and v0.4.2
+=================================
+
+v0.4.2 was released on 6 February 2021.
+
+* Improved CI for image API calls.
+* Improved upgrade CI testing.
+* Improved network state tracking.
+* Floating IPs now work, and have covering CI. shakenfist#257
+* Resolve leaks of floating IPs from both direct use and NAT gateways. shakenfist#256
+* Resolve leaks of IPManagers on network delete. shakenfist#675
+* Use system packages for ansible during install.
