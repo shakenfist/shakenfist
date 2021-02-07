@@ -4,6 +4,7 @@ import copy
 from functools import partial
 import random
 import time
+import uuid
 
 from shakenfist import baseobject
 from shakenfist.config import config
@@ -43,20 +44,34 @@ def get_network_node():
 
 class Scheduler(object):
     def __init__(self):
+        # This UUID doesn't really mean much, except as a way of tracing the
+        # behaviour of a single instance of the scheduler object in logs.
+        self.__uuid = str(uuid.uuid4())
+        self.log = LOG.with_field('scheduler_instance', self.__uuid)
+
         self.metrics = {}
         self.metrics_updated = 0
 
         self.refresh_metrics()
 
     def refresh_metrics(self):
+        self.log.debug('Refreshing metrics')
         metrics = {}
 
         for n in Nodes([node_active_states_filter]):
             node_name = n.uuid
             try:
-                metrics[node_name] = db.get_metrics(node_name)
+                new_metrics = db.get_metrics(node_name)
+                self.log.with_object(n).debug(
+                    'Metrics for node: %s', new_metrics)
+                if new_metrics:
+                    metrics[node_name] = new_metrics
+                else:
+                    self.log.with_object(n).warning(
+                        'Empty metrics from database for node')
             except exceptions.ReadException:
-                pass
+                self.log.with_object(n).warning(
+                    'Refreshing metrics for node failed')
 
         self.metrics = metrics
         self.metrics_updated = time.time()
@@ -179,11 +194,17 @@ class Scheduler(object):
 
     def place_instance(self, instance, network, candidates=None):
         with util.RecordedOperation('schedule', instance):
-            log_ctx = LOG.with_object(instance)
+            log_ctx = self.log.with_object(instance)
 
+            # Refresh metrics if its too old, or there are no nodes.
             diff = time.time() - self.metrics_updated
-            if diff > config.get('SCHEDULER_CACHE_TIMEOUT'):
+            log_ctx.debug(('Metrics are %.02f seconds old, max is %.02f seconds. '
+                           'Cache has %d elements.'),
+                          diff, config.SCHEDULER_CACHE_TIMEOUT, len(self.metrics))
+            if diff > config.SCHEDULER_CACHE_TIMEOUT or len(self.metrics) == 0:
                 self.refresh_metrics()
+                log_ctx.debug('Cache has %d elements after refresh.',
+                              len(self.metrics))
 
             if candidates:
                 log_ctx.with_field('candidates', candidates).info(
