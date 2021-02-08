@@ -1,7 +1,7 @@
 pipeline {
   agent {
     node {
-      label 'sf-privci'
+      label 'ci-ubuntu-2004'
     }
   }
 
@@ -21,6 +21,8 @@ pipeline {
                 sudo apt-get -y dist-upgrade
                 sudo apt-get -y install pwgen build-essential python3-dev python3-wheel python3-pip curl
 
+                sudo pip3 uninstall ansible
+                sudo apt-get remove -y ansible
                 sudo pip3 install -U ansible tox
                 ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform andrewrothstein.go
                 ansible-galaxy collection install community.general
