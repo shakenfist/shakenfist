@@ -140,11 +140,11 @@ def image_fetch(url, instance):
 
         # Clean common problems to store in events
         msg = str(e)
-        re_conn_err = re.compile(r'.*NewConnectionError\(\'\<.*\>: (.*)\'')
-        m = re_conn_err.match(msg)
-        if m:
-            msg = m.group(1)
-        db.add_event('image', url, 'fetch', None, None, 'Error: '+msg)
+        if msg.find('Name or service not known'):
+            msg = 'DNS error'
+        if msg.find('No address associated with hostname'):
+            msg = 'DNS error'
+        db.add_event('image', url, 'fetch', None, None, msg)
 
         raise exceptions.ImageFetchTaskFailedException(
             'Failed to fetch image: %s Exception: %s' % (url, e))

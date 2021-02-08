@@ -160,7 +160,7 @@ class BaseTestCase(testtools.TestCase):
 
     def _await_image_download_error(self, url, after=None):
         return self._await_image_event(
-            url, 'fetch', 'Name or service not known', after)
+            url, 'fetch', 'DNS error', after)
 
     def _await_image_event(
             self, url, operation, message=None, after=None):
