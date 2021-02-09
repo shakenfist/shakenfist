@@ -226,12 +226,27 @@
 - hosts: etcd
   roles:
     - role: andrewrothstein.etcd-cluster
-      when: mode == "deploy"
+      when: mode == "deploy" and cloud != "localhost"
       vars:
         etcd_secure: False
         etcd_cluster_name: shakenfist
         etcd_enable_v2: False
         etcd_master_group_name: etcd_master
+
+# NOTE(mikal): I am not happy with binding to 0.0.0.0 here for
+# etcd, but I can't bind to lo because of how the ansible role
+# is written. So here we are.
+- hosts: etcd
+  roles:
+    - role: andrewrothstein.etcd-cluster
+      when: mode == "deploy" and cloud == "localhost"
+      vars:
+        etcd_secure: False
+        etcd_cluster_name: shakenfist
+        etcd_enable_v2: False
+        etcd_master_group_name: etcd_master
+        etcd_iface_public: "all"
+        etcd_iface_cluster: "all"
 
 - hosts: allsf
   any_errors_fatal: true
