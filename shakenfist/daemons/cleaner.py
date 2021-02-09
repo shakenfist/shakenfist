@@ -158,6 +158,7 @@ class Monitor(daemon.Daemon):
         # Delay first compaction until system startup load has reduced
         last_compaction = time.time() - random.randint(1, 20*60)
 
+        last_loop_run = time.time()
         while True:
             # Update power state of all instances on this hypervisor
             LOG.info('Updating power states')
@@ -181,10 +182,19 @@ class Monitor(daemon.Daemon):
                     ni['uuid']).info('Hard deleting network interface')
                 db.hard_delete_network_interface(ni['uuid'])
 
-            # Find nodes which have been offline for a long time
             for n in Nodes([node_inactive_states_filter]):
                 age = time.time() - n.last_seen
-                if age > config.NODE_CHECKIN_MAXIMUM * 10:
+
+                # Find nodes which have returned from being missing
+                if age < config.NODE_CHECKIN_MAXIMUM:
+                    n.state = Node.STATE_CREATED
+                    LOG.with_object(n).info('Node returned from being missing')
+
+                # Find nodes which have been offline for a long time, unless
+                # this machine has been asleep for a long time (think developer
+                # laptop).
+                if (time.time() - last_loop_run < config.NODE_CHECKIN_MAXIMUM
+                        and age > config.NODE_CHECKIN_MAXIMUM * 10):
                     n.state = Node.STATE_ERROR
                     for i in virt.Instances([
                             virt.healthy_states_filter,
@@ -207,4 +217,5 @@ class Monitor(daemon.Daemon):
                 self._compact_etcd()
                 last_compaction = time.time()
 
+            last_loop_run = time.time()
             time.sleep(60)

@@ -22,6 +22,9 @@ class FakeNode(object):
         self.ip = ip
         self.state = 'created'
 
+    def unique_label(self):
+        return ('fake_node', self.uuid)
+
 
 class FakeDB(object):
     def __init__(self, nodes, interfaces=None):
