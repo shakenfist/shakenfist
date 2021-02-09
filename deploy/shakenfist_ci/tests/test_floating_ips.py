@@ -65,7 +65,7 @@ echo 'Floating IPs work!' > /var/www/html/index.html
         time.sleep(120)
 
         attempts = 0
-        for _ in range(6):
+        for _ in range(10):
             attempts += 1
             try:
                 r = requests.request(
