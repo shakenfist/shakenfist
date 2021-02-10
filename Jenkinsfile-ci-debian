@@ -165,8 +165,12 @@ pipeline {
                 tar czf deploy.tgz deploy
                 tar czf docs.tgz docs
                 python3 setup.py sdist bdist_wheel
+<<<<<<< HEAD
                 sudo pip install --upgrade dist/shakenfist-*whl
                 sudo pip install --upgrade shakenfist_client
+=======
+                sudo pip install dist/shakenfist-*whl
+>>>>>>> 3ce5146... Add Debian CI job.
 
                 # Run installer
                 sudo CLOUD="localhost" FLOATING_IP_BLOCK="10.0.0.0/24" KSM_ENABLED="0" /usr/local/share/shakenfist/installer/install.sh
