@@ -1,7 +1,7 @@
 pipeline {
   agent {
     node {
-      label 'ci-ubuntu-2004'
+      label 'ci-debian'
     }
   }
 
