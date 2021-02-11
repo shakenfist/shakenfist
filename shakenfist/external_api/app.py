@@ -1234,6 +1234,7 @@ class Networks(Resource):
         'provide_nat': fields.Boolean,
         'namespace': fields.String,
         'name': fields.String,
+        'state': fields.String
     })
     @jwt_required
     def get(self, all=False):
