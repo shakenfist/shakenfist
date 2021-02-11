@@ -76,6 +76,7 @@ echo 'Floating IPs work!' > /var/www/html/index.html
                     print('Floating IPs test attempt failed, incorrect HTTP '
                           'result')
                 else:
+<<<<<<< HEAD
                     print('Floating IPs test attempt received HTTP status %s'
                           % r.status_code)
 
@@ -86,3 +87,8 @@ echo 'Floating IPs work!' > /var/www/html/index.html
 
         self.fail('Incorrect result after %d attempts, instance was %s'
                   % (attempts, inst['uuid']))
+=======
+                    raise e
+
+            time.sleep(30)
+>>>>>>> 21d60d0... Add missing sleep in floating IPs test.
