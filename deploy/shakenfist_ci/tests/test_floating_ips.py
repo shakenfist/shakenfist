@@ -79,3 +79,5 @@ echo 'Floating IPs work!' > /var/www/html/index.html
                     pass
                 else:
                     raise e
+
+            time.sleep(30)
