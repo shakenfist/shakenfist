@@ -1,5 +1,6 @@
 import mock
 
+from shakenfist import config
 from shakenfist.config import SFConfig
 from shakenfist.tests import test_shakenfist
 
@@ -39,3 +40,7 @@ class ConfigTestCase(test_shakenfist.ShakenFistTestCase):
                      {'SHAKENFIST_RAM_SYSTEM_RESERVATION': 'banana'})
     def test_bogus_override(self):
         self.assertRaises(ValueError, SFConfig)
+
+    @mock.patch('socket.gethostbyname', side_effect=Exception)
+    def test_get_node_ip_errors(self, mock_gethostbyname):
+        self.assertEqual('127.0.0.1', config.get_node_ip())
