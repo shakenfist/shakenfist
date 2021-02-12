@@ -123,3 +123,7 @@ class NetworkException(Exception):
 
 class DeadNetwork(NetworkException):
     pass
+
+
+class CongestedNetwork(NetworkException):
+    pass
