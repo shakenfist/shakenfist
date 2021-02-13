@@ -25,5 +25,13 @@ setuptools.setup(
     setup_requires=['pbr'],
     pbr=True,
     long_description=long_description,
-    long_description_content_type="text/markdown",
-    )
+    long_description_content_type='text/markdown',
+    data_files=[
+        (
+            '/srv/shakenfist/templates', [
+                'deploy/ansible/files/libvirt.tmpl',
+                'deploy/ansible/files/dhcp.tmpl'
+            ]
+        )
+    ],
+)
