@@ -1,23 +1,23 @@
-pycdlib             # lgpl
-oslo.concurrency    # apache2
-jinja2              # bsd
-setproctitle        # bsd
-click>=7.1.1        # bsd
-prettytable         # bsd
-tox                 # mit
-flake8              # mit
-testtools           # mit
-flask               # bsd
-flask_restful       # bsd
-psutil              # bsd
-prometheus_client   # apache2
-etcd3               # apache2
-etcd3gw             # apache2
-flask-jwt-extended  # mit
-bcrypt              # apache2
-gunicorn            # mit
-pylogrus            # mit
-pydantic            # mit
+pycdlib                     # lgpl
+oslo.concurrency            # apache2
+jinja2                      # bsd
+setproctitle                # bsd
+click>=7.1.1                # bsd
+prettytable                 # bsd
+tox                         # mit
+flake8                      # mit
+testtools                   # mit
+flask                       # bsd
+flask_restful               # bsd
+psutil                      # bsd
+prometheus_client           # apache2
+etcd3                       # apache2
+etcd3gw                     # apache2
+flask-jwt-extended==3.25.0  # mit
+bcrypt                      # apache2
+gunicorn                    # mit
+pylogrus                    # mit
+pydantic                    # mit
 
 # Is difficult to get install working, use system packages instead. On Ubuntu
 # those are: libvirt-daemon-system libvirt-dev python3-libvirt
