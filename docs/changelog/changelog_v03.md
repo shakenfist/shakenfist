@@ -7,6 +7,20 @@ v0.3 is a re-write of portions of v0.2 that we felt were holding Shaken Fist bac
 
 * We also realised somewhere late in v0.2's life that the etcd library we were using was pretty buggy. Locking simply didn't work some of the time. Additionally, our locking code was pretty ad hoc and sometimes we would get the names of the locks wrong because they were just strings. This has now been completely re-written, but that has shaken out a number of bugs that are surfaced by locking actually working now. We have worked through those bugs and sought to resolve them.
 
+Changes between v0.3.4 and v0.3.5 (hotfix)
+==========================================
+
+v0.3.5 was released on 17 January 2021.
+
+* Pin Flask-JWT-Extended to resolve CI breakage.
+
+Changes between v0.3.3 and v0.3.4 (hotfix)
+==========================================
+
+v0.3.4 was released on 15 January 2021.
+
+* Package libvirt and DHCP templates in the python package, so that the modern installer can install the correct version of these templates when installing older releases.
+
 Changes between v0.3.2 and v0.3.3
 =================================
 
