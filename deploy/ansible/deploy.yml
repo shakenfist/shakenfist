@@ -4,7 +4,6 @@
   gather_facts: yes
   connection: ssh
   vars:
-    release: git
     mode: deploy
     ram_system_reservation: 5.0
 
@@ -20,23 +19,6 @@
 
     - name: Load default vars
       include_vars: main.yml
-
-    - include: tasks/build-wheel.yml
-        repo_path="../.."
-        package="shakenfist"
-      when: release == "git"
-
-    - include: tasks/build-wheel.yml
-        repo_path="../gitrepos/client-python"
-        package="shakenfist_client"
-      when: release == "git"
-
-    - name: Log wheel details
-      debug:
-        msg:
-          - "Shakenfist wheel is: {{hostvars['localhost']['shakenfist_wheel_path']}}"
-          - "Shakenfist client wheel is: {{hostvars['localhost']['shakenfist_client_wheel_path']}}"
-      when: release == "git"
 
     - name: Generate a random auth secret
       set_fact:
@@ -58,7 +40,6 @@
   gather_facts: no
   connection: ssh
   vars:
-    release: git
     mode: deploy
 
   tasks:
@@ -71,7 +52,6 @@
   gather_facts: no
   connection: ssh
   vars:
-    release: git
     mode: deploy
 
   tasks:
@@ -255,64 +235,13 @@
   gather_facts: yes
   connection: ssh
   vars:
-    release: git
     mode: deploy
 
   tasks:
-    - include: includes/python3.yml
-      when: mode == "deploy"
-
-    - name: Ensure the source directory is absent
-      file:
-        path: /srv/shakenfist/src/
-        state: absent
-      when: mode == "deploy"
-
-    - name: Remove old wheels
-      file:
-        path: /srv/shakenfist/shakenfist*-py3-none-any.whl
-        state: absent
-
     # We use a shell command here because the service might not exist and
     # that's ok.
     - name: Stop the SF daemon
       shell: systemctl stop sf || true
-
-    - name: Copy shakenfist
-      synchronize:
-        src: ../../dist/{{hostvars['localhost']['shakenfist_wheel_path']}}
-        dest: /srv/shakenfist/
-      when: release == "git"
-
-    - name: Copy shakenfist client
-      synchronize:
-        src: ../gitrepos/client-python/dist/{{hostvars['localhost']['shakenfist_client_wheel_path']}}
-        dest: /srv/shakenfist/
-      when: release == "git"
-
-    - name: Uninstall shakenfist, if present
-      command: pip3 uninstall -y shakenfist shakenfist-client
-      ignore_errors: True
-
-    - name: Install shakenfist
-      command: pip3 install {{hostvars['localhost']['shakenfist_wheel_path']}}
-      args:
-        chdir: /srv/shakenfist/
-      when: release == "git"
-
-    - name: Install shakenfist client
-      command: pip3 install {{hostvars['localhost']['shakenfist_client_wheel_path']}}
-      args:
-        chdir: /srv/shakenfist/
-      when: release == "git"
-
-    - name: Install shakenfist from pypi
-      command: pip3 install shakenfist=={{release}}
-      when: release != "git"
-
-    - name: Install shakenfist client from pypi
-      command: pip3 install shakenfist-client=={{release}}
-      when: release != "git"
 
 - hosts: primary
   any_errors_fatal: true
@@ -321,7 +250,6 @@
   gather_facts: no
   connection: ssh
   vars:
-    release: git
     mode: deploy
 
   tasks:
@@ -508,7 +436,6 @@
   gather_facts: no
   connection: ssh
   vars:
-    release: git
     mode: deploy
 
   tasks:
@@ -521,7 +448,8 @@
 
     - name: Copy libvirt template
       copy:
-        src: files/libvirt.tmpl
+        src: /usr/local/share/shakenfist/templates/libvirt.tmpl
+        remote_src: yes
         dest: /srv/shakenfist/libvirt.tmpl
         owner: root
         group: root
@@ -535,7 +463,8 @@
 
     - name: Copy dhcp config template
       copy:
-        src: files/dhcp.tmpl
+        src: /usr/local/share/shakenfist/templates/dhcp.tmpl
+        remote_src: yes
         dest: /srv/shakenfist/dhcp.tmpl
         owner: root
         group: root
@@ -543,7 +472,8 @@
 
     - name: Copy dhcp hosts template
       copy:
-        src: files/dhcphosts.tmpl
+        src: /usr/local/share/shakenfist/templates/dhcphosts.tmpl
+        remote_src: yes
         dest: /srv/shakenfist/dhcphosts.tmpl
         owner: root
         group: root
@@ -561,7 +491,8 @@
 
     - name: Write systemd unit
       template:
-        src: files/sf.service
+        src: /usr/local/share/shakenfist/templates/sf.service
+        remote_src: yes
         dest: /lib/systemd/system
         owner: root
         group: root
@@ -600,7 +531,6 @@
   gather_facts: no
   connection: ssh
   vars:
-    release: git
     mode: deploy
 
   tasks:
@@ -622,7 +552,7 @@
         chdir: /srv/shakenfist/terraform-provider-shakenfist
       when: mode == "deploy"
 
-    - name: Make /srv/shakenfist/
+    - name: Make /usr/local/bin/terraform_install/
       file:
         path: /usr/local/bin/terraform_install/
         state: directory
