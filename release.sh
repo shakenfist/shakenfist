@@ -24,12 +24,26 @@ tar cvzf docs.tgz docs
 set +x
 
 echo
-echo "--- Building ---"
+echo "--- Setup ---"
 set -x
 pip install --upgrade readme-renderer
 pip install --upgrade twine
 rm -rf build dist *.egg-info
-git pull
+git pull || true
+set +x
+
+echo
+echo "--- Setup ---"
+echo "Do you want to apply a git tag for this release (yes to tag)?"
+read TAG
+set -x
+
+if [ "%$TAG%" == "%yes%" ]
+then
+  git tag -s "v$VERSION" -m "Release v$VERSION"
+  git push origin "v$VERSION"
+fi
+
 python3 setup.py sdist bdist_wheel
 twine check dist/*
 set +x
@@ -40,7 +54,5 @@ echo "This is the point where we push files to pypi. Hit ctrl-c to abort."
 read DUMMY
 
 set -x
-git tag -s "v$VERSION" -m "Release v$VERSION"
-git push origin "v$VERSION"
 twine upload dist/*
 set +x
