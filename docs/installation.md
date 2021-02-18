@@ -7,41 +7,43 @@ This guide will assume that you want to install Shaken Fist on a single local ma
 
 Shaken Fist only supports Ubuntu 18.04 or later, so if you're running on localhost that implies that you must be running a recent Ubuntu on your development machine. Note as well that the deployer installs software and changes the configuration of your networking, so be careful when running it on machines you are fond of.
 
-Create a directory for Shaken Fist, and then checkout the Shaken Fist git repository there:
+Note that we used to recommend deployers run the installer from git, but we've outgrown that approach. If you
+see that mentioned in the documentation, you are likely reading outdated guides.
 
-```bash
-git clone https://github.com/shakenfist/shakenfist
-cd shakenfist/deploy/ansible
-```
-
-And install some dependancies:
+First install some dependancies:
 
 ```bash
 sudo apt-get update
 sudo apt-get -y dist-upgrade
-sudo apt-get -y install ansible tox pwgen build-essential python3-dev python3-wheel python3-pip curl
-ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform andrewrothstein.go
+sudo apt-get -y install ansible tox pwgen build-essential python3-dev python3-wheel \
+    python3-pip curl ansible vim git pwgen
+sudo ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform \
+    andrewrothstein.go
 ```
 
+And then manually upgrade pip:
+
+```
+sudo pip3 install -U pip
+sudo apt-get remove -y python3-pip
+```
+
+Next install your desired Shaken Fist pip package. The default should be the latest release.
+
+```
+sudo pip install -U shakenfist shakenfist_client
+```
+
+And then run the installer. We describe the correct invocation for a local development environment in the section below.
 ## Local Development
 
-Shaken Fist uses ansible as its installer, with terraform to bring up cloud resources. Because we're going to install Shaken Fist on localhost, there isn't much terraform in this example.Installation is run by a simple wrapper called "deployandtest.sh". This wrapper checks out required git repositories, runs ansible plays, and then performs CI testing of the installation.
-!!! warning
-    CI testing is currently destructive (don't run it against production!), and not supported for installs with fewer than three machines. It is skipped for a localhost install.
+Shaken Fist uses ansible as its installer, with terraform to bring up cloud resources. Because we're going to install Shaken Fist on localhost, there isn't much terraform in this example. Installation is run by a simple wrapper called "install.sh".
 
 We also make the assumption that developer laptops move around more than servers. In a traditional install we detect the primary NIC of the machine and then use that to build VXLAN meshes. For localhost single node deploys we instead create a bridge called "brsf" and then use that as our primary NIC. This means your machine can move around and have different routes to the internet over time, but it also means its fiddly to convert a localhost install into a real production cluster. Please only use localhost installs for development purposes.
 
-```bash 
-CLOUD=localhost RELEASE="git:master" ./deployandtest.sh
 ```
-
-<aside>The deployer clones a number of git repositories that it needs to build a working Shaken Fist installation. As a developer, you might want to move these out of shakenfist/deploy/gitrepos to somewhere more obvious once the installer has finished running. You can just symlink the repositories to the location that the deployer users and things will work as expected. Note that the deloyer does not clone all repositories, just those it needs, so you might still need to clone other repositories.</aside>
-
-If you want to install a specific release, you can set the RELEASE environment variable. Possible options are:
-
-* Any [valid pypi release](https://pypi.org/project/shakenfist/#history) version number. This is the default and you get the most recent pypi release if you do not specify a value.
-* "git:master" for the current master branch of each repository.
-* "git:branch" for a specific branch. If that branch does not exist in a given repository, master is used instead.
+sudo CLOUD=localhost /usr/local/share/shakenfist/installer/install.sh
+```
 
 ## Your first instance
 

@@ -28,9 +28,22 @@ setuptools.setup(
     long_description_content_type='text/markdown',
     data_files=[
         (
-            '/srv/shakenfist/templates', [
+            'share/shakenfist/templates', [
                 'deploy/ansible/files/libvirt.tmpl',
-                'deploy/ansible/files/dhcp.tmpl'
+                'deploy/ansible/files/dhcp.tmpl',
+                'deploy/ansible/files/dhcphosts.tmpl',
+                'deploy/ansible/files/sf.service'
+            ]
+        ),
+        (
+            'share/shakenfist/installer', [
+                'deploy.tgz',
+                'deploy/install.sh'
+            ]
+        ),
+        (
+            'share/shakenfist/docs', [
+                'docs.tgz'
             ]
         )
     ],
