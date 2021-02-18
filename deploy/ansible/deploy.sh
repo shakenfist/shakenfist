@@ -160,65 +160,6 @@ fi
 
 set -x
 
-#### Release selection, git or a version from pypi
-if [ -z "$RELEASE" ]
-then
-  # This is the latest version from pypi
-  RELEASE=`curl -s https://pypi.org/simple/shakenfist/ | grep whl | sed -e 's/.*shakenfist-//' -e 's/-py3.*//' | tail -1`
-fi
-
-cwd=`pwd`
-if [ `echo $RELEASE | cut -f 1 -d ":"` == "git" ]
-then
-  for repo in client-python ansible-modules
-  do
-    if [ ! -e ../gitrepos/$repo ]
-    then
-      git clone https://github.com/shakenfist/$repo ../gitrepos/$repo
-    else
-      
-      cd ../gitrepos/$repo
-      git fetch
-    fi
-    cd "$cwd"
-  done
-
-  branch=`echo $RELEASE | cut -f 2 -d ":"`
-  if [ -z "$branch" ]
-  then
-    branch="master"
-  fi
-
-  # And make sure our other repos are using the right branch too
-  for repo in client-python ansible-modules
-  do
-    cd ../gitrepos/$repo
-    git checkout $branch || git checkout master
-    git pull
-    cd "$cwd"
-  done
-
-  RELEASE="git"
-else
-  # NOTE(mikal): this is a hack until we use ansible galaxy for these modules
-  for repo in ansible-modules
-  do
-    echo "Priming $repo"
-
-    if [ ! -e ../gitrepos/$repo ]
-    then
-      git clone https://github.com/shakenfist/$repo ../gitrepos/$repo
-    else
-      cd ../gitrepos/$repo
-      git fetch
-      git checkout master
-      git pull
-    fi
-    cd "$cwd"
-  done
-fi
-VARIABLES="$VARIABLES,release=$RELEASE"
-
 #### Mode selection, deploy or hotfix at this time
 if [ -z "$MODE" ]
 then

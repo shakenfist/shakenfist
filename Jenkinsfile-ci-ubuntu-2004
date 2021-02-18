@@ -19,13 +19,18 @@ pipeline {
                 echo "Updating worker"
                 sudo apt-get update
                 sudo apt-get -y dist-upgrade
-                sudo apt-get -y install pwgen build-essential python3-dev python3-wheel python3-pip curl
+                sudo apt-get -y install ansible tox pwgen build-essential python3-dev python3-wheel \
+                  python3-pip curl ansible vim git pwgen
 
                 sudo pip3 uninstall ansible
                 sudo apt-get remove -y ansible
+
+                sudo pip3 install -U pip
+                sudo apt-get remove -y python3-pip
+
                 sudo pip3 install -U ansible tox
-                ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform andrewrothstein.go
-                ansible-galaxy collection install community.general
+                sudo ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform andrewrothstein.go
+                sudo ansible-galaxy collection install community.general
 
                 # We create a RAM disk for etcd to work around poor performance on cloud instances
                 sudo mkdir -p /var/lib/etcd
@@ -37,23 +42,35 @@ pipeline {
       steps {
         sh '''
 
-                if [ '%%' == '%%' ]
+                if [ '%master%' == '%%' ]
                 then
                   BRANCH=`git rev-parse --abbrev-ref HEAD`
                 else
-                  BRANCH=""
+                  BRANCH="master"
                 fi
 
-                cd $WORKSPACE/deploy/ansible
+                cd $WORKSPACE
 
 
 
                 # Install the latest 0.3 pypi release
-                export CLOUD="localhost"
-                export FLOATING_IP_BLOCK="10.0.0.0/24"
-                export KSM_ENABLED="0"
-                export RELEASE=`curl -s https://pypi.org/simple/shakenfist/ | grep whl | sed -e 's/.*shakenfist-//' -e 's/-py3.*//' | grep 0.3 | tail -1`
-                ./deployandtest.sh
+                sudo pip install "shakenfist>=0.3,<0.4"
+                sudo pip install "shakenfist_client>=0.3,<0.4"
+                SFVERSION=`pip list | tr -s " " | grep "shakenfist " | sed 's/.dev.*//' | cut -f 2 -d " "`
+
+                if [ -e /usr/local/share/shakenfist/installer/install.sh ]
+                then
+                  sudo CLOUD="localhost" FLOATING_IP_BLOCK="10.0.0.0/24" KSM_ENABLED="0" /usr/local/share/shakenfist/installer/install.sh
+                else
+                  cd deploy/ansible
+
+                  previous=`git branch --show-current`
+                  git remote add github https://github.com/shakenfist/shakenfist
+                  git fetch github
+                  git checkout v$SFVERSION
+                  sudo CLOUD="localhost" FLOATING_IP_BLOCK="10.0.0.0/24" KSM_ENABLED="0" ./deployandtest.sh
+                  git checkout $previous
+                fi
 
                 # Log what versions we are running
                 echo "============================================================"
@@ -131,22 +148,25 @@ pipeline {
         sh '''
 
 
-                if [ '%%' == '%%' ]
+                if [ '%master%' == '%%' ]
                 then
                   BRANCH=`git rev-parse --abbrev-ref HEAD`
                 else
-                  BRANCH=""
+                  BRANCH="master"
                 fi
 
-                cd $WORKSPACE/deploy/ansible
-                export RELEASE="git:master"
+                cd $WORKSPACE
 
-                export CLOUD="localhost"
-                export FLOATING_IP_BLOCK="10.0.0.0/24"
-                export KSM_ENABLED="0"
+                # Make a wheel to install
+                sudo pip install --upgrade readme-renderer
+                sudo pip install --upgrade twine
+                tar czf deploy.tgz deploy
+                tar czf docs.tgz docs
+                python3 setup.py sdist bdist_wheel
+                sudo pip install dist/shakenfist-*whl
 
-                echo "Deploying $RELEASE to cloud $CLOUD"
-                ./deployandtest.sh
+                # Run installer
+                sudo CLOUD="localhost" FLOATING_IP_BLOCK="10.0.0.0/24" KSM_ENABLED="0" /usr/local/share/shakenfist/installer/install.sh
 
                 # Log what versions we are running
                 echo "============================================================"
