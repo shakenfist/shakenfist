@@ -35,6 +35,8 @@ pipeline {
                 # We create a RAM disk for etcd to work around poor performance on cloud instances
                 sudo mkdir -p /var/lib/etcd
                 sudo mount -t tmpfs -o size=2g tmpfs /var/lib/etcd
+
+                sudo apt-get -y autoremove
           '''
         }
       }
