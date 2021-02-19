@@ -186,6 +186,17 @@ class BaseTestCase(testtools.TestCase):
             'After time %s, image %s had no event type "%s" (waited 5 mins)' % (
                 after, url, operation))
 
+    def _await_network_ready(self, network_uuid):
+        start_time = time.time()
+        while time.time() - start_time < 300:
+            n = self.system_client.get_network(network_uuid)
+            if n.get('state') == 'created':
+                return
+            time.sleep(5)
+
+        raise TimeoutException(
+            'Network %s never became ready (waited 5 mins)' % network_uuid)
+
     def _test_ping(self, instance_uuid, network_uuid, ip, expected, attempts=1):
         while attempts:
             sys.stderr.write('    _test_ping()  attempts=%s\n' % attempts)
