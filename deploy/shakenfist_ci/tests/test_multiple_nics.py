@@ -15,6 +15,8 @@ class TestMultipleNics(base.BaseNamespacedTestCase):
             '192.168.242.0/24', True, True, '%s-net-one' % self.namespace)
         self.net_two = self.test_client.allocate_network(
             '192.168.243.0/24', True, True, '%s-net-two' % self.namespace)
+        self._await_network_ready(self.net_one['uuid'])
+        self._await_network_ready(self.net_two['uuid'])
 
     def test_simple(self):
         ud = """#!/bin/sh
