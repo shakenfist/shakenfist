@@ -12,6 +12,7 @@ class TestCacheImage(base.BaseNamespacedTestCase):
         super(TestCacheImage, self).setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net' % self.namespace)
+        self._await_network_ready(self.net['uuid'])
 
     def test_cache_image(self):
         # It is currently not possible to check if an image is
