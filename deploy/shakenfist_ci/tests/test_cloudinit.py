@@ -12,6 +12,7 @@ class TestCloudInit(base.BaseNamespacedTestCase):
         super(TestCloudInit, self).setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net' % self.namespace)
+        self._await_network_ready(self.net['uuid'])
 
     def test_simple(self):
         ud = """#!/bin/sh

@@ -225,7 +225,7 @@ class Image(baseobject.DatabaseBackedObject):
 
     def version_image_path(self, inc=0):
         image_cache_path = os.path.join(
-            config.get('STORAGE_PATH'), 'image_cache')
+            config.STORAGE_PATH, 'image_cache')
         if not os.path.exists(image_cache_path):
             self.log.with_field('image_cache_path',
                                 image_cache_path).debug('Creating image cache')
@@ -353,9 +353,7 @@ class Image(baseobject.DatabaseBackedObject):
             os.link(image_path, backing_file)
             return backing_file
 
-        util.execute(locks,
-                     'qemu-img create -b %s.qcow2 -f qcow2 %s %dG'
-                     % (image_path, backing_file, size))
+        create_cow(locks, image_path + '.qcow2', backing_file, size)
 
         return backing_file
 
@@ -402,9 +400,7 @@ def _transcode(locks, actual_image, related_object):
             os.link(actual_image, actual_image + '.qcow2')
             return
 
-        util.execute(locks,
-                     'qemu-img convert -t none -O qcow2 %s %s.qcow2'
-                     % (actual_image, actual_image))
+        create_qcow2(locks, actual_image, actual_image + '.qcow2')
 
 
 VALUE_WITH_BRACKETS_RE = re.compile(r'.* \(([0-9]+) bytes\)')
@@ -457,6 +453,11 @@ def create_cow(locks, cache_file, disk_file, disk_size):
     if os.path.exists(disk_file):
         return
 
+    if config.GLUSTER_ENABLED:
+        disk_file = disk_file.replace(
+            os.path.join(config.STORAGE_PATH, 'instances'),
+            'gluster:shakenfist')
+
     util.execute(locks,
                  'qemu-img create -b %s -f qcow2 %s %dG'
                  % (cache_file, disk_file, int(disk_size)))
@@ -468,6 +469,11 @@ def create_flat(locks, cache_file, disk_file):
     if os.path.exists(disk_file):
         return
 
+    if config.GLUSTER_ENABLED:
+        disk_file = disk_file.replace(
+            os.path.join(config.STORAGE_PATH, 'instances'),
+            'gluster:shakenfist')
+
     util.execute(locks, 'cp %s %s' % (cache_file, disk_file))
 
 
@@ -477,13 +483,54 @@ def create_raw(locks, cache_file, disk_file):
     if os.path.exists(disk_file):
         return
 
+    if config.GLUSTER_ENABLED:
+        disk_file = disk_file.replace(
+            os.path.join(config.STORAGE_PATH, 'instances'),
+            'gluster:shakenfist')
+
     util.execute(locks,
                  'qemu-img convert -t none -O raw %s %s'
                  % (cache_file, disk_file))
 
 
+def create_qcow2(locks, cache_file, disk_file):
+    """Make a qcow2 copy of the disk from the image cache."""
+
+    if os.path.exists(disk_file):
+        return
+
+    if config.GLUSTER_ENABLED:
+        disk_file = disk_file.replace(
+            os.path.join(config.STORAGE_PATH, 'instances'),
+            'gluster:shakenfist')
+
+    util.execute(locks,
+                 'qemu-img convert -t none -O qcow2 %s %s'
+                 % (cache_file, disk_file))
+
+
+def create_blank(locks, disk_file, disk_size):
+    """Make an empty image."""
+
+    if os.path.exists(disk_file):
+        return
+
+    if config.GLUSTER_ENABLED:
+        disk_file = disk_file.replace(
+            os.path.join(config.STORAGE_PATH, 'instances'),
+            'gluster:shakenfist')
+
+    util.execute(locks, 'qemu-img create -f qcow2 %s %sG'
+                 % (disk_file, disk_size))
+
+
 def snapshot(locks, source, destination):
     """Convert a possibly COW layered disk file into a snapshot."""
+
+    if config.GLUSTER_ENABLED:
+        source = source.replace(
+            os.path.join(config.STORAGE_PATH, 'instances'),
+            'gluster:shakenfist')
 
     util.execute(locks,
                  'qemu-img convert --force-share -O qcow2 %s %s'

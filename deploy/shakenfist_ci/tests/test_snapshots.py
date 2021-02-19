@@ -10,6 +10,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         super(TestSnapshots, self).setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net' % self.namespace)
+        self._await_network_ready(self.net['uuid'])
 
     def test_single_disk_snapshots(self):
         inst = self.test_client.create_instance(

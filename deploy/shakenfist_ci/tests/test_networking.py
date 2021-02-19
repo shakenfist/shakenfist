@@ -20,6 +20,10 @@ class TestNetworking(base.BaseNamespacedTestCase):
             '192.168.242.0/24', True, True, '%s-net-three' % self.namespace)
         self.net_four = self.test_client.allocate_network(
             '192.168.10.0/24', True, True, '%s-net-four' % self.namespace)
+        self._await_network_ready(self.net_one['uuid'])
+        self._await_network_ready(self.net_two['uuid'])
+        self._await_network_ready(self.net_three['uuid'])
+        self._await_network_ready(self.net_four['uuid'])
 
     def test_network_validity(self):
         self.assertRaises(apiclient.APIException, self.test_client.allocate_network,

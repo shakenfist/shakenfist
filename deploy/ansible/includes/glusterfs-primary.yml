@@ -1,0 +1,22 @@
+- name: Setup gluster cluster
+  shell: |
+    nodes=""
+    {% for svr in groups.allsf %}
+    gluster peer probe  {{svr}}
+    nodes="$nodes {{svr}}:/srv/glusterfs"
+    {% endfor %}
+
+    if [ `gluster volume list | grep -c shakenfist` -lt 1 ]
+    then
+      gluster volume create shakenfist \
+        replica {{gluster_replicas}} transport tcp \
+        $nodes force
+      gluster volume start shakenfist
+    fi
+
+    libvirt_uid=`getent passwd libvirt-qemu | cut -f 3 -d ":"`
+    libvirt_gid=`getent group kvm | cut -f 3 -d ":"`
+    gluster volume set shakenfist storage.owner-uid $libvirt_uid
+    gluster volume set shakenfist storage.owner-gid $libvirt_gid
+    gluster volume set shakenfist server.allow-insecure on
+  ignore_errors: True
