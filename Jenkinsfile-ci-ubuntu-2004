@@ -165,7 +165,8 @@ pipeline {
                 tar czf deploy.tgz deploy
                 tar czf docs.tgz docs
                 python3 setup.py sdist bdist_wheel
-                sudo pip install dist/shakenfist-*whl
+                sudo pip install --upgrade dist/shakenfist-*whl
+                sudo pip install --upgrade shakenfist_client
 
                 # Run installer
                 sudo CLOUD="localhost" FLOATING_IP_BLOCK="10.0.0.0/24" KSM_ENABLED="0" /usr/local/share/shakenfist/installer/install.sh
