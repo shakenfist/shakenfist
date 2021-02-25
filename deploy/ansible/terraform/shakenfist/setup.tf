@@ -1,3 +1,9 @@
+terraform {
+  backend "local" {
+    path = "/etc/sf/tfstate"
+  }
+}
+
 variable "system_key" {
   description = "The key for the Shaken Fist system namespace"
 }

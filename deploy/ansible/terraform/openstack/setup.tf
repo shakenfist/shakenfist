@@ -1,3 +1,9 @@
+terraform {
+  backend "local" {
+    path = "/etc/sf/tfstate"
+  }
+}
+
 provider "openstack" {
 }
 
@@ -158,10 +164,10 @@ resource "openstack_networking_floatingip_v2" "sf_1_floating_ip" {
 }
 
 resource "openstack_compute_instance_v2" "sf_1" {
-  name      = "${var.uniqifier}sf-1"
-  image_id  = data.openstack_images_image_v2.ubuntu.id
-  flavor_id = data.openstack_compute_flavor_v2.sf.id
-  key_pair  = var.ssh_key_name
+  name            = "${var.uniqifier}sf-1"
+  image_id        = data.openstack_images_image_v2.ubuntu.id
+  flavor_id       = data.openstack_compute_flavor_v2.sf.id
+  key_pair        = var.ssh_key_name
   security_groups = [openstack_networking_secgroup_v2.sf.name]
   network {
     uuid = openstack_networking_network_v2.sf.id
@@ -178,10 +184,10 @@ resource "openstack_networking_floatingip_v2" "sf_2_floating_ip" {
 }
 
 resource "openstack_compute_instance_v2" "sf_2" {
-  name      = "${var.uniqifier}sf-2"
-  image_id  = data.openstack_images_image_v2.ubuntu.id
-  flavor_id = data.openstack_compute_flavor_v2.sf.id
-  key_pair  = var.ssh_key_name
+  name            = "${var.uniqifier}sf-2"
+  image_id        = data.openstack_images_image_v2.ubuntu.id
+  flavor_id       = data.openstack_compute_flavor_v2.sf.id
+  key_pair        = var.ssh_key_name
   security_groups = [openstack_networking_secgroup_v2.sf.name]
   network {
     uuid = openstack_networking_network_v2.sf.id
@@ -198,10 +204,10 @@ resource "openstack_networking_floatingip_v2" "sf_3_floating_ip" {
 }
 
 resource "openstack_compute_instance_v2" "sf_3" {
-  name      = "${var.uniqifier}sf-3"
-  image_id  = data.openstack_images_image_v2.ubuntu.id
-  flavor_id = data.openstack_compute_flavor_v2.sf.id
-  key_pair  = var.ssh_key_name
+  name            = "${var.uniqifier}sf-3"
+  image_id        = data.openstack_images_image_v2.ubuntu.id
+  flavor_id       = data.openstack_compute_flavor_v2.sf.id
+  key_pair        = var.ssh_key_name
   security_groups = [openstack_networking_secgroup_v2.sf.name]
   network {
     uuid = openstack_networking_network_v2.sf.id
