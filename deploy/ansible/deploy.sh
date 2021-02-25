@@ -180,11 +180,9 @@ IGNORE_MTU="${IGNORE_MTU:-0}"
 
 # Setup variables for consumption by ansible and terraform
 cwd=`pwd`
-TERRAFORM_VARS="$TERRAFORM_VARS -var=uniqifier=$UNIQIFIER"
 
 VARIABLES="$VARIABLES,cloud=$CLOUD"
 VARIABLES="$VARIABLES,bootdelay=$BOOTDELAY"
-VARIABLES="$VARIABLES,ansible_root=\"$cwd\""
 VARIABLES="$VARIABLES,uniqifier=$UNIQIFIER"
 VARIABLES="$VARIABLES,admin_password=$ADMIN_PASSWORD"
 VARIABLES="$VARIABLES,floating_network_ipblock=$FLOATING_IP_BLOCK"
@@ -197,7 +195,6 @@ VARIABLES="$VARIABLES,restore_backup=\"$RESTORE_BACKUP\""
 VARIABLES="$VARIABLES,ignore_mtu=\"$IGNORE_MTU\""
 
 echo "VARIABLES: $VARIABLES"
-TERRAFORM_VARS=""
 ANSIBLE_VARS=""
 
 VARIABLES=`echo $VARIABLES | sed 's/^,//'`
@@ -207,15 +204,24 @@ IFS=,
 vars=($(echo "$VARIABLES"))
 IFS=$OLDIFS
 
+mkdir -p /etc/sf/
+echo "# Install started at "`date` > /etc/sf/deploy-variables
 for var in "${vars[@]}"
 do
-  TERRAFORM_VARS="$TERRAFORM_VARS -var=$var"
+  echo "#    $var" >> /etc/sf/deploy-variables
   ANSIBLE_VARS="$ANSIBLE_VARS $var"
 done
 
-ansible-playbook $VERBOSE -i hosts --extra-vars "$ANSIBLE_VARS" deploy.yml $@
+echo "" >> /etc/sf/deploy-variables
+echo "export CLOUD=\"$CLOUD\"" >> /etc/sf/deploy-variables
+echo "export ANSIBLE_VARS=\"$ANSIBLE_VARS\"" >> /etc/sf/deploy-variables
+
+ansible-playbook $VERBOSE -i hosts --extra-vars "$ANSIBLE_VARS ansible_root=\"$cwd\"" deploy.yml $@
 
 if [ -e terraform/$CLOUD/local.yml ]
 then
-  ansible-playbook $VERBOSE -i hosts --extra-vars "$ANSIBLE_VARS" terraform/$CLOUD/local.yml $@
+  ansible-playbook $VERBOSE -i hosts --extra-vars "$ANSIBLE_VARS ansible_root=\"$cwd\"" terraform/$CLOUD/local.yml $@
 fi
+
+echo "" >> /etc/sf/deploy-variables
+echo "# Install finished at "`date` >> /etc/sf/deploy-variables

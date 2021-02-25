@@ -1,3 +1,9 @@
+terraform {
+  backend "local" {
+    path = "/etc/sf/tfstate"
+  }
+}
+
 provider "aws" {
   profile = "default"
   region  = var.region
