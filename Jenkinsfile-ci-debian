@@ -68,6 +68,9 @@ pipeline {
                 if [ -e /usr/local/share/shakenfist/installer/install ]
                 then
                   sudo --preserve-env /usr/local/share/shakenfist/installer/install
+                elif [ -e /usr/local/share/shakenfist/installer/install.sh ]
+                then
+                  sudo --preserve-env /usr/local/share/shakenfist/installer/install.sh
                 else
                   cd deploy/ansible
 
