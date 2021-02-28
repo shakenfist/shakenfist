@@ -100,7 +100,6 @@ class Monitor(daemon.Daemon):
                     else:
                         n.create_on_hypervisor()
 
-                n.update_dhcp()
                 n.ensure_mesh()
 
             except exceptions.LockException as e:
