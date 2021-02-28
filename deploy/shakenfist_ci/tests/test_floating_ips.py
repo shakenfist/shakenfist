@@ -77,7 +77,6 @@ echo 'Floating IPs work!' > /var/www/html/index.html
             except Exception:
                 pass
 
-            if attempts > 5:
-                self.fail('Incorrect result after %d attempts' % attempts)
-
             time.sleep(30)
+
+        self.fail('Incorrect result after %d attempts' % attempts)
