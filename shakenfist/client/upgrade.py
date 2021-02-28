@@ -89,7 +89,7 @@ def main():
     minor = int(elems[1])
 
     if major == 0:
-        if minor <= 2:
+        if minor <= 4:
             clean_events_mesh_operations(etcd_client)
 
         if minor <= 3:
