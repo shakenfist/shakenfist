@@ -20,7 +20,7 @@ pipeline {
                 sudo apt-get update
                 sudo apt-get -y dist-upgrade
                 sudo apt-get -y install ansible tox pwgen build-essential python3-dev python3-wheel \
-                  python3-pip curl ansible vim git pwgen
+                  python3-pip curl ansible vim git pwgen software-properties-common
 
                 sudo pip3 uninstall ansible
                 sudo apt-get remove -y ansible
@@ -29,8 +29,8 @@ pipeline {
                 sudo apt-get remove -y python3-pip
 
                 sudo pip3 install -U ansible tox
-                sudo ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform andrewrothstein.go
-                sudo ansible-galaxy collection install community.general
+                ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform andrewrothstein.go
+                ansible-galaxy collection install community.general
 
                 # We create a RAM disk for etcd to work around poor performance on cloud instances
                 sudo mkdir -p /var/lib/etcd
@@ -42,9 +42,7 @@ pipeline {
       }
     stage('Install pypi release') {
       steps {
-        sh '''
-
-                if [ '%%' == '%%' ]
+        sh '''  if [ '%%' == '%%' ]
                 then
                   BRANCH=`git rev-parse --abbrev-ref HEAD`
                 else
@@ -55,14 +53,21 @@ pipeline {
 
 
 
+
+
+
                 # Install the latest 0.3 pypi release
                 sudo pip install "shakenfist>=0.3,<0.4"
                 sudo pip install "shakenfist_client>=0.3,<0.4"
                 SFVERSION=`pip list | tr -s " " | grep "shakenfist " | sed 's/.dev.*//' | cut -f 2 -d " "`
 
-                if [ -e /usr/local/share/shakenfist/installer/install.sh ]
+                export CLOUD="localhost"
+                export FLOATING_IP_BLOCK="10.0.0.0/24"
+                export KSM_ENABLED="0"
+
+                if [ -e /usr/local/share/shakenfist/installer/install ]
                 then
-                  sudo CLOUD="localhost" FLOATING_IP_BLOCK="10.0.0.0/24" KSM_ENABLED="0" /usr/local/share/shakenfist/installer/install.sh
+                  sudo --preserve-env /usr/local/share/shakenfist/installer/install
                 else
                   cd deploy/ansible
 
@@ -70,7 +75,7 @@ pipeline {
                   git remote add github https://github.com/shakenfist/shakenfist
                   git fetch github
                   git checkout v$SFVERSION
-                  sudo CLOUD="localhost" FLOATING_IP_BLOCK="10.0.0.0/24" KSM_ENABLED="0" ./deployandtest.sh
+                  sudo --preserve-env ./deployandtest.sh
                   git checkout $previous
                 fi
 
@@ -83,7 +88,10 @@ pipeline {
       }
     stage('Create sample infrastructure') {
       steps {
-        sh '''  # Start an instance to upgrade
+        sh '''
+
+
+                # Start an instance to upgrade
                 sudo chmod ugo+r /etc/sf/sfrc
                 . /etc/sf/sfrc
                 sf-client namespace create upgrade
@@ -164,12 +172,18 @@ pipeline {
                 sudo pip install --upgrade twine
                 tar czf deploy.tgz deploy
                 tar czf docs.tgz docs
+                echo "9999.0.0" > VERSION.txt
                 python3 setup.py sdist bdist_wheel
+
                 sudo pip install --upgrade dist/shakenfist-*whl
-                sudo pip install --upgrade shakenfist_client
+                sudo pip install --upgrade shakenfist_client>=0.4.2
+
+                export CLOUD="localhost"
+                export FLOATING_IP_BLOCK="10.0.0.0/24"
+                export KSM_ENABLED="0"
 
                 # Run installer
-                sudo CLOUD="localhost" FLOATING_IP_BLOCK="10.0.0.0/24" KSM_ENABLED="0" /usr/local/share/shakenfist/installer/install.sh
+                sudo --preserve-env /usr/local/share/shakenfist/installer/install
 
                 # Log what versions we are running
                 echo "============================================================"
@@ -180,7 +194,10 @@ pipeline {
       }
     stage('Re-run upgrade to make sure that its a noop') {
       steps {
-        sh '''  sf-upgrade'''
+        sh '''
+
+                sf-upgrade
+          '''
       }
     }
     stage('Run CI tests') {
@@ -238,6 +255,12 @@ pipeline {
 
       sh '''  echo "=============================="
               pip list
+
+              echo "=============================="
+              cat /etc/sf/deploy-variables
+
+              echo "=============================="
+              cat /etc/hosts
 
               echo "=============================="
               cat /var/log/syslog
