@@ -13,8 +13,8 @@ echo
 echo "--- Preparing deployer ---"
 set -x
 rm -rf deploy/shakenfist_ci.egg-info deploy/gitrepos deploy/.tox
-find deploy/ansible/terraform -type f -name "*tfstate*" -exec rm {} \;
-find deploy/ansible/terraform -type d  -name ".terraform" -exec rm -rf {} \;
+find deploy/ansible/terraform -type f -name "*tfstate*" -exec rm {} \; || true
+find deploy/ansible/terraform -type d  -name ".terraform" -exec rm -rf {} \; || true
 
 rm -f deploy.tgz
 tar cvzf deploy.tgz deploy

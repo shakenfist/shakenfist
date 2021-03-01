@@ -1,3 +1,9 @@
+terraform {
+  backend "local" {
+    path = "/etc/sf/tfstate"
+  }
+}
+
 variable "project" {
   description = "The google cloud project id to use"
 }
