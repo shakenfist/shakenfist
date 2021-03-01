@@ -35,6 +35,8 @@ pipeline {
                 # We create a RAM disk for etcd to work around poor performance on cloud instances
                 sudo mkdir -p /var/lib/etcd
                 sudo mount -t tmpfs -o size=2g tmpfs /var/lib/etcd
+
+                sudo apt-get -y autoremove
           '''
         }
       }
@@ -44,7 +46,7 @@ pipeline {
                 then
                   BRANCH=`git rev-parse --abbrev-ref HEAD`
                 else
-                  BRANCH="master"
+                  BRANCH=""
                 fi
 
                 cd $WORKSPACE
@@ -159,11 +161,11 @@ pipeline {
         sh '''
 
 
-                if [ '%master%' == '%%' ]
+                if [ '%%' == '%%' ]
                 then
                   BRANCH=`git rev-parse --abbrev-ref HEAD`
                 else
-                  BRANCH="master"
+                  BRANCH=""
                 fi
 
                 cd $WORKSPACE
