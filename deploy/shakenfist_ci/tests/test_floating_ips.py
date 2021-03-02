@@ -60,19 +60,18 @@ echo 'Floating IPs work!' > /var/www/html/index.html
 
         time.sleep(120)
 
-        console = base.LoggingSocket(inst['node'], inst['console_port'])
-        out = console.execute('cat /var/www/html/index.html')
-        if not out.find('Floating IPs work!'):
-            self.fail('User data script did not run!\n\n%s' % out)
-
         attempts = 0
         for _ in range(10):
             attempts += 1
             try:
-                r = requests.request(
-                    'GET', 'http://%s/' % ifaces[0]['floating'])
-                if r.status_code == 200 and r.text.find('Floating IPs work!') != -1:
-                    return
+                console = base.LoggingSocket(
+                    inst['node'], inst['console_port'])
+                out = console.execute('cat /var/www/html/index.html')
+                if out.find('Floating IPs work!') != -1:
+                    r = requests.request(
+                        'GET', 'http://%s/' % ifaces[0]['floating'])
+                    if r.status_code == 200 and r.text.find('Floating IPs work!') != -1:
+                        return
 
             except Exception:
                 pass
