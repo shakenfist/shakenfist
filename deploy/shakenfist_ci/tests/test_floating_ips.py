@@ -31,9 +31,6 @@ echo 'Floating IPs work!' > /var/www/html/index.html
                 {
                     'network_uuid': self.net['uuid']
                 },
-                {
-                    'network_uuid': self.net['uuid']
-                }
             ],
             [
                 {
