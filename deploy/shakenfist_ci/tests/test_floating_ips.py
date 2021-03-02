@@ -43,7 +43,7 @@ echo 'Floating IPs work!' > /var/www/html/index.html
             str(base64.b64encode(ud.encode('utf-8')), 'utf-8'))
 
         self.assertIsNotNone(inst['uuid'])
-        self._await_login_prompt(inst['uuid'])
+        self._await_cloud_init_complete(inst['uuid'])
 
         # We need to refresh our view of the instance, as it might have
         # changed as it started up
@@ -65,24 +65,17 @@ echo 'Floating IPs work!' > /var/www/html/index.html
         for _ in range(10):
             attempts += 1
             try:
-                console = base.LoggingSocket(
-                    inst['node'], inst['console_port'])
-                out = console.execute('cat /var/www/html/index.html')
-                if out.find('Floating IPs work!') == -1:
-                    print('Floating IPs test attempt failed, userdata has not run')
-                else:
-                    r = requests.request(
-                        'GET', 'http://%s/' % ifaces[0]['floating'])
+                r = requests.request('GET', 'http://%s/'
+                                     % ifaces[0]['floating'])
 
-                    if r.status_code == 200:
-                        if r.text.find('Floating IPs work!') != -1:
-                            print('Floating IPs test passed')
-                            return
-                        print('Floating IPs test attempt failed, incorrect HTTP '
-                              'result')
-                    else:
-                        print('Floating IPs test attempt received HTTP status %s'
-                              % r.status_code)
+                if r.status_code == 200:
+                    if r.text.find('Floating IPs work!') != -1:
+                        return
+                    print('Floating IPs test attempt failed, incorrect HTTP '
+                          'result')
+                else:
+                    print('Floating IPs test attempt received HTTP status %s'
+                          % r.status_code)
 
             except Exception as e:
                 print('Floating IPs test attempt failed with exception: %s' % e)

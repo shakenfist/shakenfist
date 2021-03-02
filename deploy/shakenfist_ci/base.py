@@ -104,6 +104,10 @@ class BaseTestCase(testtools.TestCase):
         return self._await_instance_event(
             instance_uuid, 'trigger', 'login prompt', after)
 
+    def _await_cloud_init_complete(self, instance_uuid, after=None):
+        return self._await_instance_event(
+            instance_uuid, 'trigger', 'cloud-init complete', after)
+
     def _await_instance_event(
             self, instance_uuid, operation, message=None, after=None):
         # Wait up to 5 minutes for the instance to be created. On a slow
