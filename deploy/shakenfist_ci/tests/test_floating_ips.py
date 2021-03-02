@@ -55,7 +55,11 @@ echo 'Floating IPs work!' > /var/www/html/index.html
         ifaces = self.test_client.get_instance_interfaces(inst['uuid'])
         self.assertNotEqual(None, ifaces[0]['floating'])
 
-        time.sleep(120)
+        # Because the user data in this test does a dist-upgrade and installs
+        # a package, it can take a long time to run. This happens after the
+        # instance presents its first login prompt (checked above), so we
+        # need to sleep for a disturbingly long time just in case.
+        time.sleep(300)
 
         attempts = 0
         for _ in range(10):
@@ -64,14 +68,24 @@ echo 'Floating IPs work!' > /var/www/html/index.html
                 console = base.LoggingSocket(
                     inst['node'], inst['console_port'])
                 out = console.execute('cat /var/www/html/index.html')
-                if out.find('Floating IPs work!') != -1:
+                if out.find('Floating IPs work!') == -1:
+                    print('Floating IPs test attempt failed, userdata has not run')
+                else:
                     r = requests.request(
                         'GET', 'http://%s/' % ifaces[0]['floating'])
-                    if r.status_code == 200 and r.text.find('Floating IPs work!') != -1:
-                        return
 
-            except Exception:
-                pass
+                    if r.status_code == 200:
+                        if r.text.find('Floating IPs work!') != -1:
+                            print('Floating IPs test passed')
+                            return
+                        print('Floating IPs test attempt failed, incorrect HTTP '
+                              'result')
+                    else:
+                        print('Floating IPs test attempt received HTTP status %s'
+                              % r.status_code)
+
+            except Exception as e:
+                print('Floating IPs test attempt failed with exception: %s' % e)
 
             time.sleep(30)
 
