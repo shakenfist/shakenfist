@@ -104,6 +104,10 @@ class BaseTestCase(testtools.TestCase):
         return self._await_instance_event(
             instance_uuid, 'trigger', 'login prompt', after)
 
+    def _await_cloud_init_complete(self, instance_uuid, after=None):
+        return self._await_instance_event(
+            instance_uuid, 'trigger', 'cloud-init complete', after)
+
     def _await_instance_event(
             self, instance_uuid, operation, message=None, after=None):
         # Wait up to 5 minutes for the instance to be created. On a slow
@@ -129,7 +133,7 @@ class BaseTestCase(testtools.TestCase):
 
         # Once created, we shouldn't need more than five minutes for boot.
         start_time = time.time()
-        while time.time() - start_time < 300:
+        while time.time() - start_time < 600:
             for event in self.system_client.get_instance_events(instance_uuid):
                 if after and event['timestamp'] <= after:
                     continue
@@ -152,7 +156,7 @@ class BaseTestCase(testtools.TestCase):
         self._log_console(instance_uuid)
         self._log_instance_events(instance_uuid)
         raise TimeoutException(
-            'After time %s, instance %s had no event "%s:%s" (waited 5 mins)' % (
+            'After time %s, instance %s had no event "%s:%s" (waited 10 mins)' % (
                 after, instance_uuid, operation, message))
 
     def _await_image_download_success(self, url, after=None):

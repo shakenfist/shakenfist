@@ -2,7 +2,11 @@ import ipaddress
 import random
 
 from shakenfist import db
+from shakenfist import exceptions
 
+
+# NOTE(mikal): IPManager should _always_ return addresses as strings,
+# not as ipaddress.IPv4Address.
 
 class IPManager(object):
     def __init__(self, uuid, ipblock, in_use=None):
@@ -11,8 +15,8 @@ class IPManager(object):
         self.ipblock_obj = ipaddress.ip_network(ipblock, strict=False)
 
         self.netmask = self.ipblock_obj.netmask
-        self.broadcast_address = self.ipblock_obj.broadcast_address
-        self.network_address = self.ipblock_obj.network_address
+        self.broadcast_address = str(self.ipblock_obj.broadcast_address)
+        self.network_address = str(self.ipblock_obj.network_address)
 
         self.num_addresses = self.ipblock_obj.num_addresses
         self.in_use = {
@@ -58,7 +62,7 @@ class IPManager(object):
         db.delete_ipmanager(self.uuid)
 
     def get_address_at_index(self, idx):
-        return self.ipblock_obj[idx]
+        return str(self.ipblock_obj[idx])
 
     def is_in_range(self, address):
         return ipaddress.ip_address(address) in self.ipblock_obj
@@ -103,3 +107,5 @@ class IPManager(object):
                     return str(addr)
 
                 idx += 1
+
+        raise exceptions.CongestedNetwork('No free addresses on network')
