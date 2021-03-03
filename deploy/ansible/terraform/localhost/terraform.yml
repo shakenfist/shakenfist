@@ -8,7 +8,7 @@
 - name: Add localhost to the right groups
   add_host:
     hostname: localhost
-    groups: hypervisors, primary, etcd_master
+    groups: hypervisors, etcd_master
 
 - name: Extract hostname
   set_fact:

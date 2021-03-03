@@ -170,8 +170,7 @@ pipeline {
 
                 cd $WORKSPACE
 
-                # Make a wheel to install
-                sudo pip install --upgrade readme-renderer
+                # Make a wheel to installJenkinsfile-ubuntu-2004
                 sudo pip install --upgrade twine
                 tar czf deploy.tgz deploy
                 tar czf docs.tgz docs

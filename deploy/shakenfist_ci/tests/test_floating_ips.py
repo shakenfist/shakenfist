@@ -61,6 +61,11 @@ echo 'Floating IPs work!' > /var/www/html/index.html
         # need to sleep for a disturbingly long time just in case.
         time.sleep(300)
 
+        console = base.LoggingSocket(inst['node'], inst['console_port'])
+        out = console.execute('cat /var/www/html/index.html')
+        if not out.find('Floating IPs work!'):
+            self.fail('User data script did not run!\n\n%s' % out)
+
         attempts = 0
         for _ in range(10):
             attempts += 1

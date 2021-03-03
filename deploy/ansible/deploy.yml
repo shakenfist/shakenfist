@@ -1,5 +1,5 @@
 ---
-# Install shakenfist on a series of Ubuntu machines
+# Install shakenfist on a series of Ubuntu or Debian machines
 - hosts: localhost
   gather_facts: yes
   connection: ssh
@@ -33,7 +33,7 @@
         minutes: "{{bootdelay}}"
       when: mode == "deploy" and cloud != "localhost"
 
-- hosts: allsf
+- hosts: hypervisors:!localhost
   any_errors_fatal: true
   become: yes
   become_method: sudo
@@ -45,7 +45,26 @@
   tasks:
     - include: terraform/{{cloud}}/postboot.yml
 
-- hosts: primary
+    - include: includes/python3.yml
+      when: mode == "deploy"
+
+    - name: Copy local shakenfist wheel if the installation source is a file
+      copy:
+        src: "{{remote_package}}"
+        dest: "/tmp/{{remote_package | basename}}"
+        owner: root
+        mode: u=r,g=r,o=r
+      when: remote_source == "file"
+
+    - name: Install shakenfist if it is a local file
+      command: pip3 install "/tmp/{{remote_package | basename}}"
+      when: remote_source == "file"
+
+    - name: Install shakenfist when it is a pypi package
+      command: pip3 install "{{remote_package}}"
+      when: remote_source == "pip"
+
+- hosts: localhost
   any_errors_fatal: true
   become: yes
   become_method: sudo
@@ -132,26 +151,26 @@
         sysctl -w net.ipv6.conf.default.disable_ipv6=1
       ignore_errors: True
 
-    - name: Syslog server is the primary server
+    - name: Syslog server is the localhost server
       set_fact:
-        syslog: "{{hostvars['localhost']['primary_node_ip']}}"
+        syslog: "{{hostvars['localhost']['localhost_node_ip']}}"
       when: mode == "deploy"
 
-    - name: Send syslog to the primary server, unless I am the primary server
+    - name: Send syslog to the localhost server, unless I am the localhost server
       template:
         src: files/rsyslog-client-01-sf.conf
         dest: /etc/rsyslog.d/01-sf.conf
         owner: root
         group: sudo
         mode: u=r,g=r,o=
-      when: hostvars['localhost']['primary_node_ip'] != node_ip and mode == "deploy"
+      when: hostvars['localhost']['localhost_node_ip'] != node_ip and mode == "deploy"
 
     - name: Restart syslog
       service:
         name: rsyslog
         enabled: yes
         state: restarted
-      when: hostvars['localhost']['primary_node_ip'] != node_ip and mode == "deploy"
+      when: hostvars['localhost']['localhost_node_ip'] != node_ip and mode == "deploy"
 
     - name: Load default vars
       include_vars: main.yml
@@ -218,7 +237,7 @@
       include: includes/glusterfs-all-initial.yml
       when: gluster_enabled == "1" and mode == "deploy"
 
-- hosts: primary
+- hosts: localhost
   any_errors_fatal: true
   become: yes
   become_method: sudo
@@ -229,7 +248,7 @@
     mode: deploy
 
   tasks:
-    - name: Single node gluster configuration
+    - name: Primary node gluster configuration
       include: includes/glusterfs-primary.yml
       when: gluster_enabled == "1" and mode == "deploy"
 
@@ -289,7 +308,7 @@
     - name: Stop the SF daemon
       shell: systemctl stop sf || true
 
-- hosts: primary
+- hosts: localhost
   any_errors_fatal: true
   become: yes
   become_method: sudo
@@ -538,7 +557,6 @@
     - name: Write systemd unit
       template:
         src: /usr/local/share/shakenfist/templates/sf.service
-        remote_src: yes
         dest: /lib/systemd/system
         owner: root
         group: root
@@ -560,7 +578,7 @@
         state: restarted
         daemon_reload: yes
 
-- hosts: primary
+- hosts: localhost
   roles:
     - role: andrewrothstein.terraform
       when: mode == "deploy"
@@ -570,7 +588,7 @@
     - role: andrewrothstein.go
       when: mode == "deploy"
 
-- hosts: primary
+- hosts: localhost
   any_errors_fatal: true
   become: yes
   become_method: sudo

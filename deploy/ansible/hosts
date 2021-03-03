@@ -1,12 +1,9 @@
 [local]
 localhost ansible_connection=local
 
-[primary]
-
 [hypervisors]
 
 [allsf:children]
-  primary
   hypervisors
 
 [allsf:vars]

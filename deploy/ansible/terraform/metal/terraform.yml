@@ -4,7 +4,7 @@
   add_host:
     hostname: sf-1
     ansible_ssh_host: "{{metal_ip_sf1}}"
-    groups: hypervisors, primary, etcd_master
+    groups: hypervisors, etcd_master
 
 - name: Add sf-1 node_ip
   set_fact:
