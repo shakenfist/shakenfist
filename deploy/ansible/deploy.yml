@@ -535,10 +535,16 @@
         node_ip: "{{node_ip_complex.stdout}}"
       when: node_ip is not defined
 
+    - name: Fetch systemd unit template from remote host
+      fetch:
+        src: /usr/local/share/shakenfist/templates/sf.service
+        dest: /tmp/{{ansible_host}}_sf.service
+        flat: yes
+        fail_on_missing: yes
+
     - name: Write systemd unit
       template:
-        src: /usr/local/share/shakenfist/templates/sf.service
-        remote_src: yes
+        src: /tmp/{{ansible_host}}_sf.service
         dest: /lib/systemd/system
         owner: root
         group: root
