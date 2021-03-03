@@ -21,7 +21,10 @@ def observe(path, instance_uuid):
     setproctitle.setproctitle(
         '%s-%s' % (daemon.process_name('triggers'), instance_uuid))
     regexps = {
-        'login prompt': ['^.* login: .*', re.compile('.* login: .*')]
+        'login prompt': re.compile('.* login: .*'),
+        'user-data script start': re.compile('.*Starting.*Execute cloud user/final scripts.*'),
+        'user-data script end': re.compile('.*Finished.*Execute cloud user/final scripts.*'),
+        'cloud-init complete': re.compile('.*Reached target.*Cloud-init target.*')
     }
 
     while not os.path.exists(path):
@@ -49,7 +52,7 @@ def observe(path, instance_uuid):
             for line in lines:
                 if line:
                     for trigger in regexps:
-                        m = regexps[trigger][1].match(line)
+                        m = regexps[trigger].match(line)
                         if m:
                             log_ctx.with_field('trigger', trigger,
                                                ).info('Trigger matched')
