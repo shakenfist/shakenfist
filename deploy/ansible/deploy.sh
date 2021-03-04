@@ -90,9 +90,9 @@ then
   then
     d=`cat $GCP_SSH_KEY_FILENAME.pub`
     VARIABLES="$VARIABLES,ssh_key_filename=$GCP_SSH_KEY_FILENAME"
-    VARIABLES="$VARIABLES,ssh_key=\"$d\" ssh_user=$GCP_SSH_USER"
+    VARIABLES="$VARIABLES,ssh_key=\"$d\",ssh_user=$GCP_SSH_USER"
   else
-    VARIABLES="$VARIABLES,ssh_key_filename='' ssh_key='' ssh_user=''"
+    VARIABLES="$VARIABLES,ssh_key_filename=\"\",ssh_key=\"\",ssh_user=\"\""
   fi
 fi
 
@@ -251,9 +251,12 @@ do
   ANSIBLE_VARS="$ANSIBLE_VARS $var"
 done
 
+encoded=`echo $ANSIBLE_VARS | base64 -w 0`
+
 echo "" >> /etc/sf/deploy-variables
-echo "export CLOUD=\"$CLOUD\"" >> /etc/sf/deploy-variables
-echo "export ANSIBLE_VARS=\"$ANSIBLE_VARS\"" >> /etc/sf/deploy-variables
+echo "export CLOUD=$CLOUD" >> /etc/sf/deploy-variables
+echo "export ENCODED_ANSIBLE_VARS=$encoded" >> /etc/sf/deploy-variables
+echo "export ANSIBLE_VARS=`echo $encoded | base64 -d`" >> /etc/sf/deploy-variables
 
 ansible-playbook $VERBOSE -i hosts --extra-vars "$ANSIBLE_VARS ansible_root=\"$cwd\"" deploy.yml $@
 

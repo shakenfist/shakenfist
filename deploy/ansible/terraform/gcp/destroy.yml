@@ -1,0 +1,18 @@
+---
+# Remove any cloud resources we created for the install
+- hosts: localhost
+  gather_facts: yes
+  connection: ssh
+
+  tasks:
+    - name: Destroy infrastructure
+      terraform:
+        project_path: "{{ansible_root}}/terraform/gcp"
+        state: absent
+        force_init: true
+        variables:
+          project: "{{project}}"
+          uniqifier: "{{uniqifier}}"
+          ssh_user: "{{ssh_user}}"
+          node_count: "{{node_count}}"
+          node_image: "{{node_image}}"
