@@ -43,7 +43,8 @@ setuptools.setup(
         (
             'share/shakenfist/installer', [
                 'deploy.tgz',
-                'deploy/install'
+                'deploy/install',
+                'deploy/uninstall'
             ]
         ),
         (

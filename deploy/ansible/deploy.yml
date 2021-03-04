@@ -1,5 +1,5 @@
 ---
-# Install shakenfist on a series of Ubuntu machines
+# Install shakenfist on a series of Ubuntu or Debian machines
 - hosts: localhost
   gather_facts: yes
   connection: ssh
@@ -44,6 +44,35 @@
 
   tasks:
     - include: terraform/{{cloud}}/postboot.yml
+
+- hosts: allsf:!localhost
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+  vars:
+    mode: deploy
+
+  tasks:
+    - include: includes/python3.yml
+      when: mode == "deploy"
+
+    - name: Copy local shakenfist wheel if the installation source is a file
+      copy:
+        src: "{{remote_package}}"
+        dest: "/tmp/{{remote_package | basename}}"
+        owner: root
+        mode: u=r,g=r,o=r
+      when: remote_source == "file"
+
+    - name: Install shakenfist if it is a local file
+      command: pip3 install "/tmp/{{remote_package | basename}}"
+      when: remote_source == "file"
+
+    - name: Install shakenfist when it is a pypi package
+      command: pip3 install "{{remote_package}}"
+      when: remote_source == "pip"
 
 - hosts: primary
   any_errors_fatal: true

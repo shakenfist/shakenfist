@@ -238,9 +238,11 @@ with real users.
 | AWS_AVAILABILITY_ZONE | aws, aws-single-node | The AWS availability zone to deploy in |
 | AWS_VPC_ID | aws, aws-single-node | The AWS VPC to use |
 | AWS_SSH_KEY_NAME | aws, aws-single-node | The name of an SSH key in the AWS region to use for ansible |
-| GCP_PROJECT | gcp, gcp-xl | The GCP project id to deploy in |
-| GCP_SSH_KEY_FILENAME | gcp, gcp-xl | The path to a ssh private key file to use for authentication. It is assumed that the public key is at ```${GCP_SSH_KEY_FILENAME}.pub```. (optional, only required if not using gcloud). |
-| GCP_SSH_USER | gcp, gcp-xl | The username to add the GCP_SSH_KEY to. (optional, only used if GCPSSH_KEY_FILENAME is set). |
+| GCP_PROJECT | gcp | The GCP project id to deploy in |
+| GCP_SSH_KEY_FILENAME | gcp | The path to a ssh private key file to use for authentication. It is assumed that the public key is at ```${GCP_SSH_KEY_FILENAME}.pub```. (optional, only required if not using gcloud). |
+| GCP_SSH_USER | gcp | The username to add the GCP_SSH_KEY to. (optional, only used if GCPSSH_KEY_FILENAME is set). |
+| NODE_IMAGE | gcp | The name of an image to use for the booted instances. |
+| NODE_COUNT | gcp | The number of nodes to start. |
 | OS_SSH_KEY_NAME | openstack | The name of a SSH key in the OpenStack cloud to use for ansible |
 | OS_FLAVOR_NAME | openstack | The OpenStack flavor to use for instances |
 | OS_EXTERNAL_NET_NAME | openstack | The UUID of an OpenStack network with internet access |

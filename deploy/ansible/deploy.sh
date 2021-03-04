@@ -6,6 +6,30 @@
 VARIABLES=""
 VERBOSE="-v"
 
+# Determine what version of Shaken Fist is installed locally, as that
+# is what we will use for any remote hosts.
+install_path=`python3 -m pip show shakenfist | egrep "^Location: " | cut -f 2 -d " "`
+direct_url_path=$install_path/shakenfist-*dist-info/direct_url.json
+if [ -e $direct_url_path ]
+then
+  REMOTE_SOURCE="file"
+  REMOTE_PACKAGE=`cat $direct_url_path | python3 -c "import sys, json; print(json.loads(sys.stdin.read())['url']);"`
+
+  if [ `echo "$REMOTE_PACKAGE" | egrep -c "^file://"` -ne 1 ]
+  then
+    echo "Sorry, $REMOTE_PACKAGE is not a supported package source."
+    exit 1
+  fi
+
+  REMOTE_PACKAGE=`echo $REMOTE_PACKAGE | sed 's|file://||'`
+  echo "Shaken Fist is a locally built package from $REMOTE_PACKAGE"
+else
+  pip_version=`egrep "^Version :" $install_path/shakenfist-*dist.info/METADATA | cut -f 2 -d " "`
+  echo "Shaken Fist is pip version $pip_version"
+  REMOTE_SOURCE="pip"
+  REMOTE_PACKAGE="shakenfist==$pip_version"
+fi
+
 #### AWS
 if [ "$CLOUD" == "aws" ] || [ "$CLOUD" == "aws-single-node" ]
 then
@@ -39,14 +63,27 @@ then
 fi
 
 #### Google Cloud
-if [ "$CLOUD" == "gcp" ] || [ "$CLOUD" == "gcp-xl" ]
+if [ "$CLOUD" == "gcp" ]
 then
   if [ -z "$GCP_PROJECT" ]
   then
     echo ===== Must specify GCP project in \$GCP_PROJECT
     exit 1
   fi
-  VARIABLES="$VARIABLES,project=$GCP_PROJECT"
+
+  if [ -z "$NODE_IMAGE" ]
+  then
+    echo ===== Must specify the name of a boot image in \$NODE_IMAGE
+    exit 1
+  fi
+
+  if [ -z "$NODE_COUNT" ]
+  then
+    echo ===== Must specify the number of nodes to create in \$NODE_COUNT
+    exit 1
+  fi
+
+  VARIABLES="$VARIABLES,project=$GCP_PROJECT,node_image=$NODE_IMAGE,node_count=$NODE_COUNT"
   IGNORE_MTU="1"
 
   if [ -n "$GCP_SSH_KEY_FILENAME" ]
@@ -193,6 +230,8 @@ VARIABLES="$VARIABLES,gluster_replicas=$GLUSTER_REPLICAS"
 VARIABLES="$VARIABLES,deploy_name=$DEPLOY_NAME"
 VARIABLES="$VARIABLES,restore_backup=\"$RESTORE_BACKUP\""
 VARIABLES="$VARIABLES,ignore_mtu=\"$IGNORE_MTU\""
+VARIABLES="$VARIABLES,remote_source=\"$REMOTE_SOURCE\""
+VARIABLES="$VARIABLES,remote_package=\"$REMOTE_PACKAGE\""
 
 echo "VARIABLES: $VARIABLES"
 ANSIBLE_VARS=""
