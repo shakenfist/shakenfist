@@ -55,8 +55,92 @@
     mode: deploy
 
   tasks:
-    - include: includes/python3.yml
+    - name: Load default vars
+      include_vars: main.yml
+
+    - name: apt-get dist-upgrade
+      apt:
+        update_cache: yes
+        upgrade: dist
+        autoremove: yes
+
+    - name: Install dependencies
+      apt:
+        name: "{{ shakenfist_deps }}"
+        state: latest
+
+    - name: Disable dnsmasq
+      service:
+        name: dnsmasq
+        enabled: no
+        state: stopped
+
+    - name: Check that we can run KVM
+      shell: kvm-ok
       when: mode == "deploy"
+
+    # NOTE(mikal): this might not be right if egress and meshes are on different
+    # interfaces.
+    - name: Determine default interface
+      shell: ip route list default | head -1 | cut -f 5 -d " "
+      register: node_egress_nic_complex
+      when: node_egress_nic is not defined
+
+    - name: Extract node default interface
+      set_fact:
+        node_egress_nic: "{{node_egress_nic_complex.stdout}}"
+      when: node_egress_nic is not defined
+
+    - name: Determine default interface MTU
+      shell: ip link show {{node_egress_nic}} | grep mtu | sed -e 's/.*mtu //' -e 's/ .*//'
+      register: node_mtu_complex
+      when: mode == "deploy"
+
+    - name: Extract default interface MTU
+      set_fact:
+        node_mtu: "{{node_mtu_complex.stdout}}"
+      when: mode == "deploy"
+
+    - name: Log node MTU
+      debug:
+        msg: "Node MTU is {{node_mtu}}"
+      when: mode == "deploy"
+
+    - name: Abort if default interface MTU is too low
+      fail:
+        msg: "Node MTU is too low."
+      when: mode == "deploy" and ignore_mtu != "1" and node_mtu|int < 2000
+
+    - name: Make /srv/shakenfist/
+      file:
+        path: /srv/shakenfist
+        state: directory
+        mode: "0755"
+      when: mode == "deploy"
+
+    - name: Install python3-setuptools and venv support
+      apt:
+        name: ["python3-dev", "python3-venv"]
+        state: latest
+
+    - name: Test if we have any pip3
+      shell: pip3 help
+      ignore_errors: True
+      register: has_pip
+
+    - name: Install python3-pip
+      apt:
+        name: python3-pip
+        state: latest
+      when: has_pip is failed
+
+    - name: pip3 self-upgrade
+      command: pip3 install -U pip
+
+    - name: Remove python3-pip
+      apt:
+        name: python3-pip
+        state: absent
 
     - name: Copy local shakenfist wheel if the installation source is a file
       copy:
@@ -66,12 +150,27 @@
         mode: u=r,g=r,o=r
       when: remote_source == "file"
 
+    - name: Check if we have a venv already
+      stat:
+        path: /srv/shakenfist/venv
+      register: venv
+
+    - name: Create venv
+      command: python3 -m venv /srv/shakenfist/venv
+      when: not venv.stat.exists
+
+    - name: Update setuptools
+      shell: /srv/shakenfist/venv/bin/pip install -U setuptools wheel
+
+    - name: Install gunicorn
+      shell: /srv/shakenfist/venv/bin/pip install -U gunicorn
+
     - name: Install shakenfist if it is a local file
-      command: pip3 install "/tmp/{{remote_package | basename}}"
+      command: /srv/shakenfist/venv/bin/pip install "/tmp/{{remote_package | basename}}"
       when: remote_source == "file"
 
     - name: Install shakenfist when it is a pypi package
-      command: pip3 install "{{remote_package}}"
+      command: /srv/shakenfist/venv/bin/pip install "{{remote_package}}"
       when: remote_source == "pip"
 
 - hosts: primary
@@ -181,55 +280,6 @@
         enabled: yes
         state: restarted
       when: hostvars['localhost']['primary_node_ip'] != node_ip and mode == "deploy"
-
-    - name: Load default vars
-      include_vars: main.yml
-
-    - include: includes/debian.yml
-      when: mode == "deploy"
-
-    - name: Check that we can run KVM
-      shell: kvm-ok
-      when: mode == "deploy"
-
-    # NOTE(mikal): this might not be right if egress and meshes are on different
-    # interfaces.
-    - name: Determine default interface
-      shell: ip route list default | head -1 | cut -f 5 -d " "
-      register: node_egress_nic_complex
-      when: node_egress_nic is not defined
-
-    - name: Extract node default interface
-      set_fact:
-        node_egress_nic: "{{node_egress_nic_complex.stdout}}"
-      when: node_egress_nic is not defined
-
-    - name: Determine default interface MTU
-      shell: ip link show {{node_egress_nic}} | grep mtu | sed -e 's/.*mtu //' -e 's/ .*//'
-      register: node_mtu_complex
-      when: mode == "deploy"
-
-    - name: Extract default interface MTU
-      set_fact:
-        node_mtu: "{{node_mtu_complex.stdout}}"
-      when: mode == "deploy"
-
-    - name: Log node MTU
-      debug:
-        msg: "Node MTU is {{node_mtu}}"
-      when: mode == "deploy"
-
-    - name: Abort if default interface MTU is too low
-      fail:
-        msg: "Node MTU is too low."
-      when: mode == "deploy" and ignore_mtu != "1" and node_mtu|int < 2000
-
-    - name: Make /srv/shakenfist/
-      file:
-        path: /srv/shakenfist
-        state: directory
-        mode: "0755"
-      when: mode == "deploy"
 
 # Install glusterfs
 - hosts: hypervisors
@@ -523,7 +573,7 @@
 
     - name: Copy libvirt template
       copy:
-        src: /usr/local/share/shakenfist/templates/libvirt.tmpl
+        src: /srv/shakenfist/venv/share/shakenfist/templates/libvirt.tmpl
         remote_src: yes
         dest: /srv/shakenfist/libvirt.tmpl
         owner: root
@@ -538,7 +588,7 @@
 
     - name: Copy dhcp config template
       copy:
-        src: /usr/local/share/shakenfist/templates/dhcp.tmpl
+        src: /srv/shakenfist/venv/share/shakenfist/templates/dhcp.tmpl
         remote_src: yes
         dest: /srv/shakenfist/dhcp.tmpl
         owner: root
@@ -547,7 +597,7 @@
 
     - name: Copy dhcp hosts template
       copy:
-        src: /usr/local/share/shakenfist/templates/dhcphosts.tmpl
+        src: /srv/shakenfist/venv/share/shakenfist/templates/dhcphosts.tmpl
         remote_src: yes
         dest: /srv/shakenfist/dhcphosts.tmpl
         owner: root
@@ -564,10 +614,16 @@
         node_ip: "{{node_ip_complex.stdout}}"
       when: node_ip is not defined
 
+    - name: Fetch systemd unit template from remote host
+      fetch:
+        src: /srv/shakenfist/venv/share/shakenfist/templates/sf.service
+        dest: /tmp/{{ansible_host}}_sf.service
+        flat: yes
+        fail_on_missing: yes
+
     - name: Write systemd unit
       template:
-        src: /usr/local/share/shakenfist/templates/sf.service
-        remote_src: yes
+        src: /tmp/{{ansible_host}}_sf.service
         dest: /lib/systemd/system
         owner: root
         group: root
