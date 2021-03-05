@@ -65,9 +65,9 @@ class SFConfig(SFConfigBase):
     )
     API_COMMAND_LINE: str = Field(
         (
-            "gunicorn --workers 10 --bind 0.0.0.0:%(port)d --log-syslog "
-            "--log-syslog-prefix sf --timeout %(timeout)s --name '%(name)s' "
-            "shakenfist.external_api.app:app"
+            '/srv/shakenfist/venv/bin/gunicorn --workers 10 --bind 0.0.0.0:%(port)d --log-syslog '
+            '--log-syslog-prefix sf --timeout %(timeout)s --name "%(name)s" '
+            'shakenfist.external_api.app:app'
         ),
         description='The gunicorn command line to use',
     )

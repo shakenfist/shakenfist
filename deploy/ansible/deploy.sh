@@ -256,7 +256,7 @@ encoded=`echo $ANSIBLE_VARS | base64 -w 0`
 echo "" >> /etc/sf/deploy-variables
 echo "export CLOUD=$CLOUD" >> /etc/sf/deploy-variables
 echo "export ENCODED_ANSIBLE_VARS=$encoded" >> /etc/sf/deploy-variables
-echo "export ANSIBLE_VARS=`echo $encoded | base64 -d`" >> /etc/sf/deploy-variables
+echo 'export ANSIBLE_VARS=`echo $ENCODED_ANSIBLE_VARS | base64 -d`' >> /etc/sf/deploy-variables
 
 ansible-playbook $VERBOSE -i hosts --extra-vars "$ANSIBLE_VARS ansible_root=\"$cwd\"" deploy.yml $@
 
