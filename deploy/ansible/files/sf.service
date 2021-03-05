@@ -33,7 +33,7 @@ Environment=SHAKENFIST_DOWNLOAD_URL_UBUNTU="http://sf-1/mirrors/cloud-images.ubu
 Environment=SHAKENFIST_GLUSTER_ENABLED="true"
 {% endif %}
 
-ExecStart=/bin/sh -c 'sf-daemon'
+ExecStart=/bin/sh -c '/srv/shakenfist/venv/bin/sf-daemon'
 
 Restart=on-failure
 RestartSec=5
