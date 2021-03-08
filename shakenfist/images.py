@@ -33,7 +33,7 @@ class Image(baseobject.DatabaseBackedObject):
     current_version = 2
     state_targets = {
         None: ('initial', 'creating'),
-        'initial': ('initial', 'creating', 'error'),
+        'initial': ('initial', 'creating', 'deleted', 'error'),
         # TODO(andy): This is broken but will be accepted until Image class is
         # refactored. (hey, at least the state names will be valid)
         'creating': ('initial', 'creating', 'created', 'deleted', 'error'),
