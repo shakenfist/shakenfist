@@ -20,7 +20,7 @@ pipeline {
                 sudo apt-get update
                 sudo apt-get -y dist-upgrade
                 sudo apt-get -y install ansible tox pwgen build-essential python3-dev python3-wheel \
-                  python3-pip curl ansible vim git pwgen software-properties-common
+                  python3-pip python3-venv curl ansible vim git pwgen software-properties-common
 
                 sudo pip3 uninstall ansible
                 sudo apt-get remove -y ansible
@@ -178,19 +178,24 @@ pipeline {
                 echo "9999.0.0" > VERSION.txt
                 python3 setup.py sdist bdist_wheel
 
-                sudo pip install --upgrade dist/shakenfist-*whl
-                sudo pip install --upgrade shakenfist_client>=0.4.2
+                # Install it in a venv
+                sudo mkdir -p /srv/shakenfist/venv
+                sudo chown -R `whoami`.`whoami` /srv/shakenfist/venv
+                python3 -m venv --system-site-packages /srv/shakenfist/venv
+
+                /srv/shakenfist/venv/bin/pip install --upgrade dist/shakenfist-*whl
+                /srv/shakenfist/venv/bin/pip install --upgrade shakenfist_client>=0.4.2
 
                 export CLOUD="localhost"
                 export FLOATING_IP_BLOCK="10.0.0.0/24"
                 export KSM_ENABLED="0"
 
                 # Run installer
-                sudo --preserve-env /usr/local/share/shakenfist/installer/install
+                sudo --preserve-env /srv/shakenfist/venv/bin/pip/share/shakenfist/installer/install
 
                 # Log what versions we are running
                 echo "============================================================"
-                pip list | grep shakenfist
+                /srv/shakenfist/venv/bin/pip list | grep shakenfist
                 echo "============================================================"
           '''
         }
@@ -257,7 +262,7 @@ pipeline {
               '''
 
       sh '''  echo "=============================="
-              pip list
+              /srv/shakenfist/venv/bin/pip list
 
               echo "=============================="
               cat /etc/sf/deploy-variables

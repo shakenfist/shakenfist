@@ -16,7 +16,7 @@ First install some dependancies:
 sudo apt-get update
 sudo apt-get -y dist-upgrade
 sudo apt-get -y install ansible tox pwgen build-essential python3-dev python3-wheel \
-    python3-pip curl ansible vim git pwgen
+    python3-pip python3-venv curl ansible vim git pwgen
 sudo ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform \
     andrewrothstein.go
 ```
@@ -26,6 +26,16 @@ And then manually upgrade pip:
 ```
 sudo pip3 install -U pip
 sudo apt-get remove -y python3-pip
+```
+
+We require that Shaken Fist be installed into a venv at /srv/shakenfist/venv. Create that now:
+
+```
+sudo mkdir -p /srv/shakenfist/venv
+sudo chown -R `whoami`.`whoami` /srv/shakenfist/venv
+
+python3 -mvenv --system-site-packages /srv/shakenfist/venv
+. /srv/shakenfist/venv/bin/activate
 ```
 
 Next install your desired Shaken Fist pip package. The default should be the latest release.
