@@ -16,7 +16,7 @@ First install some dependancies:
 sudo apt-get update
 sudo apt-get -y dist-upgrade
 sudo apt-get -y install ansible tox pwgen build-essential python3-dev python3-wheel \
-    python3-pip curl ansible vim git pwgen
+    python3-pip python3-venv curl ansible vim git pwgen
 sudo ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform \
     andrewrothstein.go
 ```
@@ -28,13 +28,28 @@ sudo pip3 install -U pip
 sudo apt-get remove -y python3-pip
 ```
 
+We now install Shaken Fist in a virtual environment, so we need to create that next:
+
+```
+sudo mkdir -p /srv/shakenfist/venv
+sudo chown -R `whoami`.`whoami` /srv/shakenfist/venv
+python3 -m venv --system-site-packages /srv/shakenfist/venv
+```
+
 Next install your desired Shaken Fist pip package. The default should be the latest release.
 
 ```
-sudo pip install -U shakenfist shakenfist_client
+/srv/shakenfist/venv/bin/pip install -U shakenfist shakenfist_client
+```
+
+Because we're fancy, we should also create a symlink to the `sf-client` command so its easy to use without arguing with the virtual environment:
+
+```
+sudo ln -s /srv/shakenfist/venv/bin/sf-client /usr/local/bin/sf-client
 ```
 
 And then run the installer. We describe the correct invocation for a local development environment in the section below.
+
 ## Local Development
 
 Shaken Fist uses ansible as its installer, with terraform to bring up cloud resources. Because we're going to install Shaken Fist on localhost, there isn't much terraform in this example. Installation is run by a simple wrapper called "install.sh".
