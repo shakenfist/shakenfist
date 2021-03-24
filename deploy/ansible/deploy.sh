@@ -6,6 +6,38 @@
 VARIABLES=""
 VERBOSE="-v"
 
+# Do we have a venv? If so, use it
+if [ -e /srv/shakenfist/venv/bin/python ]
+then
+  PYTHON="/srv/shakenfist/venv/bin/python"
+else
+  PYTHON="python3"
+fi
+
+# Determine what version of Shaken Fist is installed locally, as that
+# is what we will use for any remote hosts.
+install_path=`$PYTHON -m pip show shakenfist | egrep "^Location: " | cut -f 2 -d " "`
+direct_url_path=$install_path/shakenfist-*dist-info/direct_url.json
+if [ -e $direct_url_path ]
+then
+  REMOTE_SOURCE="file"
+  REMOTE_PACKAGE=`cat $direct_url_path | $PYTHON -c "import sys, json; print(json.loads(sys.stdin.read())['url']);"`
+
+  if [ `echo "$REMOTE_PACKAGE" | egrep -c "^file://"` -ne 1 ]
+  then
+    echo "Sorry, $REMOTE_PACKAGE is not a supported package source."
+    exit 1
+  fi
+
+  REMOTE_PACKAGE=`echo $REMOTE_PACKAGE | sed 's|file://||'`
+  echo "Shaken Fist is a locally built package from $REMOTE_PACKAGE"
+else
+  pip_version=`egrep "^Version :" $install_path/shakenfist-*dist.info/METADATA | cut -f 2 -d " "`
+  echo "Shaken Fist is pip version $pip_version"
+  REMOTE_SOURCE="pip"
+  REMOTE_PACKAGE="shakenfist==$pip_version"
+fi
+
 #### AWS
 if [ "$CLOUD" == "aws" ] || [ "$CLOUD" == "aws-single-node" ]
 then
@@ -39,23 +71,36 @@ then
 fi
 
 #### Google Cloud
-if [ "$CLOUD" == "gcp" ] || [ "$CLOUD" == "gcp-xl" ]
+if [ "$CLOUD" == "gcp" ]
 then
   if [ -z "$GCP_PROJECT" ]
   then
     echo ===== Must specify GCP project in \$GCP_PROJECT
     exit 1
   fi
-  VARIABLES="$VARIABLES,project=$GCP_PROJECT"
+
+  if [ -z "$NODE_IMAGE" ]
+  then
+    echo ===== Must specify the name of a boot image in \$NODE_IMAGE
+    exit 1
+  fi
+
+  if [ -z "$NODE_COUNT" ]
+  then
+    echo ===== Must specify the number of nodes to create in \$NODE_COUNT
+    exit 1
+  fi
+
+  VARIABLES="$VARIABLES,project=$GCP_PROJECT,node_image=$NODE_IMAGE,node_count=$NODE_COUNT"
   IGNORE_MTU="1"
 
   if [ -n "$GCP_SSH_KEY_FILENAME" ]
   then
     d=`cat $GCP_SSH_KEY_FILENAME.pub`
     VARIABLES="$VARIABLES,ssh_key_filename=$GCP_SSH_KEY_FILENAME"
-    VARIABLES="$VARIABLES,ssh_key=\"$d\" ssh_user=$GCP_SSH_USER"
+    VARIABLES="$VARIABLES,ssh_key=\"$d\",ssh_user=$GCP_SSH_USER"
   else
-    VARIABLES="$VARIABLES,ssh_key_filename='' ssh_key='' ssh_user=''"
+    VARIABLES="$VARIABLES,ssh_key_filename=\"\",ssh_key=\"\",ssh_user=\"\""
   fi
 fi
 
@@ -193,6 +238,8 @@ VARIABLES="$VARIABLES,gluster_replicas=$GLUSTER_REPLICAS"
 VARIABLES="$VARIABLES,deploy_name=$DEPLOY_NAME"
 VARIABLES="$VARIABLES,restore_backup=\"$RESTORE_BACKUP\""
 VARIABLES="$VARIABLES,ignore_mtu=\"$IGNORE_MTU\""
+VARIABLES="$VARIABLES,remote_source=\"$REMOTE_SOURCE\""
+VARIABLES="$VARIABLES,remote_package=\"$REMOTE_PACKAGE\""
 
 echo "VARIABLES: $VARIABLES"
 ANSIBLE_VARS=""
@@ -212,9 +259,12 @@ do
   ANSIBLE_VARS="$ANSIBLE_VARS $var"
 done
 
+encoded=`echo $ANSIBLE_VARS | base64 -w 0`
+
 echo "" >> /etc/sf/deploy-variables
-echo "export CLOUD=\"$CLOUD\"" >> /etc/sf/deploy-variables
-echo "export ANSIBLE_VARS=\"$ANSIBLE_VARS\"" >> /etc/sf/deploy-variables
+echo "export CLOUD=$CLOUD" >> /etc/sf/deploy-variables
+echo "export ENCODED_ANSIBLE_VARS=$encoded" >> /etc/sf/deploy-variables
+echo 'export ANSIBLE_VARS=`echo $ENCODED_ANSIBLE_VARS | base64 -d`' >> /etc/sf/deploy-variables
 
 ansible-playbook $VERBOSE -i hosts --extra-vars "$ANSIBLE_VARS ansible_root=\"$cwd\"" deploy.yml $@
 

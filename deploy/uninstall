@@ -1,0 +1,23 @@
+#!/bin/bash -e
+
+# A simple script to extract the installer and then use it for a terraform destroy.
+
+CWD=`pwd`
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+mkdir -p /tmp/shakenfist_install_$$
+cd /tmp/shakenfist_install_$$
+tar xzf $DIR/deploy.tgz --directory .
+
+. /etc/sf/deploy-variables
+cd deploy/ansible/
+
+if [ -e terraform/$CLOUD/destroy.yml ]
+then
+  ansible-playbook $VERBOSE -i hosts --extra-vars "$ANSIBLE_VARS ansible_root=\"/tmp/shakenfist_install_$$/deploy/ansible\"" terraform/$CLOUD/destroy.yml
+else
+  echo "The cloud you deployed does not support uninstall."
+fi
+
+cd "$CWD"
+rm -rf /tmp/shakenfist_install_$$

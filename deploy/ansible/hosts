@@ -2,6 +2,7 @@
 localhost ansible_connection=local
 
 [primary]
+localhost
 
 [hypervisors]
 
