@@ -16,7 +16,7 @@ fi
 
 # Determine what version of Shaken Fist is installed locally, as that
 # is what we will use for any remote hosts.
-install_path=`$PYTHON -m pip show shakenfist | egrep "^Location" | cut -f 2 -d " "`
+install_path=`$PYTHON -m pip show shakenfist | egrep "^Location: " | cut -f 2 -d " "`
 direct_url_path=$install_path/shakenfist-*dist-info/direct_url.json
 if [ -e $direct_url_path ]
 then
