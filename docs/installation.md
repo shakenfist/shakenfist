@@ -28,12 +28,12 @@ sudo pip3 install -U pip
 sudo apt-get remove -y python3-pip
 ```
 
-We now install Shaken Fist in a virtual environment, so we need to create that next:
+We require that Shaken Fist be installed into a venv at /srv/shakenfist/venv. Create that now:
 
 ```
 sudo mkdir -p /srv/shakenfist/venv
 sudo chown -R `whoami`.`whoami` /srv/shakenfist/venv
-python3 -m venv --system-site-packages /srv/shakenfist/venv
+python3 -mvenv --system-site-packages /srv/shakenfist/venv
 ```
 
 Next install your desired Shaken Fist pip package. The default should be the latest release.

@@ -6,14 +6,22 @@
 VARIABLES=""
 VERBOSE="-v"
 
+# Do we have a venv? If so, use it
+if [ -e /srv/shakenfist/venv/bin/python ]
+then
+  PYTHON="/srv/shakenfist/venv/bin/python"
+else
+  PYTHON="python3"
+fi
+
 # Determine what version of Shaken Fist is installed locally, as that
 # is what we will use for any remote hosts.
-install_path=`python3 -m pip show shakenfist | egrep "^Location: " | cut -f 2 -d " "`
+install_path=`$PYTHON -m pip show shakenfist | egrep "^Location: " | cut -f 2 -d " "`
 direct_url_path=$install_path/shakenfist-*dist-info/direct_url.json
 if [ -e $direct_url_path ]
 then
   REMOTE_SOURCE="file"
-  REMOTE_PACKAGE=`cat $direct_url_path | python3 -c "import sys, json; print(json.loads(sys.stdin.read())['url']);"`
+  REMOTE_PACKAGE=`cat $direct_url_path | $PYTHON -c "import sys, json; print(json.loads(sys.stdin.read())['url']);"`
 
   if [ `echo "$REMOTE_PACKAGE" | egrep -c "^file://"` -ne 1 ]
   then
