@@ -55,6 +55,37 @@
         mode: u=r,g=r,o=r
       when: mode == "deploy" and cloud != "localhost"
 
+    # If we are installing to localhost, and are not using a packaged version
+    # we need to special case where configuration files come from.
+    - name: Set configuration file location
+      set_fact:
+        "template_path": "/srv/shakenfist/venv/share/shakenfist/templates"
+        "utility_path": "/srv/shakenfist/venv/bin"
+      delegate_to: localhost
+      delegate_facts: true
+      when: mode == "deploy" and cloud != "localhost"
+
+    - name: Check if we have a venv on localhost already
+      stat:
+        path: /srv/shakenfist/venv/share/shakenfist/templates
+      register: localhost_venv
+
+    - name: Templates from git if no localhost venv
+      set_fact:
+        "template_path": "files"
+        "utility_path": "/usr/local/bin"
+      delegate_to: localhost
+      delegate_facts: true
+      when: not localhost_venv.stat.exists and cloud == "localhost"
+
+    - name: Templates from localhost venv
+      set_fact:
+        "template_path": "/srv/shakenfist/venv/share/shakenfist/templates"
+        "utility_path": "/srv/shakenfist/venv/bin"
+      delegate_to: localhost
+      delegate_facts: true
+      when: localhost_venv.stat.exists and cloud == "localhost"
+
 - hosts: allsf
   any_errors_fatal: true
   become: yes
@@ -67,7 +98,7 @@
   tasks:
     - include: terraform/{{cloud}}/postboot.yml
 
-- hosts: allsf:!localhost
+- hosts: hypervisors
   any_errors_fatal: true
   become: yes
   become_method: sudo
@@ -189,11 +220,11 @@
 
     - name: Install shakenfist if it is a local file
       command: /srv/shakenfist/venv/bin/pip install "/tmp/{{remote_package | basename}}"
-      when: remote_source == "file"
+      when: remote_source == "file" and cloud != "localhost"
 
     - name: Install shakenfist when it is a pypi package
       command: /srv/shakenfist/venv/bin/pip install "{{remote_package}}"
-      when: remote_source == "pip"
+      when: remote_source == "pip" and cloud != "localhost"
 
 - hosts: localhost
   any_errors_fatal: true
@@ -408,7 +439,7 @@
       when: mode == "deploy"
 
     - name: Restore from backup, if there is one specified
-      shell: /srv/shakenfist/venv/bin/sf-backup restore "{{restore_backup}}"
+      shell: "{{hostvars['localhost']['utility_path']}}/sf-backup restore {{restore_backup}}"
       when: restore_backup | length > 0
 
     - name: Set system key from extra-vars
@@ -588,7 +619,7 @@
 
     - name: Copy libvirt template
       copy:
-        src: /srv/shakenfist/venv/share/shakenfist/templates/libvirt.tmpl
+        src: "{{hostvars['localhost']['template_path']}}/libvirt.tmpl"
         remote_src: yes
         dest: /srv/shakenfist/libvirt.tmpl
         owner: root
@@ -603,7 +634,7 @@
 
     - name: Copy dhcp config template
       copy:
-        src: /srv/shakenfist/venv/share/shakenfist/templates/dhcp.tmpl
+        src: "{{hostvars['localhost']['template_path']}}/dhcp.tmpl"
         remote_src: yes
         dest: /srv/shakenfist/dhcp.tmpl
         owner: root
@@ -612,7 +643,7 @@
 
     - name: Copy dhcp hosts template
       copy:
-        src: /srv/shakenfist/venv/share/shakenfist/templates/dhcphosts.tmpl
+        src: "{{hostvars['localhost']['template_path']}}/dhcphosts.tmpl"
         remote_src: yes
         dest: /srv/shakenfist/dhcphosts.tmpl
         owner: root
@@ -631,7 +662,7 @@
 
     - name: Fetch systemd unit template from remote host
       fetch:
-        src: /srv/shakenfist/venv/share/shakenfist/templates/sf.service
+        src: "{{hostvars['localhost']['template_path']}}/sf.service"
         dest: /tmp/{{ansible_host}}_sf.service
         flat: yes
         fail_on_missing: yes
@@ -646,11 +677,11 @@
       when: mode != 'hotfix'
 
     - name: Run any upgrade steps
-      shell: /srv/shakenfist/venv/bin/sf-upgrade
+      shell: "{{hostvars['localhost']['utility_path']}}/sf-upgrade"
       run_once: true
 
     - name: Create an admin namespace called "system" with one key configured
-      shell: /srv/shakenfist/venv/bin/sf-passwd deploy "{{hostvars['localhost']['system_key']}}"
+      shell: "{{hostvars['localhost']['utility_path']}}/sf-passwd deploy {{hostvars['localhost']['system_key']}}"
       run_once: true
       when: mode == "deploy"
 
