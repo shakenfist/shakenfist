@@ -19,16 +19,13 @@ pipeline {
                 echo "Updating worker"
                 sudo apt-get update
                 sudo apt-get -y dist-upgrade
-                sudo apt-get -y install ansible tox pwgen build-essential python3-dev python3-wheel \
-                  python3-pip curl ansible vim git pwgen software-properties-common
-
-                sudo pip3 uninstall ansible
-                sudo apt-get remove -y ansible
+                sudo apt-get -y install pwgen build-essential python3-dev python3-wheel \
+                  python3-pip python3-venv curl vim git software-properties-common
 
                 sudo pip3 install -U pip
                 sudo apt-get remove -y python3-pip
 
-                sudo pip3 install -U ansible tox
+                sudo pip3 install -U ansible
                 ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform andrewrothstein.go
                 ansible-galaxy collection install community.general
 
@@ -170,6 +167,9 @@ pipeline {
 
                 cd $WORKSPACE
 
+                # Remove packages from global pip so we can install it into the venv
+                sudo pip uninstall -y gunicorn shakenfist shakenfist_client
+
                 # Make a wheel to install
                 sudo pip install --upgrade readme-renderer
                 sudo pip install --upgrade twine
@@ -178,7 +178,14 @@ pipeline {
                 echo "9999.0.0" > VERSION.txt
                 python3 setup.py sdist bdist_wheel
 
-                sudo pip install --upgrade dist/shakenfist-*whl
+                # Install it in a venv
+                sudo mkdir -p /srv/shakenfist/venv
+                sudo chown -R `whoami`.`whoami` /srv/shakenfist/venv
+                python3 -m venv --system-site-packages /srv/shakenfist/venv
+
+                /srv/shakenfist/venv/bin/pip install --upgrade dist/shakenfist-*whl
+
+                # The shakenfist_client needs to be in the global venv because tox is terrible
                 sudo pip install --upgrade shakenfist_client>=0.4.2
 
                 export CLOUD="localhost"
@@ -186,28 +193,21 @@ pipeline {
                 export KSM_ENABLED="0"
 
                 # Run installer
-                sudo --preserve-env /usr/local/share/shakenfist/installer/install
+                sudo --preserve-env /srv/shakenfist/venv/share/shakenfist/installer/install
 
                 # Log what versions we are running
                 echo "============================================================"
-                pip list | grep shakenfist
+                /srv/shakenfist/venv/bin/pip list | grep shakenfist
                 echo "============================================================"
           '''
         }
       }
-    stage('Re-run upgrade to make sure that its a noop') {
-      steps {
-        sh '''
-
-                sf-upgrade
-          '''
-      }
-    }
     stage('Run CI tests') {
       steps {
         sh '''  # Run the nextgen CI
                 cd $WORKSPACE/deploy/
                 sudo chmod ugo+rx /etc/sf/shakenfist.json
+                sudo pip install -U tox
                 tox -epy3
           '''
       }
@@ -257,7 +257,7 @@ pipeline {
               '''
 
       sh '''  echo "=============================="
-              pip list
+              /srv/shakenfist/venv/bin/pip list
 
               echo "=============================="
               cat /etc/sf/deploy-variables

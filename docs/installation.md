@@ -16,8 +16,9 @@ First install some dependancies:
 sudo apt-get update
 sudo apt-get -y dist-upgrade
 sudo apt-get -y install ansible tox pwgen build-essential python3-dev python3-wheel \
+    python3-pip python3-venv curl ansible vim git pwgen
     python3-pip curl ansible vim git pwgen
-sudo ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform \
+ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform \
     andrewrothstein.go
 ```
 
@@ -28,14 +29,29 @@ sudo pip3 install -U pip
 sudo apt-get remove -y python3-pip
 ```
 
+We require that Shaken Fist be installed into a venv at /srv/shakenfist/venv. Create that now:
+
+```
+sudo mkdir -p /srv/shakenfist/venv
+sudo chown -R `whoami`.`whoami` /srv/shakenfist/venv
+python3 -mvenv --system-site-packages /srv/shakenfist/venv
+```
+
 Next install your desired Shaken Fist pip package. The default should be the latest release.
 
 ```
-sudo pip install -U shakenfist shakenfist_client
+/srv/shakenfist/venv/bin/pip install -U shakenfist shakenfist_client
+```
+
+Because we're fancy, we should also create a symlink to the `sf-client` command so its easy to use without arguing with the virtual environment:
+
+```
+sudo ln -s /srv/shakenfist/venv/bin/sf-client /usr/local/bin/sf-client
 ```
 
 And then run the installer. We describe the correct invocation for a local development environment in the section below.
-## Local Development
+
+## Local development
 
 Shaken Fist uses ansible as its installer, with terraform to bring up cloud resources. Because we're going to install Shaken Fist on localhost, there isn't much terraform in this example. Installation is run by a simple wrapper called "install.sh".
 
@@ -44,6 +60,45 @@ We also make the assumption that developer laptops move around more than servers
 ```
 sudo CLOUD=localhost /usr/local/share/shakenfist/installer/install.sh
 ```
+
+## Cluster installation
+
+Installation is similar to that done on localhost, but there are some extra steps. First off, each machine in the cluster should match this description:
+
+* Have virtualization extensions enabled in the BIOS.
+* Have jumbo frames enabled on the switch.
+* Have a cloudadmin account setup with passwordless sudo, and a ssh key in its authorized_keys file. This is an ansible requirement.
+
+Now create a file called sf-deploy.sh, which contains the details of your installation. For my home cluster, it looks like this:
+
+```
+#!/bin/bash
+
+export CLOUD=metal
+export ADMIN_PASSWORD=...a...password...
+export FLOATING_IP_BLOCK="192.168.10.0/24"
+export BOOTDELAY=0
+export DEPLOY_NAME="bonkerslab"
+export METAL_SSH_USER="cloudadmin"
+export METAL_SSH_KEY_FILENAME="/root/.ssh/id_rsa"
+
+export KSM_ENABLED=1
+export GLUSTER_ENABLED=1
+export GLUSTER_REPLICAS=3
+
+export METAL_IP_SF1=192.168.1.51
+export METAL_IP_SF2=192.168.1.52
+export METAL_IP_SF3=192.168.1.53
+```
+
+And then we can run the installer:
+
+```
+sudo - bash
+. sf-deploy.sh
+/srv/shakenfist/venv/share/shakenfist/installer/install
+```
+
 
 ## Your first instance
 
@@ -223,14 +278,18 @@ with real users.
 | AWS_AVAILABILITY_ZONE | aws, aws-single-node | The AWS availability zone to deploy in |
 | AWS_VPC_ID | aws, aws-single-node | The AWS VPC to use |
 | AWS_SSH_KEY_NAME | aws, aws-single-node | The name of an SSH key in the AWS region to use for ansible |
-| GCP_PROJECT | gcp, gcp-xl | The GCP project id to deploy in |
-| GCP_SSH_KEY_FILENAME | gcp, gcp-xl | The path to a ssh private key file to use for authentication. It is assumed that the public key is at ```${GCP_SSH_KEY_FILENAME}.pub```. (optional, only required if not using gcloud). |
-| GCP_SSH_USER | gcp, gcp-xl | The username to add the GCP_SSH_KEY to. (optional, only used if GCPSSH_KEY_FILENAME is set). |
+| GCP_PROJECT | gcp | The GCP project id to deploy in |
+| GCP_SSH_KEY_FILENAME | gcp | The path to a ssh private key file to use for authentication. It is assumed that the public key is at ```${GCP_SSH_KEY_FILENAME}.pub```. (optional, only required if not using gcloud). |
+| GCP_SSH_USER | gcp | The username to add the GCP_SSH_KEY to. (optional, only used if GCPSSH_KEY_FILENAME is set). |
+| NODE_IMAGE | gcp | The name of an image to use for the booted instances. |
+| NODE_COUNT | gcp | The number of nodes to start. |
 | OS_SSH_KEY_NAME | openstack | The name of a SSH key in the OpenStack cloud to use for ansible |
 | OS_FLAVOR_NAME | openstack | The OpenStack flavor to use for instances |
 | OS_EXTERNAL_NET_NAME | openstack | The UUID of an OpenStack network with internet access |
 | METAL_IP_SF1 | metal | The IP address of a baremetal machine |
 | METAL_IP_SF2 | metal | The IP address of a baremetal machine |
 | METAL_IP_SF3 | metal | The IP address of a baremetal machine |
+| METAL_SSH_KEY_FILENAME | metal | The path to a ssh private key file to use for authentication. It is assumed that the public key is at ```${METAL_SSH_KEY_FILENAME}.pub```. |
+| METAL_SSH_USER | metal | The username to ssh as. |
 | SHAKENFIST_KEY | shakenfist | The authentication key for a user on the shakenfist cluster to deploy in |
 | SHAKENFIST_SSH_KEY | shakenfist | The _path_ to a SSH key to use for ansible |

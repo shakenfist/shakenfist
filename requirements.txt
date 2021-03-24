@@ -1,3 +1,4 @@
+pyyaml                      # mit
 pycdlib                     # lgpl
 oslo.concurrency            # apache2
 jinja2                      # bsd
