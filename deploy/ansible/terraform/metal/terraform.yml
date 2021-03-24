@@ -1,10 +1,30 @@
 # Fake terraform for hard coded metal
 
+- name: Determine the default interface
+  shell: ip route | grep default | sed -e 's/.* dev //' -e 's/ .*//' | head -1
+  register: primary_ip_interface_complex
+  ignore_errors: True
+
+- name: Determine node_ip for the primary node
+  shell: ip addr show dev "{{primary_ip_interface_complex.stdout}}" | grep "inet " | sed -e 's/.*inet //' -e 's/\/.*//'
+  register: primary_ip_complex
+  ignore_errors: True
+
+- name: Set primary node_ip
+  set_fact:
+    node_name: "sf-primary"
+    node_ip: "{{primary_ip_complex.stdout}}"
+    primary_node_ip: "{{primary_ip_complex.stdout}}"
+  delegate_to: localhost
+  delegate_facts: true
+
 - name: Add sf-1 to ansible
   add_host:
     hostname: sf-1
     ansible_ssh_host: "{{metal_ip_sf1}}"
-    groups: hypervisors, primary, etcd_master
+    ansible_ssh_user: "{{ssh_user}}"
+    ansible_ssh_private_key_filename: "{{ssh_key_filename}}"
+    groups: hypervisors, etcd_master
 
 - name: Add sf-1 node_ip
   set_fact:
@@ -17,6 +37,8 @@
   add_host:
     hostname: sf-2
     ansible_ssh_host: "{{metal_ip_sf2}}"
+    ansible_ssh_user: "{{ssh_user}}"
+    ansible_ssh_private_key_filename: "{{ssh_key_filename}}"
     groups: hypervisors, etcd_master
 
 - name: Add sf-2 node_ip
@@ -30,6 +52,8 @@
   add_host:
     hostname: sf-3
     ansible_ssh_host: "{{metal_ip_sf3}}"
+    ansible_ssh_user: "{{ssh_user}}"
+    ansible_ssh_private_key_filename: "{{ssh_key_filename}}"
     groups: hypervisors, etcd_master
 
 - name: Add sf-3 node_ip

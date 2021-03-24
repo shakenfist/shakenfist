@@ -32,7 +32,13 @@ then
   REMOTE_PACKAGE=`echo $REMOTE_PACKAGE | sed 's|file://||'`
   echo "Shaken Fist is a locally built package from $REMOTE_PACKAGE"
 else
-  pip_version=`egrep "^Version :" $install_path/shakenfist-*dist.info/METADATA | cut -f 2 -d " "`
+  pip_version=`egrep "^Version" $install_path/shakenfist-*dist-info/METADATA | cut -f 2 -d " "`
+  if [ "%$pip_version%" == "%%" ]
+  then
+    echo "Unable to determine pip version of Shaken Fist from $install_path/shakenfist-*dist-info/METADATA"
+    exit 1
+  fi
+
   echo "Shaken Fist is pip version $pip_version"
   REMOTE_SOURCE="pip"
   REMOTE_PACKAGE="shakenfist==$pip_version"
@@ -152,6 +158,15 @@ then
     exit 1
   fi
   VARIABLES="$VARIABLES,metal_ip_sf3=$METAL_IP_SF3"
+
+  if [ -n "$METAL_SSH_KEY_FILENAME" ]
+  then
+    d=`cat $METAL_SSH_KEY_FILENAME`
+    VARIABLES="$VARIABLES,ssh_key_filename=$METAL_SSH_KEY_FILENAME"
+    VARIABLES="$VARIABLES,ssh_key=\"$d\",ssh_user=$METAL_SSH_USER"
+  else
+    VARIABLES="$VARIABLES,ssh_key_filename=\"\",ssh_key=\"\",ssh_user=\"\""
+  fi
 fi
 
 #### Localhost

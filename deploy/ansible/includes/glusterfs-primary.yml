@@ -1,10 +1,11 @@
 - name: Setup gluster cluster
   shell: |
     nodes=""
-    {% for svr in groups.allsf %}
+    {% for svr in groups.hypervisors %}
     gluster peer probe  {{svr}}
     nodes="$nodes {{svr}}:/srv/glusterfs"
     {% endfor %}
+    sleep 10
 
     if [ `gluster volume list | grep -c shakenfist` -lt 1 ]
     then
