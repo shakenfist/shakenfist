@@ -350,7 +350,7 @@
       include: includes/glusterfs-all-initial.yml
       when: gluster_enabled == "1" and mode == "deploy"
 
-- hosts: localhost
+- hosts: sf-1
   any_errors_fatal: true
   become: yes
   become_method: sudo
