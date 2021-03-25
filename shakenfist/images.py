@@ -378,7 +378,11 @@ class Images(object):
 
     def __iter__(self):
         for key, i in etcd.get_all('image', None):
-            image_node = '/'.join(key.split('/')[-2:])
+            if config.GLUSTER_ENABLED:
+                image_node = key.split('/')[-1]
+            else:
+                image_node = '/'.join(key.split('/')[-2:])
+
             i = Image.from_db(image_node)
             if not i:
                 continue
