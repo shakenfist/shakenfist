@@ -1,1 +1,3 @@
-prettytable         # bsd
+prettytable                 # bsd
+oslo.concurrency            # apache2
+shakenfist-client           # apache2
