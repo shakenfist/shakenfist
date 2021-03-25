@@ -48,7 +48,14 @@ class Image(baseobject.DatabaseBackedObject):
         # checksum is not in fact a UUID and is in fact intended to collide
         # when URLs are identical.
         self.__unique_ref = static_values['ref']
-        uuid = self.__unique_ref + '/' + static_values['node']
+
+        # NOTE(mikal): gluster deployments have a shared per-cluster image
+        # cache, so don't need to have the node name packed into the UUID.
+        if config.GLUSTER_ENABLED:
+            uuid = self.__unique_ref
+        else:
+            uuid = self.__unique_ref + '/' + static_values['node']
+
         super(Image, self).__init__(uuid, static_values['version'])
 
         self.__url = static_values['url']
@@ -62,7 +69,13 @@ class Image(baseobject.DatabaseBackedObject):
             checksum = resolver_checksum
 
         unique_ref = Image.calc_unique_ref(url)
-        uuid = '%s/%s' % (unique_ref, config.NODE_NAME)
+
+        # NOTE(mikal): gluster deployments have a shared per-cluster image
+        # cache, so don't need to have the node name packed into the UUID.
+        if config.GLUSTER_ENABLED:
+            uuid = unique_ref
+        else:
+            uuid = '%s/%s' % (unique_ref, config.NODE_NAME)
 
         # Check for existing metadata in DB
         i = Image.from_db(uuid)
