@@ -456,7 +456,7 @@ def create_cow(locks, cache_file, disk_file, disk_size):
     if config.GLUSTER_ENABLED:
         disk_file = disk_file.replace(
             os.path.join(config.STORAGE_PATH, 'instances'),
-            'gluster:shakenfist')
+            'gluster:shakenfist/instances')
 
     util.execute(locks,
                  'qemu-img create -b %s -f qcow2 %s %dG'
@@ -472,7 +472,7 @@ def create_flat(locks, cache_file, disk_file):
     if config.GLUSTER_ENABLED:
         disk_file = disk_file.replace(
             os.path.join(config.STORAGE_PATH, 'instances'),
-            'gluster:shakenfist')
+            'gluster:shakenfist/instances')
 
     util.execute(locks, 'cp %s %s' % (cache_file, disk_file))
 
@@ -486,7 +486,7 @@ def create_raw(locks, cache_file, disk_file):
     if config.GLUSTER_ENABLED:
         disk_file = disk_file.replace(
             os.path.join(config.STORAGE_PATH, 'instances'),
-            'gluster:shakenfist')
+            'gluster:shakenfist/instances')
 
     util.execute(locks,
                  'qemu-img convert -t none -O raw %s %s'
@@ -502,7 +502,7 @@ def create_qcow2(locks, cache_file, disk_file):
     if config.GLUSTER_ENABLED:
         disk_file = disk_file.replace(
             os.path.join(config.STORAGE_PATH, 'instances'),
-            'gluster:shakenfist')
+            'gluster:shakenfist/instances')
 
     util.execute(locks,
                  'qemu-img convert -t none -O qcow2 %s %s'
@@ -518,7 +518,7 @@ def create_blank(locks, disk_file, disk_size):
     if config.GLUSTER_ENABLED:
         disk_file = disk_file.replace(
             os.path.join(config.STORAGE_PATH, 'instances'),
-            'gluster:shakenfist')
+            'gluster:shakenfist/instances')
 
     util.execute(locks, 'qemu-img create -f qcow2 %s %sG'
                  % (disk_file, disk_size))
@@ -530,7 +530,7 @@ def snapshot(locks, source, destination):
     if config.GLUSTER_ENABLED:
         source = source.replace(
             os.path.join(config.STORAGE_PATH, 'instances'),
-            'gluster:shakenfist')
+            'gluster:shakenfist/instances')
 
     util.execute(locks,
                  'qemu-img convert --force-share -O qcow2 %s %s'

@@ -566,7 +566,7 @@ class Instance(baseobject.DatabaseBackedObject):
                     if config.GLUSTER_ENABLED:
                         disk['path'] = disk['path'].replace(
                             os.path.join(config.STORAGE_PATH, 'instances'),
-                            'shakenfist'
+                            'shakenfist/instances'
                         )
                         disk['source'] = ("<source protocol='gluster' name='%s'>"
                                           "<host name='%s' port='24007' />"

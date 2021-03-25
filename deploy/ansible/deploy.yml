@@ -313,6 +313,19 @@
         sysctl -w net.ipv6.conf.default.disable_ipv6=1
       ignore_errors: True
 
+    - name: Configure ipforwarding to be enabled on boot
+      copy:
+        content: |
+          net.ipv4.ip_forward = 1
+        dest: /etc/sysctl.d/10-sf-ipforwarding.conf
+        owner: root
+        mode: u=r,g=r,o=r
+
+    - name: Configure ipforwarding to be enabled now
+      shell: |
+        sysctl -w net.ipv4.ip_forward=1
+      ignore_errors: True
+
     - name: Syslog server is the primary server
       set_fact:
         syslog: "{{hostvars['localhost']['primary_node_ip']}}"
