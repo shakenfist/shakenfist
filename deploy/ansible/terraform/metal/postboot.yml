@@ -11,9 +11,10 @@
       ff02::2 ip6-allrouters
       ff02::3 ip6-allhosts
 
-      {% for svr in groups.allsf %}
+      {% for svr in groups.hypervisors %}
       {{hostvars[svr]['node_ip']}}  {{svr}}
       {% endfor %}
+      hostvars[svr]['primary_node_ip']}}  primary
     dest: /etc/hosts
     owner: root
     group: root
