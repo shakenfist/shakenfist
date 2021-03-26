@@ -22,5 +22,4 @@
     gluster volume set shakenfist storage.owner-uid $libvirt_uid
     gluster volume set shakenfist storage.owner-gid $libvirt_gid
     gluster volume set shakenfist server.allow-insecure on
-    done
   ignore_errors: True
