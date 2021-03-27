@@ -48,7 +48,14 @@ class Image(baseobject.DatabaseBackedObject):
         # checksum is not in fact a UUID and is in fact intended to collide
         # when URLs are identical.
         self.__unique_ref = static_values['ref']
-        uuid = self.__unique_ref + '/' + static_values['node']
+
+        # NOTE(mikal): gluster deployments have a shared per-cluster image
+        # cache, so don't need to have the node name packed into the UUID.
+        if config.GLUSTER_ENABLED:
+            uuid = self.__unique_ref
+        else:
+            uuid = self.__unique_ref + '/' + static_values['node']
+
         super(Image, self).__init__(uuid, static_values['version'])
 
         self.__url = static_values['url']
@@ -62,7 +69,13 @@ class Image(baseobject.DatabaseBackedObject):
             checksum = resolver_checksum
 
         unique_ref = Image.calc_unique_ref(url)
-        uuid = '%s/%s' % (unique_ref, config.NODE_NAME)
+
+        # NOTE(mikal): gluster deployments have a shared per-cluster image
+        # cache, so don't need to have the node name packed into the UUID.
+        if config.GLUSTER_ENABLED:
+            uuid = unique_ref
+        else:
+            uuid = '%s/%s' % (unique_ref, config.NODE_NAME)
 
         # Check for existing metadata in DB
         i = Image.from_db(uuid)
@@ -365,7 +378,11 @@ class Images(object):
 
     def __iter__(self):
         for key, i in etcd.get_all('image', None):
-            image_node = '/'.join(key.split('/')[-2:])
+            if config.GLUSTER_ENABLED:
+                image_node = key.split('/')[-1]
+            else:
+                image_node = '/'.join(key.split('/')[-2:])
+
             i = Image.from_db(image_node)
             if not i:
                 continue
@@ -456,7 +473,7 @@ def create_cow(locks, cache_file, disk_file, disk_size):
     if config.GLUSTER_ENABLED:
         disk_file = disk_file.replace(
             os.path.join(config.STORAGE_PATH, 'instances'),
-            'gluster:shakenfist')
+            'gluster:shakenfist/instances')
 
     util.execute(locks,
                  'qemu-img create -b %s -f qcow2 %s %dG'
@@ -472,7 +489,7 @@ def create_flat(locks, cache_file, disk_file):
     if config.GLUSTER_ENABLED:
         disk_file = disk_file.replace(
             os.path.join(config.STORAGE_PATH, 'instances'),
-            'gluster:shakenfist')
+            'gluster:shakenfist/instances')
 
     util.execute(locks, 'cp %s %s' % (cache_file, disk_file))
 
@@ -486,7 +503,7 @@ def create_raw(locks, cache_file, disk_file):
     if config.GLUSTER_ENABLED:
         disk_file = disk_file.replace(
             os.path.join(config.STORAGE_PATH, 'instances'),
-            'gluster:shakenfist')
+            'gluster:shakenfist/instances')
 
     util.execute(locks,
                  'qemu-img convert -t none -O raw %s %s'
@@ -502,7 +519,7 @@ def create_qcow2(locks, cache_file, disk_file):
     if config.GLUSTER_ENABLED:
         disk_file = disk_file.replace(
             os.path.join(config.STORAGE_PATH, 'instances'),
-            'gluster:shakenfist')
+            'gluster:shakenfist/instances')
 
     util.execute(locks,
                  'qemu-img convert -t none -O qcow2 %s %s'
@@ -518,7 +535,7 @@ def create_blank(locks, disk_file, disk_size):
     if config.GLUSTER_ENABLED:
         disk_file = disk_file.replace(
             os.path.join(config.STORAGE_PATH, 'instances'),
-            'gluster:shakenfist')
+            'gluster:shakenfist/instances')
 
     util.execute(locks, 'qemu-img create -f qcow2 %s %sG'
                  % (disk_file, disk_size))
@@ -530,7 +547,7 @@ def snapshot(locks, source, destination):
     if config.GLUSTER_ENABLED:
         source = source.replace(
             os.path.join(config.STORAGE_PATH, 'instances'),
-            'gluster:shakenfist')
+            'gluster:shakenfist/instances')
 
     util.execute(locks,
                  'qemu-img convert --force-share -O qcow2 %s %s'

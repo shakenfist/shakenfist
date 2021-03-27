@@ -27,10 +27,17 @@
     state: directory
     mode: "0755"
 
-- name: Add gluster permissions to apparmor
+- name: Add gluster permissions for virt-helper to apparmor
   copy:
     src: files/usr.lib.libvirt.virt-aa-helper
     dest: /etc/apparmor.d/local/usr.lib.libvirt.virt-aa-helper
+    owner: root
+    mode: u=r,g=r,o=r
+
+- name: Add gluster permissions for libvirt-qemu to apparmor
+  copy:
+    src: files/apparmor-libvirt-qemu
+    dest: /etc/apparmor.d/abstractions/libvirt-qemu
     owner: root
     mode: u=r,g=r,o=r
 

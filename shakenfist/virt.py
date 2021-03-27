@@ -566,7 +566,7 @@ class Instance(baseobject.DatabaseBackedObject):
                     if config.GLUSTER_ENABLED:
                         disk['path'] = disk['path'].replace(
                             os.path.join(config.STORAGE_PATH, 'instances'),
-                            'shakenfist'
+                            'shakenfist/instances'
                         )
                         disk['source'] = ("<source protocol='gluster' name='%s'>"
                                           "<host name='%s' port='24007' />"
@@ -831,7 +831,7 @@ class Instance(baseobject.DatabaseBackedObject):
                 f.write('<html></html>')
 
         for d in disks:
-            if not os.path.exists(d['path']):
+            if not config.GLUSTER_ENABLED and not os.path.exists(d['path']):
                 continue
 
             if d['snapshot_ignores']:
@@ -840,9 +840,16 @@ class Instance(baseobject.DatabaseBackedObject):
             if d['type'] != 'qcow2':
                 continue
 
+            # If we're using gluster we need to tweak some paths...
+            disk_path = d['path']
+            dest_path = os.path.join(snappath, d['device'])
+            if config.GLUSTER_ENABLED:
+                disk_path = 'gluster:%s' % d['path']
+                dest_path = dest_path.replace(_snapshot_path(),
+                                              'gluster:shakenfist/snapshots')
+
             with util.RecordedOperation('snapshot %s' % d['device'], self):
-                self._snapshot_device(
-                    d['path'], os.path.join(snappath, d['device']))
+                self._snapshot_device(disk_path, dest_path)
                 db.create_snapshot(snapshot_uuid, d['device'], self.uuid,
                                    time.time())
 

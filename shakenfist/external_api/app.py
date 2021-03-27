@@ -1148,7 +1148,10 @@ class Images(Resource):
     @jwt_required
     def get(self, node=None):
         f = []
-        if node:
+
+        # If gluster is enabled, there is no concept of an image being on a
+        # single node.
+        if not config.GLUSTER_ENABLED and node:
             f.append(partial(images.placement_filter, node))
 
         retval = []

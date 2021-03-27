@@ -313,6 +313,19 @@
         sysctl -w net.ipv6.conf.default.disable_ipv6=1
       ignore_errors: True
 
+    - name: Configure ipforwarding to be enabled on boot
+      copy:
+        content: |
+          net.ipv4.ip_forward = 1
+        dest: /etc/sysctl.d/10-sf-ipforwarding.conf
+        owner: root
+        mode: u=r,g=r,o=r
+
+    - name: Configure ipforwarding to be enabled now
+      shell: |
+        sysctl -w net.ipv4.ip_forward=1
+      ignore_errors: True
+
     - name: Syslog server is the primary server
       set_fact:
         syslog: "{{hostvars['localhost']['primary_node_ip']}}"
@@ -503,13 +516,13 @@
               origin_prometheus: {{deploy_name}}
 
           scrape_configs:
-            #- job_name: 'node'
-            #  static_configs:
-            #    - targets: [
-            #          {% for svr in groups.allsf %}
-            #            '{{hostvars[svr]['node_ip']}}:9100',
-            #          {% endfor %}
-            #        ]
+            - job_name: 'node'
+              static_configs:
+                - targets: [
+                      {% for svr in groups.allsf %}
+                        '{{hostvars[svr]['node_ip']}}:9100',
+                     {% endfor %}
+                    ]
             - job_name: 'shakenfist'
               static_configs:
                 - targets: [
@@ -517,10 +530,10 @@
                         '{{hostvars[svr]['node_ip']}}:13001',
                       {% endfor %}
                     ]
-              metric_relabel_configs:
-                - source_labels: [__name__]
-                  regex: '(python\w*|process_\w*)'
-                  action: drop
+                # metric_relabel_configs:
+                # - source_labels: [__name__]
+                #   regex: '(python\w*|process_\w*)'
+                #   action: drop
             - job_name: 'etcd'
               static_configs:
                 - targets: [
@@ -528,10 +541,10 @@
                         '{{hostvars[svr]['node_ip']}}:2379',
                       {% endfor %}
                     ]
-              metric_relabel_configs:
-                - source_labels: [__name__]
-                  regex: (?i)(etcd_mvcc_db_total_size_in_bytes|etcd_network_client_grpc_received_bytes_total|etcd_network_client_grpc_sent_bytes_total)
-                  action: keep
+                # metric_relabel_configs:
+                # - source_labels: [__name__]
+                #   regex: (?i)(etcd_mvcc_db_total_size_in_bytes|etcd_network_client_grpc_received_bytes_total|etcd_network_client_grpc_sent_bytes_total|etcd_disk_wal_fsync_duration_seconds)
+                #   action: keep
           {{prom_additional}}
         dest: /etc/prometheus/prometheus.yml
         owner: root

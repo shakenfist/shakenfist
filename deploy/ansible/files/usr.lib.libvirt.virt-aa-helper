@@ -10,6 +10,7 @@
 
 # Read local port range
 @{PROC}/sys/net/ipv4/ip_local_port_range r,
+@{PROC}/sys/net/ipv4/ip_local_reserved_ports r,
 
 # Files in /tmp
 /tmp/gfapi.volfile.* rw,
