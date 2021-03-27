@@ -38,7 +38,7 @@ def restore_instances():
                 networks.append(iface['network_uuid'])
 
         for disk in inst.disk_spec:
-            if 'base' in disk:
+            if disk.get('base'):
                 img = images.Image.new(disk['base'])
                 # NOTE(mikal): this check isn't great -- it checks for the original
                 # downloaded image, not the post transcode version
