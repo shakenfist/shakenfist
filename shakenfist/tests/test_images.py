@@ -690,6 +690,7 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
 
 
 class FakeConfigTmpFile(SFConfigBase):
+    GLUSTER_ENABLED = False
     STORAGE_PATH: str = '/tmp/'
     NODE_NAME: str = 'sf-245'
     DOWNLOAD_URL_CIRROS: AnyHttpUrl = (
