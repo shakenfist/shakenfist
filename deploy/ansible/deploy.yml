@@ -613,6 +613,23 @@
         state: restarted
       when: mode == "deploy"
 
+    - name: Enable proxy modules for apache
+      shell: a2enmod proxy proxy_http lbmethod_byrequests
+      when: mode == "deploy"
+
+    - name: Write apache site
+      template:
+        src: files/apache-site-primary.conf
+        dest: /etc/apache2/sites-enabled/000-default.conf
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
+      when: mode == "deploy"
+
+    - name: Reload apache
+      shell: apache2ctl graceful
+      when: mode == "deploy"
+
 - hosts: hypervisors
   any_errors_fatal: true
   become: yes
@@ -640,8 +657,7 @@
         mode: "0644"
 
     - name: Turn off default libvirt networking
-      shell: |
-        virsh net-destroy default
+      shell: virsh net-destroy default
       ignore_errors: True
       when: mode == "deploy"
 
@@ -712,6 +728,19 @@
         enabled: yes
         state: restarted
         daemon_reload: yes
+
+    - name: Write apache site
+      template:
+        src: files/apache-site-hypervisor.conf
+        dest: /etc/apache2/sites-enabled/000-default.conf
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
+      when: mode == "deploy"
+
+    - name: Reload apache
+      shell: apache2ctl graceful
+      when: mode == "deploy"
 
 - hosts: localhost
   roles:
