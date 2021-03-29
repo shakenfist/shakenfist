@@ -19,6 +19,6 @@ local=/{{zone}}/
 dhcp-range={{interface}},{{dhcp_start}},static,{{netmask}},{{broadcast}},1h
 dhcp-option={{interface}},1,{{netmask}}
 dhcp-option={{interface}},3,{{router}}
-dhcp-option={{interface}},6,8.8.8.8
+dhcp-option={{interface}},6,{{dns_server}}
 dhcp-option={{interface}},15,{{zone}}
 dhcp-hostsfile={{config_dir}}/hosts

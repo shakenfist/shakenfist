@@ -28,6 +28,7 @@ class DHCPTestCase(testtools.TestCase):
         super(DHCPTestCase, self).setUp()
 
         class FakeConfig(SFConfigBase):
+            DNS_SERVER: str = '8.8.8.8'
             NODE_NAME: str = 'foo'
             STORAGE_PATH: str = '/a/b/c'
             ZONE: str = 'shakenfist'

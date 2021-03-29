@@ -25,6 +25,7 @@ class DHCP(object):
             'dhcp_start': network.dhcp_start,
             'netmask': network.netmask,
             'broadcast': network.broadcast,
+            'dns_server': config.get('DNS_SERVER'),
 
             'netns': self.network_uuid,
             'in_netns': 'ip netns exec %s' % self.network_uuid,

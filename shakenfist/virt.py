@@ -638,7 +638,7 @@ class Instance(baseobject.DatabaseBackedObject):
             'networks': [],
             'services': [
                 {
-                    'address': '8.8.8.8',
+                    'address': config.DNS_SERVER,
                     'type': 'dns'
                 }
             ]
