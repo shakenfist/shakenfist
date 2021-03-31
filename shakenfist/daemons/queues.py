@@ -1,6 +1,5 @@
 import copy
 import multiprocessing
-import re
 import requests
 import setproctitle
 import time
