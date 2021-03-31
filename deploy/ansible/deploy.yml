@@ -768,29 +768,8 @@
         state: absent
       when: mode == "deploy"
 
-    - name: Clone the terraform provider
-      git:
-        repo: https://github.com/shakenfist/terraform-provider-shakenfist
-        dest: /srv/shakenfist/terraform-provider-shakenfist
-      when: mode == "deploy"
-
-    - name: Build terraform provider
-      shell:
-        cmd: /usr/local/go/bin/go build
-        chdir: /srv/shakenfist/terraform-provider-shakenfist
-      when: mode == "deploy"
-
-    - name: Make /usr/local/bin/terraform_install/
+    - name: Make sure we don't have an old provider installed
       file:
-        path: /usr/local/bin/terraform_install/
-        state: directory
-        mode: "0755"
-      when: mode == "deploy"
-
-    - name: Install terraform provider
-      copy:
-        src: /srv/shakenfist/terraform-provider-shakenfist/terraform-provider-shakenfist
-        dest: /usr/local/bin/terraform_install/terraform-provider-shakenfist
-        remote_src: yes
-        mode: u+rx,g+rx,o+rx
+        path: /usr/local/bin/terraform_install/terraform-provider-shakenfist
+        state: absent
       when: mode == "deploy"
