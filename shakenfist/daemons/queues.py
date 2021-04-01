@@ -1,6 +1,5 @@
 import copy
 import multiprocessing
-import re
 import requests
 import setproctitle
 import time
@@ -22,6 +21,7 @@ from shakenfist.tasks import (QueueTask,
                               InstanceTask,
                               PreflightInstanceTask,
                               StartInstanceTask,
+                              FloatNetworkInterfaceTask,
                               DefloatNetworkInterfaceTask
                               )
 
@@ -93,6 +93,10 @@ def handle(jobname, workitem):
                     db.enqueue('%s-metrics' % config.NODE_NAME, {})
                 except Exception as e:
                     util.ignore_exception(daemon.process_name('queues'), e)
+
+            elif isinstance(task, FloatNetworkInterfaceTask):
+                # Just punt it to the network node now that the interface is ready
+                db.enqueue('networknode', task)
 
             else:
                 log_i.with_field('task', task).error(

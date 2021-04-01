@@ -84,10 +84,11 @@ class StartInstanceTask(InstanceTask):
 class DeleteInstanceTask(InstanceTask):
     _name = 'instance_delete'
 
-
 #
 # Network Tasks
 #
+
+
 class NetworkTask(QueueTask):
     def __init__(self, network_uuid):
         super(NetworkTask, self).__init__()
@@ -166,10 +167,11 @@ class FloatNetworkInterfaceTask(NetworkInterfaceTask):
 class DefloatNetworkInterfaceTask(NetworkInterfaceTask):
     _name = 'network_interface_defloat'
 
-
 #
 # Image Tasks
 #
+
+
 class ImageTask(QueueTask):
     def __init__(self, url):
         super(ImageTask, self).__init__()

@@ -237,6 +237,7 @@ GLUSTER_REPLICAS="${GLUSTER_REPLICAS:-0}"
 DEPLOY_NAME="sf"
 RESTORE_BACKUP="${RESTORE_BACKUP:-}"
 IGNORE_MTU="${IGNORE_MTU:-0}"
+DNS_SERVER="${DNS_SERVER:-8.8.8.8}"
 
 # Setup variables for consumption by ansible and terraform
 cwd=`pwd`
@@ -253,6 +254,7 @@ VARIABLES="$VARIABLES,gluster_replicas=$GLUSTER_REPLICAS"
 VARIABLES="$VARIABLES,deploy_name=$DEPLOY_NAME"
 VARIABLES="$VARIABLES,restore_backup=\"$RESTORE_BACKUP\""
 VARIABLES="$VARIABLES,ignore_mtu=\"$IGNORE_MTU\""
+VARIABLES="$VARIABLES,dns_server=\"$DNS_SERVER\""
 VARIABLES="$VARIABLES,remote_source=\"$REMOTE_SOURCE\""
 VARIABLES="$VARIABLES,remote_package=\"$REMOTE_PACKAGE\""
 
