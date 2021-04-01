@@ -642,6 +642,22 @@ class Instance(Resource):
         return
 
 
+def _assign_floating_ip(interface_uuid):
+    float_net = net.Network.from_db('floating')
+    if not float_net:
+        return error(404, 'floating network not found')
+
+    # Address is allocated and added to the record here, so the job has it later.
+    db.add_event('interface', interface_uuid, 'api', 'float', None, None)
+    with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Interface float'):
+        ipm = IPManager.from_db('floating')
+        addr = ipm.get_random_free_address()
+        ipm.persist()
+
+    db.add_floating_to_interface(interface_uuid, addr)
+    return None
+
+
 class Instances(Resource):
     @jwt_required
     def get(self, all=False):
@@ -734,6 +750,7 @@ class Instances(Resource):
 
         # Allocate IP addresses
         order = 0
+        float_tasks = []
         if network:
             for netdesc in network:
                 n = net.Network.from_db(netdesc['network_uuid'])
@@ -771,6 +788,16 @@ class Instances(Resource):
                 db.create_network_interface(
                     iface_uuid, netdesc, instance.uuid, order)
 
+                if 'float' in netdesc and netdesc['float']:
+                    err = _assign_floating_ip(iface_uuid)
+                    if err:
+                        instance.enqueue_delete_due_error(
+                            'interface float failed: %s' % err)
+                        return err
+
+                    float_tasks.append(FloatNetworkInterfaceTask(
+                        netdesc['network_uuid'], iface_uuid))
+
         if not SCHEDULER:
             SCHEDULER = scheduler.Scheduler()
 
@@ -806,6 +833,7 @@ class Instances(Resource):
             if disk.get('base'):
                 tasks.append(FetchImageTask(disk['base'], instance.uuid))
         tasks.append(StartInstanceTask(instance.uuid, network))
+        tasks.extend(float_tasks)
 
         # Enqueue creation tasks on desired node task queue
         db.enqueue(placement, {'tasks': tasks})
@@ -1043,19 +1071,10 @@ class InterfaceFloat(Resource):
         if err:
             return err
 
-        float_net = net.Network.from_db('floating')
-        if not float_net:
-            return error(404, 'floating network not found')
+        err = _assign_floating_ip(interface_uuid)
+        if err:
+            return err
 
-        # Address is allocated and added to the record here, so the job has it later.
-        db.add_event('interface', interface_uuid,
-                     'api', 'float', None, None)
-        with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Interface float'):
-            ipm = IPManager.from_db('floating')
-            addr = ipm.get_random_free_address()
-            ipm.persist()
-
-        db.add_floating_to_interface(ni['uuid'], addr)
         db.enqueue('networknode',
                    FloatNetworkInterfaceTask(n.uuid, interface_uuid))
 
