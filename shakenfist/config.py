@@ -101,6 +101,10 @@ class SFConfig(SFConfigBase):
         '8.8.8.8',
         description='The DNS server to pass to instances via DHCP.'
     )
+    MAX_HYPERVISOR_MTU: int = Field(
+        8000,
+        description='Maximum network MTU our hypervisors can safely set.'
+    )
 
     # Database Options
     CLEANER_DELAY: int = Field(

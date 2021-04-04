@@ -263,6 +263,12 @@
   connection: ssh
 
   tasks:
+    - name: Find hypervisor with lowest MTU
+      set_fact: lowest_mtu_hypervisor={{ groups['hypervisors'] | sort('node_mtu' | int) | first }}
+
+    - name: Find lowest MTU
+      set_fact: lowest_mtu={{ hostvars[lowest_mtu_hypervisor]['node_mtu'] }}
+
     - name: Write syslog file
       template:
         src: files/rsyslog-server-01-sf.conf
