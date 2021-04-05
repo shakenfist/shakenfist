@@ -29,6 +29,7 @@ class DHCPTestCase(testtools.TestCase):
 
         class FakeConfig(SFConfigBase):
             DNS_SERVER: str = '8.8.8.8'
+            MAX_HYPERVISOR_MTU: int = 8000
             NODE_NAME: str = 'foo'
             STORAGE_PATH: str = '/a/b/c'
             ZONE: str = 'shakenfist'
