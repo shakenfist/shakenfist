@@ -265,8 +265,6 @@ with real users.
 
 | Option | Terraform definition | Description |
 |--------|----------------------|-------------|
-| MODE | All | Options are "deploy" (the default) or "hotfix". Deploy performs a full install, whereas hotfix skips steps to try and push only changes to Shaken Fist code as quickly as possible. |
-| RELEASE | All | Which release to run. This can be a version number from pypi, the keyword "git:" for the current state of master, or "git:branch" to use a branch called "branch" from your local git. |
 | CLOUD | All | The terraform definition to use |
 | ADMIN_PASSWORD | All | The admin password for the cloud once installed |
 | DNS_SERVER | All | The DNS server to configure instances with via DHCP. Defaults to 8.8.8.8 |

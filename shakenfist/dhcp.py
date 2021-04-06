@@ -26,6 +26,7 @@ class DHCP(object):
             'netmask': network.netmask,
             'broadcast': network.broadcast,
             'dns_server': config.get('DNS_SERVER'),
+            'mtu': config.get('MAX_HYPERVISOR_MTU') - 50,
 
             'netns': self.network_uuid,
             'in_netns': 'ip netns exec %s' % self.network_uuid,

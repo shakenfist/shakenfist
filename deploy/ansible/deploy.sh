@@ -220,12 +220,6 @@ fi
 
 set -x
 
-#### Mode selection, deploy or hotfix at this time
-if [ -z "$MODE" ]
-then
-  MODE="deploy"
-fi
-
 #### Default settings
 BOOTDELAY="${BOOTDELAY:-2}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-Ukoh5vie}"
@@ -247,7 +241,6 @@ VARIABLES="$VARIABLES,bootdelay=$BOOTDELAY"
 VARIABLES="$VARIABLES,uniqifier=$UNIQIFIER"
 VARIABLES="$VARIABLES,admin_password=$ADMIN_PASSWORD"
 VARIABLES="$VARIABLES,floating_network_ipblock=$FLOATING_IP_BLOCK"
-VARIABLES="$VARIABLES,mode=$MODE"
 VARIABLES="$VARIABLES,ksm_enabled=$KSM_ENABLED"
 VARIABLES="$VARIABLES,gluster_enabled=$GLUSTER_ENABLED"
 VARIABLES="$VARIABLES,gluster_replicas=$GLUSTER_REPLICAS"

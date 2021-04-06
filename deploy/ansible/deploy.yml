@@ -4,7 +4,6 @@
   gather_facts: yes
   connection: ssh
   vars:
-    mode: deploy
     ram_system_reservation: 5.0
 
   tasks:
@@ -15,7 +14,6 @@
       delegate_facts: true
 
     - include_tasks: tasks/distro-check.yml
-      when: mode == "deploy"
 
     - name: Load default vars
       include_vars: main.yml
@@ -23,15 +21,13 @@
     - name: Generate a random auth secret
       set_fact:
         auth_secret: "{{ lookup('password', '/dev/null length=30 chars=ascii_letters') }}"
-      when: mode == "deploy"
 
     - include: terraform/{{cloud}}/terraform.yml
-      when: mode == "deploy" or cloud == "metal"
 
     - name: Wait for instances to boot
       pause:
         minutes: "{{bootdelay}}"
-      when: mode == "deploy" and cloud != "localhost"
+      when: cloud != "localhost"
 
     - name: Setup /etc/hosts for localhost when acting as primary node
       copy:
@@ -53,7 +49,7 @@
         owner: root
         group: root
         mode: u=r,g=r,o=r
-      when: mode == "deploy" and cloud != "localhost"
+      when: cloud != "localhost"
 
     # If we are installing to localhost, and are not using a packaged version
     # we need to special case where configuration files come from.
@@ -63,7 +59,7 @@
         "utility_path": "/srv/shakenfist/venv/bin"
       delegate_to: localhost
       delegate_facts: true
-      when: mode == "deploy" and cloud != "localhost"
+      when: cloud != "localhost"
 
     - name: Check if we have a venv on localhost already
       stat:
@@ -92,8 +88,6 @@
   become_method: sudo
   gather_facts: no
   connection: ssh
-  vars:
-    mode: deploy
 
   tasks:
     - include: terraform/{{cloud}}/postboot.yml
@@ -104,8 +98,6 @@
   become_method: sudo
   gather_facts: no
   connection: ssh
-  vars:
-    mode: deploy
 
   tasks:
     - name: Load default vars
@@ -130,7 +122,48 @@
 
     - name: Check that we can run KVM
       shell: kvm-ok
-      when: mode == "deploy"
+
+    # Determine what architecture we're on. Derived from
+    # https://github.com/redhat-openstack/ansible-role-tripleo-parts
+    - name: Do we have Intel CPUs?
+      command: grep -q Intel /proc/cpuinfo
+      ignore_errors: true
+      register: is_intel
+
+    - name: Do we have AMD CPUs?
+      command: grep -q AMD /proc/cpuinfo
+      ignore_errors: true
+      register: is_amd
+
+    - name: Enable nested virtualization now (AMD)
+      shell: |
+        modprobe -r kvm_intel || true
+        modprobe kvm_amd nested=1
+      when: is_amd.rc == 0
+
+    - name: Enable nested virtualization now (Intel)
+      shell: |
+        modprobe -r kvm_amd
+        modprobe kvm_intel nested=1
+      when: is_intel.rc == 0
+
+    - name: Enable nested virtualization on boot (AMD)
+      copy:
+        content: |
+          options kvm_amd nested=1
+        dest: /etc/modprobe.d/sf-kvm.conf
+        owner: root
+        mode: u=r,g=r,o=r
+      when: is_amd.rc == 0
+
+    - name: Enable nested virtualization on boot (Intel)
+      copy:
+        content: |
+          options kvm_intel nested=1
+        dest: /etc/modprobe.d/sf-kvm.conf
+        owner: root
+        mode: u=r,g=r,o=r
+      when: is_intel.rc == 0
 
     # NOTE(mikal): this might not be right if egress and meshes are on different
     # interfaces.
@@ -147,29 +180,25 @@
     - name: Determine default interface MTU
       shell: ip link show {{node_egress_nic}} | grep mtu | sed -e 's/.*mtu //' -e 's/ .*//'
       register: node_mtu_complex
-      when: mode == "deploy"
 
     - name: Extract default interface MTU
       set_fact:
         node_mtu: "{{node_mtu_complex.stdout}}"
-      when: mode == "deploy"
 
     - name: Log node MTU
       debug:
         msg: "Node MTU is {{node_mtu}}"
-      when: mode == "deploy"
 
     - name: Abort if default interface MTU is too low
       fail:
         msg: "Node MTU is too low."
-      when: mode == "deploy" and ignore_mtu != "1" and node_mtu|int < 2000
+      when: ignore_mtu != "1" and node_mtu|int < 2000
 
     - name: Make /srv/shakenfist/
       file:
         path: /srv/shakenfist
         state: directory
         mode: "0755"
-      when: mode == "deploy"
 
     - name: Install python3-setuptools and venv support
       apt:
@@ -232,10 +261,14 @@
   become_method: sudo
   gather_facts: no
   connection: ssh
-  vars:
-    mode: deploy
 
   tasks:
+    - name: Find hypervisor with lowest MTU
+      set_fact: lowest_mtu_hypervisor={{ groups['hypervisors'] | sort('node_mtu' | int) | first }}
+
+    - name: Find lowest MTU
+      set_fact: lowest_mtu={{ hostvars[lowest_mtu_hypervisor]['node_mtu'] }}
+
     - name: Write syslog file
       template:
         src: files/rsyslog-server-01-sf.conf
@@ -243,14 +276,12 @@
         owner: root
         group: sudo
         mode: u=r,g=r,o=
-      when: mode == "deploy"
 
     - name: Restart syslog
       service:
         name: rsyslog
         enabled: yes
         state: restarted
-      when: mode == "deploy"
 
 - hosts: allsf
   any_errors_fatal: true
@@ -329,7 +360,6 @@
     - name: Syslog server is the primary server
       set_fact:
         syslog: "{{hostvars['localhost']['primary_node_ip']}}"
-      when: mode == "deploy"
 
     - name: Send syslog to the primary server, unless I am the primary server
       template:
@@ -338,14 +368,14 @@
         owner: root
         group: sudo
         mode: u=r,g=r,o=
-      when: hostvars['localhost']['primary_node_ip'] != node_ip and mode == "deploy"
+      when: hostvars['localhost']['primary_node_ip'] != node_ip
 
     - name: Restart syslog
       service:
         name: rsyslog
         enabled: yes
         state: restarted
-      when: hostvars['localhost']['primary_node_ip'] != node_ip and mode == "deploy"
+      when: hostvars['localhost']['primary_node_ip'] != node_ip
 
 # Install glusterfs
 - hosts: hypervisors
@@ -354,14 +384,11 @@
   become_method: sudo
   gather_facts: yes
   connection: ssh
-  vars:
-    release: git
-    mode: deploy
 
   tasks:
     - name: Install glusterfs on all nodes
       include: includes/glusterfs-all-initial.yml
-      when: gluster_enabled == "1" and mode == "deploy"
+      when: gluster_enabled == "1"
 
 - hosts: sf-1
   any_errors_fatal: true
@@ -369,14 +396,11 @@
   become_method: sudo
   gather_facts: yes
   connection: ssh
-  vars:
-    release: git
-    mode: deploy
 
   tasks:
     - name: Single node gluster configuration
       include: includes/glusterfs-primary.yml
-      when: gluster_enabled == "1" and mode == "deploy"
+      when: gluster_enabled == "1"
 
 - hosts: hypervisors
   any_errors_fatal: true
@@ -384,20 +408,17 @@
   become_method: sudo
   gather_facts: yes
   connection: ssh
-  vars:
-    release: git
-    mode: deploy
 
   tasks:
     - name: Finalize glusterfs on all nodes
       include: includes/glusterfs-all-final.yml
-      when: gluster_enabled == "1" and mode == "deploy"
+      when: gluster_enabled == "1"
 
 # Install etcd
 - hosts: etcd
   roles:
     - role: andrewrothstein.etcd-cluster
-      when: mode == "deploy" and cloud != "localhost"
+      when: cloud != "localhost"
       vars:
         etcd_secure: False
         etcd_cluster_name: shakenfist
@@ -410,7 +431,7 @@
 - hosts: etcd
   roles:
     - role: andrewrothstein.etcd-cluster
-      when: mode == "deploy" and cloud == "localhost"
+      when: cloud == "localhost"
       vars:
         etcd_secure: False
         etcd_cluster_name: shakenfist
@@ -425,8 +446,6 @@
   become_method: sudo
   gather_facts: yes
   connection: ssh
-  vars:
-    mode: deploy
 
   tasks:
     # We use a shell command here because the service might not exist and
@@ -440,8 +459,6 @@
   become_method: sudo
   gather_facts: no
   connection: ssh
-  vars:
-    mode: deploy
 
   tasks:
     - name: Create config directory
@@ -449,7 +466,6 @@
         path: /etc/sf
         state: directory
         mode: "0755"
-      when: mode == "deploy"
 
     - name: Restore from backup, if there is one specified
       shell: "{{hostvars['localhost']['utility_path']}}/sf-backup restore {{restore_backup}}"
@@ -458,13 +474,12 @@
     - name: Set system key from extra-vars
       set_fact:
         system_key: "{{admin_password}}"
-      when: mode == "deploy"
 
     - name: Use Hashicorp Vault for "system" namespace key (if enabled)
       block:
         - set_fact:
             system_key: "{{lookup('hashivault', '{{vault_system_key_path}}', 'key')}}"
-          when: vault_system_key_path is defined and mode == "deploy"
+          when: vault_system_key_path is defined
 
       rescue:
         - fail:
@@ -477,7 +492,6 @@
         owner: root
         group: sudo
         mode: u=r,g=r,o=
-      when: mode == "deploy"
 
     - name: Install sfrc for root user
       lineinfile:
@@ -485,7 +499,6 @@
         create: yes
         regexp: ". /etc/sf/sfrc"
         line: ". /etc/sf/sfrc"
-      when: mode == "deploy"
 
     - name: Write a global auth file
       template:
@@ -494,18 +507,15 @@
         owner: root
         group: sudo
         mode: u=r,g=r,o=
-      when: mode == "deploy"
 
     - name: Install prometheus
       apt:
         name: prometheus
         state: latest
-      when: mode == "deploy"
 
     - name: Read local prometheus customizations
       set_fact:
         prom_additional: "{{lookup('file', 'terraform/{{cloud}}/prometheus.yml') }}"
-      when: mode == "deploy"
 
     - name: Write prometheus configuration file
       copy:
@@ -549,17 +559,14 @@
         dest: /etc/prometheus/prometheus.yml
         owner: root
         mode: u=rw,g=r,o=r
-      when: mode == "deploy"
 
     - name: Restart prometheus
       service:
         name: prometheus
         enabled: yes
         state: restarted
-      when: mode == "deploy"
 
     - include: includes/grafana.yml
-      when: mode == "deploy"
 
     - name: Write grafana config
       template:
@@ -567,7 +574,6 @@
         dest: /etc/grafana/grafana.ini
         owner: root
         mode: u=rw,g=r,o=r
-      when: mode == "deploy"
 
     - name: Write grafana dashboard
       copy:
@@ -575,7 +581,6 @@
         dest: /etc/grafana/provisioning/dashboards/shakenfist.json
         owner: root
         mode: u=rw,g=r,o=r
-      when: mode == "deploy"
 
     - name: Write grafana dashboard config
       copy:
@@ -583,7 +588,6 @@
         dest: /etc/grafana/provisioning/dashboards/dashboards.yaml
         owner: root
         mode: u=rw,g=r,o=r
-      when: mode == "deploy"
 
     - name: Write prometheus grafana configuration file
       copy:
@@ -604,18 +608,15 @@
         dest: /etc/grafana/provisioning/datasources/prometheus.yml
         owner: root
         mode: u=rwx,g=r,o=r
-      when: mode == "deploy"
 
     - name: Restart grafana
       service:
         name: grafana-server
         enabled: yes
         state: restarted
-      when: mode == "deploy"
 
     - name: Enable proxy modules for apache
       shell: a2enmod proxy proxy_http lbmethod_byrequests
-      when: mode == "deploy"
 
     - name: Write apache site
       template:
@@ -624,11 +625,9 @@
         owner: root
         group: root
         mode: u=r,g=r,o=r
-      when: mode == "deploy"
 
     - name: Reload apache
       shell: apache2ctl graceful
-      when: mode == "deploy"
 
 - hosts: hypervisors
   any_errors_fatal: true
@@ -636,8 +635,6 @@
   become_method: sudo
   gather_facts: no
   connection: ssh
-  vars:
-    mode: deploy
 
   tasks:
     - name: Create storage directory
@@ -645,7 +642,6 @@
         path: /srv/shakenfist
         state: directory
         mode: "0755"
-      when: mode == "deploy"
 
     - name: Copy libvirt template
       copy:
@@ -659,7 +655,6 @@
     - name: Turn off default libvirt networking
       shell: virsh net-destroy default
       ignore_errors: True
-      when: mode == "deploy"
 
     - name: Copy dhcp config template
       copy:
@@ -703,7 +698,6 @@
         owner: root
         group: root
         mode: u=r,g=r,o=r
-      when: mode != 'hotfix'
 
     - name: Run any upgrade steps
       shell: "{{hostvars['localhost']['utility_path']}}/sf-upgrade"
@@ -712,7 +706,6 @@
     - name: Create an admin namespace called "system" with one key configured
       shell: "{{hostvars['localhost']['utility_path']}}/sf-passwd deploy {{hostvars['localhost']['system_key']}}"
       run_once: true
-      when: mode == "deploy"
 
     - name: Rotate logs and remove old logs
       shell: |
@@ -720,7 +713,6 @@
         journalctl --vacuum-time=2d
         /usr/sbin/logrotate -f /etc/logrotate.conf
       ignore_errors: True
-      when: mode == "deploy"
 
     - name: Start the SF daemon
       service:
@@ -736,21 +728,17 @@
         owner: root
         group: root
         mode: u=r,g=r,o=r
-      when: mode == "deploy"
 
     - name: Reload apache
       shell: apache2ctl graceful
-      when: mode == "deploy"
 
 - hosts: localhost
   roles:
     - role: andrewrothstein.terraform
-      when: mode == "deploy"
       vars:
         terraform_binary_dir: /usr/local/bin/terraform_install
 
     - role: andrewrothstein.go
-      when: mode == "deploy"
 
 - hosts: localhost
   any_errors_fatal: true
@@ -758,18 +746,14 @@
   become_method: sudo
   gather_facts: no
   connection: ssh
-  vars:
-    mode: deploy
 
   tasks:
     - name: Clear out old terraform providers
       file:
         path: /srv/shakenfist/terraform-provider-shakenfist
         state: absent
-      when: mode == "deploy"
 
     - name: Make sure we don't have an old provider installed
       file:
         path: /usr/local/bin/terraform_install/terraform-provider-shakenfist
         state: absent
-      when: mode == "deploy"
