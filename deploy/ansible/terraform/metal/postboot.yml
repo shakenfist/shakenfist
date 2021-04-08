@@ -14,7 +14,7 @@
       {% for svr in groups.hypervisors %}
       {{hostvars[svr]['node_ip']}}  {{svr}}
       {% endfor %}
-      hostvars[svr]['primary_node_ip']}}  primary
+      {{hostvars['localhost']['primary_node_ip']}}  sf-primary
     dest: /etc/hosts
     owner: root
     group: root
