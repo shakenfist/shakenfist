@@ -2,8 +2,6 @@
 # Defaults are Ubuntu specific
 shakenfist_deps:
   - ack
-  - ansible
-  - apache2
   - arping
   - bridge-utils
   - cpu-checker

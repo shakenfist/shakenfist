@@ -9,7 +9,7 @@
 
 - name: Add Grafana APT repository
   apt_repository:
-    repo: deb [arch=amd64] https://packages.grafana.com/oss/deb stable main
+    repo: deb [arch=amd64] http://packages.grafana.com/oss/deb stable main
 
 - name: Install Grafana
   apt:

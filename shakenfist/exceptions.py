@@ -127,3 +127,7 @@ class DeadNetwork(NetworkException):
 
 class CongestedNetwork(NetworkException):
     pass
+
+
+class NoInterfaceStatistics(NetworkException):
+    pass

@@ -29,7 +29,7 @@ sudo pip3 install -U pip
 sudo apt-get remove -y python3-pip
 ```
 
-We require that Shaken Fist be installed into a venv at /srv/shakenfist/venv. Create that now:
+We require that Shaken Fist be installed into a venv at /srv/shakenfist/venv on each Shaken Fist machine. Create that now:
 
 ```
 sudo mkdir -p /srv/shakenfist/venv
