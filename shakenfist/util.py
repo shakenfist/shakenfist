@@ -18,6 +18,7 @@ from oslo_concurrency import processutils
 
 from shakenfist import db
 from shakenfist.config import config
+from shakenfist import exceptions
 from shakenfist import logutil
 
 

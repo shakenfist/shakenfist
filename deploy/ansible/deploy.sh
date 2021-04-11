@@ -6,44 +6,6 @@
 VARIABLES=""
 VERBOSE="-v"
 
-# Do we have a venv? If so, use it
-if [ -e /srv/shakenfist/venv/bin/python ]
-then
-  PYTHON="/srv/shakenfist/venv/bin/python"
-else
-  PYTHON="python3"
-fi
-
-# Determine what version of Shaken Fist is installed locally, as that
-# is what we will use for any remote hosts.
-install_path=`$PYTHON -m pip show shakenfist | egrep "^Location: " | cut -f 2 -d " "`
-direct_url_path=$install_path/shakenfist-*dist-info/direct_url.json
-if [ -e $direct_url_path ]
-then
-  REMOTE_SOURCE="file"
-  REMOTE_PACKAGE=`cat $direct_url_path | $PYTHON -c "import sys, json; print(json.loads(sys.stdin.read())['url']);"`
-
-  if [ `echo "$REMOTE_PACKAGE" | egrep -c "^file://"` -ne 1 ]
-  then
-    echo "Sorry, $REMOTE_PACKAGE is not a supported package source."
-    exit 1
-  fi
-
-  REMOTE_PACKAGE=`echo $REMOTE_PACKAGE | sed 's|file://||'`
-  echo "Shaken Fist is a locally built package from $REMOTE_PACKAGE"
-else
-  pip_version=`egrep "^Version" $install_path/shakenfist-*dist-info/METADATA | cut -f 2 -d " "`
-  if [ "%$pip_version%" == "%%" ]
-  then
-    echo "Unable to determine pip version of Shaken Fist from $install_path/shakenfist-*dist-info/METADATA"
-    exit 1
-  fi
-
-  echo "Shaken Fist is pip version $pip_version"
-  REMOTE_SOURCE="pip"
-  REMOTE_PACKAGE="shakenfist==$pip_version"
-fi
-
 #### AWS
 if [ "$CLOUD" == "aws" ] || [ "$CLOUD" == "aws-single-node" ]
 then
@@ -248,8 +210,6 @@ VARIABLES="$VARIABLES,deploy_name=$DEPLOY_NAME"
 VARIABLES="$VARIABLES,restore_backup=\"$RESTORE_BACKUP\""
 VARIABLES="$VARIABLES,ignore_mtu=\"$IGNORE_MTU\""
 VARIABLES="$VARIABLES,dns_server=\"$DNS_SERVER\""
-VARIABLES="$VARIABLES,remote_source=\"$REMOTE_SOURCE\""
-VARIABLES="$VARIABLES,remote_package=\"$REMOTE_PACKAGE\""
 
 echo "VARIABLES: $VARIABLES"
 ANSIBLE_VARS=""
@@ -276,12 +236,7 @@ echo "export CLOUD=$CLOUD" >> /etc/sf/deploy-variables
 echo "export ENCODED_ANSIBLE_VARS=$encoded" >> /etc/sf/deploy-variables
 echo 'export ANSIBLE_VARS=`echo $ENCODED_ANSIBLE_VARS | base64 -d`' >> /etc/sf/deploy-variables
 
-ansible-playbook $VERBOSE -i hosts --extra-vars "$ANSIBLE_VARS ansible_root=\"$cwd\"" deploy.yml $@
-
-if [ -e terraform/$CLOUD/local.yml ]
-then
-  ansible-playbook $VERBOSE -i hosts --extra-vars "$ANSIBLE_VARS ansible_root=\"$cwd\"" terraform/$CLOUD/local.yml $@
-fi
+ANSIBLE_SSH_PIPELINING=0 ansible-playbook $VERBOSE -i hosts --extra-vars "$ANSIBLE_VARS ansible_root=\"$cwd\"" deploy.yml
 
 echo "" >> /etc/sf/deploy-variables
 echo "# Install finished at "`date` >> /etc/sf/deploy-variables

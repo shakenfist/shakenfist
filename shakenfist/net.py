@@ -678,9 +678,10 @@ class Network(baseobject.DatabaseBackedObject):
             ipaddress.IPv4Address(floating_address))
         subst['inner_address'] = inner_address
 
-        util.execute(None,
-                     'ip link del flt-%(floating_address_as_hex)s-o'
-                     % subst)
+        if util.check_for_interface('flt-%(floating_address_as_hex)s-o' % subst):
+            util.execute(None,
+                         'ip link del flt-%(floating_address_as_hex)s-o'
+                         % subst)
 
 
 class Networks(baseobject.DatabaseBackedObjectIterator):
