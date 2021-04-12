@@ -65,8 +65,8 @@ echo 'Floating IPs work!' > /var/www/html/index.html
         for _ in range(10):
             attempts += 1
             try:
-                r = requests.request('GET', 'http://%s/'
-                                     % ifaces[0]['floating'])
+                r = requests.request(
+                    'GET', 'http://%s/' % ifaces[0]['floating'])
 
                 if r.status_code == 200:
                     if r.text.find('Floating IPs work!') != -1:
@@ -82,4 +82,5 @@ echo 'Floating IPs work!' > /var/www/html/index.html
 
             time.sleep(30)
 
-        self.fail('Incorrect result after %d attempts' % attempts)
+        self.fail('Incorrect result after %d attempts, instance was %s'
+                  % (attempts, inst['uuid']))
