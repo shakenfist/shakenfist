@@ -93,15 +93,20 @@ pipeline {
               echo "=============================="
               rm -rf $BUILD_TAG
 
-              for uuid in `sf-client --simple instance list | grep $BUILD_TAG | cut -f 1 -d ","`
-              do
-                sf-client instance delete $uuid
-              done
+              if [ -e $source_path/keepme ]
+              then
+                echo "Retaining CI environment because you asked nicely."
+              else
+                for uuid in `sf-client --simple instance list | grep $BUILD_TAG | cut -f 1 -d ","`
+                do
+                  sf-client instance delete $uuid
+                done
 
-              for uuid in `sf-client --simple network list | grep $BUILD_TAG | cut -f 1 -d ","`
-              do
-                sf-client network delete $uuid
-              done
+                for uuid in `sf-client --simple network list | grep $BUILD_TAG | cut -f 1 -d ","`
+                do
+                  sf-client network delete $uuid
+                done
+              fi
           '''
     }
   }
