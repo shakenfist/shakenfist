@@ -6,7 +6,7 @@ from shakenfist_ci import base
 class TestUpgrades(base.BaseTestCase):
     def test_upgraded_data_exists(self):
         # There is an upgraded namespace called 'upgrade'
-        if not 'upgrade' in self.system_client.get_namespaces():
+        if 'upgrade' not in self.system_client.get_namespaces():
             self.skip('There is no upgrade namespace')
 
         # Collect networks and check
