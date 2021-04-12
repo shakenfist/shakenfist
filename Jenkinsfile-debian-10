@@ -4,13 +4,14 @@ pipeline {
   stages {
     stage('Build infra') {
       steps {
-        sh '''  mkdir $BUILD_TAG
-                cd $BUILD_TAG
-
-                if [ -e .git ]
+        sh '''  if [ -e .git ]
                 then
+                  echo "Detected existing git checkout."
                   SOURCE_PATH="$WORKSPACE"
                 else
+                  echo "Performing git checkout."
+                  mkdir $BUILD_TAG
+                  cd $BUILD_TAG
                   git clone https://github.com/shakenfist/shakenfist
                   cd shakenfist
                   git checkout
@@ -83,6 +84,15 @@ pipeline {
   post {
     always {
       sh '''  . /home/jenkins/sf-ci
+              . $WORKSPACE/$BUILD_TAG/ci-environment.sh
+
+              echo "=============================="
+              ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                  debian@$primary sudo cat /var/log/syslog
+
+              echo "=============================="
+              rm -rf $BUILD_TAG
+
               for uuid in `sf-client --simple instance list | grep $BUILD_TAG | cut -f 1 -d ","`
               do
                 sf-client instance delete $uuid
@@ -92,28 +102,7 @@ pipeline {
               do
                 sf-client network delete $uuid
               done
-
-              echo "=============================="
-              cat /var/log/syslog
-
-              echo "=============================="
-              rm -rf $BUILD_TAG
           '''
     }
-    failure {
-      sh '''  echo "Sleep for a long time in case we are debugging"
-              echo "Create /keepme to extend the reboot time - up to 12 hours"
-              x=12
-              while [ $x -gt 0 ]
-              do
-                  echo Sleeping...
-                  sleep 3600
-                  x=$(( $x - 1 ))
-                  if [ ! -f /keep ]; then
-                      x=0
-                  fi
-              done
-         '''
-      }
   }
 }
