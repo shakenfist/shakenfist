@@ -133,7 +133,7 @@ class ImageResolversTestCase(test_shakenfist.ShakenFistTestCase):
 
     @mock.patch('requests.get', side_effect=[
         FakeResponse(200, CIRROS_DOWNLOAD_HTML),
-        FakeResponse(200, ''),  # Handle no file available
+        FakeResponse(404, ''),  # Handle no file available
         FakeResponse(200, CIRROS_DOWNLOAD_HTML),
         FakeResponse(200, CIRROS_MD5SUM_0_3_4),
         FakeResponse(200, CIRROS_DOWNLOAD_HTML),
