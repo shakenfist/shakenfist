@@ -644,8 +644,13 @@ class Instance(baseobject.DatabaseBackedObject):
             ]
         }
 
-        seen_networks = []
+        have_default_route = False
+        ordered_ifaces = {}
         for iface in db.get_instance_interfaces(self.uuid):
+            ordered_ifaces[iface['order']] = iface
+
+        for order in sorted(ordered_ifaces.keys()):
+            iface = ordered_ifaces[order]
             devname = 'eth%d' % iface['order']
             nd['links'].append(
                 {
@@ -658,26 +663,31 @@ class Instance(baseobject.DatabaseBackedObject):
                 }
             )
 
-            if not iface['network_uuid'] in seen_networks:
-                n = net.Network.from_db(iface['network_uuid'])
-                nd['networks'].append(
-                    {
-                        'id': iface['network_uuid'],
-                        'link': devname,
-                        'type': 'ipv4',
-                        'ip_address': iface['ipv4'],
-                        'netmask': str(n.netmask),
-                        'routes': [
-                            {
-                                'network': '0.0.0.0',
-                                'netmask': '0.0.0.0',
-                                'gateway': str(n.router)
-                            }
-                        ],
-                        'network_id': iface['network_uuid']
-                    }
-                )
-                seen_networks.append(iface['network_uuid'])
+            n = net.Network.from_db(iface['network_uuid'])
+            nd['networks'].append(
+                {
+                    'id': '%s-%s' % (iface['network_uuid'], iface['order']),
+                    'link': devname,
+                    'type': 'ipv4',
+                    'ip_address': iface['ipv4'],
+                    'netmask': str(n.netmask),
+                    'network_id': iface['network_uuid']
+                }
+            )
+
+            # NOTE(mikal): it is assumed that the default route should be on
+            # the first interface specified.
+            if not have_default_route:
+                nd['networks'][-1].update({
+                    'routes': [
+                        {
+                            'network': '0.0.0.0',
+                            'netmask': '0.0.0.0',
+                            'gateway': str(n.router)
+                        }
+                    ]
+                })
+                have_default_route = True
 
         nd_encoded = json.dumps(nd).encode('ascii')
         iso.add_fp(io.BytesIO(nd_encoded), len(nd_encoded),
