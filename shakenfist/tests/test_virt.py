@@ -442,7 +442,7 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
                                 {
                                     "ethernet_mac_address": "1a:91:64:d2:15:39",
                                     "id": "eth0",
-                                    "mtu": 1450,
+                                    "mtu": 7950,
                                     "name": "eth0",
                                     "type": "vif",
                                     "vif_id": "ifaceuuid"
@@ -450,7 +450,7 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
                                 {
                                     "ethernet_mac_address": "1a:91:64:d2:15:40",
                                     "id": "eth1",
-                                    "mtu": 1450,
+                                    "mtu": 7950,
                                     "name": "eth1",
                                     "type": "vif",
                                     "vif_id": "ifaceuuid2"

@@ -19,6 +19,7 @@ Environment=SHAKENFIST_DISK_FORMAT=qcow
 # Cluster tuning.
 Environment=SHAKENFIST_RAM_SYSTEM_RESERVATION={{hostvars['localhost']['ram_system_reservation']}}
 Environment=SHAKENFIST_MAX_HYPERVISOR_MTU={{hostvars['localhost']['lowest_mtu']}}
+Environment=SHAKENFIST_DNS_SERVER="{{dns_server}}"
 
 # Whether we have a local cloud image mirror is controlled by the
 # HAS_MIRROR ansible variable. Define HAS_MIRROR with any value to use
