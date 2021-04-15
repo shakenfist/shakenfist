@@ -787,6 +787,7 @@ class Instances(Resource):
                 }).info('Interface allocated')
                 db.create_network_interface(
                     iface_uuid, netdesc, instance.uuid, order)
+                order += 1
 
                 if 'float' in netdesc and netdesc['float']:
                     err = _assign_floating_ip(iface_uuid)

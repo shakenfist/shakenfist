@@ -652,7 +652,7 @@ class Instance(baseobject.DatabaseBackedObject):
                     'ethernet_mac_address': iface['macaddr'],
                     'id': devname,
                     'name': devname,
-                    'mtu': 1450,
+                    'mtu': config.get('MAX_HYPERVISOR_MTU') - 50,
                     'type': 'vif',
                     'vif_id': iface['uuid']
                 }
