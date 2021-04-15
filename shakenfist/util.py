@@ -313,3 +313,17 @@ def random_macaddr():
     return '02:00:00:%02x:%02x:%02x' % (random.randint(0, 255),
                                         random.randint(0, 255),
                                         random.randint(0, 255))
+
+
+def fetch_remote_checksum(checksum_url):
+    resp = requests.get(checksum_url,
+                        headers={'User-Agent': get_user_agent()})
+    if resp.status_code != 200:
+        return {}
+
+    checksums = {}
+    for line in resp.text.split('\n'):
+        elems = line.split()
+        if len(elems) == 2:
+            checksums[elems[1]] = elems[0]
+    return checksums
