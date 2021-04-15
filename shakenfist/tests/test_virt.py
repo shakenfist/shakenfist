@@ -458,19 +458,23 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
                             ],
                             "networks": [
                                 {
-                                    "id": "netuuid",
-                                    "ip_address": "127.0.0.5",
-                                    "link": "eth0",
-                                    "netmask": "255.0.0.0",
-                                    "network_id": "netuuid",
-                                    "routes": [
-                                        {
-                                            "gateway": "127.0.0.1",
-                                            "netmask": "0.0.0.0",
-                                            "network": "0.0.0.0"
-                                        }
-                                    ],
-                                    "type": "ipv4"
+                                    'id': 'netuuid-0',
+                                    'ip_address': '127.0.0.5',
+                                          'link': 'eth0',
+                                          'netmask': '255.0.0.0',
+                                          'network_id': 'netuuid',
+                                          'routes': [{'gateway': '127.0.0.1',
+                                                      'netmask': '0.0.0.0',
+                                                      'network': '0.0.0.0'}],
+                                          'type': 'ipv4'
+                                },
+                                {
+                                    'id': 'netuuid-1',
+                                    'ip_address': '127.0.0.6',
+                                    'link': 'eth1',
+                                    'netmask': '255.0.0.0',
+                                    'network_id': 'netuuid',
+                                    'type': 'ipv4'
                                 }
                             ],
                             "services": [
