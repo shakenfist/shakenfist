@@ -761,22 +761,29 @@ class Instances(Resource):
                     return error(
                         404, 'network %s not found' % netdesc['network_uuid'])
 
-                with db.get_lock('ipmanager', None,  netdesc['network_uuid'],
-                                 ttl=120, op='Network allocate IP'):
-                    db.add_event('network', netdesc['network_uuid'], 'allocate address',
-                                 None, None, instance.uuid)
-                    ipm = IPManager.from_db(netdesc['network_uuid'])
-                    if 'address' not in netdesc or not netdesc['address']:
-                        netdesc['address'] = ipm.get_random_free_address()
-                    else:
-                        if not ipm.reserve(netdesc['address']):
-                            m = 'failed to reserve an IP on network %s' % (
-                                netdesc['network_uuid'])
-                            instance.enqueue_delete_due_error(m)
-                            return error(409, 'address %s in use' %
-                                         netdesc['address'])
+                # NOTE(mikal): we now support interfaces with no address on them
+                # (thanks OpenStack Kolla), which are special cased here. To not
+                # have an address, you use a detailed netdesc and specify
+                # address=none.
+                if 'address' in netdesc and util.noneish(netdesc['address']):
+                    netdesc['address'] = None
+                else:
+                    with db.get_lock('ipmanager', None,  netdesc['network_uuid'],
+                                     ttl=120, op='Network allocate IP'):
+                        db.add_event('network', netdesc['network_uuid'], 'allocate address',
+                                     None, None, instance.uuid)
+                        ipm = IPManager.from_db(netdesc['network_uuid'])
+                        if 'address' not in netdesc or not netdesc['address']:
+                            netdesc['address'] = ipm.get_random_free_address()
+                        else:
+                            if not ipm.reserve(netdesc['address']):
+                                m = 'failed to reserve an IP on network %s' % (
+                                    netdesc['network_uuid'])
+                                instance.enqueue_delete_due_error(m)
+                                return error(409, 'address %s in use' %
+                                             netdesc['address'])
 
-                    ipm.persist()
+                        ipm.persist()
 
                 if 'model' not in netdesc or not netdesc['model']:
                     netdesc['model'] = 'virtio'
