@@ -1,9 +1,13 @@
+# Old debian image: https://sfcbr.shakenfist.com/static/debian10-ci-template.qcow2
+
 - hosts: localhost
   gather_facts: yes
   connection: ssh
   vars:
     identifier: unknown
     source_path: "/home/jenkins/src/shakenfist/shakenfist"
+    base_image: "https://sfcbr.shakenfist.com/static/ubuntu2004-ci-template.qcow2"
+    base_image_user: "ubuntu"
 
   tasks:
     - name: Create a CI network
@@ -22,7 +26,7 @@
         cpu: 4
         ram: 4096
         disks:
-          - 30@https://sfcbr.shakenfist.com/static/debian10-ci-template.qcow2
+          - "30@{{base_image}}"
         networkspecs:
           - network_uuid="{{cinetwork['meta']['uuid']}}",float=True
         ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+482i1EYa6FYmDrjOQpsm+mVwFs7TW9xOI9o1jc/PHXLDDg5+inp/vVAgKoV6jijwRC9juwjFBPqr8LyXh3lXhPA1LSaQa39o3QIYTLsLuLZPeueUB8UukZzOH0XAHxgAF/qFycf5pWzD4Pzs5HjNi44+9LCDYKJtc45kh3+97iezRMYhucm3wzRAKyA8mr8nNOrQq356sKgXeMP6nnX4bhUJDrcQpfsRFkTcYWAcSuU36eSETVOj9dGUJZlc4g3QBL73R1S5VWbN6DM4UIOSWxRG6oUKprgHSvFmyp5i7S0vKv7q101PcxOw14GOvI8TSirIa8O39WtyX3ugReBj mikal@sf-primary
@@ -34,8 +38,8 @@
       add_host:
         hostname: primary
         ansible_ssh_host: "{{primary['meta']['network_interfaces'][0]['floating']}}"
-        ansible_ssh_extra_args: "-o StrictHostKeyChecking=no"
-        ansible_ssh_user: "debian"
+        ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
+        ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/home/jenkins/id_ci"
         groups: sfall
 
@@ -45,7 +49,7 @@
         cpu: 4
         ram: 8192
         disks:
-          - 50@https://sfcbr.shakenfist.com/static/debian10-ci-template.qcow2
+          - "50@{{base_image}}"
         networkspecs:
           - network_uuid="{{cinetwork['meta']['uuid']}}",float=True
         ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+482i1EYa6FYmDrjOQpsm+mVwFs7TW9xOI9o1jc/PHXLDDg5+inp/vVAgKoV6jijwRC9juwjFBPqr8LyXh3lXhPA1LSaQa39o3QIYTLsLuLZPeueUB8UukZzOH0XAHxgAF/qFycf5pWzD4Pzs5HjNi44+9LCDYKJtc45kh3+97iezRMYhucm3wzRAKyA8mr8nNOrQq356sKgXeMP6nnX4bhUJDrcQpfsRFkTcYWAcSuU36eSETVOj9dGUJZlc4g3QBL73R1S5VWbN6DM4UIOSWxRG6oUKprgHSvFmyp5i7S0vKv7q101PcxOw14GOvI8TSirIa8O39WtyX3ugReBj mikal@sf-primary
@@ -58,8 +62,8 @@
         hostname: sf1
         internal_ip: "{{sf1['meta']['network_interfaces'][0]['ipv4']}}"
         ansible_ssh_host: "{{sf1['meta']['network_interfaces'][0]['floating']}}"
-        ansible_ssh_extra_args: "-o StrictHostKeyChecking=no"
-        ansible_ssh_user: "debian"
+        ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
+        ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/home/jenkins/id_ci"
         groups: hypervisors, sfall
 
@@ -69,7 +73,7 @@
         cpu: 4
         ram: 8192
         disks:
-          - 50@https://sfcbr.shakenfist.com/static/debian10-ci-template.qcow2
+          - "50@{{base_image}}"
         networkspecs:
           - network_uuid="{{cinetwork['meta']['uuid']}}",float=True
         ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+482i1EYa6FYmDrjOQpsm+mVwFs7TW9xOI9o1jc/PHXLDDg5+inp/vVAgKoV6jijwRC9juwjFBPqr8LyXh3lXhPA1LSaQa39o3QIYTLsLuLZPeueUB8UukZzOH0XAHxgAF/qFycf5pWzD4Pzs5HjNi44+9LCDYKJtc45kh3+97iezRMYhucm3wzRAKyA8mr8nNOrQq356sKgXeMP6nnX4bhUJDrcQpfsRFkTcYWAcSuU36eSETVOj9dGUJZlc4g3QBL73R1S5VWbN6DM4UIOSWxRG6oUKprgHSvFmyp5i7S0vKv7q101PcxOw14GOvI8TSirIa8O39WtyX3ugReBj mikal@sf-primary
@@ -82,8 +86,8 @@
         hostname: sf2
         internal_ip: "{{sf2['meta']['network_interfaces'][0]['ipv4']}}"
         ansible_ssh_host: "{{sf2['meta']['network_interfaces'][0]['floating']}}"
-        ansible_ssh_extra_args: "-o StrictHostKeyChecking=no"
-        ansible_ssh_user: "debian"
+        ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
+        ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/home/jenkins/id_ci"
         groups: hypervisors, sfall
 
@@ -93,7 +97,7 @@
         cpu: 4
         ram: 8192
         disks:
-          - 50@https://sfcbr.shakenfist.com/static/debian10-ci-template.qcow2
+          - "50@{{base_image}}"
         networkspecs:
           - network_uuid="{{cinetwork['meta']['uuid']}}",float=True
         ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+482i1EYa6FYmDrjOQpsm+mVwFs7TW9xOI9o1jc/PHXLDDg5+inp/vVAgKoV6jijwRC9juwjFBPqr8LyXh3lXhPA1LSaQa39o3QIYTLsLuLZPeueUB8UukZzOH0XAHxgAF/qFycf5pWzD4Pzs5HjNi44+9LCDYKJtc45kh3+97iezRMYhucm3wzRAKyA8mr8nNOrQq356sKgXeMP6nnX4bhUJDrcQpfsRFkTcYWAcSuU36eSETVOj9dGUJZlc4g3QBL73R1S5VWbN6DM4UIOSWxRG6oUKprgHSvFmyp5i7S0vKv7q101PcxOw14GOvI8TSirIa8O39WtyX3ugReBj mikal@sf-primary
@@ -106,8 +110,8 @@
         hostname: sf3
         internal_ip: "{{sf3['meta']['network_interfaces'][0]['ipv4']}}"
         ansible_ssh_host: "{{sf3['meta']['network_interfaces'][0]['floating']}}"
-        ansible_ssh_extra_args: "-o StrictHostKeyChecking=no"
-        ansible_ssh_user: "debian"
+        ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
+        ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/home/jenkins/id_ci"
         groups: hypervisors, sfall
 
@@ -163,12 +167,6 @@
         group: root
         mode: u=r,g=r,o=r
 
-- hosts: primary
-  gather_facts: yes
-  connection: ssh
-  become: true
-
-  tasks:
     - name: apt-get dist-upgrade
       apt:
         update_cache: yes
@@ -187,6 +185,8 @@
             python3-venv,
             python3-wheel,
             python3,
+            pwgen,
+            tox,
           ]
         state: latest
 
@@ -198,6 +198,12 @@
         name: python3-pip
         state: absent
 
+- hosts: primary
+  gather_facts: yes
+  connection: ssh
+  become: true
+
+  tasks:
     # - name: Ensure we have the Ubuntu package key (helps with Debian)
     #   shell: apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367
 
@@ -286,6 +292,7 @@
   become: true
   vars:
     source_path: "/home/jenkins/src/shakenfist/shakenfist"
+    base_image_user: "ubuntu"
 
   tasks:
     - name: Copy install configuration to primary node
@@ -297,7 +304,7 @@
           export FLOATING_IP_BLOCK="10.10.10.0/24"
           export BOOTDELAY=0
           export DEPLOY_NAME="metalci"
-          export METAL_SSH_USER="debian"
+          export METAL_SSH_USER="{{base_image_user}}"
           export METAL_SSH_KEY_FILENAME="/root/.ssh/id_rsa"
 
           export KSM_ENABLED=0
