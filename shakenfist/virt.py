@@ -669,11 +669,15 @@ class Instance(baseobject.DatabaseBackedObject):
                     'id': '%s-%s' % (iface['network_uuid'], iface['order']),
                     'link': devname,
                     'type': 'ipv4',
-                    'ip_address': iface['ipv4'],
-                    'netmask': str(n.netmask),
                     'network_id': iface['network_uuid']
                 }
             )
+
+            if iface['ipv4']:
+                nd['networks'][-1].update({
+                    'ip_address': iface['ipv4'],
+                    'netmask': str(n.netmask),
+                })
 
             # NOTE(mikal): it is assumed that the default route should be on
             # the first interface specified.

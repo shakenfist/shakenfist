@@ -327,3 +327,11 @@ def fetch_remote_checksum(checksum_url):
         if len(elems) == 2:
             checksums[elems[1]] = elems[0]
     return checksums
+
+
+def noneish(value):
+    if not value:
+        return True
+    if value.lower() == 'none':
+        return True
+    return False
