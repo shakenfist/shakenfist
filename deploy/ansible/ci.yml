@@ -198,17 +198,17 @@
         name: python3-pip
         state: absent
 
-    - name: Ensure we have the Ubuntu package key (helps with Debian)
-      shell: apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367
+    # - name: Ensure we have the Ubuntu package key (helps with Debian)
+    #   shell: apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367
 
-    - name: Setup ansible package repository
-      copy:
-        content: |
-          deb http://ppa.launchpad.net/ansible/ansible/ubuntu trusty main
-        dest: "/etc/apt/sources.list.d/ansible.list"
-        owner: root
-        group: root
-        mode: u=r,g=r,o=r
+    # - name: Setup ansible package repository
+    #   copy:
+    #     content: |
+    #       deb http://ppa.launchpad.net/ansible/ansible/ubuntu trusty main
+    #     dest: "/etc/apt/sources.list.d/ansible.list"
+    #     owner: root
+    #     group: root
+    #     mode: u=r,g=r,o=r
 
     - name: Install modern ansible
       apt:
