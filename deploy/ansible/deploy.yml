@@ -114,6 +114,25 @@
         name: "{{ shakenfist_deps }}"
         state: latest
 
+    # - name: Ensure we have the Ubuntu package key (helps with Debian)
+    #   shell: apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367
+
+    # - name: Setup ansible package repository
+    #   copy:
+    #     content: |
+    #       deb http://ppa.launchpad.net/ansible/ansible/ubuntu trusty main
+    #     dest: "/etc/apt/sources.list.d/ansible.list"
+    #     owner: root
+    #     group: root
+    #     mode: u=r,g=r,o=r
+
+    - name: Install modern ansible
+      apt:
+        name: ansible
+        state: latest
+        update_cache: yes
+        autoremove: yes
+
     - name: Disable dnsmasq
       service:
         name: dnsmasq
@@ -200,60 +219,8 @@
         state: directory
         mode: "0755"
 
-    - name: Install python3-setuptools and venv support
-      apt:
-        name: ["python3-dev", "python3-venv"]
-        state: latest
-
-    - name: Test if we have any pip3
-      shell: pip3 help
-      ignore_errors: True
-      register: has_pip
-
-    - name: Install python3-pip
-      apt:
-        name: python3-pip
-        state: latest
-      when: has_pip is failed
-
-    - name: pip3 self-upgrade
-      command: pip3 install -U pip
-
-    - name: Remove python3-pip
-      apt:
-        name: python3-pip
-        state: absent
-
-    - name: Copy local shakenfist wheel if the installation source is a file
-      copy:
-        src: "{{remote_package}}"
-        dest: "/tmp/{{remote_package | basename}}"
-        owner: root
-        mode: u=r,g=r,o=r
-      when: remote_source == "file"
-
-    - name: Check if we have a venv already
-      stat:
-        path: /srv/shakenfist/venv
-      register: venv
-
-    - name: Create venv
-      command: python3 -m venv --system-site-packages /srv/shakenfist/venv
-      when: not venv.stat.exists
-
-    - name: Update setuptools
-      shell: /srv/shakenfist/venv/bin/pip install -U setuptools wheel
-
     - name: Install gunicorn
       shell: /srv/shakenfist/venv/bin/pip install -U gunicorn
-
-    - name: Install shakenfist if it is a local file
-      command: /srv/shakenfist/venv/bin/pip install "/tmp/{{remote_package | basename}}"
-      when: remote_source == "file" and cloud != "localhost"
-
-    - name: Install shakenfist when it is a pypi package
-      command: /srv/shakenfist/venv/bin/pip install "{{remote_package}}"
-      when: remote_source == "pip" and cloud != "localhost"
 
 - hosts: localhost
   any_errors_fatal: true
@@ -615,13 +582,18 @@
         enabled: yes
         state: restarted
 
+    - name: Install apache2
+      apt:
+        name: apache2
+        state: latest
+
     - name: Enable proxy modules for apache
       shell: a2enmod proxy proxy_http lbmethod_byrequests
 
     - name: Write apache site
       template:
         src: files/apache-site-primary.conf
-        dest: /etc/apache2/sites-enabled/000-default.conf
+        dest: /etc/apache2/sites-available/sf-example.conf
         owner: root
         group: root
         mode: u=r,g=r,o=r
@@ -720,6 +692,11 @@
         enabled: yes
         state: restarted
         daemon_reload: yes
+
+    - name: Install apache2
+      apt:
+        name: apache2
+        state: latest
 
     - name: Write apache site
       template:

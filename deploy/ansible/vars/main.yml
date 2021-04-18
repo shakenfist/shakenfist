@@ -2,8 +2,6 @@
 # Defaults are Ubuntu specific
 shakenfist_deps:
   - ack
-  - ansible
-  - apache2
   - arping
   - bridge-utils
   - cpu-checker
@@ -18,6 +16,7 @@ shakenfist_deps:
   - prometheus-node-exporter
   - pwgen
   - python3-libvirt
+  - python3-venv
   - qemu-kvm
   - rsync
   - telnet
