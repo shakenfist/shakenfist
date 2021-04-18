@@ -75,15 +75,23 @@ The specification is composed of a series of key-value pairs. Valid keys are: si
 Similarly, networks have a "short network specification", where you can specify the UUID of a network, but also optionally the IP address to use for the interface. You can also have more than one network interface, so this is valid:
 
 ```bash
-sf-client instance create "myinstance" 1 2048 -d 8@cirros -n netuuid1@192.168.1.2 \
+sf-client instance create "myinstance" 1 2048 -d 8@cirros -n netuuid1 \
     -n netuuid2@10.0.0.4
+```
+
+There is also a shorthand "short network specification" which implies immediately floating the interface. The details are the same as -n, except the flag is -f:
+
+```bash
+sf-client instance create "myinstance" 1 2048 -d 8@cirros -f netuuid1
 ```
 
 There is a "detailed network specification" as well, which is composed of the following keys:
 
 * _network_uuid_ is the UUID of the network to use.
-* _address_ is the IPv4 network address to use, if free. If its not free the instance will fail to start.
+* _address_ is the IPv4 network address to use, if free. If its not free the instance will fail to start. If you don't want an address on this interface, use "none" as the value for address. If you do not specify any value for address, an address on the network will be assigned to you.
 * _macaddress_ the mac address to use for the interface.
+* _model_ is the model of the network device, with options being ne2k_isa, i82551, i82557b, i82559er, ne2k_pci, pcnet, rtl8139, e1000, and virtio. The default model is virtio.
+* _float_ if true indicates to immediately float the interface once the instance is created.
 
 # Missing documentation
 
