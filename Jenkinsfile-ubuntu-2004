@@ -4,20 +4,48 @@ pipeline {
   stages {
     stage('Build infra') {
       steps {
-        sh '''  if [ -e .git ]
+        sh '''  mkdir -p $WORKSPACE/$BUILD_TAG
+
+                if [ -e .git ]
                 then
                   echo "Detected existing git checkout."
-                  SOURCE_PATH="$WORKSPACE"
-                else
-                  echo "Performing git checkout."
-                  mkdir $BUILD_TAG
-                  cd $BUILD_TAG
+                  git remote -v
+
+                  if [ "https://github.com/shakenfist/shakenfist" == "https://github.com/shakenfist/shakenfist" ]
+                  then
+                    mkdir $WORKSPACE/$BUILD_TAG/shakenfist
+                    ls -A | grep -v $BUILD_TAG | xargs -t -I '__' mv __ $WORKSPACE/$BUILD_TAG/shakenfist/
+                  elif [ "https://github.com/shakenfist/shakenfist" == "https://github.com/shakenfist/client-python" ]
+                  then
+                    mkdir $WORKSPACE/$BUILD_TAG/client-python
+                    ls -A | grep -v $BUILD_TAG | xargs -t -I '__' mv __ $WORKSPACE/$BUILD_TAG/client-python/
+                  else
+                    echo "Unknown github_url!"
+                    exit 1
+                  fi
+                fi
+
+                if [ ! -e $WORKSPACE/$BUILD_TAG/shakenfist ]
+                then
+                  echo "Performing shakenfist git checkout."
+                  cd $WORKSPACE/$BUILD_TAG
                   git clone https://github.com/shakenfist/shakenfist
                   cd shakenfist
                   git checkout
-                  SOURCE_PATH="$WORKSPACE/$BUILD_TAG/shakenfist"
                 fi
 
+                if [ ! -e $WORKSPACE/$BUILD_TAG/client-python ]
+                then
+                  echo "Performing client-python git checkout."
+                  cd $WORKSPACE/$BUILD_TAG
+                  git clone https://github.com/shakenfist/client-python
+                  cd client-python
+                  git checkout master
+                fi
+
+                SOURCE_PATH="$WORKSPACE/$BUILD_TAG"
+
+                cd $SOURCE_PATH/shakenfist
                 . /home/jenkins/sf-ci
                 ansible-playbook -i /home/jenkins/hosts \
                     --extra-vars "identifier=$BUILD_TAG source_path=$SOURCE_PATH base_image=https://sfcbr.shakenfist.com/static/ubuntu2004-ci-template.qcow2 base_image_user=ubuntu" \
@@ -36,8 +64,8 @@ pipeline {
     stage('Run CI tests on primary') {
       steps {
         sh '''  . $WORKSPACE/$BUILD_TAG/ci-environment.sh
-                scp -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                    -rp $source_path ubuntu@$primary:shakenfist
+                scp -rp -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                    $source_path/shakenfist ubuntu@$primary:shakenfist
                 ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
                     ubuntu@$primary "cd shakenfist/deploy; tox -epy3"
            '''
@@ -91,7 +119,7 @@ pipeline {
                   ubuntu@$primary sudo cat /var/log/syslog
 
               echo "=============================="
-              rm -rf $BUILD_TAG
+              rm -rf $WORKSPACE/$BUILD_TAG
 
               if [ -e $source_path/keepme ]
               then
