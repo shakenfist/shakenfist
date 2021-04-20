@@ -5,7 +5,7 @@
   connection: ssh
   vars:
     identifier: unknown
-    source_path: "/home/jenkins/src/shakenfist/shakenfist"
+    source_path: "/home/jenkins/src/shakenfist/"
     base_image: "https://sfcbr.shakenfist.com/static/ubuntu2004-ci-template.qcow2"
     base_image_user: "ubuntu"
 
@@ -155,7 +155,7 @@
   gather_facts: yes
   become: true
   vars:
-    source_path: "/home/jenkins/src/shakenfist/shakenfist"
+    source_path: "/home/jenkins/src/shakenfist/"
 
   tasks:
     - name: Use CI package cache to speed things up
@@ -229,23 +229,20 @@
     - name: Make Shaken Fist venv
       shell: python3 -m venv --system-site-packages /srv/shakenfist/venv
 
-    - name: Install Shaken Fist client
-      shell: /srv/shakenfist/venv/bin/pip install shakenfist_client
-
 - hosts: localhost
   gather_facts: yes
   vars:
-    source_path: "/home/jenkins/src/shakenfist/shakenfist"
+    source_path: "/home/jenkins/src/shakenfist/"
 
   tasks:
     - name: Remove old deploy tarball
       file:
-        path: "{{source_path}}/deploy.tgz"
+        path: "{{source_path}}/shakenfist/deploy.tgz"
         state: absent
 
     - name: Remove old docs tarball
       file:
-        path: "{{source_path}}/docs.tgz"
+        path: "{{source_path}}/shakenfist/docs.tgz"
         state: absent
 
     - name: Build Shaken Fist wheel
@@ -255,34 +252,54 @@
         rm dist/*
         python3 setup.py sdist bdist_wheel
       args:
-        chdir: "{{source_path}}"
+        chdir: "{{source_path}}/shakenfist"
 
     - name: Determine wheel filename
       shell: ls dist | egrep "shakenfist.*\.whl"
       args:
-        chdir: "{{source_path}}"
-      register: wheel_file_complex
+        chdir: "{{source_path}}/shakenfist"
+      register: server_wheel_file_complex
 
     - name: Extract the wheel filename
       set_fact:
-        wheel_file: "{{wheel_file_complex.stdout}}"
+        server_wheel_file: "{{server_wheel_file_complex.stdout}}"
 
     - debug:
-        msg: "{{wheel_file}}"
+        msg: "Server wheel file: {{server_wheel_file}}"
+
+    - name: Build Shaken Fist client wheel
+      shell: |
+        rm dist/*
+        python3 setup.py sdist bdist_wheel
+      args:
+        chdir: "{{source_path}}/client-python"
+
+    - name: Determine wheel filename
+      shell: ls dist | egrep "shakenfist_client.*\.whl"
+      args:
+        chdir: "{{source_path}}/client-python"
+      register: client_wheel_file_complex
+
+    - name: Extract the wheel filename
+      set_fact:
+        client_wheel_file: "{{client_wheel_file_complex.stdout}}"
+
+    - debug:
+        msg: "Client wheel file: {{client_wheel_file}}"
 
 - hosts: sfall
   gather_facts: yes
   become: true
   vars:
-    source_path: "/home/jenkins/src/shakenfist/shakenfist"
+    source_path: "/home/jenkins/src/shakenfist/"
 
   tasks:
-    - name: Copy wheel file
+    - name: Copy server wheel file
       copy:
-        src: "{{source_path}}/dist/{{hostvars['localhost']['wheel_file']}}"
-        dest: "/tmp/{{hostvars['localhost']['wheel_file']}}"
+        src: "{{source_path}}/shakenfist/dist/{{hostvars['localhost']['server_wheel_file']}}"
+        dest: "/tmp/{{hostvars['localhost']['server_wheel_file']}}"
 
-    - name: Make venv and install wheel
+    - name: Make venv and install server wheel
       shell: |
         python3 -m venv --system-site-packages /srv/shakenfist/venv
         /srv/shakenfist/venv/bin/pip install /tmp/shakenfist*whl
@@ -291,10 +308,19 @@
   gather_facts: yes
   become: true
   vars:
-    source_path: "/home/jenkins/src/shakenfist/shakenfist"
+    source_path: "/home/jenkins/src/shakenfist/"
     base_image_user: "ubuntu"
 
   tasks:
+    - name: Copy client wheel file
+      copy:
+        src: "{{source_path}}/client-python/dist/{{hostvars['localhost']['client_wheel_file']}}"
+        dest: "/tmp/{{hostvars['localhost']['client_wheel_file']}}"
+
+    - name: Make venv and install client wheel
+      shell: |
+        /srv/shakenfist/venv/bin/pip install /tmp/shakenfist_client*whl
+
     - name: Copy install configuration to primary node
       copy:
         content: |
