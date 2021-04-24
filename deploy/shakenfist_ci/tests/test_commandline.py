@@ -27,8 +27,9 @@ class TestCommandLine(base.BaseNamespacedTestCase):
         super(TestCommandLine, self).__init__(*args, **kwargs)
 
     def _exec_client(self, cmd):
-        return _exec('sf-client --namespace %s --key %s %s'
-                     % (self.namespace, self.namespace_key, cmd))
+        return _exec('sf-client --apiurl %s --namespace %s --key %s %s'
+                     % (self.test_client.base_url, self.namespace,
+                        self.namespace_key, cmd))
 
     def test_network_commands(self):
         # An invalid netblock
