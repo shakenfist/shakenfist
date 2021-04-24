@@ -3,6 +3,10 @@
 # matters. We need to verify auth before anything, and we need to fetch things  #
 # from the database before we make decisions based on those things. So remember #
 # the outer decorator is executed first!                                        #
+#                                                                               #
+# Additionally, you should use suppress_traceback=True in calls to error()      #
+# which exist inside an expected exception block, otherwise we'll log a stray   #
+# traceback.                                                                    #
 #################################################################################
 
 import base64
@@ -138,7 +142,7 @@ def generic_wrapper(func):
             return func(*args, **kwargs)
 
         except TypeError as e:
-            return error(400, str(e))
+            return error(400, str(e), suppress_traceback=True)
 
         except DecodeError:
             # Send a more informative message than 'Not enough segments'
@@ -158,7 +162,8 @@ def generic_wrapper(func):
 
         except Exception as e:
             LOG.exception('Server error')
-            return error(500, 'server error: %s' % repr(e))
+            return error(500, 'server error: %s' % repr(e),
+                         suppress_traceback=True)
 
     return wrapper
 
@@ -824,13 +829,13 @@ class Instances(Resource):
             instance.add_event('schedule', 'failed', None,
                                'Insufficient resources: ' + str(e))
             instance.enqueue_delete_due_error('scheduling failed')
-            return error(507, str(e))
+            return error(507, str(e), suppress_traceback=True)
 
         except exceptions.CandidateNodeNotFoundException as e:
             instance.add_event('schedule', 'failed', None,
                                'Candidate node not found: ' + str(e))
             instance.enqueue_delete_due_error('scheduling failed')
-            return error(404, 'node not found: %s' % e)
+            return error(404, 'node not found: %s' % e, suppress_traceback=True)
 
         # Record placement
         instance.place_instance(placement)
@@ -1286,7 +1291,8 @@ class Networks(Resource):
             if n.num_addresses < 8:
                 return error(400, 'network is below minimum size of /29')
         except ValueError as e:
-            return error(400, 'cannot parse netblock: %s' % e)
+            return error(400, 'cannot parse netblock: %s' % e,
+                         suppress_traceback=True)
 
         if not namespace:
             namespace = get_jwt_identity()

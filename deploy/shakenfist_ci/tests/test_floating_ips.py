@@ -51,6 +51,14 @@ echo 'Floating IPs work!' > /var/www/html/index.html
         # changed as it started up
         inst = self.test_client.get_instance(inst['uuid'])
 
+        # Wait for boot and cloud-init
+        time.sleep(120)
+
+        console = base.LoggingSocket(inst['node'], inst['console_port'])
+        out = console.execute('cat /var/www/html/index.html')
+        if not out.find('Floating IPs work!'):
+            self.fail('User data script did not run!\n\n%s' % out)
+
         ifaces = self.test_client.get_instance_interfaces(inst['uuid'])
         self.test_client.float_interface(ifaces[0]['uuid'])
 
