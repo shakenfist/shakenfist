@@ -1,5 +1,8 @@
 pipeline {
   agent any
+  options {
+    timeout(time: 1, unit: 'HOURS')
+  }
 
   stages {
     stage('Build infra') {
@@ -113,6 +116,14 @@ pipeline {
     always {
       sh '''  . /home/jenkins/sf-ci
               . $WORKSPACE/$BUILD_TAG/ci-environment.sh
+
+              echo "=============================="
+              ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                  ubuntu@$primary sudo cat /etc/sf/sfrc
+
+              echo "=============================="
+              ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                  ubuntu@$primary sudo cat /etc/sf/shakenfist.json
 
               echo "=============================="
               ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
