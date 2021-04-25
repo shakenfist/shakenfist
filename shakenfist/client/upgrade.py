@@ -354,6 +354,25 @@ def main():
                 })
                 print('--> Upgraded node %s to version 2' % old_name)
 
+    # Handle image format v3
+    for data, metadata in etcd_client.get_prefix('/sf/image/'):
+        image_node = '/'.join(
+            metadata['key'].decode('utf-8').split('/')[-2:])
+        image = json.loads(data.decode('utf-8'))
+
+        if image['version'] == 2:
+            csdata = etcd_client.get(
+                '/sf/attribute/image/%s/latest_checksum' % image_node)
+            cs = json.loads(csdata.decode('utf-8'))
+
+            cs['checksum_type'] = 'md5'
+            etcd_client.put('/sf/attribute/image/%s/latest_checksum' % image_node,
+                            json.dumps(cs, indent=4, sort_keys=True))
+
+            image['version'] = 3
+            etcd_client.put('/sf/image/%s' % image_node,
+                            json.dumps(image, indent=4, sort_keys=True))
+
 
 if __name__ == '__main__':
     main()

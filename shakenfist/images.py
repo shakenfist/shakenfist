@@ -25,7 +25,7 @@ LOG, _ = logutil.setup(__name__)
 
 class Image(dbo):
     object_type = 'image'
-    current_version = 2
+    current_version = 3
     state_targets = {
         None: (dbo.STATE_INITIAL, dbo.STATE_CREATING),
         dbo.STATE_INITIAL: (dbo.STATE_CREATING, dbo.STATE_DELETED, dbo.STATE_ERROR),
@@ -59,10 +59,12 @@ class Image(dbo):
         self.__node = static_values['node']
 
     @classmethod
-    def new(cls, url, checksum=None):
+    def new(cls, url, checksum=None, checksum_type=None):
         # Handle URL shortcut with built-in resolvers
-        url, resolver_checksum = image_resolver.resolve(url)
+        url, resolver_checksum_type, resolver_checksum = image_resolver.resolve(
+            url)
         if not checksum:
+            checksum_type = resolver_checksum_type
             checksum = resolver_checksum
 
         unique_ref = Image.calc_unique_ref(url)
@@ -77,7 +79,7 @@ class Image(dbo):
         # Check for existing metadata in DB
         i = Image.from_db(uuid)
         if i:
-            i.update_checksum(checksum)
+            i.update_checksum(checksum_type, checksum)
             return i
 
         Image._db_create(uuid, {
@@ -89,7 +91,7 @@ class Image(dbo):
         })
         i = Image.from_db(uuid)
         i.state = Image.STATE_INITIAL
-        i.update_checksum(checksum)
+        i.update_checksum(checksum_type, checksum)
         i.add_event('db record creation', None)
         return i
 
@@ -122,15 +124,21 @@ class Image(dbo):
     def checksum(self):
         checksum = self._db_get_attribute('latest_checksum')
         if not checksum:
-            return None
-        return checksum.get('checksum')
+            return None, None
+        return (checksum.get('checksum_type'), checksum.get('checksum'))
 
-    def update_checksum(self, checksum):
-        old_checksum = self.checksum
+    def update_checksum(self, checksum_type, checksum):
+        old_checksum_type, old_checksum = self.checksum
         if checksum and checksum != old_checksum:
-            self._db_set_attribute('latest_checksum', {'checksum': checksum})
+            self._db_set_attribute('latest_checksum',
+                                   {
+                                       'checksum': checksum,
+                                       'checksum_type': checksum_type
+                                   })
             self.add_event('checksum has changed',
-                           '%s -> %s' % (old_checksum, checksum))
+                           '%s:%s -> %s:%s'
+                           % (old_checksum_type, old_checksum,
+                              checksum_type, checksum))
 
     @property
     def latest_download_version(self):
@@ -170,7 +178,6 @@ class Image(dbo):
                 # We skip keys with no value
                 if d[key] is None:
                     continue
-
                 i[key] = d[key]
 
         d = self.latest_download_version
@@ -343,16 +350,28 @@ class Image(dbo):
         if not os.path.exists(image_name):
             return False
 
-        # MD5 chosen because cirros 90% of the time has MD5SUMS available...
-        md5_hash = hashlib.md5()
+        checksum_type, stored_checksum = self.checksum
+
+        if checksum_type == 'md5':
+            hasher = hashlib.md5()
+        elif checksum_type == 'sha256':
+            hasher = hashlib.sha256()
+        elif not checksum_type:
+            log.with_field('checksum', 'missing').info(
+                'Skipping checksum validation')
+            return True
+        else:
+            raise exceptions.UnknownChecksumType(checksum_type)
+
         with open(image_name, 'rb') as f:
             for byte_block in iter(lambda: f.read(4096), b''):
-                md5_hash.update(byte_block)
-        calc = md5_hash.hexdigest()
-        log.with_field('calc', calc).debug('Calc from image download')
-
-        correct = calc == self.checksum
-        log.with_field('correct', correct).info('Image checksum verification')
+                hasher.update(byte_block)
+        calc = hasher.hexdigest()
+        log.with_field('checksum', calc).info('Checksum from image download')
+        log.with_field('checksum', stored_checksum).info(
+            'Checksum from database')
+        correct = stored_checksum == calc
+        log.with_field('checksum', correct).info('Is checksum correct?')
         return correct
 
     def resize(self, locks, size):

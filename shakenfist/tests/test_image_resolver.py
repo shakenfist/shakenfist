@@ -84,13 +84,13 @@ class ImageResolversTestCase(test_shakenfist.ShakenFistTestCase):
         u = cirros.resolve('cirros')
         self.assertEqual(
             ('http://download.cirros-cloud.net/0.5.1/cirros-0.5.1-x86_64-disk.img',
-             None),
+             None, None),
             u)
 
         u = cirros.resolve('cirros:0.3.4')
         self.assertEqual(
             ('http://download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img',
-             'ee1eca47dc88f4879d8a229cc70a07c6'),
+             'md5', 'ee1eca47dc88f4879d8a229cc70a07c6'),
             u)
 
         self.assertRaises(exceptions.VersionSpecificationError,
@@ -115,21 +115,21 @@ class ImageResolversTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertEqual(
             ('https://cloud-images.ubuntu.com/groovy/current/'
              'groovy-server-cloudimg-amd64.img',
-             '1c19b08060b9feb1cd0e7ee28fd463fb'),
+             'md5', '1c19b08060b9feb1cd0e7ee28fd463fb'),
             u)
 
         u = ubuntu.resolve('ubuntu:bionic')
         self.assertEqual(
             ('https://cloud-images.ubuntu.com/bionic/current/'
              'bionic-server-cloudimg-amd64.img',
-             'ed44b9745b8d62bcbbc180b5f36c24bb'),
+             'md5', 'ed44b9745b8d62bcbbc180b5f36c24bb'),
             u)
 
         u = ubuntu.resolve('ubuntu:18.04')
         self.assertEqual(
             ('https://cloud-images.ubuntu.com/bionic/current/'
              'bionic-server-cloudimg-amd64.img',
-             'ed44b9745b8d62bcbbc180b5f36c24bb'),
+             'md5', 'ed44b9745b8d62bcbbc180b5f36c24bb'),
             u)
 
         self.assertRaises(exceptions.VersionSpecificationError,
@@ -141,15 +141,15 @@ class ImageResolversTestCase(test_shakenfist.ShakenFistTestCase):
                           ubuntu.resolve, 'ubuntu')
 
     @mock.patch('shakenfist.image_resolver.cirros.resolve',
-                return_value=('!!!cirros!!!', '123abc'))
+                return_value=('!!!cirros!!!', 'md5', '123abc'))
     @mock.patch('shakenfist.image_resolver.ubuntu.resolve',
-                return_value=('!!!ubuntu!!!', '123abc'))
+                return_value=('!!!ubuntu!!!', 'md5', '123abc'))
     def test_resolve_image(self, mock_ubuntu, mock_centos):
-        self.assertEqual(('win10', None),
+        self.assertEqual(('win10', None, None),
                          image_resolver.resolve('win10'))
-        self.assertEqual(('http://example.com/image', None),
+        self.assertEqual(('http://example.com/image', None, None),
                          image_resolver.resolve('http://example.com/image'))
-        self.assertEqual(('!!!cirros!!!', '123abc'),
+        self.assertEqual(('!!!cirros!!!', 'md5', '123abc'),
                          image_resolver.resolve('cirros'))
-        self.assertEqual(('!!!ubuntu!!!', '123abc'),
+        self.assertEqual(('!!!ubuntu!!!', 'md5', '123abc'),
                          image_resolver.resolve('ubuntu'))

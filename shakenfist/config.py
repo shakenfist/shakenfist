@@ -143,6 +143,27 @@ class SFConfig(SFConfigBase):
         description='A URL listing all Cirros releases'
     )
 
+    LISTING_URL_CENTOS6: AnyHttpUrl = Field(
+        (
+            'https://cloud.centos.org/centos/6/images/'
+        ),
+        description='A URL listing all Centos 6 releases'
+    )
+
+    LISTING_URL_CENTOS7: AnyHttpUrl = Field(
+        (
+            'https://cloud.centos.org/centos/7/images/'
+        ),
+        description='A URL listing all Centos 7 releases'
+    )
+
+    LISTING_URL_CENTOS8: AnyHttpUrl = Field(
+        (
+            'https://cloud.centos.org/centos/8/x86_64/images/'
+        ),
+        description='A URL listing all Centos 8 releases'
+    )
+
     DOWNLOAD_URL_DEBIAN: AnyHttpUrl = Field(
         (
             'https://cloud.debian.org/images/cloud/OpenStack/current-%(vernum)s/'

@@ -88,6 +88,10 @@ class BadCheckSum(Exception):
     pass
 
 
+class UnknownChecksumType(Exception):
+    pass
+
+
 # Tasks
 class TaskException(Exception):
     pass

@@ -62,4 +62,7 @@ def resolve(name):
         'checksum': checksum
     }).info('Image resolved')
 
-    return (url, checksum if checksum else None)
+    if checksum:
+        return (url, 'md5', checksum)
+    else:
+        return (url, None, None)

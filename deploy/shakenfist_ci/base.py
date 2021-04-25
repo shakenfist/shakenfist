@@ -171,6 +171,8 @@ class BaseTestCase(testtools.TestCase):
     def _await_image_event(
             self, image_uuid, operation, message=None, after=None):
         start_time = time.time()
+        # TODO(mikal): reduce this back to 300 once we have a resolution to
+        # https://github.com/shakenfist/shakenfist/issues/780
         while time.time() - start_time < 900:
             for event in self.system_client.get_image_events(image_uuid):
                 if after and event['timestamp'] <= after:
