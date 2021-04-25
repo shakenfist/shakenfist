@@ -12,20 +12,13 @@ from shakenfist.config import config
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
-from shakenfist import image_resolver_cirros
-from shakenfist import image_resolver_ubuntu
+from shakenfist import image_resolver
 from shakenfist import logutil
 from shakenfist import util
 from shakenfist import virt
 
 
 LOG, _ = logutil.setup(__name__)
-
-
-resolvers = {
-    'cirros': image_resolver_cirros,
-    'ubuntu': image_resolver_ubuntu
-}
 
 
 class Image(baseobject.DatabaseBackedObject):
@@ -63,8 +56,8 @@ class Image(baseobject.DatabaseBackedObject):
 
     @classmethod
     def new(cls, url, checksum=None):
-        # Handle URL shortcut with built-in resolvers
-        url, resolver_checksum = Image._resolve(url)
+        # Handle URL shortcut with built-in , '
+        url, resolver_checksum = image_resolver.resolve(url)
         if not checksum:
             checksum = resolver_checksum
 
@@ -187,13 +180,6 @@ class Image(baseobject.DatabaseBackedObject):
         return i
 
     # Implementation
-    @staticmethod
-    def _resolve(url):
-        for resolver in resolvers:
-            if url.startswith(resolver):
-                return resolvers[resolver].resolve(url)
-        return url, None
-
     @staticmethod
     def calc_unique_ref(url):
         """Calc unique reference for this image.

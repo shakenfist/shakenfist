@@ -4,10 +4,9 @@ import requests
 
 from shakenfist.config import config
 from shakenfist import exceptions
+from shakenfist.image_resolver import util as resolver_util
 from shakenfist import logutil
 from shakenfist import util
-
-CIRROS_URL = 'http://download.cirros-cloud.net/'
 
 
 LOG, _ = logutil.setup(__name__)
@@ -15,14 +14,14 @@ LOG, _ = logutil.setup(__name__)
 
 def resolve(name):
     # Name is assumed to be in the form cirros or cirros:0.4.0
-    resp = requests.get(CIRROS_URL,
-                        headers={'User-Agent': util.get_user_agent()})
-    if resp.status_code != 200:
-        raise exceptions.HTTPError(
-            'Failed to fetch http://download.cirros-cloud.net/, '
-            'status code %d' % resp.status_code)
-
     if name == 'cirros':
+        resp = requests.get(config.get('LISTING_URL_CIRROS'),
+                            headers={'User-Agent': util.get_user_agent()})
+        if resp.status_code != 200:
+            raise exceptions.HTTPError(
+                'Failed to fetch %s, status code %d'
+                % (config.get('LISTING_URL_CIRROS'), resp.status_code))
+
         versions = []
         dir_re = re.compile(r'.*<a href="([0-9]+\.[0-9]+\.[0-9]+)/">.*/</a>.*')
         for line in resp.text.split('\n'):
@@ -40,12 +39,16 @@ def resolve(name):
 
     url = config.get('DOWNLOAD_URL_CIRROS') % {'vernum': vernum}
 
-    checksum_url = CIRROS_URL + '/' + vernum + '/MD5SUMS'
-    checksums = util.fetch_remote_checksum(checksum_url)
+    checksum_url = config.get('CHECKSUM_URL_CIRROS') % {'vernum': vernum}
+    checksums = resolver_util.fetch_remote_checksum(checksum_url)
     checksum = checksums.get(os.path.basename(url))
     LOG.with_fields({
         'name': name,
         'url': url,
         'checksum': checksum
     }).info('Image resolved')
-    return (url, checksum)
+
+    if checksum:
+        return (url, checksum)
+    else:
+        return (url, None)
