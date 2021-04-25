@@ -31,7 +31,6 @@ from jwt.exceptions import DecodeError, PyJWTError
 import re
 import requests
 import sys
-import time
 import traceback
 import uuid
 
@@ -637,15 +636,6 @@ class Instance(Resource):
 
         instance_from_db.enqueue_delete_remote(node)
 
-        start_time = time.time()
-        while time.time() - start_time < config.get('API_ASYNC_WAIT'):
-            if instance_from_db.state.value in ['deleted', 'error']:
-                return
-
-            time.sleep(0.5)
-
-        return
-
 
 def _assign_floating_ip(interface_uuid):
     float_net = net.Network.from_db('floating')
@@ -851,14 +841,6 @@ class Instances(Resource):
         # Enqueue creation tasks on desired node task queue
         db.enqueue(placement, {'tasks': tasks})
         instance.add_event('create', 'enqueued', None, None)
-
-        # Watch for a while and return results if things are fast, give up
-        # after a while and just return the current state
-        start_time = time.time()
-        while time.time() - start_time < config.get('API_ASYNC_WAIT'):
-            if instance.state.value in ['created', 'deleted', 'error']:
-                return instance.external_view()
-            time.sleep(0.5)
         return instance.external_view()
 
     @jwt_required
@@ -893,29 +875,12 @@ class Instances(Resource):
 
             tasks_by_node.setdefault(node, [])
             tasks_by_node[node].append(DeleteInstanceTask(instance.uuid))
-            waiting_for.append(instance)
+            waiting_for.append(instance.uuid)
 
         for node in tasks_by_node:
             db.enqueue(node, {'tasks': tasks_by_node[node]})
 
-        start_time = time.time()
-        while (waiting_for and
-               (time.time() - start_time < config.get('API_ASYNC_WAIT'))):
-            for instance in copy.copy(waiting_for):
-                s = instance.state.value
-                if s in ['deleted', 'error']:
-                    waiting_for.remove(instance)
-                else:
-                    LOG.with_instance(instance).info(
-                        'Still waiting for deletion (state is %s)' % s)
-
-            if waiting_for:
-                time.sleep(0.2)
-
-        retval = []
-        for instance in waiting_for:
-            retval.append(instance.uuid)
-        return retval
+        return waiting_for
 
 
 class InstanceInterfaces(Resource):
@@ -1198,10 +1163,11 @@ class Images(Resource):
         # We ensure that the image exists in the database in an initial state
         # here so that it will show up in image list requests. The image is
         # fetched by the queued job later.
-        images.Image.new(url)
+        img = images.Image.new(url)
         db.enqueue(config.NODE_NAME, {
             'tasks': [FetchImageTask(url)],
         })
+        return img
 
 
 class ImageEvents(Resource):

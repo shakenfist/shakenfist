@@ -764,19 +764,15 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                     FakeInstance(
                         namespace='system',
                         uuid='6a973b82-31b3-4780-93e4-04d99ae49f3f',
-                        state=['created', 'deleted']),
+                        state=['created']),
                     FakeInstance(
                         namespace='system',
                         uuid='847b0327-9b17-4148-b4ed-be72b6722c17',
-                        state=['created', 'deleted'])])
-    @mock.patch('shakenfist.virt.Instance._db_get',
-                return_value={
-                    'state': 'deleted',
-                },)
+                        state=['created'])])
     @mock.patch('shakenfist.etcd.put')
     @mock.patch('shakenfist.db.get_lock')
     def test_delete_all_instances(
-            self, mock_db_get_lock, mock_etcd_put, mock_get_instance,
+            self, mock_db_get_lock, mock_etcd_put,
             mock_get_instances, mock_enqueue):
 
         resp = self.client.delete('/instances',
@@ -785,34 +781,9 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                                       'confirm': True,
                                       'namespace': 'foo'
                                   }))
-        self.assertEqual([], resp.get_json())
-        self.assertEqual(200, resp.status_code)
-
-    @mock.patch('time.sleep')
-    @mock.patch('shakenfist.db.enqueue')
-    @mock.patch('shakenfist.virt.Instances',
-                return_value=[
-                    FakeInstance(
-                        namespace='system',
-                        uuid='6a973b82-31b3-4780-93e4-04d99ae49f3f',
-                        state=['created', 'deleted']),
-                    FakeInstance(
-                        namespace='system',
-                        uuid='847b0327-9b17-4148-b4ed-be72b6722c17',
-                        state='deleted')])
-    @mock.patch('shakenfist.etcd.put')
-    @mock.patch('shakenfist.db.get_lock')
-    def test_delete_all_instances_one_already_deleted(
-            self, mock_db_get_lock,  mock_etcd_put, mock_get_instances,
-            mock_enqueue, mock_sleep):
-
-        resp = self.client.delete('/instances',
-                                  headers={'Authorization': self.auth_header},
-                                  data=json.dumps({
-                                      'confirm': True,
-                                      'namespace': 'foo'
-                                  }))
-        self.assertEqual([], resp.get_json())
+        self.assertEqual(['6a973b82-31b3-4780-93e4-04d99ae49f3f',
+                          '847b0327-9b17-4148-b4ed-be72b6722c17'],
+                         resp.get_json())
         self.assertEqual(200, resp.status_code)
 
     def test_post_instance_no_disk(self):
