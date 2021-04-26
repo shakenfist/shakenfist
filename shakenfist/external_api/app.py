@@ -1167,7 +1167,7 @@ class Images(Resource):
         db.enqueue(config.NODE_NAME, {
             'tasks': [FetchImageTask(url)],
         })
-        return img
+        return img.external_view()
 
 
 class ImageEvents(Resource):
