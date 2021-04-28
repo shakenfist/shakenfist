@@ -14,6 +14,11 @@ class ObjectException(Exception):
 class InvalidStateException(ObjectException):
     pass
 
+
+class NoStateTransitionsDefined(ObjectException):
+    pass
+
+
 # Instance
 
 
