@@ -72,6 +72,7 @@ class FakeConfig(SFConfigBase):
         '%(vername)s-server-cloudimg-amd64.img')
 
     GLUSTER_ENABLED = False
+    HTTP_PROXY_SERVER = ''
 
 
 fake_config = FakeConfig()
