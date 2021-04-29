@@ -51,7 +51,6 @@ class DatabaseBackedObject(object):
         # been done as part of the upgrade process.
         o = etcd.get(cls.object_type, None, object_uuid)
         if not o:
-            LOG.with_field(cls.object_type, object_uuid).info('Object missing')
             return None
 
         if o.get('version', 0) != cls.current_version:
