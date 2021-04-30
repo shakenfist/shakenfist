@@ -600,7 +600,7 @@ class Instance(dbo):
                           rr_name='latest',
                           joliet_path='/openstack/latest')
 
-        # meta_data.json
+        # meta_data.json -- note that limits on hostname are imposted at the API layer
         md = json.dumps({
             'random_seed': base64.b64encode(os.urandom(512)).decode('ascii'),
             'uuid': self.uuid,

@@ -681,8 +681,10 @@ class Instances(Resource):
         global SCHEDULER
 
         # Check that the instance name is safe for use as a DNS host name
-        if name != re.sub(r'([^a-zA-Z0-9_\-])', '', name) or len(name) > 63:
-            return error(400, 'instance name must be useable as a DNS host name')
+        if name != re.sub(r'([^a-zA-Z0-9\-])', '', name) or len(name) > 63:
+            return error(400, ('instance name %s is not useable as a DNS and Linux host name. '
+                               'That is, less than 63 characters and in the character set: '
+                               'a-z, A-Z, 0-9, or hyphen (-).' % name))
 
         # If we are placed, make sure that node exists
         if placed_on:
