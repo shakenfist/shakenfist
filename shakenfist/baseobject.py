@@ -99,6 +99,9 @@ class DatabaseBackedObject(object):
         with self.get_lock_attr('state', 'State update'):
             orig = self.state
 
+            if orig.value == new_value:
+                return
+
             # Ensure state change is valid
             if not self.state_targets:
                 raise exceptions.NoStateTransitionsDefined(
