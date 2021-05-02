@@ -594,7 +594,9 @@ class FakeConfigTmpFile(SFConfigBase):
 
 class FakeHeaders(object):
     def __init__(self, headers):
-        self.headers = headers
+        self.headers = {'Content-Length': '1000000'}
+        if headers:
+            self.headers.update(headers)
 
     def get(self, header):
         return self.headers.get(header)
