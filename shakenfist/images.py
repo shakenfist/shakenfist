@@ -282,8 +282,13 @@ class Image(baseobject.DatabaseBackedObject):
         return actual_image
 
     def _open_connection(self):
+        proxies = {}
+        if config.get('HTTP_PROXY_SERVER'):
+            proxies['http'] = config.get('HTTP_PROXY_SERVER')
+
         resp = requests.get(self.url, allow_redirects=True, stream=True,
-                            headers={'User-Agent': util.get_user_agent()})
+                            headers={'User-Agent': util.get_user_agent()},
+                            proxies=proxies)
         if resp.status_code != 200:
             raise exceptions.HTTPError(
                 'Failed to fetch HEAD of %s (status code %d)'

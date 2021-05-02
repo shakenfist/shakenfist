@@ -194,6 +194,7 @@ DEPLOY_NAME="sf"
 RESTORE_BACKUP="${RESTORE_BACKUP:-}"
 IGNORE_MTU="${IGNORE_MTU:-0}"
 DNS_SERVER="${DNS_SERVER:-8.8.8.8}"
+HTTP_PROXY="${HTTP_PROXY:-}"
 
 # Setup variables for consumption by ansible and terraform
 cwd=`pwd`
@@ -210,6 +211,7 @@ VARIABLES="$VARIABLES,deploy_name=$DEPLOY_NAME"
 VARIABLES="$VARIABLES,restore_backup=\"$RESTORE_BACKUP\""
 VARIABLES="$VARIABLES,ignore_mtu=\"$IGNORE_MTU\""
 VARIABLES="$VARIABLES,dns_server=\"$DNS_SERVER\""
+VARIABLES="$VARIABLES,http_proxy=\"$HTTP_PROXY\""
 
 echo "VARIABLES: $VARIABLES"
 ANSIBLE_VARS=""

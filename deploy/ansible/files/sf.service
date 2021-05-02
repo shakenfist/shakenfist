@@ -21,6 +21,10 @@ Environment=SHAKENFIST_RAM_SYSTEM_RESERVATION={{hostvars['localhost']['ram_syste
 Environment=SHAKENFIST_MAX_HYPERVISOR_MTU={{hostvars['localhost']['lowest_mtu']}}
 Environment=SHAKENFIST_DNS_SERVER="{{dns_server}}"
 
+{% if http_proxy != '' %}
+Environment=SHAKENFIST_HTTP_PROXY_SERVER="{{http_proxy}}"
+{% endif %}
+
 # Whether we have a local cloud image mirror is controlled by the
 # HAS_MIRROR ansible variable. Define HAS_MIRROR with any value to use
 # a local mirror, otherwise leave the variable undefined.

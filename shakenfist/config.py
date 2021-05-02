@@ -101,6 +101,10 @@ class SFConfig(SFConfigBase):
         '8.8.8.8',
         description='The DNS server to pass to instances via DHCP.'
     )
+    HTTP_PROXY_SERVER: str = Field(
+        '',
+        description='The URL to an option HTTP proxy used for image downloads.'
+    )
     MAX_HYPERVISOR_MTU: int = Field(
         8000,
         description='Maximum network MTU our hypervisors can safely set.'

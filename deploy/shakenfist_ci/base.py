@@ -169,7 +169,7 @@ class BaseTestCase(testtools.TestCase):
     def _await_image_event(
             self, url, operation, message=None, after=None):
         start_time = time.time()
-        while time.time() - start_time < 300:
+        while time.time() - start_time < 900:
             for event in self.system_client.get_image_events(url):
                 if after and event['timestamp'] <= after:
                     continue
