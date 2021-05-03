@@ -2,14 +2,11 @@
 import os
 import requests
 
+from shakenfist.config import config
 from shakenfist import exceptions
+from shakenfist.image_resolver import util as resolver_util
 from shakenfist import logutil
 from shakenfist import util
-
-DEBIAN_URL = ('https://cloud.debian.org/images/cloud/OpenStack/current-%(version)s/'
-              'debian-%(version)s-openstack-amd64.qcow2')
-CHECKSUM_URL = 'https://cloud.debian.org/images/cloud/OpenStack/current-%(version)s/MD5SUMS'
-
 
 LOG, _ = logutil.setup(__name__)
 
@@ -23,8 +20,8 @@ def resolve(name):
             raise exceptions.VersionSpecificationError(
                 'Cannot parse version: %s' % name)
 
-        url = DEBIAN_URL % {'version': vernum}
-        checksum_url = CHECKSUM_URL % {'version': vernum}
+        url = config.get('DOWNLOAD_URL_DEBIAN') % {'vernum': vernum}
+        checksum_url = config.get('CHECKSUM_URL_DEBIAN') % {'vernum': vernum}
         resp = requests.head(url,
                              headers={'User-Agent': util.get_user_agent()})
         if resp.status_code != 200:
@@ -34,7 +31,7 @@ def resolve(name):
     else:
         found_any = False
         for vernum in range(9, 20):
-            url = DEBIAN_URL % {'version': vernum}
+            url = config.get('DOWNLOAD_URL_DEBIAN') % {'vernum': vernum}
             resp = requests.head(url,
                                  headers={'User-Agent': util.get_user_agent()})
             if resp.status_code != 200:
@@ -44,14 +41,15 @@ def resolve(name):
             else:
                 found_any = True
 
-        url = DEBIAN_URL % {'version': vernum}
-        checksum_url = CHECKSUM_URL % {'version': vernum}
+        url = config.get('DOWNLOAD_URL_DEBIAN') % {'vernum': vernum}
+        checksum_url = config.get('CHECKSUM_URL_DEBIAN') % {'vernum': vernum}
 
-    checksums = util.fetch_remote_checksum(checksum_url)
+    checksums = resolver_util.fetch_remote_checksum(checksum_url)
     checksum = checksums.get(os.path.basename(url))
     LOG.with_fields({
         'name': name,
         'url': url,
         'checksum': checksum
     }).info('Image resolved')
-    return (url, checksum)
+
+    return (url, checksum if checksum else None)

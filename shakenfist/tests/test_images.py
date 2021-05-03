@@ -7,8 +7,6 @@ import shutil
 
 from shakenfist import exceptions
 from shakenfist import images
-from shakenfist import image_resolver_cirros
-from shakenfist import image_resolver_ubuntu
 from shakenfist import logutil
 from shakenfist.baseobject import State
 from shakenfist.tests import test_shakenfist
@@ -21,21 +19,6 @@ TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 
 with open('%s/files/qemu-img-info' % TEST_DIR) as f:
     QEMU_IMG_OUT = f.read()
-
-with open('%s/files/cirros-download' % TEST_DIR) as f:
-    CIRROS_DOWNLOAD_HTML = f.read()
-
-with open('%s/files/cirros-MD5SUMS-0.3.4' % TEST_DIR) as f:
-    CIRROS_MD5SUM_0_3_4 = f.read()
-
-with open('%s/files/ubuntu-MD5SUMS-bionic' % TEST_DIR) as f:
-    UBUNTU_MD5SUM_BIONIC = f.read()
-
-with open('%s/files/ubuntu-MD5SUMS-groovy' % TEST_DIR) as f:
-    UBUNTU_MD5SUM_GROOVY = f.read()
-
-with open('%s/files/ubuntu-download' % TEST_DIR) as f:
-    UBUNTU_DOWNLOAD_HTML = f.read()
 
 
 class FakeResponse(object):
@@ -122,86 +105,6 @@ class ImageUtilsTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertTrue(p.startswith('/a/b/c/image_cache'))
 
 
-class ImageResolversTestCase(test_shakenfist.ShakenFistTestCase):
-    def setUp(self):
-        super().setUp()
-
-        fake_config = FakeConfig()
-
-        self.config = mock.patch('shakenfist.config.config', fake_config)
-        self.mock_config = self.config.start()
-        self.addCleanup(self.config.stop)
-
-    @mock.patch('requests.get', side_effect=[
-        FakeResponse(200, CIRROS_DOWNLOAD_HTML),
-        FakeResponse(404, ''),  # Handle no file available
-        FakeResponse(200, CIRROS_DOWNLOAD_HTML),
-        FakeResponse(200, CIRROS_MD5SUM_0_3_4),
-        FakeResponse(200, CIRROS_DOWNLOAD_HTML),
-    ])
-    def test_resolve_cirros(self, mock_get):
-        u = image_resolver_cirros.resolve('cirros')
-        self.assertEqual(
-            ('http://download.cirros-cloud.net/0.5.1/cirros-0.5.1-x86_64-disk.img',
-             None),
-            u)
-
-        u = image_resolver_cirros.resolve('cirros:0.3.4')
-        self.assertEqual(
-            ('http://download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img',
-             'ee1eca47dc88f4879d8a229cc70a07c6'),
-            u)
-
-        self.assertRaises(exceptions.VersionSpecificationError,
-                          image_resolver_cirros.resolve, 'cirros***')
-
-    @mock.patch('requests.get', return_value=FakeResponse(404, None))
-    def test_resolve_cirros_error(self, mock_get):
-        self.assertRaises(exceptions.HTTPError,
-                          image_resolver_cirros.resolve, 'cirros')
-
-    @mock.patch('requests.get', side_effect=[
-        FakeResponse(200, UBUNTU_DOWNLOAD_HTML),
-        FakeResponse(200, UBUNTU_MD5SUM_GROOVY),
-        FakeResponse(200, UBUNTU_DOWNLOAD_HTML),
-        FakeResponse(200, UBUNTU_MD5SUM_BIONIC),
-        FakeResponse(200, UBUNTU_DOWNLOAD_HTML),
-        FakeResponse(200, UBUNTU_MD5SUM_BIONIC),
-        FakeResponse(200, UBUNTU_DOWNLOAD_HTML),
-    ])
-    @mock.patch('shakenfist.image_resolver_ubuntu.UBUNTU_URL',
-                'https://cloud-images.ubuntu.com')
-    def test_resolve_ubuntu(self, mock_get):
-        u = image_resolver_ubuntu.resolve('ubuntu')
-        self.assertEqual(
-            ('https://cloud-images.ubuntu.com/groovy/current/'
-             'groovy-server-cloudimg-amd64.img',
-             '1c19b08060b9feb1cd0e7ee28fd463fb'),
-            u)
-
-        u = image_resolver_ubuntu.resolve('ubuntu:bionic')
-        self.assertEqual(
-            ('https://cloud-images.ubuntu.com/bionic/current/'
-             'bionic-server-cloudimg-amd64.img',
-             'ed44b9745b8d62bcbbc180b5f36c24bb'),
-            u)
-
-        u = image_resolver_ubuntu.resolve('ubuntu:18.04')
-        self.assertEqual(
-            ('https://cloud-images.ubuntu.com/bionic/current/'
-             'bionic-server-cloudimg-amd64.img',
-             'ed44b9745b8d62bcbbc180b5f36c24bb'),
-            u)
-
-        self.assertRaises(exceptions.VersionSpecificationError,
-                          image_resolver_ubuntu.resolve, 'ubuntu***')
-
-    @mock.patch('requests.get', return_value=FakeResponse(404, None))
-    def test_resolve_ubuntu_error(self, mock_get):
-        self.assertRaises(exceptions.HTTPError,
-                          image_resolver_ubuntu.resolve, 'ubuntu')
-
-
 class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
@@ -220,20 +123,6 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
         self.put = mock.patch('shakenfist.etcd.put')
         self.mock_put = self.put.start()
         self.addCleanup(self.put.stop)
-
-    @mock.patch('shakenfist.image_resolver_cirros.resolve',
-                return_value=('!!!cirros!!!', '123abc'))
-    @mock.patch('shakenfist.image_resolver_ubuntu.resolve',
-                return_value=('!!!ubuntu!!!', '123abc'))
-    def test_resolve_image(self, mock_ubuntu, mock_centos):
-        self.assertEqual(('win10', None),
-                         images.Image._resolve('win10'))
-        self.assertEqual(('http://example.com/image', None),
-                         images.Image._resolve('http://example.com/image'))
-        self.assertEqual(('!!!cirros!!!', '123abc'),
-                         images.Image._resolve('cirros'))
-        self.assertEqual(('!!!ubuntu!!!', '123abc'),
-                         images.Image._resolve('ubuntu'))
 
     @mock.patch('shakenfist.etcd.get',
                 return_value={
@@ -705,7 +594,9 @@ class FakeConfigTmpFile(SFConfigBase):
 
 class FakeHeaders(object):
     def __init__(self, headers):
-        self.headers = headers
+        self.headers = {'Content-Length': '1000000'}
+        if headers:
+            self.headers.update(headers)
 
     def get(self, header):
         return self.headers.get(header)

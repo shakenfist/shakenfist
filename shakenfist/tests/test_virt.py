@@ -206,24 +206,6 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertTrue(time.time() - etcd_write[1][1].update_time < 3)
         self.assertEqual('preflight', etcd_write[1][1].value)
 
-    @mock.patch('shakenfist.virt.Instance.error',
-                new_callable=mock.PropertyMock)
-    @mock.patch('shakenfist.db.get_lock')
-    @mock.patch('shakenfist.virt.Instance._db_get_attribute',
-                side_effect=[
-                    {'value': None, 'update_time': 0},
-                    {'value': 'created', 'update_time': 1},
-                ])
-    @mock.patch('shakenfist.virt.Instance._db_set_attribute')
-    @mock.patch('shakenfist.etcd.put')
-    def test_set_state_duplicate(
-            self, mock_put, mock_attribute_set, mock_state_get, mock_lock,
-            mock_error):
-        i = self._make_instance()
-        with testtools.ExpectedException(exceptions.InvalidStateException):
-            i.state = 'created'
-        self.assertEqual(2, mock_attribute_set.call_count)
-
     @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.virt.Instance._db_get_attribute',
                 side_effect=[

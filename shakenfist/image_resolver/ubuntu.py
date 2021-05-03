@@ -4,24 +4,20 @@ import requests
 
 from shakenfist.config import config
 from shakenfist import exceptions
+from shakenfist.image_resolver import util as resolver_util
 from shakenfist import logutil
 from shakenfist import util
-
-# The official Ubuntu download URL 'https://cloud-images.ubuntu.com' is unreliable.
-# We try it first, but then try an alternative location on failure.
-UBUNTU_URL = 'https://cloud-images.ubuntu.com'
-
 
 LOG, _ = logutil.setup(__name__)
 
 
 def resolve(name):
     # Name is assumed to be in the form ubuntu, ubuntu:18.04, or ubuntu:bionic
-    resp = requests.get(UBUNTU_URL,
+    resp = requests.get(config.get('LISTING_URL_UBUNTU'),
                         headers={'User-Agent': util.get_user_agent()})
     if resp.status_code != 200:
         raise exceptions.HTTPError('Failed to fetch %s, status code %d'
-                                   % (UBUNTU_URL, resp.status_code))
+                                   % (config.get('LISTING_URL_UBUNTU'), resp.status_code))
 
     num_to_name = {}
     name_to_num = {}
@@ -56,12 +52,13 @@ def resolve(name):
     url = (config.get('DOWNLOAD_URL_UBUNTU') % {'vernum': vernum,
                                                 'vername': vername})
 
-    checksum_url = UBUNTU_URL + '/' + vername + '/current/MD5SUMS'
-    checksums = util.fetch_remote_checksum(checksum_url)
+    checksum_url = config.get('CHECKSUM_URL_UBUNTU') % {'vername': vername}
+    checksums = resolver_util.fetch_remote_checksum(checksum_url)
     checksum = checksums.get('*' + os.path.basename(url))
     LOG.with_fields({
         'name': name,
         'url': url,
         'checksum': checksum
     }).info('Image resolved')
-    return (url, checksum)
+
+    return (url, checksum if checksum else None)

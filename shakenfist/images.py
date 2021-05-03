@@ -12,20 +12,13 @@ from shakenfist.config import config
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
-from shakenfist import image_resolver_cirros
-from shakenfist import image_resolver_ubuntu
+from shakenfist import image_resolver
 from shakenfist import logutil
 from shakenfist import util
 from shakenfist import virt
 
 
 LOG, _ = logutil.setup(__name__)
-
-
-resolvers = {
-    'cirros': image_resolver_cirros,
-    'ubuntu': image_resolver_ubuntu
-}
 
 
 class Image(baseobject.DatabaseBackedObject):
@@ -64,7 +57,7 @@ class Image(baseobject.DatabaseBackedObject):
     @classmethod
     def new(cls, url, checksum=None):
         # Handle URL shortcut with built-in resolvers
-        url, resolver_checksum = Image._resolve(url)
+        url, resolver_checksum = image_resolver.resolve(url)
         if not checksum:
             checksum = resolver_checksum
 
@@ -188,13 +181,6 @@ class Image(baseobject.DatabaseBackedObject):
 
     # Implementation
     @staticmethod
-    def _resolve(url):
-        for resolver in resolvers:
-            if url.startswith(resolver):
-                return resolvers[resolver].resolve(url)
-        return url, None
-
-    @staticmethod
     def calc_unique_ref(url):
         """Calc unique reference for this image.
 
@@ -312,12 +298,20 @@ class Image(baseobject.DatabaseBackedObject):
     def _fetch(self, resp, locks=None):
         """Download the image if the latest version is not in the cache."""
         fetched = 0
+        total_size = int(resp.headers.get('Content-Length'))
+        previous_percentage = 0.0
 
         last_refresh = 0
         with open(self.version_image_path(inc=1), 'wb') as f:
             for chunk in resp.iter_content(chunk_size=8192):
                 fetched += len(chunk)
                 f.write(chunk)
+
+                percentage = fetched / total_size * 100.0
+                if (percentage - previous_percentage) > 10.0:
+                    self.log.with_field('bytes_fetched', fetched).info(
+                        'Fetch %.02f percent complete' % percentage)
+                    previous_percentage = percentage
 
                 if time.time() - last_refresh > 5:
                     db.refresh_locks(locks)

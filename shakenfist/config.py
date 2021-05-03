@@ -122,6 +122,62 @@ class SFConfig(SFConfigBase):
                     'due to failure to check in'
     )
 
+    # Image resolver options
+    DOWNLOAD_URL_CIRROS: AnyHttpUrl = Field(
+        (
+            'http://download.cirros-cloud.net/%(vernum)s/'
+            'cirros-%(vernum)s-x86_64-disk.img'
+        ),
+        description='Default download mirror for Cirros images'
+    )
+    CHECKSUM_URL_CIRROS: AnyHttpUrl = Field(
+        (
+            'http://download.cirros-cloud.net/%(vernum)s/MD5SUMS'
+        ),
+        description='Default checksum URL for Cirros images'
+    )
+    LISTING_URL_CIRROS: AnyHttpUrl = Field(
+        (
+            'http://download.cirros-cloud.net/'
+        ),
+        description='A URL listing all Cirros releases'
+    )
+
+    DOWNLOAD_URL_DEBIAN: AnyHttpUrl = Field(
+        (
+            'https://cloud.debian.org/images/cloud/OpenStack/current-%(vernum)s/'
+            'debian-%(vernum)s-openstack-amd64.qcow2'
+        ),
+        description='Default download mirror for Debian images'
+    )
+    CHECKSUM_URL_DEBIAN: AnyHttpUrl = Field(
+        (
+            'https://cloud.debian.org/images/cloud/OpenStack/'
+            'current-%(vernum)s/MD5SUMS'
+        ),
+        description='Default checksum URL for Debian images'
+    )
+
+    DOWNLOAD_URL_UBUNTU: AnyHttpUrl = Field(
+        (
+            'https://cloud-images.ubuntu.com/%(vername)s/current/'
+            '%(vername)s-server-cloudimg-amd64.img'
+        ),
+        description='Default download mirror for Ubuntu image'
+    )
+    CHECKSUM_URL_UBUNTU: AnyHttpUrl = Field(
+        (
+            'https://cloud-images.ubuntu.com/%(vername)s/current/MD5SUMS'
+        ),
+        description='Default checksum URL for Debian images'
+    )
+    LISTING_URL_UBUNTU: AnyHttpUrl = Field(
+        (
+            'https://cloud-images.ubuntu.com'
+        ),
+        description='A URL listing all Ubuntu releases'
+    )
+
     # Other options
     GLUSTER_ENABLED: bool = Field(
         False,
@@ -129,20 +185,6 @@ class SFConfig(SFConfigBase):
     )
     ZONE: str = Field(
         'shakenfist', description='What nova called an availability zone'
-    )
-    DOWNLOAD_URL_CIRROS: AnyHttpUrl = Field(
-        (
-            'http://download.cirros-cloud.net/%(vernum)s/'
-            'cirros-%(vernum)s-x86_64-disk.img'
-        ),
-        description='Default download mirror for Cirros image'
-    )
-    DOWNLOAD_URL_UBUNTU: AnyHttpUrl = Field(
-        (
-            'https://cloud-images.ubuntu.com/%(vername)s/current/'
-            '%(vername)s-server-cloudimg-amd64.img'
-        ),
-        description='Default download mirror for Ubuntu image'
     )
 
     #################
