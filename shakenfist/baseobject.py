@@ -107,9 +107,12 @@ class DatabaseBackedObject(object):
                 raise exceptions.NoStateTransitionsDefined(
                     self.object_type)
 
-            LOG.with_field('original state', orig).with_field(
-                'new state', new_value).with_field(
-                    'targets', self.state_targets).debug('Verifying state transition')
+            LOG.with_fields(
+                {
+                    'original state': orig,
+                    'new state': new_value,
+                    'targets': self.state_targets
+                }).debug('Verifying state transition')
 
             if new_value not in self.state_targets.get(orig.value, []):
                 raise exceptions.InvalidStateException(

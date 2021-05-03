@@ -56,7 +56,7 @@ class Image(baseobject.DatabaseBackedObject):
 
     @classmethod
     def new(cls, url, checksum=None):
-        # Handle URL shortcut with built-in , '
+        # Handle URL shortcut with built-in resolvers
         url, resolver_checksum = image_resolver.resolve(url)
         if not checksum:
             checksum = resolver_checksum
