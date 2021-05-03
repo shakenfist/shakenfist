@@ -94,10 +94,26 @@ class Monitor(daemon.Daemon):
                     continue
 
                 if not n.is_okay():
-                    LOG.with_network(n).info('Recreating not okay network')
                     if util.is_network_node():
+                        LOG.with_network(n).info(
+                            'Recreating not okay network on network node')
                         n.create_on_network_node()
+
+                        # If the network node was missing a network, then that implies
+                        # that we also need to re-create all of the floating IPs for
+                        # that network.
+                        for ni in db.get_network_interfaces(n.uuid):
+                            if ni['floating']:
+                                LOG.with_fields(
+                                    {
+                                        'instance': ni['instance_uuid'],
+                                        'networkinterface': ni['uuid'],
+                                        'floating': ni['floating']
+                                    }).info('Refloating interface')
+                                n.add_floating_ip(ni['floating'], ni['ipv4'])
                     else:
+                        LOG.with_network(n).info(
+                            'Recreating not okay network on hypervisor')
                         n.create_on_hypervisor()
 
                 n.ensure_mesh()
