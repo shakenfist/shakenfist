@@ -19,6 +19,7 @@ from shakenfist import images
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
+from shakenfist import networkinterface
 from shakenfist.node import Node
 from shakenfist import util
 from shakenfist import virt
@@ -33,9 +34,9 @@ def restore_instances():
     instances = []
     for inst in virt.Instances([virt.this_node_filter, virt.healthy_states_filter]):
         instance_problems = []
-        for iface in db.get_instance_interfaces(inst.uuid):
-            if not iface['network_uuid'] in networks:
-                networks.append(iface['network_uuid'])
+        for ni in networkinterface.interfaces_for_instance(inst):
+            if ni.network_uuid not in networks:
+                networks.append(ni.network_uuid)
 
         for disk in inst.disk_spec:
             if disk.get('base'):

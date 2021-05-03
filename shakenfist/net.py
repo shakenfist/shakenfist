@@ -16,11 +16,13 @@ from shakenfist import etcd
 from shakenfist.exceptions import DeadNetwork
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
+from shakenfist import networkinterface
 from shakenfist.node import Node
-from shakenfist.tasks import (DeployNetworkTask,
-                              UpdateDHCPNetworkTask,
-                              RemoveDHCPNetworkTask,
-                              RemoveNATNetworkTask)
+from shakenfist.tasks import (
+    DeployNetworkTask,
+    UpdateDHCPNetworkTask,
+    RemoveDHCPNetworkTask,
+    RemoveNATNetworkTask)
 from shakenfist import util
 from shakenfist import virt
 
@@ -483,6 +485,7 @@ class Network(baseobject.DatabaseBackedObject):
 
     def hard_delete(self):
         etcd.delete('network', None, self.uuid)
+        etcd.delete_all('attribute/network', self.uuid)
         etcd.delete_all('event/network', self.uuid)
         db.delete_metadata('network', self.uuid)
 
@@ -578,9 +581,9 @@ class Network(baseobject.DatabaseBackedObject):
             added = []
 
             instances = []
-            for iface in db.get_network_interfaces(self.uuid):
-                if not iface['instance_uuid'] in instances:
-                    instances.append(iface['instance_uuid'])
+            for ni in networkinterface.interfaces_for_network(self):
+                if ni.instance_uuid not in instances:
+                    instances.append(ni.instance_uuid)
 
             node_fqdns = []
             for inst_uuid in instances:

@@ -11,14 +11,17 @@ from shakenfist import exceptions
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
-from shakenfist.tasks import (DeployNetworkTask,
-                              NetworkTask,
-                              RemoveDHCPNetworkTask,
-                              RemoveNATNetworkTask,
-                              UpdateDHCPNetworkTask,
-                              NetworkInterfaceTask,
-                              FloatNetworkInterfaceTask,
-                              DefloatNetworkInterfaceTask)
+from shakenfist import networkinterface
+from shakenfist.networkinterface import NetworkInterface
+from shakenfist.tasks import (
+    DeployNetworkTask,
+    NetworkTask,
+    RemoveDHCPNetworkTask,
+    RemoveNATNetworkTask,
+    UpdateDHCPNetworkTask,
+    NetworkInterfaceTask,
+    FloatNetworkInterfaceTask,
+    DefloatNetworkInterfaceTask)
 from shakenfist import util
 from shakenfist import virt
 
@@ -40,9 +43,9 @@ class Monitor(daemon.Daemon):
         if not util.is_network_node():
             # For normal nodes, just the ones we have instances for
             for inst in virt.Instances([virt.this_node_filter, virt.active_states_filter]):
-                for iface in db.get_instance_interfaces(inst.uuid):
-                    if not iface['network_uuid'] in host_networks:
-                        host_networks.append(iface['network_uuid'])
+                for ni in networkinterface.interfaces_for_instance(inst):
+                    if ni.network_uuid not in host_networks:
+                        host_networks.append(ni.network_uuid)
         else:
             # For network nodes, its all networks
             for n in net.Networks([baseobject.active_states_filter]):
@@ -65,9 +68,9 @@ class Monitor(daemon.Daemon):
 
                 # Network nodes also look for interfaces for absent instances
                 # and delete them
-                for ni in db.get_network_interfaces(n.uuid):
+                for ni in networkinterface.interfaces_for_network(n):
                     stray = False
-                    inst = virt.Instance.from_db(ni['instance_uuid'])
+                    inst = virt.Instance.from_db(ni.instance_uuid)
                     if not inst:
                         stray = True
                     else:
@@ -75,10 +78,10 @@ class Monitor(daemon.Daemon):
                             stray = True
 
                     if stray:
-                        db.hard_delete_network_interface(ni['uuid'])
+                        ni.hard_delete()
                         LOG.with_instance(
-                            ni['instance_uuid']).with_networkinterface(
-                            ni['uuid']).info('Hard deleted stray network interface')
+                            ni.instance_uuid).with_networkinterface(
+                            ni.uuid).info('Hard deleted stray network interface')
 
         # Ensure we are on every network we have a host for
         for network in host_networks:
@@ -102,15 +105,15 @@ class Monitor(daemon.Daemon):
                         # If the network node was missing a network, then that implies
                         # that we also need to re-create all of the floating IPs for
                         # that network.
-                        for ni in db.get_network_interfaces(n.uuid):
-                            if ni['floating']:
+                        for ni in networkinterface.interfaces_for_network(n):
+                            if ni.floating:
                                 LOG.with_fields(
                                     {
-                                        'instance': ni['instance_uuid'],
-                                        'networkinterface': ni['uuid'],
-                                        'floating': ni['floating']
+                                        'instance': ni.instance_uuid,
+                                        'networkinterface': ni.uuid,
+                                        'floating': ni.floating
                                     }).info('Refloating interface')
-                                n.add_floating_ip(ni['floating'], ni['ipv4'])
+                                n.add_floating_ip(ni.floating, ni.ipv4)
                     else:
                         LOG.with_network(n).info(
                             'Recreating not okay network on hypervisor')
@@ -215,7 +218,7 @@ class Monitor(daemon.Daemon):
             log_ctx.warning('Received work item for non-existent network')
             return
 
-        ni = db.get_network_interface(workitem.interface_uuid())
+        ni = NetworkInterface.from_db(workitem.interface_uuid())
         if not ni:
             log_ctx.warning(
                 'Received work item for non-existent network interface')
@@ -229,16 +232,16 @@ class Monitor(daemon.Daemon):
             return
 
         if isinstance(workitem, FloatNetworkInterfaceTask):
-            n.add_floating_ip(ni['floating'], ni['ipv4'])
+            n.add_floating_ip(ni.floating, ni.ipv4)
 
         elif isinstance(workitem, DefloatNetworkInterfaceTask):
-            n.remove_floating_ip(ni['floating'], ni['ipv4'])
-            db.remove_floating_from_interface(ni['uuid'])
+            n.remove_floating_ip(ni.floating, ni.ipv4)
+            db.remove_floating_from_interface(ni.uuid)
 
-            db.add_event('interface', ni['uuid'], 'api', 'defloat', None, None)
+            db.add_event('interface', ni.uuid, 'api', 'defloat', None, None)
             with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Instance defloat'):
                 ipm = IPManager.from_db('floating')
-                ipm.release(ni['floating'])
+                ipm.release(ni.floating)
                 ipm.persist()
 
     def _process_network_node_workitems(self):

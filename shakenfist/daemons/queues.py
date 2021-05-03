@@ -12,6 +12,7 @@ from shakenfist.images import Image
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
+from shakenfist import networkinterface
 from shakenfist import scheduler
 from shakenfist import util
 from shakenfist import virt
@@ -236,8 +237,8 @@ def instance_start(instance, network):
                     'instance failed to start: %s' % e)
                 return
 
-        for iface in db.get_instance_interfaces(instance.uuid):
-            db.update_network_interface_state(iface['uuid'], 'created')
+        for ni in networkinterface.interfaces_for_instance(instance):
+            ni.state = 'created'
 
 
 def instance_delete(instance):
@@ -246,36 +247,36 @@ def instance_delete(instance):
 
         # Create list of networks used by instance
         instance_networks = []
-        for iface in list(db.get_instance_interfaces(instance.uuid)):
-            if not iface['network_uuid'] in instance_networks:
-                instance_networks.append(iface['network_uuid'])
+        for ni in networkinterface.interfaces_for_instance(instance):
+            if ni.network_uuid not in instance_networks:
+                instance_networks.append(ni.network_uuid)
 
         # Create list of networks used by all other instances
         host_networks = []
         for inst in virt.Instances([virt.this_node_filter,
                                     virt.active_states_filter]):
             if not inst.uuid == instance.uuid:
-                for iface in db.get_instance_interfaces(inst.uuid):
-                    if not iface['network_uuid'] in host_networks:
-                        host_networks.append(iface['network_uuid'])
+                for ni in networkinterface.interfaces_for_instance(instance):
+                    if ni.network_uuid not in host_networks:
+                        host_networks.append(ni.network_uuid)
 
         instance.delete()
 
         # Delete the instance's interfaces
         with util.RecordedOperation('release network addresses', instance):
-            for ni in db.get_instance_interfaces(instance.uuid):
-                if ni.get('floating'):
+            for ni in networkinterface.interfaces_for_instance(instance):
+                if ni.floating['floating_address']:
                     db.enqueue(
                         'networknode',
-                        DefloatNetworkInterfaceTask(ni['network_uuid'], ni['uuid']))
+                        DefloatNetworkInterfaceTask(ni.network_uuid, ni.uuid))
 
-                with db.get_lock('ipmanager', None, ni['network_uuid'],
+                with db.get_lock('ipmanager', None, ni.network_uuid,
                                  ttl=120, op='Instance delete'):
-                    ipm = IPManager.from_db(ni['network_uuid'])
-                    ipm.release(ni['ipv4'])
+                    ipm = IPManager.from_db(ni.network_uuid)
+                    ipm.release(ni.ipv4)
                     ipm.persist()
 
-                db.update_network_interface_state(ni['uuid'], 'deleted')
+                ni.state = 'deleted'
 
         # Check each network used by the deleted instance
         for network in instance_networks:

@@ -42,18 +42,21 @@ from shakenfist import images
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
+from shakenfist import networkinterface
+from shakenfist.networkinterface import NetworkInterface
 from shakenfist.node import Node, Nodes
 from shakenfist import scheduler
 from shakenfist import util
 from shakenfist import virt
 from shakenfist.daemons import daemon
-from shakenfist.tasks import (DeleteInstanceTask,
-                              FetchImageTask,
-                              PreflightInstanceTask,
-                              StartInstanceTask,
-                              FloatNetworkInterfaceTask,
-                              DefloatNetworkInterfaceTask
-                              )
+from shakenfist.tasks import (
+    DeleteInstanceTask,
+    FetchImageTask,
+    PreflightInstanceTask,
+    StartInstanceTask,
+    FloatNetworkInterfaceTask,
+    DefloatNetworkInterfaceTask
+)
 
 
 LOG, HANDLER = logutil.setup(__name__)
@@ -787,8 +790,7 @@ class Instances(Resource):
                 LOG.with_object(instance).with_object(n).withFields({
                     'networkinterface': iface_uuid
                 }).info('Interface allocated')
-                db.create_network_interface(
-                    iface_uuid, netdesc, instance.uuid, order)
+                NetworkInterface.new(iface_uuid, netdesc, instance.uuid, order)
                 order += 1
 
                 if 'float' in netdesc and netdesc['float']:
@@ -888,7 +890,10 @@ class InstanceInterfaces(Resource):
     @arg_is_instance_uuid
     @requires_instance_ownership
     def get(self, instance_uuid=None, instance_from_db=None):
-        return list(db.get_instance_interfaces(instance_uuid))
+        out = []
+        for ni in networkinterface.interfaces_for_instance(instance_from_db):
+            out.append(ni.external_view())
+        return out
 
 
 class InstanceEvents(Resource):
@@ -1008,14 +1013,14 @@ class InstanceUnpause(Resource):
 
 
 def _safe_get_network_interface(interface_uuid):
-    ni = db.get_network_interface(interface_uuid)
+    ni = NetworkInterface.from_db(interface_uuid)
     if not ni:
         return None, None, error(404, 'interface not found')
 
-    log = LOG.with_fields({'network': ni['network_uuid'],
-                           'networkinterface': ni['uuid']})
+    log = LOG.with_fields({'network': ni.network_uuid,
+                           'networkinterface': ni.uuid})
 
-    n = net.Network.from_db(ni['network_uuid'])
+    n = net.Network.from_db(ni.network_uuid)
     if not n:
         log.info('Network not found or deleted')
         return None, None, error(404, 'interface network not found')
@@ -1024,7 +1029,7 @@ def _safe_get_network_interface(interface_uuid):
         log.info('Interface not found, failed ownership test')
         return None, None, error(404, 'interface not found')
 
-    i = virt.Instance.from_db(ni['instance_uuid'])
+    i = virt.Instance.from_db(ni.instance_uuid)
     if get_jwt_identity() not in [i.namespace, 'system']:
         log.with_object(i).info('Instance not found, failed ownership test')
         return None, None, error(404, 'interface not found')
@@ -1039,7 +1044,7 @@ class Interface(Resource):
         ni, _, err = _safe_get_network_interface(interface_uuid)
         if err:
             return err
-        return ni
+        return ni.external_view()
 
 
 class InterfaceFloat(Resource):
@@ -1211,12 +1216,18 @@ class Network(Resource):
         if network_uuid == 'floating':
             return error(403, 'you cannot delete the floating network')
 
+        n = net.Network.from_db(network_from_db.uuid)
+        if not n:
+            LOG.with_fields({'network_uuid': n.uuid}).warning(
+                'delete_network: network does not exist')
+            return error(404, 'network does not exist')
+
         # We only delete unused networks
-        ifaces = list(db.get_network_interfaces(network_uuid))
+        ifaces = list(networkinterface.interfaces_for_network(n))
         if len(ifaces) > 0:
             for iface in ifaces:
-                LOG.withFields({'network_interface': iface['uuid'],
-                                'state': iface['state']}).info('Blocks network delete')
+                LOG.withFields({'network_interface': iface.uuid,
+                                'state': iface.state}).info('Blocks network delete')
             return error(403, 'you cannot delete an in use network')
 
         # Check if network has already been deleted
@@ -1297,7 +1308,7 @@ class Networks(Resource):
         networks_unable = []
         for n in net.Networks([partial(baseobject.namespace_filter, namespace),
                                baseobject.active_states_filter]):
-            if len(list(db.get_network_interfaces(n.uuid))) > 0:
+            if len(list(networkinterface.interfaces_for_network(n))) > 0:
                 LOG.with_object(n).warning(
                     'Network in use, cannot be deleted by delete-all')
                 networks_unable.append(n.uuid)
@@ -1321,13 +1332,16 @@ class NetworkEvents(Resource):
         return list(db.get_events('network', network_uuid))
 
 
-class NetworkInterfaces(Resource):
+class NetworkInterfacesEndpoint(Resource):
     @jwt_required
     @arg_is_network_uuid
     @requires_network_ownership
     @requires_network_active
     def get(self, network_uuid=None, network_from_db=None):
-        return list(db.get_network_interfaces(network_uuid))
+        out = []
+        for ni in networkinterface.interfaces_for_network(self.network):
+            out.append(ni.external_view())
+        return out
 
 
 class NetworkMetadatas(Resource):
@@ -1451,7 +1465,8 @@ api.add_resource(ImageEvents, '/images/events')
 api.add_resource(Networks, '/networks')
 api.add_resource(Network, '/networks/<network_uuid>')
 api.add_resource(NetworkEvents, '/networks/<network_uuid>/events')
-api.add_resource(NetworkInterfaces, '/networks/<network_uuid>/interfaces')
+api.add_resource(NetworkInterfacesEndpoint,
+                 '/networks/<network_uuid>/interfaces')
 api.add_resource(NetworkMetadatas, '/networks/<network_uuid>/metadata')
 api.add_resource(NetworkMetadata,
                  '/networks/<network_uuid>/metadata/<key>')

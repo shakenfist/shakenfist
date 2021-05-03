@@ -7,18 +7,18 @@ import shutil
 import signal
 
 from shakenfist.config import config
-from shakenfist import db
+from shakenfist import networkinterface
 from shakenfist import util
 from shakenfist import virt
 
 
 class DHCP(object):
     def __init__(self, network, interface):
-        self.network_uuid = network.uuid
+        self.network = network
 
         self.subst = {
             'config_dir': os.path.join(
-                config.get('STORAGE_PATH'), 'dhcp', self.network_uuid),
+                config.get('STORAGE_PATH'), 'dhcp', self.network.uuid),
             'zone': config.get('ZONE'),
 
             'router': network.router,
@@ -28,16 +28,16 @@ class DHCP(object):
             'dns_server': config.get('DNS_SERVER'),
             'mtu': config.get('MAX_HYPERVISOR_MTU') - 50,
 
-            'netns': self.network_uuid,
-            'in_netns': 'ip netns exec %s' % self.network_uuid,
+            'netns': self.network.uuid,
+            'in_netns': 'ip netns exec %s' % self.network.uuid,
             'interface': interface
         }
 
     def __str__(self):
-        return 'dhcp(%s)' % self.network_uuid
+        return 'dhcp(%s)' % self.network.uuid
 
     def unique_label(self):
-        return ('dhcp', self.network_uuid)
+        return ('dhcp', self.network.uuid)
 
     def _read_template(self, template):
         with open(os.path.join(config.get('STORAGE_PATH'),
@@ -62,16 +62,16 @@ class DHCP(object):
         t = self._read_template('dhcphosts.tmpl')
 
         instances = []
-        for ni in list(db.get_network_interfaces(self.network_uuid)):
-            instance = virt.Instance.from_db(ni['instance_uuid'])
+        for ni in networkinterface.interfaces_for_network(self.network):
+            instance = virt.Instance.from_db(ni.instance_uuid)
             if not instance:
                 continue
 
             instances.append(
                 {
-                    'uuid': ni['instance_uuid'],
-                    'macaddr': ni['macaddr'],
-                    'ipv4': ni['ipv4'],
+                    'uuid': ni.instance_uuid,
+                    'macaddr': ni.macaddr,
+                    'ipv4': ni.ipv4,
                     'name': instance.name.replace(',', '')
                 }
             )

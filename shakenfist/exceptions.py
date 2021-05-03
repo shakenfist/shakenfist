@@ -136,3 +136,12 @@ class CongestedNetwork(NetworkException):
 
 class NoInterfaceStatistics(NetworkException):
     pass
+
+
+# NetworkInterface
+class NetworkInterfaceException(Exception):
+    pass
+
+
+class NetworkInterfaceAlreadyFloating(NetworkInterfaceException):
+    pass

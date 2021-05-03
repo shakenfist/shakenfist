@@ -55,20 +55,20 @@ class SFPyLogrus(logging.Logger, PyLogrusBase):
             inst = inst.uuid
         return SFCustomAdapter(self, {'instance': inst})
 
-    def with_network(self, inst):
-        if not isinstance(inst, str):
-            inst = inst.uuid
-        return SFCustomAdapter(self, {'network': inst})
+    def with_network(self, n):
+        if not isinstance(n, str):
+            n = n.uuid
+        return SFCustomAdapter(self, {'network': n})
 
-    def with_networkinterface(self, inst):
-        if not isinstance(inst, str):
-            inst = inst.uuid
-        return SFCustomAdapter(self, {'networkinterface': inst})
+    def with_networkinterface(self, ni):
+        if not isinstance(ni, str):
+            ni = ni.uuid
+        return SFCustomAdapter(self, {'networkinterface': ni})
 
-    def with_image(self, inst):
-        if not isinstance(inst, str):
-            inst = inst.unique_ref
-        return SFCustomAdapter(self, {'image': inst})
+    def with_image(self, i):
+        if not isinstance(i, str):
+            i = i.unique_ref
+        return SFCustomAdapter(self, {'image': i})
 
 
 class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
