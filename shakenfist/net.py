@@ -604,8 +604,11 @@ class Network(baseobject.DatabaseBackedObject):
                     node_ips.add(n.ip)
 
             discovered = list(self.discover_mesh())
-            self.log.with_field('discovered', discovered).with_field(
-                'node_ips', node_ips).debug('Discovered mesh elements')
+            self.log.with_fields(
+                {
+                    'discovered': discovered,
+                    'node_ips': node_ips
+                }).debug('Discovered mesh elements')
 
             for n in discovered:
                 if n in node_ips:
