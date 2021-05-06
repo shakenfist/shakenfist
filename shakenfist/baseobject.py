@@ -110,6 +110,19 @@ class DatabaseBackedObject(object):
             if orig.value == new_value:
                 return
 
+            # TODO(mikal): move this to a constant when we have a good set of shared basic states.
+            if orig.value == 'deleted':
+                LOG.with_fields(
+                    {
+                        'uuid': self.uuid,
+                        'object_type': self.object_type,
+                        'original state': orig,
+                        'new state': new_value
+                    }).warn('Objects do not undelete')
+                raise exceptions.InvalidStateException(
+                    'Invalid state change from %s to %s for object=%s uuid=%s',
+                    orig.value, new_value, self.object_type, self.uuid)
+
             # Ensure state change is valid
             if not self.state_targets:
                 raise exceptions.NoStateTransitionsDefined(
