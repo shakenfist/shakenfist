@@ -101,6 +101,18 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
 
     def with_fields(self, fields=None):
         extra = copy.deepcopy(self._extra)
+        if not fields:
+            fields = {}
+
+        # Handle "special fields" which might be internal objects
+        for key in ['instance', 'network', 'networkinterface', 'image']:
+            if key in fields:
+                value = fields[key]
+                if not isinstance(value, str):
+                    value = value.uuid
+                extra.update({key: value})
+                del fields[key]
+
         extra.update(self._normalize(fields))
         return SFCustomAdapter(self._logger, extra, self._prefix)
 
