@@ -1,16 +1,14 @@
 import etcd3
-from functools import partial
 import json
 import os
 import random
 import time
 
-from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import logutil
 from shakenfist import net
-from shakenfist.networkinterface import NetworkInterfaces
+from shakenfist import networkinterface
 from shakenfist.node import (
     Node, Nodes,
     active_states_filter as node_active_states_filter,
@@ -165,21 +163,15 @@ class Monitor(daemon.Daemon):
             self._update_power_states()
 
             # Cleanup soft deleted instances and networks
-            for i in virt.Instances([
-                    virt.inactive_states_filter,
-                    partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))]):
+            for i in virt.inactive_instances():
                 LOG.with_object(i).info('Hard deleting instance')
                 i.hard_delete()
 
-            for n in net.Networks([
-                    baseobject.inactive_states_filter,
-                    partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))]):
+            for n in net.inactive_networks():
                 LOG.with_network(n).info('Hard deleting network')
                 n.hard_delete()
 
-            for ni in NetworkInterfaces([
-                    partial(baseobject.state_filter, ['deleted', 'error']),
-                    partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))]):
+            for ni in networkinterface.inactive_network_interfaces():
                 LOG.with_networkinterface(
                     ni).info('Hard deleting network interface')
                 ni.hard_delete()
@@ -198,9 +190,7 @@ class Monitor(daemon.Daemon):
                 if (time.time() - last_loop_run < config.NODE_CHECKIN_MAXIMUM
                         and age > config.NODE_CHECKIN_MAXIMUM * 10):
                     n.state = Node.STATE_ERROR
-                    for i in virt.Instances([
-                            virt.healthy_states_filter,
-                            partial(virt.placement_filter, n.uuid)]):
+                    for i in virt.health_instances_on_node(n):
                         LOG.with_object(i).with_object(n).info(
                             'Node in error state, erroring instance')
                         # Note, this queue job is just in case the node comes

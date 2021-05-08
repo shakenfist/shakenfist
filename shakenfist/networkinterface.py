@@ -4,6 +4,7 @@ from functools import partial
 from uuid import uuid4
 
 from shakenfist import baseobject
+from shakenfist.config import config
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
@@ -194,3 +195,9 @@ def interfaces_for_instance(instance):
 def interfaces_for_network(network):
     return NetworkInterfaces([baseobject.active_states_filter,
                               partial(network_filter, network)])
+
+
+def inactive_network_interfaces():
+    return NetworkInterfaces([
+        partial(baseobject.state_filter, ['deleted', 'error']),
+        partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))])

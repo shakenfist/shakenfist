@@ -962,3 +962,23 @@ healthy_states_filter = partial(
 
 inactive_states_filter = partial(
     baseobject.state_filter, [Instance.STATE_DELETED])
+
+
+# Convenience helpers
+
+def inactive_instances():
+    return Instances([
+        inactive_states_filter,
+        partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))])
+
+
+def healthy_instances_on_node(n):
+    return Instances([healthy_states_filter, partial(placement_filter, n.uuid)])
+
+
+def created_instances_on_node():
+    return Instances([this_node_filter, partial(baseobject.state_filter, ['created'])])
+
+
+def instances_in_namespace(namespace):
+    return Instances([partial(baseobject.namespace_filter, namespace)])
