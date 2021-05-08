@@ -64,8 +64,9 @@ class BaseTestCase(testtools.TestCase):
         self._log_events(instance_uuid,
                          self.system_client.get_instance_events(instance_uuid))
 
-    def _log_image_events(self, url):
-        self._log_events(url, self.system_client.get_image_events(url))
+    def _log_image_events(self, image_uuid):
+        self._log_events(
+            image_uuid, self.system_client.get_image_events(image_uuid))
 
     def _log_events(self, uuid, event_source):
         x = PrettyTable()
@@ -159,18 +160,18 @@ class BaseTestCase(testtools.TestCase):
             'After time %s, instance %s had no event "%s:%s" (waited 10 mins)' % (
                 after, instance_uuid, operation, message))
 
-    def _await_image_download_success(self, url, after=None):
-        return self._await_image_event(url, 'fetch', 'success', after)
+    def _await_image_download_success(self, image_uuid, after=None):
+        return self._await_image_event(image_uuid, 'fetch', 'success', after)
 
-    def _await_image_download_error(self, url, after=None):
+    def _await_image_download_error(self, image_uuid, after=None):
         return self._await_image_event(
-            url, 'fetch', 'DNS error', after)
+            image_uuid, 'fetch', 'DNS error', after)
 
     def _await_image_event(
-            self, url, operation, message=None, after=None):
+            self, image_uuid, operation, message=None, after=None):
         start_time = time.time()
-        while time.time() - start_time < 300:
-            for event in self.system_client.get_image_events(url):
+        while time.time() - start_time < 900:
+            for event in self.system_client.get_image_events(image_uuid):
                 if after and event['timestamp'] <= after:
                     continue
 
@@ -178,17 +179,17 @@ class BaseTestCase(testtools.TestCase):
                     if message in str(event['message']):
                         return event['timestamp']
 
-                    self._log_image_events(url)
+                    self._log_image_events(image_uuid)
                     raise WrongEventException(
-                        'After time %s, image %s expected event "%s:%s" got %s' % (
-                            after, url, operation, message, event['message']))
+                        'After time %s, image %s expected event "%s:%s" got %s'
+                        % (after, image_uuid, operation, message, event['message']))
 
             time.sleep(5)
 
-        self._log_image_events(url)
+        self._log_image_events(image_uuid)
         raise TimeoutException(
-            'After time %s, image %s had no event type "%s" (waited 5 mins)' % (
-                after, url, operation))
+            'After time %s, image %s had no event type "%s" (waited 5 mins)'
+            % (after, image_uuid, operation))
 
     def _await_network_ready(self, network_uuid):
         start_time = time.time()
@@ -257,6 +258,41 @@ class BaseNamespacedTestCase(BaseTestCase):
         for net in self.test_client.get_networks():
             self.test_client.delete_network(net['uuid'])
         self._remove_namespace(self.namespace)
+
+
+class TestDistroBoots(BaseNamespacedTestCase):
+    def setUp(self):
+        super(TestDistroBoots, self).setUp()
+        self.net = self.test_client.allocate_network(
+            '192.168.242.0/24', True, True, '%s-net' % self.namespace)
+        self._await_network_ready(self.net['uuid'])
+
+    def _test_distro_boot(self, base_image):
+        inst = self.test_client.create_instance(
+            base_image, 1, 1024,
+            [
+                {
+                    'network_uuid': self.net['uuid']
+                }
+            ],
+            [
+                {
+                    'size': 8,
+                    'base': base_image,
+                    'type': 'disk'
+                }
+            ], None, None)
+
+        self._await_login_prompt(inst['uuid'])
+
+        ip = self.test_client.get_instance_interfaces(inst['uuid'])[0]['ipv4']
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
+
+        self.test_client.delete_instance(inst['uuid'])
+        inst_uuids = []
+        for i in self.test_client.get_instances():
+            inst_uuids.append(i['uuid'])
+        self.assertNotIn(inst['uuid'], inst_uuids)
 
 
 class LoggingSocket(object):

@@ -1,0 +1,358 @@
+# Old debian image: https://sfcbr.shakenfist.com/static/debian10-ci-template.qcow2
+
+- hosts: localhost
+  gather_facts: yes
+  connection: ssh
+  vars:
+    identifier: unknown
+    source_path: "/home/jenkins/src/shakenfist/"
+    base_image: "https://sfcbr.shakenfist.com/static/ubuntu2004-ci-template.qcow2"
+    base_image_user: "ubuntu"
+
+  tasks:
+    - name: Create a CI network
+      sf_network:
+        netblock: "10.0.0.0/24"
+        name: "{{identifier}}"
+      register: cinetwork
+
+    - name: Log network details
+      debug:
+        msg: "Network is {{cinetwork['meta']['uuid']}}"
+
+    - name: Create a primary instance
+      sf_instance:
+        name: "{{identifier}}-primary"
+        cpu: 4
+        ram: 4096
+        disks:
+          - "30@{{base_image}}"
+        networkspecs:
+          - network_uuid="{{cinetwork['meta']['uuid']}}",float=True
+        ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+482i1EYa6FYmDrjOQpsm+mVwFs7TW9xOI9o1jc/PHXLDDg5+inp/vVAgKoV6jijwRC9juwjFBPqr8LyXh3lXhPA1LSaQa39o3QIYTLsLuLZPeueUB8UukZzOH0XAHxgAF/qFycf5pWzD4Pzs5HjNi44+9LCDYKJtc45kh3+97iezRMYhucm3wzRAKyA8mr8nNOrQq356sKgXeMP6nnX4bhUJDrcQpfsRFkTcYWAcSuU36eSETVOj9dGUJZlc4g3QBL73R1S5VWbN6DM4UIOSWxRG6oUKprgHSvFmyp5i7S0vKv7q101PcxOw14GOvI8TSirIa8O39WtyX3ugReBj mikal@sf-primary
+        placement: sf-2
+        state: present
+      register: primary
+
+    - name: Add primary to ansible
+      add_host:
+        hostname: primary
+        ansible_ssh_host: "{{primary['meta']['network_interfaces'][0]['floating']}}"
+        ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
+        ansible_ssh_user: "{{base_image_user}}"
+        ansible_ssh_private_key_file: "/home/jenkins/id_ci"
+        groups: sfall
+
+    - name: Create sf-1
+      sf_instance:
+        name: "{{identifier}}-1"
+        cpu: 4
+        ram: 8192
+        disks:
+          - "50@{{base_image}}"
+        networkspecs:
+          - network_uuid="{{cinetwork['meta']['uuid']}}",float=True
+        ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+482i1EYa6FYmDrjOQpsm+mVwFs7TW9xOI9o1jc/PHXLDDg5+inp/vVAgKoV6jijwRC9juwjFBPqr8LyXh3lXhPA1LSaQa39o3QIYTLsLuLZPeueUB8UukZzOH0XAHxgAF/qFycf5pWzD4Pzs5HjNi44+9LCDYKJtc45kh3+97iezRMYhucm3wzRAKyA8mr8nNOrQq356sKgXeMP6nnX4bhUJDrcQpfsRFkTcYWAcSuU36eSETVOj9dGUJZlc4g3QBL73R1S5VWbN6DM4UIOSWxRG6oUKprgHSvFmyp5i7S0vKv7q101PcxOw14GOvI8TSirIa8O39WtyX3ugReBj mikal@sf-primary
+        placement: sf-2
+        state: present
+      register: sf1
+
+    - name: Add sf-1 to ansible
+      add_host:
+        hostname: sf1
+        internal_ip: "{{sf1['meta']['network_interfaces'][0]['ipv4']}}"
+        ansible_ssh_host: "{{sf1['meta']['network_interfaces'][0]['floating']}}"
+        ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
+        ansible_ssh_user: "{{base_image_user}}"
+        ansible_ssh_private_key_file: "/home/jenkins/id_ci"
+        groups: hypervisors, sfall
+
+    - name: Create sf-2
+      sf_instance:
+        name: "{{identifier}}-2"
+        cpu: 4
+        ram: 8192
+        disks:
+          - "50@{{base_image}}"
+        networkspecs:
+          - network_uuid="{{cinetwork['meta']['uuid']}}",float=True
+        ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+482i1EYa6FYmDrjOQpsm+mVwFs7TW9xOI9o1jc/PHXLDDg5+inp/vVAgKoV6jijwRC9juwjFBPqr8LyXh3lXhPA1LSaQa39o3QIYTLsLuLZPeueUB8UukZzOH0XAHxgAF/qFycf5pWzD4Pzs5HjNi44+9LCDYKJtc45kh3+97iezRMYhucm3wzRAKyA8mr8nNOrQq356sKgXeMP6nnX4bhUJDrcQpfsRFkTcYWAcSuU36eSETVOj9dGUJZlc4g3QBL73R1S5VWbN6DM4UIOSWxRG6oUKprgHSvFmyp5i7S0vKv7q101PcxOw14GOvI8TSirIa8O39WtyX3ugReBj mikal@sf-primary
+        placement: sf-3
+        state: present
+      register: sf2
+
+    - name: Add sf-2 to ansible
+      add_host:
+        hostname: sf2
+        internal_ip: "{{sf2['meta']['network_interfaces'][0]['ipv4']}}"
+        ansible_ssh_host: "{{sf2['meta']['network_interfaces'][0]['floating']}}"
+        ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
+        ansible_ssh_user: "{{base_image_user}}"
+        ansible_ssh_private_key_file: "/home/jenkins/id_ci"
+        groups: hypervisors, sfall
+
+    - name: Create sf-3
+      sf_instance:
+        name: "{{identifier}}-3"
+        cpu: 4
+        ram: 8192
+        disks:
+          - "50@{{base_image}}"
+        networkspecs:
+          - network_uuid="{{cinetwork['meta']['uuid']}}",float=True
+        ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+482i1EYa6FYmDrjOQpsm+mVwFs7TW9xOI9o1jc/PHXLDDg5+inp/vVAgKoV6jijwRC9juwjFBPqr8LyXh3lXhPA1LSaQa39o3QIYTLsLuLZPeueUB8UukZzOH0XAHxgAF/qFycf5pWzD4Pzs5HjNi44+9LCDYKJtc45kh3+97iezRMYhucm3wzRAKyA8mr8nNOrQq356sKgXeMP6nnX4bhUJDrcQpfsRFkTcYWAcSuU36eSETVOj9dGUJZlc4g3QBL73R1S5VWbN6DM4UIOSWxRG6oUKprgHSvFmyp5i7S0vKv7q101PcxOw14GOvI8TSirIa8O39WtyX3ugReBj mikal@sf-primary
+        placement: sf-3
+        state: present
+      register: sf3
+
+    - name: Add sf-3 to ansible
+      add_host:
+        hostname: sf3
+        internal_ip: "{{sf3['meta']['network_interfaces'][0]['ipv4']}}"
+        ansible_ssh_host: "{{sf3['meta']['network_interfaces'][0]['floating']}}"
+        ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
+        ansible_ssh_user: "{{base_image_user}}"
+        ansible_ssh_private_key_file: "/home/jenkins/id_ci"
+        groups: hypervisors, sfall
+
+    - name: Log instance details
+      debug:
+        msg:
+          - "Primary: is {{primary['meta']['uuid']}} at {{primary['meta']['network_interfaces'][0]['ipv4']}}, {{primary['meta']['network_interfaces'][0]['floating']}}"
+          - "   sf-1: is {{sf1['meta']['uuid']}} at {{sf1['meta']['network_interfaces'][0]['ipv4']}}, {{sf1['meta']['network_interfaces'][0]['floating']}}"
+          - "   sf-2: is {{sf2['meta']['uuid']}} at {{sf2['meta']['network_interfaces'][0]['ipv4']}}, {{sf2['meta']['network_interfaces'][0]['floating']}}"
+          - "   sf-3: is {{sf3['meta']['uuid']}} at {{sf3['meta']['network_interfaces'][0]['ipv4']}}, {{sf3['meta']['network_interfaces'][0]['floating']}}"
+
+    - name: Ensure we have somewhere to write the build details to
+      file:
+        path: "{{ lookup('env', 'WORKSPACE') }}/{{ lookup('env', 'BUILD_TAG') }}"
+        state: directory
+        mode: "0755"
+
+    - name: Write details of instances to workspace
+      copy:
+        content: |
+          {% for svr in groups.sfall%}
+          export {{svr}}={{hostvars[svr]['ansible_ssh_host']}}
+          {% endfor %}
+
+          export identifier={{identifier}}
+          export source_path={{source_path}}
+        dest: "{{ lookup('env', 'WORKSPACE') }}/{{ lookup('env', 'BUILD_TAG') }}/ci-environment.sh"
+        owner: jenkins
+        group: jenkins
+        mode: u=r,g=r,o=r
+
+    - name: Log environment details path
+      debug:
+        msg: "Environment details written to {{ lookup('env', 'WORKSPACE') }}/{{ lookup('env', 'BUILD_TAG') }}/ci-environment.sh"
+
+    - name: Wait for instances to boot
+      pause:
+        minutes: 1
+
+- hosts: sfall
+  gather_facts: yes
+  become: true
+  vars:
+    source_path: "/home/jenkins/src/shakenfist/"
+
+  tasks:
+    - name: Use CI package cache to speed things up
+      copy:
+        content: |
+          Acquire::http::Proxy "http://192.168.1.50:8000";
+        dest: /etc/apt/apt.conf.d/00proxy
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
+
+    - name: apt-get dist-upgrade
+      apt:
+        update_cache: yes
+        upgrade: dist
+        autoremove: yes
+
+    # TODO(mikal): dial this back once we have things working.
+    - name: Install dependencies
+      apt:
+        name:
+          [
+            git,
+            python3-dev,
+            python3-grpcio,
+            python3-pip,
+            python3-venv,
+            python3-wheel,
+            python3,
+            pwgen,
+            tox,
+          ]
+        state: latest
+
+    - name: pip3 self-upgrade
+      command: pip3 install -U pip
+
+    - name: Remove python3-pip
+      apt:
+        name: python3-pip
+        state: absent
+
+- hosts: primary
+  gather_facts: yes
+  connection: ssh
+  become: true
+
+  tasks:
+    # - name: Ensure we have the Ubuntu package key (helps with Debian)
+    #   shell: apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367
+
+    # - name: Setup ansible package repository
+    #   copy:
+    #     content: |
+    #       deb http://ppa.launchpad.net/ansible/ansible/ubuntu trusty main
+    #     dest: "/etc/apt/sources.list.d/ansible.list"
+    #     owner: root
+    #     group: root
+    #     mode: u=r,g=r,o=r
+
+    - name: Install modern ansible
+      apt:
+        name: ansible
+        state: latest
+        update_cache: yes
+        autoremove: yes
+
+    - name: Install ansible roles
+      shell: ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform andrewrothstein.go
+
+    - name: Make Shaken Fist venv
+      shell: python3 -m venv --system-site-packages /srv/shakenfist/venv
+
+- hosts: localhost
+  gather_facts: yes
+  vars:
+    source_path: "/home/jenkins/src/shakenfist/"
+
+  tasks:
+    - name: Remove old deploy tarball
+      file:
+        path: "{{source_path}}/shakenfist/deploy.tgz"
+        state: absent
+
+    - name: Remove old docs tarball
+      file:
+        path: "{{source_path}}/shakenfist/docs.tgz"
+        state: absent
+
+    - name: Build Shaken Fist wheel
+      shell: |
+        tar czf deploy.tgz deploy
+        tar czf docs.tgz docs
+        rm dist/*
+        python3 setup.py sdist bdist_wheel
+      args:
+        chdir: "{{source_path}}/shakenfist"
+
+    - name: Determine wheel filename
+      shell: ls dist | egrep "shakenfist.*\.whl"
+      args:
+        chdir: "{{source_path}}/shakenfist"
+      register: server_wheel_file_complex
+
+    - name: Extract the wheel filename
+      set_fact:
+        server_wheel_file: "{{server_wheel_file_complex.stdout}}"
+
+    - debug:
+        msg: "Server wheel file: {{server_wheel_file}}"
+
+    - name: Build Shaken Fist client wheel
+      shell: |
+        rm dist/*
+        python3 setup.py sdist bdist_wheel
+      args:
+        chdir: "{{source_path}}/client-python"
+
+    - name: Determine wheel filename
+      shell: ls dist | egrep "shakenfist_client.*\.whl"
+      args:
+        chdir: "{{source_path}}/client-python"
+      register: client_wheel_file_complex
+
+    - name: Extract the wheel filename
+      set_fact:
+        client_wheel_file: "{{client_wheel_file_complex.stdout}}"
+
+    - debug:
+        msg: "Client wheel file: {{client_wheel_file}}"
+
+- hosts: sfall
+  gather_facts: yes
+  become: true
+  vars:
+    source_path: "/home/jenkins/src/shakenfist/"
+
+  tasks:
+    - name: Copy server wheel file
+      copy:
+        src: "{{source_path}}/shakenfist/dist/{{hostvars['localhost']['server_wheel_file']}}"
+        dest: "/tmp/{{hostvars['localhost']['server_wheel_file']}}"
+
+    - name: Make venv and install server wheel
+      shell: |
+        python3 -m venv --system-site-packages /srv/shakenfist/venv
+        /srv/shakenfist/venv/bin/pip install /tmp/shakenfist*whl
+
+- hosts: primary
+  gather_facts: yes
+  become: true
+  vars:
+    source_path: "/home/jenkins/src/shakenfist/"
+    base_image_user: "ubuntu"
+
+  tasks:
+    - name: Copy client wheel file
+      copy:
+        src: "{{source_path}}/client-python/dist/{{hostvars['localhost']['client_wheel_file']}}"
+        dest: "/tmp/{{hostvars['localhost']['client_wheel_file']}}"
+
+    - name: Make venv and install client wheel
+      shell: |
+        /srv/shakenfist/venv/bin/pip install /tmp/shakenfist_client*whl
+
+    - name: Copy install configuration to primary node
+      copy:
+        content: |
+          #!/bin/bash
+          export CLOUD=metal
+          export ADMIN_PASSWORD=foobar
+          export FLOATING_IP_BLOCK="10.10.10.0/24"
+          export BOOTDELAY=0
+          export DEPLOY_NAME="metalci"
+          export METAL_SSH_USER="{{base_image_user}}"
+          export METAL_SSH_KEY_FILENAME="/root/.ssh/id_rsa"
+          export HTTP_PROXY="http://192.168.1.50:3128"
+          export INCLUDE_TRACEBACKS="True"
+
+          export KSM_ENABLED=0
+          export GLUSTER_ENABLED=0
+          export GLUSTER_REPLICAS=3
+
+          export METAL_IP_SF1={{hostvars['sf1']['internal_ip']}}
+          export METAL_IP_SF2={{hostvars['sf2']['internal_ip']}}
+          export METAL_IP_SF3={{hostvars['sf3']['internal_ip']}}
+
+          /srv/shakenfist/venv/share/shakenfist/installer/install
+        dest: "/root/sf-deploy.sh"
+        owner: root
+        group: root
+        mode: u=rx
+
+    - name: Copy ssh key to primary node
+      copy:
+        src: /home/jenkins/id_ci
+        dest: /root/.ssh/id_rsa
+        owner: root
+        group: root
+        mode: u=r,g=,o=

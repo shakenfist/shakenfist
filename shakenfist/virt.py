@@ -21,6 +21,7 @@ from shakenfist import exceptions
 from shakenfist import images
 from shakenfist import logutil
 from shakenfist import net
+from shakenfist import networkinterface
 from shakenfist import util
 from shakenfist.tasks import DeleteInstanceTask
 
@@ -644,40 +645,49 @@ class Instance(baseobject.DatabaseBackedObject):
             ]
         }
 
-        seen_networks = []
-        for iface in db.get_instance_interfaces(self.uuid):
-            devname = 'eth%d' % iface['order']
+        have_default_route = False
+        for iface in networkinterface.interfaces_for_instance(self):
+            devname = 'eth%d' % iface.order
             nd['links'].append(
                 {
-                    'ethernet_mac_address': iface['macaddr'],
+                    'ethernet_mac_address': iface.macaddr,
                     'id': devname,
                     'name': devname,
-                    'mtu': 1450,
+                    'mtu': config.get('MAX_HYPERVISOR_MTU') - 50,
                     'type': 'vif',
-                    'vif_id': iface['uuid']
+                    'vif_id': iface.uuid
                 }
             )
 
-            if not iface['network_uuid'] in seen_networks:
-                n = net.Network.from_db(iface['network_uuid'])
-                nd['networks'].append(
-                    {
-                        'id': iface['network_uuid'],
-                        'link': devname,
-                        'type': 'ipv4',
-                        'ip_address': iface['ipv4'],
-                        'netmask': str(n.netmask),
-                        'routes': [
-                            {
-                                'network': '0.0.0.0',
-                                'netmask': '0.0.0.0',
-                                'gateway': str(n.router)
-                            }
-                        ],
-                        'network_id': iface['network_uuid']
-                    }
-                )
-                seen_networks.append(iface['network_uuid'])
+            n = net.Network.from_db(iface.network_uuid)
+            nd['networks'].append(
+                {
+                    'id': '%s-%s' % (iface.network_uuid, iface.order),
+                    'link': devname,
+                    'type': 'ipv4',
+                    'network_id': iface.network_uuid
+                }
+            )
+
+            if iface.ipv4:
+                nd['networks'][-1].update({
+                    'ip_address': iface.ipv4,
+                    'netmask': str(n.netmask),
+                })
+
+            # NOTE(mikal): it is assumed that the default route should be on
+            # the first interface specified.
+            if not have_default_route:
+                nd['networks'][-1].update({
+                    'routes': [
+                        {
+                            'network': '0.0.0.0',
+                            'netmask': '0.0.0.0',
+                            'gateway': str(n.router)
+                        }
+                    ]
+                })
+                have_default_route = True
 
         nd_encoded = json.dumps(nd).encode('ascii')
         iso.add_fp(io.BytesIO(nd_encoded), len(nd_encoded),
@@ -722,13 +732,13 @@ class Instance(baseobject.DatabaseBackedObject):
             t = jinja2.Template(f.read())
 
         networks = []
-        for iface in list(db.get_instance_interfaces(self.uuid)):
-            n = net.Network.from_db(iface['network_uuid'])
+        for ni in networkinterface.interfaces_for_instance(self):
+            n = net.Network.from_db(ni.network_uuid)
             networks.append(
                 {
-                    'macaddr': iface['macaddr'],
+                    'macaddr': ni.macaddr,
                     'bridge': n.subst_dict()['vx_bridge'],
-                    'model': iface['model']
+                    'model': ni.model
                 }
             )
 
@@ -905,11 +915,16 @@ class Instance(baseobject.DatabaseBackedObject):
         })
 
     def enqueue_delete_due_error(self, error_msg):
-        self.log.info('enqueue_instance_error')
+        self.log.with_field('error', error_msg).info('enqueue_instance_error')
 
         # Error needs to be set immediately so that API clients get
         # correct information. The VM and network tear down can be delayed.
-        self.state = '%s-error' % self.state.value
+        try:
+            self.state = '%s-error' % self.state.value
+        except Exception:
+            # We can land here if there is a serious database error.
+            self.state = 'error'
+
         self.error = error_msg
         self.enqueue_delete()
 

@@ -7,7 +7,6 @@ from shakenfist.config import config
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import logutil
-from shakenfist import util
 
 
 ETCD_ATTEMPT_TIMEOUT = 60
@@ -64,90 +63,6 @@ def persist_ipmanager(network_uuid, data):
 def delete_ipmanager(network_uuid):
     etcd.delete('ipmanager', None, uuid)
 
-
-#####################################################################
-# NetworkInterfaces
-#####################################################################
-
-
-def create_network_interface(interface_uuid, netdesc, instance_uuid, order):
-    if 'macaddress' not in netdesc or not netdesc['macaddress']:
-        possible_mac = util.random_macaddr()
-        mac_iface = {'interface_uuid': interface_uuid}
-        while not etcd.create('macaddress', None, possible_mac, mac_iface):
-            possible_mac = util.random_macaddr()
-        netdesc['macaddress'] = possible_mac
-
-    etcd.put('networkinterface', None, interface_uuid,
-             {
-                 'uuid': interface_uuid,
-                 'network_uuid': netdesc['network_uuid'],
-                 'instance_uuid': instance_uuid,
-                 'macaddr': netdesc['macaddress'],
-                 'ipv4': netdesc['address'],
-                 'order': order,
-                 'floating': None,
-                 'state': 'initial',
-                 'state_updated': time.time(),
-                 'model': netdesc['model']
-             })
-
-
-def get_stale_network_interfaces(delay):
-    for _, n in etcd.get_all('networkinterface', None):
-        if n['state'] in ['deleted', 'error']:
-            if time.time() - n['state_updated'] > delay:
-                yield n
-
-
-def hard_delete_network_interface(interface_uuid):
-    etcd.delete('networkinterface', None, interface_uuid)
-    etcd.delete_all('event/networkinterface', interface_uuid)
-
-
-def get_instance_interfaces(instance_uuid):
-    for _, ni in etcd.get_all('networkinterface', None):
-        if ni['state'] == 'deleted':
-            continue
-        if ni['instance_uuid'] == instance_uuid:
-            yield ni
-
-
-def get_network_interfaces(network_uuid):
-    for _, ni in etcd.get_all('networkinterface', None):
-        if ni['state'] == 'deleted':
-            continue
-        if ni['network_uuid'] == network_uuid:
-            yield ni
-
-
-def get_network_interface(interface_uuid):
-    return etcd.get('networkinterface', None, interface_uuid)
-
-
-def update_network_interface_state(interface_uuid, state):
-    ni = get_network_interface(interface_uuid)
-    if not ni:
-        return
-
-    ni['state'] = state
-    ni['state_updated'] = time.time()
-    etcd.put('networkinterface', None, interface_uuid, ni)
-
-    if state == 'deleted':
-        etcd.delete('macaddress', None, ni['macaddr'])
-
-
-def add_floating_to_interface(interface_uuid, addr):
-    ni = get_network_interface(interface_uuid)
-    ni['floating'] = addr
-    etcd.put('networkinterface', None, interface_uuid, ni)
-
-
-def remove_floating_from_interface(interface_uuid):
-    ni = get_network_interface(interface_uuid)
-    ni['floating'] = None
-    etcd.put('networkinterface', None, interface_uuid, ni)
 
 #####################################################################
 # Snapshots

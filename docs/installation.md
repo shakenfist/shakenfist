@@ -29,7 +29,7 @@ sudo pip3 install -U pip
 sudo apt-get remove -y python3-pip
 ```
 
-We require that Shaken Fist be installed into a venv at /srv/shakenfist/venv. Create that now:
+We require that Shaken Fist be installed into a venv at /srv/shakenfist/venv on each Shaken Fist machine. Create that now:
 
 ```
 sudo mkdir -p /srv/shakenfist/venv
@@ -268,6 +268,8 @@ with real users.
 | CLOUD | All | The terraform definition to use |
 | ADMIN_PASSWORD | All | The admin password for the cloud once installed |
 | DNS_SERVER | All | The DNS server to configure instances with via DHCP. Defaults to 8.8.8.8 |
+| HTTP_PROXY | All | A URL for a HTTP proxy to use for image downloads. For example http://localhost:3128 |
+| INCLUDE_TRACEBACKS | All | Whether to include tracebacks in server 500 errors. Never set this to true in production! |
 | FLOATING_IP_BLOCK | All | The IP range to use for the floating network |
 | BOOTDELAY | All | How long to wait for terraform deployed instances to boot before continuing with install, in minutes |
 | SKIP_SF_TEST | All | Set to 1 to skip running destructive testing of the cloud |

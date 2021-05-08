@@ -313,3 +313,11 @@ def random_macaddr():
     return '02:00:00:%02x:%02x:%02x' % (random.randint(0, 255),
                                         random.randint(0, 255),
                                         random.randint(0, 255))
+
+
+def noneish(value):
+    if not value:
+        return True
+    if value.lower() == 'none':
+        return True
+    return False

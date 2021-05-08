@@ -14,6 +14,11 @@ class ObjectException(Exception):
 class InvalidStateException(ObjectException):
     pass
 
+
+class NoStateTransitionsDefined(ObjectException):
+    pass
+
+
 # Instance
 
 
@@ -126,4 +131,17 @@ class DeadNetwork(NetworkException):
 
 
 class CongestedNetwork(NetworkException):
+    pass
+
+
+class NoInterfaceStatistics(NetworkException):
+    pass
+
+
+# NetworkInterface
+class NetworkInterfaceException(Exception):
+    pass
+
+
+class NetworkInterfaceAlreadyFloating(NetworkInterfaceException):
     pass

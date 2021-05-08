@@ -16,11 +16,13 @@ from shakenfist import etcd
 from shakenfist.exceptions import DeadNetwork
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
+from shakenfist import networkinterface
 from shakenfist.node import Node
-from shakenfist.tasks import (DeployNetworkTask,
-                              UpdateDHCPNetworkTask,
-                              RemoveDHCPNetworkTask,
-                              RemoveNATNetworkTask)
+from shakenfist.tasks import (
+    DeployNetworkTask,
+    UpdateDHCPNetworkTask,
+    RemoveDHCPNetworkTask,
+    RemoveNATNetworkTask)
 from shakenfist import util
 from shakenfist import virt
 
@@ -483,6 +485,7 @@ class Network(baseobject.DatabaseBackedObject):
 
     def hard_delete(self):
         etcd.delete('network', None, self.uuid)
+        etcd.delete_all('attribute/network', self.uuid)
         etcd.delete_all('event/network', self.uuid)
         db.delete_metadata('network', self.uuid)
 
@@ -578,9 +581,9 @@ class Network(baseobject.DatabaseBackedObject):
             added = []
 
             instances = []
-            for iface in db.get_network_interfaces(self.uuid):
-                if not iface['instance_uuid'] in instances:
-                    instances.append(iface['instance_uuid'])
+            for ni in networkinterface.interfaces_for_network(self):
+                if ni.instance_uuid not in instances:
+                    instances.append(ni.instance_uuid)
 
             node_fqdns = []
             for inst_uuid in instances:
@@ -604,8 +607,11 @@ class Network(baseobject.DatabaseBackedObject):
                     node_ips.add(n.ip)
 
             discovered = list(self.discover_mesh())
-            self.log.with_field('discovered', discovered).with_field(
-                'node_ips', node_ips).debug('Discovered mesh elements')
+            self.log.with_fields(
+                {
+                    'discovered': discovered,
+                    'node_ips': node_ips
+                }).debug('Discovered mesh elements')
 
             for n in discovered:
                 if n in node_ips:
@@ -678,9 +684,10 @@ class Network(baseobject.DatabaseBackedObject):
             ipaddress.IPv4Address(floating_address))
         subst['inner_address'] = inner_address
 
-        util.execute(None,
-                     'ip link del flt-%(floating_address_as_hex)s-o'
-                     % subst)
+        if util.check_for_interface('flt-%(floating_address_as_hex)s-o' % subst):
+            util.execute(None,
+                         'ip link del flt-%(floating_address_as_hex)s-o'
+                         % subst)
 
 
 class Networks(baseobject.DatabaseBackedObjectIterator):

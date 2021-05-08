@@ -3,6 +3,10 @@
 # matters. We need to verify auth before anything, and we need to fetch things  #
 # from the database before we make decisions based on those things. So remember #
 # the outer decorator is executed first!                                        #
+#                                                                               #
+# Additionally, you should use suppress_traceback=True in calls to error()      #
+# which exist inside an expected exception block, otherwise we'll log a stray   #
+# traceback.                                                                    #
 #################################################################################
 
 import base64
@@ -27,7 +31,6 @@ from jwt.exceptions import DecodeError, PyJWTError
 import re
 import requests
 import sys
-import time
 import traceback
 import uuid
 
@@ -39,18 +42,21 @@ from shakenfist import images
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
+from shakenfist import networkinterface
+from shakenfist.networkinterface import NetworkInterface
 from shakenfist.node import Node, Nodes
 from shakenfist import scheduler
 from shakenfist import util
 from shakenfist import virt
 from shakenfist.daemons import daemon
-from shakenfist.tasks import (DeleteInstanceTask,
-                              FetchImageTask,
-                              PreflightInstanceTask,
-                              StartInstanceTask,
-                              FloatNetworkInterfaceTask,
-                              DefloatNetworkInterfaceTask
-                              )
+from shakenfist.tasks import (
+    DeleteInstanceTask,
+    FetchImageTask,
+    PreflightInstanceTask,
+    StartInstanceTask,
+    FloatNetworkInterfaceTask,
+    DefloatNetworkInterfaceTask
+)
 
 
 LOG, HANDLER = logutil.setup(__name__)
@@ -138,7 +144,7 @@ def generic_wrapper(func):
             return func(*args, **kwargs)
 
         except TypeError as e:
-            return error(400, str(e))
+            return error(400, str(e), suppress_traceback=True)
 
         except DecodeError:
             # Send a more informative message than 'Not enough segments'
@@ -158,7 +164,8 @@ def generic_wrapper(func):
 
         except Exception as e:
             LOG.exception('Server error')
-            return error(500, 'server error: %s' % repr(e))
+            return error(500, 'server error: %s' % repr(e),
+                         suppress_traceback=True)
 
     return wrapper
 
@@ -632,15 +639,6 @@ class Instance(Resource):
 
         instance_from_db.enqueue_delete_remote(node)
 
-        start_time = time.time()
-        while time.time() - start_time < config.get('API_ASYNC_WAIT'):
-            if instance_from_db.state.value in ['deleted', 'error']:
-                return
-
-            time.sleep(0.5)
-
-        return
-
 
 def _assign_floating_ip(interface_uuid):
     float_net = net.Network.from_db('floating')
@@ -706,9 +704,9 @@ class Instances(Resource):
                     return error(400, 'network specification is missing network_uuid')
 
                 net_uuid = netdesc['network_uuid']
-                if netdesc.get('address'):
+                if netdesc.get('address') and not util.noneish(netdesc.get('address')):
                     # The requested address must be within the ip range specified
-                    # for that virtual network
+                    # for that virtual network, unless it is equivalent to "none".
                     ipm = IPManager.from_db(net_uuid)
                     if not ipm.is_in_range(netdesc['address']):
                         return error(400,
@@ -761,22 +759,29 @@ class Instances(Resource):
                     return error(
                         404, 'network %s not found' % netdesc['network_uuid'])
 
-                with db.get_lock('ipmanager', None,  netdesc['network_uuid'],
-                                 ttl=120, op='Network allocate IP'):
-                    db.add_event('network', netdesc['network_uuid'], 'allocate address',
-                                 None, None, instance.uuid)
-                    ipm = IPManager.from_db(netdesc['network_uuid'])
-                    if 'address' not in netdesc or not netdesc['address']:
-                        netdesc['address'] = ipm.get_random_free_address()
-                    else:
-                        if not ipm.reserve(netdesc['address']):
-                            m = 'failed to reserve an IP on network %s' % (
-                                netdesc['network_uuid'])
-                            instance.enqueue_delete_due_error(m)
-                            return error(409, 'address %s in use' %
-                                         netdesc['address'])
+                # NOTE(mikal): we now support interfaces with no address on them
+                # (thanks OpenStack Kolla), which are special cased here. To not
+                # have an address, you use a detailed netdesc and specify
+                # address=none.
+                if 'address' in netdesc and util.noneish(netdesc['address']):
+                    netdesc['address'] = None
+                else:
+                    with db.get_lock('ipmanager', None,  netdesc['network_uuid'],
+                                     ttl=120, op='Network allocate IP'):
+                        db.add_event('network', netdesc['network_uuid'], 'allocate address',
+                                     None, None, instance.uuid)
+                        ipm = IPManager.from_db(netdesc['network_uuid'])
+                        if 'address' not in netdesc or not netdesc['address']:
+                            netdesc['address'] = ipm.get_random_free_address()
+                        else:
+                            if not ipm.reserve(netdesc['address']):
+                                m = 'failed to reserve an IP on network %s' % (
+                                    netdesc['network_uuid'])
+                                instance.enqueue_delete_due_error(m)
+                                return error(409, 'address %s in use' %
+                                             netdesc['address'])
 
-                    ipm.persist()
+                        ipm.persist()
 
                 if 'model' not in netdesc or not netdesc['model']:
                     netdesc['model'] = 'virtio'
@@ -785,8 +790,8 @@ class Instances(Resource):
                 LOG.with_object(instance).with_object(n).withFields({
                     'networkinterface': iface_uuid
                 }).info('Interface allocated')
-                db.create_network_interface(
-                    iface_uuid, netdesc, instance.uuid, order)
+                NetworkInterface.new(iface_uuid, netdesc, instance.uuid, order)
+                order += 1
 
                 if 'float' in netdesc and netdesc['float']:
                     err = _assign_floating_ip(iface_uuid)
@@ -816,13 +821,13 @@ class Instances(Resource):
             instance.add_event('schedule', 'failed', None,
                                'Insufficient resources: ' + str(e))
             instance.enqueue_delete_due_error('scheduling failed')
-            return error(507, str(e))
+            return error(507, str(e), suppress_traceback=True)
 
         except exceptions.CandidateNodeNotFoundException as e:
             instance.add_event('schedule', 'failed', None,
                                'Candidate node not found: ' + str(e))
             instance.enqueue_delete_due_error('scheduling failed')
-            return error(404, 'node not found: %s' % e)
+            return error(404, 'node not found: %s' % e, suppress_traceback=True)
 
         # Record placement
         instance.place_instance(placement)
@@ -838,14 +843,6 @@ class Instances(Resource):
         # Enqueue creation tasks on desired node task queue
         db.enqueue(placement, {'tasks': tasks})
         instance.add_event('create', 'enqueued', None, None)
-
-        # Watch for a while and return results if things are fast, give up
-        # after a while and just return the current state
-        start_time = time.time()
-        while time.time() - start_time < config.get('API_ASYNC_WAIT'):
-            if instance.state.value in ['created', 'deleted', 'error']:
-                return instance.external_view()
-            time.sleep(0.5)
         return instance.external_view()
 
     @jwt_required
@@ -880,29 +877,12 @@ class Instances(Resource):
 
             tasks_by_node.setdefault(node, [])
             tasks_by_node[node].append(DeleteInstanceTask(instance.uuid))
-            waiting_for.append(instance)
+            waiting_for.append(instance.uuid)
 
         for node in tasks_by_node:
             db.enqueue(node, {'tasks': tasks_by_node[node]})
 
-        start_time = time.time()
-        while (waiting_for and
-               (time.time() - start_time < config.get('API_ASYNC_WAIT'))):
-            for instance in copy.copy(waiting_for):
-                s = instance.state.value
-                if s in ['deleted', 'error']:
-                    waiting_for.remove(instance)
-                else:
-                    LOG.with_instance(instance).info(
-                        'Still waiting for deletion (state is %s)' % s)
-
-            if waiting_for:
-                time.sleep(0.2)
-
-        retval = []
-        for instance in waiting_for:
-            retval.append(instance.uuid)
-        return retval
+        return waiting_for
 
 
 class InstanceInterfaces(Resource):
@@ -910,7 +890,10 @@ class InstanceInterfaces(Resource):
     @arg_is_instance_uuid
     @requires_instance_ownership
     def get(self, instance_uuid=None, instance_from_db=None):
-        return list(db.get_instance_interfaces(instance_uuid))
+        out = []
+        for ni in networkinterface.interfaces_for_instance(instance_from_db):
+            out.append(ni.external_view())
+        return out
 
 
 class InstanceEvents(Resource):
@@ -1030,14 +1013,14 @@ class InstanceUnpause(Resource):
 
 
 def _safe_get_network_interface(interface_uuid):
-    ni = db.get_network_interface(interface_uuid)
+    ni = NetworkInterface.from_db(interface_uuid)
     if not ni:
         return None, None, error(404, 'interface not found')
 
-    log = LOG.with_fields({'network': ni['network_uuid'],
-                           'networkinterface': ni['uuid']})
+    log = LOG.with_fields({'network': ni.network_uuid,
+                           'networkinterface': ni.uuid})
 
-    n = net.Network.from_db(ni['network_uuid'])
+    n = net.Network.from_db(ni.network_uuid)
     if not n:
         log.info('Network not found or deleted')
         return None, None, error(404, 'interface network not found')
@@ -1046,7 +1029,7 @@ def _safe_get_network_interface(interface_uuid):
         log.info('Interface not found, failed ownership test')
         return None, None, error(404, 'interface not found')
 
-    i = virt.Instance.from_db(ni['instance_uuid'])
+    i = virt.Instance.from_db(ni.instance_uuid)
     if get_jwt_identity() not in [i.namespace, 'system']:
         log.with_object(i).info('Instance not found, failed ownership test')
         return None, None, error(404, 'interface not found')
@@ -1061,7 +1044,7 @@ class Interface(Resource):
         ni, _, err = _safe_get_network_interface(interface_uuid)
         if err:
             return err
-        return ni
+        return ni.external_view()
 
 
 class InterfaceFloat(Resource):
@@ -1185,10 +1168,11 @@ class Images(Resource):
         # We ensure that the image exists in the database in an initial state
         # here so that it will show up in image list requests. The image is
         # fetched by the queued job later.
-        images.Image.new(url)
+        img = images.Image.new(url)
         db.enqueue(config.NODE_NAME, {
             'tasks': [FetchImageTask(url)],
         })
+        return img.external_view()
 
 
 class ImageEvents(Resource):
@@ -1232,12 +1216,18 @@ class Network(Resource):
         if network_uuid == 'floating':
             return error(403, 'you cannot delete the floating network')
 
+        n = net.Network.from_db(network_from_db.uuid)
+        if not n:
+            LOG.with_fields({'network_uuid': n.uuid}).warning(
+                'delete_network: network does not exist')
+            return error(404, 'network does not exist')
+
         # We only delete unused networks
-        ifaces = list(db.get_network_interfaces(network_uuid))
+        ifaces = list(networkinterface.interfaces_for_network(n))
         if len(ifaces) > 0:
             for iface in ifaces:
-                LOG.withFields({'network_interface': iface['uuid'],
-                                'state': iface['state']}).info('Blocks network delete')
+                LOG.withFields({'network_interface': iface.uuid,
+                                'state': iface.state}).info('Blocks network delete')
             return error(403, 'you cannot delete an in use network')
 
         # Check if network has already been deleted
@@ -1278,7 +1268,8 @@ class Networks(Resource):
             if n.num_addresses < 8:
                 return error(400, 'network is below minimum size of /29')
         except ValueError as e:
-            return error(400, 'cannot parse netblock: %s' % e)
+            return error(400, 'cannot parse netblock: %s' % e,
+                         suppress_traceback=True)
 
         if not namespace:
             namespace = get_jwt_identity()
@@ -1317,7 +1308,7 @@ class Networks(Resource):
         networks_unable = []
         for n in net.Networks([partial(baseobject.namespace_filter, namespace),
                                baseobject.active_states_filter]):
-            if len(list(db.get_network_interfaces(n.uuid))) > 0:
+            if len(list(networkinterface.interfaces_for_network(n))) > 0:
                 LOG.with_object(n).warning(
                     'Network in use, cannot be deleted by delete-all')
                 networks_unable.append(n.uuid)
@@ -1341,13 +1332,16 @@ class NetworkEvents(Resource):
         return list(db.get_events('network', network_uuid))
 
 
-class NetworkInterfaces(Resource):
+class NetworkInterfacesEndpoint(Resource):
     @jwt_required
     @arg_is_network_uuid
     @requires_network_ownership
     @requires_network_active
     def get(self, network_uuid=None, network_from_db=None):
-        return list(db.get_network_interfaces(network_uuid))
+        out = []
+        for ni in networkinterface.interfaces_for_network(self.network):
+            out.append(ni.external_view())
+        return out
 
 
 class NetworkMetadatas(Resource):
@@ -1471,7 +1465,8 @@ api.add_resource(ImageEvents, '/images/events')
 api.add_resource(Networks, '/networks')
 api.add_resource(Network, '/networks/<network_uuid>')
 api.add_resource(NetworkEvents, '/networks/<network_uuid>/events')
-api.add_resource(NetworkInterfaces, '/networks/<network_uuid>/interfaces')
+api.add_resource(NetworkInterfacesEndpoint,
+                 '/networks/<network_uuid>/interfaces')
 api.add_resource(NetworkMetadatas, '/networks/<network_uuid>/metadata')
 api.add_resource(NetworkMetadata,
                  '/networks/<network_uuid>/metadata/<key>')

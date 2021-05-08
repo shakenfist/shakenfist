@@ -270,9 +270,6 @@ class ExternalApiTestCase(test_shakenfist.ShakenFistTestCase):
 
 
 class ExternalApiGeneralTestCase(ExternalApiTestCase):
-    def setUp(self):
-        super(ExternalApiGeneralTestCase, self).setUp()
-
     def test_get_root(self):
         resp = self.client.get('/')
         self.assertEqual('Shaken Fist REST API service',
@@ -764,19 +761,15 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                     FakeInstance(
                         namespace='system',
                         uuid='6a973b82-31b3-4780-93e4-04d99ae49f3f',
-                        state=['created', 'deleted']),
+                        state=['created']),
                     FakeInstance(
                         namespace='system',
                         uuid='847b0327-9b17-4148-b4ed-be72b6722c17',
-                        state=['created', 'deleted'])])
-    @mock.patch('shakenfist.virt.Instance._db_get',
-                return_value={
-                    'state': 'deleted',
-                },)
+                        state=['created'])])
     @mock.patch('shakenfist.etcd.put')
     @mock.patch('shakenfist.db.get_lock')
     def test_delete_all_instances(
-            self, mock_db_get_lock, mock_etcd_put, mock_get_instance,
+            self, mock_db_get_lock, mock_etcd_put,
             mock_get_instances, mock_enqueue):
 
         resp = self.client.delete('/instances',
@@ -785,34 +778,9 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                                       'confirm': True,
                                       'namespace': 'foo'
                                   }))
-        self.assertEqual([], resp.get_json())
-        self.assertEqual(200, resp.status_code)
-
-    @mock.patch('time.sleep')
-    @mock.patch('shakenfist.db.enqueue')
-    @mock.patch('shakenfist.virt.Instances',
-                return_value=[
-                    FakeInstance(
-                        namespace='system',
-                        uuid='6a973b82-31b3-4780-93e4-04d99ae49f3f',
-                        state=['created', 'deleted']),
-                    FakeInstance(
-                        namespace='system',
-                        uuid='847b0327-9b17-4148-b4ed-be72b6722c17',
-                        state='deleted')])
-    @mock.patch('shakenfist.etcd.put')
-    @mock.patch('shakenfist.db.get_lock')
-    def test_delete_all_instances_one_already_deleted(
-            self, mock_db_get_lock,  mock_etcd_put, mock_get_instances,
-            mock_enqueue, mock_sleep):
-
-        resp = self.client.delete('/instances',
-                                  headers={'Authorization': self.auth_header},
-                                  data=json.dumps({
-                                      'confirm': True,
-                                      'namespace': 'foo'
-                                  }))
-        self.assertEqual([], resp.get_json())
+        self.assertEqual(['6a973b82-31b3-4780-93e4-04d99ae49f3f',
+                          '847b0327-9b17-4148-b4ed-be72b6722c17'],
+                         resp.get_json())
         self.assertEqual(200, resp.status_code)
 
     def test_post_instance_no_disk(self):
@@ -975,7 +943,7 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
                     name='bob',
                     netblock='10.10.0.0/24'
                 )])
-    @mock.patch('shakenfist.db.get_network_interfaces', return_value=[])
+    @mock.patch('shakenfist.networkinterface.interfaces_for_network', return_value=[])
     @mock.patch('shakenfist.ipmanager.IPManager.from_db',
                 return_value=IPManager('uuid', '10.0.0.0/24'))
     @mock.patch('shakenfist.net.Network.remove_dhcp')
@@ -990,7 +958,7 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
                                  mock_delete,
                                  mock_remove_dhcp,
                                  mock_get_ipmanager,
-                                 mock_db_get_network_interfaces,
+                                 mock_network_interfaces,
                                  mock_db_get_networks,
                                  mock_db_get_network,
                                  mock_ipmanager_from_db,
@@ -1017,7 +985,7 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
                 ))
     @mock.patch('shakenfist.etcd.get_all',
                 return_value=[(None, {'uuid': '30f6da44-look-i-am-uuid'})])
-    @mock.patch('shakenfist.db.get_network_interfaces', return_value=[])
+    @mock.patch('shakenfist.networkinterface.interfaces_for_network', return_value=[])
     @mock.patch('shakenfist.ipmanager.IPManager.from_db',
                 return_value=IPManager('uuid', '10.0.0.0/24'))
     @mock.patch('shakenfist.net.Network.remove_dhcp')
@@ -1028,7 +996,7 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
                                                 mock_etcd_put,
                                                 mock_remove_dhcp,
                                                 mock_get_ipmanager,
-                                                mock_db_get_network_interfaces,
+                                                mock_network_interfaces,
                                                 mock_db_get_networks,
                                                 mock_db_get_network):
         resp = self.client.delete('/networks',
