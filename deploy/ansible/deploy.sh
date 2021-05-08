@@ -195,7 +195,7 @@ RESTORE_BACKUP="${RESTORE_BACKUP:-}"
 IGNORE_MTU="${IGNORE_MTU:-0}"
 DNS_SERVER="${DNS_SERVER:-8.8.8.8}"
 HTTP_PROXY="${HTTP_PROXY:-}"
-INCLUDE_TRACEBACKS="${INCLUDE_TRACEBACKS:False}"
+INCLUDE_TRACEBACKS="${INCLUDE_TRACEBACKS:-False}"
 
 # Setup variables for consumption by ansible and terraform
 cwd=`pwd`
