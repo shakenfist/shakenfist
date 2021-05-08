@@ -145,12 +145,12 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.images.Image._db_get_attribute',
                 side_effect=[
                     {'value': None, 'update_time': 0},
-                    {'value': 'initial', 'update_time': 0},
-                    {'value': 'initial', 'update_time': 0},
-                    {'value': 'creating', 'update_time': 0},
-                    {'value': 'created', 'update_time': 0},
+                    {'value': images.Image.STATE_INITIAL, 'update_time': 0},
+                    {'value': images.Image.STATE_INITIAL, 'update_time': 0},
+                    {'value': images.Image.STATE_CREATING, 'update_time': 0},
+                    {'value': images.Image.STATE_CREATED, 'update_time': 0},
                     {'value': 'error', 'update_time': 0},
-                    {'value': 'deleted', 'update_time': 0},
+                    {'value': images.Image.STATE_DELETED, 'update_time': 0},
                 ])
     @mock.patch('shakenfist.images.Image._db_set_attribute')
     @mock.patch('shakenfist.etcd.put')
@@ -163,16 +163,16 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
             'version': 1,
             'url': 'a'
         })
-        i.state = 'initial'
+        i.state = images.Image.STATE_INITIAL
         with testtools.ExpectedException(exceptions.InvalidStateException):
-            i.state = 'created'
+            i.state = images.Image.STATE_CREATED
         with testtools.ExpectedException(exceptions.InvalidStateException):
-            i.state = 'created'
-        i.state = 'deleted'
-        i.state = 'error'
-        i.state = 'deleted'
+            i.state = images.Image.STATE_CREATED
+        i.state = images.Image.STATE_DELETED
+        i.state = images.Image.STATE_ERROR
+        i.state = images.Image.STATE_DELETED
         with testtools.ExpectedException(exceptions.InvalidStateException):
-            i.state = 'created'
+            i.state = images.Image.STATE_CREATED
 
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get',
                 return_value={
@@ -793,7 +793,7 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
     # All download attempts not matching checksum
     @mock.patch('shakenfist.images.Image._db_get_attribute',
                 side_effect=[
-                    {'value': 'creating', 'update_time': 123},
+                    {'value': images.Image.STATE_CREATING, 'update_time': 123},
                     {'value': 'error', 'update_time': 123},
                     {'value': 'error', 'update_time': 123},
                     {'value': 'error', 'update_time': 123},

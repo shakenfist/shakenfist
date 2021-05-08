@@ -6,6 +6,7 @@ import json
 import time
 
 from shakenfist import baseobject
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist import networkinterface
 from shakenfist.node import Node
 from shakenfist import util
@@ -225,11 +226,11 @@ def main():
                     etcd_client.put(
                         '/sf/attribute/image/%s/state' % image_node,
                         json.dumps({
-                            'state': 'created',
+                            'state': dbo.STATE_CREATED,
                             'state_updated': time.time()
                         }, indent=4, sort_keys=True))
 
-                    new = baseobject.State('created', time.time())
+                    new = baseobject.State(dbo.STATE_CREATED, time.time())
                     etcd_client.put(
                         '/sf/attribute/image/%s/state' % image_node,
                         json.dumps(new.obj_dict(), indent=4, sort_keys=True))
@@ -290,7 +291,7 @@ def main():
                                        indent=4, sort_keys=True))
                         del network['floating_gateway']
 
-                    new = baseobject.State('created', time.time())
+                    new = baseobject.State(dbo.STATE_CREATED, time.time())
                     etcd_client.put(
                         '/sf/attribute/network/%s/state' % n['uuid'],
                         json.dumps(new.obj_dict(), indent=4, sort_keys=True))

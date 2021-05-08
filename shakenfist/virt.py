@@ -14,6 +14,9 @@ import time
 from uuid import uuid4
 
 from shakenfist import baseobject
+from shakenfist.baseobject import (
+    DatabaseBackedObject as dbo,
+    DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import etcd
@@ -115,34 +118,29 @@ def _snapshot_path():
     return os.path.join(config.get('STORAGE_PATH'), 'snapshots')
 
 
-class Instance(baseobject.DatabaseBackedObject):
+class Instance(dbo):
     object_type = 'instance'
     current_version = 2
 
     # docs/development/state_machine.md has a description of these states.
-    STATE_INITIAL = 'initial'
     STATE_INITIAL_ERROR = 'initial-error'
     STATE_PREFLIGHT = 'preflight'
     STATE_PREFLIGHT_ERROR = 'preflight-error'
-    STATE_CREATING = 'creating'
     STATE_CREATING_ERROR = 'creating-error'
-    STATE_CREATED = 'created'
     STATE_CREATED_ERROR = 'created-error'
-    STATE_ERROR = 'error'
-    STATE_DELETED = 'deleted'
 
     state_targets = {
-        None: (STATE_INITIAL, STATE_ERROR),
-        STATE_INITIAL: (STATE_PREFLIGHT, STATE_DELETED, STATE_INITIAL_ERROR),
-        STATE_PREFLIGHT: (STATE_CREATING, STATE_DELETED, STATE_PREFLIGHT_ERROR),
-        STATE_CREATING: (STATE_CREATED, STATE_DELETED, STATE_CREATING_ERROR),
-        STATE_CREATED: (STATE_DELETED, STATE_CREATED_ERROR),
-        STATE_INITIAL_ERROR: (STATE_ERROR),
-        STATE_PREFLIGHT_ERROR: (STATE_ERROR),
-        STATE_CREATING_ERROR: (STATE_ERROR),
-        STATE_CREATED_ERROR: (STATE_ERROR),
-        STATE_ERROR: (STATE_DELETED, STATE_ERROR),
-        STATE_DELETED: None,
+        None: (dbo.STATE_INITIAL, dbo.STATE_ERROR),
+        dbo.STATE_INITIAL: (STATE_PREFLIGHT, dbo.STATE_DELETED, STATE_INITIAL_ERROR),
+        STATE_PREFLIGHT: (dbo.STATE_CREATING, dbo.STATE_DELETED, STATE_PREFLIGHT_ERROR),
+        dbo.STATE_CREATING: (dbo.STATE_CREATED, dbo.STATE_DELETED, STATE_CREATING_ERROR),
+        dbo.STATE_CREATED: (dbo.STATE_DELETED, STATE_CREATED_ERROR),
+        STATE_INITIAL_ERROR: (dbo.STATE_ERROR),
+        STATE_PREFLIGHT_ERROR: (dbo.STATE_ERROR),
+        STATE_CREATING_ERROR: (dbo.STATE_ERROR),
+        STATE_CREATED_ERROR: (dbo.STATE_ERROR),
+        dbo.STATE_ERROR: (dbo.STATE_DELETED, dbo.STATE_ERROR),
+        dbo.STATE_DELETED: None,
     }
 
     def __init__(self, static_values):
@@ -923,13 +921,13 @@ class Instance(baseobject.DatabaseBackedObject):
             self.state = '%s-error' % self.state.value
         except Exception:
             # We can land here if there is a serious database error.
-            self.state = 'error'
+            self.state = self.STATE_ERROR
 
         self.error = error_msg
         self.enqueue_delete()
 
 
-class Instances(baseobject.DatabaseBackedObjectIterator):
+class Instances(dbo_iter):
     def __iter__(self):
         for _, i in etcd.get_all('instance', None):
             i = Instance.from_db(i['uuid'])
@@ -977,7 +975,7 @@ def healthy_instances_on_node(n):
 
 
 def created_instances_on_node():
-    return Instances([this_node_filter, partial(baseobject.state_filter, ['created'])])
+    return Instances([this_node_filter, partial(baseobject.state_filter, [dbo.STATE_CREATED])])
 
 
 def instances_in_namespace(namespace):

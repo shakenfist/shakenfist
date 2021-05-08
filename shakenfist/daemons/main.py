@@ -6,6 +6,7 @@ import os
 import psutil
 
 from shakenfist import baseobject
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.daemons import external_api as external_api_daemon
@@ -43,7 +44,7 @@ def restore_instances():
                 img = images.Image.new(disk['base'])
                 # NOTE(mikal): this check isn't great -- it checks for the original
                 # downloaded image, not the post transcode version
-                if (img.state in ['deleted', 'error'] or
+                if (img.state in [dbo.STATE_DELETED, dbo.STATE_ERROR] or
                         not os.path.exists(img.version_image_path())):
                     instance_problems.append(
                         '%s missing from image cache' % disk['base'])
@@ -72,7 +73,8 @@ def restore_instances():
                 with db.get_lock(
                         'instance', None, inst.uuid, ttl=120, timeout=120,
                         op='Instance restore'):
-                    started = ['on', 'transition-to-on', 'initial', 'unknown']
+                    started = ['on', 'transition-to-on',
+                               virt.Instance.STATE_INITIAL, 'unknown']
                     if inst.power_state not in started:
                         continue
 

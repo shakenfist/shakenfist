@@ -1,6 +1,7 @@
 import mock
 import testtools
 
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist import exceptions
 from shakenfist import net
 from shakenfist.config import SFConfig
@@ -250,13 +251,13 @@ link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
     @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.net.Network._db_get_attribute',
                 side_effect=[
-                    {'value': 'created', 'update_time': 0},
-                    {'value': 'created', 'update_time': 0},
-                    {'value': 'created', 'update_time': 0},
-                    {'value': 'error', 'update_time': 0},
-                    {'value': 'deleted', 'update_time': 0},
-                    {'value': 'deleted', 'update_time': 0},
-                    ])
+                    {'value': dbo.STATE_CREATED, 'update_time': 0},
+                    {'value': dbo.STATE_CREATED, 'update_time': 0},
+                    {'value': dbo.STATE_CREATED, 'update_time': 0},
+                    {'value': dbo.STATE_ERROR, 'update_time': 0},
+                    {'value': dbo.STATE_DELETED, 'update_time': 0},
+                    {'value': dbo.STATE_DELETED, 'update_time': 0},
+                ])
     @mock.patch('shakenfist.net.Network._db_set_attribute')
     @mock.patch('shakenfist.etcd.put')
     def test_set_state_valid(
@@ -273,8 +274,8 @@ link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
             'netblock': '192.168.1.0/24'
         })
         with testtools.ExpectedException(exceptions.InvalidStateException):
-            n.state = 'initial'
-        n.state = 'error'
-        n.state = 'deleted'
+            n.state = net.Network.STATE_INITIAL
+        n.state = dbo.STATE_ERROR
+        n.state = dbo.STATE_DELETED
         with testtools.ExpectedException(exceptions.InvalidStateException):
-            n.state = 'created'
+            n.state = dbo.STATE_CREATED

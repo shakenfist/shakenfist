@@ -1,6 +1,7 @@
 import mock
 import time
 
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist import exceptions
 from shakenfist import images
 from shakenfist import scheduler
@@ -20,7 +21,7 @@ class FakeNode(object):
     def __init__(self, fqdn, ip):
         self.uuid = fqdn
         self.ip = ip
-        self.state = 'created'
+        self.state = dbo.STATE_CREATED
 
     def unique_label(self):
         return ('fake_node', self.uuid)
@@ -444,7 +445,7 @@ class FindMostTestCase(SchedulerTestCase):
                 ])
     def test_most_matching_images(
             self, mock_from_db, mock_get_meta_all, mock_state_get):
-        mock_state_get.return_value = State('created', 0)
+        mock_state_get.return_value = State(dbo.STATE_CREATED, 0)
 
         req_images = ['req_image1']
         candidates = ['node1_net', 'node2', 'node3', 'node4']
@@ -517,7 +518,7 @@ class FindMostTestCase(SchedulerTestCase):
                 ])
     def test_most_matching_images_big_one(
             self, mock_from_db, mock_get_meta_all, mock_state_get):
-        mock_state_get.return_value = State('created', 1)
+        mock_state_get.return_value = State(dbo.STATE_CREATED, 1)
 
         candidates = ['node1_net', 'node2', 'node3', 'node4']
 
@@ -631,7 +632,7 @@ class FindMostTestCase(SchedulerTestCase):
                 ])
     def test_most_matching_images_big_two(
             self, mock_from_db, mock_get_meta_all, mock_state_get):
-        mock_state_get.return_value = State('created', 1)
+        mock_state_get.return_value = State(dbo.STATE_CREATED, 1)
 
         candidates = ['node1_net', 'node2', 'node3', 'node4']
 
@@ -703,7 +704,7 @@ class FindMostTestCase(SchedulerTestCase):
                 ])
     def test_most_matching_images_big_three(
             self, mock_from_db, mock_get_meta_all, mock_state_get):
-        mock_state_get.return_value = State('created', 1)
+        mock_state_get.return_value = State(dbo.STATE_CREATED, 1)
 
         candidates = ['node1_net', 'node2', 'node3', 'node4']
 
