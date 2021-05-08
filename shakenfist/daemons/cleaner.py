@@ -8,9 +8,9 @@ import time
 from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist.daemons import daemon
-from shakenfist import db
 from shakenfist import logutil
 from shakenfist import net
+from shakenfist.networkinterface import NetworkInterfaces
 from shakenfist.node import (
     Node, Nodes,
     active_states_filter as node_active_states_filter,
@@ -177,10 +177,12 @@ class Monitor(daemon.Daemon):
                 LOG.with_network(n).info('Hard deleting network')
                 n.hard_delete()
 
-            for ni in db.get_stale_network_interfaces(config.get('CLEANER_DELAY')):
+            for ni in NetworkInterfaces([
+                    partial(baseobject.state_filter, ['deleted', 'error']),
+                    partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))]):
                 LOG.with_networkinterface(
-                    ni['uuid']).info('Hard deleting network interface')
-                db.hard_delete_network_interface(ni['uuid'])
+                    ni).info('Hard deleting network interface')
+                ni.hard_delete()
 
             for n in Nodes([node_inactive_states_filter]):
                 age = time.time() - n.last_seen

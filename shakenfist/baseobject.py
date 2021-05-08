@@ -98,21 +98,35 @@ class DatabaseBackedObject(object):
     def state(self, new_value):
         with self.get_lock_attr('state', 'State update'):
             orig = self.state
+            LOG.with_fields(
+                {
+                    'uuid': self.uuid,
+                    'object_type': self.object_type,
+                    'original state': orig,
+                    'new state': new_value,
+                    'targets': self.state_targets
+                }).debug('Verifying state transition')
 
             if orig.value == new_value:
                 return
+
+            # TODO(mikal): move this to a constant when we have a good set of shared basic states.
+            if orig.value == 'deleted':
+                LOG.with_fields(
+                    {
+                        'uuid': self.uuid,
+                        'object_type': self.object_type,
+                        'original state': orig,
+                        'new state': new_value
+                    }).warn('Objects do not undelete')
+                raise exceptions.InvalidStateException(
+                    'Invalid state change from %s to %s for object=%s uuid=%s',
+                    orig.value, new_value, self.object_type, self.uuid)
 
             # Ensure state change is valid
             if not self.state_targets:
                 raise exceptions.NoStateTransitionsDefined(
                     self.object_type)
-
-            LOG.with_fields(
-                {
-                    'original state': orig,
-                    'new state': new_value,
-                    'targets': self.state_targets
-                }).debug('Verifying state transition')
 
             if new_value not in self.state_targets.get(orig.value, []):
                 raise exceptions.InvalidStateException(

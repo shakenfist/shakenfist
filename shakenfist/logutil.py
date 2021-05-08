@@ -55,20 +55,20 @@ class SFPyLogrus(logging.Logger, PyLogrusBase):
             inst = inst.uuid
         return SFCustomAdapter(self, {'instance': inst})
 
-    def with_network(self, inst):
-        if not isinstance(inst, str):
-            inst = inst.uuid
-        return SFCustomAdapter(self, {'network': inst})
+    def with_network(self, n):
+        if not isinstance(n, str):
+            n = n.uuid
+        return SFCustomAdapter(self, {'network': n})
 
-    def with_networkinterface(self, inst):
-        if not isinstance(inst, str):
-            inst = inst.uuid
-        return SFCustomAdapter(self, {'networkinterface': inst})
+    def with_networkinterface(self, ni):
+        if not isinstance(ni, str):
+            ni = ni.uuid
+        return SFCustomAdapter(self, {'networkinterface': ni})
 
-    def with_image(self, inst):
-        if not isinstance(inst, str):
-            inst = inst.unique_ref
-        return SFCustomAdapter(self, {'image': inst})
+    def with_image(self, i):
+        if not isinstance(i, str):
+            i = i.unique_ref
+        return SFCustomAdapter(self, {'image': i})
 
 
 class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
@@ -101,6 +101,18 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
 
     def with_fields(self, fields=None):
         extra = copy.deepcopy(self._extra)
+        if not fields:
+            fields = {}
+
+        # Handle "special fields" which might be internal objects
+        for key in ['instance', 'network', 'networkinterface', 'image']:
+            if key in fields:
+                value = fields[key]
+                if not isinstance(value, str):
+                    value = value.uuid
+                extra.update({key: value})
+                del fields[key]
+
         extra.update(self._normalize(fields))
         return SFCustomAdapter(self._logger, extra, self._prefix)
 

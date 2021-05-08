@@ -28,6 +28,18 @@ class FakeNetwork(object):
         self.broadcast = '127.255.255.255'
 
 
+class FakeNetworkInterface(object):
+    object_type = 'networkinterface'
+
+    def __init__(self, values):
+        self.uuid = values['uuid']
+        self.instance_uuid = values['instance_uuid']
+        self.network_uuid = values['network_uuid']
+        self.macaddr = values['macaddr']
+        self.ipv4 = values['ipv4']
+        self.order = values['order']
+
+
 class VirtMetaTestCase(test_shakenfist.ShakenFistTestCase):
     def setUp(self):
         super(VirtMetaTestCase, self).setUp()
@@ -356,33 +368,31 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
 
     # create, delete
 
-    @mock.patch('shakenfist.net.Network.from_db',
-                return_value=FakeNetwork())
-    @mock.patch('shakenfist.db.get_instance_interfaces',
+    @mock.patch('shakenfist.networkinterface.NetworkInterfaces',
                 return_value=[
-                    {
+                    FakeNetworkInterface({
                         'uuid': 'ifaceuuid',
                         'instance_uuid': 'instuuid',
                         'network_uuid': 'netuuid',
                         'macaddr': '1a:91:64:d2:15:39',
                         'ipv4': '127.0.0.5',
                         'order': 0
-                    },
-                    {
+                    }),
+                    FakeNetworkInterface({
                         'uuid': 'ifaceuuid2',
                         'instance_uuid': 'instuuid',
                         'network_uuid': 'netuuid',
                         'macaddr': '1a:91:64:d2:15:40',
                         'ipv4': '127.0.0.6',
                         'order': 1
-                    }
+                    })
                 ])
     @mock.patch('shakenfist.net.Network.from_db',
                 return_value=FakeNetwork())
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject.state',
                 new_callable=mock.PropertyMock)
     def test_make_config_drive(self, mock_update, mock_net_from_db,
-                               mock_interfaces, mock_network):
+                               mock_interfaces):
         i = self._make_instance()
 
         (fd, cd_file) = tempfile.mkstemp()

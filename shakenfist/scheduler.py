@@ -12,6 +12,7 @@ from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import images
 from shakenfist import logutil
+from shakenfist import networkinterface
 from shakenfist.node import (
     Nodes, active_states_filter as node_active_states_filter)
 from shakenfist import util
@@ -137,9 +138,9 @@ class Scheduler(object):
             # Make a list of networks for the node
             present_networks = []
             for inst in per_node.get(n, []):
-                for iface in db.get_instance_interfaces(inst.uuid):
-                    if not iface['network_uuid'] in present_networks:
-                        present_networks.append(iface['network_uuid'])
+                for ni in networkinterface.interfaces_for_instance(inst):
+                    if ni.network_uuid not in present_networks:
+                        present_networks.append(ni.network_uuid)
 
             # Count the requested networks present on this node
             for network in present_networks:

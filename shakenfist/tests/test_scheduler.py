@@ -27,22 +27,23 @@ class FakeNode(object):
 
 
 class FakeDB(object):
-    def __init__(self, nodes, interfaces=None):
+    def __init__(self, nodes):
         self.metrics = {}
         self.nodes = nodes
-        self.interfaces = interfaces
 
     def set_node_metrics_same(self, metrics):
         for n in self.nodes:
             self.metrics[n] = metrics
 
-    def get_instance_interfaces(self, inst_uuid):
-        return self.interfaces[inst_uuid]
-
     def get_metrics(self, node_name):
         if node_name not in self.metrics:
             raise exceptions.ReadException
         return self.metrics[node_name]
+
+
+class FakeInterface(object):
+    def __init__(self, network_uuid):
+        self.network_uuid = network_uuid
 
 
 fake_config = SFConfig(
@@ -278,8 +279,7 @@ class CorrectAllocationTestCase(SchedulerTestCase):
     def setUp(self):
         super(CorrectAllocationTestCase, self).setUp()
 
-        self.fake_db = FakeDB(['node1_net', 'node2', 'node3', 'node4'],
-                              {'inst-1': [{'network_uuid': 'uuid-net1'}]})
+        self.fake_db = FakeDB(['node1_net', 'node2', 'node3', 'node4'])
 
         mock_db_get_metrics = mock.patch('shakenfist.db.get_metrics',
                                          side_effect=self.fake_db.get_metrics)
@@ -299,12 +299,6 @@ class CorrectAllocationTestCase(SchedulerTestCase):
                           FakeNode('node4', '10.0.0.4')])
         mock_get_nodes.start()
         self.addCleanup(mock_get_nodes.stop)
-
-        self.mock_get_instance_interfaces = mock.patch(
-            'shakenfist.db.get_instance_interfaces',
-            side_effect=self.fake_db.get_instance_interfaces)
-        self.mock_get_instance_interfaces.start()
-        self.addCleanup(self.mock_get_instance_interfaces.stop)
 
     @mock.patch('shakenfist.virt.Instance._db_get_attribute')
     @mock.patch('shakenfist.virt.Instance._db_get',
@@ -350,6 +344,8 @@ class CorrectAllocationTestCase(SchedulerTestCase):
         self.assertSetEqual(set(self.fake_db.nodes)-{'node1_net', },
                             set(nodes))
 
+    @mock.patch('shakenfist.networkinterface.interfaces_for_instance',
+                return_value=[FakeInterface('uuid-net1')])
     @mock.patch('shakenfist.virt.Instance._db_get_attribute',
                 return_value={
                     'node': 'node3'
@@ -372,7 +368,7 @@ class CorrectAllocationTestCase(SchedulerTestCase):
     @mock.patch('shakenfist.images.Images', return_value=[])
     def test_single_node_that_has_network(
             self, mock_get_image_meta, mock_image_from_url, mock_get_instances,
-            mock_get_instance, mock_instance_attribute):
+            mock_get_instance, mock_instance_attribute, mock_instance_interfaces):
         self.fake_db.set_node_metrics_same({
             'cpu_max_per_instance': 16,
             'cpu_max': 4,
@@ -399,13 +395,7 @@ class FindMostTestCase(SchedulerTestCase):
     def setUp(self):
         super(FindMostTestCase, self).setUp()
 
-        self.fake_db = FakeDB(['node1_net', 'node2', 'node3', 'node4'],
-                              {'node3': [{'uuid': 'inst-1',
-                                          'node': 'node3',
-                                          'block_devices': [],
-                                          },
-                                         ],
-                               })
+        self.fake_db = FakeDB(['node1_net', 'node2', 'node3', 'node4'])
 
         self.mock_config = mock.patch(
             'shakenfist.scheduler.config', fake_config)

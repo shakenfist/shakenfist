@@ -79,6 +79,10 @@ class TestNetworking(base.BaseNamespacedTestCase):
         inst2 = self.test_client.get_instance(inst2['uuid'])
 
         nics = self.test_client.get_instance_interfaces(inst2['uuid'])
+        self.assertEqual(1, len(nics))
+        for iface in nics:
+            self.assertEqual('created', iface['state'],
+                             'Interface %s is not in correct state' % iface['uuid'])
 
         console = base.LoggingSocket(inst1['node'], inst1['console_port'])
         out = console.execute('ping -c 3 %s' % nics[0]['ipv4'])
@@ -128,6 +132,10 @@ class TestNetworking(base.BaseNamespacedTestCase):
         inst2 = self.test_client.get_instance(inst2['uuid'])
 
         nics = self.test_client.get_instance_interfaces(inst2['uuid'])
+        self.assertEqual(1, len(nics))
+        for iface in nics:
+            self.assertEqual('created', iface['state'],
+                             'Interface %s is not in correct state' % iface['uuid'])
 
         console = base.LoggingSocket(inst1['node'], inst1['console_port'])
         out = console.execute('ping -c 3 %s' % nics[0]['ipv4'])
@@ -177,6 +185,10 @@ class TestNetworking(base.BaseNamespacedTestCase):
         inst2 = self.test_client.get_instance(inst2['uuid'])
 
         nics = self.test_client.get_instance_interfaces(inst2['uuid'])
+        self.assertEqual(1, len(nics))
+        for iface in nics:
+            self.assertEqual('created', iface['state'],
+                             'Interface %s is not in correct state' % iface['uuid'])
 
         # Ping the other instance on this network
         console = base.LoggingSocket(inst1['node'], inst1['console_port'])
@@ -214,6 +226,11 @@ class TestNetworking(base.BaseNamespacedTestCase):
             self.fail('Instance is not in created state: %s' % inst)
 
         nics = self.test_client.get_instance_interfaces(inst['uuid'])
+        self.assertEqual(1, len(nics))
+        for iface in nics:
+            self.assertEqual('created', iface['state'],
+                             'Interface %s is not in correct state' % iface['uuid'])
+
         ips = []
         for nic in nics:
             ips.append(nic['ipv4'])
@@ -269,3 +286,43 @@ class TestNetworking(base.BaseNamespacedTestCase):
         out = console.execute('ip link')
         if not out.find('04:ed:33:c0:2e:6c'):
             self.fail('Requested macaddress not used!\n\n%s' % out)
+
+    def test_interface_delete(self):
+        inst1 = self.test_client.create_instance(
+            'cirros', 1, 1024,
+            [
+                {
+                    'network_uuid': self.net_one['uuid']
+                }
+            ],
+            [
+                {
+                    'size': 8,
+                    'base': 'cirros',
+                    'type': 'disk'
+                }
+            ], None, None)
+
+        self.assertIsNotNone(inst1['uuid'])
+        self._await_login_prompt(inst1['uuid'])
+
+        # We need to refresh our view of the instances, as it might have
+        # changed as they started up
+        inst1 = self.test_client.get_instance(inst1['uuid'])
+
+        nics = self.test_client.get_instance_interfaces(inst1['uuid'])
+        self.assertEqual(1, len(nics))
+        for iface in nics:
+            self.assertEqual('created', iface['state'],
+                             'Interface %s is not in correct state' % iface['uuid'])
+
+        # Delete the instance
+        self.test_client.delete_instance(inst1['uuid'])
+
+        # Allow some time for propogation
+        time.sleep(10)
+
+        # Ensure that interfaces are now marked as deleted
+        for iface in nics:
+            self.assertEqual(
+                'deleted', self.test_client.get_interface(iface['uuid'])['state'])

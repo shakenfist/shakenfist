@@ -55,6 +55,9 @@ sudo /etc/init.d/S40network restart"""
 
         ifaces = self.test_client.get_instance_interfaces(inst['uuid'])
         self.assertEqual(2, len(ifaces))
+        for iface in ifaces:
+            self.assertEqual('created', iface['state'],
+                             'Interface %s is not in correct state' % iface['uuid'])
 
         for iface in ifaces:
             self._test_ping(

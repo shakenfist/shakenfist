@@ -23,6 +23,18 @@ class FakeNetwork(object):
         self.broadcast = '10.255.255.255'
 
 
+class FakeNetworkInterface(object):
+    object_type = 'networkinterface'
+
+    def __init__(self, values):
+        self.uuid = values['uuid']
+        self.instance_uuid = values['instance_uuid']
+        self.network_uuid = values['network_uuid']
+        self.macaddr = values['macaddr']
+        self.ipv4 = values['ipv4']
+        self.order = values['order']
+
+
 class DHCPTestCase(testtools.TestCase):
     def setUp(self):
         super(DHCPTestCase, self).setUp()
@@ -115,14 +127,20 @@ class DHCPTestCase(testtools.TestCase):
         )
 
     @mock.patch('os.path.exists', return_value=True)
-    @mock.patch('shakenfist.db.get_network_interfaces',
+    @mock.patch('shakenfist.networkinterface.NetworkInterfaces',
                 return_value=[
-                    {'instance_uuid': 'instuuid1',
-                     'macaddr': '1a:91:64:d2:15:39',
-                     'ipv4': '127.0.0.5'},
-                    {'instance_uuid': 'instuuid2',
-                     'macaddr': '1a:91:64:d2:15:40',
-                     'ipv4': '127.0.0.6'}
+                    FakeNetworkInterface({'uuid': 'notauuid1',
+                                          'instance_uuid': 'instuuid1',
+                                          'network_uuid': 'netuuid',
+                                          'macaddr': '1a:91:64:d2:15:39',
+                                          'ipv4': '127.0.0.5',
+                                          'order': 0}),
+                    FakeNetworkInterface({'uuid': 'notauuid2',
+                                          'instance_uuid': 'instuuid2',
+                                          'network_uuid': 'netuuid',
+                                          'macaddr': '1a:91:64:d2:15:40',
+                                          'ipv4': '127.0.0.6',
+                                          'order': 0})
                 ])
     @mock.patch('shakenfist.virt.Instance._db_get',
                 side_effect=[

@@ -6,7 +6,7 @@ import json
 import time
 
 from shakenfist import baseobject
-from shakenfist import db
+from shakenfist import networkinterface
 from shakenfist.node import Node
 from shakenfist import util
 from shakenfist import virt
@@ -181,14 +181,14 @@ def main():
                     bad = True
 
                 if bad:
-                    for ni in db.get_network_interfaces(n['uuid']):
-                        inst = virt.Instance.from_db(ni['instance_uuid'])
+                    for ni in networkinterface.interfaces_for_network(n):
+                        inst = virt.Instance.from_db(ni.instance_uuid)
                         if inst:
                             inst.enqueue_delete_due_error(
                                 'Instance was on invalid network at upgrade.')
                         else:
-                            print(f"--> Instance ({ni['instance_uuid']}) on "
-                                  "invalid network, does not exist in DB")
+                            print('--> Instance %s on invalid network, does '
+                                  'not exist in DB' % ni.instance_uuid)
 
                     # NOTE(mikal): we have to hard delete this network here, or
                     # it will cause a crash later in the Networks iterator.
@@ -275,6 +275,32 @@ def main():
                     etcd_client.put(metadata['key'],
                                     json.dumps(image, indent=4, sort_keys=True))
                     print('--> Upgraded image %s to version 2' % image_node)
+
+            # Upgrade networkinterfaces to the new attribute style
+            for data, metadata in etcd_client.get_prefix('/sf/networkinterface/'):
+                ni = json.loads(data.decode('utf-8'))
+                if int(ni.get('version', 0)) < 2:
+                    etcd_client.put(
+                        ('/sf/attribute/image/%s/floating' % ni.uuid,
+                         json.dumps({'floating_address': ni.get('floating')},
+                                    indent=4, sort_keys=True)))
+                    if 'floating' in ni:
+                        del ni['floatig']
+
+                    etcd_client.put(
+                        '/sf/attribute/image/%s/state' % ni.uuid,
+                        json.dumps({
+                            'state': ni['state'],
+                            'state_updated': ni['state_updated']
+                        }, indent=4, sort_keys=True))
+                    del ni['state']
+                    del ni['state_updated']
+
+                    ni['version'] = 2
+                    etcd_client.put(
+                        metadata['key'], json.dumps(ni, indent=4, sort_keys=True))
+                    print('--> Upgraded networkinterface %s to version 2' %
+                          ni['uuid'])
 
         if minor <= 4:
             for old_name in old_style_nodes:
