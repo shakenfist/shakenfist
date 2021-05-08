@@ -14,7 +14,7 @@
         <link rel="canonical" href="https://shakenfist.com/usage/">
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.1.2, mkdocs-material-7.1.0">
+      <meta name="generator" content="mkdocs-1.1.2, mkdocs-material-7.1.4">
     
     
       
@@ -22,7 +22,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.33e2939f.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.bde7dde4.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.ef6f36e2.min.css">
@@ -295,6 +295,7 @@
     <li class="md-nav__item md-nav__item--active">
       
       <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+      
       
         
       
@@ -613,6 +614,7 @@
 <nav class="md-nav md-nav--secondary" aria-label="Table of contents">
   
   
+  
     
   
   
@@ -671,14 +673,19 @@ floating IP pool to do so, and performs NAT in a network namespace on the networ
 <li><em>type</em> can be one of disk or cdrom. Note that cdroms are excluded from snapshots.</li>
 </ul>
 <p>Similarly, networks have a "short network specification", where you can specify the UUID of a network, but also optionally the IP address to use for the interface. You can also have more than one network interface, so this is valid:</p>
-<pre><code class="language-bash">sf-client instance create &quot;myinstance&quot; 1 2048 -d 8@cirros -n netuuid1@192.168.1.2 \
+<pre><code class="language-bash">sf-client instance create &quot;myinstance&quot; 1 2048 -d 8@cirros -n netuuid1 \
     -n netuuid2@10.0.0.4
+</code></pre>
+<p>There is also a shorthand "short network specification" which implies immediately floating the interface. The details are the same as -n, except the flag is -f:</p>
+<pre><code class="language-bash">sf-client instance create &quot;myinstance&quot; 1 2048 -d 8@cirros -f netuuid1
 </code></pre>
 <p>There is a "detailed network specification" as well, which is composed of the following keys:</p>
 <ul>
 <li><em>network_uuid</em> is the UUID of the network to use.</li>
-<li><em>address</em> is the IPv4 network address to use, if free. If its not free the instance will fail to start.</li>
+<li><em>address</em> is the IPv4 network address to use, if free. If its not free the instance will fail to start. If you don't want an address on this interface, use "none" as the value for address. If you do not specify any value for address, an address on the network will be assigned to you.</li>
 <li><em>macaddress</em> the mac address to use for the interface.</li>
+<li><em>model</em> is the model of the network device, with options being ne2k_isa, i82551, i82557b, i82559er, ne2k_pci, pcnet, rtl8139, e1000, and virtio. The default model is virtio.</li>
+<li><em>float</em> if true indicates to immediately float the interface once the instance is created.</li>
 </ul>
 <h1 id="missing-documentation">Missing documentation</h1>
 <p>I really should document these as well:</p>
@@ -761,10 +768,10 @@ floating IP pool to do so, and performs NAT in a network namespace on the networ
     <div class="md-dialog" data-md-component="dialog">
       <div class="md-dialog__inner md-typeset"></div>
     </div>
-    <script id="__config" type="application/json">{"base": "..", "features": [], "translations": {"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing"}, "search": "../assets/javascripts/workers/search.fe42c31b.min.js", "version": null}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": [], "translations": {"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing"}, "search": "../assets/javascripts/workers/search.4fa0e4ee.min.js", "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.d892486b.min.js"></script>
+      <script src="../assets/javascripts/bundle.1d3bfcf1.min.js"></script>
       
     
   </body>
