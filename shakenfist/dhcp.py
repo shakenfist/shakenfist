@@ -63,8 +63,8 @@ class DHCP(object):
 
         instances = []
         for ni in networkinterface.interfaces_for_network(self.network):
-            instance = virt.Instance.from_db(ni.instance_uuid)
-            if not instance:
+            inst = virt.Instance.from_db(ni.instance_uuid)
+            if not inst:
                 continue
 
             instances.append(
@@ -72,7 +72,7 @@ class DHCP(object):
                     'uuid': ni.instance_uuid,
                     'macaddr': ni.macaddr,
                     'ipv4': ni.ipv4,
-                    'name': instance.name.replace(',', '')
+                    'name': inst.name.replace(',', '')
                 }
             )
         self.subst['instances'] = instances

@@ -733,7 +733,7 @@ class Instances(Resource):
                          'only admins can create resources in a different namespace')
 
         # Create instance object
-        instance = virt.Instance.new(
+        inst = virt.Instance.new(
             name=name,
             disk_spec=disk,
             memory=memory,
@@ -746,7 +746,7 @@ class Instances(Resource):
         )
 
         # Initialise metadata
-        db.persist_metadata('instance', instance.uuid, {})
+        db.persist_metadata('instance', inst.uuid, {})
 
         # Allocate IP addresses
         order = 0
@@ -757,7 +757,7 @@ class Instances(Resource):
                 if not n:
                     m = 'missing network %s during IP allocation phase' % (
                         netdesc['network_uuid'])
-                    instance.enqueue_delete_due_error(m)
+                    inst.enqueue_delete_due_error(m)
                     return error(
                         404, 'network %s not found' % netdesc['network_uuid'])
 
@@ -771,7 +771,7 @@ class Instances(Resource):
                     with db.get_lock('ipmanager', None,  netdesc['network_uuid'],
                                      ttl=120, op='Network allocate IP'):
                         db.add_event('network', netdesc['network_uuid'], 'allocate address',
-                                     None, None, instance.uuid)
+                                     None, None, inst.uuid)
                         ipm = IPManager.from_db(netdesc['network_uuid'])
                         if 'address' not in netdesc or not netdesc['address']:
                             netdesc['address'] = ipm.get_random_free_address()
@@ -779,7 +779,7 @@ class Instances(Resource):
                             if not ipm.reserve(netdesc['address']):
                                 m = 'failed to reserve an IP on network %s' % (
                                     netdesc['network_uuid'])
-                                instance.enqueue_delete_due_error(m)
+                                inst.enqueue_delete_due_error(m)
                                 return error(409, 'address %s in use' %
                                              netdesc['address'])
 
@@ -789,16 +789,16 @@ class Instances(Resource):
                     netdesc['model'] = 'virtio'
 
                 iface_uuid = str(uuid.uuid4())
-                LOG.with_object(instance).with_object(n).withFields({
+                LOG.with_object(inst).with_object(n).withFields({
                     'networkinterface': iface_uuid
                 }).info('Interface allocated')
-                NetworkInterface.new(iface_uuid, netdesc, instance.uuid, order)
+                NetworkInterface.new(iface_uuid, netdesc, inst.uuid, order)
                 order += 1
 
                 if 'float' in netdesc and netdesc['float']:
                     err = _assign_floating_ip(iface_uuid)
                     if err:
-                        instance.enqueue_delete_due_error(
+                        inst.enqueue_delete_due_error(
                             'interface float failed: %s' % err)
                         return err
 
@@ -811,41 +811,41 @@ class Instances(Resource):
         try:
             # Have we been placed?
             if not placed_on:
-                candidates = SCHEDULER.place_instance(instance, network)
+                candidates = SCHEDULER.place_instance(inst, network)
                 placement = candidates[0]
 
             else:
-                SCHEDULER.place_instance(instance, network,
+                SCHEDULER.place_instance(inst, network,
                                          candidates=[placed_on])
                 placement = placed_on
 
         except exceptions.LowResourceException as e:
-            instance.add_event('schedule', 'failed', None,
-                               'Insufficient resources: ' + str(e))
-            instance.enqueue_delete_due_error('scheduling failed')
+            inst.add_event('schedule', 'failed', None,
+                           'Insufficient resources: ' + str(e))
+            inst.enqueue_delete_due_error('scheduling failed')
             return error(507, str(e), suppress_traceback=True)
 
         except exceptions.CandidateNodeNotFoundException as e:
-            instance.add_event('schedule', 'failed', None,
-                               'Candidate node not found: ' + str(e))
-            instance.enqueue_delete_due_error('scheduling failed')
+            inst.add_event('schedule', 'failed', None,
+                           'Candidate node not found: ' + str(e))
+            inst.enqueue_delete_due_error('scheduling failed')
             return error(404, 'node not found: %s' % e, suppress_traceback=True)
 
         # Record placement
-        instance.place_instance(placement)
+        inst.place_instance(placement)
 
         # Create a queue entry for the instance start
-        tasks = [PreflightInstanceTask(instance.uuid, network)]
-        for disk in instance.disk_spec:
+        tasks = [PreflightInstanceTask(inst.uuid, network)]
+        for disk in inst.disk_spec:
             if disk.get('base'):
-                tasks.append(FetchImageTask(disk['base'], instance.uuid))
-        tasks.append(StartInstanceTask(instance.uuid, network))
+                tasks.append(FetchImageTask(disk['base'], inst.uuid))
+        tasks.append(StartInstanceTask(inst.uuid, network))
         tasks.extend(float_tasks)
 
         # Enqueue creation tasks on desired node task queue
         db.enqueue(placement, {'tasks': tasks})
-        instance.add_event('create', 'enqueued', None, None)
-        return instance.external_view()
+        inst.add_event('create', 'enqueued', None, None)
+        return inst.external_view()
 
     @jwt_required
     def delete(self, confirm=False, namespace=None):
@@ -868,18 +868,18 @@ class Instances(Resource):
 
         waiting_for = []
         tasks_by_node = {}
-        for instance in virt.Instances([partial(baseobject.namespace_filter, namespace),
-                                        virt.active_states_filter]):
+        for inst in virt.Instances([partial(baseobject.namespace_filter, namespace),
+                                    virt.active_states_filter]):
             # If this instance is not on a node, just do the DB cleanup locally
-            dbplacement = instance.placement
+            dbplacement = inst.placement
             if not dbplacement.get('node'):
                 node = config.NODE_NAME
             else:
                 node = dbplacement['node']
 
             tasks_by_node.setdefault(node, [])
-            tasks_by_node[node].append(DeleteInstanceTask(instance.uuid))
-            waiting_for.append(instance.uuid)
+            tasks_by_node[node].append(DeleteInstanceTask(inst.uuid))
+            waiting_for.append(inst.uuid)
 
         for node in tasks_by_node:
             db.enqueue(node, {'tasks': tasks_by_node[node]})

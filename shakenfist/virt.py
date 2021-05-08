@@ -402,9 +402,9 @@ class Instance(dbo):
             try:
                 self.power_off()
 
-                instance = self._get_domain()
-                if instance:
-                    instance.undefine()
+                inst = self._get_domain()
+                if inst:
+                    inst.undefine()
             except Exception as e:
                 util.ignore_exception('instance delete', e)
 
@@ -771,12 +771,12 @@ class Instance(dbo):
             return None
 
     def is_powered_on(self):
-        instance = self._get_domain()
-        if not instance:
+        inst = self._get_domain()
+        if not inst:
             return 'off'
 
         libvirt = util.get_libvirt()
-        return util.extract_power_state(libvirt, instance)
+        return util.extract_power_state(libvirt, inst)
 
     def power_on(self):
         if not os.path.exists(self.xml_file):
@@ -786,36 +786,36 @@ class Instance(dbo):
         with open(self.xml_file) as f:
             xml = f.read()
 
-        instance = self._get_domain()
-        if not instance:
+        inst = self._get_domain()
+        if not inst:
             conn = libvirt.open('qemu:///system')
-            instance = conn.defineXML(xml)
-            if not instance:
+            inst = conn.defineXML(xml)
+            if not inst:
                 self.enqueue_delete_due_error(
                     'power on failed to create domain')
                 raise exceptions.NoDomainException()
 
         try:
-            instance.create()
+            inst.create()
         except libvirt.libvirtError as e:
             err = 'Requested operation is not valid: domain is already running'
             if not str(e).startswith(err):
                 self.log.warning('Instance start error: %s', e)
                 return False
 
-        instance.setAutostart(1)
-        self.update_power_state(util.extract_power_state(libvirt, instance))
+        inst.setAutostart(1)
+        self.update_power_state(util.extract_power_state(libvirt, inst))
         self.add_event('poweron', 'complete')
         return True
 
     def power_off(self):
         libvirt = util.get_libvirt()
-        instance = self._get_domain()
-        if not instance:
+        inst = self._get_domain()
+        if not inst:
             return
 
         try:
-            instance.destroy()
+            inst.destroy()
         except libvirt.libvirtError as e:
             self.log.error('Failed to delete domain: %s', e)
 
@@ -865,25 +865,25 @@ class Instance(dbo):
 
     def reboot(self, hard=False):
         libvirt = util.get_libvirt()
-        instance = self._get_domain()
+        inst = self._get_domain()
         if not hard:
-            instance.reboot(flags=libvirt.VIR_DOMAIN_REBOOT_ACPI_POWER_BTN)
+            inst.reboot(flags=libvirt.VIR_DOMAIN_REBOOT_ACPI_POWER_BTN)
         else:
-            instance.reset()
+            inst.reset()
         self.add_event('reboot', 'complete')
 
     def pause(self):
         libvirt = util.get_libvirt()
-        instance = self._get_domain()
-        instance.suspend()
-        self.update_power_state(util.extract_power_state(libvirt, instance))
+        inst = self._get_domain()
+        inst.suspend()
+        self.update_power_state(util.extract_power_state(libvirt, inst))
         self.add_event('pause', 'complete')
 
     def unpause(self):
         libvirt = util.get_libvirt()
-        instance = self._get_domain()
-        instance.resume()
-        self.update_power_state(util.extract_power_state(libvirt, instance))
+        inst = self._get_domain()
+        inst.resume()
+        self.update_power_state(util.extract_power_state(libvirt, inst))
         self.add_event('unpause', 'complete')
 
     def get_console_data(self, length):

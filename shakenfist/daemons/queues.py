@@ -38,7 +38,7 @@ def handle(jobname, workitem):
     setproctitle.setproctitle(
         '%s-%s' % (daemon.process_name('queues'), jobname))
 
-    instance = None
+    inst = None
     task = None
     try:
         for task in workitem.get('tasks', []):
@@ -47,16 +47,16 @@ def handle(jobname, workitem):
                     'Task was not decoded: %s' % task)
 
             if InstanceTask.__subclasscheck__(type(task)):
-                instance = virt.Instance.from_db(task.instance_uuid())
-                if not instance:
+                inst = virt.Instance.from_db(task.instance_uuid())
+                if not inst:
                     raise exceptions.InstanceNotInDBException(
                         task.instance_uuid())
 
             if isinstance(task, FetchImageTask):
-                instance = virt.Instance.from_db(task.instance_uuid())
+                inst = virt.Instance.from_db(task.instance_uuid())
 
-            if instance:
-                log_i = log.with_instance(instance)
+            if inst:
+                log_i = log.with_instance(inst)
             else:
                 log_i = log
 
@@ -69,16 +69,16 @@ def handle(jobname, workitem):
             # dequeued in the DB. Currently it's reporting action on the item
             # and calling it 'dequeue'.
 
-            if instance:
+            if inst:
                 # TODO(andy) move to QueueTask
-                db.add_event('instance', instance.uuid, task.pretty_task_name(),
+                db.add_event('instance', inst.uuid, task.pretty_task_name(),
                              'dequeued', None, 'Work item %s' % jobname)
 
             if isinstance(task, FetchImageTask):
-                image_fetch(task.url(), instance)
+                image_fetch(task.url(), inst)
 
             elif isinstance(task, PreflightInstanceTask):
-                redirect_to = instance_preflight(instance, task.network())
+                redirect_to = instance_preflight(inst, task.network())
                 if redirect_to:
                     log_i.info('Redirecting instance start to %s'
                                % redirect_to)
@@ -86,12 +86,12 @@ def handle(jobname, workitem):
                     return
 
             elif isinstance(task, StartInstanceTask):
-                instance_start(instance, task.network())
+                instance_start(inst, task.network())
                 db.enqueue('%s-metrics' % config.NODE_NAME, {})
 
             elif isinstance(task, DeleteInstanceTask):
                 try:
-                    instance_delete(instance)
+                    instance_delete(inst)
                     db.enqueue('%s-metrics' % config.NODE_NAME, {})
                 except Exception as e:
                     util.ignore_exception(daemon.process_name('queues'), e)
@@ -109,24 +109,24 @@ def handle(jobname, workitem):
     except exceptions.ImageFetchTaskFailedException as e:
         # Usually caused by external issue and not an application error
         log.info('Fetch Image Error: %s', e)
-        if instance:
-            instance.enqueue_delete_due_error('Failed queue task: %s' % e)
+        if inst:
+            inst.enqueue_delete_due_error('Failed queue task: %s' % e)
 
     except Exception as e:
         # Logging ignored exception - this should be investigated
         util.ignore_exception(daemon.process_name('queues'), e)
-        if instance:
-            instance.enqueue_delete_due_error('Failed queue task: %s' % e)
+        if inst:
+            inst.enqueue_delete_due_error('Failed queue task: %s' % e)
 
     finally:
         db.resolve(config.NODE_NAME, jobname)
-        if instance:
-            instance.add_event('tasks complete', 'dequeued',
-                               msg='Work item %s' % jobname)
+        if inst:
+            inst.add_event('tasks complete', 'dequeued',
+                           msg='Work item %s' % jobname)
         log.info('Completed workitem')
 
 
-def image_fetch(url, instance):
+def image_fetch(url, inst):
     try:
         # TODO(andy): Wait up to 15 mins for another queue process to download
         # the required image. This will be changed to queue on a
@@ -138,7 +138,7 @@ def image_fetch(url, instance):
             # it is fetched. However, the new() call here handles that case and
             # will just return the previous entry if one exists.
             img = Image.new(url)
-            img.get([lock], instance)
+            img.get([lock], inst)
             db.add_event('image', url, 'fetch', None, None, 'success')
 
     except (exceptions.HTTPError, requests.exceptions.RequestException) as e:
@@ -156,63 +156,63 @@ def image_fetch(url, instance):
             'Failed to fetch image: %s Exception: %s' % (url, e))
 
 
-def instance_preflight(instance, network):
-    instance.state = 'preflight'
+def instance_preflight(inst, network):
+    inst.state = 'preflight'
 
     # Try to place on this node
     s = scheduler.Scheduler()
     try:
-        s.place_instance(instance, network, candidates=[config.NODE_NAME])
+        s.place_instance(inst, network, candidates=[config.NODE_NAME])
         return None
 
     except exceptions.LowResourceException as e:
-        instance.add_event('schedule', 'retry', None,
-                           'insufficient resources: ' + str(e))
+        inst.add_event('schedule', 'retry', None,
+                       'insufficient resources: ' + str(e))
 
     # Unsuccessful placement, check if reached placement attempt limit
-    db_placement = instance.placement
+    db_placement = inst.placement
     if db_placement['placement_attempts'] > 3:
         raise exceptions.AbortInstanceStartException(
             'Too many start attempts')
 
     # Try placing on another node
     try:
-        if instance.requested_placement:
+        if inst.requested_placement:
             # TODO(andy): Ask Mikal why this is not the current node?
-            candidates = [instance.requested_placement]
+            candidates = [inst.requested_placement]
         else:
             candidates = []
             for node in s.metrics.keys():
                 if node != config.NODE_NAME:
                     candidates.append(node)
 
-        candidates = s.place_instance(instance, network,
+        candidates = s.place_instance(inst, network,
                                       candidates=candidates)
-        instance.place_instance(candidates[0])
+        inst.place_instance(candidates[0])
         return candidates[0]
 
     except exceptions.LowResourceException as e:
-        instance.add_event('schedule', 'failed', None,
-                           'insufficient resources: ' + str(e))
+        inst.add_event('schedule', 'failed', None,
+                       'insufficient resources: ' + str(e))
         # This raise implies delete above
         raise exceptions.AbortInstanceStartException(
             'Unable to find suitable node')
 
 
-def instance_start(instance, network):
-    with instance.get_lock(ttl=900, op='Instance start') as lock:
+def instance_start(inst, network):
+    with inst.get_lock(ttl=900, op='Instance start') as lock:
         # Ensure networks are connected to this node
         nets = {}
         for netdesc in network:
             if netdesc['network_uuid'] not in nets:
                 n = net.Network.from_db(netdesc['network_uuid'])
                 if not n:
-                    instance.enqueue_delete_due_error(
+                    inst.enqueue_delete_due_error(
                         'missing network: %s' % netdesc['network_uuid'])
                     return
 
                 if n.state.value != dbo.STATE_CREATED:
-                    instance.enqueue_delete_due_error(
+                    inst.enqueue_delete_due_error(
                         'network is not active: %s' % n.uuid)
                     return
 
@@ -221,34 +221,33 @@ def instance_start(instance, network):
                 n.update_dhcp()
 
         # Allocate console and VDI ports
-        instance.allocate_instance_ports()
+        inst.allocate_instance_ports()
 
         # Now we can start the instance
         libvirt = util.get_libvirt()
         try:
-            with util.RecordedOperation('instance creation',
-                                        instance):
-                instance.create(lock=lock)
+            with util.RecordedOperation('instance creation', inst):
+                inst.create(lock=lock)
 
         except libvirt.libvirtError as e:
             code = e.get_error_code()
             if code in (libvirt.VIR_ERR_CONFIG_UNSUPPORTED,
                         libvirt.VIR_ERR_XML_ERROR):
-                instance.enqueue_delete_due_error(
+                inst.enqueue_delete_due_error(
                     'instance failed to start: %s' % e)
                 return
 
-        for ni in networkinterface.interfaces_for_instance(instance):
+        for ni in networkinterface.interfaces_for_instance(inst):
             ni.state = dbo.STATE_CREATED
 
 
-def instance_delete(instance):
-    with instance.get_lock(op='Instance delete'):
-        db.add_event('instance', instance.uuid, 'queued', 'delete', None, None)
+def instance_delete(inst):
+    with inst.get_lock(op='Instance delete'):
+        db.add_event('instance', inst.uuid, 'queued', 'delete', None, None)
 
         # Create list of networks used by instance
         instance_networks = []
-        for ni in networkinterface.interfaces_for_instance(instance):
+        for ni in networkinterface.interfaces_for_instance(inst):
             if ni.network_uuid not in instance_networks:
                 instance_networks.append(ni.network_uuid)
 
@@ -256,16 +255,16 @@ def instance_delete(instance):
         host_networks = []
         for inst in virt.Instances([virt.this_node_filter,
                                     virt.active_states_filter]):
-            if not inst.uuid == instance.uuid:
-                for ni in networkinterface.interfaces_for_instance(instance):
+            if not inst.uuid == inst.uuid:
+                for ni in networkinterface.interfaces_for_instance(inst):
                     if ni.network_uuid not in host_networks:
                         host_networks.append(ni.network_uuid)
 
-        instance.delete()
+        inst.delete()
 
         # Delete the instance's interfaces
-        with util.RecordedOperation('release network addresses', instance):
-            for ni in networkinterface.interfaces_for_instance(instance):
+        with util.RecordedOperation('release network addresses', inst):
+            for ni in networkinterface.interfaces_for_instance(inst):
                 if ni.floating['floating_address']:
                     db.enqueue(
                         'networknode',
@@ -285,14 +284,13 @@ def instance_delete(instance):
             if n:
                 # If network used by another instance, only update
                 if network in host_networks:
-                    with util.RecordedOperation('deallocate ip address',
-                                                instance):
+                    with util.RecordedOperation('deallocate ip address', inst):
                         n.update_dhcp()
                 else:
                     # Network not used by any other instance therefore delete
                     with util.RecordedOperation('remove network from node', n):
                         n.delete_on_node_with_lock()
-        return instance
+        return inst
 
 
 class Monitor(daemon.Daemon):
