@@ -35,11 +35,13 @@ import traceback
 import uuid
 
 from shakenfist import baseobject
+from shakenfist.daemons import daemon
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import images
+from shakenfist import instance
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
@@ -47,9 +49,6 @@ from shakenfist import networkinterface
 from shakenfist.networkinterface import NetworkInterface
 from shakenfist.node import Node, Nodes
 from shakenfist import scheduler
-from shakenfist import util
-from shakenfist import virt
-from shakenfist.daemons import daemon
 from shakenfist.tasks import (
     DeleteInstanceTask,
     FetchImageTask,
@@ -58,6 +57,7 @@ from shakenfist.tasks import (
     FloatNetworkInterfaceTask,
     DefloatNetworkInterfaceTask
 )
+from shakenfist import util
 
 
 LOG, HANDLER = logutil.setup(__name__)
@@ -189,7 +189,7 @@ def arg_is_instance_uuid(func):
     # Method uses the instance from the db
     def wrapper(*args, **kwargs):
         if 'instance_uuid' in kwargs:
-            kwargs['instance_from_db'] = virt.Instance.from_db(
+            kwargs['instance_from_db'] = instance.Instance.from_db(
                 kwargs['instance_uuid'])
         if not kwargs.get('instance_from_db'):
             LOG.with_instance(kwargs['instance_uuid']).info(
@@ -264,7 +264,7 @@ def requires_instance_active(func):
             return error(404, 'instance not found')
 
         i = kwargs['instance_from_db']
-        if i.state.value != virt.Instance.STATE_CREATED:
+        if i.state.value != instance.Instance.STATE_CREATED:
             LOG.with_instance(i).info(
                 'Instance not ready (%s)' % i.state.value)
             return error(406, 'instance %s is not ready (%s)' % (i.uuid, i.state.value))
@@ -490,7 +490,7 @@ class AuthNamespace(Resource):
         # The namespace must be empty
         instances = []
         deleted_instances = []
-        for i in virt.instances_in_namespace(namespace):
+        for i in instance.instances_in_namespace(namespace):
             if i.state.value in [dbo.STATE_DELETED, dbo.STATE_ERROR]:
                 deleted_instances.append(i.uuid)
             else:
@@ -663,10 +663,10 @@ class Instances(Resource):
     def get(self, all=False):
         filters = [partial(baseobject.namespace_filter, get_jwt_identity())]
         if not all:
-            filters.append(virt.active_states_filter)
+            filters.append(instance.active_states_filter)
 
         retval = []
-        for i in virt.Instances(filters):
+        for i in instance.Instances(filters):
             # This forces the instance through the external view rehydration
             retval.append(i.external_view())
         return retval
@@ -733,7 +733,7 @@ class Instances(Resource):
                          'only admins can create resources in a different namespace')
 
         # Create instance object
-        inst = virt.Instance.new(
+        inst = instance.Instance.new(
             name=name,
             disk_spec=disk,
             memory=memory,
@@ -868,8 +868,8 @@ class Instances(Resource):
 
         waiting_for = []
         tasks_by_node = {}
-        for inst in virt.Instances([partial(baseobject.namespace_filter, namespace),
-                                    virt.active_states_filter]):
+        for inst in instance.Instances([partial(baseobject.namespace_filter, namespace),
+                                        instance.active_states_filter]):
             # If this instance is not on a node, just do the DB cleanup locally
             dbplacement = inst.placement
             if not dbplacement.get('node'):
@@ -1031,7 +1031,7 @@ def _safe_get_network_interface(interface_uuid):
         log.info('Interface not found, failed ownership test')
         return None, None, error(404, 'interface not found')
 
-    i = virt.Instance.from_db(ni.instance_uuid)
+    i = instance.Instance.from_db(ni.instance_uuid)
     if get_jwt_identity() not in [i.namespace, 'system']:
         log.with_object(i).info('Instance not found, failed ownership test')
         return None, None, error(404, 'interface not found')

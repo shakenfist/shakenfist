@@ -17,13 +17,13 @@ from shakenfist.daemons import resources as resource_daemon
 from shakenfist.daemons import triggers as trigger_daemon
 from shakenfist import db
 from shakenfist import images
+from shakenfist import instance
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
 from shakenfist import networkinterface
 from shakenfist.node import Node
 from shakenfist import util
-from shakenfist import virt
 
 
 LOG, HANDLER = logutil.setup('main')
@@ -33,7 +33,7 @@ def restore_instances():
     # Ensure all instances for this node are defined
     networks = []
     instances = []
-    for inst in virt.Instances([virt.this_node_filter, virt.healthy_states_filter]):
+    for inst in instance.Instances([instance.this_node_filter, instance.healthy_states_filter]):
         instance_problems = []
         for ni in networkinterface.interfaces_for_instance(inst):
             if ni.network_uuid not in networks:
@@ -74,7 +74,7 @@ def restore_instances():
                         'instance', None, inst.uuid, ttl=120, timeout=120,
                         op='Instance restore'):
                     started = ['on', 'transition-to-on',
-                               virt.Instance.STATE_INITIAL, 'unknown']
+                               instance.Instance.STATE_INITIAL, 'unknown']
                     if inst.power_state not in started:
                         continue
 

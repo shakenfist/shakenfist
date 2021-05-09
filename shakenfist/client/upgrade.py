@@ -7,10 +7,10 @@ import time
 
 from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist import instance
 from shakenfist import networkinterface
 from shakenfist.node import Node
 from shakenfist import util
-from shakenfist import virt
 
 # Very simple data upgrader
 
@@ -255,7 +255,7 @@ def main():
 
                 if bad:
                     for ni in networkinterface.interfaces_for_network(n):
-                        inst = virt.Instance.from_db(ni.instance_uuid)
+                        inst = instance.Instance.from_db(ni.instance_uuid)
                         if inst:
                             inst.enqueue_delete_due_error(
                                 'Instance was on invalid network at upgrade.')

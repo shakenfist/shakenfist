@@ -18,6 +18,7 @@ from shakenfist import db
 from shakenfist import dhcp
 from shakenfist import etcd
 from shakenfist.exceptions import DeadNetwork
+from shakenfist import instance
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import networkinterface
@@ -28,7 +29,6 @@ from shakenfist.tasks import (
     RemoveDHCPNetworkTask,
     RemoveNATNetworkTask)
 from shakenfist import util
-from shakenfist import virt
 
 
 LOG, _ = logutil.setup(__name__)
@@ -591,7 +591,7 @@ class Network(dbo):
 
             node_fqdns = []
             for inst_uuid in instances:
-                inst = virt.Instance.from_db(inst_uuid)
+                inst = instance.Instance.from_db(inst_uuid)
                 placement = inst.placement
                 if not placement:
                     continue

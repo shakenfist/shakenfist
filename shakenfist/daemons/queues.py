@@ -10,13 +10,13 @@ from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import exceptions
 from shakenfist.images import Image
+from shakenfist import instance
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
 from shakenfist import networkinterface
 from shakenfist import scheduler
 from shakenfist import util
-from shakenfist import virt
 from shakenfist.tasks import (QueueTask,
                               DeleteInstanceTask,
                               FetchImageTask,
@@ -47,13 +47,13 @@ def handle(jobname, workitem):
                     'Task was not decoded: %s' % task)
 
             if InstanceTask.__subclasscheck__(type(task)):
-                inst = virt.Instance.from_db(task.instance_uuid())
+                inst = instance.Instance.from_db(task.instance_uuid())
                 if not inst:
                     raise exceptions.InstanceNotInDBException(
                         task.instance_uuid())
 
             if isinstance(task, FetchImageTask):
-                inst = virt.Instance.from_db(task.instance_uuid())
+                inst = instance.Instance.from_db(task.instance_uuid())
 
             if inst:
                 log_i = log.with_instance(inst)
@@ -253,8 +253,8 @@ def instance_delete(inst):
 
         # Create list of networks used by all other instances
         host_networks = []
-        for inst in virt.Instances([virt.this_node_filter,
-                                    virt.active_states_filter]):
+        for inst in instance.Instances([instance.this_node_filter,
+                                        instance.active_states_filter]):
             if not inst.uuid == inst.uuid:
                 for ni in networkinterface.interfaces_for_instance(inst):
                     if ni.network_uuid not in host_networks:

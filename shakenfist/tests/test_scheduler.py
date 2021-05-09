@@ -4,11 +4,11 @@ import time
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist import exceptions
 from shakenfist import images
+from shakenfist.instance import Instance
 from shakenfist import scheduler
 from shakenfist.tests import test_shakenfist
 from shakenfist.baseobject import State
 from shakenfist.config import SFConfig
-from shakenfist.virt import Instance
 
 
 class FakeInstance(Instance):
@@ -109,7 +109,7 @@ class LowResourceTestCase(SchedulerTestCase):
         mock_get_nodes.start()
         self.addCleanup(mock_get_nodes.stop)
 
-        self.mock_get_instances = mock.patch('shakenfist.virt.Instances')
+        self.mock_get_instances = mock.patch('shakenfist.instance.Instances')
         self.mock_get_instances.start()
         self.addCleanup(self.mock_get_instances.stop)
 
@@ -301,8 +301,8 @@ class CorrectAllocationTestCase(SchedulerTestCase):
         mock_get_nodes.start()
         self.addCleanup(mock_get_nodes.stop)
 
-    @mock.patch('shakenfist.virt.Instance._db_get_attribute')
-    @mock.patch('shakenfist.virt.Instance._db_get',
+    @mock.patch('shakenfist.instance.Instance._db_get_attribute')
+    @mock.patch('shakenfist.instance.Instance._db_get',
                 return_value={
                     'uuid': 'inst-1',
                     'cpus': 1,
@@ -347,11 +347,11 @@ class CorrectAllocationTestCase(SchedulerTestCase):
 
     @mock.patch('shakenfist.networkinterface.interfaces_for_instance',
                 return_value=[FakeInterface('uuid-net1')])
-    @mock.patch('shakenfist.virt.Instance._db_get_attribute',
+    @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 return_value={
                     'node': 'node3'
                 })
-    @mock.patch('shakenfist.virt.Instance._db_get',
+    @mock.patch('shakenfist.instance.Instance._db_get',
                 return_value={
                     'uuid': 'inst-1',
                     'cpus': 1,
@@ -741,7 +741,7 @@ class ForcedCandidatesTestCase(SchedulerTestCase):
         mock_get_nodes.start()
         self.addCleanup(mock_get_nodes.stop)
 
-        self.mock_get_instances = mock.patch('shakenfist.virt.Instances')
+        self.mock_get_instances = mock.patch('shakenfist.instance.Instances')
         self.mock_get_instances.start()
         self.addCleanup(self.mock_get_instances.stop)
 
@@ -846,7 +846,7 @@ class MetricsRefreshTestCase(SchedulerTestCase):
         mock_get_nodes.start()
         self.addCleanup(mock_get_nodes.stop)
 
-        self.mock_get_instances = mock.patch('shakenfist.virt.Instances')
+        self.mock_get_instances = mock.patch('shakenfist.instance.Instances')
         self.mock_get_instances.start()
         self.addCleanup(self.mock_get_instances.stop)
 

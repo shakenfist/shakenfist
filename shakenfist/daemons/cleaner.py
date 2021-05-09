@@ -8,6 +8,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import logutil
+from shakenfist import instance
 from shakenfist import net
 from shakenfist import networkinterface
 from shakenfist.node import (
@@ -15,7 +16,6 @@ from shakenfist.node import (
     active_states_filter as node_active_states_filter,
     inactive_states_filter as node_inactive_states_filter)
 from shakenfist import util
-from shakenfist import virt
 
 
 LOG, _ = logutil.setup(__name__)
@@ -38,7 +38,7 @@ class Monitor(daemon.Daemon):
                 instance_uuid = domain.name().split(':')[1]
                 log_ctx = LOG.with_instance(instance_uuid)
 
-                inst = virt.Instance.from_db(instance_uuid)
+                inst = instance.Instance.from_db(instance_uuid)
                 if not inst:
                     # Instance is SF but not in database. Kill to reduce load.
                     log_ctx.warning('Destroying unknown instance')
@@ -92,7 +92,7 @@ class Monitor(daemon.Daemon):
                 if domain_name not in seen:
                     instance_uuid = domain_name.split(':')[1]
                     log_ctx = LOG.with_instance(instance_uuid)
-                    inst = virt.Instance.from_db(instance_uuid)
+                    inst = instance.Instance.from_db(instance_uuid)
 
                     if not inst:
                         # Instance is SF but not in database. Kill because
@@ -164,7 +164,7 @@ class Monitor(daemon.Daemon):
             self._update_power_states()
 
             # Cleanup soft deleted instances and networks
-            for i in virt.inactive_instances():
+            for i in instance.inactive_instances():
                 LOG.with_object(i).info('Hard deleting instance')
                 i.hard_delete()
 
@@ -191,7 +191,7 @@ class Monitor(daemon.Daemon):
                 if (time.time() - last_loop_run < config.NODE_CHECKIN_MAXIMUM
                         and age > config.NODE_CHECKIN_MAXIMUM * 10):
                     n.state = Node.STATE_ERROR
-                    for i in virt.health_instances_on_node(n):
+                    for i in instance.health_instances_on_node(n):
                         LOG.with_object(i).with_object(n).info(
                             'Node in error state, erroring instance')
                         # Note, this queue job is just in case the node comes
