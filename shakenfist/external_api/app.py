@@ -652,7 +652,8 @@ def _assign_floating_ip(interface_uuid):
         addr = ipm.get_random_free_address()
         ipm.persist()
 
-    db.add_floating_to_interface(interface_uuid, addr)
+    ni = NetworkInterface.from_db(interface_uuid)
+    ni.floating = addr
     return None
 
 

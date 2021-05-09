@@ -142,9 +142,9 @@ class NetworkInterface(baseobject.DatabaseBackedObject):
 
     @floating.setter
     def floating(self, address):
-        if self.floating.get('floating_ip') is not None:
+        if address and self.floating.get('floating_address') is not None:
             raise exceptions.NetworkInterfaceAlreadyFloating()
-        self._db_set_attribute('floating', {'floating_ip': address})
+        self._db_set_attribute('floating', {'floating_address': address})
 
     def hard_delete(self):
         etcd.delete('macaddress', None, self.macaddr)
