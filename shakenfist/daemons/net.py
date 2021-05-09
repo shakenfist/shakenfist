@@ -106,14 +106,15 @@ class Monitor(daemon.Daemon):
                         # that we also need to re-create all of the floating IPs for
                         # that network.
                         for ni in networkinterface.interfaces_for_network(n):
-                            if ni.floating:
+                            if ni.floating.get('floating_address'):
                                 LOG.with_fields(
                                     {
                                         'instance': ni.instance_uuid,
                                         'networkinterface': ni.uuid,
-                                        'floating': ni.floating
+                                        'floating': ni.floating.get('floating_address')
                                     }).info('Refloating interface')
-                                n.add_floating_ip(ni.floating, ni.ipv4)
+                                n.add_floating_ip(ni.floating.get(
+                                    'floating_address'), ni.ipv4)
                     else:
                         LOG.with_network(n).info(
                             'Recreating not okay network on hypervisor')
@@ -232,16 +233,16 @@ class Monitor(daemon.Daemon):
             return
 
         if isinstance(workitem, FloatNetworkInterfaceTask):
-            n.add_floating_ip(ni.floating, ni.ipv4)
+            n.add_floating_ip(ni.floating.get('floating_address'), ni.ipv4)
 
         elif isinstance(workitem, DefloatNetworkInterfaceTask):
-            n.remove_floating_ip(ni.floating, ni.ipv4)
-            db.remove_floating_from_interface(ni.uuid)
+            n.remove_floating_ip(ni.floating.get('floating_address'), ni.ipv4)
+            ni.floating = None
 
             db.add_event('interface', ni.uuid, 'api', 'defloat', None, None)
             with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Instance defloat'):
                 ipm = IPManager.from_db('floating')
-                ipm.release(ni.floating)
+                ipm.release(ni.floating.get('floating_address'))
                 ipm.persist()
 
     def _process_network_node_workitems(self):
