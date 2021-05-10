@@ -489,7 +489,7 @@ class AuthNamespace(Resource):
         # The namespace must be empty
         instances = []
         deleted_instances = []
-        for i in virt.Instances([partial(baseobject.namespace_filter, namespace)]):
+        for i in virt.instances_in_namespace(namespace):
             if i.state.value in ['deleted', 'error']:
                 deleted_instances.append(i.uuid)
             else:
@@ -498,7 +498,7 @@ class AuthNamespace(Resource):
             return error(400, 'you cannot delete a namespace with instances')
 
         networks = []
-        for n in net.Networks([partial(baseobject.namespace_filter, namespace)]):
+        for n in net.networks_in_namespace(namespace):
             if not n.is_dead():
                 networks.append(n.uuid)
         if len(networks) > 0:
