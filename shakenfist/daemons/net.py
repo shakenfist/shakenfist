@@ -4,6 +4,7 @@ import time
 from oslo_concurrency import processutils
 
 from shakenfist import baseobject
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
@@ -74,7 +75,7 @@ class Monitor(daemon.Daemon):
                     if not inst:
                         stray = True
                     else:
-                        if inst.state.value in ['deleted', 'error', 'unknown']:
+                        if inst.state.value in [dbo.STATE_DELETED, dbo.STATE_ERROR, 'unknown']:
                             stray = True
 
                     if stray:
@@ -195,7 +196,7 @@ class Monitor(daemon.Daemon):
             try:
                 n.create_on_network_node()
                 n.ensure_mesh()
-                n.state = 'created'
+                n.state = self.STATE_CREATED
                 db.add_event('network', workitem.network_uuid(),
                              'network node', 'deploy', None, None)
             except exceptions.DeadNetwork as e:

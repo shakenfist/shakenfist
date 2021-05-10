@@ -2,6 +2,9 @@ from functools import partial
 import time
 
 from shakenfist import baseobject
+from shakenfist.baseobject import (
+    DatabaseBackedObject as dbo,
+    DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist.config import config
 from shakenfist import etcd
 from shakenfist import logutil
@@ -11,21 +14,18 @@ from shakenfist import util
 LOG, _ = logutil.setup(__name__)
 
 
-class Node(baseobject.DatabaseBackedObject):
+class Node(dbo):
     object_type = 'node'
     current_version = 2
 
     # docs/development/state_machine.md has a description of these states.
-    STATE_CREATED = 'created'
-    STATE_ERROR = 'error'
-    STATE_DELETED = 'deleted'
     STATE_MISSING = 'missing'
 
     state_targets = {
-        None: (STATE_CREATED, STATE_ERROR, STATE_MISSING),
-        STATE_CREATED: (STATE_DELETED, STATE_ERROR, STATE_MISSING),
-        STATE_ERROR: (STATE_ERROR, STATE_DELETED),
-        STATE_MISSING: (STATE_CREATED, STATE_ERROR)
+        None: (dbo.STATE_CREATED, dbo.STATE_ERROR, STATE_MISSING),
+        dbo.STATE_CREATED: (dbo.STATE_DELETED, dbo.STATE_ERROR, STATE_MISSING),
+        dbo.STATE_ERROR: (dbo.STATE_DELETED),
+        STATE_MISSING: (dbo.STATE_CREATED, dbo.STATE_ERROR)
     }
 
     def __init__(self, static_values):
@@ -101,7 +101,7 @@ class Node(baseobject.DatabaseBackedObject):
         return self._db_get_attribute('observed')['release']
 
 
-class Nodes(baseobject.DatabaseBackedObjectIterator):
+class Nodes(dbo_iter):
     def __iter__(self):
         for _, n in etcd.get_all('node', None):
             n = Node.from_db(n['uuid'])
@@ -114,6 +114,6 @@ class Nodes(baseobject.DatabaseBackedObjectIterator):
 
 
 active_states_filter = partial(
-    baseobject.state_filter, ['created'])
+    baseobject.state_filter, [dbo.STATE_CREATED])
 inactive_states_filter = partial(
-    baseobject.state_filter, ['deleted', 'error', 'missing'])
+    baseobject.state_filter, [dbo.STATE_DELETED, dbo.STATE_ERROR, 'missing'])

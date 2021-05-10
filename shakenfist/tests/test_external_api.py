@@ -4,7 +4,9 @@ import json
 import mock
 
 
-from shakenfist.baseobject import State
+from shakenfist.baseobject import (
+    DatabaseBackedObject as dbo,
+    State)
 from shakenfist.config import config, SFConfigBase, SFConfig
 from shakenfist.external_api import app as external_api
 from shakenfist.ipmanager import IPManager
@@ -56,7 +58,7 @@ class FakeInstance(BaseFakeObject):
     object_type = 'instance'
 
     def __init__(self, uuid=None, namespace=None,
-                 state='created', power_state='on',
+                 state=dbo.STATE_CREATED, power_state='on',
                  placement='node1'):
         super(FakeInstance, self).__init__(state)
 
@@ -71,7 +73,7 @@ class FakeNetwork(BaseFakeObject):
     object_type = 'network'
 
     def __init__(self, uuid=None, vxid=None, namespace=None,
-                 name=None, netblock=None, state='created'):
+                 name=None, netblock=None, state=dbo.STATE_CREATED):
         super(FakeNetwork, self).__init__(state)
         self.uuid = uuid
         self.vxid = vxid
@@ -389,7 +391,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
             resp.get_json())
 
     @mock.patch('shakenfist.virt.Instance._db_get_attribute',
-                return_value={'value': 'created', 'update_time': 2})
+                return_value={'value': dbo.STATE_CREATED, 'update_time': 2})
     @mock.patch('shakenfist.virt.Instances',
                 return_value=[FakeInstance(uuid='123')])
     def test_delete_namespace_with_instances(self, mock_get_instances,
@@ -406,7 +408,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
 
     @mock.patch('shakenfist.virt.Instances', return_value=[])
     @mock.patch('shakenfist.net.Networks',
-                return_value=[FakeNetwork(uuid='123', state='created')])
+                return_value=[FakeNetwork(uuid='123', state=dbo.STATE_CREATED)])
     def test_delete_namespace_with_networks(self, mock_get_networks, mock_get_instances):
         resp = self.client.delete('/auth/namespaces/foo',
                                   headers={'Authorization': self.auth_header})
@@ -761,11 +763,11 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                     FakeInstance(
                         namespace='system',
                         uuid='6a973b82-31b3-4780-93e4-04d99ae49f3f',
-                        state=['created']),
+                        state=[dbo.STATE_CREATED]),
                     FakeInstance(
                         namespace='system',
                         uuid='847b0327-9b17-4148-b4ed-be72b6722c17',
-                        state=['created'])])
+                        state=[dbo.STATE_CREATED])])
     @mock.patch('shakenfist.etcd.put')
     @mock.patch('shakenfist.db.get_lock')
     def test_delete_all_instances(
@@ -863,7 +865,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         self.assertEqual(400, resp.status_code)
 
     @mock.patch('shakenfist.net.Network._db_get_attribute',
-                return_value={'value': 'created', 'update_time': 2})
+                return_value={'value': dbo.STATE_CREATED, 'update_time': 2})
     @mock.patch('shakenfist.net.Network.from_db',
                 return_value=FakeNetwork(
                     uuid='87c15186-5f73-4947-a9fb-2183c4951efc',
@@ -925,7 +927,7 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
         self.addCleanup(self.config.stop)
 
     @mock.patch('shakenfist.net.Network._db_get_attribute',
-                return_value={'value': 'created', 'update_time': 2})
+                return_value={'value': dbo.STATE_CREATED, 'update_time': 2})
     @mock.patch('shakenfist.ipmanager.IPManager.from_db')
     @mock.patch('shakenfist.net.Network.from_db',
                 return_value=FakeNetwork(
@@ -981,7 +983,7 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
                     namespace='foo',
                     name='bob',
                     netblock='10.10.0.0/24',
-                    state='deleted'
+                    state=dbo.STATE_DELETED
                 ))
     @mock.patch('shakenfist.etcd.get_all',
                 return_value=[(None, {'uuid': '30f6da44-look-i-am-uuid'})])

@@ -4,6 +4,7 @@ import requests
 import setproctitle
 import time
 
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
@@ -210,7 +211,7 @@ def instance_start(instance, network):
                         'missing network: %s' % netdesc['network_uuid'])
                     return
 
-                if n.state.value != 'created':
+                if n.state.value != dbo.STATE_CREATED:
                     instance.enqueue_delete_due_error(
                         'network is not active: %s' % n.uuid)
                     return
@@ -238,7 +239,7 @@ def instance_start(instance, network):
                 return
 
         for ni in networkinterface.interfaces_for_instance(instance):
-            ni.state = 'created'
+            ni.state = dbo.STATE_CREATED
 
 
 def instance_delete(instance):
@@ -276,7 +277,7 @@ def instance_delete(instance):
                     ipm.release(ni.ipv4)
                     ipm.persist()
 
-                ni.state = 'deleted'
+                ni.state = dbo.STATE_DELETED
 
         # Check each network used by the deleted instance
         for network in instance_networks:

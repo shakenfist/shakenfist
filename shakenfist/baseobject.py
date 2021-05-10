@@ -16,6 +16,12 @@ class DatabaseBackedObject(object):
     current_version = None
     state_targets = None
 
+    STATE_INITIAL = 'initial'
+    STATE_CREATING = 'creating'
+    STATE_CREATED = 'created'
+    STATE_DELETED = 'deleted'
+    STATE_ERROR = 'error'
+
     def __init__(self, object_uuid, version=None):
         self.__uuid = object_uuid
         self.__version = version
@@ -110,8 +116,7 @@ class DatabaseBackedObject(object):
             if orig.value == new_value:
                 return
 
-            # TODO(mikal): move this to a constant when we have a good set of shared basic states.
-            if orig.value == 'deleted':
+            if orig.value == self.STATE_DELETED:
                 LOG.with_fields(
                     {
                         'uuid': self.uuid,
@@ -176,8 +181,12 @@ def state_filter(states, o):
 # Do not use these filters for instances or nodes, use the more
 # specific ones instead
 active_states_filter = partial(
-    state_filter, ['initial', 'creating', 'created', 'error'])
-inactive_states_filter = partial(state_filter, ['deleted'])
+    state_filter, [DatabaseBackedObject.STATE_INITIAL,
+                   DatabaseBackedObject.STATE_CREATING,
+                   DatabaseBackedObject.STATE_CREATED,
+                   DatabaseBackedObject.STATE_ERROR])
+inactive_states_filter = partial(
+    state_filter, [DatabaseBackedObject.STATE_DELETED])
 
 
 def state_age_filter(delay, o):

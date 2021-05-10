@@ -10,6 +10,9 @@ from uuid import uuid4
 
 
 from shakenfist import baseobject
+from shakenfist.baseobject import (
+    DatabaseBackedObject as dbo,
+    DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import dhcp
@@ -31,15 +34,15 @@ from shakenfist import virt
 LOG, _ = logutil.setup(__name__)
 
 
-class Network(baseobject.DatabaseBackedObject):
+class Network(dbo):
     object_type = 'network'
     current_version = 2
     state_targets = {
-        None: ('initial', ),
-        'initial': ('created', 'deleted', 'error'),
-        'created': ('created', 'deleted', 'error'),
-        'error': ('deleted', 'error'),
-        'deleted': (),
+        None: (dbo.STATE_INITIAL, ),
+        dbo.STATE_INITIAL: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR),
+        dbo.STATE_CREATED: (dbo.STATE_DELETED, dbo.STATE_ERROR),
+        dbo.STATE_ERROR: (dbo.STATE_DELETED, dbo.STATE_ERROR),
+        dbo.STATE_DELETED: (),
     }
 
     def __init__(self, static_values):
@@ -103,7 +106,7 @@ class Network(baseobject.DatabaseBackedObject):
         )
 
         n = Network.from_db(uuid)
-        n.state = 'initial'
+        n.state = Network.STATE_INITIAL
         n.add_event('db record creation', None)
 
         # Networks should immediately appear on the network node
@@ -291,7 +294,7 @@ class Network(baseobject.DatabaseBackedObject):
         callers will wait on a lock before calling this function. In this case
         we definitely need to update the in-memory object model.
         """
-        return self.state.value in ('deleted', 'error')
+        return self.state.value in (self.STATE_DELETED, self.STATE_ERROR)
 
     def _create_common(self):
         subst = self.subst_dict()
@@ -427,7 +430,7 @@ class Network(baseobject.DatabaseBackedObject):
                 self.log.info('Network died whilst waiting for lock')
                 return
             self._delete_on_node()
-            self.state = 'deleted'
+            self.state = self.STATE_DELETED
 
         self.remove_dhcp()
         self.remove_nat()
@@ -691,7 +694,7 @@ class Network(baseobject.DatabaseBackedObject):
                          % subst)
 
 
-class Networks(baseobject.DatabaseBackedObjectIterator):
+class Networks(dbo_iter):
     def __iter__(self):
         for _, n in etcd.get_all('network', None):
             if n['uuid'] == 'floating':

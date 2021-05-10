@@ -4,6 +4,7 @@ import os
 import random
 import time
 
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import logutil
@@ -49,7 +50,7 @@ class Monitor(daemon.Daemon):
                 seen.append(domain.name())
 
                 db_state = instance.state
-                if db_state.value == 'deleted':
+                if db_state.value == dbo.STATE_DELETED:
                     # NOTE(mikal): a delete might be in-flight in the queue.
                     # We only worry about instances which should have gone
                     # away five minutes ago.
@@ -80,7 +81,7 @@ class Monitor(daemon.Daemon):
                 state = util.extract_power_state(libvirt, domain)
                 instance.update_power_state(state)
                 if state == 'crashed':
-                    instance.state = 'error'
+                    instance.state = dbo.STATE_ERROR
 
             # Inactive VMs just have a name, and are powered off
             # in our state system.
@@ -102,7 +103,7 @@ class Monitor(daemon.Daemon):
                         continue
 
                     db_state = instance.state
-                    if db_state.value == 'deleted':
+                    if db_state.value == dbo.STATE_DELETED:
                         # NOTE(mikal): a delete might be in-flight in the queue.
                         # We only worry about instances which should have gone
                         # away five minutes ago.
@@ -122,7 +123,7 @@ class Monitor(daemon.Daemon):
                         # If we're inactive and our files aren't on disk,
                         # we have a problem.
                         log_ctx.info('Detected error state for instance')
-                        instance.state = 'error'
+                        instance.state = dbo.STATE_ERROR
 
                     elif not db_power or db_power['power_state'] != 'off':
                         log_ctx.info('Detected power off for instance')

@@ -4,6 +4,9 @@ from functools import partial
 from uuid import uuid4
 
 from shakenfist import baseobject
+from shakenfist.baseobject import (
+    DatabaseBackedObject as dbo,
+    DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import etcd
@@ -15,15 +18,15 @@ from shakenfist import util
 LOG, _ = logutil.setup(__name__)
 
 
-class NetworkInterface(baseobject.DatabaseBackedObject):
+class NetworkInterface(dbo):
     object_type = 'networkinterface'
     current_version = 2
     state_targets = {
-        None: ('initial', ),
-        'initial': ('created', 'deleted', 'error'),
-        'created': ('created', 'deleted', 'error'),
-        'error': ('deleted', 'error'),
-        'deleted': (),
+        None: (dbo.STATE_INITIAL, ),
+        dbo.STATE_INITIAL: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR),
+        dbo.STATE_CREATED: (dbo.STATE_DELETED, dbo.STATE_ERROR),
+        dbo.STATE_ERROR: (dbo.STATE_DELETED, dbo.STATE_ERROR),
+        dbo.STATE_DELETED: (),
     }
 
     def __init__(self, static_values):
@@ -72,7 +75,7 @@ class NetworkInterface(baseobject.DatabaseBackedObject):
 
         ni = NetworkInterface.from_db(interface_uuid)
         ni._db_set_attribute('floating', {'floating_address': None})
-        ni.state = 'initial'
+        ni.state = NetworkInterface.STATE_INITIAL
         ni.add_event('db record creation', None)
 
         # TODO(andy): Integrate metadata into each object type
@@ -155,7 +158,7 @@ class NetworkInterface(baseobject.DatabaseBackedObject):
         db.delete_metadata('networkinterface', self.uuid)
 
 
-class NetworkInterfaces(baseobject.DatabaseBackedObjectIterator):
+class NetworkInterfaces(dbo_iter):
     def __iter__(self):
         for _, ni in etcd.get_all('networkinterface', None):
             ni = NetworkInterface.from_db(ni['uuid'])
@@ -199,5 +202,5 @@ def interfaces_for_network(network):
 
 def inactive_network_interfaces():
     return NetworkInterfaces([
-        partial(baseobject.state_filter, ['deleted', 'error']),
+        partial(baseobject.state_filter, [dbo.STATE_DELETED, dbo.STATE_ERROR]),
         partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))])

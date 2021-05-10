@@ -1,6 +1,8 @@
 import mock
 
-from shakenfist.baseobject import State
+from shakenfist.baseobject import (
+    DatabaseBackedObject as dbo,
+    State)
 from shakenfist.config import SFConfigBase
 from shakenfist.daemons import cleaner
 from shakenfist.tests import test_shakenfist
@@ -152,7 +154,7 @@ class CleanerTestCase(test_shakenfist.ShakenFistTestCase):
                 ('attribute/instance', 'crashed',
                  'power_state', {'power_state': 'crashed'}),
                 ('attribute/instance', 'crashed',
-                 'state', State('error', 7)),
+                 'state', State(dbo.STATE_ERROR, 7)),
                 ('attribute/instance', 'paused',
                  'power_state', {'power_state': 'paused'}),
                 ('attribute/instance', 'suspended',
@@ -162,5 +164,5 @@ class CleanerTestCase(test_shakenfist.ShakenFistTestCase):
                 ('attribute/instance', 'bar',
                  'power_state', {'power_state': 'off'}),
                 ('attribute/instance', 'nofiles',
-                 'state', State('error', 7))
+                 'state', State(dbo.STATE_ERROR, 7))
             ], result)

@@ -35,6 +35,7 @@ import traceback
 import uuid
 
 from shakenfist import baseobject
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import exceptions
@@ -343,7 +344,7 @@ def requires_network_active(func):
             return error(404, 'network not found')
 
         state = kwargs['network_from_db'].state
-        if state.value != 'created':
+        if state.value != dbo.STATE_CREATED:
             log.info('Network not ready (%s)' % state.value)
             return error(406,
                          'network %s is not ready (%s)'
@@ -490,7 +491,7 @@ class AuthNamespace(Resource):
         instances = []
         deleted_instances = []
         for i in virt.instances_in_namespace(namespace):
-            if i.state.value in ['deleted', 'error']:
+            if i.state.value in [dbo.STATE_DELETED, dbo.STATE_ERROR]:
                 deleted_instances.append(i.uuid)
             else:
                 instances.append(i.uuid)
@@ -627,7 +628,7 @@ class Instance(Resource):
     @requires_instance_ownership
     def delete(self, instance_uuid=None, instance_from_db=None):
         # Check if instance has already been deleted
-        if instance_from_db.state.value == 'deleted':
+        if instance_from_db.state.value == dbo.STATE_DELETED:
             return error(404, 'instance not found')
 
         # If this instance is not on a node, just do the DB cleanup locally
@@ -717,7 +718,7 @@ class Instances(Resource):
                 n = net.Network.from_db(net_uuid)
                 if not n:
                     return error(404, 'network %s does not exist' % net_uuid)
-                if n.state.value != 'created':
+                if n.state.value != net.Network.STATE_CREATED:
                     return error(406, 'network %s is not ready (%s)' % (n.uuid, n.state.value))
 
         if not video:
@@ -1232,7 +1233,7 @@ class Network(Resource):
             return error(403, 'you cannot delete an in use network')
 
         # Check if network has already been deleted
-        if network_from_db.state.value in 'deleted':
+        if network_from_db.state.value in dbo.STATE_DELETED:
             return error(404, 'network not found')
 
         return _delete_network(network_from_db)
