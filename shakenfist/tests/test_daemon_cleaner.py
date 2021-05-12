@@ -118,13 +118,13 @@ class CleanerTestCase(test_shakenfist.ShakenFistTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
-    @mock.patch('shakenfist.virt.Instance.error',
+    @mock.patch('shakenfist.instance.Instance.error',
                 new_callable=mock.PropertyMock)
     @mock.patch('shakenfist.etcd.get', side_effect=fake_get)
     @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.node.Node.observe_this_node')
     @mock.patch('shakenfist.db.add_event')
-    @mock.patch('shakenfist.virt.Instance._db_get', side_effect=fake_instance_get)
+    @mock.patch('shakenfist.instance.Instance._db_get', side_effect=fake_instance_get)
     @mock.patch('shakenfist.etcd.put', side_effect=fake_put)
     @mock.patch('os.path.exists', side_effect=fake_exists)
     @mock.patch('time.time', return_value=7)

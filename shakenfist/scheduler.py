@@ -11,12 +11,12 @@ from shakenfist.config import config
 from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import images
+from shakenfist import instance
 from shakenfist import logutil
 from shakenfist import networkinterface
 from shakenfist.node import (
     Nodes, active_states_filter as node_active_states_filter)
 from shakenfist import util
-from shakenfist import virt
 
 
 LOG, _ = logutil.setup(__name__)
@@ -125,7 +125,7 @@ class Scheduler(object):
         # Find number of matching networks on each node. We need to be careful
         # how we do this to avoid repeatedly scanning the etcd repository.
         per_node = {}
-        for inst in virt.Instances([]):
+        for inst in instance.Instances([]):
             n = inst.placement
             if n.get('node'):
                 per_node.setdefault(n['node'], [])

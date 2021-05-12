@@ -15,9 +15,9 @@ from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import image_resolver
+from shakenfist import instance
 from shakenfist import logutil
 from shakenfist import util
-from shakenfist import virt
 
 
 LOG, _ = logutil.setup(__name__)
@@ -257,7 +257,7 @@ class Image(dbo):
 
                 # Ensure checksum is correct
                 if not self.correct_checksum(actual_image):
-                    if isinstance(related_object, virt.Instance):
+                    if isinstance(related_object, instance.Instance):
                         related_object.add_event('fetch image', 'bad checksum')
                     raise exceptions.BadCheckSum('url=%s' % self.url)
 

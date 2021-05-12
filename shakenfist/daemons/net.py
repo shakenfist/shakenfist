@@ -9,6 +9,7 @@ from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import exceptions
+from shakenfist import instance
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
@@ -24,7 +25,6 @@ from shakenfist.tasks import (
     FloatNetworkInterfaceTask,
     DefloatNetworkInterfaceTask)
 from shakenfist import util
-from shakenfist import virt
 
 
 LOG, _ = logutil.setup(__name__)
@@ -43,7 +43,7 @@ class Monitor(daemon.Daemon):
 
         if not util.is_network_node():
             # For normal nodes, just the ones we have instances for
-            for inst in virt.Instances([virt.this_node_filter, virt.active_states_filter]):
+            for inst in instance.Instances([instance.this_node_filter, instance.active_states_filter]):
                 for ni in networkinterface.interfaces_for_instance(inst):
                     if ni.network_uuid not in host_networks:
                         host_networks.append(ni.network_uuid)
@@ -71,7 +71,7 @@ class Monitor(daemon.Daemon):
                 # and delete them
                 for ni in networkinterface.interfaces_for_network(n):
                     stray = False
-                    inst = virt.Instance.from_db(ni.instance_uuid)
+                    inst = instance.Instance.from_db(ni.instance_uuid)
                     if not inst:
                         stray = True
                     else:
