@@ -555,10 +555,12 @@ class Network(dbo):
     def remove_nat(self):
         if util.is_network_node():
             if self.floating_gateway:
-                ipm = IPManager.from_db('floating')
-                ipm.release(self.floating_gateway)
-                ipm.persist()
-                self.update_floating_gateway(None)
+                with db.get_lock('ipmanager', None, 'floating', ttl=120,
+                                 op='Remove NAT'):
+                    ipm = IPManager.from_db('floating')
+                    ipm.release(self.floating_gateway)
+                    ipm.persist()
+                    self.update_floating_gateway(None)
 
         else:
             db.enqueue('networknode', RemoveNATNetworkTask(self.uuid))

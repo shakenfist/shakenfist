@@ -1,4 +1,5 @@
 import ipaddress
+import itertools
 import time
 
 from oslo_concurrency import processutils
@@ -266,6 +267,44 @@ class Monitor(daemon.Daemon):
             if jobname:
                 db.resolve('networknode', jobname)
 
+    def _reap_leaked_floating_ips(self):
+        # Ensure we haven't leaked any floating IPs (because we use to)
+        floating_gateways = []
+        for n in net.Networks([]):
+            if n.floating_gateway:
+                floating_gateways.append(n.floating_gateway)
+        LOG.info('Found floating gateways: %s' % floating_gateways)
+
+        floating_addresses = []
+        for ni in networkinterface.NetworkInterfaces([]):
+            if ni.floating.get('floating_address'):
+                floating_addresses.append(ni.floating.get('floating_address'))
+        LOG.info('Found floating addresses: %s' % floating_addresses)
+
+        with db.get_lock('ipmanager', None, 'floating', ttl=120,
+                         op='Cleanup leaks'):
+            floating_ipm = IPManager.from_db('floating')
+            floating_reserved = [
+                floating_ipm.get_address_at_index(0),
+                floating_ipm.get_address_at_index(1),
+                floating_ipm.broadcast_address,
+                floating_ipm.network_address
+            ]
+            LOG.info('Found floating reservations: %s' % floating_reserved)
+
+            leaks = []
+            for ip in floating_ipm.in_use:
+                if ip not in itertools.chain(floating_gateways,
+                                             floating_addresses,
+                                             floating_reserved):
+                    LOG.error('Floating IP %s has leaked.' % ip)
+                    leaks.append(ip)
+
+            for ip in leaks:
+                LOG.error('Leaked floating IP %s has been released.' % ip)
+                floating_ipm.release(ip)
+            floating_ipm.persist()
+
     def run(self):
         LOG.info('Starting')
         last_management = 0
@@ -279,4 +318,6 @@ class Monitor(daemon.Daemon):
 
             if time.time() - last_management > 30:
                 self._maintain_networks()
+                if util.is_network_node:
+                    self._reap_leaked_floating_ips()
                 last_management = time.time()
