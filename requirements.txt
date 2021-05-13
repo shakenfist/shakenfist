@@ -8,7 +8,8 @@ prettytable                 # bsd
 tox                         # mit
 flake8                      # mit
 testtools                   # mit
-flask                       # bsd
+Werkzeug<2.0                # bsd
+flask<2.0                   # bsd
 flask_restful               # bsd
 psutil                      # bsd
 prometheus_client           # apache2
