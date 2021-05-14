@@ -272,13 +272,13 @@ class Monitor(daemon.Daemon):
     def _reap_leaked_floating_ips(self):
         # Ensure we haven't leaked any floating IPs (because we use to)
         floating_gateways = []
-        for n in net.Networks([]):
+        for n in net.Networks([baseobject.active_states_filter]):
             if n.floating_gateway:
                 floating_gateways.append(n.floating_gateway)
         LOG.info('Found floating gateways: %s' % floating_gateways)
 
         floating_addresses = []
-        for ni in networkinterface.NetworkInterfaces([]):
+        for ni in networkinterface.NetworkInterfaces([baseobject.active_states_filter]):
             if ni.floating.get('floating_address'):
                 floating_addresses.append(ni.floating.get('floating_address'))
         LOG.info('Found floating addresses: %s' % floating_addresses)
