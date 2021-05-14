@@ -388,7 +388,7 @@ class Network(dbo):
                     ipm = IPManager.from_db('floating')
                     if not self.floating_gateway:
                         self.update_floating_gateway(
-                            ipm.get_random_free_address())
+                            ipm.get_random_free_address(self.unique_label()))
                         ipm.persist()
 
                     subst['floating_router'] = ipm.get_address_at_index(1)

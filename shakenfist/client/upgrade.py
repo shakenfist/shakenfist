@@ -117,6 +117,41 @@ def main():
                     print('--> Upgraded networkinterface %s to version 2'
                           % ni['uuid'])
 
+            # Upgrade ipmanagers to v2, deleting strays while we're at it
+            for data, metadata in etcd_client.get_prefix('/sf/ipmanager/'):
+                network_uuid = metadata['key'].decode('utf-8').split('/')[-1]
+
+                if not etcd_client.get('/sf/network/%s' % network_uuid):
+                    print('--> Deleted stray ipmanager %s' % network_uuid)
+                    etcd_client.delete(metadata['key'])
+                    continue
+
+                ipm = json.loads(data.decode('utf-8'))
+                if 'ipmanager.v1' in ipm:
+                    ipm['ipmanager.v2'] = {
+                        'ipblock': ipm['ipmanager.v1']['ipblock'],
+                        'in_use': {},
+                        'uuid': network_uuid
+                    }
+                    for elem in ipm['ipmanager.v1']['in_use']:
+                        ipm['ipmanager.v2']['in_use'][elem] = ('unknown', None)
+
+                    del ipm['ipmanager.v1']
+
+                if ipm['ipmanager.v2']['uuid'] == 'floating':
+                    ipblock_obj = ipaddress.ip_network(ipm['ipmanager.v2']['ipblock'],
+                                                       strict=False)
+                    for addr in [str(ipblock_obj[0]),
+                                 str(ipblock_obj[1]),
+                                 str(ipblock_obj.broadcast_address),
+                                 str(ipblock_obj.network_address)]:
+                        ipm['ipmanager.v2']['in_use'][addr] = (
+                            'ipmanager', network_uuid)
+
+                etcd_client.put(
+                    metadata['key'], json.dumps(ipm, indent=4, sort_keys=True))
+                print('--> Upgraded ipmanager %s to version 2' % network_uuid)
+
             clean_events_mesh_operations(etcd_client)
 
         if minor <= 3:
