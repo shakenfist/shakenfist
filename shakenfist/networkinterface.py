@@ -11,7 +11,9 @@ from shakenfist.config import config
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
+from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
+from shakenfist.tasks import DefloatNetworkInterfaceTask
 from shakenfist import util
 
 
@@ -149,6 +151,20 @@ class NetworkInterface(dbo):
         if address and self.floating.get('floating_address') is not None:
             raise exceptions.NetworkInterfaceAlreadyFloating()
         self._db_set_attribute('floating', {'floating_address': address})
+
+    def delete(self):
+        if self.floating['floating_address']:
+            db.enqueue(
+                'networknode',
+                DefloatNetworkInterfaceTask(self.network_uuid, self.uuid))
+
+        with db.get_lock('ipmanager', None, self.network_uuid,
+                         ttl=120, op='Release fixed IP'):
+            ipm = IPManager.from_db(self.network_uuid)
+            ipm.release(self.ipv4)
+            ipm.persist()
+
+        self.state = dbo.STATE_DELETED
 
     def hard_delete(self):
         etcd.delete('macaddress', None, self.macaddr)

@@ -11,21 +11,18 @@ from shakenfist import db
 from shakenfist import exceptions
 from shakenfist.images import Image
 from shakenfist import instance
-from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
-from shakenfist import net
-from shakenfist import networkinterface
-from shakenfist import scheduler
-from shakenfist import util
 from shakenfist.tasks import (QueueTask,
                               DeleteInstanceTask,
                               FetchImageTask,
                               InstanceTask,
                               PreflightInstanceTask,
                               StartInstanceTask,
-                              FloatNetworkInterfaceTask,
-                              DefloatNetworkInterfaceTask
-                              )
+                              FloatNetworkInterfaceTask)
+from shakenfist import net
+from shakenfist import networkinterface
+from shakenfist import scheduler
+from shakenfist import util
 
 
 LOG, _ = logutil.setup(__name__)
@@ -265,18 +262,7 @@ def instance_delete(inst):
         # Delete the instance's interfaces
         with util.RecordedOperation('release network addresses', inst):
             for ni in networkinterface.interfaces_for_instance(inst):
-                if ni.floating['floating_address']:
-                    db.enqueue(
-                        'networknode',
-                        DefloatNetworkInterfaceTask(ni.network_uuid, ni.uuid))
-
-                with db.get_lock('ipmanager', None, ni.network_uuid,
-                                 ttl=120, op='Instance delete'):
-                    ipm = IPManager.from_db(ni.network_uuid)
-                    ipm.release(ni.ipv4)
-                    ipm.persist()
-
-                ni.state = dbo.STATE_DELETED
+                ni.delete()
 
         # Check each network used by the deleted instance
         for network in instance_networks:
