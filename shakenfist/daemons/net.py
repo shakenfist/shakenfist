@@ -70,20 +70,22 @@ class Monitor(daemon.Daemon):
 
                 # Network nodes also look for interfaces for absent instances
                 # and delete them
+                t = time.time()
                 for ni in networkinterface.interfaces_for_network(n):
-                    stray = False
                     inst = instance.Instance.from_db(ni.instance_uuid)
                     if not inst:
-                        stray = True
-                    else:
-                        if inst.state.value in [dbo.STATE_DELETED, dbo.STATE_ERROR, 'unknown']:
-                            stray = True
-
-                    if stray:
-                        ni.hard_delete()
+                        ni.delete()
                         LOG.with_instance(
                             ni.instance_uuid).with_networkinterface(
-                            ni.uuid).info('Hard deleted stray network interface')
+                            ni.uuid).info('Deleted stray network interface for missing instance')
+                    else:
+                        s = inst.state
+                        if (s.update_time + 30 < t and
+                                s.value in [dbo.STATE_DELETED, dbo.STATE_ERROR, 'unknown']):
+                            ni.delete()
+                            LOG.with_instance(
+                                ni.instance_uuid).with_networkinterface(
+                                ni.uuid).info('Deleted stray network interface')
 
         # Ensure we are on every network we have a host for
         for network in host_networks:
