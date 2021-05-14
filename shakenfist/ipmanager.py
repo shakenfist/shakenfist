@@ -3,31 +3,39 @@ import random
 
 from shakenfist import db
 from shakenfist import exceptions
+from shakenfist import logutil
+
+
+LOG, _ = logutil.setup(__name__)
 
 
 # NOTE(mikal): IPManager should _always_ return addresses as strings,
 # not as ipaddress.IPv4Address.
 
 class IPManager(object):
-    def __init__(self, uuid, ipblock, in_use=None):
+    def __init__(self, uuid=None, ipblock=None, in_use=None):
         self.uuid = uuid
         self.ipblock = ipblock
         self.ipblock_obj = ipaddress.ip_network(ipblock, strict=False)
+        self.log = LOG.with_field('ipmanager', self.uuid)
 
         self.netmask = self.ipblock_obj.netmask
         self.broadcast_address = str(self.ipblock_obj.broadcast_address)
         self.network_address = str(self.ipblock_obj.network_address)
-
         self.num_addresses = self.ipblock_obj.num_addresses
-        self.in_use = {
-            self.network_address: True,
-            self.broadcast_address: True
-        }
-        self.in_use_counter = 0
 
         if in_use:
-            for addr in in_use:
-                self.reserve(addr)
+            self.in_use_counter = len(in_use)
+            self.in_use = in_use
+        else:
+            self.in_use_counter = 0
+            self.in_use = {
+                self.network_address: self.unique_label(),
+                self.broadcast_address: self.unique_label()
+            }
+
+    def unique_label(self):
+        return ('ipmanager', self.uuid)
 
     @staticmethod
     def new(uuid, ipblock):
@@ -35,25 +43,22 @@ class IPManager(object):
                          op='Network object initialization'):
             ipm = IPManager(uuid, ipblock)
             # Reserve first IP address
-            ipm.reserve(ipm.get_address_at_index(1))
+            ipm.reserve(ipm.get_address_at_index(1), ipm.unique_label())
             ipm.persist()
         return ipm
 
     @staticmethod
     def from_db(uuid):
         db_data = db.get_ipmanager(uuid)
-        ipm = IPManager(uuid=uuid, **db_data['ipmanager.v1'])
+        ipm = IPManager(**db_data['ipmanager.v2'])
         return ipm
 
     def persist(self):
-        in_use = set()
-        for ip in self.in_use:
-            in_use.add(str(ip))
-
         d = {
-            'ipmanager.v1': {
+            'ipmanager.v2': {
                 'ipblock': self.ipblock,
-                'in_use': list(in_use)
+                'in_use': self.in_use,
+                'uuid': self.uuid
             }
         }
         db.persist_ipmanager(self.uuid, d)
@@ -70,11 +75,13 @@ class IPManager(object):
     def is_free(self, address):
         return address not in self.in_use
 
-    def reserve(self, address):
+    def reserve(self, address, unique_label_tuple):
         if not self.is_free(address):
             return False
 
-        self.in_use[address] = True
+        self.log.with_field(*unique_label_tuple).with_field(
+            'address', address).info('Reserving address')
+        self.in_use[address] = unique_label_tuple
         self.in_use_counter += 1
         return True
 
@@ -82,6 +89,7 @@ class IPManager(object):
         if self.is_free(address):
             return
 
+        self.log.with_field('address', address).info('Releasing address')
         del self.in_use[address]
         self.in_use_counter -= 1
 
@@ -90,11 +98,11 @@ class IPManager(object):
             self.ipblock_obj.max_prefixlen - self.ipblock_obj.prefixlen)
         return str(ipaddress.IPv4Address(self.ipblock_obj.network_address + bits))
 
-    def get_random_free_address(self):
+    def get_random_free_address(self, unique_label_tuple):
         if self.in_use_counter / self.num_addresses < 0.5:
             while True:
                 addr = self.get_random_address()
-                free = self.reserve(addr)
+                free = self.reserve(addr, unique_label_tuple)
                 if free:
                     return str(addr)
 
@@ -102,7 +110,7 @@ class IPManager(object):
             idx = 1
             while idx < self.num_addresses:
                 addr = self.get_address_at_index(idx)
-                free = self.reserve(addr)
+                free = self.reserve(addr, unique_label_tuple)
                 if free:
                     return str(addr)
 

@@ -72,7 +72,7 @@ class IPManagerTestCase(test_shakenfist.ShakenFistTestCase):
 
     def test_reserve(self):
         ipm = IPManager('uuid', '192.168.1.0/24')
-        ipm.reserve('192.168.1.10')
+        ipm.reserve('192.168.1.10', ('test', '123'))
         self.assertEqual(
             {
                 '192.168.1.0': True,
@@ -82,7 +82,7 @@ class IPManagerTestCase(test_shakenfist.ShakenFistTestCase):
 
     def test_release(self):
         ipm = IPManager('uuid', '192.168.1.0/24')
-        ipm.reserve('192.168.1.10')
+        ipm.reserve('192.168.1.10', ('test', '123'))
         ipm.release('10.0.0.1')
         ipm.release('192.168.1.10')
         self.assertEqual(
@@ -94,12 +94,12 @@ class IPManagerTestCase(test_shakenfist.ShakenFistTestCase):
     def test_is_free_and_reserve(self):
         ipm = IPManager('uuid', '192.168.1.0/24')
         self.assertEqual(True, ipm.is_free('192.168.1.24'))
-        ipm.reserve('192.168.1.24')
+        ipm.reserve('192.168.1.24', ('test', '123'))
         self.assertEqual(False, ipm.is_free('192.168.1.24'))
-        self.assertEqual(False, ipm.reserve('192.168.1.24'))
+        self.assertEqual(False, ipm.reserve('192.168.1.24', ('test', '123')))
 
         self.assertEqual(True, ipm.is_free('192.168.1.42'))
-        self.assertEqual(True, ipm.reserve('192.168.1.42'))
+        self.assertEqual(True, ipm.reserve('192.168.1.42', ('test', '123')))
         self.assertEqual(False, ipm.is_free('192.168.1.42'))
         ipm.release('192.168.1.42')
         self.assertEqual(True, ipm.is_free('192.168.1.42'))
@@ -108,7 +108,7 @@ class IPManagerTestCase(test_shakenfist.ShakenFistTestCase):
         ipm = IPManager('uuid', '10.0.0.0/8')
 
         for _ in range(65025):
-            ipm.get_random_free_address()
+            ipm.get_random_free_address(('test', '123'))
 
         # The extra two are the reserved network and broadcast
         # addresses
@@ -119,7 +119,7 @@ class IPManagerTestCase(test_shakenfist.ShakenFistTestCase):
 
         try:
             for _ in range(65025):
-                ipm.get_random_free_address()
+                ipm.get_random_free_address(('test', '123'))
 
         except exceptions.CongestedNetwork:
             pass
