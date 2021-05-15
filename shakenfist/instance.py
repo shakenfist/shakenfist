@@ -800,8 +800,14 @@ class Instance(dbo):
         try:
             inst.create()
         except libvirt.libvirtError as e:
-            err = 'Requested operation is not valid: domain is already running'
-            if not str(e).startswith(err):
+            if str(e).startswith('Requested operation is not valid: '
+                                 'domain is already running'):
+                pass
+            elif str(e).find('Failed to find an available port: '
+                             'Address already in use') != -1:
+                self.log.warning('Instance ports clash: %s', e)
+                raise exceptions.InstancePortsClash(e)
+            else:
                 self.log.warning('Instance start error: %s', e)
                 return False
 
