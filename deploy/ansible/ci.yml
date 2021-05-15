@@ -151,6 +151,18 @@
       pause:
         minutes: 1
 
+- hosts: hypervisors
+  gather_facts: yes
+  become: true
+  vars:
+    source_path: "/home/jenkins/src/shakenfist/"
+
+  tasks:
+    - name: Setup a RAM disk for etcd
+      shell: |
+        mkdir -p /var/lib/etcd/
+        mount -t tmpfs -o rw,size=512M tmpfs /var/lib/etcd/
+
 - hosts: sfall
   gather_facts: yes
   become: true
