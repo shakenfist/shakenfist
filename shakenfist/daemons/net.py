@@ -241,13 +241,14 @@ class Monitor(daemon.Daemon):
 
         elif isinstance(workitem, DefloatNetworkInterfaceTask):
             n.remove_floating_ip(ni.floating.get('floating_address'), ni.ipv4)
-            ni.floating = None
 
             db.add_event('interface', ni.uuid, 'api', 'defloat', None, None)
             with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Instance defloat'):
                 ipm = IPManager.from_db('floating')
                 ipm.release(ni.floating.get('floating_address'))
                 ipm.persist()
+
+            ni.floating = None
 
     def _process_network_node_workitems(self):
         jobname, workitem = db.dequeue('networknode')
@@ -320,6 +321,6 @@ class Monitor(daemon.Daemon):
 
             if time.time() - last_management > 30:
                 self._maintain_networks()
-                if util.is_network_node:
+                if util.is_network_node():
                     self._reap_leaked_floating_ips()
                 last_management = time.time()

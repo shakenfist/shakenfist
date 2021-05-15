@@ -276,7 +276,6 @@ def instance_delete(inst):
                     # Network not used by any other instance therefore delete
                     with util.RecordedOperation('remove network from node', n):
                         n.delete_on_node_with_lock()
-        return inst
 
 
 class Monitor(daemon.Daemon):
