@@ -94,11 +94,11 @@ class Node(dbo):
     # Values routed to attributes, writes are via helper methods.
     @property
     def last_seen(self):
-        return self._db_get_attribute('observed')['at']
+        return self._db_get_attribute('observed').get('at', 0)
 
     @property
     def installed_version(self):
-        return self._db_get_attribute('observed')['release']
+        return self._db_get_attribute('observed').get('release')
 
 
 class Nodes(dbo_iter):
