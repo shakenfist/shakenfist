@@ -321,6 +321,6 @@ class Monitor(daemon.Daemon):
 
             if time.time() - last_management > 30:
                 self._maintain_networks()
-                if util.is_network_node:
+                if util.is_network_node():
                     self._reap_leaked_floating_ips()
                 last_management = time.time()
