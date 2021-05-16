@@ -54,6 +54,7 @@ from shakenfist.tasks import (
     FetchImageTask,
     PreflightInstanceTask,
     StartInstanceTask,
+    DestroyNetworkTask,
     FloatNetworkInterfaceTask,
     DefloatNetworkInterfaceTask
 )
@@ -1200,7 +1201,7 @@ def _delete_network(network_from_db):
         return error(404, 'network is deleted')
 
     n.add_event('api', 'delete')
-    n.delete()
+    db.enqueue('networknode', DestroyNetworkTask(n.uuid))
 
 
 class Network(Resource):
@@ -1236,7 +1237,7 @@ class Network(Resource):
         if network_from_db.state.value in dbo.STATE_DELETED:
             return error(404, 'network not found')
 
-        return _delete_network(network_from_db)
+        _delete_network(network_from_db)
 
 
 class Networks(Resource):

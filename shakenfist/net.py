@@ -423,13 +423,49 @@ class Network(dbo):
                 self.enable_nat()
 
         self.update_dhcp()
+        self.state = self.STATE_CREATED
 
-    def delete(self):
+    def delete_on_hypervisor(self):
         with self.get_lock(op='Network delete'):
-            if self.is_dead():
-                self.log.info('Network died whilst waiting for lock')
-                return
-            self._delete_on_node()
+            subst = self.subst_dict()
+
+            if util.check_for_interface(subst['vx_bridge']):
+                with util.RecordedOperation('delete vxlan bridge', self):
+                    util.execute(None, 'ip link delete %(vx_bridge)s' % subst)
+
+            if util.check_for_interface(subst['vx_interface']):
+                with util.RecordedOperation('delete vxlan interface', self):
+                    util.execute(
+                        None, 'ip link delete %(vx_interface)s' % subst)
+
+    def delete_on_network_node(self):
+        with self.get_lock(op='Network delete'):
+            subst = self.subst_dict()
+
+            if util.is_network_node():
+                if util.check_for_interface(subst['vx_veth_outer']):
+                    with util.RecordedOperation('delete router veth', self):
+                        util.execute(
+                            None, 'ip link delete %(vx_veth_outer)s' % subst)
+
+                if util.check_for_interface(subst['physical_veth_outer']):
+                    with util.RecordedOperation('delete physical veth', self):
+                        util.execute(
+                            None,
+                            'ip link delete %(physical_veth_outer)s' % subst)
+
+                if os.path.exists('/var/run/netns/%(netns)s' % subst):
+                    with util.RecordedOperation('delete netns', self):
+                        util.execute(None, 'ip netns del %(netns)s' % subst)
+
+                if self.floating_gateway:
+                    with db.get_lock('ipmanager', None, 'floating', ttl=120,
+                                     op='Network delete'):
+                        ipm = IPManager.from_db('floating')
+                        ipm.release(self.floating_gateway)
+                        ipm.persist()
+                        self.update_floating_gateway(None)
+
             self.state = self.STATE_DELETED
 
         self.remove_dhcp()
@@ -438,57 +474,9 @@ class Network(dbo):
         ipm = IPManager.from_db(self.uuid)
         ipm.delete()
 
-    def delete_on_node_with_lock(self):
-        with self.get_lock(op='Network delete on node'):
-            if self.is_dead():
-                self.log.info('Network died whilst waiting for lock')
-                return
-            self._delete_on_node()
-
-    def _delete_on_node(self):
-        subst = self.subst_dict()
-        LOG.with_fields(subst).debug('net.delete_on_node()')
-
-        # Cleanup local node
-        if util.check_for_interface(subst['vx_bridge']):
-            with util.RecordedOperation('delete vxlan bridge', self):
-                util.execute(None, 'ip link delete %(vx_bridge)s' % subst)
-
-        if util.check_for_interface(subst['vx_interface']):
-            with util.RecordedOperation('delete vxlan interface', self):
-                util.execute(
-                    None, 'ip link delete %(vx_interface)s' % subst)
-
-        # If this is the network node do additional cleanup
-        if util.is_network_node():
-            if util.check_for_interface(subst['vx_veth_outer']):
-                with util.RecordedOperation('delete router veth', self):
-                    util.execute(
-                        None, 'ip link delete %(vx_veth_outer)s' % subst)
-
-            if util.check_for_interface(subst['physical_veth_outer']):
-                with util.RecordedOperation('delete physical veth', self):
-                    util.execute(
-                        None,
-                        'ip link delete %(physical_veth_outer)s' % subst)
-
-            if os.path.exists('/var/run/netns/%(netns)s' % subst):
-                with util.RecordedOperation('delete netns', self):
-                    util.execute(None, 'ip netns del %(netns)s' % subst)
-
-            if self.floating_gateway:
-                with db.get_lock('ipmanager', None, 'floating', ttl=120,
-                                 op='Network delete'):
-                    ipm = IPManager.from_db('floating')
-                    ipm.release(self.floating_gateway)
-                    ipm.persist()
-                    self.update_floating_gateway(None)
-
-        Network.deallocate_vxid(self.vxid)
-        IPManager.from_db(self.uuid).delete()
-
     def hard_delete(self):
         etcd.delete('network', None, self.uuid)
+        etcd.delete('vxid', None, self.vxid)
         etcd.delete_all('attribute/network', self.uuid)
         etcd.delete_all('event/network', self.uuid)
         db.delete_metadata('network', self.uuid)
