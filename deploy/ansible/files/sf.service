@@ -16,6 +16,7 @@ Environment=SHAKENFIST_AUTH_SECRET_SEED="{{hostvars['localhost']['auth_secret']}
 Environment=SHAKENFIST_INCLUDE_TRACEBACKS="{{hostvars['localhost']['include_tracebacks']}}"
 
 Environment=SHAKENFIST_DISK_FORMAT=qcow
+Environment=SHAKENFIST_LOG_METHOD_TRACE=False
 
 # Cluster tuning.
 Environment=SHAKENFIST_RAM_SYSTEM_RESERVATION={{hostvars['localhost']['ram_system_reservation']}}
