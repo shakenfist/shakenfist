@@ -113,6 +113,10 @@ class DeployNetworkTask(NetworkTask):
     _name = 'network_deploy'
 
 
+class DestroyNetworkTask(NetworkTask):
+    _name = 'network_destroy'
+
+
 class UpdateDHCPNetworkTask(NetworkTask):
     _name = 'network_update_dhcp'
 

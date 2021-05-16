@@ -18,6 +18,7 @@ from shakenfist import networkinterface
 from shakenfist.networkinterface import NetworkInterface
 from shakenfist.tasks import (
     DeployNetworkTask,
+    DestroyNetworkTask,
     NetworkTask,
     RemoveDHCPNetworkTask,
     RemoveNATNetworkTask,
@@ -143,23 +144,6 @@ class Monitor(daemon.Daemon):
             LOG.with_field('vxids', extra_vxids).warning(
                 'Extra vxlans present!')
 
-            # Determine the network uuids for those vxids
-            # vxid_to_uuid = {}
-            # for n in db.get_networks():
-            #     vxid_to_uuid[n['vxid']] = n.uuid
-
-            # for extra in extra_vxids:
-            #     if extra in vxid_to_uuid:
-            #         with db.get_lock('network', None, vxid_to_uuid[extra],
-            #                          ttl=120, op='Network reap VXLAN'):
-            #             n = net.Network.from_db(vxid_to_uuid[extra])
-            #             n.delete()
-            #             LOG.info('Extra vxlan %s (network %s) removed.'
-            #                      % (extra, vxid_to_uuid[extra]))
-            #     else:
-            #         LOG.error('Extra vxlan %s does not map to any network.'
-            #                   % extra)
-
         # And record vxids in the database
         db.persist_node_vxid_mapping(config.NODE_NAME, vxid_to_mac)
 
@@ -199,12 +183,20 @@ class Monitor(daemon.Daemon):
             try:
                 n.create_on_network_node()
                 n.ensure_mesh()
-                n.state = dbo.STATE_CREATED
                 db.add_event('network', workitem.network_uuid(),
                              'network node', 'deploy', None, None)
             except exceptions.DeadNetwork as e:
                 log_ctx.with_field('exception', e).warning(
                     'DeployNetworkTask on dead network')
+
+        elif isinstance(workitem, DestroyNetworkTask):
+            try:
+                n.delete_on_network_node()
+                db.add_event('network', workitem.network_uuid(),
+                             'network node', 'destroy', None, None)
+            except exceptions.DeadNetwork as e:
+                log_ctx.with_field('exception', e).warning(
+                    'DestroyNetworkTask on dead network')
 
         elif isinstance(workitem, UpdateDHCPNetworkTask):
             try:
