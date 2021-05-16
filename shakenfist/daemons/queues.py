@@ -250,10 +250,10 @@ def instance_delete(inst):
 
         # Create list of networks used by all other instances
         host_networks = []
-        for inst in instance.Instances([instance.this_node_filter,
-                                        instance.active_states_filter]):
-            if not inst.uuid == inst.uuid:
-                for ni in networkinterface.interfaces_for_instance(inst):
+        for i in instance.Instances([instance.this_node_filter,
+                                     instance.active_states_filter]):
+            if not i.uuid == inst.uuid:
+                for ni in networkinterface.interfaces_for_instance(i):
                     if ni.network_uuid not in host_networks:
                         host_networks.append(ni.network_uuid)
 
