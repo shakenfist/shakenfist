@@ -196,7 +196,7 @@ class Monitor(daemon.Daemon):
             try:
                 n.create_on_network_node()
                 n.ensure_mesh()
-                n.state = self.STATE_CREATED
+                n.state = dbo.STATE_CREATED
                 db.add_event('network', workitem.network_uuid(),
                              'network node', 'deploy', None, None)
             except exceptions.DeadNetwork as e:
