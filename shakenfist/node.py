@@ -24,7 +24,8 @@ class Node(dbo):
     state_targets = {
         None: (dbo.STATE_CREATED, dbo.STATE_ERROR, STATE_MISSING),
         dbo.STATE_CREATED: (dbo.STATE_DELETED, dbo.STATE_ERROR, STATE_MISSING),
-        dbo.STATE_ERROR: (dbo.STATE_DELETED),
+        # A node can return from the dead...
+        dbo.STATE_ERROR: (dbo.STATE_CREATED, dbo.STATE_DELETED),
         STATE_MISSING: (dbo.STATE_CREATED, dbo.STATE_ERROR)
     }
 
