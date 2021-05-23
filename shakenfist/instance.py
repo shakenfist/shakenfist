@@ -133,7 +133,7 @@ class Instance(dbo):
         None: (dbo.STATE_INITIAL, dbo.STATE_ERROR),
         dbo.STATE_INITIAL: (STATE_PREFLIGHT, dbo.STATE_DELETED, STATE_INITIAL_ERROR),
         STATE_PREFLIGHT: (dbo.STATE_CREATING, dbo.STATE_DELETED, STATE_PREFLIGHT_ERROR),
-        dbo.STATE_CREATING: (dbo.STATE_CREATED, dbo.STATE_DELETED, STATE_CREATING_ERROR),
+        dbo.STATE_CREATING: (dbo.STATE_CREATED, STATE_CREATING_ERROR),
         dbo.STATE_CREATED: (dbo.STATE_DELETED, STATE_CREATED_ERROR),
         STATE_INITIAL_ERROR: (dbo.STATE_ERROR),
         STATE_PREFLIGHT_ERROR: (dbo.STATE_ERROR),
@@ -385,7 +385,7 @@ class Instance(dbo):
         with util.RecordedOperation('create domain', self):
             if not self.power_on():
                 attempts = 0
-                while not self.power_on() and attempts < 100:
+                while not self.power_on() and attempts < 5:
                     self.log.warning(
                         'Instance required an additional attempt to power on')
                     time.sleep(5)
@@ -393,9 +393,10 @@ class Instance(dbo):
 
         if self.is_powered_on():
             self.log.info('Instance now powered on')
+            self.state = self.STATE_CREATED
         else:
             self.log.info('Instance failed to power on')
-        self.state = self.STATE_CREATED
+            self.enqueue_delete_due_error('Instance failed to power on')
 
     def delete(self):
         with util.RecordedOperation('delete domain', self):
@@ -781,6 +782,7 @@ class Instance(dbo):
     def power_on(self):
         if not os.path.exists(self.xml_file):
             self.enqueue_delete_due_error('missing domain file in power on')
+            raise exceptions.NoDomainException()
 
         libvirt = util.get_libvirt()
         with open(self.xml_file) as f:
@@ -798,8 +800,14 @@ class Instance(dbo):
         try:
             inst.create()
         except libvirt.libvirtError as e:
-            err = 'Requested operation is not valid: domain is already running'
-            if not str(e).startswith(err):
+            if str(e).startswith('Requested operation is not valid: '
+                                 'domain is already running'):
+                pass
+            elif str(e).find('Failed to find an available port: '
+                             'Address already in use') != -1:
+                self.log.warning('Instance ports clash: %s', e)
+                raise exceptions.InstancePortsClash(e)
+            else:
                 self.log.warning('Instance start error: %s', e)
                 return False
 

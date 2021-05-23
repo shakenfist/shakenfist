@@ -24,7 +24,8 @@ class Node(dbo):
     state_targets = {
         None: (dbo.STATE_CREATED, dbo.STATE_ERROR, STATE_MISSING),
         dbo.STATE_CREATED: (dbo.STATE_DELETED, dbo.STATE_ERROR, STATE_MISSING),
-        dbo.STATE_ERROR: (dbo.STATE_DELETED),
+        # A node can return from the dead...
+        dbo.STATE_ERROR: (dbo.STATE_CREATED, dbo.STATE_DELETED),
         STATE_MISSING: (dbo.STATE_CREATED, dbo.STATE_ERROR)
     }
 
@@ -94,11 +95,11 @@ class Node(dbo):
     # Values routed to attributes, writes are via helper methods.
     @property
     def last_seen(self):
-        return self._db_get_attribute('observed')['at']
+        return self._db_get_attribute('observed').get('at', 0)
 
     @property
     def installed_version(self):
-        return self._db_get_attribute('observed')['release']
+        return self._db_get_attribute('observed').get('release')
 
 
 class Nodes(dbo_iter):

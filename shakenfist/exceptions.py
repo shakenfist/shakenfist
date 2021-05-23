@@ -34,6 +34,10 @@ class InstanceBadDiskSpecification(InstanceException):
     pass
 
 
+class InstancePortsClash(InstanceException):
+    pass
+
+
 class SchedulerException(Exception):
     pass
 

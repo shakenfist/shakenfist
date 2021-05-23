@@ -191,7 +191,7 @@ class Monitor(daemon.Daemon):
                 if (time.time() - last_loop_run < config.NODE_CHECKIN_MAXIMUM
                         and age > config.NODE_CHECKIN_MAXIMUM * 10):
                     n.state = Node.STATE_ERROR
-                    for i in instance.health_instances_on_node(n):
+                    for i in instance.healthy_instances_on_node(n):
                         LOG.with_object(i).with_object(n).info(
                             'Node in error state, erroring instance')
                         # Note, this queue job is just in case the node comes
