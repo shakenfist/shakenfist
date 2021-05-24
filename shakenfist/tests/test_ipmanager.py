@@ -10,19 +10,8 @@ class IPManagerTestCase(test_shakenfist.ShakenFistTestCase):
         ipm = IPManager('uuid', '192.168.1.0/24')
         self.assertEqual(
             {
-                '192.168.1.0': True,
-                '192.168.1.255': True
-            }, ipm.in_use)
-
-    def test_init_with_inuse(self):
-        ipm = IPManager('uuid', '192.168.1.0/24',
-                        ['192.168.1.10', '192.168.1.11'])
-        self.assertEqual(
-            {
-                '192.168.1.0': True,
-                '192.168.1.255': True,
-                '192.168.1.10': True,
-                '192.168.1.11': True
+                '192.168.1.0': ('ipmanager', 'uuid'),
+                '192.168.1.255': ('ipmanager', 'uuid')
             }, ipm.in_use)
 
     @mock.patch('shakenfist.db.get_lock')
@@ -31,21 +20,21 @@ class IPManagerTestCase(test_shakenfist.ShakenFistTestCase):
         ipm = IPManager.new('uuid', '192.168.1.0/24')
         self.assertEqual(
             {
-                '192.168.1.0': True,
-                '192.168.1.255': True,
-                '192.168.1.1': True
+                '192.168.1.0': ('ipmanager', 'uuid'),
+                '192.168.1.255': ('ipmanager', 'uuid'),
+                '192.168.1.1': ('ipmanager', 'uuid')
             }, ipm.in_use)
 
     @mock.patch('shakenfist.db.get_ipmanager',
                 return_value={
-                    'ipmanager.v1': {
-                        'in_use': [
-                            '192.168.20.0',
-                            '192.168.20.255',
-                            '192.168.20.1',
-                            '192.168.20.75',
-                            '192.168.20.101'
-                        ],
+                    'ipmanager.v2': {
+                        'in_use': {
+                            '192.168.20.0': ('ipmanager', 'uuid'),
+                            '192.168.20.255': ('ipmanager', 'uuid'),
+                            '192.168.20.1': ('ipmanager', 'uuid'),
+                            '192.168.20.75': ('ipmanager', 'uuid'),
+                            '192.168.20.101': ('ipmanager', 'uuid')
+                        },
                         'ipblock': '192.168.20.0/24'
                     }}
                 )
@@ -53,11 +42,11 @@ class IPManagerTestCase(test_shakenfist.ShakenFistTestCase):
         ipm = IPManager.from_db('floating')
         self.assertEqual(
             {
-                '192.168.20.0': True,
-                '192.168.20.255': True,
-                '192.168.20.1': True,
-                '192.168.20.75': True,
-                '192.168.20.101': True
+                '192.168.20.0': ('ipmanager', 'uuid'),
+                '192.168.20.255': ('ipmanager', 'uuid'),
+                '192.168.20.1': ('ipmanager', 'uuid'),
+                '192.168.20.75': ('ipmanager', 'uuid'),
+                '192.168.20.101': ('ipmanager', 'uuid')
             }, ipm.in_use)
 
     def test_get_address_at_index(self):
@@ -75,9 +64,9 @@ class IPManagerTestCase(test_shakenfist.ShakenFistTestCase):
         ipm.reserve('192.168.1.10', ('test', '123'))
         self.assertEqual(
             {
-                '192.168.1.0': True,
-                '192.168.1.255': True,
-                '192.168.1.10': True
+                '192.168.1.0': ('ipmanager', 'uuid'),
+                '192.168.1.255': ('ipmanager', 'uuid'),
+                '192.168.1.10': ('test', '123')
             }, ipm.in_use)
 
     def test_release(self):
@@ -87,8 +76,8 @@ class IPManagerTestCase(test_shakenfist.ShakenFistTestCase):
         ipm.release('192.168.1.10')
         self.assertEqual(
             {
-                '192.168.1.0': True,
-                '192.168.1.255': True
+                '192.168.1.0': ('ipmanager', 'uuid'),
+                '192.168.1.255': ('ipmanager', 'uuid')
             }, ipm.in_use)
 
     def test_is_free_and_reserve(self):
