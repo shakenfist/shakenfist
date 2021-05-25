@@ -75,6 +75,13 @@ def handle(jobname, workitem):
                 image_fetch(task.url(), inst)
 
             elif isinstance(task, PreflightInstanceTask):
+                if (inst.state.value == dbo.STATE_DELETED or
+                        inst.state.value.endswith('-error')):
+                    log_i.warning(
+                        'You cannot preflight an instance in state %s, skipping task'
+                        % inst.state.value)
+                    continue
+
                 redirect_to = instance_preflight(inst, task.network())
                 if redirect_to:
                     log_i.info('Redirecting instance start to %s'
@@ -83,6 +90,13 @@ def handle(jobname, workitem):
                     return
 
             elif isinstance(task, StartInstanceTask):
+                if (inst.state.value == dbo.STATE_DELETED or
+                        inst.state.value.endswith('-error')):
+                    log_i.warning(
+                        'You cannot start an instance in state %s, skipping task'
+                        % inst.state.value)
+                    continue
+
                 instance_start(inst, task.network())
                 db.enqueue('%s-metrics' % config.NODE_NAME, {})
 
