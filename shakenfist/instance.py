@@ -133,7 +133,7 @@ class Instance(dbo):
         None: (dbo.STATE_INITIAL, dbo.STATE_ERROR),
         dbo.STATE_INITIAL: (STATE_PREFLIGHT, dbo.STATE_DELETED, STATE_INITIAL_ERROR),
         STATE_PREFLIGHT: (dbo.STATE_CREATING, dbo.STATE_DELETED, STATE_PREFLIGHT_ERROR),
-        dbo.STATE_CREATING: (dbo.STATE_CREATED, STATE_CREATING_ERROR),
+        dbo.STATE_CREATING: (dbo.STATE_CREATED, dbo.STATE_DELETED, STATE_CREATING_ERROR),
         dbo.STATE_CREATED: (dbo.STATE_DELETED, STATE_CREATED_ERROR),
         STATE_INITIAL_ERROR: (dbo.STATE_ERROR),
         STATE_PREFLIGHT_ERROR: (dbo.STATE_ERROR),
@@ -457,7 +457,8 @@ class Instance(dbo):
                     return port
             except socket.error as e:
                 LOG.with_field('instance', self.uuid).info(
-                    'Exception during port allocation: %s' % e)
+                    'Collided with in use port %d, selecting another' % port)
+                consumed.append(port)
             finally:
                 s.close()
 
