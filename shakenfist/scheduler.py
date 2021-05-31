@@ -1,6 +1,7 @@
 # Make scheduling decisions
 
 import copy
+import math
 from functools import partial
 import random
 import time
@@ -77,12 +78,19 @@ class Scheduler(object):
         self.metrics = metrics
         self.metrics_updated = time.time()
 
-    def _has_sufficient_cpu(self, cpus, node):
-        max_cpu = (self.metrics[node].get('cpu_max', 0) *
-                   config.get('CPU_OVERCOMMIT_RATIO'))
+    # Note this method returns a three-way value: true (yes), false (no), -1 (if you must)
+    def _has_sufficient_cpu(self, cpus, node, cpu_ratio):
+        preferred_max_cpus = self.metrics[node].get('cpu_max', 0) * cpu_ratio
+        hard_max_cpus = (self.metrics[node].get(
+            'cpu_max', 0) * config.get('CPU_OVERCOMMIT_RATIO'))
         current_cpu = self.metrics[node].get('cpu_total_instance_vcpus', 0)
-        if current_cpu + cpus > max_cpu:
+
+        if current_cpu + cpus > hard_max_cpus:
             return False
+
+        if current_cpu + cpus > preferred_max_cpus:
+            return -1
+
         return True
 
     def _has_sufficient_ram(self, memory, node):
@@ -239,11 +247,33 @@ class Scheduler(object):
                 raise exceptions.LowResourceException(
                     'Requested vCPUs exceeds vCPU limit')
 
-            # Do we have enough idle CPU?
+            # Do we have enough idle CPU? The config value CPU_OVERCOMMIT_RATIO
+            # specifies the maximum overcommit that the cluster is willing to do
+            # on a per-node basis. However, we try to keep the actual overcommit
+            # even across the hypervisor nodes. So, we calculate the current
+            # overcommit ratio for the cluster, and then cap that at the configured
+            # maximum. That is then compared with the overcommit ratio for this node.
+            current_cluster_cpu = 0
+            actual_cluster_cpu = 0
+            for node in self.metrics:
+                current_cluster_cpu += self.metrics[node].get(
+                    'cpu_total_instance_vcpus', 0)
+                actual_cluster_cpu += self.metrics[node].get(
+                    'cpu_available', 0)
+            cpu_ratio = min(config.get('CPU_OVERCOMMIT_RATIO'),
+                            math.ceil(current_cluster_cpu / actual_cluster_cpu))
+            log_ctx.info('Current cluster CPU overcommit ratio is %d, configured maximum %d'
+                         % (cpu_ratio, config.get('CPU_OVERCOMMIT_RATIO')))
+
             for n in copy.copy(candidates):
-                if not self._has_sufficient_cpu(
-                        instance.cpus, n):
+                preference = self._has_sufficient_cpu(
+                    instance.cpus, n, cpu_ratio)
+                if preference == -1:
                     candidates.remove(n)
+                    candidates.append(n)
+                elif not preference:
+                    candidates.remove(n)
+
             log_ctx.with_field('candidates', candidates).info(
                 'Scheduling: have enough idle CPU')
             instance.add_event('schedule',
