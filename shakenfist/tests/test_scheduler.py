@@ -132,6 +132,8 @@ class LowResourceTestCase(SchedulerTestCase):
     def test_requested_too_many_cpu(self):
         self.fake_db.set_node_metrics_same({
             'cpu_max_per_instance': 5,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12
         })
 
         fake_inst = FakeInstance({
@@ -156,7 +158,8 @@ class LowResourceTestCase(SchedulerTestCase):
             'cpu_total_instance_vcpus': 4*16,
             'memory_available': 5*1024+1024-1,
             'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024
+            'disk_free': 2000*1024*1024*1024,
+            'cpu_available': 4
         })
 
         fake_inst = FakeInstance({
@@ -180,7 +183,9 @@ class LowResourceTestCase(SchedulerTestCase):
             'cpu_max': 4,
             'memory_available': 5*1024+1024-1,
             'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024
+            'disk_free': 2000*1024*1024*1024,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12
         })
 
         fake_inst = FakeInstance({
@@ -206,6 +211,8 @@ class LowResourceTestCase(SchedulerTestCase):
             'memory_max': 10000,
             'memory_total_instance_actual': 15001,
             'disk_free': 2000*1024*1024*1024,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12
         })
 
         fake_inst = FakeInstance({
@@ -231,7 +238,9 @@ class LowResourceTestCase(SchedulerTestCase):
             'cpu_max': 4,
             'memory_available': 22000,
             'memory_max': 24000,
-            'disk_free': 20*1024*1024*1024
+            'disk_free': 20*1024*1024*1024,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12
         })
 
         fake_inst = FakeInstance({
@@ -257,7 +266,9 @@ class LowResourceTestCase(SchedulerTestCase):
             'cpu_max': 4,
             'memory_available': 22000,
             'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024
+            'disk_free': 2000*1024*1024*1024,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12
         })
 
         fake_inst = FakeInstance({
@@ -328,7 +339,9 @@ class CorrectAllocationTestCase(SchedulerTestCase):
             'cpu_max': 4,
             'memory_available': 22000,
             'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024
+            'disk_free': 2000*1024*1024*1024,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12
         })
 
         fake_inst = FakeInstance({
@@ -375,7 +388,9 @@ class CorrectAllocationTestCase(SchedulerTestCase):
             'cpu_max': 4,
             'memory_available': 22000,
             'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024
+            'disk_free': 2000*1024*1024*1024,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12
         })
 
         fake_inst = FakeInstance({
@@ -753,7 +768,9 @@ class ForcedCandidatesTestCase(SchedulerTestCase):
             'cpu_max': 4,
             'memory_available': 22000,
             'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024
+            'disk_free': 2000*1024*1024*1024,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12
         })
 
         fake_inst = FakeInstance({
@@ -777,7 +794,9 @@ class ForcedCandidatesTestCase(SchedulerTestCase):
             'cpu_max': 4,
             'memory_available': 22000,
             'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024
+            'disk_free': 2000*1024*1024*1024,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12
         })
 
         fake_inst = FakeInstance({
@@ -867,7 +886,9 @@ class MetricsRefreshTestCase(SchedulerTestCase):
             'cpu_max': 4,
             'memory_available': 22000,
             'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024
+            'disk_free': 2000*1024*1024*1024,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12
         })
 
         s = scheduler.Scheduler()
@@ -879,7 +900,9 @@ class MetricsRefreshTestCase(SchedulerTestCase):
             'cpu_max': 4,
             'memory_available': 11000,
             'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024
+            'disk_free': 2000*1024*1024*1024,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12
         })
         s.metrics_updated = time.time() - 400
         s.place_instance(fake_inst, [])
