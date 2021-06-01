@@ -262,8 +262,8 @@ class Scheduler(object):
                     'cpu_available', 0)
             cpu_ratio = min(config.get('CPU_OVERCOMMIT_RATIO'),
                             math.ceil(current_cluster_cpu / actual_cluster_cpu))
-            log_ctx.info('Current cluster CPU overcommit ratio is %d, configured maximum %d'
-                         % (cpu_ratio, config.get('CPU_OVERCOMMIT_RATIO')))
+            log_ctx.info('Current cluster CPU overcommit ratio is %d, configured maximum %d',
+                         cpu_ratio, config.get('CPU_OVERCOMMIT_RATIO'))
 
             for n in copy.copy(candidates):
                 preference = self._has_sufficient_cpu(
