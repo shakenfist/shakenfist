@@ -433,8 +433,8 @@ class Instance(dbo):
 
     def _allocate_console_port(self):
         node = config.NODE_NAME
-        consumed = {value['port']
-                    for _, value in etcd.get_all('console', node)}
+        consumed = [value['port']
+                    for _, value in etcd.get_all('console', node)]
         while True:
             port = random.randint(30000, 50000)
             # avoid hitting etcd if it's probably in use
