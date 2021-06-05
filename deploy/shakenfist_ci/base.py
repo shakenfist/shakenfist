@@ -247,30 +247,30 @@ class BaseNamespacedTestCase(BaseTestCase):
             base_url=self.system_client.base_url,
             namespace=self.namespace, key=self.namespace_key,
             async_strategy=apiclient.ASYNC_CONTINUE)
-        for inst in self.test_client.get_instances():
+        for inst in non_blocking_client.get_instances():
             non_blocking_client.delete_instance(inst['uuid'])
 
         start_time = time.time()
         while time.time() - start_time < 300:
-            if not list(self.test_client.get_instances()):
+            if not list(non_blocking_client.get_instances()):
                 break
             time.sleep(5)
 
-        remaining_instances = list(self.test_client.get_instances())
+        remaining_instances = list(non_blocking_client.get_instances())
         if remaining_instances:
             self.fail('Failed to delete instances: %s'
                       % remaining_instances)
 
-        for net in self.test_client.get_networks():
+        for net in non_blocking_client.get_networks():
             non_blocking_client.delete_network(net['uuid'])
 
         start_time = time.time()
         while time.time() - start_time < 300:
-            if not list(self.test_client.get_networks()):
+            if not list(non_blocking_client.get_networks()):
                 break
             time.sleep(5)
 
-        remaining_networks = list(self.test_client.get_networks())
+        remaining_networks = list(non_blocking_client.get_networks())
         if remaining_networks:
             self.fail('Failed to delete networks: %s'
                       % remaining_networks)
