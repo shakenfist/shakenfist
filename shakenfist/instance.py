@@ -455,7 +455,7 @@ class Instance(dbo):
                 if allocatedPort:
 
                     return port
-            except socket.error as e:
+            except socket.error:
                 LOG.with_field('instance', self.uuid).info(
                     'Collided with in use port %d, selecting another' % port)
                 consumed.append(port)
