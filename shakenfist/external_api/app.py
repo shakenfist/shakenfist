@@ -1353,6 +1353,29 @@ class NetworkInterfacesEndpoint(Resource):
         return out
 
 
+class NetworkVLANEndpoint(Resource):
+    @jwt_required
+    @arg_is_network_uuid
+    @requires_network_active
+    @caller_is_admin
+    def get(self, network_uuid=None, network_from_db=None):
+        return network_from_db.vlanid
+
+    @jwt_required
+    @arg_is_network_uuid
+    @requires_network_active
+    @caller_is_admin
+    def put(self, network_uuid=None, vlanid=None, network_from_db=None):
+        network_from_db.map_vlan(vlanid)
+
+    @jwt_required
+    @arg_is_network_uuid
+    @requires_network_active
+    @caller_is_admin
+    def delete(self, network_uuid=None, vlanid=None, network_from_db=None):
+        network_from_db.unmap_vlan(vlanid)
+
+
 class NetworkMetadatas(Resource):
     @jwt_required
     @arg_is_network_uuid
@@ -1459,9 +1482,11 @@ api.add_resource(InstancePowerOff, '/instances/<instance_uuid>/poweroff')
 api.add_resource(InstancePowerOn, '/instances/<instance_uuid>/poweron')
 api.add_resource(InstancePause, '/instances/<instance_uuid>/pause')
 api.add_resource(InstanceUnpause, '/instances/<instance_uuid>/unpause')
+
 api.add_resource(Interface, '/interfaces/<interface_uuid>')
 api.add_resource(InterfaceFloat, '/interfaces/<interface_uuid>/float')
 api.add_resource(InterfaceDefloat, '/interfaces/<interface_uuid>/defloat')
+
 api.add_resource(InstanceMetadatas, '/instances/<instance_uuid>/metadata')
 api.add_resource(InstanceMetadata,
                  '/instances/<instance_uuid>/metadata/<key>')
@@ -1474,6 +1499,7 @@ api.add_resource(ImageEvents, '/images/events')
 api.add_resource(Networks, '/networks')
 api.add_resource(Network, '/networks/<network_uuid>')
 api.add_resource(NetworkEvents, '/networks/<network_uuid>/events')
+api.add_resource(NetworkVLANEndpoint, '/networks/<network_uuid>/vlan')
 api.add_resource(NetworkInterfacesEndpoint,
                  '/networks/<network_uuid>/interfaces')
 api.add_resource(NetworkMetadatas, '/networks/<network_uuid>/metadata')

@@ -85,11 +85,10 @@ class StartInstanceTask(InstanceTask):
 class DeleteInstanceTask(InstanceTask):
     _name = 'instance_delete'
 
+
 #
 # Network Tasks
 #
-
-
 class NetworkTask(QueueTask):
     def __init__(self, network_uuid):
         super(NetworkTask, self).__init__()
@@ -128,6 +127,30 @@ class RemoveDHCPNetworkTask(NetworkTask):
 
 class RemoveNATNetworkTask(NetworkTask):
     _name = 'network_remove_nat'
+
+
+#
+# VLAN Tasks
+#
+class NetworkVLANTask(NetworkTask):
+    def __init__(self, network_uuid, vlanid):
+        super(NetworkVLANTask, self).__init__(network_uuid)
+        self._vlanid = vlanid
+
+    def vlanid(self):
+        return self._vlanid
+
+    def obj_dict(self):
+        return {**super(NetworkTask, self).obj_dict(),
+                'vlanid': self._vlanid}
+
+
+class MapVLANTask(NetworkVLANTask):
+    _name = 'network_map_vlan'
+
+
+class UnmapVLANTask(NetworkVLANTask):
+    _name = 'network_unmap_vlan'
 
 
 #
