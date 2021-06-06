@@ -31,9 +31,12 @@ from jwt.exceptions import DecodeError, PyJWTError
 import re
 import requests
 import sys
+import time
 import traceback
 import uuid
 
+from shakenfist import artifact
+from shakenfist.artifact import Artifact, Artifacts
 from shakenfist import baseobject
 from shakenfist.daemons import daemon
 from shakenfist.baseobject import DatabaseBackedObject as dbo
@@ -920,20 +923,44 @@ class InstanceSnapshot(Resource):
     @redirect_instance_request
     @requires_instance_active
     def post(self, instance_uuid=None, instance_from_db=None, all=None):
-        snap_uuid = instance_from_db.snapshot(all=all)
-        instance_from_db.add_event('api', 'snapshot (all=%s)' % all,
-                                   None, snap_uuid)
-        db.add_event('snapshot', snap_uuid, 'api', 'create', None, None)
-        return snap_uuid
+        disks = instance_from_db.block_devices['devices']
+        if not all:
+            disks = [disks[0]]
+
+        out = {}
+        for disk in disks:
+            if disk['snapshot_ignores']:
+                continue
+
+            if disk['type'] != 'qcow2':
+                continue
+
+            a = Artifact.from_url(
+                Artifact.TYPE_SNAPSHOT,
+                'sf://instance/%s/%s' % (instance_uuid, disk['device']))
+            index = a.most_recent_index.get('index', 0) + 1
+            size = instance_from_db.snapshot(a.uuid, disk, index)
+            a.add_index(index, size, time.time(), time.time())
+
+            out[disk['device']] = {
+                'uuid': a.uuid,
+                'index': index,
+                'size': size
+            }
+            instance_from_db.add_event('api', 'snapshot %s' % disk,
+                                       None, a.uuid)
+            if a.state == dbo.STATE_INITIAL:
+                a.state = dbo.STATE_CREATED
+
+        return out
 
     @jwt_required
     @arg_is_instance_uuid
     @requires_instance_ownership
     def get(self, instance_uuid=None, instance_from_db=None):
         out = []
-        for snap in db.get_instance_snapshots(instance_uuid):
-            snap['created'] = snap['created']
-            out.append(snap)
+        for snap in Artifacts([partial(artifact.instance_snapshot_filter, instance_uuid)]):
+            out.append(snap.external_view())
         return out
 
 

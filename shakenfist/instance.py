@@ -825,15 +825,7 @@ class Instance(dbo):
         self.update_power_state('off')
         self.add_event('poweroff', 'complete')
 
-    def _snapshot_device(self, source, destination):
-        images.snapshot(None, source, destination)
-
-    def snapshot(self, all=False):
-        disks = self.block_devices['devices']
-        if not all:
-            disks = [disks[0]]
-
-        snapshot_uuid = str(uuid4())
+    def snapshot(self, snapshot_uuid, d, version):
         snappath = os.path.join(_snapshot_path(), snapshot_uuid)
         if not os.path.exists(snappath):
             self.log.debug('Creating snapshot storage at %s', snappath)
@@ -841,30 +833,24 @@ class Instance(dbo):
             with open(os.path.join(_snapshot_path(), 'index.html'), 'w') as f:
                 f.write('<html></html>')
 
-        for d in disks:
-            if not config.GLUSTER_ENABLED and not os.path.exists(d['path']):
-                continue
+        if not config.GLUSTER_ENABLED and not os.path.exists(d['path']):
+            return
 
-            if d['snapshot_ignores']:
-                continue
+        # If we're using gluster we need to tweak some paths...
+        disk_path = d['path']
+        dest_path = os.path.join(snappath, d['device'])
+        orig_dest_path = dest_path
 
-            if d['type'] != 'qcow2':
-                continue
+        if config.GLUSTER_ENABLED:
+            disk_path = 'gluster:%s' % d['path']
+            dest_path = dest_path.replace(_snapshot_path(),
+                                          'gluster:shakenfist/snapshots')
 
-            # If we're using gluster we need to tweak some paths...
-            disk_path = d['path']
-            dest_path = os.path.join(snappath, d['device'])
-            if config.GLUSTER_ENABLED:
-                disk_path = 'gluster:%s' % d['path']
-                dest_path = dest_path.replace(_snapshot_path(),
-                                              'gluster:shakenfist/snapshots')
-
-            with util.RecordedOperation('snapshot %s' % d['device'], self):
-                self._snapshot_device(disk_path, dest_path)
-                db.create_snapshot(snapshot_uuid, d['device'], self.uuid,
-                                   time.time())
-
-        return snapshot_uuid
+        # Actually make the snapshot
+        with util.RecordedOperation('snapshot %s' % d['device'], self):
+            images.snapshot(None, disk_path, dest_path)
+            st = os.stat(orig_dest_path)
+            return st.st_size
 
     def reboot(self, hard=False):
         libvirt = util.get_libvirt()

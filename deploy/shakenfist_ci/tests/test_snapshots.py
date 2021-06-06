@@ -41,11 +41,11 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         snap2 = self.test_client.snapshot_instance(inst['uuid'], all=True)
         self.assertIsNotNone(snap2)
         snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
-        self.assertEqual(2, len(snapshots))
+        self.assertEqual(1, len(snapshots))
 
         for snap in snapshots:
-            self.assertEqual('vda', snap['device'])
-            self.assertEqual(inst['uuid'], snap['instance_uuid'])
+            self.assertEqual('sf://instance/%s/vda' %
+                             inst['uuid'], snap['source_url'])
 
         self.test_client.delete_instance(inst['uuid'])
 
@@ -86,10 +86,11 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         snap2 = self.test_client.snapshot_instance(inst['uuid'], all=True)
         self.assertIsNotNone(snap2)
         snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
-        self.assertEqual(3, len(snapshots))
+        self.assertEqual(2, len(snapshots))
 
         for snap in snapshots:
-            self.assertIn(snap['device'], ['vda', 'vdc'])
-            self.assertEqual(inst['uuid'], snap['instance_uuid'])
+            self.assertIn(snap['source_url'].split('/')[-1], ['vda', 'vdc'])
+            self.assertTrue(snap['source_url'].startswith(
+                'sf://instance/%s' % inst['uuid']))
 
         self.test_client.delete_instance(inst['uuid'])

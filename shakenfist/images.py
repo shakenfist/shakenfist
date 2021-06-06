@@ -547,11 +547,6 @@ def create_blank(locks, disk_file, disk_size):
 def snapshot(locks, source, destination):
     """Convert a possibly COW layered disk file into a snapshot."""
 
-    if config.GLUSTER_ENABLED:
-        source = source.replace(
-            os.path.join(config.STORAGE_PATH, 'instances'),
-            'gluster:shakenfist/instances')
-
     util.execute(locks,
                  'qemu-img convert --force-share -O qcow2 %s %s'
                  % (source, destination))
