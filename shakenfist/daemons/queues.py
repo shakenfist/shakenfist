@@ -11,21 +11,18 @@ from shakenfist import db
 from shakenfist import exceptions
 from shakenfist.images import Image
 from shakenfist import instance
-from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
-from shakenfist import net
-from shakenfist import networkinterface
-from shakenfist import scheduler
-from shakenfist import util
 from shakenfist.tasks import (QueueTask,
                               DeleteInstanceTask,
                               FetchImageTask,
                               InstanceTask,
                               PreflightInstanceTask,
                               StartInstanceTask,
-                              FloatNetworkInterfaceTask,
-                              DefloatNetworkInterfaceTask
-                              )
+                              FloatNetworkInterfaceTask)
+from shakenfist import net
+from shakenfist import networkinterface
+from shakenfist import scheduler
+from shakenfist import util
 
 
 LOG, _ = logutil.setup(__name__)
@@ -78,6 +75,13 @@ def handle(jobname, workitem):
                 image_fetch(task.url(), inst)
 
             elif isinstance(task, PreflightInstanceTask):
+                if (inst.state.value == dbo.STATE_DELETED or
+                        inst.state.value.endswith('-error')):
+                    log_i.warning(
+                        'You cannot preflight an instance in state %s, skipping task'
+                        % inst.state.value)
+                    continue
+
                 redirect_to = instance_preflight(inst, task.network())
                 if redirect_to:
                     log_i.info('Redirecting instance start to %s'
@@ -86,6 +90,13 @@ def handle(jobname, workitem):
                     return
 
             elif isinstance(task, StartInstanceTask):
+                if (inst.state.value == dbo.STATE_DELETED or
+                        inst.state.value.endswith('-error')):
+                    log_i.warning(
+                        'You cannot start an instance in state %s, skipping task'
+                        % inst.state.value)
+                    continue
+
                 instance_start(inst, task.network())
                 db.enqueue('%s-metrics' % config.NODE_NAME, {})
 
@@ -265,18 +276,7 @@ def instance_delete(inst):
         # Delete the instance's interfaces
         with util.RecordedOperation('release network addresses', inst):
             for ni in networkinterface.interfaces_for_instance(inst):
-                if ni.floating['floating_address']:
-                    db.enqueue(
-                        'networknode',
-                        DefloatNetworkInterfaceTask(ni.network_uuid, ni.uuid))
-
-                with db.get_lock('ipmanager', None, ni.network_uuid,
-                                 ttl=120, op='Instance delete'):
-                    ipm = IPManager.from_db(ni.network_uuid)
-                    ipm.release(ni.ipv4)
-                    ipm.persist()
-
-                ni.state = dbo.STATE_DELETED
+                ni.delete()
 
         # Check each network used by the deleted instance
         for network in instance_networks:
@@ -289,8 +289,7 @@ def instance_delete(inst):
                 else:
                     # Network not used by any other instance therefore delete
                     with util.RecordedOperation('remove network from node', n):
-                        n.delete_on_node_with_lock()
-        return inst
+                        n.delete_on_hypervisor()
 
 
 class Monitor(daemon.Daemon):

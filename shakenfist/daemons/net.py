@@ -1,4 +1,5 @@
 import ipaddress
+import itertools
 import time
 
 from oslo_concurrency import processutils
@@ -17,6 +18,7 @@ from shakenfist import networkinterface
 from shakenfist.networkinterface import NetworkInterface
 from shakenfist.tasks import (
     DeployNetworkTask,
+    DestroyNetworkTask,
     NetworkTask,
     RemoveDHCPNetworkTask,
     RemoveNATNetworkTask,
@@ -69,20 +71,22 @@ class Monitor(daemon.Daemon):
 
                 # Network nodes also look for interfaces for absent instances
                 # and delete them
+                t = time.time()
                 for ni in networkinterface.interfaces_for_network(n):
-                    stray = False
                     inst = instance.Instance.from_db(ni.instance_uuid)
                     if not inst:
-                        stray = True
-                    else:
-                        if inst.state.value in [dbo.STATE_DELETED, dbo.STATE_ERROR, 'unknown']:
-                            stray = True
-
-                    if stray:
-                        ni.hard_delete()
+                        ni.delete()
                         LOG.with_instance(
                             ni.instance_uuid).with_networkinterface(
-                            ni.uuid).info('Hard deleted stray network interface')
+                            ni.uuid).info('Deleted stray network interface for missing instance')
+                    else:
+                        s = inst.state
+                        if (s.update_time + 30 < t and
+                                s.value in [dbo.STATE_DELETED, dbo.STATE_ERROR, 'unknown']):
+                            ni.delete()
+                            LOG.with_instance(
+                                ni.instance_uuid).with_networkinterface(
+                                ni.uuid).info('Deleted stray network interface')
 
         # Ensure we are on every network we have a host for
         for network in host_networks:
@@ -140,23 +144,6 @@ class Monitor(daemon.Daemon):
             LOG.with_field('vxids', extra_vxids).warning(
                 'Extra vxlans present!')
 
-            # Determine the network uuids for those vxids
-            # vxid_to_uuid = {}
-            # for n in db.get_networks():
-            #     vxid_to_uuid[n['vxid']] = n.uuid
-
-            # for extra in extra_vxids:
-            #     if extra in vxid_to_uuid:
-            #         with db.get_lock('network', None, vxid_to_uuid[extra],
-            #                          ttl=120, op='Network reap VXLAN'):
-            #             n = net.Network.from_db(vxid_to_uuid[extra])
-            #             n.delete()
-            #             LOG.info('Extra vxlan %s (network %s) removed.'
-            #                      % (extra, vxid_to_uuid[extra]))
-            #     else:
-            #         LOG.error('Extra vxlan %s does not map to any network.'
-            #                   % extra)
-
         # And record vxids in the database
         db.persist_node_vxid_mapping(config.NODE_NAME, vxid_to_mac)
 
@@ -196,12 +183,20 @@ class Monitor(daemon.Daemon):
             try:
                 n.create_on_network_node()
                 n.ensure_mesh()
-                n.state = dbo.STATE_CREATED
                 db.add_event('network', workitem.network_uuid(),
                              'network node', 'deploy', None, None)
             except exceptions.DeadNetwork as e:
                 log_ctx.with_field('exception', e).warning(
                     'DeployNetworkTask on dead network')
+
+        elif isinstance(workitem, DestroyNetworkTask):
+            try:
+                n.delete_on_network_node()
+                db.add_event('network', workitem.network_uuid(),
+                             'network node', 'destroy', None, None)
+            except exceptions.DeadNetwork as e:
+                log_ctx.with_field('exception', e).warning(
+                    'DestroyNetworkTask on dead network')
 
         elif isinstance(workitem, UpdateDHCPNetworkTask):
             try:
@@ -238,13 +233,14 @@ class Monitor(daemon.Daemon):
 
         elif isinstance(workitem, DefloatNetworkInterfaceTask):
             n.remove_floating_ip(ni.floating.get('floating_address'), ni.ipv4)
-            ni.floating = None
 
             db.add_event('interface', ni.uuid, 'api', 'defloat', None, None)
             with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Instance defloat'):
                 ipm = IPManager.from_db('floating')
                 ipm.release(ni.floating.get('floating_address'))
                 ipm.persist()
+
+            ni.floating = None
 
     def _process_network_node_workitems(self):
         jobname, workitem = db.dequeue('networknode')
@@ -266,6 +262,44 @@ class Monitor(daemon.Daemon):
             if jobname:
                 db.resolve('networknode', jobname)
 
+    def _reap_leaked_floating_ips(self):
+        # Ensure we haven't leaked any floating IPs (because we use to)
+        floating_gateways = []
+        for n in net.Networks([baseobject.active_states_filter]):
+            if n.floating_gateway:
+                floating_gateways.append(n.floating_gateway)
+        LOG.info('Found floating gateways: %s' % floating_gateways)
+
+        floating_addresses = []
+        for ni in networkinterface.NetworkInterfaces([baseobject.active_states_filter]):
+            if ni.floating.get('floating_address'):
+                floating_addresses.append(ni.floating.get('floating_address'))
+        LOG.info('Found floating addresses: %s' % floating_addresses)
+
+        with db.get_lock('ipmanager', None, 'floating', ttl=120,
+                         op='Cleanup leaks'):
+            floating_ipm = IPManager.from_db('floating')
+            floating_reserved = [
+                floating_ipm.get_address_at_index(0),
+                floating_ipm.get_address_at_index(1),
+                floating_ipm.broadcast_address,
+                floating_ipm.network_address
+            ]
+            LOG.info('Found floating reservations: %s' % floating_reserved)
+
+            leaks = []
+            for ip in floating_ipm.in_use:
+                if ip not in itertools.chain(floating_gateways,
+                                             floating_addresses,
+                                             floating_reserved):
+                    LOG.error('Floating IP %s has leaked.' % ip)
+                    leaks.append(ip)
+
+            for ip in leaks:
+                LOG.error('Leaked floating IP %s has been released.' % ip)
+                floating_ipm.release(ip)
+            floating_ipm.persist()
+
     def run(self):
         LOG.info('Starting')
         last_management = 0
@@ -279,4 +313,6 @@ class Monitor(daemon.Daemon):
 
             if time.time() - last_management > 30:
                 self._maintain_networks()
+                if util.is_network_node():
+                    self._reap_leaked_floating_ips()
                 last_management = time.time()

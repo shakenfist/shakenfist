@@ -144,8 +144,6 @@ class VirtMetaTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertEqual(2, inst.version)
         self.assertEqual({'memory': 16384, 'model': 'cirrus'}, inst.video)
         self.assertEqual('/a/b/c/instances/uuid42', inst.instance_path)
-        self.assertEqual(
-            '/a/b/c/instances/uuid42/libvirt.xml', inst.xml_file)
 
 
 class InstanceTestCase(test_shakenfist.ShakenFistTestCase):

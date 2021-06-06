@@ -28,7 +28,8 @@ class BaseTestCase(testtools.TestCase):
     def setUp(self):
         super(BaseTestCase, self).setUp()
 
-        self.system_client = apiclient.Client()
+        self.system_client = apiclient.Client(
+            async_strategy=apiclient.ASYNC_PAUSE)
 
     def _make_namespace(self, name, key):
         self._remove_namespace(name)
@@ -37,8 +38,8 @@ class BaseTestCase(testtools.TestCase):
         self.system_client.add_namespace_key(name, 'test', key)
         return apiclient.Client(
             base_url=self.system_client.base_url,
-            namespace=name,
-            key=key)
+            namespace=name, key=key,
+            async_strategy=apiclient.ASYNC_PAUSE)
 
     def _remove_namespace(self, name):
         ns = self.system_client.get_namespaces()
@@ -241,22 +242,39 @@ class BaseNamespacedTestCase(BaseTestCase):
 
     def tearDown(self):
         super(BaseNamespacedTestCase, self).tearDown()
-        for inst in self.test_client.get_instances():
-            self.test_client.delete_instance(inst['uuid'])
+
+        non_blocking_client = apiclient.Client(
+            base_url=self.system_client.base_url,
+            namespace=self.namespace, key=self.namespace_key,
+            async_strategy=apiclient.ASYNC_CONTINUE)
+        for inst in non_blocking_client.get_instances():
+            non_blocking_client.delete_instance(inst['uuid'])
 
         start_time = time.time()
         while time.time() - start_time < 300:
-            if not list(self.test_client.get_instances()):
+            if not list(non_blocking_client.get_instances()):
                 break
             time.sleep(5)
 
-        remaining_instances = list(self.test_client.get_instances())
+        remaining_instances = list(non_blocking_client.get_instances())
         if remaining_instances:
             self.fail('Failed to delete instances: %s'
                       % remaining_instances)
 
-        for net in self.test_client.get_networks():
-            self.test_client.delete_network(net['uuid'])
+        for net in non_blocking_client.get_networks():
+            non_blocking_client.delete_network(net['uuid'])
+
+        start_time = time.time()
+        while time.time() - start_time < 300:
+            if not list(non_blocking_client.get_networks()):
+                break
+            time.sleep(5)
+
+        remaining_networks = list(non_blocking_client.get_networks())
+        if remaining_networks:
+            self.fail('Failed to delete networks: %s'
+                      % remaining_networks)
+
         self._remove_namespace(self.namespace)
 
 

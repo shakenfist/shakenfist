@@ -133,7 +133,7 @@ class Instance(dbo):
         None: (dbo.STATE_INITIAL, dbo.STATE_ERROR),
         dbo.STATE_INITIAL: (STATE_PREFLIGHT, dbo.STATE_DELETED, STATE_INITIAL_ERROR),
         STATE_PREFLIGHT: (dbo.STATE_CREATING, dbo.STATE_DELETED, STATE_PREFLIGHT_ERROR),
-        dbo.STATE_CREATING: (dbo.STATE_CREATED, STATE_CREATING_ERROR),
+        dbo.STATE_CREATING: (dbo.STATE_CREATED, dbo.STATE_DELETED, STATE_CREATING_ERROR),
         dbo.STATE_CREATED: (dbo.STATE_DELETED, STATE_CREATED_ERROR),
         STATE_INITIAL_ERROR: (dbo.STATE_ERROR),
         STATE_PREFLIGHT_ERROR: (dbo.STATE_ERROR),
@@ -289,10 +289,6 @@ class Instance(dbo):
     def instance_path(self):
         return os.path.join(config.get('STORAGE_PATH'), 'instances', self.uuid)
 
-    @property
-    def xml_file(self):
-        return os.path.join(self.instance_path, 'libvirt.xml')
-
     # Values routed to attributes, writes are via helper methods.
     @property
     def placement(self):
@@ -376,12 +372,9 @@ class Instance(dbo):
         # Configure block devices, include config drive creation
         self._configure_block_devices(lock)
 
-        # Create the actual instance
-        with util.RecordedOperation('create domain XML', self):
-            self._create_domain_xml()
-
-        # Sometimes on Ubuntu 20.04 we need to wait for port binding to work.
-        # Revisiting this is tracked by issue 320 on github.
+        # Create the actual instance. Sometimes on Ubuntu 20.04 we need to wait
+        # for port binding to work. Revisiting this is tracked by issue 320 on
+        # github.
         with util.RecordedOperation('create domain', self):
             if not self.power_on():
                 attempts = 0
@@ -433,8 +426,8 @@ class Instance(dbo):
 
     def _allocate_console_port(self):
         node = config.NODE_NAME
-        consumed = {value['port']
-                    for _, value in etcd.get_all('console', node)}
+        consumed = [value['port']
+                    for _, value in etcd.get_all('console', node)]
         while True:
             port = random.randint(30000, 50000)
             # avoid hitting etcd if it's probably in use
@@ -455,9 +448,10 @@ class Instance(dbo):
                 if allocatedPort:
 
                     return port
-            except socket.error as e:
+            except socket.error:
                 LOG.with_field('instance', self.uuid).info(
-                    'Exception during port allocation: %s' % e)
+                    'Collided with in use port %d, selecting another' % port)
+                consumed.append(port)
             finally:
                 s.close()
 
@@ -724,9 +718,6 @@ class Instance(dbo):
     def _create_domain_xml(self):
         """Create the domain XML for the instance."""
 
-        if os.path.exists(self.xml_file):
-            return
-
         with open(os.path.join(config.get('STORAGE_PATH'), 'libvirt.tmpl')) as f:
             t = jinja2.Template(f.read())
 
@@ -746,7 +737,7 @@ class Instance(dbo):
         # I hadn't spent _ages_ finding a bug related to it.
         block_devices = self.block_devices
         ports = self.ports
-        xml = t.render(
+        return t.render(
             uuid=self.uuid,
             memory=self.memory * 1024,
             vcpus=self.cpus,
@@ -758,9 +749,6 @@ class Instance(dbo):
             video_model=self.video['model'],
             video_memory=self.video['memory']
         )
-
-        with open(self.xml_file, 'w') as f:
-            f.write(xml)
 
     def _get_domain(self):
         libvirt = util.get_libvirt()
@@ -780,18 +768,11 @@ class Instance(dbo):
         return util.extract_power_state(libvirt, inst)
 
     def power_on(self):
-        if not os.path.exists(self.xml_file):
-            self.enqueue_delete_due_error('missing domain file in power on')
-            raise exceptions.NoDomainException()
-
         libvirt = util.get_libvirt()
-        with open(self.xml_file) as f:
-            xml = f.read()
-
         inst = self._get_domain()
         if not inst:
             conn = libvirt.open('qemu:///system')
-            inst = conn.defineXML(xml)
+            inst = conn.defineXML(self._create_domain_xml())
             if not inst:
                 self.enqueue_delete_due_error(
                     'power on failed to create domain')
@@ -806,7 +787,17 @@ class Instance(dbo):
             elif str(e).find('Failed to find an available port: '
                              'Address already in use') != -1:
                 self.log.warning('Instance ports clash: %s', e)
-                raise exceptions.InstancePortsClash(e)
+
+                # Free those ports and pick some new ones
+                ports = self.ports
+                self._free_console_port(ports['console_port'])
+                self._free_console_port(ports['vid_port'])
+
+                self.ports = {
+                    'console_port': self._allocate_console_port(),
+                    'vdi_port': self._allocate_console_port()
+                }
+                return False
             else:
                 self.log.warning('Instance start error: %s', e)
                 return False

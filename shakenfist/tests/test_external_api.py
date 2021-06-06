@@ -949,15 +949,19 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
     @mock.patch('shakenfist.ipmanager.IPManager.from_db',
                 return_value=IPManager('uuid', '10.0.0.0/24'))
     @mock.patch('shakenfist.net.Network.remove_dhcp')
-    @mock.patch('shakenfist.net.Network.delete')
+    @mock.patch('shakenfist.net.Network.delete_on_network_node')
+    @mock.patch('shakenfist.net.Network.delete_on_hypervisor')
     @mock.patch('shakenfist.net.Network.state')
     @mock.patch('shakenfist.etcd.put')
+    @mock.patch('shakenfist.etcd.enqueue')
     @mock.patch('shakenfist.db.get_lock')
     def test_delete_all_networks(self,
                                  mock_db_get_lock,
+                                 mock_etcd_enqueue,
                                  mock_etcd_put,
                                  mock_network_state,
-                                 mock_delete,
+                                 mock_delete_on_hypervisor,
+                                 mock_delete_on_network_node,
                                  mock_remove_dhcp,
                                  mock_get_ipmanager,
                                  mock_network_interfaces,

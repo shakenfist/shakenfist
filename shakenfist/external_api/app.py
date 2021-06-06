@@ -54,6 +54,7 @@ from shakenfist.tasks import (
     FetchImageTask,
     PreflightInstanceTask,
     StartInstanceTask,
+    DestroyNetworkTask,
     FloatNetworkInterfaceTask,
     DefloatNetworkInterfaceTask
 )
@@ -494,6 +495,8 @@ class AuthNamespace(Resource):
             if i.state.value in [dbo.STATE_DELETED, dbo.STATE_ERROR]:
                 deleted_instances.append(i.uuid)
             else:
+                LOG.withFields({'instance': i.uuid,
+                                'state': i.state}).info('Blocks namespace delete')
                 instances.append(i.uuid)
         if len(instances) > 0:
             return error(400, 'you cannot delete a namespace with instances')
@@ -501,6 +504,8 @@ class AuthNamespace(Resource):
         networks = []
         for n in net.networks_in_namespace(namespace):
             if not n.is_dead():
+                LOG.withFields({'network': n.uuid,
+                                'state': n.state}).info('Blocks namespace delete')
                 networks.append(n.uuid)
         if len(networks) > 0:
             return error(400, 'you cannot delete a namespace with networks')
@@ -641,21 +646,19 @@ class Instance(Resource):
         instance_from_db.enqueue_delete_remote(node)
 
 
-def _assign_floating_ip(interface_uuid):
+def _assign_floating_ip(ni):
     float_net = net.Network.from_db('floating')
     if not float_net:
         return error(404, 'floating network not found')
 
     # Address is allocated and added to the record here, so the job has it later.
-    db.add_event('interface', interface_uuid, 'api', 'float', None, None)
+    db.add_event('interface', ni.uuid, 'api', 'float', None, None)
     with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Interface float'):
         ipm = IPManager.from_db('floating')
-        addr = ipm.get_random_free_address()
+        addr = ipm.get_random_free_address(ni.unique_label())
         ipm.persist()
 
-    ni = NetworkInterface.from_db(interface_uuid)
     ni.floating = addr
-    return None
 
 
 class Instances(Resource):
@@ -774,9 +777,10 @@ class Instances(Resource):
                                      None, None, inst.uuid)
                         ipm = IPManager.from_db(netdesc['network_uuid'])
                         if 'address' not in netdesc or not netdesc['address']:
-                            netdesc['address'] = ipm.get_random_free_address()
+                            netdesc['address'] = ipm.get_random_free_address(
+                                inst.unique_label())
                         else:
-                            if not ipm.reserve(netdesc['address']):
+                            if not ipm.reserve(netdesc['address'], inst.unique_label()):
                                 m = 'failed to reserve an IP on network %s' % (
                                     netdesc['network_uuid'])
                                 inst.enqueue_delete_due_error(m)
@@ -792,11 +796,12 @@ class Instances(Resource):
                 LOG.with_object(inst).with_object(n).withFields({
                     'networkinterface': iface_uuid
                 }).info('Interface allocated')
-                NetworkInterface.new(iface_uuid, netdesc, inst.uuid, order)
+                ni = NetworkInterface.new(
+                    iface_uuid, netdesc, inst.uuid, order)
                 order += 1
 
                 if 'float' in netdesc and netdesc['float']:
-                    err = _assign_floating_ip(iface_uuid)
+                    err = _assign_floating_ip(ni)
                     if err:
                         inst.enqueue_delete_due_error(
                             'interface float failed: %s' % err)
@@ -1056,7 +1061,7 @@ class InterfaceFloat(Resource):
         if err:
             return err
 
-        err = _assign_floating_ip(interface_uuid)
+        err = _assign_floating_ip(ni)
         if err:
             return err
 
@@ -1200,7 +1205,7 @@ def _delete_network(network_from_db):
         return error(404, 'network is deleted')
 
     n.add_event('api', 'delete')
-    n.delete()
+    db.enqueue('networknode', DestroyNetworkTask(n.uuid))
 
 
 class Network(Resource):
@@ -1236,7 +1241,7 @@ class Network(Resource):
         if network_from_db.state.value in dbo.STATE_DELETED:
             return error(404, 'network not found')
 
-        return _delete_network(network_from_db)
+        _delete_network(network_from_db)
 
 
 class Networks(Resource):
