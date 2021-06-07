@@ -791,7 +791,7 @@ class Instance(dbo):
                 # Free those ports and pick some new ones
                 ports = self.ports
                 self._free_console_port(ports['console_port'])
-                self._free_console_port(ports['vid_port'])
+                self._free_console_port(ports['vdi_port'])
 
                 self.ports = {
                     'console_port': self._allocate_console_port(),
