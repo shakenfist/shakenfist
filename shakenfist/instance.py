@@ -409,9 +409,7 @@ class Instance(dbo):
             except Exception as e:
                 util.ignore_exception('instance delete', e)
 
-        ports = self.ports
-        self._free_console_port(ports.get('console_port'))
-        self._free_console_port(ports.get('vdi_port'))
+        self.deallocate_instance_ports()
 
         if self.state.value.endswith('-%s' % self.STATE_ERROR):
             self.state = self.STATE_ERROR
@@ -446,7 +444,6 @@ class Instance(dbo):
                         'port': port,
                     })
                 if allocatedPort:
-
                     return port
             except socket.error:
                 LOG.with_field('instance', self.uuid).info(
@@ -461,12 +458,20 @@ class Instance(dbo):
 
     def allocate_instance_ports(self):
         with self.get_lock_attr('ports', 'Instance port allocation'):
-            ports = self.ports
-            if not ports:
-                self.ports = {
+            p = self.ports
+            if not p:
+                p = {
                     'console_port': self._allocate_console_port(),
                     'vdi_port': self._allocate_console_port()
                 }
+                self.ports = p
+                self.log.with_fields(p).info('Console ports allocated')
+
+    def deallocate_instance_ports(self):
+        ports = self.ports
+        self._free_console_port(ports.get('console_port'))
+        self._free_console_port(ports.get('vdi_port'))
+        self._db_delete_attribute('ports')
 
     def _configure_block_devices(self, lock):
         with self.get_lock_attr('block_devices', 'Initialize block devices'):
@@ -792,11 +797,10 @@ class Instance(dbo):
                 ports = self.ports
                 self._free_console_port(ports['console_port'])
                 self._free_console_port(ports['vdi_port'])
+                inst.undefine()
 
-                self.ports = {
-                    'console_port': self._allocate_console_port(),
-                    'vdi_port': self._allocate_console_port()
-                }
+                self.ports = None
+                self.allocate_instance_ports()
                 return False
             else:
                 self.log.warning('Instance start error: %s', e)
