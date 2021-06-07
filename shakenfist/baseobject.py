@@ -65,8 +65,8 @@ class DatabaseBackedObject(object):
         return o
 
     def _db_get_attribute(self, attribute):
-        retval = etcd.get('attribute/%s' %
-                          self.object_type, self.__uuid, attribute)
+        retval = etcd.get('attribute/%s' % self.object_type,
+                          self.__uuid, attribute)
         if not retval:
             return {}
         return retval

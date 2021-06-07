@@ -81,7 +81,7 @@ class Monitor(daemon.Daemon):
                 state = util.extract_power_state(libvirt, domain)
                 inst.update_power_state(state)
                 if state == 'crashed':
-                    inst.state = dbo.STATE_ERROR
+                    inst.state = inst.state.value + '-error'
 
             # Inactive VMs just have a name, and are powered off
             # in our state system.
@@ -123,7 +123,7 @@ class Monitor(daemon.Daemon):
                         # If we're inactive and our files aren't on disk,
                         # we have a problem.
                         log_ctx.info('Detected error state for instance')
-                        inst.state = dbo.STATE_ERROR
+                        inst.state = inst.state.value + '-error'
 
                     elif not db_power or db_power['power_state'] != 'off':
                         log_ctx.info('Detected power off for instance')
