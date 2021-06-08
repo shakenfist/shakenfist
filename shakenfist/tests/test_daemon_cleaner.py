@@ -1,8 +1,6 @@
 import mock
 
-from shakenfist.baseobject import (
-    DatabaseBackedObject as dbo,
-    State)
+from shakenfist.baseobject import State
 from shakenfist.config import SFConfigBase
 from shakenfist.daemons import cleaner
 from shakenfist.tests import test_shakenfist
@@ -118,6 +116,8 @@ class CleanerTestCase(test_shakenfist.ShakenFistTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
+    @mock.patch('shakenfist.baseobject.State.value',
+                new_callable=mock.PropertyMock)
     @mock.patch('shakenfist.instance.Instance.error',
                 new_callable=mock.PropertyMock)
     @mock.patch('shakenfist.etcd.get', side_effect=fake_get)
@@ -130,7 +130,9 @@ class CleanerTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('time.time', return_value=7)
     def test_update_power_states(self, mock_time, mock_exists, mock_put,
                                  mock_get_instance, mock_event, mock_see,
-                                 mock_lock, mock_etcd_get, mock_error):
+                                 mock_lock, mock_etcd_get, mock_error,
+                                 mock_state_value):
+        mock_state_value.return_value = 'created'
 
         m = cleaner.Monitor('cleaner')
         m._update_power_states()
@@ -154,7 +156,7 @@ class CleanerTestCase(test_shakenfist.ShakenFistTestCase):
                 ('attribute/instance', 'crashed',
                  'power_state', {'power_state': 'crashed'}),
                 ('attribute/instance', 'crashed',
-                 'state', State(dbo.STATE_ERROR, 7)),
+                 'state', State('created-error', 7)),
                 ('attribute/instance', 'paused',
                  'power_state', {'power_state': 'paused'}),
                 ('attribute/instance', 'suspended',
@@ -164,5 +166,5 @@ class CleanerTestCase(test_shakenfist.ShakenFistTestCase):
                 ('attribute/instance', 'bar',
                  'power_state', {'power_state': 'off'}),
                 ('attribute/instance', 'nofiles',
-                 'state', State(dbo.STATE_ERROR, 7))
+                 'state', State('created-error', 7))
             ], result)

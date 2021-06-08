@@ -65,8 +65,8 @@ class DatabaseBackedObject(object):
         return o
 
     def _db_get_attribute(self, attribute):
-        retval = etcd.get('attribute/%s' %
-                          self.object_type, self.__uuid, attribute)
+        retval = etcd.get('attribute/%s' % self.object_type,
+                          self.__uuid, attribute)
         if not retval:
             return {}
         return retval
@@ -79,6 +79,9 @@ class DatabaseBackedObject(object):
     def _db_set_attribute(self, attribute, value):
         etcd.put('attribute/%s' % self.object_type,
                  self.__uuid, attribute, value)
+
+    def _db_delete_attribute(self, attribute):
+        etcd.delete('attribute/%s' % self.object_type, self.__uuid, attribute)
 
     def get_lock(self, subtype=None, ttl=60, relatedobjects=None, log_ctx=None,
                  op=None):
