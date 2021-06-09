@@ -22,7 +22,7 @@ def resolve(name):
 
         url = config.get('DOWNLOAD_URL_DEBIAN') % {'vernum': vernum}
         checksum_url = config.get('CHECKSUM_URL_DEBIAN') % {'vernum': vernum}
-        resp = requests.head(url,
+        resp = requests.head(url, allow_redirects=True,
                              headers={'User-Agent': util.get_user_agent()})
         if resp.status_code != 200:
             raise exceptions.HTTPError(
@@ -32,7 +32,7 @@ def resolve(name):
         found_any = False
         for vernum in range(9, 20):
             url = config.get('DOWNLOAD_URL_DEBIAN') % {'vernum': vernum}
-            resp = requests.head(url,
+            resp = requests.head(url, allow_redirects=True,
                                  headers={'User-Agent': util.get_user_agent()})
             if resp.status_code != 200:
                 if found_any:
