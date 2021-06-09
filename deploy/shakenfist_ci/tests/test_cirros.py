@@ -21,7 +21,7 @@ class TestCirros(base.BaseNamespacedTestCase):
         was specified.
         """
         inst = self.test_client.create_instance(
-            'test_cirros_boot_no_network', 1, 1024, None,
+            'test-cirros-boot-no-network', 1, 1024, None,
             [
                 {
                     'size': 8,
@@ -40,7 +40,7 @@ class TestCirros(base.BaseNamespacedTestCase):
 
     def test_cirros_boot_network(self):
         inst = self.test_client.create_instance(
-            'test_cirros_boot_network', 1, 1024,
+            'test-cirros-boot-network', 1, 1024,
             [
                 {
                     'network_uuid': self.net['uuid']
@@ -64,7 +64,7 @@ class TestCirros(base.BaseNamespacedTestCase):
 
     def test_cirros_boot_large_disk(self):
         inst = self.test_client.create_instance(
-            'test_cirros_boot_large_disk', 1, 1024, None,
+            'test-cirros-boot-large-disk', 1, 1024, None,
             [
                 {
                     'size': 30,

@@ -789,7 +789,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         resp = self.client.post('/instances',
                                 headers={'Authorization': self.auth_header},
                                 data=json.dumps({
-                                    'name': 'test_instance',
+                                    'name': 'test-instance',
                                     'cpus': 1,
                                     'memory': 1024,
                                     'network': [],
@@ -808,7 +808,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         resp = self.client.post('/instances',
                                 headers={'Authorization': self.auth_header},
                                 data=json.dumps({
-                                    'name': 'test_instance',
+                                    'name': 'test-instance',
                                     'cpus': 1,
                                     'memory': 1024,
                                     'network': [],
@@ -827,7 +827,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         resp = self.client.post('/instances',
                                 headers={'Authorization': self.auth_header},
                                 data=json.dumps({
-                                    'name': 'test_instance',
+                                    'name': 'test-instance',
                                     'cpus': 1,
                                     'memory': 1024,
                                     'network': ['87c15186-5f73-4947-a9fb-2183c4951efc'],
@@ -847,7 +847,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         resp = self.client.post('/instances',
                                 headers={'Authorization': self.auth_header},
                                 data=json.dumps({
-                                    'name': 'test_instance',
+                                    'name': 'test-instance',
                                     'cpus': 1,
                                     'memory': 1024,
                                     'network': [
@@ -887,7 +887,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                                 headers={
                                     'Authorization': non_system_auth_header},
                                 data=json.dumps({
-                                    'name': 'test_instance',
+                                    'name': 'test-instance',
                                     'cpus': 1,
                                     'memory': 1024,
                                     'network': [
