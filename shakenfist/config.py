@@ -223,8 +223,8 @@ class SFConfig(SFConfigBase):
     LOGLEVEL_RESOURCES: str = 'info'
     LOGLEVEL_TRIGGERS: str = 'info'
     LOGLEVEL_QUEUES: str = 'info'
-    LOG_METHOD_TRACE: int = Field(
-        0, description='Add method name and module line number to log messages'
+    LOG_METHOD_TRACE: bool = Field(
+        False, description='Add method name and module line number to log messages'
     )
 
     class Config:
