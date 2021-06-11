@@ -135,11 +135,11 @@ class Instance(dbo):
         STATE_PREFLIGHT: (dbo.STATE_CREATING, dbo.STATE_DELETED, STATE_PREFLIGHT_ERROR),
         dbo.STATE_CREATING: (dbo.STATE_CREATED, dbo.STATE_DELETED, STATE_CREATING_ERROR),
         dbo.STATE_CREATED: (dbo.STATE_DELETED, STATE_CREATED_ERROR),
-        STATE_INITIAL_ERROR: (dbo.STATE_ERROR),
-        STATE_PREFLIGHT_ERROR: (dbo.STATE_ERROR),
-        STATE_CREATING_ERROR: (dbo.STATE_ERROR),
-        STATE_CREATED_ERROR: (dbo.STATE_ERROR),
-        dbo.STATE_ERROR: (dbo.STATE_DELETED, dbo.STATE_ERROR),
+        STATE_INITIAL_ERROR: (dbo.STATE_DELETED),
+        STATE_PREFLIGHT_ERROR: (dbo.STATE_DELETED),
+        STATE_CREATING_ERROR: (dbo.STATE_DELETED),
+        STATE_CREATED_ERROR: (dbo.STATE_DELETED),
+        dbo.STATE_ERROR: (dbo.STATE_DELETED),
         dbo.STATE_DELETED: None,
     }
 
@@ -410,11 +410,7 @@ class Instance(dbo):
                 util.ignore_exception('instance delete', e)
 
         self.deallocate_instance_ports()
-
-        if self.state.value.endswith('-%s' % self.STATE_ERROR):
-            self.state = self.STATE_ERROR
-        else:
-            self.state = self.STATE_DELETED
+        self.state = self.STATE_DELETED
 
     def hard_delete(self):
         etcd.delete('instance', None, self.uuid)

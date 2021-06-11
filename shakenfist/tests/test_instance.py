@@ -248,7 +248,8 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
         i.state = instance.Instance.STATE_CREATING
         i.state = instance.Instance.STATE_CREATED
         i.state = 'created-error'
-        i.state = instance.Instance.STATE_ERROR
+        with testtools.ExpectedException(exceptions.InvalidStateException):
+            i.state = instance.Instance.STATE_ERROR
         i.state = instance.Instance.STATE_DELETED
 
     @mock.patch('shakenfist.db.get_lock')
