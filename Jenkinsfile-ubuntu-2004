@@ -132,16 +132,17 @@ pipeline {
               echo "=============================="
               rm -rf $WORKSPACE/$BUILD_TAG
 
+              safe_build_tag=`echo $BUILD_TAG | tr "_" "-"`
               if [ -e $source_path/keepme ]
               then
                 echo "Retaining CI environment because you asked nicely."
               else
-                for uuid in `sf-client --simple instance list | grep $BUILD_TAG | cut -f 1 -d ","`
+                for uuid in `sf-client --simple instance list | grep $safe_build_tag | cut -f 1 -d ","`
                 do
                   sf-client instance delete $uuid
                 done
 
-                for uuid in `sf-client --simple network list | grep $BUILD_TAG | cut -f 1 -d ","`
+                for uuid in `sf-client --simple network list | grep $safe_build_tag | cut -f 1 -d ","`
                 do
                   sf-client network delete $uuid
                 done
