@@ -1,4 +1,3 @@
-from functools import partial
 import multiprocessing
 import os
 import re
@@ -6,12 +5,11 @@ import setproctitle
 import signal
 import time
 
-from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import logutil
-from shakenfist import virt
+from shakenfist import instance
 
 
 LOG, _ = logutil.setup(__name__)
@@ -84,8 +82,7 @@ class Monitor(daemon.Daemon):
             # Start missing observers
             extra_instances = list(observers.keys())
 
-            for inst in virt.Instances([virt.this_node_filter,
-                                        partial(baseobject.state_filter, ['created'])]):
+            for inst in instance.created_instances_on_node():
                 if inst.uuid in extra_instances:
                     extra_instances.remove(inst.uuid)
 

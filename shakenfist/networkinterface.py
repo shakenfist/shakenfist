@@ -4,25 +4,31 @@ from functools import partial
 from uuid import uuid4
 
 from shakenfist import baseobject
+from shakenfist.baseobject import (
+    DatabaseBackedObject as dbo,
+    DatabaseBackedObjectIterator as dbo_iter)
+from shakenfist.config import config
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
+from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
+from shakenfist.tasks import DefloatNetworkInterfaceTask
 from shakenfist import util
 
 
 LOG, _ = logutil.setup(__name__)
 
 
-class NetworkInterface(baseobject.DatabaseBackedObject):
+class NetworkInterface(dbo):
     object_type = 'networkinterface'
     current_version = 2
     state_targets = {
-        None: ('initial', ),
-        'initial': ('created', 'deleted', 'error'),
-        'created': ('created', 'deleted', 'error'),
-        'error': ('deleted', 'error'),
-        'deleted': (),
+        None: (dbo.STATE_INITIAL, ),
+        dbo.STATE_INITIAL: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR),
+        dbo.STATE_CREATED: (dbo.STATE_DELETED, dbo.STATE_ERROR),
+        dbo.STATE_ERROR: (dbo.STATE_DELETED, dbo.STATE_ERROR),
+        dbo.STATE_DELETED: (),
     }
 
     def __init__(self, static_values):
@@ -71,7 +77,7 @@ class NetworkInterface(baseobject.DatabaseBackedObject):
 
         ni = NetworkInterface.from_db(interface_uuid)
         ni._db_set_attribute('floating', {'floating_address': None})
-        ni.state = 'initial'
+        ni.state = NetworkInterface.STATE_INITIAL
         ni.add_event('db record creation', None)
 
         # TODO(andy): Integrate metadata into each object type
@@ -146,6 +152,20 @@ class NetworkInterface(baseobject.DatabaseBackedObject):
             raise exceptions.NetworkInterfaceAlreadyFloating()
         self._db_set_attribute('floating', {'floating_address': address})
 
+    def delete(self):
+        if self.floating['floating_address']:
+            db.enqueue(
+                'networknode',
+                DefloatNetworkInterfaceTask(self.network_uuid, self.uuid))
+
+        with db.get_lock('ipmanager', None, self.network_uuid,
+                         ttl=120, op='Release fixed IP'):
+            ipm = IPManager.from_db(self.network_uuid)
+            ipm.release(self.ipv4)
+            ipm.persist()
+
+        self.state = dbo.STATE_DELETED
+
     def hard_delete(self):
         etcd.delete('macaddress', None, self.macaddr)
         etcd.delete('networkinterface', None, self.uuid)
@@ -154,7 +174,7 @@ class NetworkInterface(baseobject.DatabaseBackedObject):
         db.delete_metadata('networkinterface', self.uuid)
 
 
-class NetworkInterfaces(baseobject.DatabaseBackedObjectIterator):
+class NetworkInterfaces(dbo_iter):
     def __iter__(self):
         for _, ni in etcd.get_all('networkinterface', None):
             ni = NetworkInterface.from_db(ni['uuid'])
@@ -194,3 +214,9 @@ def interfaces_for_instance(instance):
 def interfaces_for_network(network):
     return NetworkInterfaces([baseobject.active_states_filter,
                               partial(network_filter, network)])
+
+
+def inactive_network_interfaces():
+    return NetworkInterfaces([
+        partial(baseobject.state_filter, [dbo.STATE_DELETED, dbo.STATE_ERROR]),
+        partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))])

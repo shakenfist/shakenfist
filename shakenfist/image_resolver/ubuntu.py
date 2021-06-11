@@ -14,6 +14,7 @@ LOG, _ = logutil.setup(__name__)
 def resolve(name):
     # Name is assumed to be in the form ubuntu, ubuntu:18.04, or ubuntu:bionic
     resp = requests.get(config.get('LISTING_URL_UBUNTU'),
+                        allow_redirects=True,
                         headers={'User-Agent': util.get_user_agent()})
     if resp.status_code != 200:
         raise exceptions.HTTPError('Failed to fetch %s, status code %d'

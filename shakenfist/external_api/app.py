@@ -35,10 +35,13 @@ import traceback
 import uuid
 
 from shakenfist import baseobject
+from shakenfist.daemons import daemon
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import images
+from shakenfist import instance
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
@@ -46,17 +49,16 @@ from shakenfist import networkinterface
 from shakenfist.networkinterface import NetworkInterface
 from shakenfist.node import Node, Nodes
 from shakenfist import scheduler
-from shakenfist import util
-from shakenfist import virt
-from shakenfist.daemons import daemon
 from shakenfist.tasks import (
     DeleteInstanceTask,
     FetchImageTask,
     PreflightInstanceTask,
     StartInstanceTask,
+    DestroyNetworkTask,
     FloatNetworkInterfaceTask,
     DefloatNetworkInterfaceTask
 )
+from shakenfist import util
 
 
 LOG, HANDLER = logutil.setup(__name__)
@@ -188,7 +190,7 @@ def arg_is_instance_uuid(func):
     # Method uses the instance from the db
     def wrapper(*args, **kwargs):
         if 'instance_uuid' in kwargs:
-            kwargs['instance_from_db'] = virt.Instance.from_db(
+            kwargs['instance_from_db'] = instance.Instance.from_db(
                 kwargs['instance_uuid'])
         if not kwargs.get('instance_from_db'):
             LOG.with_instance(kwargs['instance_uuid']).info(
@@ -263,7 +265,7 @@ def requires_instance_active(func):
             return error(404, 'instance not found')
 
         i = kwargs['instance_from_db']
-        if i.state.value != virt.Instance.STATE_CREATED:
+        if i.state.value != instance.Instance.STATE_CREATED:
             LOG.with_instance(i).info(
                 'Instance not ready (%s)' % i.state.value)
             return error(406, 'instance %s is not ready (%s)' % (i.uuid, i.state.value))
@@ -343,7 +345,7 @@ def requires_network_active(func):
             return error(404, 'network not found')
 
         state = kwargs['network_from_db'].state
-        if state.value != 'created':
+        if state.value != dbo.STATE_CREATED:
             log.info('Network not ready (%s)' % state.value)
             return error(406,
                          'network %s is not ready (%s)'
@@ -489,17 +491,21 @@ class AuthNamespace(Resource):
         # The namespace must be empty
         instances = []
         deleted_instances = []
-        for i in virt.Instances([partial(baseobject.namespace_filter, namespace)]):
-            if i.state.value in ['deleted', 'error']:
+        for i in instance.instances_in_namespace(namespace):
+            if i.state.value in [dbo.STATE_DELETED, dbo.STATE_ERROR]:
                 deleted_instances.append(i.uuid)
             else:
+                LOG.withFields({'instance': i.uuid,
+                                'state': i.state}).info('Blocks namespace delete')
                 instances.append(i.uuid)
         if len(instances) > 0:
             return error(400, 'you cannot delete a namespace with instances')
 
         networks = []
-        for n in net.Networks([partial(baseobject.namespace_filter, namespace)]):
+        for n in net.networks_in_namespace(namespace):
             if not n.is_dead():
+                LOG.withFields({'network': n.uuid,
+                                'state': n.state}).info('Blocks namespace delete')
                 networks.append(n.uuid)
         if len(networks) > 0:
             return error(400, 'you cannot delete a namespace with networks')
@@ -627,7 +633,7 @@ class Instance(Resource):
     @requires_instance_ownership
     def delete(self, instance_uuid=None, instance_from_db=None):
         # Check if instance has already been deleted
-        if instance_from_db.state.value == 'deleted':
+        if instance_from_db.state.value == dbo.STATE_DELETED:
             return error(404, 'instance not found')
 
         # If this instance is not on a node, just do the DB cleanup locally
@@ -640,21 +646,19 @@ class Instance(Resource):
         instance_from_db.enqueue_delete_remote(node)
 
 
-def _assign_floating_ip(interface_uuid):
+def _assign_floating_ip(ni):
     float_net = net.Network.from_db('floating')
     if not float_net:
         return error(404, 'floating network not found')
 
     # Address is allocated and added to the record here, so the job has it later.
-    db.add_event('interface', interface_uuid, 'api', 'float', None, None)
+    db.add_event('interface', ni.uuid, 'api', 'float', None, None)
     with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Interface float'):
         ipm = IPManager.from_db('floating')
-        addr = ipm.get_random_free_address()
+        addr = ipm.get_random_free_address(ni.unique_label())
         ipm.persist()
 
-    ni = NetworkInterface.from_db(interface_uuid)
     ni.floating = addr
-    return None
 
 
 class Instances(Resource):
@@ -662,10 +666,10 @@ class Instances(Resource):
     def get(self, all=False):
         filters = [partial(baseobject.namespace_filter, get_jwt_identity())]
         if not all:
-            filters.append(virt.active_states_filter)
+            filters.append(instance.active_states_filter)
 
         retval = []
-        for i in virt.Instances(filters):
+        for i in instance.Instances(filters):
             # This forces the instance through the external view rehydration
             retval.append(i.external_view())
         return retval
@@ -677,8 +681,10 @@ class Instances(Resource):
         global SCHEDULER
 
         # Check that the instance name is safe for use as a DNS host name
-        if name != re.sub(r'([^a-zA-Z0-9_\-])', '', name) or len(name) > 63:
-            return error(400, 'instance name must be useable as a DNS host name')
+        if name != re.sub(r'([^a-zA-Z0-9\-])', '', name) or len(name) > 63:
+            return error(400, ('instance name %s is not useable as a DNS and Linux host name. '
+                               'That is, less than 63 characters and in the character set: '
+                               'a-z, A-Z, 0-9, or hyphen (-).' % name))
 
         # If we are placed, make sure that node exists
         if placed_on:
@@ -717,7 +723,7 @@ class Instances(Resource):
                 n = net.Network.from_db(net_uuid)
                 if not n:
                     return error(404, 'network %s does not exist' % net_uuid)
-                if n.state.value != 'created':
+                if n.state.value != net.Network.STATE_CREATED:
                     return error(406, 'network %s is not ready (%s)' % (n.uuid, n.state.value))
 
         if not video:
@@ -732,7 +738,7 @@ class Instances(Resource):
                          'only admins can create resources in a different namespace')
 
         # Create instance object
-        instance = virt.Instance.new(
+        inst = instance.Instance.new(
             name=name,
             disk_spec=disk,
             memory=memory,
@@ -745,7 +751,7 @@ class Instances(Resource):
         )
 
         # Initialise metadata
-        db.persist_metadata('instance', instance.uuid, {})
+        db.persist_metadata('instance', inst.uuid, {})
 
         # Allocate IP addresses
         order = 0
@@ -756,7 +762,7 @@ class Instances(Resource):
                 if not n:
                     m = 'missing network %s during IP allocation phase' % (
                         netdesc['network_uuid'])
-                    instance.enqueue_delete_due_error(m)
+                    inst.enqueue_delete_due_error(m)
                     return error(
                         404, 'network %s not found' % netdesc['network_uuid'])
 
@@ -770,15 +776,16 @@ class Instances(Resource):
                     with db.get_lock('ipmanager', None,  netdesc['network_uuid'],
                                      ttl=120, op='Network allocate IP'):
                         db.add_event('network', netdesc['network_uuid'], 'allocate address',
-                                     None, None, instance.uuid)
+                                     None, None, inst.uuid)
                         ipm = IPManager.from_db(netdesc['network_uuid'])
                         if 'address' not in netdesc or not netdesc['address']:
-                            netdesc['address'] = ipm.get_random_free_address()
+                            netdesc['address'] = ipm.get_random_free_address(
+                                inst.unique_label())
                         else:
-                            if not ipm.reserve(netdesc['address']):
+                            if not ipm.reserve(netdesc['address'], inst.unique_label()):
                                 m = 'failed to reserve an IP on network %s' % (
                                     netdesc['network_uuid'])
-                                instance.enqueue_delete_due_error(m)
+                                inst.enqueue_delete_due_error(m)
                                 return error(409, 'address %s in use' %
                                              netdesc['address'])
 
@@ -788,16 +795,17 @@ class Instances(Resource):
                     netdesc['model'] = 'virtio'
 
                 iface_uuid = str(uuid.uuid4())
-                LOG.with_object(instance).with_object(n).withFields({
+                LOG.with_object(inst).with_object(n).withFields({
                     'networkinterface': iface_uuid
                 }).info('Interface allocated')
-                NetworkInterface.new(iface_uuid, netdesc, instance.uuid, order)
+                ni = NetworkInterface.new(
+                    iface_uuid, netdesc, inst.uuid, order)
                 order += 1
 
                 if 'float' in netdesc and netdesc['float']:
-                    err = _assign_floating_ip(iface_uuid)
+                    err = _assign_floating_ip(ni)
                     if err:
-                        instance.enqueue_delete_due_error(
+                        inst.enqueue_delete_due_error(
                             'interface float failed: %s' % err)
                         return err
 
@@ -810,41 +818,41 @@ class Instances(Resource):
         try:
             # Have we been placed?
             if not placed_on:
-                candidates = SCHEDULER.place_instance(instance, network)
+                candidates = SCHEDULER.place_instance(inst, network)
                 placement = candidates[0]
 
             else:
-                SCHEDULER.place_instance(instance, network,
+                SCHEDULER.place_instance(inst, network,
                                          candidates=[placed_on])
                 placement = placed_on
 
         except exceptions.LowResourceException as e:
-            instance.add_event('schedule', 'failed', None,
-                               'Insufficient resources: ' + str(e))
-            instance.enqueue_delete_due_error('scheduling failed')
+            inst.add_event('schedule', 'failed', None,
+                           'Insufficient resources: ' + str(e))
+            inst.enqueue_delete_due_error('scheduling failed')
             return error(507, str(e), suppress_traceback=True)
 
         except exceptions.CandidateNodeNotFoundException as e:
-            instance.add_event('schedule', 'failed', None,
-                               'Candidate node not found: ' + str(e))
-            instance.enqueue_delete_due_error('scheduling failed')
+            inst.add_event('schedule', 'failed', None,
+                           'Candidate node not found: ' + str(e))
+            inst.enqueue_delete_due_error('scheduling failed')
             return error(404, 'node not found: %s' % e, suppress_traceback=True)
 
         # Record placement
-        instance.place_instance(placement)
+        inst.place_instance(placement)
 
         # Create a queue entry for the instance start
-        tasks = [PreflightInstanceTask(instance.uuid, network)]
-        for disk in instance.disk_spec:
+        tasks = [PreflightInstanceTask(inst.uuid, network)]
+        for disk in inst.disk_spec:
             if disk.get('base'):
-                tasks.append(FetchImageTask(disk['base'], instance.uuid))
-        tasks.append(StartInstanceTask(instance.uuid, network))
+                tasks.append(FetchImageTask(disk['base'], inst.uuid))
+        tasks.append(StartInstanceTask(inst.uuid, network))
         tasks.extend(float_tasks)
 
         # Enqueue creation tasks on desired node task queue
         db.enqueue(placement, {'tasks': tasks})
-        instance.add_event('create', 'enqueued', None, None)
-        return instance.external_view()
+        inst.add_event('create', 'enqueued', None, None)
+        return inst.external_view()
 
     @jwt_required
     def delete(self, confirm=False, namespace=None):
@@ -867,18 +875,18 @@ class Instances(Resource):
 
         waiting_for = []
         tasks_by_node = {}
-        for instance in virt.Instances([partial(baseobject.namespace_filter, namespace),
-                                        virt.active_states_filter]):
+        for inst in instance.Instances([partial(baseobject.namespace_filter, namespace),
+                                        instance.active_states_filter]):
             # If this instance is not on a node, just do the DB cleanup locally
-            dbplacement = instance.placement
+            dbplacement = inst.placement
             if not dbplacement.get('node'):
                 node = config.NODE_NAME
             else:
                 node = dbplacement['node']
 
             tasks_by_node.setdefault(node, [])
-            tasks_by_node[node].append(DeleteInstanceTask(instance.uuid))
-            waiting_for.append(instance.uuid)
+            tasks_by_node[node].append(DeleteInstanceTask(inst.uuid))
+            waiting_for.append(inst.uuid)
 
         for node in tasks_by_node:
             db.enqueue(node, {'tasks': tasks_by_node[node]})
@@ -1030,7 +1038,7 @@ def _safe_get_network_interface(interface_uuid):
         log.info('Interface not found, failed ownership test')
         return None, None, error(404, 'interface not found')
 
-    i = virt.Instance.from_db(ni.instance_uuid)
+    i = instance.Instance.from_db(ni.instance_uuid)
     if get_jwt_identity() not in [i.namespace, 'system']:
         log.with_object(i).info('Instance not found, failed ownership test')
         return None, None, error(404, 'interface not found')
@@ -1055,7 +1063,7 @@ class InterfaceFloat(Resource):
         if err:
             return err
 
-        err = _assign_floating_ip(interface_uuid)
+        err = _assign_floating_ip(ni)
         if err:
             return err
 
@@ -1199,7 +1207,7 @@ def _delete_network(network_from_db):
         return error(404, 'network is deleted')
 
     n.add_event('api', 'delete')
-    n.delete()
+    db.enqueue('networknode', DestroyNetworkTask(n.uuid))
 
 
 class Network(Resource):
@@ -1232,10 +1240,10 @@ class Network(Resource):
             return error(403, 'you cannot delete an in use network')
 
         # Check if network has already been deleted
-        if network_from_db.state.value in 'deleted':
+        if network_from_db.state.value in dbo.STATE_DELETED:
             return error(404, 'network not found')
 
-        return _delete_network(network_from_db)
+        _delete_network(network_from_db)
 
 
 class Networks(Resource):

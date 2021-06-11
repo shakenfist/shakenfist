@@ -7,32 +7,36 @@ import re
 import requests
 import time
 
-from shakenfist import baseobject
+from shakenfist.baseobject import (
+    DatabaseBackedObject as dbo,
+    DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import image_resolver
+from shakenfist import instance
 from shakenfist import logutil
 from shakenfist import util
-from shakenfist import virt
 
 
 LOG, _ = logutil.setup(__name__)
 
 
-class Image(baseobject.DatabaseBackedObject):
+class Image(dbo):
     object_type = 'image'
     current_version = 2
     state_targets = {
-        None: ('initial', 'creating'),
-        'initial': ('initial', 'creating', 'deleted', 'error'),
+        None: (dbo.STATE_INITIAL, dbo.STATE_CREATING),
+        dbo.STATE_INITIAL: (dbo.STATE_CREATING, dbo.STATE_DELETED, dbo.STATE_ERROR),
         # TODO(andy): This is broken but will be accepted until Image class is
         # refactored. (hey, at least the state names will be valid)
-        'creating': ('initial', 'creating', 'created', 'deleted', 'error'),
-        'created': ('initial', 'creating', 'created', 'deleted', 'error'),
-        'error': ('deleted', 'error'),
-        'deleted': ('deleted', 'error', 'creating'),
+        dbo.STATE_CREATING: (dbo.STATE_INITIAL, dbo.STATE_CREATING, dbo.STATE_CREATED,
+                             dbo.STATE_DELETED, dbo.STATE_ERROR),
+        dbo.STATE_CREATED: (dbo.STATE_INITIAL, dbo.STATE_CREATING, dbo.STATE_CREATED,
+                            dbo.STATE_DELETED, dbo.STATE_ERROR),
+        dbo.STATE_ERROR: (dbo.STATE_DELETED, dbo.STATE_ERROR),
+        dbo.STATE_DELETED: (dbo.STATE_DELETED, dbo.STATE_ERROR, dbo.STATE_CREATING),
     }
 
     def __init__(self, static_values):
@@ -84,7 +88,7 @@ class Image(baseobject.DatabaseBackedObject):
             'version': cls.current_version
         })
         i = Image.from_db(uuid)
-        i.state = 'initial'
+        i.state = Image.STATE_INITIAL
         i.update_checksum(checksum)
         i.add_event('db record creation', None)
         return i
@@ -200,7 +204,7 @@ class Image(baseobject.DatabaseBackedObject):
         # without verifying that no instance is using it, so we just mark the
         # image as deleted in the database and move on without removing things
         # from the cache. We will probably want to revisit this in the future.
-        self.state = 'deleted'
+        self.state = self.STATE_DELETED
 
     def get(self, locks, related_object):
         """Wrap three retries around the image get.
@@ -209,15 +213,15 @@ class Image(baseobject.DatabaseBackedObject):
         download, the locks will be refreshed. Any lock error should abort the
         get, since the lock will have been lost.
         """
-        self.state = 'creating'
+        self.state = self.STATE_CREATING
         for _ in range(3):
             try:
                 image_path = self._get(locks, related_object)
-                self.state = 'created'
+                self.state = self.STATE_CREATED
                 return image_path
             except exceptions.BadCheckSum as e:
                 self.log.warning('Bad checksum while downloading image: %s', e)
-                self.state = 'error'
+                self.state = self.STATE_ERROR
                 self.error = 'Bad checksum while downloading image: %s' % e
                 exc = e
         raise exc
@@ -253,7 +257,7 @@ class Image(baseobject.DatabaseBackedObject):
 
                 # Ensure checksum is correct
                 if not self.correct_checksum(actual_image):
-                    if isinstance(related_object, virt.Instance):
+                    if isinstance(related_object, instance.Instance):
                         related_object.add_event('fetch image', 'bad checksum')
                     raise exceptions.BadCheckSum('url=%s' % self.url)
 
@@ -371,7 +375,7 @@ class Image(baseobject.DatabaseBackedObject):
 
 
 # TODO(mikal): can this be refactored into baseobject?
-class Images(object):
+class Images(dbo_iter):
     def __init__(self, filters):
         self.filters = filters
 

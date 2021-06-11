@@ -16,6 +16,7 @@ def resolve(name):
     # Name is assumed to be in the form cirros or cirros:0.4.0
     if name == 'cirros':
         resp = requests.get(config.get('LISTING_URL_CIRROS'),
+                            allow_redirects=True,
                             headers={'User-Agent': util.get_user_agent()})
         if resp.status_code != 200:
             raise exceptions.HTTPError(

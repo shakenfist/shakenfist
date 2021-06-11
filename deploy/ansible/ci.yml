@@ -22,7 +22,7 @@
 
     - name: Create a primary instance
       sf_instance:
-        name: "{{identifier}}-primary"
+        name: "{{identifier|truncate(50, True, '---')}}-primary"
         cpu: 4
         ram: 4096
         disks:
@@ -45,7 +45,7 @@
 
     - name: Create sf-1
       sf_instance:
-        name: "{{identifier}}-1"
+        name: "{{identifier|truncate(50, True, '---')}}-1"
         cpu: 4
         ram: 8192
         disks:
@@ -69,7 +69,7 @@
 
     - name: Create sf-2
       sf_instance:
-        name: "{{identifier}}-2"
+        name: "{{identifier|truncate(50, True, '---')}}-2"
         cpu: 4
         ram: 8192
         disks:
@@ -93,7 +93,7 @@
 
     - name: Create sf-3
       sf_instance:
-        name: "{{identifier}}-3"
+        name: "{{identifier|truncate(50, True, '---')}}-3"
         cpu: 4
         ram: 8192
         disks:

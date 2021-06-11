@@ -1,22 +1,21 @@
 import etcd3
-from functools import partial
 import json
 import os
 import random
 import time
 
-from shakenfist import baseobject
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import logutil
+from shakenfist import instance
 from shakenfist import net
-from shakenfist.networkinterface import NetworkInterfaces
+from shakenfist import networkinterface
 from shakenfist.node import (
     Node, Nodes,
     active_states_filter as node_active_states_filter,
     inactive_states_filter as node_inactive_states_filter)
 from shakenfist import util
-from shakenfist import virt
 
 
 LOG, _ = logutil.setup(__name__)
@@ -39,27 +38,27 @@ class Monitor(daemon.Daemon):
                 instance_uuid = domain.name().split(':')[1]
                 log_ctx = LOG.with_instance(instance_uuid)
 
-                instance = virt.Instance.from_db(instance_uuid)
-                if not instance:
+                inst = instance.Instance.from_db(instance_uuid)
+                if not inst:
                     # Instance is SF but not in database. Kill to reduce load.
                     log_ctx.warning('Destroying unknown instance')
                     util.execute(None,
                                  'virsh destroy "sf:%s"' % instance_uuid)
                     continue
 
-                instance.place_instance(config.NODE_NAME)
+                inst.place_instance(config.NODE_NAME)
                 seen.append(domain.name())
 
-                db_state = instance.state
-                if db_state.value == 'deleted':
+                db_state = inst.state
+                if db_state.value == dbo.STATE_DELETED:
                     # NOTE(mikal): a delete might be in-flight in the queue.
                     # We only worry about instances which should have gone
                     # away five minutes ago.
                     if time.time() - db_state.update_time < 300:
                         continue
 
-                    instance.enforced_deletes_increment()
-                    attempts = instance._db_get_attribute(
+                    inst.enforced_deletes_increment()
+                    attempts = inst._db_get_attribute(
                         'enforced_deletes')['count']
 
                     if attempts > 5:
@@ -70,9 +69,9 @@ class Monitor(daemon.Daemon):
                         util.execute(None,
                                      'virsh destroy "sf:%s"' % instance_uuid)
 
-                        instance.add_event('enforced delete', 'complete')
+                        inst.add_event('enforced delete', 'complete')
                     else:
-                        instance.delete()
+                        inst.delete()
 
                     log_ctx.with_field('attempt', attempts).warning(
                         'Deleting stray instance')
@@ -80,9 +79,9 @@ class Monitor(daemon.Daemon):
                     continue
 
                 state = util.extract_power_state(libvirt, domain)
-                instance.update_power_state(state)
+                inst.update_power_state(state)
                 if state == 'crashed':
-                    instance.state = 'error'
+                    inst.state = inst.state.value + '-error'
 
             # Inactive VMs just have a name, and are powered off
             # in our state system.
@@ -93,9 +92,9 @@ class Monitor(daemon.Daemon):
                 if domain_name not in seen:
                     instance_uuid = domain_name.split(':')[1]
                     log_ctx = LOG.with_instance(instance_uuid)
-                    instance = virt.Instance.from_db(instance_uuid)
+                    inst = instance.Instance.from_db(instance_uuid)
 
-                    if not instance:
+                    if not inst:
                         # Instance is SF but not in database. Kill because
                         # unknown.
                         log_ctx.warning('Removing unknown inactive instance')
@@ -103,8 +102,8 @@ class Monitor(daemon.Daemon):
                         domain.undefine()
                         continue
 
-                    db_state = instance.state
-                    if db_state.value == 'deleted':
+                    db_state = inst.state
+                    if db_state.value == dbo.STATE_DELETED:
                         # NOTE(mikal): a delete might be in-flight in the queue.
                         # We only worry about instances which should have gone
                         # away five minutes ago.
@@ -114,22 +113,22 @@ class Monitor(daemon.Daemon):
                         domain = conn.lookupByName(domain_name)
                         domain.undefine()
                         log_ctx.info('Detected stray instance')
-                        instance.add_event('deleted stray', 'complete')
+                        inst.add_event('deleted stray', 'complete')
                         continue
 
-                    instance.place_instance(config.NODE_NAME)
+                    inst.place_instance(config.NODE_NAME)
 
-                    db_power = instance.power_state
-                    if not os.path.exists(instance.instance_path):
+                    db_power = inst.power_state
+                    if not os.path.exists(inst.instance_path):
                         # If we're inactive and our files aren't on disk,
                         # we have a problem.
                         log_ctx.info('Detected error state for instance')
-                        instance.state = 'error'
+                        inst.state = inst.state.value + '-error'
 
                     elif not db_power or db_power['power_state'] != 'off':
                         log_ctx.info('Detected power off for instance')
-                        instance.update_power_state('off')
-                        instance.add_event('detected poweroff', 'complete')
+                        inst.update_power_state('off')
+                        inst.add_event('detected poweroff', 'complete')
 
         except libvirt.libvirtError as e:
             LOG.error('Failed to lookup all domains: %s' % e)
@@ -165,21 +164,15 @@ class Monitor(daemon.Daemon):
             self._update_power_states()
 
             # Cleanup soft deleted instances and networks
-            for i in virt.Instances([
-                    virt.inactive_states_filter,
-                    partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))]):
+            for i in instance.inactive_instances():
                 LOG.with_object(i).info('Hard deleting instance')
                 i.hard_delete()
 
-            for n in net.Networks([
-                    baseobject.inactive_states_filter,
-                    partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))]):
+            for n in net.inactive_networks():
                 LOG.with_network(n).info('Hard deleting network')
                 n.hard_delete()
 
-            for ni in NetworkInterfaces([
-                    partial(baseobject.state_filter, ['deleted', 'error']),
-                    partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))]):
+            for ni in networkinterface.inactive_network_interfaces():
                 LOG.with_networkinterface(
                     ni).info('Hard deleting network interface')
                 ni.hard_delete()
@@ -198,9 +191,7 @@ class Monitor(daemon.Daemon):
                 if (time.time() - last_loop_run < config.NODE_CHECKIN_MAXIMUM
                         and age > config.NODE_CHECKIN_MAXIMUM * 10):
                     n.state = Node.STATE_ERROR
-                    for i in virt.Instances([
-                            virt.healthy_states_filter,
-                            partial(virt.placement_filter, n.uuid)]):
+                    for i in instance.healthy_instances_on_node(n):
                         LOG.with_object(i).with_object(n).info(
                             'Node in error state, erroring instance')
                         # Note, this queue job is just in case the node comes

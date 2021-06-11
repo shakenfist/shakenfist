@@ -58,7 +58,7 @@ Shaken Fist uses ansible as its installer, with terraform to bring up cloud reso
 We also make the assumption that developer laptops move around more than servers. In a traditional install we detect the primary NIC of the machine and then use that to build VXLAN meshes. For localhost single node deploys we instead create a bridge called "brsf" and then use that as our primary NIC. This means your machine can move around and have different routes to the internet over time, but it also means its fiddly to convert a localhost install into a real production cluster. Please only use localhost installs for development purposes.
 
 ```
-sudo CLOUD=localhost /usr/local/share/shakenfist/installer/install.sh
+sudo CLOUD=localhost /srv/shakenfist/venv/share/shakenfist/installer/install
 ```
 
 ## Cluster installation

@@ -6,10 +6,11 @@ import json
 import time
 
 from shakenfist import baseobject
+from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist import instance
 from shakenfist import networkinterface
 from shakenfist.node import Node
 from shakenfist import util
-from shakenfist import virt
 
 # Very simple data upgrader
 
@@ -116,84 +117,119 @@ def main():
                     print('--> Upgraded networkinterface %s to version 2'
                           % ni['uuid'])
 
+            # Upgrade ipmanagers to v2, deleting strays while we're at it
+            for data, metadata in etcd_client.get_prefix('/sf/ipmanager/'):
+                network_uuid = metadata['key'].decode('utf-8').split('/')[-1]
+
+                if not etcd_client.get('/sf/network/%s' % network_uuid):
+                    print('--> Deleted stray ipmanager %s' % network_uuid)
+                    etcd_client.delete(metadata['key'])
+                    continue
+
+                ipm = json.loads(data.decode('utf-8'))
+                if 'ipmanager.v1' in ipm:
+                    ipm['ipmanager.v2'] = {
+                        'ipblock': ipm['ipmanager.v1']['ipblock'],
+                        'in_use': {},
+                        'uuid': network_uuid
+                    }
+                    for elem in ipm['ipmanager.v1']['in_use']:
+                        ipm['ipmanager.v2']['in_use'][elem] = ('unknown', None)
+
+                    del ipm['ipmanager.v1']
+
+                if ipm['ipmanager.v2']['uuid'] == 'floating':
+                    ipblock_obj = ipaddress.ip_network(ipm['ipmanager.v2']['ipblock'],
+                                                       strict=False)
+                    for addr in [str(ipblock_obj[0]),
+                                 str(ipblock_obj[1]),
+                                 str(ipblock_obj.broadcast_address),
+                                 str(ipblock_obj.network_address)]:
+                        ipm['ipmanager.v2']['in_use'][addr] = (
+                            'ipmanager', network_uuid)
+
+                etcd_client.put(
+                    metadata['key'], json.dumps(ipm, indent=4, sort_keys=True))
+                print('--> Upgraded ipmanager %s to version 2' % network_uuid)
+
             clean_events_mesh_operations(etcd_client)
 
         if minor <= 3:
             # Upgrade instances to the new attribute style (this needs to
             # happen before we upgrade networks below).
             for data, _ in etcd_client.get_prefix('/sf/instance/'):
-                instance = json.loads(data.decode('utf-8'))
-                if int(instance.get('version', 0)) < 2:
+                inst = json.loads(data.decode('utf-8'))
+                if int(inst.get('version', 0)) < 2:
                     data = {}
                     for attr in ['node', 'placement_attempts']:
-                        if instance.get(attr):
-                            data[attr] = instance[attr]
-                            del instance[attr]
+                        if inst.get(attr):
+                            data[attr] = inst[attr]
+                            del inst[attr]
                     etcd_client.put(
-                        '/sf/attribute/instance/%s/placement' % instance['uuid'],
+                        '/sf/attribute/instance/%s/placement' % inst['uuid'],
                         json.dumps(data, indent=4, sort_keys=True))
 
-                    if 'enforced_deletes' in instance:
-                        data = {'count': instance.get('enforced_deletes', 0)}
-                        del instance['enforced_deletes']
+                    if 'enforced_deletes' in inst:
+                        data = {'count': inst.get('enforced_deletes', 0)}
+                        del inst['enforced_deletes']
                         etcd_client.put(
-                            '/sf/attribute/instance/%s/enforce_deletes' % instance['uuid'],
+                            '/sf/attribute/instance/%s/enforce_deletes' % inst['uuid'],
                             json.dumps(data, indent=4, sort_keys=True))
 
-                    if 'block_devices' in instance:
-                        data = {'block_devices': instance.get(
+                    if 'block_devices' in inst:
+                        data = {'block_devices': inst.get(
                             'block_devices', 0)}
-                        del instance['block_devices']
+                        del inst['block_devices']
                         etcd_client.put(
-                            '/sf/attribute/instance/%s/block_devices' % instance['uuid'],
+                            '/sf/attribute/instance/%s/block_devices' % inst['uuid'],
                             json.dumps(data, indent=4, sort_keys=True))
 
-                    state = baseobject.State(instance.get('state'),
-                                             instance.get('state_updated'))
+                    state = baseobject.State(inst.get('state'),
+                                             inst.get('state_updated'))
                     for attr in ['state', 'state_updated']:
-                        instance.pop(attr, None)
+                        inst.pop(attr, None)
                     etcd_client.put(
-                        '/sf/attribute/instance/%s/state' % instance['uuid'],
+                        '/sf/attribute/instance/%s/state' % inst['uuid'],
                         json.dumps(state.obj_dict(), indent=4, sort_keys=True))
 
-                    err_msg = instance.get('error_message')
+                    err_msg = inst.get('error_message')
                     if err_msg:
-                        instance.pop('error_message', None)
+                        inst.pop('error_message', None)
                         etcd_client.put(
-                            '/sf/attribute/instance/%s/error' % instance['uuid'],
+                            '/sf/attribute/instance/%s/error' % inst['uuid'],
                             json.dumps({'message': err_msg},
                                        indent=4, sort_keys=True))
 
                     data = {}
                     for attr in ['power_state', 'power_state_previous',
                                  'power_state_updated']:
-                        if instance.get(attr):
-                            data[attr] = instance[attr]
-                            del instance[attr]
+                        if inst.get(attr):
+                            data[attr] = inst[attr]
+                            del inst[attr]
                     etcd_client.put(
-                        '/sf/attribute/instance/%s/power_state' % instance['uuid'],
+                        '/sf/attribute/instance/%s/power_state' % inst['uuid'],
                         json.dumps(data, indent=4, sort_keys=True))
 
                     data = {}
                     for attr in ['console_port', 'vdi_port']:
-                        if instance.get(attr):
-                            data[attr] = instance[attr]
-                            del instance[attr]
+                        if inst.get(attr):
+                            data[attr] = inst[attr]
+                            del inst[attr]
                     etcd_client.put(
-                        '/sf/attribute/instance/%s/ports' % instance['uuid'],
+                        '/sf/attribute/instance/%s/ports' % inst['uuid'],
                         json.dumps(data, indent=4, sort_keys=True))
 
                     # These fields were set in code to v0.3.3, but never used
                     for key in ['node_history', 'requested_placement']:
-                        if key in instance:
-                            del instance[key]
+                        if key in inst:
+                            del inst[key]
 
-                    instance['version'] = 2
+                    inst['version'] = 2
                     etcd_client.put(
-                        '/sf/instance/%s' % instance['uuid'],
-                        json.dumps(instance, indent=4, sort_keys=True))
+                        '/sf/instance/%s' % inst['uuid'],
+                        json.dumps(inst, indent=4, sort_keys=True))
                     print('--> Upgraded instance %s to version 2'
-                          % instance['uuid'])
+                          % inst['uuid'])
 
             # Upgrade images to the new attribute style
             for data, metadata in etcd_client.get_prefix('/sf/image/'):
@@ -225,11 +261,11 @@ def main():
                     etcd_client.put(
                         '/sf/attribute/image/%s/state' % image_node,
                         json.dumps({
-                            'state': 'created',
+                            'state': dbo.STATE_CREATED,
                             'state_updated': time.time()
                         }, indent=4, sort_keys=True))
 
-                    new = baseobject.State('created', time.time())
+                    new = baseobject.State(dbo.STATE_CREATED, time.time())
                     etcd_client.put(
                         '/sf/attribute/image/%s/state' % image_node,
                         json.dumps(new.obj_dict(), indent=4, sort_keys=True))
@@ -254,7 +290,7 @@ def main():
 
                 if bad:
                     for ni in networkinterface.interfaces_for_network(n):
-                        inst = virt.Instance.from_db(ni.instance_uuid)
+                        inst = instance.Instance.from_db(ni.instance_uuid)
                         if inst:
                             inst.enqueue_delete_due_error(
                                 'Instance was on invalid network at upgrade.')
@@ -290,7 +326,7 @@ def main():
                                        indent=4, sort_keys=True))
                         del network['floating_gateway']
 
-                    new = baseobject.State('created', time.time())
+                    new = baseobject.State(dbo.STATE_CREATED, time.time())
                     etcd_client.put(
                         '/sf/attribute/network/%s/state' % n['uuid'],
                         json.dumps(new.obj_dict(), indent=4, sort_keys=True))

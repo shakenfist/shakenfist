@@ -46,6 +46,7 @@ class InstanceTask(QueueTask):
     def __init__(self, instance_uuid, network=None):
         super(InstanceTask, self).__init__()
         self._instance_uuid = instance_uuid
+
         # Only set network if deliberately set in function paramater. This
         # avoids setting _network to None which is not iterable.
         self._network = []
@@ -111,6 +112,10 @@ class NetworkTask(QueueTask):
 
 class DeployNetworkTask(NetworkTask):
     _name = 'network_deploy'
+
+
+class DestroyNetworkTask(NetworkTask):
+    _name = 'network_destroy'
 
 
 class UpdateDHCPNetworkTask(NetworkTask):

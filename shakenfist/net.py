@@ -1,5 +1,6 @@
 # Copyright 2020 Michael Still
 
+from functools import partial
 import ipaddress
 import os
 import psutil
@@ -9,11 +10,15 @@ from uuid import uuid4
 
 
 from shakenfist import baseobject
+from shakenfist.baseobject import (
+    DatabaseBackedObject as dbo,
+    DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import dhcp
 from shakenfist import etcd
 from shakenfist.exceptions import DeadNetwork
+from shakenfist import instance
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import networkinterface
@@ -24,21 +29,20 @@ from shakenfist.tasks import (
     RemoveDHCPNetworkTask,
     RemoveNATNetworkTask)
 from shakenfist import util
-from shakenfist import virt
 
 
 LOG, _ = logutil.setup(__name__)
 
 
-class Network(baseobject.DatabaseBackedObject):
+class Network(dbo):
     object_type = 'network'
     current_version = 2
     state_targets = {
-        None: ('initial', ),
-        'initial': ('created', 'deleted', 'error'),
-        'created': ('created', 'deleted', 'error'),
-        'error': ('deleted', 'error'),
-        'deleted': (),
+        None: (dbo.STATE_INITIAL, ),
+        dbo.STATE_INITIAL: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR),
+        dbo.STATE_CREATED: (dbo.STATE_DELETED, dbo.STATE_ERROR),
+        dbo.STATE_ERROR: (dbo.STATE_DELETED, dbo.STATE_ERROR),
+        dbo.STATE_DELETED: (),
     }
 
     def __init__(self, static_values):
@@ -102,7 +106,7 @@ class Network(baseobject.DatabaseBackedObject):
         )
 
         n = Network.from_db(uuid)
-        n.state = 'initial'
+        n.state = Network.STATE_INITIAL
         n.add_event('db record creation', None)
 
         # Networks should immediately appear on the network node
@@ -290,7 +294,7 @@ class Network(baseobject.DatabaseBackedObject):
         callers will wait on a lock before calling this function. In this case
         we definitely need to update the in-memory object model.
         """
-        return self.state.value in ('deleted', 'error')
+        return self.state.value in (self.STATE_DELETED, self.STATE_ERROR)
 
     def _create_common(self):
         subst = self.subst_dict()
@@ -384,7 +388,7 @@ class Network(baseobject.DatabaseBackedObject):
                     ipm = IPManager.from_db('floating')
                     if not self.floating_gateway:
                         self.update_floating_gateway(
-                            ipm.get_random_free_address())
+                            ipm.get_random_free_address(self.unique_label()))
                         ipm.persist()
 
                     subst['floating_router'] = ipm.get_address_at_index(1)
@@ -419,14 +423,50 @@ class Network(baseobject.DatabaseBackedObject):
                 self.enable_nat()
 
         self.update_dhcp()
+        self.state = self.STATE_CREATED
 
-    def delete(self):
+    def delete_on_hypervisor(self):
         with self.get_lock(op='Network delete'):
-            if self.is_dead():
-                self.log.info('Network died whilst waiting for lock')
-                return
-            self._delete_on_node()
-            self.state = 'deleted'
+            subst = self.subst_dict()
+
+            if util.check_for_interface(subst['vx_bridge']):
+                with util.RecordedOperation('delete vxlan bridge', self):
+                    util.execute(None, 'ip link delete %(vx_bridge)s' % subst)
+
+            if util.check_for_interface(subst['vx_interface']):
+                with util.RecordedOperation('delete vxlan interface', self):
+                    util.execute(
+                        None, 'ip link delete %(vx_interface)s' % subst)
+
+    def delete_on_network_node(self):
+        with self.get_lock(op='Network delete'):
+            subst = self.subst_dict()
+
+            if util.is_network_node():
+                if util.check_for_interface(subst['vx_veth_outer']):
+                    with util.RecordedOperation('delete router veth', self):
+                        util.execute(
+                            None, 'ip link delete %(vx_veth_outer)s' % subst)
+
+                if util.check_for_interface(subst['physical_veth_outer']):
+                    with util.RecordedOperation('delete physical veth', self):
+                        util.execute(
+                            None,
+                            'ip link delete %(physical_veth_outer)s' % subst)
+
+                if os.path.exists('/var/run/netns/%(netns)s' % subst):
+                    with util.RecordedOperation('delete netns', self):
+                        util.execute(None, 'ip netns del %(netns)s' % subst)
+
+                if self.floating_gateway:
+                    with db.get_lock('ipmanager', None, 'floating', ttl=120,
+                                     op='Network delete'):
+                        ipm = IPManager.from_db('floating')
+                        ipm.release(self.floating_gateway)
+                        ipm.persist()
+                        self.update_floating_gateway(None)
+
+            self.state = self.STATE_DELETED
 
         self.remove_dhcp()
         self.remove_nat()
@@ -434,57 +474,9 @@ class Network(baseobject.DatabaseBackedObject):
         ipm = IPManager.from_db(self.uuid)
         ipm.delete()
 
-    def delete_on_node_with_lock(self):
-        with self.get_lock(op='Network delete on node'):
-            if self.is_dead():
-                self.log.info('Network died whilst waiting for lock')
-                return
-            self._delete_on_node()
-
-    def _delete_on_node(self):
-        subst = self.subst_dict()
-        LOG.with_fields(subst).debug('net.delete_on_node()')
-
-        # Cleanup local node
-        if util.check_for_interface(subst['vx_bridge']):
-            with util.RecordedOperation('delete vxlan bridge', self):
-                util.execute(None, 'ip link delete %(vx_bridge)s' % subst)
-
-        if util.check_for_interface(subst['vx_interface']):
-            with util.RecordedOperation('delete vxlan interface', self):
-                util.execute(
-                    None, 'ip link delete %(vx_interface)s' % subst)
-
-        # If this is the network node do additional cleanup
-        if util.is_network_node():
-            if util.check_for_interface(subst['vx_veth_outer']):
-                with util.RecordedOperation('delete router veth', self):
-                    util.execute(
-                        None, 'ip link delete %(vx_veth_outer)s' % subst)
-
-            if util.check_for_interface(subst['physical_veth_outer']):
-                with util.RecordedOperation('delete physical veth', self):
-                    util.execute(
-                        None,
-                        'ip link delete %(physical_veth_outer)s' % subst)
-
-            if os.path.exists('/var/run/netns/%(netns)s' % subst):
-                with util.RecordedOperation('delete netns', self):
-                    util.execute(None, 'ip netns del %(netns)s' % subst)
-
-            if self.floating_gateway:
-                with db.get_lock('ipmanager', None, 'floating', ttl=120,
-                                 op='Network delete'):
-                    ipm = IPManager.from_db('floating')
-                    ipm.release(self.floating_gateway)
-                    ipm.persist()
-                    self.update_floating_gateway(None)
-
-        Network.deallocate_vxid(self.vxid)
-        IPManager.from_db(self.uuid).delete()
-
     def hard_delete(self):
         etcd.delete('network', None, self.uuid)
+        etcd.delete('vxid', None, self.vxid)
         etcd.delete_all('attribute/network', self.uuid)
         etcd.delete_all('event/network', self.uuid)
         db.delete_metadata('network', self.uuid)
@@ -551,10 +543,12 @@ class Network(baseobject.DatabaseBackedObject):
     def remove_nat(self):
         if util.is_network_node():
             if self.floating_gateway:
-                ipm = IPManager.from_db('floating')
-                ipm.release(self.floating_gateway)
-                ipm.persist()
-                self.update_floating_gateway(None)
+                with db.get_lock('ipmanager', None, 'floating', ttl=120,
+                                 op='Remove NAT'):
+                    ipm = IPManager.from_db('floating')
+                    ipm.release(self.floating_gateway)
+                    ipm.persist()
+                    self.update_floating_gateway(None)
 
         else:
             db.enqueue('networknode', RemoveNATNetworkTask(self.uuid))
@@ -587,7 +581,7 @@ class Network(baseobject.DatabaseBackedObject):
 
             node_fqdns = []
             for inst_uuid in instances:
-                inst = virt.Instance.from_db(inst_uuid)
+                inst = instance.Instance.from_db(inst_uuid)
                 placement = inst.placement
                 if not placement:
                     continue
@@ -690,7 +684,7 @@ class Network(baseobject.DatabaseBackedObject):
                          % subst)
 
 
-class Networks(baseobject.DatabaseBackedObjectIterator):
+class Networks(dbo_iter):
     def __iter__(self):
         for _, n in etcd.get_all('network', None):
             if n['uuid'] == 'floating':
@@ -703,3 +697,15 @@ class Networks(baseobject.DatabaseBackedObjectIterator):
             out = self.apply_filters(n)
             if out:
                 yield out
+
+
+# Convenience helpers
+
+def inactive_networks():
+    return Networks([
+                    baseobject.inactive_states_filter,
+                    partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))])
+
+
+def networks_in_namespace(namespace):
+    return Networks([partial(baseobject.namespace_filter, namespace)])

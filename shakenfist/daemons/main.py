@@ -6,6 +6,7 @@ import os
 import psutil
 
 from shakenfist import baseobject
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.daemons import external_api as external_api_daemon
@@ -16,13 +17,13 @@ from shakenfist.daemons import resources as resource_daemon
 from shakenfist.daemons import triggers as trigger_daemon
 from shakenfist import db
 from shakenfist import images
+from shakenfist import instance
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
 from shakenfist import networkinterface
 from shakenfist.node import Node
 from shakenfist import util
-from shakenfist import virt
 
 
 LOG, HANDLER = logutil.setup('main')
@@ -32,7 +33,7 @@ def restore_instances():
     # Ensure all instances for this node are defined
     networks = []
     instances = []
-    for inst in virt.Instances([virt.this_node_filter, virt.healthy_states_filter]):
+    for inst in instance.Instances([instance.this_node_filter, instance.healthy_states_filter]):
         instance_problems = []
         for ni in networkinterface.interfaces_for_instance(inst):
             if ni.network_uuid not in networks:
@@ -43,7 +44,7 @@ def restore_instances():
                 img = images.Image.new(disk['base'])
                 # NOTE(mikal): this check isn't great -- it checks for the original
                 # downloaded image, not the post transcode version
-                if (img.state in ['deleted', 'error'] or
+                if (img.state in [dbo.STATE_DELETED, dbo.STATE_ERROR] or
                         not os.path.exists(img.version_image_path())):
                     instance_problems.append(
                         '%s missing from image cache' % disk['base'])
@@ -72,7 +73,8 @@ def restore_instances():
                 with db.get_lock(
                         'instance', None, inst.uuid, ttl=120, timeout=120,
                         op='Instance restore'):
-                    started = ['on', 'transition-to-on', 'initial', 'unknown']
+                    started = ['on', 'transition-to-on',
+                               instance.Instance.STATE_INITIAL, 'unknown']
                     if inst.power_state not in started:
                         continue
 

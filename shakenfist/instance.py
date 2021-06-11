@@ -14,6 +14,9 @@ import time
 from uuid import uuid4
 
 from shakenfist import baseobject
+from shakenfist.baseobject import (
+    DatabaseBackedObject as dbo,
+    DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import etcd
@@ -115,34 +118,29 @@ def _snapshot_path():
     return os.path.join(config.get('STORAGE_PATH'), 'snapshots')
 
 
-class Instance(baseobject.DatabaseBackedObject):
+class Instance(dbo):
     object_type = 'instance'
     current_version = 2
 
     # docs/development/state_machine.md has a description of these states.
-    STATE_INITIAL = 'initial'
     STATE_INITIAL_ERROR = 'initial-error'
     STATE_PREFLIGHT = 'preflight'
     STATE_PREFLIGHT_ERROR = 'preflight-error'
-    STATE_CREATING = 'creating'
     STATE_CREATING_ERROR = 'creating-error'
-    STATE_CREATED = 'created'
     STATE_CREATED_ERROR = 'created-error'
-    STATE_ERROR = 'error'
-    STATE_DELETED = 'deleted'
 
     state_targets = {
-        None: (STATE_INITIAL, STATE_ERROR),
-        STATE_INITIAL: (STATE_PREFLIGHT, STATE_DELETED, STATE_INITIAL_ERROR),
-        STATE_PREFLIGHT: (STATE_CREATING, STATE_DELETED, STATE_PREFLIGHT_ERROR),
-        STATE_CREATING: (STATE_CREATED, STATE_DELETED, STATE_CREATING_ERROR),
-        STATE_CREATED: (STATE_DELETED, STATE_CREATED_ERROR),
-        STATE_INITIAL_ERROR: (STATE_ERROR),
-        STATE_PREFLIGHT_ERROR: (STATE_ERROR),
-        STATE_CREATING_ERROR: (STATE_ERROR),
-        STATE_CREATED_ERROR: (STATE_ERROR),
-        STATE_ERROR: (STATE_DELETED, STATE_ERROR),
-        STATE_DELETED: None,
+        None: (dbo.STATE_INITIAL, dbo.STATE_ERROR),
+        dbo.STATE_INITIAL: (STATE_PREFLIGHT, dbo.STATE_DELETED, STATE_INITIAL_ERROR),
+        STATE_PREFLIGHT: (dbo.STATE_CREATING, dbo.STATE_DELETED, STATE_PREFLIGHT_ERROR),
+        dbo.STATE_CREATING: (dbo.STATE_CREATED, dbo.STATE_DELETED, STATE_CREATING_ERROR),
+        dbo.STATE_CREATED: (dbo.STATE_DELETED, STATE_CREATED_ERROR),
+        STATE_INITIAL_ERROR: (dbo.STATE_ERROR),
+        STATE_PREFLIGHT_ERROR: (dbo.STATE_ERROR),
+        STATE_CREATING_ERROR: (dbo.STATE_ERROR),
+        STATE_CREATED_ERROR: (dbo.STATE_ERROR),
+        dbo.STATE_ERROR: (dbo.STATE_DELETED, dbo.STATE_ERROR),
+        dbo.STATE_DELETED: None,
     }
 
     def __init__(self, static_values):
@@ -291,10 +289,6 @@ class Instance(baseobject.DatabaseBackedObject):
     def instance_path(self):
         return os.path.join(config.get('STORAGE_PATH'), 'instances', self.uuid)
 
-    @property
-    def xml_file(self):
-        return os.path.join(self.instance_path, 'libvirt.xml')
-
     # Values routed to attributes, writes are via helper methods.
     @property
     def placement(self):
@@ -378,16 +372,13 @@ class Instance(baseobject.DatabaseBackedObject):
         # Configure block devices, include config drive creation
         self._configure_block_devices(lock)
 
-        # Create the actual instance
-        with util.RecordedOperation('create domain XML', self):
-            self._create_domain_xml()
-
-        # Sometimes on Ubuntu 20.04 we need to wait for port binding to work.
-        # Revisiting this is tracked by issue 320 on github.
+        # Create the actual instance. Sometimes on Ubuntu 20.04 we need to wait
+        # for port binding to work. Revisiting this is tracked by issue 320 on
+        # github.
         with util.RecordedOperation('create domain', self):
             if not self.power_on():
                 attempts = 0
-                while not self.power_on() and attempts < 100:
+                while not self.power_on() and attempts < 5:
                     self.log.warning(
                         'Instance required an additional attempt to power on')
                     time.sleep(5)
@@ -395,18 +386,19 @@ class Instance(baseobject.DatabaseBackedObject):
 
         if self.is_powered_on():
             self.log.info('Instance now powered on')
+            self.state = self.STATE_CREATED
         else:
             self.log.info('Instance failed to power on')
-        self.state = self.STATE_CREATED
+            self.enqueue_delete_due_error('Instance failed to power on')
 
     def delete(self):
         with util.RecordedOperation('delete domain', self):
             try:
                 self.power_off()
 
-                instance = self._get_domain()
-                if instance:
-                    instance.undefine()
+                inst = self._get_domain()
+                if inst:
+                    inst.undefine()
             except Exception as e:
                 util.ignore_exception('instance delete', e)
 
@@ -417,9 +409,7 @@ class Instance(baseobject.DatabaseBackedObject):
             except Exception as e:
                 util.ignore_exception('instance delete', e)
 
-        ports = self.ports
-        self._free_console_port(ports.get('console_port'))
-        self._free_console_port(ports.get('vdi_port'))
+        self.deallocate_instance_ports()
 
         if self.state.value.endswith('-%s' % self.STATE_ERROR):
             self.state = self.STATE_ERROR
@@ -434,8 +424,8 @@ class Instance(baseobject.DatabaseBackedObject):
 
     def _allocate_console_port(self):
         node = config.NODE_NAME
-        consumed = {value['port']
-                    for _, value in etcd.get_all('console', node)}
+        consumed = [value['port']
+                    for _, value in etcd.get_all('console', node)]
         while True:
             port = random.randint(30000, 50000)
             # avoid hitting etcd if it's probably in use
@@ -454,11 +444,11 @@ class Instance(baseobject.DatabaseBackedObject):
                         'port': port,
                     })
                 if allocatedPort:
-
                     return port
-            except socket.error as e:
+            except socket.error:
                 LOG.with_field('instance', self.uuid).info(
-                    'Exception during port allocation: %s' % e)
+                    'Collided with in use port %d, selecting another' % port)
+                consumed.append(port)
             finally:
                 s.close()
 
@@ -468,12 +458,20 @@ class Instance(baseobject.DatabaseBackedObject):
 
     def allocate_instance_ports(self):
         with self.get_lock_attr('ports', 'Instance port allocation'):
-            ports = self.ports
-            if not ports:
-                self.ports = {
+            p = self.ports
+            if not p:
+                p = {
                     'console_port': self._allocate_console_port(),
                     'vdi_port': self._allocate_console_port()
                 }
+                self.ports = p
+                self.log.with_fields(p).info('Console ports allocated')
+
+    def deallocate_instance_ports(self):
+        ports = self.ports
+        self._free_console_port(ports.get('console_port'))
+        self._free_console_port(ports.get('vdi_port'))
+        self._db_delete_attribute('ports')
 
     def _configure_block_devices(self, lock):
         with self.get_lock_attr('block_devices', 'Initialize block devices'):
@@ -602,7 +600,7 @@ class Instance(baseobject.DatabaseBackedObject):
                           rr_name='latest',
                           joliet_path='/openstack/latest')
 
-        # meta_data.json
+        # meta_data.json -- note that limits on hostname are imposted at the API layer
         md = json.dumps({
             'random_seed': base64.b64encode(os.urandom(512)).decode('ascii'),
             'uuid': self.uuid,
@@ -725,9 +723,6 @@ class Instance(baseobject.DatabaseBackedObject):
     def _create_domain_xml(self):
         """Create the domain XML for the instance."""
 
-        if os.path.exists(self.xml_file):
-            return
-
         with open(os.path.join(config.get('STORAGE_PATH'), 'libvirt.tmpl')) as f:
             t = jinja2.Template(f.read())
 
@@ -747,7 +742,7 @@ class Instance(baseobject.DatabaseBackedObject):
         # I hadn't spent _ages_ finding a bug related to it.
         block_devices = self.block_devices
         ports = self.ports
-        xml = t.render(
+        return t.render(
             uuid=self.uuid,
             memory=self.memory * 1024,
             vcpus=self.cpus,
@@ -760,9 +755,6 @@ class Instance(baseobject.DatabaseBackedObject):
             video_memory=self.video['memory']
         )
 
-        with open(self.xml_file, 'w') as f:
-            f.write(xml)
-
     def _get_domain(self):
         libvirt = util.get_libvirt()
         conn = libvirt.open('qemu:///system')
@@ -773,51 +765,60 @@ class Instance(baseobject.DatabaseBackedObject):
             return None
 
     def is_powered_on(self):
-        instance = self._get_domain()
-        if not instance:
+        inst = self._get_domain()
+        if not inst:
             return 'off'
 
         libvirt = util.get_libvirt()
-        return util.extract_power_state(libvirt, instance)
+        return util.extract_power_state(libvirt, inst)
 
     def power_on(self):
-        if not os.path.exists(self.xml_file):
-            self.enqueue_delete_due_error('missing domain file in power on')
-
         libvirt = util.get_libvirt()
-        with open(self.xml_file) as f:
-            xml = f.read()
-
-        instance = self._get_domain()
-        if not instance:
+        inst = self._get_domain()
+        if not inst:
             conn = libvirt.open('qemu:///system')
-            instance = conn.defineXML(xml)
-            if not instance:
+            inst = conn.defineXML(self._create_domain_xml())
+            if not inst:
                 self.enqueue_delete_due_error(
                     'power on failed to create domain')
                 raise exceptions.NoDomainException()
 
         try:
-            instance.create()
+            inst.create()
         except libvirt.libvirtError as e:
-            err = 'Requested operation is not valid: domain is already running'
-            if not str(e).startswith(err):
+            if str(e).startswith('Requested operation is not valid: '
+                                 'domain is already running'):
+                pass
+            elif str(e).find('Failed to find an available port: '
+                             'Address already in use') != -1:
+                self.log.warning('Instance ports clash: %s', e)
+
+                # Free those ports and pick some new ones
+                ports = self.ports
+                self._free_console_port(ports['console_port'])
+                self._free_console_port(ports['vdi_port'])
+                inst.undefine()
+
+                self.ports = None
+                self.allocate_instance_ports()
+                return False
+            else:
                 self.log.warning('Instance start error: %s', e)
                 return False
 
-        instance.setAutostart(1)
-        self.update_power_state(util.extract_power_state(libvirt, instance))
+        inst.setAutostart(1)
+        self.update_power_state(util.extract_power_state(libvirt, inst))
         self.add_event('poweron', 'complete')
         return True
 
     def power_off(self):
         libvirt = util.get_libvirt()
-        instance = self._get_domain()
-        if not instance:
+        inst = self._get_domain()
+        if not inst:
             return
 
         try:
-            instance.destroy()
+            inst.destroy()
         except libvirt.libvirtError as e:
             self.log.error('Failed to delete domain: %s', e)
 
@@ -867,25 +868,25 @@ class Instance(baseobject.DatabaseBackedObject):
 
     def reboot(self, hard=False):
         libvirt = util.get_libvirt()
-        instance = self._get_domain()
+        inst = self._get_domain()
         if not hard:
-            instance.reboot(flags=libvirt.VIR_DOMAIN_REBOOT_ACPI_POWER_BTN)
+            inst.reboot(flags=libvirt.VIR_DOMAIN_REBOOT_ACPI_POWER_BTN)
         else:
-            instance.reset()
+            inst.reset()
         self.add_event('reboot', 'complete')
 
     def pause(self):
         libvirt = util.get_libvirt()
-        instance = self._get_domain()
-        instance.suspend()
-        self.update_power_state(util.extract_power_state(libvirt, instance))
+        inst = self._get_domain()
+        inst.suspend()
+        self.update_power_state(util.extract_power_state(libvirt, inst))
         self.add_event('pause', 'complete')
 
     def unpause(self):
         libvirt = util.get_libvirt()
-        instance = self._get_domain()
-        instance.resume()
-        self.update_power_state(util.extract_power_state(libvirt, instance))
+        inst = self._get_domain()
+        inst.resume()
+        self.update_power_state(util.extract_power_state(libvirt, inst))
         self.add_event('unpause', 'complete')
 
     def get_console_data(self, length):
@@ -923,13 +924,13 @@ class Instance(baseobject.DatabaseBackedObject):
             self.state = '%s-error' % self.state.value
         except Exception:
             # We can land here if there is a serious database error.
-            self.state = 'error'
+            self.state = self.STATE_ERROR
 
         self.error = error_msg
         self.enqueue_delete()
 
 
-class Instances(baseobject.DatabaseBackedObjectIterator):
+class Instances(dbo_iter):
     def __iter__(self):
         for _, i in etcd.get_all('instance', None):
             i = Instance.from_db(i['uuid'])
@@ -962,3 +963,23 @@ healthy_states_filter = partial(
 
 inactive_states_filter = partial(
     baseobject.state_filter, [Instance.STATE_DELETED])
+
+
+# Convenience helpers
+
+def inactive_instances():
+    return Instances([
+        inactive_states_filter,
+        partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))])
+
+
+def healthy_instances_on_node(n):
+    return Instances([healthy_states_filter, partial(placement_filter, n.uuid)])
+
+
+def created_instances_on_node():
+    return Instances([this_node_filter, partial(baseobject.state_filter, [dbo.STATE_CREATED])])
+
+
+def instances_in_namespace(namespace):
+    return Instances([partial(baseobject.namespace_filter, namespace)])

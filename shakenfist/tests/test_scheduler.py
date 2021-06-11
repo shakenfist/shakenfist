@@ -1,13 +1,14 @@
 import mock
 import time
 
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist import exceptions
 from shakenfist import images
+from shakenfist.instance import Instance
 from shakenfist import scheduler
 from shakenfist.tests import test_shakenfist
 from shakenfist.baseobject import State
 from shakenfist.config import SFConfig
-from shakenfist.virt import Instance
 
 
 class FakeInstance(Instance):
@@ -20,7 +21,7 @@ class FakeNode(object):
     def __init__(self, fqdn, ip):
         self.uuid = fqdn
         self.ip = ip
-        self.state = 'created'
+        self.state = dbo.STATE_CREATED
 
     def unique_label(self):
         return ('fake_node', self.uuid)
@@ -108,7 +109,7 @@ class LowResourceTestCase(SchedulerTestCase):
         mock_get_nodes.start()
         self.addCleanup(mock_get_nodes.stop)
 
-        self.mock_get_instances = mock.patch('shakenfist.virt.Instances')
+        self.mock_get_instances = mock.patch('shakenfist.instance.Instances')
         self.mock_get_instances.start()
         self.addCleanup(self.mock_get_instances.stop)
 
@@ -131,6 +132,8 @@ class LowResourceTestCase(SchedulerTestCase):
     def test_requested_too_many_cpu(self):
         self.fake_db.set_node_metrics_same({
             'cpu_max_per_instance': 5,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12
         })
 
         fake_inst = FakeInstance({
@@ -155,7 +158,8 @@ class LowResourceTestCase(SchedulerTestCase):
             'cpu_total_instance_vcpus': 4*16,
             'memory_available': 5*1024+1024-1,
             'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024
+            'disk_free': 2000*1024*1024*1024,
+            'cpu_available': 4
         })
 
         fake_inst = FakeInstance({
@@ -179,7 +183,9 @@ class LowResourceTestCase(SchedulerTestCase):
             'cpu_max': 4,
             'memory_available': 5*1024+1024-1,
             'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024
+            'disk_free': 2000*1024*1024*1024,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12
         })
 
         fake_inst = FakeInstance({
@@ -205,6 +211,8 @@ class LowResourceTestCase(SchedulerTestCase):
             'memory_max': 10000,
             'memory_total_instance_actual': 15001,
             'disk_free': 2000*1024*1024*1024,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12
         })
 
         fake_inst = FakeInstance({
@@ -230,7 +238,9 @@ class LowResourceTestCase(SchedulerTestCase):
             'cpu_max': 4,
             'memory_available': 22000,
             'memory_max': 24000,
-            'disk_free': 20*1024*1024*1024
+            'disk_free': 20*1024*1024*1024,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12
         })
 
         fake_inst = FakeInstance({
@@ -256,7 +266,9 @@ class LowResourceTestCase(SchedulerTestCase):
             'cpu_max': 4,
             'memory_available': 22000,
             'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024
+            'disk_free': 2000*1024*1024*1024,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12
         })
 
         fake_inst = FakeInstance({
@@ -300,8 +312,8 @@ class CorrectAllocationTestCase(SchedulerTestCase):
         mock_get_nodes.start()
         self.addCleanup(mock_get_nodes.stop)
 
-    @mock.patch('shakenfist.virt.Instance._db_get_attribute')
-    @mock.patch('shakenfist.virt.Instance._db_get',
+    @mock.patch('shakenfist.instance.Instance._db_get_attribute')
+    @mock.patch('shakenfist.instance.Instance._db_get',
                 return_value={
                     'uuid': 'inst-1',
                     'cpus': 1,
@@ -327,7 +339,9 @@ class CorrectAllocationTestCase(SchedulerTestCase):
             'cpu_max': 4,
             'memory_available': 22000,
             'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024
+            'disk_free': 2000*1024*1024*1024,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12
         })
 
         fake_inst = FakeInstance({
@@ -346,11 +360,11 @@ class CorrectAllocationTestCase(SchedulerTestCase):
 
     @mock.patch('shakenfist.networkinterface.interfaces_for_instance',
                 return_value=[FakeInterface('uuid-net1')])
-    @mock.patch('shakenfist.virt.Instance._db_get_attribute',
+    @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 return_value={
                     'node': 'node3'
                 })
-    @mock.patch('shakenfist.virt.Instance._db_get',
+    @mock.patch('shakenfist.instance.Instance._db_get',
                 return_value={
                     'uuid': 'inst-1',
                     'cpus': 1,
@@ -374,7 +388,9 @@ class CorrectAllocationTestCase(SchedulerTestCase):
             'cpu_max': 4,
             'memory_available': 22000,
             'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024
+            'disk_free': 2000*1024*1024*1024,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12
         })
 
         fake_inst = FakeInstance({
@@ -444,7 +460,7 @@ class FindMostTestCase(SchedulerTestCase):
                 ])
     def test_most_matching_images(
             self, mock_from_db, mock_get_meta_all, mock_state_get):
-        mock_state_get.return_value = State('created', 0)
+        mock_state_get.return_value = State(dbo.STATE_CREATED, 0)
 
         req_images = ['req_image1']
         candidates = ['node1_net', 'node2', 'node3', 'node4']
@@ -517,7 +533,7 @@ class FindMostTestCase(SchedulerTestCase):
                 ])
     def test_most_matching_images_big_one(
             self, mock_from_db, mock_get_meta_all, mock_state_get):
-        mock_state_get.return_value = State('created', 1)
+        mock_state_get.return_value = State(dbo.STATE_CREATED, 1)
 
         candidates = ['node1_net', 'node2', 'node3', 'node4']
 
@@ -631,7 +647,7 @@ class FindMostTestCase(SchedulerTestCase):
                 ])
     def test_most_matching_images_big_two(
             self, mock_from_db, mock_get_meta_all, mock_state_get):
-        mock_state_get.return_value = State('created', 1)
+        mock_state_get.return_value = State(dbo.STATE_CREATED, 1)
 
         candidates = ['node1_net', 'node2', 'node3', 'node4']
 
@@ -703,7 +719,7 @@ class FindMostTestCase(SchedulerTestCase):
                 ])
     def test_most_matching_images_big_three(
             self, mock_from_db, mock_get_meta_all, mock_state_get):
-        mock_state_get.return_value = State('created', 1)
+        mock_state_get.return_value = State(dbo.STATE_CREATED, 1)
 
         candidates = ['node1_net', 'node2', 'node3', 'node4']
 
@@ -740,7 +756,7 @@ class ForcedCandidatesTestCase(SchedulerTestCase):
         mock_get_nodes.start()
         self.addCleanup(mock_get_nodes.stop)
 
-        self.mock_get_instances = mock.patch('shakenfist.virt.Instances')
+        self.mock_get_instances = mock.patch('shakenfist.instance.Instances')
         self.mock_get_instances.start()
         self.addCleanup(self.mock_get_instances.stop)
 
@@ -752,7 +768,9 @@ class ForcedCandidatesTestCase(SchedulerTestCase):
             'cpu_max': 4,
             'memory_available': 22000,
             'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024
+            'disk_free': 2000*1024*1024*1024,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12
         })
 
         fake_inst = FakeInstance({
@@ -776,7 +794,9 @@ class ForcedCandidatesTestCase(SchedulerTestCase):
             'cpu_max': 4,
             'memory_available': 22000,
             'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024
+            'disk_free': 2000*1024*1024*1024,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12
         })
 
         fake_inst = FakeInstance({
@@ -845,7 +865,7 @@ class MetricsRefreshTestCase(SchedulerTestCase):
         mock_get_nodes.start()
         self.addCleanup(mock_get_nodes.stop)
 
-        self.mock_get_instances = mock.patch('shakenfist.virt.Instances')
+        self.mock_get_instances = mock.patch('shakenfist.instance.Instances')
         self.mock_get_instances.start()
         self.addCleanup(self.mock_get_instances.stop)
 
@@ -866,7 +886,9 @@ class MetricsRefreshTestCase(SchedulerTestCase):
             'cpu_max': 4,
             'memory_available': 22000,
             'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024
+            'disk_free': 2000*1024*1024*1024,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12
         })
 
         s = scheduler.Scheduler()
@@ -878,7 +900,9 @@ class MetricsRefreshTestCase(SchedulerTestCase):
             'cpu_max': 4,
             'memory_available': 11000,
             'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024
+            'disk_free': 2000*1024*1024*1024,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12
         })
         s.metrics_updated = time.time() - 400
         s.place_instance(fake_inst, [])
