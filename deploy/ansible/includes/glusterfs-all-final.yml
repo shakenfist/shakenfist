@@ -35,14 +35,14 @@
     dest: /srv/shakenfist/image_cache
     state: link
 
-- name: Create snapshot storage directory
+- name: Create blob storage directory
   file:
-    path: /srv/shakenfist/replicated/snapshots
+    path: /srv/shakenfist/replicated/blobs
     state: directory
     mode: "0755"
 
-- name: Link to snapshot storage directory
+- name: Link to blob storage directory
   file:
-    src: /srv/shakenfist/replicated/snapshots
-    dest: /srv/shakenfist/snapshots
+    src: /srv/shakenfist/replicated/blobs
+    dest: /srv/shakenfist/blobs
     state: link

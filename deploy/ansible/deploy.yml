@@ -693,22 +693,6 @@
         state: restarted
         daemon_reload: yes
 
-    - name: Install apache2
-      apt:
-        name: apache2
-        state: latest
-
-    - name: Write apache site
-      template:
-        src: files/apache-site-hypervisor.conf
-        dest: /etc/apache2/sites-enabled/000-default.conf
-        owner: root
-        group: root
-        mode: u=r,g=r,o=r
-
-    - name: Reload apache
-      shell: apache2ctl graceful
-
 - hosts: localhost
   roles:
     - role: andrewrothstein.terraform

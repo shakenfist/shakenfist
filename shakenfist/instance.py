@@ -114,8 +114,8 @@ def _initialize_block_devices(instance_path, disk_spec):
     return block_devices
 
 
-def _snapshot_path():
-    return os.path.join(config.get('STORAGE_PATH'), 'snapshots')
+def _blob_path():
+    return os.path.join(config.get('STORAGE_PATH'), 'blobs')
 
 
 class Instance(dbo):
@@ -825,29 +825,26 @@ class Instance(dbo):
         self.update_power_state('off')
         self.add_event('poweroff', 'complete')
 
-    def snapshot(self, snapshot_uuid, d, version):
-        snappath = os.path.join(_snapshot_path(), snapshot_uuid)
+    def snapshot(self, blob_uuid, disk):
+        snappath = os.path.join(_blob_path(), blob_uuid)
         if not os.path.exists(snappath):
-            self.log.debug('Creating snapshot storage at %s', snappath)
             os.makedirs(snappath, exist_ok=True)
-            with open(os.path.join(_snapshot_path(), 'index.html'), 'w') as f:
-                f.write('<html></html>')
 
-        if not config.GLUSTER_ENABLED and not os.path.exists(d['path']):
+        if not config.GLUSTER_ENABLED and not os.path.exists(disk['path']):
             return
 
         # If we're using gluster we need to tweak some paths...
-        disk_path = d['path']
-        dest_path = os.path.join(snappath, d['device'])
+        disk_path = disk['path']
+        dest_path = os.path.join(snappath, disk['device'])
         orig_dest_path = dest_path
 
         if config.GLUSTER_ENABLED:
-            disk_path = 'gluster:%s' % d['path']
-            dest_path = dest_path.replace(_snapshot_path(),
+            disk_path = 'gluster:%s' % disk['path']
+            dest_path = dest_path.replace(_blob_path(),
                                           'gluster:shakenfist/snapshots')
 
         # Actually make the snapshot
-        with util.RecordedOperation('snapshot %s' % d['device'], self):
+        with util.RecordedOperation('snapshot %s' % disk['device'], self):
             images.snapshot(None, disk_path, dest_path)
             st = os.stat(orig_dest_path)
             return st.st_size

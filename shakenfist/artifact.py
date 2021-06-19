@@ -93,16 +93,19 @@ class Artifact(dbo):
             return {'index': 0}
         return indices[sorted(indices)[-1]]
 
-    def add_index(self, new_index, size, modified, fetched_at):
+    def add_index(self, size, modified, fetched_at, blob_uuid):
         with self.get_lock_attr('index', 'Artifact index creation'):
-            self._db_set_attribute('index_%d' % new_index,
-                                   {
-                                       'size': size,
-                                       'modified': modified,
-                                       'fetched_at': fetched_at,
-                                       'index': new_index,
-                                       'location': config.NODE_NAME
-                                   })
+            index = self.most_recent_index.get('index', 0) + 1
+            entry = {
+                'size': size,
+                'modified': modified,
+                'fetched_at': fetched_at,
+                'index': index,
+                'blob_uuid': blob_uuid,
+                'locations': [config.NODE_NAME]
+            }
+            self._db_set_attribute('index_%d' % index, entry)
+            return entry
 
     def external_view(self):
         # If this is an external view, then mix back in attributes that users
@@ -113,6 +116,8 @@ class Artifact(dbo):
             'source_url': self.source_url,
             'version': self.version
         }
+
+        a.update(self.most_recent_index)
         return a
 
     # Static values

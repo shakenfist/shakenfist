@@ -938,14 +938,16 @@ class InstanceSnapshot(Resource):
             a = Artifact.from_url(
                 Artifact.TYPE_SNAPSHOT,
                 'sf://instance/%s/%s' % (instance_uuid, disk['device']))
-            index = a.most_recent_index.get('index', 0) + 1
-            size = instance_from_db.snapshot(a.uuid, disk, index)
-            a.add_index(index, size, time.time(), time.time())
+
+            blob_uuid = str(uuid.uuid4())
+            size = instance_from_db.snapshot(blob_uuid, disk)
+            entry = a.add_index(size, time.time(), time.time(), blob_uuid)
 
             out[disk['device']] = {
                 'uuid': a.uuid,
-                'index': index,
-                'size': size
+                'index': entry['index'],
+                'size': size,
+                'blob_uuid': entry['blob_uuid']
             }
             instance_from_db.add_event('api', 'snapshot %s' % disk,
                                        None, a.uuid)
