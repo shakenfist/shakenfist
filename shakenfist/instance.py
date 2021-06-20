@@ -17,6 +17,7 @@ from shakenfist import baseobject
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
+from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import etcd
@@ -847,7 +848,11 @@ class Instance(dbo):
         with util.RecordedOperation('snapshot %s' % disk['device'], self):
             images.snapshot(None, disk_path, dest_path)
             st = os.stat(orig_dest_path)
-            return st.st_size
+
+        # And make the associated blob
+        b = Blob.new(blob_uuid, st.st_size, time.time(), time.time())
+        b.observe()
+        return b
 
     def reboot(self, hard=False):
         libvirt = util.get_libvirt()

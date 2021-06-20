@@ -28,16 +28,18 @@ from flask_restful import marshal_with
 import ipaddress
 import json
 from jwt.exceptions import DecodeError, PyJWTError
+import os
+import random
 import re
 import requests
 import sys
-import time
 import traceback
 import uuid
 
 from shakenfist import artifact
 from shakenfist.artifact import Artifact, Artifacts
 from shakenfist import baseobject
+from shakenfist.blob import Blob
 from shakenfist.daemons import daemon
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
@@ -624,6 +626,62 @@ class AuthMetadata(Resource):
             db.persist_metadata('namespace', namespace, md)
 
 
+class BlobEndpoint(Resource):
+    @jwt_required
+    def get(self, blob_uuid=None):
+        # Fast path if we have the blob locally
+        blob_path = os.path.join(config.get(
+            'STORAGE_PATH'), 'blobs', blob_uuid)
+        if os.path.exists(blob_path):
+            def read_file(filename):
+                with open(blob_path, 'rb') as f:
+                    d = f.read(8192)
+                    while d:
+                        yield d
+                        d = f.read(8192)
+
+            return flask.Response(flask.stream_with_context(read_file(blob_path)),
+                                  mimetype='text/plain', status=200)
+
+        # Otherwise find a node which has the blob and proxy. Write to our blob
+        # store if the blob is under-replicated.
+        b = Blob.from_db(blob_uuid)
+        if not b:
+            return error(404, 'blob not found')
+
+        locations = b.locations
+        if not locations:
+            return error(404, 'blob missing')
+
+        def read_remote(target, blob_uuid, blob_path=None):
+            api_token = util.get_api_token(
+                'http://%s:%d' % (target, config.get('API_PORT')),
+                namespace=get_jwt_identity())
+            url = 'http://%s:%d/blob/%s' % (target,
+                                            config.get('API_PORT'), blob_uuid)
+
+            if blob_path:
+                local_blob = open(blob_path + '.partial', 'wb')
+            r = requests.request('GET', url,
+                                 headers={'Authorization': api_token,
+                                          'User-Agent': util.get_user_agent()})
+            for chunk in r.iter_content(chunk_size=8192):
+                if blob_path:
+                    local_blob.write(chunk)
+                yield chunk
+
+            if blob_path:
+                local_blob.close()
+                os.rename(blob_path + '.partial', blob_path)
+
+        if len(locations) >= config.BLOB_REPLICATION_FACTOR:
+            blob_path = None
+
+        return flask.Response(flask.stream_with_context(
+            read_remote(random.shuffle(locations)[0], blob_uuid, blob_path=blob_path)),
+            mimetype='text/plain', status=200)
+
+
 class Instance(Resource):
     @jwt_required
     @arg_is_instance_uuid
@@ -940,14 +998,15 @@ class InstanceSnapshot(Resource):
                 'sf://instance/%s/%s' % (instance_uuid, disk['device']))
 
             blob_uuid = str(uuid.uuid4())
-            size = instance_from_db.snapshot(blob_uuid, disk)
-            entry = a.add_index(size, time.time(), time.time(), blob_uuid)
+            blob = instance_from_db.snapshot(blob_uuid, disk)
+            entry = a.add_index(blob_uuid)
 
             out[disk['device']] = {
-                'uuid': a.uuid,
-                'index': entry['index'],
-                'size': size,
-                'blob_uuid': entry['blob_uuid']
+                'artifact_uuid': a.uuid,
+                'artifact_index': entry['index'],
+                'blob_uuid': blob.uuid,
+                'blob_size': blob.size,
+                'blob_modified': blob.modified
             }
             instance_from_db.add_event('api', 'snapshot %s' % disk,
                                        None, a.uuid)
@@ -1476,6 +1535,8 @@ api.add_resource(AuthNamespaceKey,
 api.add_resource(AuthMetadatas, '/auth/namespaces/<namespace>/metadata')
 api.add_resource(AuthMetadata,
                  '/auth/namespaces/<namespace>/metadata/<key>')
+
+api.add_resource(BlobEndpoint, '/blob/<blob_uuid>')
 
 api.add_resource(Instances, '/instances')
 api.add_resource(Instance, '/instances/<instance_uuid>')

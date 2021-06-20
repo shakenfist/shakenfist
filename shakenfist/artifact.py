@@ -6,7 +6,6 @@ from uuid import uuid4
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
-from shakenfist.config import config
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import logutil
@@ -93,16 +92,12 @@ class Artifact(dbo):
             return {'index': 0}
         return indices[sorted(indices)[-1]]
 
-    def add_index(self, size, modified, fetched_at, blob_uuid):
+    def add_index(self, blob_uuid):
         with self.get_lock_attr('index', 'Artifact index creation'):
             index = self.most_recent_index.get('index', 0) + 1
             entry = {
-                'size': size,
-                'modified': modified,
-                'fetched_at': fetched_at,
                 'index': index,
-                'blob_uuid': blob_uuid,
-                'locations': [config.NODE_NAME]
+                'blob_uuid': blob_uuid
             }
             self._db_set_attribute('index_%d' % index, entry)
             return entry
