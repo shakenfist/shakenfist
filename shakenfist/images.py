@@ -3,13 +3,17 @@
 import email.utils
 import hashlib
 import os
+import random
 import re
 import requests
+import shutil
 import time
 
+from shakenfist.artifact import Artifact
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
+from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import etcd
@@ -207,7 +211,55 @@ class Image(dbo):
         self.state = self.STATE_DELETED
 
     def get(self, locks, related_object):
-        """Wrap three retries around the image get.
+        if self.url.startswith('sf://blob/'):
+            return self._blob_get(self.url, locks, related_object)
+        elif self.url.startswith('sf://snapshot/'):
+            snapshot_uuid = self.url[len('sf://snapshot/'):]
+            snap = Artifact.from_db(snapshot_uuid)
+            blob_uuid = snap.most_recent_index['blob_uuid']
+            url = 'sf://blob/%s' % blob_uuid
+            return self._blob_get(url, locks, related_object)
+        else:
+            return self._http_get(self.url, locks, related_object)
+
+    def _blob_get(self, url, locks, related_object):
+        """Fetch a blob from the cluster."""
+
+        actual_image = self.version_image_path()
+        blob_uuid = url[len('sf://blob/'):]
+        blob_path = os.path.join(config.get(
+            'STORAGE_PATH'), 'blobs', blob_uuid)
+
+        locations = Blob.from_db(blob_uuid).locations
+        random.shuffle(locations)
+        blob_source = locations[0]
+
+        if not os.path.exists(blob_path):
+            with util.RecordedOperation('fetch blob', related_object):
+                url = 'http://%s:%d/blob/%s' % (blob_source, config.get('API_PORT'),
+                                                blob_uuid)
+                admin_token = util.get_api_token(
+                    'http://%s:%d' % (blob_source, config.get('API_PORT')))
+                r = requests.request('GET', url,
+                                     headers={'Authorization': admin_token,
+                                              'User-Agent': util.get_user_agent()})
+
+                with open(blob_path + '.partial', 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        f.write(chunk)
+
+                os.rename(blob_path + '.partial', blob_path)
+                Blob.from_db(blob_uuid).observe()
+
+        # NOTE(mikal): I would prefer to hard link this, but qemu gets sulky.
+        shutil.copyfile(blob_path, actual_image)
+        _transcode(locks, actual_image, related_object)
+        return actual_image
+
+    def _http_get(self, url, locks, related_object):
+        """Fetch an image over HTTP.
+
+        Wrap three retries around the image get.
 
         The Image must be locked before calling this function. During the
         download, the locks will be refreshed. Any lock error should abort the
@@ -216,7 +268,7 @@ class Image(dbo):
         self.state = self.STATE_CREATING
         for _ in range(3):
             try:
-                image_path = self._get(locks, related_object)
+                image_path = self._http_get_inner(url, locks, related_object)
                 self.state = self.STATE_CREATED
                 return image_path
             except exceptions.BadCheckSum as e:
@@ -237,12 +289,12 @@ class Image(dbo):
         return '%s/%s.v%03d' % (image_cache_path, self.unique_ref,
                                 self.latest_download_version['sequence'] + inc)
 
-    def _get(self, locks, related_object):
+    def _http_get_inner(self, url, locks, related_object):
         """Fetch image if not downloaded and return image path."""
         actual_image = self.version_image_path()
 
         with util.RecordedOperation('fetch image', related_object):
-            resp = self._open_connection()
+            resp = self._open_connection(url)
 
             diff_field = self._new_image_available(resp)
             if diff_field:
@@ -253,13 +305,13 @@ class Image(dbo):
                     msg = '%s: %s -> %s' % diff_field
                     db.add_event(t, u, 'image requires fetch', None, None, msg)
 
-                actual_image = self._fetch(resp, locks)
+                actual_image = self._fetch(url, resp, locks)
 
                 # Ensure checksum is correct
                 if not self.correct_checksum(actual_image):
                     if isinstance(related_object, instance.Instance):
                         related_object.add_event('fetch image', 'bad checksum')
-                    raise exceptions.BadCheckSum('url=%s' % self.url)
+                    raise exceptions.BadCheckSum('url=%s' % url)
 
                 # Only persist values after the file has been verified.
                 # Otherwise diff_field will not trigger a new download in the
@@ -271,18 +323,18 @@ class Image(dbo):
         _transcode(locks, actual_image, related_object)
         return actual_image
 
-    def _open_connection(self):
+    def _open_connection(self, url):
         proxies = {}
         if config.get('HTTP_PROXY_SERVER'):
             proxies['http'] = config.get('HTTP_PROXY_SERVER')
 
-        resp = requests.get(self.url, allow_redirects=True, stream=True,
+        resp = requests.get(url, allow_redirects=True, stream=True,
                             headers={'User-Agent': util.get_user_agent()},
                             proxies=proxies)
         if resp.status_code != 200:
             raise exceptions.HTTPError(
                 'Failed to fetch HEAD of %s (status code %d)'
-                % (self.url, resp.status_code))
+                % (url, resp.status_code))
         return resp
 
     def _new_image_available(self, resp):
@@ -299,7 +351,7 @@ class Image(dbo):
 
         return False
 
-    def _fetch(self, resp, locks=None):
+    def _fetch(self, url, resp, locks=None):
         """Download the image if the latest version is not in the cache."""
         fetched = 0
         total_size = int(resp.headers.get('Content-Length'))
@@ -325,7 +377,7 @@ class Image(dbo):
 
         # Check if decompression not required
         fn = self.version_image_path(inc=1)
-        if not self.url.endswith('.gz'):
+        if not url.endswith('.gz'):
             return fn
 
         # Check if already decompressed

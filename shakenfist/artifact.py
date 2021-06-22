@@ -92,6 +92,14 @@ class Artifact(dbo):
             return {'index': 0}
         return indices[sorted(indices)[-1]]
 
+    def get_all_indexes(self):
+        indices = {}
+        for key, data in self._db_get_attributes('index_'):
+            indices[key] = data
+
+        for key in sorted(indices):
+            yield indices[key]
+
     def add_index(self, blob_uuid):
         with self.get_lock_attr('index', 'Artifact index creation'):
             index = self.most_recent_index.get('index', 0) + 1
@@ -102,16 +110,18 @@ class Artifact(dbo):
             self._db_set_attribute('index_%d' % index, entry)
             return entry
 
-    def external_view(self):
-        # If this is an external view, then mix back in attributes that users
-        # expect
-        a = {
+    def external_view_without_index(self):
+        return {
             'uuid': self.uuid,
             'artifact_type': self.artifact_type,
             'source_url': self.source_url,
             'version': self.version
         }
 
+    def external_view(self):
+        # If this is an external view, then mix back in attributes that users
+        # expect
+        a = self.external_view_without_index()
         a.update(self.most_recent_index)
         return a
 

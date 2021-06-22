@@ -827,7 +827,7 @@ class Instance(dbo):
         self.add_event('poweroff', 'complete')
 
     def snapshot(self, blob_uuid, disk):
-        snappath = os.path.join(_blob_path(), blob_uuid)
+        snappath = _blob_path()
         if not os.path.exists(snappath):
             os.makedirs(snappath, exist_ok=True)
 
@@ -836,7 +836,7 @@ class Instance(dbo):
 
         # If we're using gluster we need to tweak some paths...
         disk_path = disk['path']
-        dest_path = os.path.join(snappath, disk['device'])
+        dest_path = os.path.join(snappath, blob_uuid)
         orig_dest_path = dest_path
 
         if config.GLUSTER_ENABLED:

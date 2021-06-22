@@ -644,7 +644,7 @@ class BlobEndpoint(Resource):
                                   mimetype='text/plain', status=200)
 
         # Otherwise find a node which has the blob and proxy. Write to our blob
-        # store if the blob is under-replicated.
+        # store as well if the blob is under replicated.
         b = Blob.from_db(blob_uuid)
         if not b:
             return error(404, 'blob not found')
@@ -673,12 +673,14 @@ class BlobEndpoint(Resource):
             if blob_path:
                 local_blob.close()
                 os.rename(blob_path + '.partial', blob_path)
+                Blob.from_db(blob_uuid).observe()
 
         if len(locations) >= config.BLOB_REPLICATION_FACTOR:
             blob_path = None
 
+        random.shuffle(locations)
         return flask.Response(flask.stream_with_context(
-            read_remote(random.shuffle(locations)[0], blob_uuid, blob_path=blob_path)),
+            read_remote(locations[0], blob_uuid, blob_path=blob_path)),
             mimetype='text/plain', status=200)
 
 
@@ -999,15 +1001,24 @@ class InstanceSnapshot(Resource):
 
             blob_uuid = str(uuid.uuid4())
             blob = instance_from_db.snapshot(blob_uuid, disk)
+            blob.observe()
             entry = a.add_index(blob_uuid)
 
             out[disk['device']] = {
+                'source_url': a.source_url,
                 'artifact_uuid': a.uuid,
                 'artifact_index': entry['index'],
                 'blob_uuid': blob.uuid,
                 'blob_size': blob.size,
                 'blob_modified': blob.modified
             }
+
+            LOG.with_fields({
+                'instance': instance_uuid,
+                'artifact': a.uuid,
+                'blob': blob.uuid,
+                'device': disk['device']
+            }).info('Created snapshot')
             instance_from_db.add_event('api', 'snapshot %s' % disk,
                                        None, a.uuid)
             if a.state == dbo.STATE_INITIAL:
@@ -1021,7 +1032,17 @@ class InstanceSnapshot(Resource):
     def get(self, instance_uuid=None, instance_from_db=None):
         out = []
         for snap in Artifacts([partial(artifact.instance_snapshot_filter, instance_uuid)]):
-            out.append(snap.external_view())
+            ev = snap.external_view_without_index()
+            for idx in snap.get_all_indexes():
+                # Give the blob uuid a better name
+                b = Blob.from_db(idx['blob_uuid']).external_view()
+                b['blob_uuid'] = b['uuid']
+                del b['uuid']
+
+                # Merge it with the parent artifact
+                a = copy.copy(ev)
+                a.update(b)
+                out.append(a)
         return out
 
 

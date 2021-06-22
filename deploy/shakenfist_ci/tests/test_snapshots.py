@@ -13,7 +13,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self._await_network_ready(self.net['uuid'])
 
     def test_single_disk_snapshots(self):
-        inst = self.test_client.create_instance(
+        inst1 = self.test_client.create_instance(
             'cirros', 1, 1024,
             [
                 {
@@ -28,26 +28,70 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                 }
             ], None, None)
 
-        self.assertIsNotNone(inst['uuid'])
-        self.assertIsNotNone(inst['node'])
+        self.assertIsNotNone(inst1['uuid'])
+        self.assertIsNotNone(inst1['node'])
 
-        self._await_login_prompt(inst['uuid'])
+        self._await_login_prompt(inst1['uuid'])
 
-        snap1 = self.test_client.snapshot_instance(inst['uuid'])
+        # Take a snapshot
+        snap1 = self.test_client.snapshot_instance(inst1['uuid'])
         self.assertIsNotNone(snap1)
-        snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
+        snapshots = self.test_client.get_instance_snapshots(inst1['uuid'])
         self.assertEqual(1, len(snapshots))
 
-        snap2 = self.test_client.snapshot_instance(inst['uuid'], all=True)
-        self.assertIsNotNone(snap2)
-        snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
-        self.assertEqual(1, len(snapshots))
+        # Take another snapshot, we only get the new snapshot returned
+        snap2 = self.test_client.snapshot_instance(inst1['uuid'])
+        self.assertEqual(2, snap2['vda']['artifact_index'])
 
-        for snap in snapshots:
-            self.assertEqual('sf://instance/%s/vda' %
-                             inst['uuid'], snap['source_url'])
+        # get_instance_snapshots should return all snapshots however
+        snapshots = self.test_client.get_instance_snapshots(inst1['uuid'])
+        self.assertEqual(2, len(snapshots))
+        self.assertEqual('sf://instance/%s/vda'
+                         % inst1['uuid'], snapshots[0]['source_url'])
 
-        self.test_client.delete_instance(inst['uuid'])
+        # Now attempt to boot the snapshot via blob uuid
+        inst2 = self.test_client.create_instance(
+            'cirros-from-blob', 1, 1024,
+            [
+                {
+                    'network_uuid': self.net['uuid']
+                }
+            ],
+            [
+                {
+                    'size': 8,
+                    'base': 'sf://blob/%s' % snap2['vda']['blob_uuid'],
+                    'type': 'disk'
+                }
+            ], None, None)
+
+        self.assertIsNotNone(inst2['uuid'])
+        self.assertIsNotNone(inst2['node'])
+        self._await_login_prompt(inst2['uuid'])
+
+        # Now attempt to boot the snapshot via snapshot uuid
+        inst3 = self.test_client.create_instance(
+            'cirros-from-snapshot', 1, 1024,
+            [
+                {
+                    'network_uuid': self.net['uuid']
+                }
+            ],
+            [
+                {
+                    'size': 8,
+                    'base': 'sf://snapshot/%s' % snap2['vda']['artifact_uuid'],
+                    'type': 'disk'
+                }
+            ], None, None)
+
+        self.assertIsNotNone(inst3['uuid'])
+        self.assertIsNotNone(inst3['node'])
+        self._await_login_prompt(inst3['uuid'])
+
+        self.test_client.delete_instance(inst1['uuid'])
+        self.test_client.delete_instance(inst2['uuid'])
+        self.test_client.delete_instance(inst3['uuid'])
 
     def test_multiple_disk_snapshots(self):
         inst = self.test_client.create_instance(
@@ -78,15 +122,15 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self.assertIsNotNone(inst['node'])
         self._await_login_prompt(inst['uuid'])
 
-        snap1 = self.test_client.snapshot_instance(inst['uuid'])
+        snap1 = self.test_client.snapshot_instance(inst['uuid'], all=True)
         self.assertIsNotNone(snap1)
         snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
-        self.assertEqual(1, len(snapshots))
+        self.assertEqual(2, len(snapshots))
 
         snap2 = self.test_client.snapshot_instance(inst['uuid'], all=True)
         self.assertIsNotNone(snap2)
         snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
-        self.assertEqual(2, len(snapshots))
+        self.assertEqual(4, len(snapshots))
 
         for snap in snapshots:
             self.assertIn(snap['source_url'].split('/')[-1], ['vda', 'vdc'])
