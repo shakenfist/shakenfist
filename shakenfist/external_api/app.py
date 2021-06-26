@@ -1241,7 +1241,7 @@ class Network(Resource):
 
         # Check if network has already been deleted
         if network_from_db.state.value in dbo.STATE_DELETED:
-            return error(404, 'network not found')
+            return
 
         _delete_network(network_from_db)
 
