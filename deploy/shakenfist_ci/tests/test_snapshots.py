@@ -138,3 +138,57 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                 'sf://instance/%s' % inst['uuid']))
 
         self.test_client.delete_instance(inst['uuid'])
+
+    def test_labels(self):
+        inst1 = self.test_client.create_instance(
+            'cirros', 1, 1024,
+            [
+                {
+                    'network_uuid': self.net['uuid']
+                }
+            ],
+            [
+                {
+                    'size': 8,
+                    'base': 'cirros',
+                    'type': 'disk'
+                }
+            ], None, None)
+
+        self.assertIsNotNone(inst1['uuid'])
+        self.assertIsNotNone(inst1['node'])
+
+        self._await_login_prompt(inst1['uuid'])
+
+        # Take a snapshot
+        snap = self.test_client.snapshot_instance(inst1['uuid'])
+        self.assertIsNotNone(snap)
+
+        # Do a hillarious thing to apply a label because the client
+        # doesn't support it yet...
+        self.test_client._request_url(
+            'POST', '/label/testlabel',
+            data={'blob_uuid': snap['vda']['blob_uuid']})
+
+        # Now attempt to boot the snapshot via snapshot uuid
+        inst2 = self.test_client.create_instance(
+            'cirros-from-snapshot', 1, 1024,
+            [
+                {
+                    'network_uuid': self.net['uuid']
+                }
+            ],
+            [
+                {
+                    'size': 8,
+                    'base': 'label:testlabel',
+                    'type': 'disk'
+                }
+            ], None, None)
+
+        self.assertIsNotNone(inst2['uuid'])
+        self.assertIsNotNone(inst2['node'])
+        self._await_login_prompt(inst2['uuid'])
+
+        self.test_client.delete_instance(inst1['uuid'])
+        self.test_client.delete_instance(inst2['uuid'])

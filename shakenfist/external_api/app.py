@@ -764,6 +764,14 @@ class Instances(Resource):
             if not isinstance(d, dict):
                 return error(400, 'disk specification should contain JSON objects')
 
+            if d.get('base', '').startswith('label:'):
+                label = d['base'][len('label:'):]
+                a = Artifact.from_url(
+                    Artifact.TYPE_LABEL, 'sf://label/%s/%s' % (get_jwt_identity(), label))
+                if not a:
+                    return error(404, 'label %s not found' % label)
+                d['base'] = 'sf://blob/%s' % a.most_recent_index['blob_uuid']
+
         if network:
             for netdesc in network:
                 if not isinstance(netdesc, dict):
@@ -1044,6 +1052,38 @@ class InstanceSnapshot(Resource):
                 a.update(b)
                 out.append(a)
         return out
+
+
+class LabelEndpoint(Resource):
+    @jwt_required
+    def post(self, label_name=None, blob_uuid=None):
+        a = Artifact.from_url(
+            Artifact.TYPE_LABEL, 'sf://label/%s/%s' % (get_jwt_identity(), label_name))
+        if not a:
+            a = Artifact.new(
+                Artifact.TYPE_LABEL, 'sf://label/%s/%s' % (get_jwt_identity(), label_name))
+
+        a.add_index(blob_uuid)
+        a.state = dbo.STATE_CREATED
+        return a.external_view()
+
+    @jwt_required
+    def get(self, label_name=None):
+        a = Artifact.from_url(
+            Artifact.TYPE_LABEL, 'sf://label/%s/%s' % (get_jwt_identity(), label_name))
+        if not a:
+            error(404, 'label %s not found' % label_name)
+
+        return a.external_view()
+
+    @jwt_required
+    def delete(self, label_name=None):
+        a = Artifact.from_url(
+            Artifact.TYPE_LABEL, 'sf://label/%s/%s' % (get_jwt_identity(), label_name))
+        if not a:
+            error(404, 'label %s not found' % label_name)
+
+        a.state = dbo.STATE_DELETED
 
 
 class InstanceRebootSoft(Resource):
@@ -1581,6 +1621,8 @@ api.add_resource(InstanceConsoleData, '/instances/<instance_uuid>/consoledata',
 
 api.add_resource(Images, '/images')
 api.add_resource(ImageEvents, '/images/events')
+
+api.add_resource(LabelEndpoint, '/label/<label_name>')
 
 api.add_resource(Networks, '/networks')
 api.add_resource(Network, '/networks/<network_uuid>')

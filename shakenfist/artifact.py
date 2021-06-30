@@ -26,6 +26,7 @@ class Artifact(dbo):
     }
 
     TYPE_SNAPSHOT = 'snapshot'
+    TYPE_LABEL = 'label'
 
     def __init__(self, static_values):
         super(Artifact, self).__init__(static_values.get('uuid'),

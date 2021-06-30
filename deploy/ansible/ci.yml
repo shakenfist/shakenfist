@@ -1,5 +1,3 @@
-# Old debian image: https://sfcbr.shakenfist.com/static/debian10-ci-template.qcow2
-
 - hosts: localhost
   gather_facts: yes
   connection: ssh
@@ -147,9 +145,13 @@
       debug:
         msg: "Environment details written to {{ lookup('env', 'WORKSPACE') }}/{{ lookup('env', 'BUILD_TAG') }}/ci-environment.sh"
 
-    - name: Wait for instances to boot
-      pause:
-        minutes: 1
+    - name: Wait for all instances to present an "OpenSSH" prompt
+      wait_for:
+        port: 22
+        host: "{{hostvars[item]['ansible_ssh_host']}}"
+        search_regex: OpenSSH
+        delay: 10
+      with_items: "{{ groups['sfall'] }}"
 
 - hosts: sfall
   gather_facts: yes
