@@ -17,6 +17,7 @@ from shakenfist import baseobject
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
+from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import etcd
@@ -114,8 +115,8 @@ def _initialize_block_devices(instance_path, disk_spec):
     return block_devices
 
 
-def _snapshot_path():
-    return os.path.join(config.get('STORAGE_PATH'), 'snapshots')
+def _blob_path():
+    return os.path.join(config.get('STORAGE_PATH'), 'blobs')
 
 
 class Instance(dbo):
@@ -825,46 +826,33 @@ class Instance(dbo):
         self.update_power_state('off')
         self.add_event('poweroff', 'complete')
 
-    def _snapshot_device(self, source, destination):
-        images.snapshot(None, source, destination)
-
-    def snapshot(self, all=False):
-        disks = self.block_devices['devices']
-        if not all:
-            disks = [disks[0]]
-
-        snapshot_uuid = str(uuid4())
-        snappath = os.path.join(_snapshot_path(), snapshot_uuid)
+    def snapshot(self, blob_uuid, disk):
+        snappath = _blob_path()
         if not os.path.exists(snappath):
-            self.log.debug('Creating snapshot storage at %s', snappath)
             os.makedirs(snappath, exist_ok=True)
-            with open(os.path.join(_snapshot_path(), 'index.html'), 'w') as f:
-                f.write('<html></html>')
 
-        for d in disks:
-            if not config.GLUSTER_ENABLED and not os.path.exists(d['path']):
-                continue
+        if not config.GLUSTER_ENABLED and not os.path.exists(disk['path']):
+            return
 
-            if d['snapshot_ignores']:
-                continue
+        # If we're using gluster we need to tweak some paths...
+        disk_path = disk['path']
+        dest_path = os.path.join(snappath, blob_uuid)
+        orig_dest_path = dest_path
 
-            if d['type'] != 'qcow2':
-                continue
+        if config.GLUSTER_ENABLED:
+            disk_path = 'gluster:%s' % disk['path']
+            dest_path = dest_path.replace(_blob_path(),
+                                          'gluster:shakenfist/snapshots')
 
-            # If we're using gluster we need to tweak some paths...
-            disk_path = d['path']
-            dest_path = os.path.join(snappath, d['device'])
-            if config.GLUSTER_ENABLED:
-                disk_path = 'gluster:%s' % d['path']
-                dest_path = dest_path.replace(_snapshot_path(),
-                                              'gluster:shakenfist/snapshots')
+        # Actually make the snapshot
+        with util.RecordedOperation('snapshot %s' % disk['device'], self):
+            images.snapshot(None, disk_path, dest_path)
+            st = os.stat(orig_dest_path)
 
-            with util.RecordedOperation('snapshot %s' % d['device'], self):
-                self._snapshot_device(disk_path, dest_path)
-                db.create_snapshot(snapshot_uuid, d['device'], self.uuid,
-                                   time.time())
-
-        return snapshot_uuid
+        # And make the associated blob
+        b = Blob.new(blob_uuid, st.st_size, time.time(), time.time())
+        b.observe()
+        return b
 
     def reboot(self, hard=False):
         libvirt = util.get_libvirt()

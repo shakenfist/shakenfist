@@ -286,7 +286,7 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
         }
 
         img = images.Image.new('http://example.com')
-        dirty_fields = img._new_image_available(img._open_connection())
+        dirty_fields = img._new_image_available(img._open_connection(img.url))
         self.assertEqual(False, dirty_fields)
 
     @mock.patch('requests.get',
@@ -318,7 +318,7 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
         }
 
         img = images.Image.new('http://example.com')
-        dirty_fields = img._new_image_available(img._open_connection())
+        dirty_fields = img._new_image_available(img._open_connection(img.url))
         self.assertEqual(('modified',
                           'Tue, 10 Sep 2019 07:24:40 GMT',
                           'Fri, 06 Mar 2020 19:19:05 GMT'),
@@ -353,7 +353,7 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
         }
 
         img = images.Image.new('http://example.com')
-        dirty_fields = img._new_image_available(img._open_connection())
+        dirty_fields = img._new_image_available(img._open_connection(img.url))
         self.assertEqual(('size', 200000, 16338944), dirty_fields)
 
     @mock.patch('shakenfist.images.Image.state')
@@ -383,7 +383,7 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
         mock_state.setter.return_value = State(None, 1)
 
         img = images.Image.new('http://example.com')
-        dirty_fields = img._new_image_available(img._open_connection())
+        dirty_fields = img._new_image_available(img._open_connection(img.url))
         self.assertEqual(('modified', None, 'Tue, 10 Sep 2019 07:24:40 GMT'),
                          dirty_fields)
 
@@ -683,7 +683,7 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
 
         # Data matching checksum
         resp = FakeResp(chunks=[(b'chunk1', b'chunk2')])
-        ret = image._fetch(resp)
+        ret = image._fetch(image.url, resp)
         self.addCleanup(os.remove, ret)
         self.assertEqual(
             '/tmp/image_cache/'
@@ -693,7 +693,7 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
 
         # Data does not match checksum
         resp = FakeResp(chunks=[(b'chunk1', b'badchunk2')])
-        ret = image._fetch(resp)
+        ret = image._fetch(image.url, resp)
         self.assertEqual(
             '/tmp/image_cache/'
             '67066e685b94da02c9b7bb3840a9624b306755f7e1e5453dee8f3e665f34ff8f.v002',
@@ -727,7 +727,7 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
 
         test_checksum = '097c42989a9e5d9dcced7b35ec4b0486'
         image = FakeImageChecksum({
-            'url': 'testurl',
+            'url': 'http://testurl',
             'ref': '67066e685b94da02c9b7bb3840a9624b306755f7e1e5453dee8f3e665f34ff8f',
             'node': 'sf-245',
             'version': 2
@@ -775,7 +775,7 @@ class ImageChecksumTestCase(test_shakenfist.ShakenFistTestCase):
 
         test_checksum = '097c42989a9e5d9dcced7b35ec4b0486'
         image = FakeImageChecksum({
-            'url': 'testurl',
+            'url': 'http://testurl',
             'ref': '67066e685b94da02c9b7bb3840a9624b306755f7e1e5453dee8f3e665f34ff8f',
             'node': 'sf-245',
             'version': 2

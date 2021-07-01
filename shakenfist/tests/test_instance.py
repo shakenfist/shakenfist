@@ -362,7 +362,7 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
                          etcd_write[1]['power_state_previous'])
 
     def test_helpers(self):
-        self.assertEqual('/a/b/c/snapshots', instance._snapshot_path())
+        self.assertEqual('/a/b/c/blobs', instance._blob_path())
 
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject.state',
                 new_callable=mock.PropertyMock)

@@ -28,13 +28,18 @@ from flask_restful import marshal_with
 import ipaddress
 import json
 from jwt.exceptions import DecodeError, PyJWTError
+import os
+import random
 import re
 import requests
 import sys
 import traceback
 import uuid
 
+from shakenfist import artifact
+from shakenfist.artifact import Artifact, Artifacts
 from shakenfist import baseobject
+from shakenfist.blob import Blob
 from shakenfist.daemons import daemon
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
@@ -621,6 +626,64 @@ class AuthMetadata(Resource):
             db.persist_metadata('namespace', namespace, md)
 
 
+class BlobEndpoint(Resource):
+    @jwt_required
+    def get(self, blob_uuid=None):
+        # Fast path if we have the blob locally
+        blob_path = os.path.join(config.get(
+            'STORAGE_PATH'), 'blobs', blob_uuid)
+        if os.path.exists(blob_path):
+            def read_file(filename):
+                with open(blob_path, 'rb') as f:
+                    d = f.read(8192)
+                    while d:
+                        yield d
+                        d = f.read(8192)
+
+            return flask.Response(flask.stream_with_context(read_file(blob_path)),
+                                  mimetype='text/plain', status=200)
+
+        # Otherwise find a node which has the blob and proxy. Write to our blob
+        # store as well if the blob is under replicated.
+        b = Blob.from_db(blob_uuid)
+        if not b:
+            return error(404, 'blob not found')
+
+        locations = b.locations
+        if not locations:
+            return error(404, 'blob missing')
+
+        def read_remote(target, blob_uuid, blob_path=None):
+            api_token = util.get_api_token(
+                'http://%s:%d' % (target, config.get('API_PORT')),
+                namespace=get_jwt_identity())
+            url = 'http://%s:%d/blob/%s' % (target,
+                                            config.get('API_PORT'), blob_uuid)
+
+            if blob_path:
+                local_blob = open(blob_path + '.partial', 'wb')
+            r = requests.request('GET', url,
+                                 headers={'Authorization': api_token,
+                                          'User-Agent': util.get_user_agent()})
+            for chunk in r.iter_content(chunk_size=8192):
+                if blob_path:
+                    local_blob.write(chunk)
+                yield chunk
+
+            if blob_path:
+                local_blob.close()
+                os.rename(blob_path + '.partial', blob_path)
+                Blob.from_db(blob_uuid).observe()
+
+        if len(locations) >= config.BLOB_REPLICATION_FACTOR:
+            blob_path = None
+
+        random.shuffle(locations)
+        return flask.Response(flask.stream_with_context(
+            read_remote(locations[0], blob_uuid, blob_path=blob_path)),
+            mimetype='text/plain', status=200)
+
+
 class Instance(Resource):
     @jwt_required
     @arg_is_instance_uuid
@@ -700,6 +763,14 @@ class Instances(Resource):
         for d in disk:
             if not isinstance(d, dict):
                 return error(400, 'disk specification should contain JSON objects')
+
+            if d.get('base', '').startswith('label:'):
+                label = d['base'][len('label:'):]
+                a = Artifact.from_url(
+                    Artifact.TYPE_LABEL, 'sf://label/%s/%s' % (get_jwt_identity(), label))
+                if not a:
+                    return error(404, 'label %s not found' % label)
+                d['base'] = 'sf://blob/%s' % a.most_recent_index['blob_uuid']
 
         if network:
             for netdesc in network:
@@ -920,21 +991,99 @@ class InstanceSnapshot(Resource):
     @redirect_instance_request
     @requires_instance_active
     def post(self, instance_uuid=None, instance_from_db=None, all=None):
-        snap_uuid = instance_from_db.snapshot(all=all)
-        instance_from_db.add_event('api', 'snapshot (all=%s)' % all,
-                                   None, snap_uuid)
-        db.add_event('snapshot', snap_uuid, 'api', 'create', None, None)
-        return snap_uuid
+        disks = instance_from_db.block_devices['devices']
+        if not all:
+            disks = [disks[0]]
+
+        out = {}
+        for disk in disks:
+            if disk['snapshot_ignores']:
+                continue
+
+            if disk['type'] != 'qcow2':
+                continue
+
+            a = Artifact.from_url(
+                Artifact.TYPE_SNAPSHOT,
+                'sf://instance/%s/%s' % (instance_uuid, disk['device']))
+
+            blob_uuid = str(uuid.uuid4())
+            blob = instance_from_db.snapshot(blob_uuid, disk)
+            blob.observe()
+            entry = a.add_index(blob_uuid)
+
+            out[disk['device']] = {
+                'source_url': a.source_url,
+                'artifact_uuid': a.uuid,
+                'artifact_index': entry['index'],
+                'blob_uuid': blob.uuid,
+                'blob_size': blob.size,
+                'blob_modified': blob.modified
+            }
+
+            LOG.with_fields({
+                'instance': instance_uuid,
+                'artifact': a.uuid,
+                'blob': blob.uuid,
+                'device': disk['device']
+            }).info('Created snapshot')
+            instance_from_db.add_event('api', 'snapshot %s' % disk,
+                                       None, a.uuid)
+            if a.state == dbo.STATE_INITIAL:
+                a.state = dbo.STATE_CREATED
+
+        return out
 
     @jwt_required
     @arg_is_instance_uuid
     @requires_instance_ownership
     def get(self, instance_uuid=None, instance_from_db=None):
         out = []
-        for snap in db.get_instance_snapshots(instance_uuid):
-            snap['created'] = snap['created']
-            out.append(snap)
+        for snap in Artifacts([partial(artifact.instance_snapshot_filter, instance_uuid)]):
+            ev = snap.external_view_without_index()
+            for idx in snap.get_all_indexes():
+                # Give the blob uuid a better name
+                b = Blob.from_db(idx['blob_uuid']).external_view()
+                b['blob_uuid'] = b['uuid']
+                del b['uuid']
+
+                # Merge it with the parent artifact
+                a = copy.copy(ev)
+                a.update(b)
+                out.append(a)
         return out
+
+
+class LabelEndpoint(Resource):
+    @jwt_required
+    def post(self, label_name=None, blob_uuid=None):
+        a = Artifact.from_url(
+            Artifact.TYPE_LABEL, 'sf://label/%s/%s' % (get_jwt_identity(), label_name))
+        if not a:
+            a = Artifact.new(
+                Artifact.TYPE_LABEL, 'sf://label/%s/%s' % (get_jwt_identity(), label_name))
+
+        a.add_index(blob_uuid)
+        a.state = dbo.STATE_CREATED
+        return a.external_view()
+
+    @jwt_required
+    def get(self, label_name=None):
+        a = Artifact.from_url(
+            Artifact.TYPE_LABEL, 'sf://label/%s/%s' % (get_jwt_identity(), label_name))
+        if not a:
+            error(404, 'label %s not found' % label_name)
+
+        return a.external_view()
+
+    @jwt_required
+    def delete(self, label_name=None):
+        a = Artifact.from_url(
+            Artifact.TYPE_LABEL, 'sf://label/%s/%s' % (get_jwt_identity(), label_name))
+        if not a:
+            error(404, 'label %s not found' % label_name)
+
+        a.state = dbo.STATE_DELETED
 
 
 class InstanceRebootSoft(Resource):
@@ -1448,6 +1597,8 @@ api.add_resource(AuthMetadatas, '/auth/namespaces/<namespace>/metadata')
 api.add_resource(AuthMetadata,
                  '/auth/namespaces/<namespace>/metadata/<key>')
 
+api.add_resource(BlobEndpoint, '/blob/<blob_uuid>')
+
 api.add_resource(Instances, '/instances')
 api.add_resource(Instance, '/instances/<instance_uuid>')
 api.add_resource(InstanceEvents, '/instances/<instance_uuid>/events')
@@ -1470,6 +1621,8 @@ api.add_resource(InstanceConsoleData, '/instances/<instance_uuid>/consoledata',
 
 api.add_resource(Images, '/images')
 api.add_resource(ImageEvents, '/images/events')
+
+api.add_resource(LabelEndpoint, '/label/<label_name>')
 
 api.add_resource(Networks, '/networks')
 api.add_resource(Network, '/networks/<network_uuid>')

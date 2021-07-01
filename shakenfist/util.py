@@ -197,8 +197,7 @@ def extract_power_state(libvirt, domain):
 
 
 def get_api_token(base_url, namespace='system'):
-    with db.get_lock('namespace', None, namespace,
-                     op='Get API token'):
+    with db.get_lock('namespace', None, namespace, op='Get API token'):
         auth_url = base_url + '/auth'
         LOG.info('Fetching %s auth token from %s', namespace, auth_url)
         ns = db.get_namespace(namespace)
