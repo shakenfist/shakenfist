@@ -2,6 +2,7 @@
   gather_facts: yes
   connection: ssh
   vars:
+    identifier: unknown
     source_path: "/home/jenkins/src/shakenfist/"
     base_image: "https://sfcbr.shakenfist.com/static/ubuntu2004-ci-template.qcow2"
     base_image_user: "ubuntu"
@@ -10,7 +11,7 @@
     - name: Create a CI network
       sf_network:
         netblock: "10.0.0.0/24"
-        name: "imagerebuild"
+        name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}"
       register: cinetwork
 
     - name: Log network details
@@ -19,7 +20,7 @@
 
     - name: Create an instance
       sf_instance:
-        name: "imagerebuild"
+        name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}"
         cpu: 4
         ram: 4096
         disks:
@@ -107,7 +108,9 @@
 
   tasks:
     - name: Snapshot the instance
-      shell: sf-client instance snapshot "{{hostvars['imagerebuild']['sf_instance_uuid']}}"
+      shell: |
+        sf-client instance snapshot "{{hostvars['imagerebuild']['sf_instance_uuid']}}" \
+            --label_name sfci-image
 
     - name: Delete instance
       sf_instance:

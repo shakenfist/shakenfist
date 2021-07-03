@@ -161,14 +161,9 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self._await_login_prompt(inst1['uuid'])
 
         # Take a snapshot
-        snap = self.test_client.snapshot_instance(inst1['uuid'])
+        snap = self.test_client.snapshot_instance(
+            inst1['uuid'], label_name='testlabel')
         self.assertIsNotNone(snap)
-
-        # Do a hillarious thing to apply a label because the client
-        # doesn't support it yet...
-        self.test_client._request_url(
-            'POST', '/label/testlabel',
-            data={'blob_uuid': snap['vda']['blob_uuid']})
 
         # Now attempt to boot the snapshot via snapshot uuid
         inst2 = self.test_client.create_instance(
