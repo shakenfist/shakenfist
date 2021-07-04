@@ -116,7 +116,9 @@ def _initialize_block_devices(instance_path, disk_spec):
 
 
 def _blob_path():
-    return os.path.join(config.get('STORAGE_PATH'), 'blobs')
+    blob_path = os.path.join(config.get('STORAGE_PATH'), 'blobs')
+    os.makedirs(blob_path, exist_ok=True)
+    return blob_path
 
 
 class Instance(dbo):
