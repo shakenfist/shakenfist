@@ -630,6 +630,8 @@ class BlobEndpoint(Resource):
     @jwt_required
     def get(self, blob_uuid=None):
         # Fast path if we have the blob locally
+        os.makedirs(os.path.join(config.get(
+            'STORAGE_PATH'), 'blobs'), exist_ok=True)
         blob_path = os.path.join(config.get(
             'STORAGE_PATH'), 'blobs', blob_uuid)
         if os.path.exists(blob_path):

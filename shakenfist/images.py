@@ -229,6 +229,8 @@ class Image(dbo):
         blob_uuid = url[len('sf://blob/'):]
         blob_path = os.path.join(config.get(
             'STORAGE_PATH'), 'blobs', blob_uuid)
+        os.makedirs(os.path.join(config.get(
+            'STORAGE_PATH'), 'blobs'), exist_ok=True)
 
         locations = Blob.from_db(blob_uuid).locations
         random.shuffle(locations)
