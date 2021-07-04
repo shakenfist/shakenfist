@@ -14,7 +14,7 @@ flask_restful               # bsd
 psutil                      # bsd
 prometheus_client           # apache2
 etcd3                       # apache2
-etcd3gw                     # apache2
+etcd3gw==0.2.6              # apache2
 flask-jwt-extended==3.25.0  # mit
 bcrypt                      # apache2
 gunicorn                    # mit
