@@ -1,12 +1,12 @@
 # Copyright 2020 Michael Still
 
-from etcd3gw.client import Etcd3Client
 import ipaddress
 import json
 import time
 
 from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist import etcd
 from shakenfist import instance
 from shakenfist import networkinterface
 from shakenfist.node import Node
@@ -49,7 +49,7 @@ def clean_events_mesh_operations(etcd_client):
 
 
 def main():
-    etcd_client = Etcd3Client()
+    etcd_client = etcd.WrappedEtcdClient()
 
     releases = {}
     old_style_nodes = []

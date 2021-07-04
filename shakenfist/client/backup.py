@@ -26,7 +26,7 @@ def cli(ctx, verbose=None):
 @click.pass_context
 def backup(ctx, output):
     with tarfile.open(output, 'w:gz') as tar:
-        for data, metadata in etcd.Etcd3Client().get_prefix('/'):
+        for data, metadata in etcd.WrappedEtcdClient().get_prefix('/'):
             info = tarfile.TarInfo(metadata['key'].decode('utf-8').rstrip('/'))
             info.size = len(data)
             tar.addfile(info, io.BytesIO(data))
@@ -44,7 +44,7 @@ def restore(ctx, input):
             key = tarinfo.name
             data = tar.extractfile(key).read()
 
-            etcd.Etcd3Client().put(key, data)
+            etcd.WrappedEtcdClient().put(key, data)
 
 
 cli.add_command(restore)
