@@ -11,7 +11,7 @@
     - name: Create a CI network
       sf_network:
         netblock: "10.0.0.0/24"
-        name: "{{identifier}}"
+        name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}"
       register: cinetwork
 
     - name: Log network details
