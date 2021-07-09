@@ -766,7 +766,11 @@ class Instances(Resource):
             if not isinstance(d, dict):
                 return error(400, 'disk specification should contain JSON objects')
 
-            if d.get('base', '').startswith('label:'):
+            disk_base = d.get('base')
+            if not disk_base:
+                disk_base = ''
+            if disk_base.startswith('label:'):
+                label = disk_base[len('label:'):]
                 label = d['base'][len('label:'):]
                 a = Artifact.from_url(
                     Artifact.TYPE_LABEL, 'sf://label/%s/%s' % (get_jwt_identity(), label))
