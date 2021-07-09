@@ -123,7 +123,7 @@ def _blob_path():
 
 class Instance(dbo):
     object_type = 'instance'
-    current_version = 2
+    current_version = 3
 
     # docs/development/state_machine.md has a description of these states.
     STATE_INITIAL_ERROR = 'initial-error'
@@ -159,6 +159,7 @@ class Instance(dbo):
         self.__ssh_key = static_values.get('ssh_key')
         self.__user_data = static_values.get('user_data')
         self.__video = static_values.get('video')
+        self.__uefi = static_values.get('uefi', False)
 
         if not self.__disk_spec:
             # This should not occur since the API will filter for zero disks.
@@ -167,7 +168,8 @@ class Instance(dbo):
 
     @classmethod
     def new(cls, name, cpus, memory, namespace, ssh_key=None, disk_spec=None,
-            user_data=None, video=None, requested_placement=None, uuid=None):
+            user_data=None, video=None, requested_placement=None, uuid=None,
+            uefi=False):
 
         if not uuid:
             # uuid should only be specified in testing
@@ -185,6 +187,7 @@ class Instance(dbo):
                 'ssh_key': ssh_key,
                 'user_data': user_data,
                 'video': video,
+                'uefi': uefi,
 
                 'version': cls.current_version
             })
@@ -220,6 +223,7 @@ class Instance(dbo):
             'state': self.state.value,
             'user_data': self.user_data,
             'video': self.video,
+            'uefi': self.uefi,
             'version': self.version,
             'error_message': self.error,
         }
@@ -287,6 +291,10 @@ class Instance(dbo):
     @property
     def video(self):
         return self.__video
+
+    @property
+    def uefi(self):
+        return self.__uefi
 
     @property
     def instance_path(self):
@@ -755,7 +763,8 @@ class Instance(dbo):
             console_port=ports.get('console_port'),
             vdi_port=ports.get('vdi_port'),
             video_model=self.video['model'],
-            video_memory=self.video['memory']
+            video_memory=self.video['memory'],
+            uefi=self.uefi
         )
 
     def _get_domain(self):
