@@ -520,12 +520,20 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(404, resp.status_code)
 
     @mock.patch('shakenfist.instance.Instance._db_get',
-                return_value={'uuid': '123',
-                              'cpus': 2,
-                              'memory': 4096,
-                              'name': 'banana',
-                              'namespace': 'foo',
-                              'disk_spec': [{'size': 4, 'base': 'foo'}]})
+                return_value={
+                    'cpus': 1,
+                    'disk_spec': [{}],
+                    'memory': 2048,
+                    'name': 'barry',
+                    'namespace': 'namespace',
+                    'requested_placement': None,
+                    'ssh_key': 'sshkey',
+                    'user_data': 'userdata',
+                    'uuid': 'uuid42',
+                    'version': 3,
+                    'video': {'memory': 16384, 'model': 'cirrus'},
+                    'uefi': False
+                })
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 return_value={})
     def test_get_instance(self, mock_get_instance_attribute, mock_get_instance):
@@ -533,21 +541,22 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
             '/instances/foo', headers={'Authorization': self.auth_header})
         self.assertEqual({
             'console_port': None,
-            'cpus': 2,
-            'disk_spec': [{'base': 'foo', 'size': 4}],
+            'cpus': 1,
+            'disk_spec': [{}],
             'error_message': None,
-            'memory': 4096,
-            'name': 'banana',
-            'namespace': 'foo',
+            'memory': 2048,
+            'name': 'barry',
+            'namespace': 'namespace',
             'node': None,
             'power_state': None,
-            'ssh_key': None,
+            'ssh_key': 'sshkey',
             'state': None,
-            'user_data': None,
-            'uuid': '123',
-            'version': None,
+            'uefi': False,
+            'user_data': 'userdata',
+            'uuid': 'uuid42',
             'vdi_port': None,
-            'video': None
+            'version': 3,
+            'video': {'memory': 16384, 'model': 'cirrus'}
         }, resp.get_json())
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)

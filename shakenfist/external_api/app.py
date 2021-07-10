@@ -742,7 +742,7 @@ class Instances(Resource):
     @jwt_required
     def post(self, name=None, cpus=None, memory=None, network=None, disk=None,
              ssh_key=None, user_data=None, placed_on=None, namespace=None,
-             video=None):
+             video=None, uefi=False):
         global SCHEDULER
 
         # Check that the instance name is safe for use as a DNS host name
@@ -771,7 +771,6 @@ class Instances(Resource):
                 disk_base = ''
             if disk_base.startswith('label:'):
                 label = disk_base[len('label:'):]
-                label = d['base'][len('label:'):]
                 a = Artifact.from_url(
                     Artifact.TYPE_LABEL, 'sf://label/%s/%s' % (get_jwt_identity(), label))
                 if not a:
@@ -824,6 +823,7 @@ class Instances(Resource):
             user_data=user_data,
             namespace=namespace,
             video=video,
+            uefi=uefi,
             requested_placement=placed_on
         )
 

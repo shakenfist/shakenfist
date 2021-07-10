@@ -13,6 +13,7 @@ shakenfist_deps:
   - libvirt-daemon-system
   - libvirt-dev
   - net-tools
+  - ovmf
   - prometheus-node-exporter
   - pwgen
   - python3-libvirt
