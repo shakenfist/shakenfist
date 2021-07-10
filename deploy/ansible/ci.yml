@@ -205,37 +205,6 @@
         mkdir -p /var/lib/etcd
         mount -t tmpfs -o rw,size=2G tmpfs /var/lib/etcd
 
-- hosts: primary
-  gather_facts: yes
-  connection: ssh
-  become: true
-
-  tasks:
-    # - name: Ensure we have the Ubuntu package key (helps with Debian)
-    #   shell: apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367
-
-    # - name: Setup ansible package repository
-    #   copy:
-    #     content: |
-    #       deb http://ppa.launchpad.net/ansible/ansible/ubuntu trusty main
-    #     dest: "/etc/apt/sources.list.d/ansible.list"
-    #     owner: root
-    #     group: root
-    #     mode: u=r,g=r,o=r
-
-    - name: Install modern ansible
-      apt:
-        name: ansible
-        state: latest
-        update_cache: yes
-        autoremove: yes
-
-    - name: Install ansible roles
-      shell: ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform andrewrothstein.go
-
-    - name: Make Shaken Fist venv
-      shell: python3 -m venv --system-site-packages /srv/shakenfist/venv
-
 - hosts: localhost
   gather_facts: yes
   vars:
@@ -294,6 +263,49 @@
     - debug:
         msg: "Client wheel file: {{client_wheel_file}}"
 
+- hosts: primary
+  gather_facts: yes
+  connection: ssh
+  become: true
+
+  tasks:
+    # - name: Ensure we have the Ubuntu package key (helps with Debian)
+    #   shell: apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367
+
+    # - name: Setup ansible package repository
+    #   copy:
+    #     content: |
+    #       deb http://ppa.launchpad.net/ansible/ansible/ubuntu trusty main
+    #     dest: "/etc/apt/sources.list.d/ansible.list"
+    #     owner: root
+    #     group: root
+    #     mode: u=r,g=r,o=r
+
+    - name: Install modern ansible
+      apt:
+        name: ansible
+        state: latest
+        update_cache: yes
+        autoremove: yes
+
+    - name: Install ansible roles
+      shell: ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform andrewrothstein.go
+
+    - name: Copy client wheel file
+      copy:
+        src: "{{source_path}}/client-python/dist/{{hostvars['localhost']['client_wheel_file']}}"
+        dest: "/tmp/{{hostvars['localhost']['client_wheel_file']}}"
+
+    # This needs to be in system packages for tox to pick it up correctly, which we
+    # want in order for CI to see unreleased client changes. You wouldn't do this
+    # for a real deployment
+    - name: Install client wheel into system packages
+      shell: |
+        pip install /tmp/shakenfist_client*whl
+
+    - name: Make Shaken Fist venv
+      shell: python3 -m venv --system-site-packages /srv/shakenfist/venv
+
 - hosts: sfall
   gather_facts: yes
   become: true
@@ -319,14 +331,12 @@
     base_image_user: "ubuntu"
 
   tasks:
-    - name: Copy client wheel file
-      copy:
-        src: "{{source_path}}/client-python/dist/{{hostvars['localhost']['client_wheel_file']}}"
-        dest: "/tmp/{{hostvars['localhost']['client_wheel_file']}}"
-
-    - name: Make venv and install client wheel
+    # We need to install into the shakenfist venv as well so that the ansible modules
+    # are in the right place to be found later. In a normal universe we'd only install
+    # here, but we need the system packages above for tox to work.
+    - name: Install client wheel into shakenfist venv (in addition to system above)
       shell: |
-        /srv/shakenfist/venv/bin/pip install /tmp/shakenfist_client*whl
+        /srv/shakenfist/venv/bin/pip install -U --force-reinstall /tmp/shakenfist_client*whl
 
     - name: Copy install configuration to primary node
       copy:
