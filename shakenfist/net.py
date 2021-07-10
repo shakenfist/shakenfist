@@ -27,7 +27,9 @@ from shakenfist.tasks import (
     DeployNetworkTask,
     UpdateDHCPNetworkTask,
     RemoveDHCPNetworkTask,
-    RemoveNATNetworkTask)
+    RemoveNATNetworkTask,
+    MapVLANTask,
+    UnmapVLANTask)
 from shakenfist import util
 
 
@@ -146,6 +148,7 @@ class Network(dbo):
             'floating_gateway': self.floating_gateway,
             'state': self.state.value,
             'vxid': self.__vxid,
+            'vlanid': self.vlanid,
             'version': self.version
         }
 
@@ -161,14 +164,6 @@ class Network(dbo):
         return n
 
     # Static values
-    @property
-    def floating_gateway(self):
-        return self._db_get_attribute('routing').get('floating_gateway')
-
-    @property
-    def routing(self):
-        return self._db_get_attribute('routing')
-
     @property
     def name(self):
         return self.__name
@@ -217,6 +212,22 @@ class Network(dbo):
     @property
     def network_address(self):
         return self.__network_address
+
+    # Values routed to attributes
+    @property
+    def floating_gateway(self):
+        return self._db_get_attribute('routing').get('floating_gateway')
+
+    @property
+    def routing(self):
+        return self._db_get_attribute('routing')
+
+    @property
+    def vlanid(self):
+        vlan = self._db_get_attribute('vlan')
+        if not vlan:
+            return None
+        return vlan.get('vlanid')
 
     # TODO(andy) Create new class to avoid external direct access to DB
     @staticmethod
@@ -553,6 +564,45 @@ class Network(dbo):
         else:
             db.enqueue('networknode', RemoveNATNetworkTask(self.uuid))
             self.add_event('remove dhcp', 'enqueued')
+
+    def map_vlan(self, vlanid):
+        if util.is_network_node():
+            if self.vlanid:
+                return
+
+            subst = self.subst_dict()
+            subst['vlanid'] = vlanid
+            with util.RecordedOperation('map vlan', self):
+                util.execute(None,
+                             'ip link add link %(physical_nic)s name '
+                             '%(physical_nic)s.%(vlanid)s type vlan id '
+                             '%(vlanid)s' % subst)
+                util.execute(None,
+                             'ip link set dev %(physical_nic)s.%(vlanid)s up'
+                             % subst)
+                util.execute(None,
+                             'ip link set %(physical_nic)s.%(vlanid)s master '
+                             '%(vx_bridge)s' % subst)
+
+        else:
+            db.enqueue('networknode', MapVLANTask(self.uuid, vlanid))
+            self.add_event('map vlan', 'enqueued')
+
+    def unmap_vlan(self, vlanid):
+        if util.is_network_node():
+            if self.vlanid:
+                return
+
+            subst = self.subst_dict()
+            subst['vlanid'] = vlanid
+            with util.RecordedOperation('unmap vlan', self):
+                util.execute(None,
+                             'ip link del link %(physical_nic)s.%(vlanid)s'
+                             % subst)
+
+        else:
+            db.enqueue('networknode', UnmapVLANTask(self.uuid, vlanid))
+            self.add_event('unmap vlan', 'enqueued')
 
     def discover_mesh(self):
         mesh_re = re.compile(r'00:00:00:00:00:00 dst (.*) self permanent')
