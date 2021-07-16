@@ -407,6 +407,12 @@ class Instance(dbo):
             try:
                 self.power_off()
 
+                nvram_path = os.path.join(
+                    config.STORAGE_PATH, 'instances', self.uuid,
+                    'nvram')
+                if os.path.exists(nvram_path):
+                    os.unlink(nvram_path)
+
                 inst = self._get_domain()
                 if inst:
                     inst.undefine()
