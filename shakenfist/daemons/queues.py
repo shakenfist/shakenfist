@@ -5,6 +5,7 @@ import setproctitle
 import time
 
 from shakenfist.artifact import Artifact
+from shakenfist import blob
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
@@ -302,9 +303,7 @@ def instance_delete(inst):
 
 
 def snapshot(inst, disk, artifact_uuid, blob_uuid):
-    blob = inst.snapshot(blob_uuid, disk)
-    blob.observe()
-
+    blob.snapshot_disk(disk, blob_uuid)
     a = Artifact.from_db(artifact_uuid)
     if a.state == dbo.STATE_INITIAL:
         a.state = dbo.STATE_CREATED

@@ -6,7 +6,6 @@ import os
 import psutil
 
 from shakenfist import baseobject
-from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.daemons import external_api as external_api_daemon
@@ -16,7 +15,6 @@ from shakenfist.daemons import net as net_daemon
 from shakenfist.daemons import resources as resource_daemon
 from shakenfist.daemons import triggers as trigger_daemon
 from shakenfist import db
-from shakenfist import images
 from shakenfist import instance
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
@@ -39,16 +37,17 @@ def restore_instances():
             if ni.network_uuid not in networks:
                 networks.append(ni.network_uuid)
 
-        for disk in inst.disk_spec:
-            if disk.get('base'):
-                img = images.Image.new(disk['base'])
-                # NOTE(mikal): this check isn't great -- it checks for the original
-                # downloaded image, not the post transcode version
-                if (img.state in [dbo.STATE_DELETED, dbo.STATE_ERROR] or
-                        not os.path.exists(img.version_image_path())):
-                    instance_problems.append(
-                        '%s missing from image cache' % disk['base'])
-                    img.delete()
+        # TODO(mikal): do better here.
+        # for disk in inst.disk_spec:
+        #     if disk.get('base'):
+        #         img = images.Image.new(disk['base'])
+        #         # NOTE(mikal): this check isn't great -- it checks for the original
+        #         # downloaded image, not the post transcode version
+        #         if (img.state in [dbo.STATE_DELETED, dbo.STATE_ERROR] or
+        #                 not os.path.exists(img.version_image_path())):
+        #             instance_problems.append(
+        #                 '%s missing from image cache' % disk['base'])
+        #             img.delete()
 
         if instance_problems:
             inst.enqueue_delete_due_error(

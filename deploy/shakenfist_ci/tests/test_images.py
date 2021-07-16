@@ -11,7 +11,7 @@ class TestImages(base.BaseTestCase):
         self.system_client.cache_image(url)
         image_urls = []
         for image in self.system_client.get_images():
-            image_urls.append(image['url'])
+            image_urls.append(image['source_url'])
 
         self.assertIn(url, image_urls)
 
@@ -22,8 +22,8 @@ class TestImages(base.BaseTestCase):
         while time.time() - start_time < 300:
             cache = {}
             for img in self.system_client.get_images():
-                cache.setdefault(img['url'], [])
-                cache[img['url']].append(img)
+                cache.setdefault(img['source_url'], [])
+                cache[img['source_url']].append(img)
 
             self.assertIn(url, cache)
             if cache[url][0]['state'] == 'created':

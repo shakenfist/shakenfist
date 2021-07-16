@@ -367,10 +367,6 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertEqual('transition-to-off',
                          etcd_write[1]['power_state_previous'])
 
-    @mock.patch('os.makedirs')
-    def test_helpers(self, mock_exists):
-        self.assertEqual('/a/b/c/blobs', instance._blob_path())
-
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject.state',
                 new_callable=mock.PropertyMock)
     def test_str(self, mock_update):

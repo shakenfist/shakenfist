@@ -9,6 +9,7 @@ shakenfist_deps:
   - dnsutils
   - etcd-client
   - git
+  - libmagic-dev
   - libssl-dev
   - libvirt-daemon-system
   - libvirt-dev

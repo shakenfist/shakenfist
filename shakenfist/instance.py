@@ -18,7 +18,6 @@ from shakenfist import baseobject
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
-from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import etcd
@@ -507,25 +506,34 @@ class Instance(dbo):
                     os.path.join(self.instance_path,
                                  block_devices['devices'][1]['path']))
 
-            # Prepare disks
+            # Prepare disks. A this point we have a file for each blob in the image
+            # cache at a well known location (the blob uuid with .qcow2 appended).
             if not block_devices['finalized']:
                 modified_disks = []
                 for disk in block_devices['devices']:
                     disk['source'] = "<source file='%s'/>" % disk['path']
                     disk['source_type'] = 'file'
 
-                    disk_base = disk.get('base')
+                    # All disk bases must have an associated blob, force that
+                    # if an image had to be fetched from outside the cluster.
+                    disk_base = None
                     if disk.get('blob_uuid'):
+                        disk_base = '%s%s' % (BLOB_URL, disk['blob_uuid'])
+                    elif disk.get('base'):
+                        img = images.Image.new(disk['base'])
+                        disk['blob_uuid'] = \
+                            img.artifact().most_recent_index['blob_uuid']
                         disk_base = '%s%s' % (BLOB_URL, disk['blob_uuid'])
 
                     if disk_base:
                         img = images.Image.new(disk_base)
-                        hashed_image_path = img.version_image_path()
+                        cached_image_path = os.path.join(
+                            config.STORAGE_PATH, 'image_cache', disk['blob_uuid'] + '.qcow2')
 
                         with util.RecordedOperation('detect cdrom images', self):
                             try:
                                 cd = pycdlib.PyCdlib()
-                                cd.open(hashed_image_path)
+                                cd.open(cached_image_path)
                                 disk['present_as'] = 'cdrom'
                             except Exception:
                                 pass
@@ -538,11 +546,9 @@ class Instance(dbo):
                             disk['snapshot_ignores'] = True
 
                             try:
-                                os.link(hashed_image_path, disk['path'])
+                                os.link(cached_image_path, disk['path'])
                             except OSError:
-                                # Different filesystems
-                                util.execute(
-                                    [lock], 'cp %s %s' % (hashed_image_path, disk['path']))
+                                os.symlink(cached_image_path, disk['path'])
 
                             # Due to limitations in some installers, cdroms are always on IDE
                             disk['device'] = 'hd%s' % disk['device'][-1]
@@ -550,7 +556,7 @@ class Instance(dbo):
                         else:
                             if config.DISK_FORMAT == 'qcow':
                                 with util.RecordedOperation('create copy on write layer', self):
-                                    images.create_cow([lock], hashed_image_path,
+                                    images.create_cow([lock], cached_image_path,
                                                       disk['path'], disk['size'])
 
                                 # Record the backing store for modern libvirts
@@ -559,7 +565,7 @@ class Instance(dbo):
                                     '        <format type=\'qcow2\'/>\n'
                                     '        <source file=\'%s\'/>\n'
                                     '      </backingStore>\n'
-                                    % (hashed_image_path))
+                                    % (cached_image_path))
 
                             elif config.DISK_FORMAT == 'qcow_flat':
                                 with util.RecordedOperation('resize image', self):
@@ -849,34 +855,6 @@ class Instance(dbo):
 
         self.update_power_state('off')
         self.add_event('poweroff', 'complete')
-
-    def snapshot(self, blob_uuid, disk):
-        snappath = _blob_path()
-        if not os.path.exists(snappath):
-            os.makedirs(snappath, exist_ok=True)
-
-        if not config.GLUSTER_ENABLED and not os.path.exists(disk['path']):
-            return
-
-        # If we're using gluster we need to tweak some paths...
-        disk_path = disk['path']
-        dest_path = os.path.join(snappath, blob_uuid)
-        orig_dest_path = dest_path
-
-        if config.GLUSTER_ENABLED:
-            disk_path = 'gluster:%s' % disk['path']
-            dest_path = dest_path.replace(_blob_path(),
-                                          'gluster:shakenfist/snapshots')
-
-        # Actually make the snapshot
-        with util.RecordedOperation('snapshot %s' % disk['device'], self):
-            images.snapshot(None, disk_path, dest_path)
-            st = os.stat(orig_dest_path)
-
-        # And make the associated blob
-        b = Blob.new(blob_uuid, st.st_size, time.time(), time.time())
-        b.observe()
-        return b
 
     def reboot(self, hard=False):
         libvirt = util.get_libvirt()
