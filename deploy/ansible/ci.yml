@@ -18,6 +18,14 @@
       debug:
         msg: "Network is {{cinetwork['meta']['uuid']}}"
 
+    # NOTE(mikal): we used to use placement here to force the virtual network to be across
+    # at least two nodes so that we were testing the mesh networking nicely. This was great,
+    # except when the CI cluster was busy and a single node filled, and then CI tests failed
+    # instead of scheduling around the busy node. This means we weren't testing the scheduler
+    # as well as we could either. It also doesn't make sense on a CI cluster with more than
+    # two or three nodes. So instead we've stopped doing that until we can come up with
+    # some sort of anti-affinity thing instead to cause more node diversity.
+
     - name: Create a primary instance
       sf_instance:
         name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-primary"
@@ -28,7 +36,6 @@
         networkspecs:
           - network_uuid="{{cinetwork['meta']['uuid']}}",float=True
         ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+482i1EYa6FYmDrjOQpsm+mVwFs7TW9xOI9o1jc/PHXLDDg5+inp/vVAgKoV6jijwRC9juwjFBPqr8LyXh3lXhPA1LSaQa39o3QIYTLsLuLZPeueUB8UukZzOH0XAHxgAF/qFycf5pWzD4Pzs5HjNi44+9LCDYKJtc45kh3+97iezRMYhucm3wzRAKyA8mr8nNOrQq356sKgXeMP6nnX4bhUJDrcQpfsRFkTcYWAcSuU36eSETVOj9dGUJZlc4g3QBL73R1S5VWbN6DM4UIOSWxRG6oUKprgHSvFmyp5i7S0vKv7q101PcxOw14GOvI8TSirIa8O39WtyX3ugReBj mikal@sf-primary
-        placement: sf-2
         state: present
       register: primary
 
@@ -51,7 +58,6 @@
         networkspecs:
           - network_uuid="{{cinetwork['meta']['uuid']}}",float=True
         ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+482i1EYa6FYmDrjOQpsm+mVwFs7TW9xOI9o1jc/PHXLDDg5+inp/vVAgKoV6jijwRC9juwjFBPqr8LyXh3lXhPA1LSaQa39o3QIYTLsLuLZPeueUB8UukZzOH0XAHxgAF/qFycf5pWzD4Pzs5HjNi44+9LCDYKJtc45kh3+97iezRMYhucm3wzRAKyA8mr8nNOrQq356sKgXeMP6nnX4bhUJDrcQpfsRFkTcYWAcSuU36eSETVOj9dGUJZlc4g3QBL73R1S5VWbN6DM4UIOSWxRG6oUKprgHSvFmyp5i7S0vKv7q101PcxOw14GOvI8TSirIa8O39WtyX3ugReBj mikal@sf-primary
-        placement: sf-2
         state: present
       register: sf1
 
@@ -75,7 +81,6 @@
         networkspecs:
           - network_uuid="{{cinetwork['meta']['uuid']}}",float=True
         ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+482i1EYa6FYmDrjOQpsm+mVwFs7TW9xOI9o1jc/PHXLDDg5+inp/vVAgKoV6jijwRC9juwjFBPqr8LyXh3lXhPA1LSaQa39o3QIYTLsLuLZPeueUB8UukZzOH0XAHxgAF/qFycf5pWzD4Pzs5HjNi44+9LCDYKJtc45kh3+97iezRMYhucm3wzRAKyA8mr8nNOrQq356sKgXeMP6nnX4bhUJDrcQpfsRFkTcYWAcSuU36eSETVOj9dGUJZlc4g3QBL73R1S5VWbN6DM4UIOSWxRG6oUKprgHSvFmyp5i7S0vKv7q101PcxOw14GOvI8TSirIa8O39WtyX3ugReBj mikal@sf-primary
-        placement: sf-3
         state: present
       register: sf2
 
@@ -99,7 +104,6 @@
         networkspecs:
           - network_uuid="{{cinetwork['meta']['uuid']}}",float=True
         ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+482i1EYa6FYmDrjOQpsm+mVwFs7TW9xOI9o1jc/PHXLDDg5+inp/vVAgKoV6jijwRC9juwjFBPqr8LyXh3lXhPA1LSaQa39o3QIYTLsLuLZPeueUB8UukZzOH0XAHxgAF/qFycf5pWzD4Pzs5HjNi44+9LCDYKJtc45kh3+97iezRMYhucm3wzRAKyA8mr8nNOrQq356sKgXeMP6nnX4bhUJDrcQpfsRFkTcYWAcSuU36eSETVOj9dGUJZlc4g3QBL73R1S5VWbN6DM4UIOSWxRG6oUKprgHSvFmyp5i7S0vKv7q101PcxOw14GOvI8TSirIa8O39WtyX3ugReBj mikal@sf-primary
-        placement: sf-3
         state: present
       register: sf3
 
