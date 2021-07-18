@@ -6,97 +6,6 @@
 VARIABLES=""
 VERBOSE="-v"
 
-#### AWS
-if [ "$CLOUD" == "aws" ] || [ "$CLOUD" == "aws-single-node" ]
-then
-  if [ -z "$AWS_REGION" ]
-  then
-    echo ===== Must specify AWS region in \$AWS_REGION
-    exit 1
-  fi
-  VARIABLES="$VARIABLES,region=$AWS_REGION"
-
-  if [ -z "$AWS_AVAILABILITY_ZONE" ]
-  then
-    echo ===== Must specify AWS availability zone in \$AWS_AVAILABILITY_ZONE
-    exit 1
-  fi
-  VARIABLES="$VARIABLES,availability_zone=$AWS_REGION"
-
-  if [ -z "$AWS_VPC_ID" ]
-  then
-    echo ===== Must specify AWS VPC ID in \$AWS_VPC_ID
-    exit 1
-  fi
-  VARIABLES="$VARIABLES,vpc_id=$AWS_VPC_ID"
-
-  if [ -z "$AWS_SSH_KEY_NAME" ]
-  then
-    echo ===== Must specify AWS Instance SSH key name in \$AWS_SSH_KEY_NAME
-    exit 1
-  fi
-  VARIABLES="$VARIABLES,ssh_key_name=$AWS_SSH_KEY_NAME"
-fi
-
-#### Google Cloud
-if [ "$CLOUD" == "gcp" ]
-then
-  if [ -z "$GCP_PROJECT" ]
-  then
-    echo ===== Must specify GCP project in \$GCP_PROJECT
-    exit 1
-  fi
-
-  if [ -z "$NODE_IMAGE" ]
-  then
-    echo ===== Must specify the name of a boot image in \$NODE_IMAGE
-    exit 1
-  fi
-
-  if [ -z "$NODE_COUNT" ]
-  then
-    echo ===== Must specify the number of nodes to create in \$NODE_COUNT
-    exit 1
-  fi
-
-  VARIABLES="$VARIABLES,project=$GCP_PROJECT,node_image=$NODE_IMAGE,node_count=$NODE_COUNT"
-  IGNORE_MTU="1"
-
-  if [ -n "$GCP_SSH_KEY_FILENAME" ]
-  then
-    d=`cat $GCP_SSH_KEY_FILENAME.pub`
-    VARIABLES="$VARIABLES,ssh_key_filename=$GCP_SSH_KEY_FILENAME"
-    VARIABLES="$VARIABLES,ssh_key=\"$d\",ssh_user=$GCP_SSH_USER"
-  else
-    VARIABLES="$VARIABLES,ssh_key_filename=\"\",ssh_key=\"\",ssh_user=\"\""
-  fi
-fi
-
-#### Openstack
-if [ "$CLOUD" == "openstack" ]
-then
-  if [ -z "$OS_SSH_KEY_NAME" ]
-  then
-    echo ===== Must specify Openstack SSH key name in \$OS_SSH_KEY_NAME
-    exit 1
-  fi
-  VARIABLES="$VARIABLES,ssh_key_name=$OS_SSH_KEY_NAME"
-
-  if [ -z "$OS_FLAVOR_NAME" ]
-  then
-    echo ===== Must specify Openstack instance flavor name in \$OS_FLAVOR_NAME
-    exit 1
-  fi
-  VARIABLES="$VARIABLES,os_flavor=$OS_FLAVOR_NAME"
-
-  if [ -z "$OS_EXTERNAL_NET_NAME" ]
-  then
-    echo ===== Must specify Openstack External network name in \$OS_EXTERNAL_NET_NAME
-    exit 1
-  fi
-  VARIABLES="$VARIABLES,os_external_net_name=$OS_EXTERNAL_NET_NAME"
-fi
-
 #### Metal
 if [ "$CLOUD" == "metal" ]
 then
@@ -160,8 +69,7 @@ if [ -z "$CLOUD" ]
 then
 {
   echo ====
-  echo ==== CLOUD should be specified: aws, aws-single-node, gcp, localhost, metal, openstack, shakenfist
-  echo ==== eg.  ./deployandtest/sh gcp
+  echo ==== CLOUD should be specified: localhost, metal, shakenfist
   echo ====
   echo ==== Continuing, because you might know what you are doing...
   echo

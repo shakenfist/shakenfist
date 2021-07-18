@@ -1,9 +1,15 @@
 # Fake terraform for a localhost deployment
 
 - name: Determine hostname
-  shell: hostname -f
-  register: hostname_complex
-  ignore_errors: True
+  block:
+    - name: Try a lookup
+      shell: hostname -f
+      register: hostname_complex
+
+  rescue:
+    - name: Try a lookup
+      shell: hostname
+      register: hostname_complex
 
 - name: Add localhost to the right groups
   add_host:
