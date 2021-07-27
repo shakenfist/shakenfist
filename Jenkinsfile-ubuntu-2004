@@ -130,7 +130,6 @@ pipeline {
                   ubuntu@$primary sudo cat /var/log/syslog
 
               echo "=============================="
-              rm -rf $WORKSPACE/$BUILD_TAG
 
               safe_build_tag=`echo $BUILD_TAG | tr "_" "-"`
               if [ -e $source_path/keepme ]
@@ -147,6 +146,8 @@ pipeline {
                   sf-client network delete $uuid
                 done
               fi
+
+              rm -rf $WORKSPACE/$BUILD_TAG
           '''
     }
   }

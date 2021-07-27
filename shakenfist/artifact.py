@@ -99,6 +99,7 @@ class Artifact(dbo):
             indices[key] = data
 
         for key in sorted(indices):
+            self.log.info('Yielding index %s' % indices[key])
             yield indices[key]
 
     def add_index(self, blob_uuid):
@@ -108,7 +109,7 @@ class Artifact(dbo):
                 'index': index,
                 'blob_uuid': blob_uuid
             }
-            self._db_set_attribute('index_%d' % index, entry)
+            self._db_set_attribute('index_%012d' % index, entry)
             return entry
 
     def external_view_without_index(self):
@@ -157,4 +158,6 @@ def type_filter(artifact_type, a):
 
 
 def instance_snapshot_filter(instance_uuid, a):
+    if a.artifact_type != Artifact.TYPE_SNAPSHOT:
+        return False
     return a.source_url.startswith('sf://instance/%s' % instance_uuid)
