@@ -72,7 +72,7 @@ class DatabaseBackedObject(object):
         return retval
 
     def _db_get_attributes(self, attribute_prefix):
-        for key, data in etcd.get_all('attribute/%s' % type(self).object_type,
+        for key, data in etcd.get_all('attribute/%s' % self.object_type,
                                       self.__uuid, prefix=attribute_prefix):
             yield key, data
 
