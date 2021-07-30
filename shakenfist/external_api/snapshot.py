@@ -5,11 +5,13 @@ import uuid
 
 from shakenfist import artifact
 from shakenfist.artifact import Artifact, Artifacts
-from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
+from shakenfist.config import config
 from shakenfist.daemons import daemon
+from shakenfist import db
 from shakenfist.external_api import base as api_base
 from shakenfist import logutil
+from shakenfist.tasks import SnapshotTask
 
 LOG, HANDLER = logutil.setup(__name__)
 daemon.set_log_level(LOG, 'api')
@@ -39,29 +41,20 @@ class InstanceSnapshotEndpoint(api_base.Resource):
                 'sf://instance/%s/%s' % (instance_uuid, disk['device']))
 
             blob_uuid = str(uuid.uuid4())
-            blob = instance_from_db.snapshot(blob_uuid, disk)
-            blob.observe()
             entry = a.add_index(blob_uuid)
 
             out[disk['device']] = {
                 'source_url': a.source_url,
                 'artifact_uuid': a.uuid,
                 'artifact_index': entry['index'],
-                'blob_uuid': blob.uuid,
-                'blob_size': blob.size,
-                'blob_modified': blob.modified
+                'blob_uuid': blob_uuid
             }
 
-            LOG.with_fields({
-                'instance': instance_uuid,
-                'artifact': a.uuid,
-                'blob': blob.uuid,
-                'device': disk['device']
-            }).info('Created snapshot')
-            instance_from_db.add_event('api', 'snapshot %s' % disk,
+            db.enqueue(config.NODE_NAME, {
+                'tasks': [SnapshotTask(instance_uuid, disk, a.uuid, blob_uuid)],
+            })
+            instance_from_db.add_event('api', 'snapshot of %s requested' % disk,
                                        None, a.uuid)
-            if a.state == dbo.STATE_INITIAL:
-                a.state = dbo.STATE_CREATED
 
         return out
 
@@ -74,12 +67,16 @@ class InstanceSnapshotEndpoint(api_base.Resource):
             ev = snap.external_view_without_index()
             for idx in snap.get_all_indexes():
                 # Give the blob uuid a better name
-                b = Blob.from_db(idx['blob_uuid']).external_view()
-                b['blob_uuid'] = b['uuid']
-                del b['uuid']
+                b = Blob.from_db(idx['blob_uuid'])
+                if not b:
+                    continue
+
+                bout = b.external_view()
+                bout['blob_uuid'] = bout['uuid']
+                del bout['uuid']
 
                 # Merge it with the parent artifact
                 a = copy.copy(ev)
-                a.update(b)
+                a.update(bout)
                 out.append(a)
         return out

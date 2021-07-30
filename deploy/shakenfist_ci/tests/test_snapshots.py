@@ -1,3 +1,5 @@
+import time
+
 from shakenfist_ci import base
 
 
@@ -36,15 +38,31 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         # Take a snapshot
         snap1 = self.test_client.snapshot_instance(inst1['uuid'])
         self.assertIsNotNone(snap1)
-        snapshots = self.test_client.get_instance_snapshots(inst1['uuid'])
+
+        # Wait until the blob uuid specified above is the one used for the
+        # current snapshot
+        start_time = time.time()
+        while time.time() - start_time < 300:
+            snapshots = self.test_client.get_instance_snapshots(inst1['uuid'])
+            if snapshots and snapshots[-1].get('blob_uuid') == snap1['vda']['blob_uuid']:
+                break
+            time.sleep(5)
+
         self.assertEqual(1, len(snapshots))
 
         # Take another snapshot, we only get the new snapshot returned
         snap2 = self.test_client.snapshot_instance(inst1['uuid'])
         self.assertEqual(2, snap2['vda']['artifact_index'])
 
-        # get_instance_snapshots should return all snapshots however
-        snapshots = self.test_client.get_instance_snapshots(inst1['uuid'])
+        # Wait until the blob uuid specified above is the one used for the
+        # current snapshot
+        start_time = time.time()
+        while time.time() - start_time < 300:
+            snapshots = self.test_client.get_instance_snapshots(inst1['uuid'])
+            if snapshots and snapshots[-1].get('blob_uuid') == snap2['vda']['blob_uuid']:
+                break
+            time.sleep(5)
+
         self.assertEqual(2, len(snapshots))
         self.assertEqual('sf://instance/%s/vda'
                          % inst1['uuid'], snapshots[0]['source_url'])
@@ -124,12 +142,30 @@ class TestSnapshots(base.BaseNamespacedTestCase):
 
         snap1 = self.test_client.snapshot_instance(inst['uuid'], all=True)
         self.assertIsNotNone(snap1)
-        snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
+
+        # Wait until the blob uuid specified above is the one used for the
+        # current snapshot
+        start_time = time.time()
+        while time.time() - start_time < 300:
+            snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
+            if snapshots and snapshots[-1].get('blob_uuid') == snap1['vdc']['blob_uuid']:
+                break
+            time.sleep(5)
+
         self.assertEqual(2, len(snapshots))
 
         snap2 = self.test_client.snapshot_instance(inst['uuid'], all=True)
         self.assertIsNotNone(snap2)
-        snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
+
+        # Wait until the blob uuid specified above is the one used for the
+        # current snapshot
+        start_time = time.time()
+        while time.time() - start_time < 300:
+            snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
+            if snapshots and snapshots[-1].get('blob_uuid') == snap2['vdc']['blob_uuid']:
+                break
+            time.sleep(5)
+
         self.assertEqual(4, len(snapshots))
 
         for snap in snapshots:

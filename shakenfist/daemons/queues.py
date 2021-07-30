@@ -4,6 +4,7 @@ import requests
 import setproctitle
 import time
 
+from shakenfist.artifact import Artifact
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
@@ -18,7 +19,8 @@ from shakenfist.tasks import (QueueTask,
                               InstanceTask,
                               PreflightInstanceTask,
                               StartInstanceTask,
-                              FloatNetworkInterfaceTask)
+                              FloatNetworkInterfaceTask,
+                              SnapshotTask)
 from shakenfist import net
 from shakenfist import networkinterface
 from shakenfist import scheduler
@@ -50,6 +52,9 @@ def handle(jobname, workitem):
                         task.instance_uuid())
 
             if isinstance(task, FetchImageTask):
+                inst = instance.Instance.from_db(task.instance_uuid())
+
+            if isinstance(task, SnapshotTask):
                 inst = instance.Instance.from_db(task.instance_uuid())
 
             if inst:
@@ -110,6 +115,10 @@ def handle(jobname, workitem):
             elif isinstance(task, FloatNetworkInterfaceTask):
                 # Just punt it to the network node now that the interface is ready
                 db.enqueue('networknode', task)
+
+            elif isinstance(task, SnapshotTask):
+                snapshot(inst, task.disk(),
+                         task.artifact_uuid(), task.blob_uuid())
 
             else:
                 log_i.with_field('task', task).error(
@@ -290,6 +299,15 @@ def instance_delete(inst):
                     # Network not used by any other instance therefore delete
                     with util.RecordedOperation('remove network from node', n):
                         n.delete_on_hypervisor()
+
+
+def snapshot(inst, disk, artifact_uuid, blob_uuid):
+    blob = inst.snapshot(blob_uuid, disk)
+    blob.observe()
+
+    a = Artifact.from_db(artifact_uuid)
+    if a.state == dbo.STATE_INITIAL:
+        a.state = dbo.STATE_CREATED
 
 
 class Monitor(daemon.Daemon):
