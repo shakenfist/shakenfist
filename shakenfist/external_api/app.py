@@ -402,9 +402,11 @@ class Instances(api_base.Resource):
             if n.state.value != Node.STATE_CREATED:
                 return api_base.error(404, 'Specified node not ready')
 
-        # Sanity check
+        # Sanity check and lookup blobs for disks where relevant
         if not disk:
             return api_base.error(400, 'instance must specify at least one disk')
+
+        transformed_disk = []
         for d in disk:
             if not isinstance(d, dict):
                 return api_base.error(400, 'disk specification should contain JSON objects')
@@ -412,13 +414,22 @@ class Instances(api_base.Resource):
             disk_base = d.get('base')
             if not disk_base:
                 disk_base = ''
+
             if disk_base.startswith('label:'):
                 label = disk_base[len('label:'):]
                 a = Artifact.from_url(
                     Artifact.TYPE_LABEL, 'sf://label/%s/%s' % (get_jwt_identity(), label))
                 if not a:
                     return api_base.error(404, 'label %s not found' % label)
-                d['base'] = 'sf://blob/%s' % a.most_recent_index['blob_uuid']
+                d['blob_uuid'] = a.most_recent_index['blob_uuid']
+            elif disk_base.startswith('sf://snapshot/'):
+                a = Artifact.from_db(disk_base[len('sf://snapshot/'):])
+                d['blob_uuid'] = a.most_recent_index['blob_uuid']
+            elif disk_base.startswith('sf://blob/'):
+                d['blob_uuid'] = disk_base[len('sf://blob/'):]
+
+            transformed_disk.append(d)
+        disk = transformed_disk
 
         if network:
             for netdesc in network:
@@ -564,7 +575,10 @@ class Instances(api_base.Resource):
         # Create a queue entry for the instance start
         tasks = [PreflightInstanceTask(inst.uuid, network)]
         for disk in inst.disk_spec:
-            if disk.get('base'):
+            if disk.get('blob_uuid'):
+                tasks.append(FetchImageTask('sf://blob/%s' %
+                                            disk['blob_uuid'], inst.uuid))
+            elif disk.get('base'):
                 tasks.append(FetchImageTask(disk['base'], inst.uuid))
         tasks.append(StartInstanceTask(inst.uuid, network))
         tasks.extend(float_tasks)
