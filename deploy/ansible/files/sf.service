@@ -26,14 +26,6 @@ Environment=SHAKENFIST_DNS_SERVER="{{dns_server}}"
 Environment=SHAKENFIST_HTTP_PROXY_SERVER="{{http_proxy}}"
 {% endif %}
 
-# Whether we have a local cloud image mirror is controlled by the
-# HAS_MIRROR ansible variable. Define HAS_MIRROR with any value to use
-# a local mirror, otherwise leave the variable undefined.
-{% if HAS_MIRROR is defined %}
-Environment=SHAKENFIST_DOWNLOAD_URL_CIRROS="http://sf-1/mirrors/download.cirros-cloud.net/%(vernum)s/cirros-%(vernum)s-x86_64-disk.img"
-Environment=SHAKENFIST_DOWNLOAD_URL_UBUNTU="http://sf-1/mirrors/cloud-images.ubuntu.com/%(vername)s/current/%(vername)s-server-cloudimg-amd64.img"
-{% endif %}
-
 # Is glusterfs enabled? If so, we fast path some disk accesses straight
 # to gluster.
 {% if gluster_enabled == "1" %}
