@@ -13,6 +13,7 @@ import socket
 import time
 from uuid import uuid4
 
+from shakenfist.artifact import BLOB_URL
 from shakenfist import baseobject
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
@@ -515,7 +516,7 @@ class Instance(dbo):
 
                     disk_base = disk.get('base')
                     if disk.get('blob_uuid'):
-                        disk_base = 'sf://blob/%s' % disk['blob_uuid']
+                        disk_base = '%s%s' % (BLOB_URL, disk['blob_uuid'])
 
                     if disk_base:
                         img = images.Image.new(disk_base)

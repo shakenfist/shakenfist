@@ -24,7 +24,7 @@ import ipaddress
 import re
 import uuid
 
-from shakenfist.artifact import Artifact
+from shakenfist.artifact import Artifact, BLOB_URL, LABEL_URL, SNAPSHOT_URL
 from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.daemons import daemon
@@ -418,15 +418,15 @@ class Instances(api_base.Resource):
             if disk_base.startswith('label:'):
                 label = disk_base[len('label:'):]
                 a = Artifact.from_url(
-                    Artifact.TYPE_LABEL, 'sf://label/%s/%s' % (get_jwt_identity(), label))
+                    Artifact.TYPE_LABEL, '%s%s/%s' % (LABEL_URL, get_jwt_identity(), label))
                 if not a:
                     return api_base.error(404, 'label %s not found' % label)
                 d['blob_uuid'] = a.most_recent_index['blob_uuid']
-            elif disk_base.startswith('sf://snapshot/'):
-                a = Artifact.from_db(disk_base[len('sf://snapshot/'):])
+            elif disk_base.startswith(SNAPSHOT_URL):
+                a = Artifact.from_db(disk_base[len(SNAPSHOT_URL):])
                 d['blob_uuid'] = a.most_recent_index['blob_uuid']
-            elif disk_base.startswith('sf://blob/'):
-                d['blob_uuid'] = disk_base[len('sf://blob/'):]
+            elif disk_base.startswith(BLOB_URL):
+                d['blob_uuid'] = disk_base[len(BLOB_URL):]
 
             transformed_disk.append(d)
         disk = transformed_disk
@@ -576,8 +576,8 @@ class Instances(api_base.Resource):
         tasks = [PreflightInstanceTask(inst.uuid, network)]
         for disk in inst.disk_spec:
             if disk.get('blob_uuid'):
-                tasks.append(FetchImageTask('sf://blob/%s' %
-                                            disk['blob_uuid'], inst.uuid))
+                tasks.append(FetchImageTask(
+                    '%s%s' % (BLOB_URL, disk['blob_uuid']), inst.uuid))
             elif disk.get('base'):
                 tasks.append(FetchImageTask(disk['base'], inst.uuid))
         tasks.append(StartInstanceTask(inst.uuid, network))

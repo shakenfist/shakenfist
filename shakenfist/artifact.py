@@ -14,6 +14,12 @@ from shakenfist import logutil
 LOG, _ = logutil.setup(__name__)
 
 
+BLOB_URL = 'sf://blob/'
+INSTANCE_URL = 'sf://instance/'
+LABEL_URL = 'sf://label/'
+SNAPSHOT_URL = 'sf://snapshot/'
+
+
 class Artifact(dbo):
     object_type = 'artifact'
     current_version = 2
@@ -160,4 +166,4 @@ def type_filter(artifact_type, a):
 def instance_snapshot_filter(instance_uuid, a):
     if a.artifact_type != Artifact.TYPE_SNAPSHOT:
         return False
-    return a.source_url.startswith('sf://instance/%s' % instance_uuid)
+    return a.source_url.startswith('%s%s' % (INSTANCE_URL, instance_uuid))
