@@ -48,6 +48,16 @@ pipeline {
 
                 SOURCE_PATH="$WORKSPACE/$BUILD_TAG"
 
+                echo "==== shakenfist git log ===="
+                cd $SOURCE_PATH/shakenfist
+                git log -5 --no-merges
+
+                echo "==== client-python git log ===="
+                cd $SOURCE_PATH/client-python
+                git log -5 --no-merges
+
+                echo "==== end git logs ===="
+
                 cd $SOURCE_PATH/shakenfist
                 . /home/jenkins/sf-ci
                 ansible-playbook -i /home/jenkins/hosts \
