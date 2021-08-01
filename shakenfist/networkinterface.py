@@ -203,10 +203,6 @@ def interfaces_for_instance(instance):
         nis[ni.order] = ni
         loggable_nis[ni.order] = str(ni)
 
-    LOG.with_fields({
-        'instance': instance,
-        'interfaces': loggable_nis
-    }).debug('Found %d interfaces' % len(nis))
     for order in sorted(nis.keys()):
         yield nis[order]
 
