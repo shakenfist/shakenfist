@@ -27,7 +27,7 @@ def set_log_level(log, name):
     process_name(name)
 
     # Check for configuration override
-    level = config.get('LOGLEVEL_' + name.upper())
+    level = getattr(config, 'LOGLEVEL_' + name.upper(), None)
     if level:
         numeric_level = getattr(logging, level.upper(), None)
         if not isinstance(numeric_level, int):

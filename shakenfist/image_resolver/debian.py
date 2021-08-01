@@ -20,8 +20,8 @@ def resolve(name):
             raise exceptions.VersionSpecificationError(
                 'Cannot parse version: %s' % name)
 
-        url = config.get('DOWNLOAD_URL_DEBIAN') % {'vernum': vernum}
-        checksum_url = config.get('CHECKSUM_URL_DEBIAN') % {'vernum': vernum}
+        url = config.DOWNLOAD_URL_DEBIAN % {'vernum': vernum}
+        checksum_url = config.CHECKSUM_URL_DEBIAN % {'vernum': vernum}
         resp = requests.head(url, allow_redirects=True,
                              headers={'User-Agent': util.get_user_agent()})
         if resp.status_code != 200:
@@ -31,7 +31,7 @@ def resolve(name):
     else:
         found_any = False
         for vernum in range(9, 20):
-            url = config.get('DOWNLOAD_URL_DEBIAN') % {'vernum': vernum}
+            url = config.DOWNLOAD_URL_DEBIAN % {'vernum': vernum}
             resp = requests.head(url, allow_redirects=True,
                                  headers={'User-Agent': util.get_user_agent()})
             if resp.status_code != 200:
@@ -41,8 +41,8 @@ def resolve(name):
             else:
                 found_any = True
 
-        url = config.get('DOWNLOAD_URL_DEBIAN') % {'vernum': vernum}
-        checksum_url = config.get('CHECKSUM_URL_DEBIAN') % {'vernum': vernum}
+        url = config.DOWNLOAD_URL_DEBIAN % {'vernum': vernum}
+        checksum_url = config.CHECKSUM_URL_DEBIAN % {'vernum': vernum}
 
     checksums = resolver_util.fetch_remote_checksum(checksum_url)
     checksum = checksums.get(os.path.basename(url))

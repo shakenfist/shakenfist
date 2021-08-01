@@ -23,16 +23,7 @@ def get_node_name():
     return socket.getfqdn()
 
 
-class SFConfigBase(BaseSettings):
-    """
-    Separated from SFConfig for ease of testing
-    """
-
-    def get(self, key):
-        return self.dict()[key]
-
-
-class SFConfig(SFConfigBase):
+class SFConfig(BaseSettings):
     ###################
     # Deployment Wide #
     ###################

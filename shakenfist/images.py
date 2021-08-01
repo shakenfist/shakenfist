@@ -226,11 +226,9 @@ class Image(dbo):
         """Fetch a blob from the cluster."""
 
         actual_image = self.version_image_path()
-        blob_uuid = url[len(BLOB_URL):]
-        blob_path = os.path.join(config.get(
-            'STORAGE_PATH'), 'blobs', blob_uuid)
-        os.makedirs(os.path.join(config.get(
-            'STORAGE_PATH'), 'blobs'), exist_ok=True)
+        blob_uuid = url[len('sf://blob/'):]
+        blob_path = os.path.join(config.STORAGE_PATH, 'blobs', blob_uuid)
+        os.makedirs(os.path.join(config.STORAGE_PATH, 'blobs'), exist_ok=True)
 
         locations = Blob.from_db(blob_uuid).locations
         random.shuffle(locations)
@@ -238,10 +236,10 @@ class Image(dbo):
 
         if not os.path.exists(blob_path):
             with util.RecordedOperation('fetch blob', related_object):
-                url = 'http://%s:%d/blob/%s' % (blob_source, config.get('API_PORT'),
+                url = 'http://%s:%d/blob/%s' % (blob_source, config.API_PORT,
                                                 blob_uuid)
                 admin_token = util.get_api_token(
-                    'http://%s:%d' % (blob_source, config.get('API_PORT')))
+                    'http://%s:%d' % (blob_source, config.API_PORT))
                 r = requests.request('GET', url,
                                      headers={'Authorization': admin_token,
                                               'User-Agent': util.get_user_agent()})
@@ -327,8 +325,8 @@ class Image(dbo):
 
     def _open_connection(self, url):
         proxies = {}
-        if config.get('HTTP_PROXY_SERVER'):
-            proxies['http'] = config.get('HTTP_PROXY_SERVER')
+        if config.HTTP_PROXY_SERVER:
+            proxies['http'] = config.HTTP_PROXY_SERVER
 
         resp = requests.get(url, allow_redirects=True, stream=True,
                             headers={'User-Agent': util.get_user_agent()},

@@ -173,12 +173,12 @@ def main():
         floating_network = net.Network.from_db('floating')
         if not floating_network:
             floating_network = net.Network.create_floating_network(
-                config.get('FLOATING_NETWORK'))
+                config.FLOATING_NETWORK)
 
         subst = {
             'physical_bridge': util.get_safe_interface_name(
-                'phy-br-%s' % config.get('NODE_EGRESS_NIC')),
-            'physical_nic': config.get('NODE_EGRESS_NIC')
+                'phy-br-%s' % config.NODE_EGRESS_NIC),
+            'physical_nic': config.NODE_EGRESS_NIC
         }
 
         if not util.check_for_interface(subst['physical_bridge']):

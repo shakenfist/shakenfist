@@ -215,4 +215,4 @@ def interfaces_for_network(network):
 def inactive_network_interfaces():
     return NetworkInterfaces([
         partial(baseobject.state_filter, [dbo.STATE_DELETED, dbo.STATE_ERROR]),
-        partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))])
+        partial(baseobject.state_age_filter, config.CLEANER_DELAY)])

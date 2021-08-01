@@ -106,7 +106,7 @@ class ActualLock(Lock):
     def __enter__(self):
         start_time = time.time()
         slow_warned = False
-        threshold = int(config.get('SLOW_LOCK_THRESHOLD'))
+        threshold = int(config.SLOW_LOCK_THRESHOLD)
 
         while time.time() - start_time < self.timeout:
             res = self.acquire()

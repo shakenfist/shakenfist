@@ -8,7 +8,7 @@ from pydantic import AnyHttpUrl, IPvAnyAddress
 
 from shakenfist import dhcp
 from shakenfist.ipmanager import IPManager
-from shakenfist.config import SFConfigBase
+from shakenfist.config import BaseSettings
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -39,7 +39,7 @@ class DHCPTestCase(testtools.TestCase):
     def setUp(self):
         super(DHCPTestCase, self).setUp()
 
-        class FakeConfig(SFConfigBase):
+        class FakeConfig(BaseSettings):
             DNS_SERVER: str = '8.8.8.8'
             MAX_HYPERVISOR_MTU: int = 8000
             NODE_NAME: str = 'foo'
