@@ -38,7 +38,7 @@ class InstanceSnapshotEndpoint(api_base.Resource):
 
             a = Artifact.from_url(
                 Artifact.TYPE_SNAPSHOT,
-                'sf://instance/%s/%s' % (instance_uuid, disk['device']))
+                '%s%s/%s' % (artifact.INSTANCE_URL, instance_uuid, disk['device']))
 
             blob_uuid = str(uuid.uuid4())
             entry = a.add_index(blob_uuid)

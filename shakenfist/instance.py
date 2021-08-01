@@ -13,6 +13,7 @@ import socket
 import time
 from uuid import uuid4
 
+from shakenfist.artifact import BLOB_URL
 from shakenfist import baseobject
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
@@ -81,6 +82,7 @@ def _initialize_block_devices(instance_path, disk_spec):
                 'bus': bus,
                 'path': os.path.join(instance_path, root_device),
                 'base': disk_spec[0].get('base'),
+                'blob_uuid': disk_spec[0].get('blob_uuid'),
                 'present_as': _get_defaulted_disk_type(disk_spec[0]),
                 'snapshot_ignores': False
             },
@@ -106,6 +108,7 @@ def _initialize_block_devices(instance_path, disk_spec):
             'bus': bus,
             'path': os.path.join(instance_path, device),
             'base': d.get('base'),
+            'blob_uuid': d.get('blob_uuid'),
             'present_as': _get_defaulted_disk_type(d),
             'snapshot_ignores': False
         })
@@ -511,8 +514,12 @@ class Instance(dbo):
                     disk['source'] = "<source file='%s'/>" % disk['path']
                     disk['source_type'] = 'file'
 
-                    if disk.get('base'):
-                        img = images.Image.new(disk['base'])
+                    disk_base = disk.get('base')
+                    if disk.get('blob_uuid'):
+                        disk_base = '%s%s' % (BLOB_URL, disk['blob_uuid'])
+
+                    if disk_base:
+                        img = images.Image.new(disk_base)
                         hashed_image_path = img.version_image_path()
 
                         with util.RecordedOperation('detect cdrom images', self):

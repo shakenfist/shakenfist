@@ -9,7 +9,7 @@ import requests
 import shutil
 import time
 
-from shakenfist.artifact import Artifact
+from shakenfist.artifact import Artifact, BLOB_URL, SNAPSHOT_URL
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
@@ -211,13 +211,13 @@ class Image(dbo):
         self.state = self.STATE_DELETED
 
     def get(self, locks, related_object):
-        if self.url.startswith('sf://blob/'):
+        if self.url.startswith(BLOB_URL):
             return self._blob_get(self.url, locks, related_object)
-        elif self.url.startswith('sf://snapshot/'):
-            snapshot_uuid = self.url[len('sf://snapshot/'):]
+        elif self.url.startswith(SNAPSHOT_URL):
+            snapshot_uuid = self.url[len(SNAPSHOT_URL):]
             snap = Artifact.from_db(snapshot_uuid)
             blob_uuid = snap.most_recent_index['blob_uuid']
-            url = 'sf://blob/%s' % blob_uuid
+            url = '%s%s' % (BLOB_URL, blob_uuid)
             return self._blob_get(url, locks, related_object)
         else:
             return self._http_get(self.url, locks, related_object)
@@ -226,7 +226,7 @@ class Image(dbo):
         """Fetch a blob from the cluster."""
 
         actual_image = self.version_image_path()
-        blob_uuid = url[len('sf://blob/'):]
+        blob_uuid = url[len(BLOB_URL):]
         blob_path = os.path.join(config.get(
             'STORAGE_PATH'), 'blobs', blob_uuid)
         os.makedirs(os.path.join(config.get(
