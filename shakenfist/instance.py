@@ -38,7 +38,7 @@ def _get_defaulted_disk_bus(disk):
     bus = disk.get('bus')
     if bus:
         return bus
-    return config.get('DISK_BUS')
+    return config.DISK_BUS
 
 
 def _get_disk_device_base(bus):
@@ -70,7 +70,7 @@ def _initialize_block_devices(instance_path, disk_spec):
     config_device = _get_disk_device_base(bus) + 'b'
 
     disk_type = 'qcow2'
-    if config.get('DISK_FORMAT') == 'flat':
+    if config.DISK_FORMAT == 'flat':
         disk_type = 'raw'
 
     block_devices = {
@@ -119,7 +119,7 @@ def _initialize_block_devices(instance_path, disk_spec):
 
 
 def _blob_path():
-    blob_path = os.path.join(config.get('STORAGE_PATH'), 'blobs')
+    blob_path = os.path.join(config.STORAGE_PATH, 'blobs')
     os.makedirs(blob_path, exist_ok=True)
     return blob_path
 
@@ -301,7 +301,7 @@ class Instance(dbo):
 
     @property
     def instance_path(self):
-        return os.path.join(config.get('STORAGE_PATH'), 'instances', self.uuid)
+        return os.path.join(config.STORAGE_PATH, 'instances', self.uuid)
 
     # Values routed to attributes, writes are via helper methods.
     @property
@@ -548,7 +548,7 @@ class Instance(dbo):
                             disk['device'] = 'hd%s' % disk['device'][-1]
                             disk['bus'] = 'ide'
                         else:
-                            if config.get('DISK_FORMAT') == 'qcow':
+                            if config.DISK_FORMAT == 'qcow':
                                 with util.RecordedOperation('create copy on write layer', self):
                                     images.create_cow([lock], hashed_image_path,
                                                       disk['path'], disk['size'])
@@ -561,7 +561,7 @@ class Instance(dbo):
                                     '      </backingStore>\n'
                                     % (hashed_image_path))
 
-                            elif config.get('DISK_FORMAT') == 'qcow_flat':
+                            elif config.DISK_FORMAT == 'qcow_flat':
                                 with util.RecordedOperation('resize image', self):
                                     resized_image_path = img.resize(
                                         [lock], disk['size'])
@@ -570,7 +570,7 @@ class Instance(dbo):
                                     images.create_flat(
                                         [lock], resized_image_path, disk['path'])
 
-                            elif config.get('DISK_FORMAT') == 'flat':
+                            elif config.DISK_FORMAT == 'flat':
                                 with util.RecordedOperation('resize image', self):
                                     resized_image_path = img.resize(
                                         [lock], disk['size'])
@@ -628,7 +628,7 @@ class Instance(dbo):
         md = json.dumps({
             'random_seed': base64.b64encode(os.urandom(512)).decode('ascii'),
             'uuid': self.uuid,
-            'availability_zone': config.get('ZONE'),
+            'availability_zone': config.ZONE,
             'hostname': '%s.local' % self.name,
             'launch_index': 0,
             'devices': [],
@@ -675,7 +675,7 @@ class Instance(dbo):
                     'ethernet_mac_address': iface.macaddr,
                     'id': devname,
                     'name': devname,
-                    'mtu': config.get('MAX_HYPERVISOR_MTU') - 50,
+                    'mtu': config.MAX_HYPERVISOR_MTU - 50,
                     'type': 'vif',
                     'vif_id': iface.uuid
                 }
@@ -747,7 +747,7 @@ class Instance(dbo):
     def _create_domain_xml(self):
         """Create the domain XML for the instance."""
 
-        with open(os.path.join(config.get('STORAGE_PATH'), 'libvirt.tmpl')) as f:
+        with open(os.path.join(config.STORAGE_PATH, 'libvirt.tmpl')) as f:
             t = jinja2.Template(f.read())
 
         networks = []
@@ -982,7 +982,7 @@ inactive_states_filter = partial(
 def inactive_instances():
     return Instances([
         inactive_states_filter,
-        partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))])
+        partial(baseobject.state_age_filter, config.CLEANER_DELAY)])
 
 
 def healthy_instances_on_node(n):

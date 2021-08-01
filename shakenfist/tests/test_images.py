@@ -10,7 +10,7 @@ from shakenfist import images
 from shakenfist import logutil
 from shakenfist.baseobject import State
 from shakenfist.tests import test_shakenfist
-from shakenfist.config import SFConfigBase
+from shakenfist.config import BaseSettings
 
 
 LOG, _ = logutil.setup(__name__)
@@ -43,7 +43,7 @@ class FakeImage(object):
         return ('image', self.url)
 
 
-class FakeConfig(SFConfigBase):
+class FakeConfig(BaseSettings):
     STORAGE_PATH: str = '/a/b/c'
     NODE_NAME: str = 'sf-245'
     DOWNLOAD_URL_CIRROS: AnyHttpUrl = (
@@ -579,7 +579,7 @@ class ImageObjectTestCase(test_shakenfist.ShakenFistTestCase):
             'qemu-img convert --force-share -O qcow2 /a/b/c/base /a/b/c/snap')
 
 
-class FakeConfigTmpFile(SFConfigBase):
+class FakeConfigTmpFile(BaseSettings):
     GLUSTER_ENABLED = False
     STORAGE_PATH: str = '/tmp/'
     NODE_NAME: str = 'sf-245'

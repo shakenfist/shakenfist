@@ -130,7 +130,7 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
         msg = '%s[%s] %s' % (setproctitle.getproctitle(), os.getpid(), msg)
         kwargs["extra"] = self.extra
 
-        if config.get('LOG_METHOD_TRACE'):
+        if config.LOG_METHOD_TRACE:
             # Determine the name of the calling method
             filename = traceback.extract_stack()[-4].filename
             f_match = self.FILENAME_RE.match(filename)

@@ -82,7 +82,7 @@ class Scheduler(object):
     def _has_sufficient_cpu(self, log_ctx, cpus, node, cpu_ratio):
         preferred_max_cpus = self.metrics[node].get('cpu_max', 0) * cpu_ratio
         hard_max_cpus = (self.metrics[node].get(
-            'cpu_max', 0) * config.get('CPU_OVERCOMMIT_RATIO'))
+            'cpu_max', 0) * config.CPU_OVERCOMMIT_RATIO)
         current_cpu = self.metrics[node].get('cpu_total_instance_vcpus', 0)
 
         if current_cpu + cpus > hard_max_cpus:
@@ -111,7 +111,7 @@ class Scheduler(object):
         # there is no overlap with existing VMs when checking this. Note as
         # well that metrics are in MB...
         available = (self.metrics[node].get('memory_available', 0) -
-                     (config.get('RAM_SYSTEM_RESERVATION') * 1024))
+                     (config.RAM_SYSTEM_RESERVATION * 1024))
         if available - memory < 0.0:
             log_ctx.with_fields({
                 'node': node,
@@ -125,12 +125,12 @@ class Scheduler(object):
         instance_memory = (
             self.metrics[node].get('memory_total_instance_actual', 0) + memory)
         if (instance_memory / self.metrics[node].get('memory_max', 0) >
-                config.get('RAM_OVERCOMMIT_RATIO')):
+                config.RAM_OVERCOMMIT_RATIO):
             log_ctx.with_fields({
                 'node': node,
                 'instance_memory': instance_memory,
                 'memory_max': self.metrics[node].get('memory_max', 0),
-                'overcommit_ratio': config.get('RAM_OVERCOMMIT_RATIO')
+                'overcommit_ratio': config.RAM_OVERCOMMIT_RATIO
             }).debug('KSM overcommit ratio exceeded')
             return False
 
@@ -288,10 +288,10 @@ class Scheduler(object):
                     'cpu_total_instance_vcpus', 0)
                 actual_cluster_cpu += self.metrics[node].get(
                     'cpu_available', 0)
-            cpu_ratio = min(config.get('CPU_OVERCOMMIT_RATIO'),
+            cpu_ratio = min(config.CPU_OVERCOMMIT_RATIO,
                             math.ceil(current_cluster_cpu / actual_cluster_cpu))
             log_ctx.info('Current cluster CPU overcommit ratio is %d, configured maximum %d',
-                         cpu_ratio, config.get('CPU_OVERCOMMIT_RATIO'))
+                         cpu_ratio, config.CPU_OVERCOMMIT_RATIO)
 
             for n in copy.copy(candidates):
                 preference = self._has_sufficient_cpu(

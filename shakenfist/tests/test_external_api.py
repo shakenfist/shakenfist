@@ -7,7 +7,7 @@ import mock
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     State)
-from shakenfist.config import config, SFConfigBase, SFConfig
+from shakenfist.config import config, BaseSettings, SFConfig
 from shakenfist.external_api import app as external_api
 from shakenfist.ipmanager import IPManager
 from shakenfist.tests import test_shakenfist
@@ -755,7 +755,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         self.mock_virt_from_db = self.virt_from_db.start()
         self.addCleanup(self.virt_from_db.stop)
 
-        class FakeConfig(SFConfigBase):
+        class FakeConfig(BaseSettings):
             API_ASYNC_WAIT: int = 1
             LOG_METHOD_TRACE: int = 1
 
@@ -919,7 +919,7 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
     def setUp(self):
         super(ExternalApiNetworkTestCase, self).setUp()
 
-        class FakeConfig(SFConfigBase):
+        class FakeConfig(BaseSettings):
             NODE_NAME: str = 'seriously'
             NODE_IP: str = '127.0.0.1'
             NETWORK_NODE_IP = '127.0.0.1'

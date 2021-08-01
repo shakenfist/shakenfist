@@ -1,7 +1,7 @@
 import mock
 
 from shakenfist.baseobject import State
-from shakenfist.config import SFConfigBase
+from shakenfist.config import BaseSettings
 from shakenfist.daemons import cleaner
 from shakenfist.tests import test_shakenfist
 
@@ -58,7 +58,7 @@ def fake_exists(path):
     return True
 
 
-class FakeConfig(SFConfigBase):
+class FakeConfig(BaseSettings):
     NODE_NAME: str = 'abigcomputer'
     STORAGE_PATH: str = '/srv/shakenfist'
     LOGLEVEL_CLEANER: str = 'debug'

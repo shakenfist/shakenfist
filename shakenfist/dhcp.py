@@ -18,15 +18,15 @@ class DHCP(object):
 
         self.subst = {
             'config_dir': os.path.join(
-                config.get('STORAGE_PATH'), 'dhcp', self.network.uuid),
-            'zone': config.get('ZONE'),
+                config.STORAGE_PATH, 'dhcp', self.network.uuid),
+            'zone': config.ZONE,
 
             'router': network.router,
             'dhcp_start': network.dhcp_start,
             'netmask': network.netmask,
             'broadcast': network.broadcast,
-            'dns_server': config.get('DNS_SERVER'),
-            'mtu': config.get('MAX_HYPERVISOR_MTU') - 50,
+            'dns_server': config.DNS_SERVER,
+            'mtu': config.MAX_HYPERVISOR_MTU - 50,
 
             'netns': self.network.uuid,
             'in_netns': 'ip netns exec %s' % self.network.uuid,
@@ -40,8 +40,7 @@ class DHCP(object):
         return ('dhcp', self.network.uuid)
 
     def _read_template(self, template):
-        with open(os.path.join(config.get('STORAGE_PATH'),
-                               template)) as f:
+        with open(os.path.join(config.STORAGE_PATH, template)) as f:
             return jinja2.Template(f.read())
 
     def _make_config(self):

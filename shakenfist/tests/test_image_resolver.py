@@ -9,7 +9,7 @@ from shakenfist.image_resolver import cirros
 from shakenfist.image_resolver import ubuntu
 from shakenfist import logutil
 from shakenfist.tests import test_shakenfist
-from shakenfist.config import SFConfigBase
+from shakenfist.config import BaseSettings
 
 
 LOG, _ = logutil.setup(__name__)
@@ -30,7 +30,7 @@ class FakeResponse(object):
         pass
 
 
-class FakeConfig(SFConfigBase):
+class FakeConfig(BaseSettings):
     STORAGE_PATH: str = '/a/b/c'
     NODE_NAME: str = 'sf-245'
     DOWNLOAD_URL_CIRROS: AnyHttpUrl = (

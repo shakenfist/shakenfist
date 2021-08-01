@@ -39,7 +39,7 @@ def error(status_code, message, suppress_traceback=False):
     _, _, tb = sys.exc_info()
     formatted_trace = traceback.format_exc()
 
-    if TESTING or config.get('INCLUDE_TRACEBACKS'):
+    if TESTING or config.INCLUDE_TRACEBACKS:
         if tb:
             body['traceback'] = formatted_trace
 
@@ -97,10 +97,10 @@ def redirect_instance_request(func):
             return
 
         if placement.get('node') != config.NODE_NAME:
-            url = 'http://%s:%d%s' % (placement['node'], config.get('API_PORT'),
+            url = 'http://%s:%d%s' % (placement['node'], config.API_PORT,
                                       flask.request.environ['PATH_INFO'])
             api_token = util.get_api_token(
-                'http://%s:%d' % (placement['node'], config.get('API_PORT')),
+                'http://%s:%d' % (placement['node'], config.API_PORT),
                 namespace=get_jwt_identity())
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'], url,
@@ -177,13 +177,12 @@ def redirect_to_network_node(func):
         if not util.is_network_node():
             admin_token = util.get_api_token(
                 'http://%s:%d' % (config.NETWORK_NODE_IP,
-                                  config.get('API_PORT')),
+                                  config.API_PORT),
                 namespace='system')
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'],
                 'http://%s:%d%s'
-                % (config.NETWORK_NODE_IP,
-                   config.get('API_PORT'),
+                % (config.NETWORK_NODE_IP, config.API_PORT,
                    flask.request.environ['PATH_INFO']),
                 data=flask.request.data,
                 headers={'Authorization': admin_token,

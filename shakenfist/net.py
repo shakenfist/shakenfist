@@ -57,7 +57,7 @@ class Network(dbo):
         self.__vxid = static_values.get('vxid')
 
         self.physical_nic = static_values.get(
-            'physical_nic', config.get('NODE_EGRESS_NIC'))
+            'physical_nic', config.NODE_EGRESS_NIC)
 
         ipm = IPManager.from_db(self.uuid)
         self.__ipblock = ipm.network_address
@@ -250,7 +250,7 @@ class Network(dbo):
             'vx_veth_inner': 'veth-%06x-i' % self.vxid,
 
             'physical_interface': self.physical_nic,
-            'physical_bridge': 'phy-br-%s' % config.get('NODE_EGRESS_NIC'),
+            'physical_bridge': 'phy-br-%s' % config.NODE_EGRESS_NIC,
             'physical_veth_outer': 'phy-%06x-o' % self.vxid,
             'physical_veth_inner': 'phy-%06x-i' % self.vxid,
 
@@ -704,7 +704,7 @@ class Networks(dbo_iter):
 def inactive_networks():
     return Networks([
                     baseobject.inactive_states_filter,
-                    partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))])
+                    partial(baseobject.state_age_filter, config.CLEANER_DELAY)])
 
 
 def networks_in_namespace(namespace):

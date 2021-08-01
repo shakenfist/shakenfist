@@ -13,12 +13,11 @@ LOG, _ = logutil.setup(__name__)
 
 def resolve(name):
     # Name is assumed to be in the form ubuntu, ubuntu:18.04, or ubuntu:bionic
-    resp = requests.get(config.get('LISTING_URL_UBUNTU'),
-                        allow_redirects=True,
+    resp = requests.get(config.LISTING_URL_UBUNTU, allow_redirects=True,
                         headers={'User-Agent': util.get_user_agent()})
     if resp.status_code != 200:
         raise exceptions.HTTPError('Failed to fetch %s, status code %d'
-                                   % (config.get('LISTING_URL_UBUNTU'), resp.status_code))
+                                   % (config.LISTING_URL_UBUNTU, resp.status_code))
 
     num_to_name = {}
     name_to_num = {}
@@ -50,10 +49,10 @@ def resolve(name):
             raise exceptions.VersionSpecificationError(
                 'Cannot parse version: %s' % name)
 
-    url = (config.get('DOWNLOAD_URL_UBUNTU') % {'vernum': vernum,
-                                                'vername': vername})
+    url = (config.DOWNLOAD_URL_UBUNTU % {'vernum': vernum,
+                                         'vername': vername})
 
-    checksum_url = config.get('CHECKSUM_URL_UBUNTU') % {'vername': vername}
+    checksum_url = config.CHECKSUM_URL_UBUNTU % {'vername': vername}
     checksums = resolver_util.fetch_remote_checksum(checksum_url)
     checksum = checksums.get('*' + os.path.basename(url))
     LOG.with_fields({

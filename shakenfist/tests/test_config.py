@@ -20,8 +20,8 @@ class ConfigTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch.dict('os.environ', {'SHAKENFIST_STORAGE_PATH': 'foo'})
     def test_string_override(self):
         conf = SFConfig()
-        self.assertTrue(isinstance(conf.get('STORAGE_PATH'), str))
-        self.assertEqual('foo', conf.get('STORAGE_PATH'))
+        self.assertTrue(isinstance(conf.STORAGE_PATH, str))
+        self.assertEqual('foo', conf.STORAGE_PATH)
 
     @mock.patch.dict('os.environ', {'SHAKENFIST_CPU_OVERCOMMIT_RATIO': '1'})
     def test_int_override(self):

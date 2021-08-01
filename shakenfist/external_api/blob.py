@@ -15,10 +15,8 @@ class BlobEndpoint(api_base.Resource):
     @jwt_required
     def get(self, blob_uuid=None):
         # Fast path if we have the blob locally
-        os.makedirs(os.path.join(config.get(
-            'STORAGE_PATH'), 'blobs'), exist_ok=True)
-        blob_path = os.path.join(config.get(
-            'STORAGE_PATH'), 'blobs', blob_uuid)
+        os.makedirs(os.path.join(config.STORAGE_PATH, 'blobs'), exist_ok=True)
+        blob_path = os.path.join(config.STORAGE_PATH, 'blobs', blob_uuid)
         if os.path.exists(blob_path):
             def read_file(filename):
                 with open(blob_path, 'rb') as f:
@@ -42,10 +40,9 @@ class BlobEndpoint(api_base.Resource):
 
         def read_remote(target, blob_uuid, blob_path=None):
             api_token = util.get_api_token(
-                'http://%s:%d' % (target, config.get('API_PORT')),
+                'http://%s:%d' % (target, config.API_PORT),
                 namespace=get_jwt_identity())
-            url = 'http://%s:%d/blob/%s' % (target,
-                                            config.get('API_PORT'), blob_uuid)
+            url = 'http://%s:%d/blob/%s' % (target, config.API_PORT, blob_uuid)
 
             if blob_path:
                 local_blob = open(blob_path + '.partial', 'wb')
