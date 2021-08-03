@@ -48,7 +48,6 @@ class VirtMetaTestCase(test_shakenfist.ShakenFistTestCase):
         fake_config = SFConfig(
             STORAGE_PATH="/a/b/c",
             DISK_BUS="virtio",
-            DISK_FORMAT="qcow",
             ZONE="sfzone",
             NODE_NAME="node01",
         )
@@ -157,7 +156,6 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
         fake_config = SFConfig(
             STORAGE_PATH="/a/b/c",
             DISK_BUS="virtio",
-            DISK_FORMAT="qcow",
             ZONE="sfzone",
             NODE_NAME="node01",
         )

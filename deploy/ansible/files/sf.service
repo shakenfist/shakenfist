@@ -15,8 +15,6 @@ Environment=SHAKENFIST_NETWORK_NODE_IP="{{hostvars['localhost']['network_node_ip
 Environment=SHAKENFIST_AUTH_SECRET_SEED="{{hostvars['localhost']['auth_secret']}}"
 Environment=SHAKENFIST_INCLUDE_TRACEBACKS="{{hostvars['localhost']['include_tracebacks']}}"
 
-Environment=SHAKENFIST_DISK_FORMAT=qcow
-
 # Cluster tuning.
 Environment=SHAKENFIST_RAM_SYSTEM_RESERVATION={{hostvars['localhost']['ram_system_reservation']}}
 Environment=SHAKENFIST_MAX_HYPERVISOR_MTU={{hostvars['localhost']['lowest_mtu']}}
