@@ -208,6 +208,13 @@ class SFConfig(BaseSettings):
         '/srv/shakenfist', description='Where on disk instances are stored'
     )
 
+    LIBVIRT_USER: str = Field(
+        'libvirt-qemu', description='Name of the libvirt user'
+    )
+    LIBVIRT_GROUP: str = Field(
+        'libvirt-qemu', description='Name of the libvirt group'
+    )
+
     # Logging
     SLOW_LOCK_THRESHOLD: float = 5.0
     LOGLEVEL_API: str = 'info'

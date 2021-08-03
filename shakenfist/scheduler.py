@@ -7,6 +7,7 @@ import random
 import time
 import uuid
 
+from shakenfist import artifact
 from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist import db
@@ -210,9 +211,15 @@ class Scheduler(object):
             candidates_image_matches[n] = 0
 
         for image in requested_images:
-            for i in images.Images(filters=[partial(images.url_filter, image),
-                                            baseobject.active_states_filter]):
-                candidates_image_matches[i.node] += 1
+            for i in artifact.Artifacts(filters=[
+                    partial(artifact.type_filter,
+                            artifact.Artifact.TYPE_IMAGE),
+                    partial(artifact.url_filter, image),
+                    baseobject.active_states_filter]):
+                b = i.most_recent_index
+                if b:
+                    for loc in b.locations:
+                        candidates_image_matches[loc] += 1
 
         # Create dict of candidate lists keyed by number of image matches
         candidates_by_image_matches = {}

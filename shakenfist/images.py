@@ -1,22 +1,16 @@
-# Helpers to resolve images when we don't have an image service
-
-import email.utils
 import hashlib
 import os
 import random
 import re
 import requests
 import shutil
-import time
+import uuid
 
-from shakenfist.artifact import Artifact, BLOB_URL, SNAPSHOT_URL
-from shakenfist.baseobject import (
-    DatabaseBackedObject as dbo,
-    DatabaseBackedObjectIterator as dbo_iter)
+from shakenfist.artifact import Artifact, BLOB_URL
+from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist import blob
 from shakenfist.blob import Blob
 from shakenfist.config import config
-from shakenfist import db
-from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import image_resolver
 from shakenfist import instance
@@ -61,6 +55,12 @@ class Image(dbo):
 
         self.__url = static_values['url']
         self.__node = static_values['node']
+
+        # Images here have a mirroring artifact of type 'image' for now.
+        # This is done so we can tie all the various download versions
+        # together. Over time this class should go away and be replaced
+        # with just the artifact.
+        self.__artifact = Artifact.from_url(Artifact.TYPE_IMAGE, self.__url)
 
     @classmethod
     def new(cls, url, checksum=None):
@@ -136,57 +136,6 @@ class Image(dbo):
             self.add_event('checksum has changed',
                            '%s -> %s' % (old_checksum, checksum))
 
-    @property
-    def latest_download_version(self):
-        versions = {}
-        for key, data in self._db_get_attributes('download_'):
-            if data:
-                versions[int(key.split('_')[1])] = data
-        if not versions:
-            return {'sequence': 0}
-        return versions[sorted(versions)[-1]]
-
-    def _add_download_version(self, size, modified, fetched_at):
-        with self.get_lock_attr('download', 'Image version creation'):
-            new_version = self.latest_download_version['sequence'] + 1
-            self._db_set_attribute('download_%d' % new_version,
-                                   {
-                                       'size': size,
-                                       'modified': modified,
-                                       'fetched_at': fetched_at,
-                                       'sequence': new_version
-                                   })
-
-    def external_view(self):
-        # If this is an external view, then mix back in attributes that users expect
-        i = {
-            'uuid': self.uuid,
-            'url': self.url,
-            'node': self.node,
-            'ref': self.unique_ref,
-            'state': self.state.value,
-            'version': self.version
-        }
-
-        for attrname in ['latest_checksum']:
-            d = self._db_get_attribute(attrname)
-            for key in d:
-                # We skip keys with no value
-                if d[key] is None:
-                    continue
-
-                i[key] = d[key]
-
-        d = self.latest_download_version
-        for key in d:
-            # We skip keys with no value
-            if d[key] is None:
-                continue
-
-            i[key] = d[key]
-
-        return i
-
     # Implementation
     @staticmethod
     def calc_unique_ref(url):
@@ -203,6 +152,12 @@ class Image(dbo):
         h.update(url.encode('utf-8'))
         return h.hexdigest()
 
+    def artifact(self):
+        return self.__artifact
+
+    def external_view(self):
+        return self.__artifact.external_view()
+
     def delete(self):
         # NOTE(mikal): it isn't actually safe to remove the image from the cache
         # without verifying that no instance is using it, so we just mark the
@@ -211,26 +166,100 @@ class Image(dbo):
         self.state = self.STATE_DELETED
 
     def get(self, locks, related_object):
-        if self.url.startswith(BLOB_URL):
-            return self._blob_get(self.url, locks, related_object)
-        elif self.url.startswith(SNAPSHOT_URL):
-            snapshot_uuid = self.url[len(SNAPSHOT_URL):]
-            snap = Artifact.from_db(snapshot_uuid)
-            blob_uuid = snap.most_recent_index['blob_uuid']
-            url = '%s%s' % (BLOB_URL, blob_uuid)
-            return self._blob_get(url, locks, related_object)
+        self.state = self.STATE_CREATING
+        url = self.url
+
+        # If this is a request for a URL, do we have the most recent version
+        # somewhere in the cluster?
+        if not url.startswith(BLOB_URL):
+            most_recent = self.__artifact.most_recent_index
+            dirty = False
+
+            if most_recent.get('index', 0) == 0:
+                self.log.with_fields({'url': url}).info(
+                    'Cluster does not have a copy of image')
+                dirty = True
+            else:
+                most_recent_blob = Blob.from_db(most_recent['blob_uuid'])
+                resp = self._open_connection(self.url)
+
+                if most_recent_blob.modified != resp.headers.get('Last-Modified'):
+                    self.add_event('image requires fetch', None, None,
+                                   'Last-Modified: %s -> %s' % (most_recent_blob.modified,
+                                                                resp.headers.get('Last-Modified')))
+                    dirty = True
+
+                if most_recent_blob.size != resp.headers.get('Content-Length'):
+                    self.add_event('image requires fetch', None, None,
+                                   'Content-Length: %s -> %s' % (most_recent_blob.size,
+                                                                 resp.headers.get('Content-Length')))
+                    dirty = True
+
+                self.log.with_fields({'url': url}).info(
+                    'Cluster cached image is stale')
+
+            if not dirty:
+                url = '%s%s' % (BLOB_URL, most_recent_blob.uuid)
+                self.log.with_fields({'url': url}).info(
+                    'Using cached image from cluster')
+
+        # Ensure that we have the blob in the local store. This blob is in the
+        # "original format" if downloaded from an HTTP source.
+        if url.startswith(BLOB_URL):
+            self.log.with_fields({'url': url}).info(
+                'Fetching image from within the cluster')
+            b = self._blob_get(url, locks, related_object)
         else:
-            return self._http_get(self.url, locks, related_object)
+            self.log.with_fields({'url': url}).info(
+                'Fetching image from the internet')
+            b = self._http_get_inner(url, locks, related_object)
+
+        # Transcode if required, placing the transcoded file in a well known location.
+        if not os.path.exists(os.path.join(config.STORAGE_PATH, 'image_cache', b.uuid + '.qcow2')):
+            blob_path = os.path.join(config.STORAGE_PATH, 'blobs', b.uuid)
+            if b.info.get('mime-type', '') == 'application/gzip':
+                cache_path = os.path.join(
+                    config.STORAGE_PATH, 'image_cache', b.uuid)
+                with util.RecordedOperation('decompress image', related_object):
+                    util.execute(locks, 'gunzip -k -q -c %s > %s'
+                                 % (blob_path, cache_path))
+                blob_path = cache_path
+
+            os.makedirs(
+                os.path.join(config.STORAGE_PATH, 'image_cache'), exist_ok=True)
+            cache_path = os.path.join(
+                config.STORAGE_PATH, 'image_cache', b.uuid + '.qcow2')
+            if identify(blob_path).get('file format', '') == 'qcow2':
+                try:
+                    os.link(blob_path, cache_path)
+                    self.log.with_fields({'blob': b}).info(
+                        'Hard linking %s -> %s' % (blob_path, cache_path))
+                except OSError:
+                    os.symlink(blob_path, cache_path)
+                    self.log.with_fields({'blob': b}).info(
+                        'Symbolic linking %s -> %s' % (blob_path, cache_path))
+
+                shutil.chown(cache_path, config.LIBVIRT_USER,
+                             config.LIBVIRT_GROUP)
+            else:
+                with util.RecordedOperation('transcode image', related_object):
+                    self.log.with_fields({'blob': b}).info(
+                        'Transcoding %s -> %s' % (blob_path, cache_path))
+                    create_qcow2(locks, blob_path, cache_path)
+
+        self.__artifact.state = Artifact.STATE_CREATED
+        self.state = self.STATE_CREATED
 
     def _blob_get(self, url, locks, related_object):
         """Fetch a blob from the cluster."""
 
-        actual_image = self.version_image_path()
-        blob_uuid = url[len('sf://blob/'):]
-        blob_path = os.path.join(config.STORAGE_PATH, 'blobs', blob_uuid)
-        os.makedirs(os.path.join(config.STORAGE_PATH, 'blobs'), exist_ok=True)
+        blob_uuid = url[len(BLOB_URL):]
+        blob_dir = os.path.join(config.STORAGE_PATH, 'blobs')
+        blob_path = os.path.join(blob_dir, blob_uuid)
+        os.makedirs(blob_dir, exist_ok=True)
 
-        locations = Blob.from_db(blob_uuid).locations
+        b = Blob.from_db(blob_uuid)
+        locations = b.locations
         random.shuffle(locations)
         blob_source = locations[0]
 
@@ -249,79 +278,30 @@ class Image(dbo):
                         f.write(chunk)
 
                 os.rename(blob_path + '.partial', blob_path)
-                Blob.from_db(blob_uuid).observe()
+                b.observe()
 
-        # NOTE(mikal): I would prefer to hard link this, but qemu gets sulky.
-        shutil.copyfile(blob_path, actual_image)
-        _transcode(locks, actual_image, related_object)
-        return actual_image
-
-    def _http_get(self, url, locks, related_object):
-        """Fetch an image over HTTP.
-
-        Wrap three retries around the image get.
-
-        The Image must be locked before calling this function. During the
-        download, the locks will be refreshed. Any lock error should abort the
-        get, since the lock will have been lost.
-        """
-        self.state = self.STATE_CREATING
-        for _ in range(3):
-            try:
-                image_path = self._http_get_inner(url, locks, related_object)
-                self.state = self.STATE_CREATED
-                return image_path
-            except exceptions.BadCheckSum as e:
-                self.log.warning('Bad checksum while downloading image: %s', e)
-                self.state = self.STATE_ERROR
-                self.error = 'Bad checksum while downloading image: %s' % e
-                exc = e
-        raise exc
-
-    def version_image_path(self, inc=0):
-        image_cache_path = os.path.join(
-            config.STORAGE_PATH, 'image_cache')
-        if not os.path.exists(image_cache_path):
-            self.log.with_field('image_cache_path',
-                                image_cache_path).debug('Creating image cache')
-            os.makedirs(image_cache_path, exist_ok=True)
-
-        return '%s/%s.v%03d' % (image_cache_path, self.unique_ref,
-                                self.latest_download_version['sequence'] + inc)
+        return b
 
     def _http_get_inner(self, url, locks, related_object):
         """Fetch image if not downloaded and return image path."""
-        actual_image = self.version_image_path()
 
         with util.RecordedOperation('fetch image', related_object):
             resp = self._open_connection(url)
+            blob_uuid = str(uuid.uuid4())
+            b = blob.http_fetch(resp, blob_uuid, locks, self.log)
 
-            diff_field = self._new_image_available(resp)
-            if diff_field:
-                self.log.with_field('diff_field', diff_field).info(
-                    'Fetch required due HTTP field change')
-                if related_object:
-                    t, u = related_object.unique_label()
-                    msg = '%s: %s -> %s' % diff_field
-                    db.add_event(t, u, 'image requires fetch', None, None, msg)
+            # Ensure checksum is correct
+            if not self.correct_checksum(
+                    os.path.join(config.STORAGE_PATH, 'blobs', b.uuid)):
+                if isinstance(related_object, instance.Instance):
+                    related_object.add_event('fetch image', 'bad checksum')
+                raise exceptions.BadCheckSum('url=%s' % url)
 
-                actual_image = self._fetch(url, resp, locks)
+            # Only persist values after the file has been verified.
+            b.observe()
+            self.__artifact.add_index(b.uuid)
 
-                # Ensure checksum is correct
-                if not self.correct_checksum(actual_image):
-                    if isinstance(related_object, instance.Instance):
-                        related_object.add_event('fetch image', 'bad checksum')
-                    raise exceptions.BadCheckSum('url=%s' % url)
-
-                # Only persist values after the file has been verified.
-                # Otherwise diff_field will not trigger a new download in the
-                # case of a checksum verification failure.
-                self._add_download_version(resp.headers.get('Content-Length'),
-                                           resp.headers.get('Last-Modified'),
-                                           email.utils.formatdate())
-
-        _transcode(locks, actual_image, related_object)
-        return actual_image
+            return b
 
     def _open_connection(self, url):
         proxies = {}
@@ -336,54 +316,6 @@ class Image(dbo):
                 'Failed to fetch HEAD of %s (status code %d)'
                 % (url, resp.status_code))
         return resp
-
-    def _new_image_available(self, resp):
-        """Check if HTTP headers indicate the image file has changed."""
-        latest = self.latest_download_version
-
-        modified = resp.headers.get('Last-Modified')
-        if latest.get('modified') != modified:
-            return ('modified', latest.get('modified'), modified)
-
-        size = resp.headers.get('Content-Length')
-        if latest.get('size') != size:
-            return ('size', latest.get('size'), size)
-
-        return False
-
-    def _fetch(self, url, resp, locks=None):
-        """Download the image if the latest version is not in the cache."""
-        fetched = 0
-        total_size = int(resp.headers.get('Content-Length'))
-        previous_percentage = 0.0
-
-        last_refresh = 0
-        with open(self.version_image_path(inc=1), 'wb') as f:
-            for chunk in resp.iter_content(chunk_size=8192):
-                fetched += len(chunk)
-                f.write(chunk)
-
-                percentage = fetched / total_size * 100.0
-                if (percentage - previous_percentage) > 10.0:
-                    self.log.with_field('bytes_fetched', fetched).info(
-                        'Fetch %.02f percent complete' % percentage)
-                    previous_percentage = percentage
-
-                if time.time() - last_refresh > 5:
-                    db.refresh_locks(locks)
-                    last_refresh = time.time()
-
-        self.log.with_field('bytes_fetched', fetched).info('Fetch complete')
-
-        # Check if decompression not required
-        fn = self.version_image_path(inc=1)
-        if not url.endswith('.gz'):
-            return fn
-
-        # Check if already decompressed
-        if not os.path.exists(f + '.orig'):
-            util.execute(locks, 'gunzip -k -q -c %s > %s.orig' % (fn, fn))
-        return fn + '.orig'
 
     def correct_checksum(self, image_name):
         log = self.log.with_field('image', image_name)
@@ -407,73 +339,6 @@ class Image(dbo):
         log.with_field('correct', correct).info('Image checksum verification')
         return correct
 
-    def resize(self, locks, size):
-        """Resize the image to the specified size."""
-        image_path = self.version_image_path()
-        backing_file = image_path + '.qcow2' + '.' + str(size) + 'G'
-
-        if os.path.exists(backing_file):
-            return backing_file
-
-        current_size = identify(image_path).get('virtual size')
-
-        if current_size == size * 1024 * 1024 * 1024:
-            os.link(image_path, backing_file)
-            return backing_file
-
-        create_cow(locks, image_path + '.qcow2', backing_file, size)
-
-        return backing_file
-
-
-# TODO(mikal): can this be refactored into baseobject?
-class Images(dbo_iter):
-    def __init__(self, filters):
-        self.filters = filters
-
-    def __iter__(self):
-        for key, i in etcd.get_all('image', None):
-            if config.GLUSTER_ENABLED:
-                image_node = key.split('/')[-1]
-            else:
-                image_node = '/'.join(key.split('/')[-2:])
-
-            i = Image.from_db(image_node)
-            if not i:
-                continue
-
-            skip = False
-            for f in self.filters:
-                # If a filter returns false, we remove the image from
-                # the result set.
-                if not f(i):
-                    skip = True
-                    break
-
-            if not skip:
-                yield i
-
-
-def url_filter(url, i):
-    return i.url == url
-
-
-def placement_filter(node, i):
-    return i.node == node
-
-
-def _transcode(locks, actual_image, related_object):
-    with util.RecordedOperation('transcode image', related_object):
-        if os.path.exists(actual_image + '.qcow2'):
-            return
-
-        current_format = identify(actual_image).get('file format')
-        if current_format == 'qcow2':
-            os.link(actual_image, actual_image + '.qcow2')
-            return
-
-        create_qcow2(locks, actual_image, actual_image + '.qcow2')
-
 
 VALUE_WITH_BRACKETS_RE = re.compile(r'.* \(([0-9]+) bytes\)')
 
@@ -484,8 +349,7 @@ def identify(path):
     if not os.path.exists(path):
         return {}
 
-    out, _ = util.execute(None,
-                          'qemu-img info %s' % path)
+    out, _ = util.execute(None, 'qemu-img info %s' % path)
 
     data = {}
     for line in out.split('\n'):
@@ -530,9 +394,14 @@ def create_cow(locks, cache_file, disk_file, disk_size):
             os.path.join(config.STORAGE_PATH, 'instances'),
             'gluster:shakenfist/instances')
 
-    util.execute(locks,
-                 'qemu-img create -b %s -f qcow2 %s %dG'
-                 % (cache_file, disk_file, int(disk_size)))
+    if disk_size:
+        util.execute(locks,
+                     'qemu-img create -b %s -f qcow2 %s %dG'
+                     % (cache_file, disk_file, int(disk_size)))
+    else:
+        util.execute(locks,
+                     'qemu-img create -b %s -f qcow2 %s'
+                     % (cache_file, disk_file))
 
 
 def create_flat(locks, cache_file, disk_file):
@@ -602,3 +471,16 @@ def snapshot(locks, source, destination):
     util.execute(locks,
                  'qemu-img convert --force-share -O qcow2 %s %s'
                  % (source, destination))
+
+
+def resize(locks, input, output, size):
+    if os.path.exists(output):
+        return
+
+    current_size = identify(input).get('virtual size')
+
+    if current_size == size * 1024 * 1024 * 1024:
+        os.link(input, output)
+        return
+
+    create_cow(locks, input, output, size)

@@ -24,7 +24,9 @@ import ipaddress
 import re
 import uuid
 
-from shakenfist.artifact import Artifact, BLOB_URL, LABEL_URL, SNAPSHOT_URL
+from shakenfist.artifact import (
+    Artifact, Artifacts, BLOB_URL, LABEL_URL, SNAPSHOT_URL,
+    type_filter as artifact_type_filter)
 from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.daemons import daemon
@@ -411,6 +413,7 @@ class Instances(api_base.Resource):
             if not isinstance(d, dict):
                 return api_base.error(400, 'disk specification should contain JSON objects')
 
+            # Convert internal shorthand forms into specific blobs
             disk_base = d.get('base')
             if not disk_base:
                 disk_base = ''
@@ -868,16 +871,22 @@ class InstanceConsoleData(api_base.Resource):
 class Images(api_base.Resource):
     @jwt_required
     def get(self, node=None):
-        f = []
-
         # If gluster is enabled, there is no concept of an image being on a
         # single node.
         if not config.GLUSTER_ENABLED and node:
-            f.append(partial(images.placement_filter, node))
+            node = None
 
         retval = []
-        for i in images.Images(filters=f):
-            retval.append(i.external_view())
+        for i in Artifacts(filters=[
+                partial(artifact_type_filter,
+                        Artifact.TYPE_IMAGE),
+                baseobject.active_states_filter]):
+            b = i.most_recent_index
+            if b:
+                if not node:
+                    retval.append(i.external_view())
+                elif node in b.locations:
+                    retval.append(i.external_view())
         return retval
 
     @jwt_required
