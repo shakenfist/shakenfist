@@ -365,8 +365,6 @@
           export INCLUDE_TRACEBACKS="True"
 
           export KSM_ENABLED=0
-          export GLUSTER_ENABLED=0
-          export GLUSTER_REPLICAS=3
 
           export METAL_IP_SF1={{hostvars['sf1']['internal_ip']}}
           export METAL_IP_SF2={{hostvars['sf2']['internal_ip']}}

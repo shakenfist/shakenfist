@@ -567,18 +567,6 @@ class Instance(dbo):
                     elif not os.path.exists(disk['path']):
                         images.create_blank([lock], disk['path'], disk['size'])
 
-                    # Tweak the disk if we're using gluster
-                    if config.GLUSTER_ENABLED:
-                        disk['path'] = disk['path'].replace(
-                            os.path.join(config.STORAGE_PATH, 'instances'),
-                            'shakenfist/instances'
-                        )
-                        disk['source'] = ("<source protocol='gluster' name='%s'>"
-                                          "<host name='%s' port='24007' />"
-                                          "</source>"
-                                          % (disk['path'], config.NODE_NAME))
-                        disk['source_type'] = 'network'
-
                     modified_disks.append(disk)
 
                 block_devices['devices'] = modified_disks

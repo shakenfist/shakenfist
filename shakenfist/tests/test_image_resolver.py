@@ -43,8 +43,6 @@ class FakeConfig(BaseSettings):
     LISTING_URL_UBUNTU: AnyHttpUrl = (
         'https://cloud-images.ubuntu.com/')
 
-    GLUSTER_ENABLED = False
-
 
 fake_config = FakeConfig()
 

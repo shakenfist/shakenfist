@@ -344,43 +344,6 @@
         state: restarted
       when: hostvars['localhost']['primary_node_ip'] != node_ip
 
-# Install glusterfs
-- hosts: hypervisors
-  any_errors_fatal: true
-  become: yes
-  become_method: sudo
-  gather_facts: yes
-  connection: ssh
-
-  tasks:
-    - name: Install glusterfs on all nodes
-      include: includes/glusterfs-all-initial.yml
-      when: gluster_enabled == "1"
-
-- hosts: sf-1
-  any_errors_fatal: true
-  become: yes
-  become_method: sudo
-  gather_facts: yes
-  connection: ssh
-
-  tasks:
-    - name: Single node gluster configuration
-      include: includes/glusterfs-primary.yml
-      when: gluster_enabled == "1"
-
-- hosts: hypervisors
-  any_errors_fatal: true
-  become: yes
-  become_method: sudo
-  gather_facts: yes
-  connection: ssh
-
-  tasks:
-    - name: Finalize glusterfs on all nodes
-      include: includes/glusterfs-all-final.yml
-      when: gluster_enabled == "1"
-
 # Install etcd
 - hosts: etcd
   roles:

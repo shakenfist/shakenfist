@@ -83,8 +83,6 @@ export METAL_SSH_USER="cloudadmin"
 export METAL_SSH_KEY_FILENAME="/root/.ssh/id_rsa"
 
 export KSM_ENABLED=1
-export GLUSTER_ENABLED=1
-export GLUSTER_REPLICAS=3
 
 export METAL_IP_SF1=192.168.1.51
 export METAL_IP_SF2=192.168.1.52
