@@ -404,36 +404,6 @@ def create_cow(locks, cache_file, disk_file, disk_size):
                      % (cache_file, disk_file))
 
 
-def create_flat(locks, cache_file, disk_file):
-    """Make a flat copy of the disk from the image cache."""
-
-    if os.path.exists(disk_file):
-        return
-
-    if config.GLUSTER_ENABLED:
-        disk_file = disk_file.replace(
-            os.path.join(config.STORAGE_PATH, 'instances'),
-            'gluster:shakenfist/instances')
-
-    util.execute(locks, 'cp %s %s' % (cache_file, disk_file))
-
-
-def create_raw(locks, cache_file, disk_file):
-    """Make a raw copy of the disk from the image cache."""
-
-    if os.path.exists(disk_file):
-        return
-
-    if config.GLUSTER_ENABLED:
-        disk_file = disk_file.replace(
-            os.path.join(config.STORAGE_PATH, 'instances'),
-            'gluster:shakenfist/instances')
-
-    util.execute(locks,
-                 'qemu-img convert -t none -O raw %s %s'
-                 % (cache_file, disk_file))
-
-
 def create_qcow2(locks, cache_file, disk_file):
     """Make a qcow2 copy of the disk from the image cache."""
 

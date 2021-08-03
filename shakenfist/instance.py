@@ -69,8 +69,6 @@ def _initialize_block_devices(instance_path, disk_spec):
     config_device = _get_disk_device_base(bus) + 'b'
 
     disk_type = 'qcow2'
-    if config.DISK_FORMAT == 'flat':
-        disk_type = 'raw'
 
     block_devices = {
         'devices': [
@@ -554,39 +552,17 @@ class Instance(dbo):
                             disk['device'] = 'hd%s' % disk['device'][-1]
                             disk['bus'] = 'ide'
                         else:
-                            if config.DISK_FORMAT == 'qcow':
-                                with util.RecordedOperation('create copy on write layer', self):
-                                    images.create_cow([lock], cached_image_path,
-                                                      disk['path'], disk['size'])
+                            with util.RecordedOperation('create copy on write layer', self):
+                                images.create_cow([lock], cached_image_path,
+                                                  disk['path'], disk['size'])
 
-                                # Record the backing store for modern libvirts
-                                disk['backing'] = (
-                                    '<backingStore type=\'file\'>\n'
-                                    '        <format type=\'qcow2\'/>\n'
-                                    '        <source file=\'%s\'/>\n'
-                                    '      </backingStore>\n'
-                                    % (cached_image_path))
-
-                            elif config.DISK_FORMAT == 'qcow_flat':
-                                with util.RecordedOperation('resize image', self):
-                                    resized_image_path = img.resize(
-                                        [lock], disk['size'])
-
-                                with util.RecordedOperation('create flat layer', self):
-                                    images.create_flat(
-                                        [lock], resized_image_path, disk['path'])
-
-                            elif config.DISK_FORMAT == 'flat':
-                                with util.RecordedOperation('resize image', self):
-                                    resized_image_path = img.resize(
-                                        [lock], disk['size'])
-
-                                with util.RecordedOperation('create raw disk', self):
-                                    images.create_raw(
-                                        [lock], resized_image_path, disk['path'])
-
-                            else:
-                                raise Exception('Unknown disk format')
+                            # Record the backing store for modern libvirts
+                            disk['backing'] = (
+                                '<backingStore type=\'file\'>\n'
+                                '        <format type=\'qcow2\'/>\n'
+                                '        <source file=\'%s\'/>\n'
+                                '      </backingStore>\n'
+                                % (cached_image_path))
 
                     elif not os.path.exists(disk['path']):
                         images.create_blank([lock], disk['path'], disk['size'])

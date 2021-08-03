@@ -190,12 +190,6 @@ class SFConfig(BaseSettings):
         description='The bus to use for disk devices. One of virtio, scsi, '
                     'usb, ide, etc. See libvirt docs for full list of options.'
     )
-    DISK_FORMAT: str = Field(
-        'qcow',
-        description='The format for disks. Options are qcow (COW layers onto '
-                    'of image cache), qcow_flat (just qcow2, no COW), and flat '
-                    '(just raw disk).'
-    )
     NODE_IP: str = Field(
         default_factory=get_node_ip, description='IP of this node'
     )
