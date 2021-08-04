@@ -1,21 +1,15 @@
 import mock
 
-from shakenfist import config
 from shakenfist.config import SFConfig
 from shakenfist.tests import test_shakenfist
 
 
 class ConfigTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('socket.getfqdn', return_value='a.b.com')
-    @mock.patch('socket.gethostbyname', return_value='1.1.1.1')
-    def test_hostname(self, mock_hostname, mock_fqdn):
+    def test_hostname(self, mock_fqdn):
         conf = SFConfig()
-
         mock_fqdn.assert_called()
-        mock_hostname.assert_called()
-
         self.assertEqual('a.b.com', str(conf.NODE_NAME))
-        self.assertEqual('1.1.1.1', str(conf.NODE_IP))
 
     @mock.patch.dict('os.environ', {'SHAKENFIST_STORAGE_PATH': 'foo'})
     def test_string_override(self):
@@ -40,7 +34,3 @@ class ConfigTestCase(test_shakenfist.ShakenFistTestCase):
                      {'SHAKENFIST_RAM_SYSTEM_RESERVATION': 'banana'})
     def test_bogus_override(self):
         self.assertRaises(ValueError, SFConfig)
-
-    @mock.patch('socket.gethostbyname', side_effect=Exception)
-    def test_get_node_ip_errors(self, mock_gethostbyname):
-        self.assertEqual('127.0.0.1', config.get_node_ip())

@@ -5,8 +5,9 @@ from shakenfist import util
 from shakenfist.tests import test_shakenfist
 
 
-net_node_conf = SFConfig(NODE_IP='1.1.1.1', NETWORK_NODE_IP='1.1.1.1')
-not_net_node_conf = SFConfig(NODE_IP='1.1.1.1', NETWORK_NODE_IP='1.1.1.2')
+net_node_conf = SFConfig(NODE_MESH_IP='1.1.1.1', NETWORK_NODE_IP='1.1.1.1')
+not_net_node_conf = SFConfig(
+    NODE_MESH_IP='1.1.1.1', NETWORK_NODE_IP='1.1.1.2')
 
 
 class UtilTestCase(test_shakenfist.ShakenFistTestCase):
