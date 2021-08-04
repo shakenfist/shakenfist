@@ -24,12 +24,6 @@ Environment=SHAKENFIST_DNS_SERVER="{{dns_server}}"
 Environment=SHAKENFIST_HTTP_PROXY_SERVER="{{http_proxy}}"
 {% endif %}
 
-# Is glusterfs enabled? If so, we fast path some disk accesses straight
-# to gluster.
-{% if gluster_enabled == "1" %}
-Environment=SHAKENFIST_GLUSTER_ENABLED="true"
-{% endif %}
-
 ExecStart=/bin/sh -c '/srv/shakenfist/venv/bin/sf-daemon'
 
 Restart=on-failure

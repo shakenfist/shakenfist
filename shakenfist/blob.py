@@ -122,25 +122,15 @@ def _ensure_blob_path():
 
 
 def snapshot_disk(disk, blob_uuid, related_object=None):
-    if not config.GLUSTER_ENABLED and not os.path.exists(disk['path']):
+    if not os.path.exists(disk['path']):
         return
     _ensure_blob_path()
-
-    # If we're using gluster we need to tweak some paths...
-    disk_path = disk['path']
     dest_path = os.path.join(config.STORAGE_PATH, 'blobs', blob_uuid)
-    orig_dest_path = dest_path
-
-    if config.GLUSTER_ENABLED:
-        disk_path = 'gluster:%s' % disk['path']
-        dest_path = dest_path.replace(
-            os.path.join(config.STORAGE_PATH, 'blobs'),
-            'gluster:shakenfist/snapshots')
 
     # Actually make the snapshot
     with util.RecordedOperation('snapshot %s' % disk['device'], related_object):
-        images.snapshot(None, disk_path, dest_path)
-        st = os.stat(orig_dest_path)
+        images.snapshot(None, disk['path'], dest_path)
+        st = os.stat(dest_path)
 
     # And make the associated blob
     b = Blob.new(blob_uuid, st.st_size, time.time(), time.time())

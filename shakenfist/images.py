@@ -44,14 +44,8 @@ class Image(dbo):
         # when URLs are identical.
         self.__unique_ref = static_values['ref']
 
-        # NOTE(mikal): gluster deployments have a shared per-cluster image
-        # cache, so don't need to have the node name packed into the UUID.
-        if config.GLUSTER_ENABLED:
-            uuid = self.__unique_ref
-        else:
-            uuid = self.__unique_ref + '/' + static_values['node']
-
-        super(Image, self).__init__(uuid, static_values['version'])
+        super(Image, self).__init__(self.__unique_ref + '/' +
+                                    static_values['node'], static_values['version'])
 
         self.__url = static_values['url']
         self.__node = static_values['node']
@@ -70,39 +64,33 @@ class Image(dbo):
             checksum = resolver_checksum
 
         unique_ref = Image.calc_unique_ref(url)
-
-        # NOTE(mikal): gluster deployments have a shared per-cluster image
-        # cache, so don't need to have the node name packed into the UUID.
-        if config.GLUSTER_ENABLED:
-            uuid = unique_ref
-        else:
-            uuid = '%s/%s' % (unique_ref, config.NODE_NAME)
+        image_uuid = '%s/%s' % (unique_ref, config.NODE_NAME)
 
         # Check for existing metadata in DB
-        i = Image.from_db(uuid)
+        i = Image.from_db(image_uuid)
         if i:
             i.update_checksum(checksum)
             return i
 
-        Image._db_create(uuid, {
-            'uuid': uuid,
+        Image._db_create(image_uuid, {
+            'uuid': image_uuid,
             'url': url,
             'node': config.NODE_NAME,
             'ref': unique_ref,
             'version': cls.current_version
         })
-        i = Image.from_db(uuid)
+        i = Image.from_db(image_uuid)
         i.state = Image.STATE_INITIAL
         i.update_checksum(checksum)
         i.add_event('db record creation', None)
         return i
 
     @staticmethod
-    def from_db(uuid):
-        if not uuid:
+    def from_db(image_uuid):
+        if not image_uuid:
             return None
 
-        static_values = Image._db_get(uuid)
+        static_values = Image._db_get(image_uuid)
         if not static_values:
             return None
 
@@ -389,11 +377,6 @@ def create_cow(locks, cache_file, disk_file, disk_size):
     if os.path.exists(disk_file):
         return
 
-    if config.GLUSTER_ENABLED:
-        disk_file = disk_file.replace(
-            os.path.join(config.STORAGE_PATH, 'instances'),
-            'gluster:shakenfist/instances')
-
     if disk_size:
         util.execute(locks,
                      'qemu-img create -b %s -f qcow2 %s %dG'
@@ -410,11 +393,6 @@ def create_qcow2(locks, cache_file, disk_file):
     if os.path.exists(disk_file):
         return
 
-    if config.GLUSTER_ENABLED:
-        disk_file = disk_file.replace(
-            os.path.join(config.STORAGE_PATH, 'instances'),
-            'gluster:shakenfist/instances')
-
     util.execute(locks,
                  'qemu-img convert -t none -O qcow2 %s %s'
                  % (cache_file, disk_file))
@@ -425,11 +403,6 @@ def create_blank(locks, disk_file, disk_size):
 
     if os.path.exists(disk_file):
         return
-
-    if config.GLUSTER_ENABLED:
-        disk_file = disk_file.replace(
-            os.path.join(config.STORAGE_PATH, 'instances'),
-            'gluster:shakenfist/instances')
 
     util.execute(locks, 'qemu-img create -f qcow2 %s %sG'
                  % (disk_file, disk_size))

@@ -173,10 +173,6 @@ class SFConfig(BaseSettings):
     BLOB_REPLICATION_FACTOR: int = Field(
         2, description='How many copies of each blob we like to have.'
     )
-    GLUSTER_ENABLED: bool = Field(
-        False,
-        description='If we are using gluster for shared block storage.'
-    )
     ZONE: str = Field(
         'shakenfist', description='What nova called an availability zone'
     )

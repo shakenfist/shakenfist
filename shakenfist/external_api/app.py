@@ -871,11 +871,6 @@ class InstanceConsoleData(api_base.Resource):
 class Images(api_base.Resource):
     @jwt_required
     def get(self, node=None):
-        # If gluster is enabled, there is no concept of an image being on a
-        # single node.
-        if not config.GLUSTER_ENABLED and node:
-            node = None
-
         retval = []
         for i in Artifacts(filters=[
                 partial(artifact_type_filter,
