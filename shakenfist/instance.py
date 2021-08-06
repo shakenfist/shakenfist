@@ -555,6 +555,10 @@ class Instance(dbo):
                             with util.RecordedOperation('create copy on write layer', self):
                                 images.create_cow([lock], cached_image_path,
                                                   disk['path'], disk['size'])
+                            shutil.chown(
+                                disk['path'], 'libvirt-qemu', 'libvirt-qemu')
+                            self.log.with_fields(util.stat_log_fields(disk['path'])).info(
+                                'COW layer %s created' % disk['path'])
 
                             # Record the backing store for modern libvirts
                             disk['backing'] = (

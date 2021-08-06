@@ -235,6 +235,10 @@ class Image(dbo):
                         'Transcoding %s -> %s' % (blob_path, cache_path))
                     create_qcow2(locks, blob_path, cache_path)
 
+            shutil.chown(cache_path, 'libvirt-qemu', 'libvirt-qemu')
+            self.log.with_fields(util.stat_log_fields(cache_path)).info(
+                'Cache file %s created' % cache_path)
+
         self.__artifact.state = Artifact.STATE_CREATED
         self.state = self.STATE_CREATED
 
