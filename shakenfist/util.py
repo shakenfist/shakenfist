@@ -9,6 +9,7 @@ import random
 import re
 import requests
 import secrets
+import stat
 import string
 import sys
 import time
@@ -320,3 +321,13 @@ def noneish(value):
     if value.lower() == 'none':
         return True
     return False
+
+
+def stat_log_fields(path):
+    st = os.stat(path)
+    return {
+        'size': st.st_size,
+        'mode': stat.filemode(st.st_mode),
+        'owner': st.st_uid,
+        'group': st.st_gid,
+    }
