@@ -921,10 +921,11 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
 
         class FakeConfig(BaseSettings):
             NODE_NAME: str = 'seriously'
-            NODE_IP: str = '127.0.0.1'
+            NODE_EGRESS_IP: str = '127.0.0.1'
             NETWORK_NODE_IP = '127.0.0.1'
             LOG_METHOD_TRACE: int = 1
             NODE_EGRESS_NIC: str = 'eth0'
+            NODE_MESH_NIC: str = 'eth1'
 
         fake_config_network = FakeConfig()
         self.config = mock.patch('shakenfist.config.config',

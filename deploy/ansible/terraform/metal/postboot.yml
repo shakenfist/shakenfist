@@ -12,7 +12,7 @@
       ff02::3 ip6-allhosts
 
       {% for svr in groups.hypervisors %}
-      {{hostvars[svr]['node_ip']}}  {{svr}}
+      {{hostvars[svr]['node_egress_ip']}}  {{svr}}
       {% endfor %}
       {{hostvars['localhost']['primary_node_ip']}}  sf-primary
     dest: /etc/hosts
@@ -22,12 +22,12 @@
 
 - name: Determine network node
   set_fact:
-    network_node_ip: "{{hostvars['sf-1']['node_ip']}}"
+    network_node_ip: "{{hostvars['sf-1']['node_mesh_ip']}}"
   delegate_to: localhost
   delegate_facts: true
 
 - name: Determine primary node
   set_fact:
-    primary_node_ip: "{{hostvars['localhost']['node_ip']}}"
+    primary_node_ip: "{{hostvars['localhost']['node_egress_ip']}}"
   delegate_to: localhost
   delegate_facts: true

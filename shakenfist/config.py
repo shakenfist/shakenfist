@@ -10,15 +10,6 @@ from pydantic import (
 )
 
 
-def get_node_ip():
-    node_name = socket.getfqdn()
-    try:
-        return socket.gethostbyname(node_name)
-    except Exception:
-        # Only for localhost development environments
-        return '127.0.0.1'
-
-
 def get_node_name():
     return socket.getfqdn()
 
@@ -85,8 +76,7 @@ class SFConfig(BaseSettings):
                     'IPs'
     )
     NETWORK_NODE_IP: str = Field(
-        default_factory=get_node_ip,
-        description='IP of the node which will egress all traffic',
+        '', description='Mesh IP of the node which will egress all traffic',
     )
     DNS_SERVER: str = Field(
         '8.8.8.8',
@@ -186,14 +176,21 @@ class SFConfig(BaseSettings):
         description='The bus to use for disk devices. One of virtio, scsi, '
                     'usb, ide, etc. See libvirt docs for full list of options.'
     )
-    NODE_IP: str = Field(
-        default_factory=get_node_ip, description='IP of this node'
-    )
     NODE_NAME: str = Field(
         default_factory=get_node_name, description='FQDN of this node'
     )
+    NODE_EGRESS_IP: str = Field(
+        '', description='Egress IP of this node'
+    )
     NODE_EGRESS_NIC: str = Field(
-        'eth0', description='NIC for outbound traffic')
+        'eth0', description='NIC for outbound traffic'
+    )
+    NODE_MESH_IP: str = Field(
+        '', description='Mesh network IP of this node'
+    )
+    NODE_MESH_NIC: str = Field(
+        'eth0', description='NIC for virtual network mesh traffic'
+    )
     STORAGE_PATH: str = Field(
         '/srv/shakenfist', description='Where on disk instances are stored'
     )

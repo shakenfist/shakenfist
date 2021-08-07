@@ -24,6 +24,10 @@
 
     - include: terraform/{{cloud}}/terraform.yml
 
+    - name: The primary node doesn't have a mesh ip, but we need to mimic it later, set one
+      set_fact:
+        node_mesh_ip: "{{node_egress_ip}}"
+
     - name: Wait for instances to boot
       pause:
         minutes: "{{bootdelay}}"
@@ -43,7 +47,7 @@
           ff02::3 ip6-allhosts
 
           {% for svr in groups.hypervisors %}
-          {{hostvars[svr]['node_ip']}}  {{svr}}
+          {{hostvars[svr]['node_egress_ip']}}  {{svr}}
           {% endfor %}
         dest: /etc/hosts
         owner: root
@@ -335,14 +339,14 @@
         owner: root
         group: sudo
         mode: u=r,g=r,o=
-      when: hostvars['localhost']['primary_node_ip'] != node_ip
+      when: hostvars['localhost']['primary_node_ip'] != node_egress_ip
 
     - name: Restart syslog
       service:
         name: rsyslog
         enabled: yes
         state: restarted
-      when: hostvars['localhost']['primary_node_ip'] != node_ip
+      when: hostvars['localhost']['primary_node_ip'] != node_egress_ip
 
 # Install etcd
 - hosts: etcd
@@ -460,14 +464,14 @@
               static_configs:
                 - targets: [
                       {% for svr in groups.allsf %}
-                        '{{hostvars[svr]['node_ip']}}:9100',
+                        '{{hostvars[svr]['node_mesh_ip']}}:9100',
                      {% endfor %}
                     ]
             - job_name: 'shakenfist'
               static_configs:
                 - targets: [
                       {% for svr in groups.hypervisors %}
-                        '{{hostvars[svr]['node_ip']}}:13001',
+                        '{{hostvars[svr]['node_mesh_ip']}}:13001',
                       {% endfor %}
                     ]
                 # metric_relabel_configs:
@@ -478,7 +482,7 @@
               static_configs:
                 - targets: [
                       {% for svr in groups.allsf %}
-                        '{{hostvars[svr]['node_ip']}}:2379',
+                        '{{hostvars[svr]['node_mesh_ip']}}:2379',
                       {% endfor %}
                     ]
                 # metric_relabel_configs:
@@ -528,7 +532,7 @@
           - name: Prometheus
             type: prometheus
             orgId: 1
-            url: http://{{node_ip}}:9090
+            url: http://{{node_mesh_ip}}:9090
             isDefault: true
             version: 1
             editable: false
@@ -608,16 +612,6 @@
         owner: root
         group: root
         mode: "0644"
-
-    - name: Determine node IP
-      shell: /usr/bin/dig @resolver1.opendns.com ANY myip.opendns.com +short
-      register: node_ip_complex
-      when: node_ip is not defined
-
-    - name: Extract node IP
-      set_fact:
-        node_ip: "{{node_ip_complex.stdout}}"
-      when: node_ip is not defined
 
     - name: Fetch systemd unit template from remote host
       fetch:

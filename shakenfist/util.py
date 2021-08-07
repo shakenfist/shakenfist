@@ -17,8 +17,8 @@ import traceback
 
 from oslo_concurrency import processutils
 
-from shakenfist import db
 from shakenfist.config import config
+from shakenfist import db
 from shakenfist import logutil
 
 
@@ -67,7 +67,7 @@ class RecordedOperation():
 
 def is_network_node():
     """Test if this node is the network node."""
-    return config.NODE_IP == config.NETWORK_NODE_IP
+    return config.NODE_MESH_IP == config.NETWORK_NODE_IP
 
 
 def check_for_interface(name, namespace=None, up=False):

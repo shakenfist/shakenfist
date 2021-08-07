@@ -84,17 +84,42 @@ export METAL_SSH_KEY_FILENAME="/root/.ssh/id_rsa"
 
 export KSM_ENABLED=1
 
-export METAL_IP_SF1=192.168.1.51
-export METAL_IP_SF2=192.168.1.52
-export METAL_IP_SF3=192.168.1.53
+# Metal topology is in JSON
+read -r -d '' TOPOLOGY <<'EOF'
+[
+    {
+        "name": "sf-1",
+        "egress_ip": "10.0.0.1",
+        "egress_nic": "eth0",
+        "mesh_ip": "10.0.1.1",
+        "mesh_nic": "eth1"
+    },
+    {
+        "name": "sf-2",
+        "egress_ip": "10.0.0.2",
+        "egress_nic": "eth0",
+        "mesh_ip": "10.0.1.2",
+        "mesh_nic": "eth1"
+    },
+    {
+        "name": "sf-3",
+        "egress_ip": "10.0.0.3",
+        "egress_nic": "eth0",
+        "mesh_ip": "10.0.1.3",
+        "mesh_nic": "eth1"
+    }
+]
+EOF
+export TOPOLOGY
+
+/srv/shakenfist/venv/share/shakenfist/installer/install
 ```
 
 And then we can run the installer:
 
 ```
 sudo - bash
-. sf-deploy.sh
-/srv/shakenfist/venv/share/shakenfist/installer/install
+./sf-deploy.sh
 ```
 
 
@@ -273,21 +298,7 @@ with real users.
 | SKIP_SF_TEST | All | Set to 1 to skip running destructive testing of the cloud |
 | KSM_ENABLED | All | Set to 1 to enable KSM, 0 to disable |
 | DEPLOY_NAME | All | The name of the deployment to use as an external label for prometheus |
-| AWS_REGION | aws, aws-single-node | The AWS region to deploy in |
-| AWS_AVAILABILITY_ZONE | aws, aws-single-node | The AWS availability zone to deploy in |
-| AWS_VPC_ID | aws, aws-single-node | The AWS VPC to use |
-| AWS_SSH_KEY_NAME | aws, aws-single-node | The name of an SSH key in the AWS region to use for ansible |
-| GCP_PROJECT | gcp | The GCP project id to deploy in |
-| GCP_SSH_KEY_FILENAME | gcp | The path to a ssh private key file to use for authentication. It is assumed that the public key is at ```${GCP_SSH_KEY_FILENAME}.pub```. (optional, only required if not using gcloud). |
-| GCP_SSH_USER | gcp | The username to add the GCP_SSH_KEY to. (optional, only used if GCPSSH_KEY_FILENAME is set). |
-| NODE_IMAGE | gcp | The name of an image to use for the booted instances. |
-| NODE_COUNT | gcp | The number of nodes to start. |
-| OS_SSH_KEY_NAME | openstack | The name of a SSH key in the OpenStack cloud to use for ansible |
-| OS_FLAVOR_NAME | openstack | The OpenStack flavor to use for instances |
-| OS_EXTERNAL_NET_NAME | openstack | The UUID of an OpenStack network with internet access |
-| METAL_IP_SF1 | metal | The IP address of a baremetal machine |
-| METAL_IP_SF2 | metal | The IP address of a baremetal machine |
-| METAL_IP_SF3 | metal | The IP address of a baremetal machine |
+| TOPOLOGY | metal | The topology of the metal cluster, as described above |
 | METAL_SSH_KEY_FILENAME | metal | The path to a ssh private key file to use for authentication. It is assumed that the public key is at ```${METAL_SSH_KEY_FILENAME}.pub```. |
 | METAL_SSH_USER | metal | The username to ssh as. |
 | SHAKENFIST_KEY | shakenfist | The authentication key for a user on the shakenfist cluster to deploy in |

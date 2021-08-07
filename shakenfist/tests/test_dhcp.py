@@ -48,7 +48,7 @@ class DHCPTestCase(testtools.TestCase):
             ETCD_USER: str = 'sf'
             ETCD_PASSWORD: str = 'foo'
             ETCD_SERVER: str = 'localhost'
-            NODE_IP: IPvAnyAddress = '127.0.0.1'
+            NODE_EGRESS_IP: IPvAnyAddress = '127.0.0.1'
             DOWNLOAD_URL_CIRROS: AnyHttpUrl = ('http://download.cirros-cloud.net/%(vernum)s/'
                                                'cirros-%(vernum)s-x86_64-disk.img')
 

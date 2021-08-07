@@ -1,0 +1,17 @@
+- name: Add {{item['name']}} to ansible
+  add_host:
+    hostname: "{{item['name']}}"
+    ansible_ssh_host: "{{item['node_egress_ip']}}"
+    ansible_ssh_user: "{{ssh_user}}"
+    ansible_ssh_private_key_filename: "{{ssh_key_filename}}"
+    groups: hypervisors, etcd_master
+
+- name: Add node facts
+  set_fact:
+    node_name: "{{item['name']}}"
+    node_egress_ip: "{{item['node_egress_ip']}}"
+    node_egress_nic: "{{item['node_egress_nic']}}"
+    node_mesh_ip: "{{item['node_mesh_ip']}}"
+    node_mesh_nic: "{{item['node_mesh_nic']}}"
+  delegate_to: "{{item['name']}}"
+  delegate_facts: true
