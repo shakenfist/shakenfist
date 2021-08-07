@@ -188,20 +188,8 @@
         mode: u=r,g=r,o=r
       when: is_intel.rc == 0
 
-    # NOTE(mikal): this might not be right if egress and meshes are on different
-    # interfaces.
-    - name: Determine default interface
-      shell: ip route list default | head -1 | cut -f 5 -d " "
-      register: node_egress_nic_complex
-      when: node_egress_nic is not defined
-
-    - name: Extract node default interface
-      set_fact:
-        node_egress_nic: "{{node_egress_nic_complex.stdout}}"
-      when: node_egress_nic is not defined
-
-    - name: Determine default interface MTU
-      shell: ip link show {{node_egress_nic}} | grep mtu | sed -e 's/.*mtu //' -e 's/ .*//'
+    - name: Determine the mesh network interface MTU
+      shell: ip link show {{node_mesh_nic}} | grep mtu | sed -e 's/.*mtu //' -e 's/ .*//'
       register: node_mtu_complex
 
     - name: Extract default interface MTU
