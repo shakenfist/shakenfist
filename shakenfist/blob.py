@@ -164,7 +164,13 @@ def http_fetch(resp, blob_uuid, locks, logs):
 
     logs.with_field('bytes_fetched', fetched).info('Fetch complete')
 
+    # We really should verify the checksum here before we commit the blob to the
+    # database.
+
     # And make the associated blob
-    b = Blob.new(blob_uuid, fetched, time.time(), time.time())
+    b = Blob.new(blob_uuid,
+                 resp.headers.get('Content-Length'),
+                 resp.headers.get('Last-Modified'),
+                 time.time())
     b.observe()
     return b
