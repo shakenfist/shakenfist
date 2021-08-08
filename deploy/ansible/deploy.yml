@@ -346,6 +346,8 @@
         etcd_cluster_name: shakenfist
         etcd_enable_v2: False
         etcd_master_group_name: etcd_master
+        etcd_iface_public: "{{node_mesh_nic}}"
+        etcd_iface_cluster: "{{node_mesh_nic}}"
 
 # NOTE(mikal): I am not happy with binding to 0.0.0.0 here for
 # etcd, but I can't bind to lo because of how the ansible role

@@ -15,6 +15,6 @@ localhost
   ansible_python_interpreter='/usr/bin/python3'
 
 [etcd:children]
-  allsf
+  hypervisors
 
 [etcd_master]

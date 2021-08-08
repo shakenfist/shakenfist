@@ -12,7 +12,7 @@
       ff02::3 ip6-allhosts
 
       {% for svr in groups.hypervisors %}
-      {{hostvars[svr]['node_egress_ip']}}  {{svr}}
+      {{hostvars[svr]['node_mesh_ip']}}  {{svr}}
       {% endfor %}
       {{hostvars['localhost']['primary_node_ip']}}  sf-primary
     dest: /etc/hosts
