@@ -12,8 +12,9 @@ import sys
 os.makedirs('/etc/sf', exist_ok=True)
 with open('/etc/sf/deploy-log', 'w') as logfile:
     def logwrite(s):
+        s = s.rstrip()
         timestamp = datetime.datetime.now()
-        print('%s %s' % (timestamp, s.rstrip()))
+        print('%s %s' % (timestamp, s))
         logfile.write('%s %s\n' % (timestamp, s))
 
     variables = {}
