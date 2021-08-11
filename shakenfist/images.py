@@ -7,13 +7,11 @@ import shutil
 import uuid
 
 from shakenfist.artifact import Artifact, BLOB_URL
-from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist import blob
 from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist import exceptions
 from shakenfist import image_resolver
-from shakenfist import instance
 from shakenfist import logutil
 from shakenfist import util
 
@@ -21,211 +19,103 @@ from shakenfist import util
 LOG, _ = logutil.setup(__name__)
 
 
-class Image(dbo):
-    object_type = 'image'
-    current_version = 2
-    state_targets = {
-        None: (dbo.STATE_INITIAL, dbo.STATE_CREATING),
-        dbo.STATE_INITIAL: (dbo.STATE_CREATING, dbo.STATE_DELETED, dbo.STATE_ERROR),
-        # TODO(andy): This is broken but will be accepted until Image class is
-        # refactored. (hey, at least the state names will be valid)
-        dbo.STATE_CREATING: (dbo.STATE_INITIAL, dbo.STATE_CREATING, dbo.STATE_CREATED,
-                             dbo.STATE_DELETED, dbo.STATE_ERROR),
-        dbo.STATE_CREATED: (dbo.STATE_INITIAL, dbo.STATE_CREATING, dbo.STATE_CREATED,
-                            dbo.STATE_DELETED, dbo.STATE_ERROR),
-        dbo.STATE_ERROR: (dbo.STATE_DELETED, dbo.STATE_ERROR),
-        dbo.STATE_DELETED: (dbo.STATE_DELETED, dbo.STATE_ERROR, dbo.STATE_CREATING),
-    }
+class ImageFetchHelper(object):
+    def __init__(self, inst, url):
+        self.instance = inst
+        self.url = url
 
-    def __init__(self, static_values):
-        # NOTE(mikal): we call the unique_ref the "uuid" for the rest of this
-        # class because that's what the base object does. Note that the
-        # checksum is not in fact a UUID and is in fact intended to collide
-        # when URLs are identical.
-        self.__unique_ref = static_values['ref']
+        self.__artifact = Artifact.from_url(Artifact.TYPE_IMAGE, self.url)
+        self.log = LOG.with_fields(
+            {'url': self.url, 'artifact': self.__artifact.uuid})
 
-        super(Image, self).__init__(self.__unique_ref + '/' +
-                                    static_values['node'], static_values['version'])
+    def get_image(self):
+        with self.__artifact.get_lock() as lock:
+            url, checksum, checksum_type = image_resolver.resolve(self.url)
 
-        self.__url = static_values['url']
-        self.__node = static_values['node']
+            # If this is a request for a URL, do we have the most recent version
+            # somewhere in the cluster?
+            if not url.startswith(BLOB_URL):
+                most_recent = self.__artifact.most_recent_index
+                dirty = False
 
-        # Images here have a mirroring artifact of type 'image' for now.
-        # This is done so we can tie all the various download versions
-        # together. Over time this class should go away and be replaced
-        # with just the artifact.
-        self.__artifact = Artifact.from_url(Artifact.TYPE_IMAGE, self.__url)
+                if most_recent.get('index', 0) == 0:
+                    self.log.info('Cluster does not have a copy of image')
+                    dirty = True
+                else:
+                    most_recent_blob = Blob.from_db(most_recent['blob_uuid'])
+                    resp = self._open_connection(url)
 
-    @classmethod
-    def new(cls, url):
-        unique_ref = Image.calc_unique_ref(url)
-        image_uuid = '%s/%s' % (unique_ref, config.NODE_NAME)
+                    if most_recent_blob.modified != resp.headers.get('Last-Modified'):
+                        self.add_event('image requires fetch', None, None,
+                                       'Last-Modified: %s -> %s' % (most_recent_blob.modified,
+                                                                    resp.headers.get('Last-Modified')))
+                        dirty = True
 
-        # Check for existing metadata in DB
-        i = Image.from_db(image_uuid)
-        if i:
-            return i
+                    if most_recent_blob.size != resp.headers.get('Content-Length'):
+                        self.add_event('image requires fetch', None, None,
+                                       'Content-Length: %s -> %s' % (most_recent_blob.size,
+                                                                     resp.headers.get('Content-Length')))
+                        dirty = True
 
-        Image._db_create(image_uuid, {
-            'uuid': image_uuid,
-            'url': url,
-            'node': config.NODE_NAME,
-            'ref': unique_ref,
-            'version': cls.current_version
-        })
-        i = Image.from_db(image_uuid)
-        i.state = Image.STATE_INITIAL
-        i.add_event('db record creation', None)
-        return i
+                    self.log.info('Cluster cached image is stale')
 
-    @staticmethod
-    def from_db(image_uuid):
-        if not image_uuid:
-            return None
+                if not dirty:
+                    url = '%s%s' % (BLOB_URL, most_recent_blob.uuid)
+                    self.log.info('Using cached image from cluster')
 
-        static_values = Image._db_get(image_uuid)
-        if not static_values:
-            return None
-
-        return Image(static_values)
-
-    # Static values
-    @property
-    def url(self):
-        return self.__url
-
-    @property
-    def unique_ref(self):
-        return self.__unique_ref
-
-    @property
-    def node(self):
-        return self.__node
-
-    # Implementation
-    @staticmethod
-    def calc_unique_ref(url):
-        """Calc unique reference for this image.
-
-        The calculated reference is used as the unique DB reference and as the
-        on-disk filename.
-        """
-
-        # TODO(andy): If we namespace downloads then this can combine namespace
-        # with the URL. The DB stores the URL allowing searches to re-use
-        # already downloaded images.
-        h = hashlib.sha256()
-        h.update(url.encode('utf-8'))
-        return h.hexdigest()
-
-    def artifact(self):
-        return self.__artifact
-
-    def external_view(self):
-        return self.__artifact.external_view()
-
-    def delete(self):
-        # NOTE(mikal): it isn't actually safe to remove the image from the cache
-        # without verifying that no instance is using it, so we just mark the
-        # image as deleted in the database and move on without removing things
-        # from the cache. We will probably want to revisit this in the future.
-        self.state = self.STATE_DELETED
-
-    def get(self, locks, related_object):
-        self.state = self.STATE_CREATING
-        url, checksum, checksum_type = image_resolver.resolve(self.url)
-
-        # If this is a request for a URL, do we have the most recent version
-        # somewhere in the cluster?
-        if not url.startswith(BLOB_URL):
-            most_recent = self.__artifact.most_recent_index
-            dirty = False
-
-            if most_recent.get('index', 0) == 0:
-                self.log.with_fields({'url': self.url}).info(
-                    'Cluster does not have a copy of image')
-                dirty = True
+            # Ensure that we have the blob in the local store. This blob is in the
+            # "original format" if downloaded from an HTTP source.
+            if url.startswith(BLOB_URL):
+                self.log.info('Fetching image from within the cluster')
+                b = self._blob_get(url)
             else:
-                most_recent_blob = Blob.from_db(most_recent['blob_uuid'])
-                resp = self._open_connection(url)
+                self.log.info('Fetching image from the internet')
+                b = self._http_get_inner(lock, url, checksum, checksum_type)
 
-                if most_recent_blob.modified != resp.headers.get('Last-Modified'):
-                    self.add_event('image requires fetch', None, None,
-                                   'Last-Modified: %s -> %s' % (most_recent_blob.modified,
-                                                                resp.headers.get('Last-Modified')))
-                    dirty = True
+            # If this blob uuid is not the most recent index for the artifact, set that
+            if self.__artifact.most_recent_index.get('blob_uuid') != b.uuid:
+                self.__artifact.add_index(b.uuid)
 
-                if most_recent_blob.size != resp.headers.get('Content-Length'):
-                    self.add_event('image requires fetch', None, None,
-                                   'Content-Length: %s -> %s' % (most_recent_blob.size,
-                                                                 resp.headers.get('Content-Length')))
-                    dirty = True
+            # Transcode if required, placing the transcoded file in a well known location.
+            if not os.path.exists(os.path.join(config.STORAGE_PATH, 'image_cache', b.uuid + '.qcow2')):
+                blob_path = os.path.join(config.STORAGE_PATH, 'blobs', b.uuid)
+                if b.info.get('mime-type', '') == 'application/gzip':
+                    cache_path = os.path.join(
+                        config.STORAGE_PATH, 'image_cache', b.uuid)
+                    with util.RecordedOperation('decompress image', self.instance):
+                        util.execute([lock], 'gunzip -k -q -c %s > %s'
+                                     % (blob_path, cache_path))
+                    blob_path = cache_path
 
-                self.log.with_fields({'url': self.url}).info(
-                    'Cluster cached image is stale')
-
-            if not dirty:
-                url = '%s%s' % (BLOB_URL, most_recent_blob.uuid)
-                self.log.with_fields({'url': url}).info(
-                    'Using cached image from cluster')
-
-        # Ensure that we have the blob in the local store. This blob is in the
-        # "original format" if downloaded from an HTTP source.
-        if url.startswith(BLOB_URL):
-            self.log.with_fields({'url': url}).info(
-                'Fetching image from within the cluster')
-            b = self._blob_get(url, locks, related_object)
-        else:
-            self.log.with_fields({'url': url}).info(
-                'Fetching image from the internet')
-            b = self._http_get_inner(url, locks, related_object, checksum,
-                                     checksum_type)
-
-        # If this blob uuid is not the most recent index for the artifact, set that
-        if self.__artifact.most_recent_index.get('blob_uuid') != b.uuid:
-            self.__artifact.add_index(b.uuid)
-
-        # Transcode if required, placing the transcoded file in a well known location.
-        if not os.path.exists(os.path.join(config.STORAGE_PATH, 'image_cache', b.uuid + '.qcow2')):
-            blob_path = os.path.join(config.STORAGE_PATH, 'blobs', b.uuid)
-            if b.info.get('mime-type', '') == 'application/gzip':
+                os.makedirs(
+                    os.path.join(config.STORAGE_PATH, 'image_cache'), exist_ok=True)
                 cache_path = os.path.join(
-                    config.STORAGE_PATH, 'image_cache', b.uuid)
-                with util.RecordedOperation('decompress image', related_object):
-                    util.execute(locks, 'gunzip -k -q -c %s > %s'
-                                 % (blob_path, cache_path))
-                blob_path = cache_path
+                    config.STORAGE_PATH, 'image_cache', b.uuid + '.qcow2')
+                if identify(blob_path).get('file format', '') == 'qcow2':
+                    try:
+                        os.link(blob_path, cache_path)
+                        self.log.with_fields({'blob': b}).info(
+                            'Hard linking %s -> %s' % (blob_path, cache_path))
+                    except OSError:
+                        os.symlink(blob_path, cache_path)
+                        self.log.with_fields({'blob': b}).info(
+                            'Symbolic linking %s -> %s' % (blob_path, cache_path))
 
-            os.makedirs(
-                os.path.join(config.STORAGE_PATH, 'image_cache'), exist_ok=True)
-            cache_path = os.path.join(
-                config.STORAGE_PATH, 'image_cache', b.uuid + '.qcow2')
-            if identify(blob_path).get('file format', '') == 'qcow2':
-                try:
-                    os.link(blob_path, cache_path)
-                    self.log.with_fields({'blob': b}).info(
-                        'Hard linking %s -> %s' % (blob_path, cache_path))
-                except OSError:
-                    os.symlink(blob_path, cache_path)
-                    self.log.with_fields({'blob': b}).info(
-                        'Symbolic linking %s -> %s' % (blob_path, cache_path))
+                    shutil.chown(cache_path, config.LIBVIRT_USER,
+                                 config.LIBVIRT_GROUP)
+                else:
+                    with util.RecordedOperation('transcode image', self.instance):
+                        self.log.with_fields({'blob': b}).info(
+                            'Transcoding %s -> %s' % (blob_path, cache_path))
+                        create_qcow2([lock], blob_path, cache_path)
 
-                shutil.chown(cache_path, config.LIBVIRT_USER,
-                             config.LIBVIRT_GROUP)
-            else:
-                with util.RecordedOperation('transcode image', related_object):
-                    self.log.with_fields({'blob': b}).info(
-                        'Transcoding %s -> %s' % (blob_path, cache_path))
-                    create_qcow2(locks, blob_path, cache_path)
+                shutil.chown(cache_path, 'libvirt-qemu', 'libvirt-qemu')
+                self.log.with_fields(util.stat_log_fields(cache_path)).info(
+                    'Cache file %s created' % cache_path)
 
-            shutil.chown(cache_path, 'libvirt-qemu', 'libvirt-qemu')
-            self.log.with_fields(util.stat_log_fields(cache_path)).info(
-                'Cache file %s created' % cache_path)
+            self.__artifact.state = Artifact.STATE_CREATED
 
-        self.__artifact.state = Artifact.STATE_CREATED
-        self.state = self.STATE_CREATED
-
-    def _blob_get(self, url, locks, related_object):
+    def _blob_get(self, url):
         """Fetch a blob from the cluster."""
 
         blob_uuid = url[len(BLOB_URL):]
@@ -239,7 +129,7 @@ class Image(dbo):
         blob_source = locations[0]
 
         if not os.path.exists(blob_path):
-            with util.RecordedOperation('fetch blob', related_object):
+            with util.RecordedOperation('fetch blob', self.instance):
                 url = 'http://%s:%d/blob/%s' % (blob_source, config.API_PORT,
                                                 blob_uuid)
                 admin_token = util.get_api_token(
@@ -257,29 +147,27 @@ class Image(dbo):
 
         return b
 
-    def _http_get_inner(self, url, locks, related_object, checksum, checksum_type):
+    def _http_get_inner(self, lock, url, checksum, checksum_type):
         """Fetch image if not downloaded and return image path."""
 
-        with util.RecordedOperation('fetch image', related_object):
+        with util.RecordedOperation('fetch image', self.instance):
             resp = self._open_connection(url)
             blob_uuid = str(uuid.uuid4())
             self.log.with_fields({
                 'artifact': self.__artifact.uuid,
                 'blob': blob_uuid,
                 'url': url}).info('Commencing HTTP fetch to blob')
-            b = blob.http_fetch(resp, blob_uuid, locks, self.log)
+            b = blob.http_fetch(resp, blob_uuid, [lock], self.log)
 
             # Ensure checksum is correct
             if not verify_checksum(
                     os.path.join(config.STORAGE_PATH, 'blobs', b.uuid),
                     checksum, checksum_type):
-                if isinstance(related_object, instance.Instance):
-                    related_object.add_event('fetch image', 'bad checksum')
+                self.instance.add_event('fetch image', 'bad checksum')
                 raise exceptions.BadCheckSum('url=%s' % url)
 
             # Only persist values after the file has been verified.
             b.observe()
-
             return b
 
     def _open_connection(self, url):

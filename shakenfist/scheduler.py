@@ -12,7 +12,6 @@ from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import exceptions
-from shakenfist import images
 from shakenfist import instance
 from shakenfist import logutil
 from shakenfist import networkinterface
@@ -218,7 +217,7 @@ class Scheduler(object):
                     baseobject.active_states_filter]):
                 b = i.most_recent_index
                 if b:
-                    for loc in b.locations:
+                    for loc in b.get('locations', []):
                         candidates_image_matches[loc] += 1
 
         # Create dict of candidate lists keyed by number of image matches
@@ -360,8 +359,7 @@ class Scheduler(object):
             requested_images = []
             for disk in instance.disk_spec:
                 if disk.get('base'):
-                    img = images.Image.new(disk['base'])
-                    requested_images = img.url
+                    requested_images.append(disk['base'])
 
             candidates = self._find_most_matching_images(
                 requested_images, candidates)

@@ -37,7 +37,6 @@ from shakenfist.external_api import snapshot as api_snapshot
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import exceptions
-from shakenfist import images
 from shakenfist import instance
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
@@ -430,8 +429,14 @@ class Instances(api_base.Resource):
                 d['blob_uuid'] = a.most_recent_index['blob_uuid']
             elif disk_base.startswith(BLOB_URL):
                 d['blob_uuid'] = disk_base[len(BLOB_URL):]
+            else:
+                # We ensure that the image exists in the database in an initial state
+                # here so that it will show up in image list requests. The image is
+                # fetched by the queued job later.
+                Artifact.from_url(Artifact.TYPE_IMAGE, disk_base)
 
             transformed_disk.append(d)
+
         disk = transformed_disk
 
         if network:
@@ -891,11 +896,11 @@ class Images(api_base.Resource):
         # We ensure that the image exists in the database in an initial state
         # here so that it will show up in image list requests. The image is
         # fetched by the queued job later.
-        img = images.Image.new(url)
+        a = Artifact.from_url(Artifact.TYPE_IMAGE, url)
         db.enqueue(config.NODE_NAME, {
             'tasks': [FetchImageTask(url)],
         })
-        return img.external_view()
+        return a.external_view()
 
 
 class ImageEvents(api_base.Resource):
