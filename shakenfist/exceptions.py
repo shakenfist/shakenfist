@@ -154,3 +154,11 @@ class ArtifactException(Exception):
 
 class TooManyMatches(ArtifactException):
     pass
+
+
+class UnknownChecksumType(ArtifactException):
+    pass
+
+
+class ArtifactHasNoBlobs(ArtifactException):
+    pass

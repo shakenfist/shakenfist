@@ -57,19 +57,13 @@ class Image(dbo):
         self.__artifact = Artifact.from_url(Artifact.TYPE_IMAGE, self.__url)
 
     @classmethod
-    def new(cls, url, checksum=None):
-        # Handle URL shortcut with built-in resolvers
-        url, resolver_checksum = image_resolver.resolve(url)
-        if not checksum:
-            checksum = resolver_checksum
-
+    def new(cls, url):
         unique_ref = Image.calc_unique_ref(url)
         image_uuid = '%s/%s' % (unique_ref, config.NODE_NAME)
 
         # Check for existing metadata in DB
         i = Image.from_db(image_uuid)
         if i:
-            i.update_checksum(checksum)
             return i
 
         Image._db_create(image_uuid, {
@@ -81,7 +75,6 @@ class Image(dbo):
         })
         i = Image.from_db(image_uuid)
         i.state = Image.STATE_INITIAL
-        i.update_checksum(checksum)
         i.add_event('db record creation', None)
         return i
 
@@ -108,21 +101,6 @@ class Image(dbo):
     @property
     def node(self):
         return self.__node
-
-    # Values routed to attributes
-    @property
-    def checksum(self):
-        checksum = self._db_get_attribute('latest_checksum')
-        if not checksum:
-            return None
-        return checksum.get('checksum')
-
-    def update_checksum(self, checksum):
-        old_checksum = self.checksum
-        if checksum and checksum != old_checksum:
-            self._db_set_attribute('latest_checksum', {'checksum': checksum})
-            self.add_event('checksum has changed',
-                           '%s -> %s' % (old_checksum, checksum))
 
     # Implementation
     @staticmethod
@@ -155,7 +133,7 @@ class Image(dbo):
 
     def get(self, locks, related_object):
         self.state = self.STATE_CREATING
-        url = self.url
+        url, checksum, checksum_type = image_resolver.resolve(self.url)
 
         # If this is a request for a URL, do we have the most recent version
         # somewhere in the cluster?
@@ -164,12 +142,12 @@ class Image(dbo):
             dirty = False
 
             if most_recent.get('index', 0) == 0:
-                self.log.with_fields({'url': url}).info(
+                self.log.with_fields({'url': self.url}).info(
                     'Cluster does not have a copy of image')
                 dirty = True
             else:
                 most_recent_blob = Blob.from_db(most_recent['blob_uuid'])
-                resp = self._open_connection(self.url)
+                resp = self._open_connection(url)
 
                 if most_recent_blob.modified != resp.headers.get('Last-Modified'):
                     self.add_event('image requires fetch', None, None,
@@ -183,7 +161,7 @@ class Image(dbo):
                                                                  resp.headers.get('Content-Length')))
                     dirty = True
 
-                self.log.with_fields({'url': url}).info(
+                self.log.with_fields({'url': self.url}).info(
                     'Cluster cached image is stale')
 
             if not dirty:
@@ -200,7 +178,12 @@ class Image(dbo):
         else:
             self.log.with_fields({'url': url}).info(
                 'Fetching image from the internet')
-            b = self._http_get_inner(url, locks, related_object)
+            b = self._http_get_inner(url, locks, related_object, checksum,
+                                     checksum_type)
+
+        # If this blob uuid is not the most recent index for the artifact, set that
+        if self.__artifact.most_recent_index.get('blob_uuid') != b.uuid:
+            self.__artifact.add_index(b.uuid)
 
         # Transcode if required, placing the transcoded file in a well known location.
         if not os.path.exists(os.path.join(config.STORAGE_PATH, 'image_cache', b.uuid + '.qcow2')):
@@ -274,24 +257,28 @@ class Image(dbo):
 
         return b
 
-    def _http_get_inner(self, url, locks, related_object):
+    def _http_get_inner(self, url, locks, related_object, checksum, checksum_type):
         """Fetch image if not downloaded and return image path."""
 
         with util.RecordedOperation('fetch image', related_object):
             resp = self._open_connection(url)
             blob_uuid = str(uuid.uuid4())
+            self.log.with_fields({
+                'artifact': self.__artifact.uuid,
+                'blob': blob_uuid,
+                'url': url}).info('Commencing HTTP fetch to blob')
             b = blob.http_fetch(resp, blob_uuid, locks, self.log)
 
             # Ensure checksum is correct
-            if not self.correct_checksum(
-                    os.path.join(config.STORAGE_PATH, 'blobs', b.uuid)):
+            if not verify_checksum(
+                    os.path.join(config.STORAGE_PATH, 'blobs', b.uuid),
+                    checksum, checksum_type):
                 if isinstance(related_object, instance.Instance):
                     related_object.add_event('fetch image', 'bad checksum')
                 raise exceptions.BadCheckSum('url=%s' % url)
 
             # Only persist values after the file has been verified.
             b.observe()
-            self.__artifact.add_index(b.uuid)
 
             return b
 
@@ -309,16 +296,18 @@ class Image(dbo):
                 % (url, resp.status_code))
         return resp
 
-    def correct_checksum(self, image_name):
-        log = self.log.with_field('image', image_name)
 
-        if not self.checksum:
-            log.info('No checksum comparison available')
-            return True
+def verify_checksum(image_name, checksum, checksum_type):
+    log = LOG.with_field('image', image_name)
 
-        if not os.path.exists(image_name):
-            return False
+    if not checksum:
+        log.info('No checksum comparison available')
+        return True
 
+    if not os.path.exists(image_name):
+        return False
+
+    if checksum_type == 'md5':
         # MD5 chosen because cirros 90% of the time has MD5SUMS available...
         md5_hash = hashlib.md5()
         with open(image_name, 'rb') as f:
@@ -327,9 +316,12 @@ class Image(dbo):
         calc = md5_hash.hexdigest()
         log.with_field('calc', calc).debug('Calc from image download')
 
-        correct = calc == self.checksum
+        correct = calc == checksum
         log.with_field('correct', correct).info('Image checksum verification')
         return correct
+
+    else:
+        raise exceptions.UnknownChecksumType(checksum_type)
 
 
 VALUE_WITH_BRACKETS_RE = re.compile(r'.* \(([0-9]+) bytes\)')

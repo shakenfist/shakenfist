@@ -519,8 +519,15 @@ class Instance(dbo):
                         disk_base = '%s%s' % (BLOB_URL, disk['blob_uuid'])
                     elif disk.get('base'):
                         img = images.Image.new(disk['base'])
-                        disk['blob_uuid'] = \
-                            img.artifact().most_recent_index['blob_uuid']
+                        mri = img.artifact().most_recent_index
+
+                        if 'blob_uuid' not in mri:
+                            a = img.artifact()
+                            raise exceptions.ArtifactHasNoBlobs(
+                                'Artifact %s of type %s has no versions'
+                                % (a.uuid, a.artifact_type))
+
+                        disk['blob_uuid'] = mri['blob_uuid']
                         disk_base = '%s%s' % (BLOB_URL, disk['blob_uuid'])
 
                     if disk_base:

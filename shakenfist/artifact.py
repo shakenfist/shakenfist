@@ -119,6 +119,7 @@ class Artifact(dbo):
                 'blob_uuid': blob_uuid
             }
             self._db_set_attribute('index_%012d' % index, entry)
+            self.log.with_fields(entry).info('Added index to artifact')
             return entry
 
     def external_view_without_index(self):
