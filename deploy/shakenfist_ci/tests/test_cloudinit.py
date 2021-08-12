@@ -1,4 +1,5 @@
 import base64
+import time
 
 from shakenfist_ci import base
 
@@ -10,9 +11,12 @@ class TestCloudInit(base.BaseNamespacedTestCase):
 
     def setUp(self):
         super(TestCloudInit, self).setUp()
-        self.net = self.test_client.allocate_network(
-            '192.168.242.0/24', True, True, '%s-net' % self.namespace)
-        self._await_network_ready(self.net['uuid'])
+        self.net_one = self.test_client.allocate_network(
+            '192.168.242.0/24', True, True, '%s-net-1' % self.namespace)
+        self.net_two = self.test_client.allocate_network(
+            '192.168.243.0/24', True, True, '%s-net-2' % self.namespace)
+        self._await_network_ready(self.net_one['uuid'])
+        self._await_network_ready(self.net_two['uuid'])
 
     def test_simple(self):
         ud = """#!/bin/sh
@@ -22,10 +26,10 @@ sudo echo 'banana' >  /tmp/output"""
             'cirros', 1, 1024,
             [
                 {
-                    'network_uuid': self.net['uuid']
+                    'network_uuid': self.net_one['uuid']
                 },
                 {
-                    'network_uuid': self.net['uuid']
+                    'network_uuid': self.net_one['uuid']
                 }
             ],
             [
@@ -62,3 +66,40 @@ sudo echo 'banana' >  /tmp/output"""
         out = console.execute('cat /home/cirros/.ssh/authorized_keys')
         if not out.find('elLwq/bpzBWsg0JjjGvtuuKMM'):
             self.fail('ssh key was not placed in authorized keys!\n\n%s' % out)
+
+    def test_cloudinit_no_tracebacks(self):
+        inst = self.test_client.create_instance(
+            'notracebacks', 2, 2048,
+            [
+                {
+                    'network_uuid': self.net_one['uuid']
+                },
+                {
+                    'network_uuid': self.net_two['uuid'],
+                    'address': None
+                }
+            ],
+            [
+                {
+                    'size': 8,
+                    'base': 'ubuntu:20.04',
+                    'type': 'disk'
+                }
+            ], None, None)
+
+        self.assertIsNotNone(inst['uuid'])
+
+        while inst['state'] not in ['created', 'error']:
+            time.sleep(1)
+            inst = self.test_client.get_instance(inst['uuid'])
+
+        self._await_login_prompt(inst['uuid'])
+
+        ifaces = self.test_client.get_instance_interfaces(inst['uuid'])
+        self.assertEqual(2, len(ifaces))
+        for iface in ifaces:
+            self.assertEqual('created', iface['state'],
+                             'Interface %s is not in correct state' % iface['uuid'])
+
+        c = self.test_client.get_console_data(inst['uuid'], 200000)
+        self.assertFalse('Traceback' in c)
