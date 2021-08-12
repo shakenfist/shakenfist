@@ -650,29 +650,29 @@ class Instance(dbo):
 
         have_default_route = False
         for iface in networkinterface.interfaces_for_instance(self):
-            devname = 'eth%d' % iface.order
-            nd['links'].append(
-                {
-                    'ethernet_mac_address': iface.macaddr,
-                    'id': devname,
-                    'name': devname,
-                    'mtu': config.MAX_HYPERVISOR_MTU - 50,
-                    'type': 'vif',
-                    'vif_id': iface.uuid
-                }
-            )
-
-            n = net.Network.from_db(iface.network_uuid)
-            nd['networks'].append(
-                {
-                    'id': '%s-%s' % (iface.network_uuid, iface.order),
-                    'link': devname,
-                    'type': 'ipv4',
-                    'network_id': iface.network_uuid
-                }
-            )
-
             if iface.ipv4:
+                devname = 'eth%d' % iface.order
+                nd['links'].append(
+                    {
+                        'ethernet_mac_address': iface.macaddr,
+                        'id': devname,
+                        'name': devname,
+                        'mtu': config.MAX_HYPERVISOR_MTU - 50,
+                        'type': 'vif',
+                        'vif_id': iface.uuid
+                    }
+                )
+
+                n = net.Network.from_db(iface.network_uuid)
+                nd['networks'].append(
+                    {
+                        'id': '%s-%s' % (iface.network_uuid, iface.order),
+                        'link': devname,
+                        'type': 'ipv4',
+                        'network_id': iface.network_uuid
+                    }
+                )
+
                 nd['networks'][-1].update({
                     'ip_address': iface.ipv4,
                     'netmask': str(n.netmask),
