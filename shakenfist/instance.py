@@ -13,7 +13,7 @@ import socket
 import time
 from uuid import uuid4
 
-from shakenfist.artifact import BLOB_URL
+from shakenfist.artifact import Artifact, BLOB_URL
 from shakenfist import baseobject
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
@@ -518,11 +518,11 @@ class Instance(dbo):
                     if disk.get('blob_uuid'):
                         disk_base = '%s%s' % (BLOB_URL, disk['blob_uuid'])
                     elif disk.get('base'):
-                        img = images.Image.new(disk['base'])
-                        mri = img.artifact().most_recent_index
+                        a = Artifact.from_url(
+                            Artifact.TYPE_IMAGE, disk['base'])
+                        mri = a.most_recent_index
 
                         if 'blob_uuid' not in mri:
-                            a = img.artifact()
                             raise exceptions.ArtifactHasNoBlobs(
                                 'Artifact %s of type %s has no versions'
                                 % (a.uuid, a.artifact_type))
@@ -531,7 +531,6 @@ class Instance(dbo):
                         disk_base = '%s%s' % (BLOB_URL, disk['blob_uuid'])
 
                     if disk_base:
-                        img = images.Image.new(disk_base)
                         cached_image_path = os.path.join(
                             config.STORAGE_PATH, 'image_cache', disk['blob_uuid'] + '.qcow2')
 

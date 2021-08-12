@@ -228,9 +228,8 @@ class LowResourceTestCase(SchedulerTestCase):
                                 [])
         self.assertEqual('No nodes with enough idle RAM', str(exc))
 
-    @mock.patch('shakenfist.images.Image.new')
     @mock.patch('shakenfist.artifact.Artifacts', return_value=[])
-    def test_not_enough_disk(self, mock_get_image_meta, mock_image_from_url):
+    def test_not_enough_disk(self, mock_get_artifacts):
         self.fake_db.set_node_metrics_same({
             'cpu_max_per_instance': 16,
             'cpu_max': 4,
@@ -256,9 +255,8 @@ class LowResourceTestCase(SchedulerTestCase):
                                 [])
         self.assertEqual('No nodes with enough disk space', str(exc))
 
-    @mock.patch('shakenfist.images.Image.new')
     @mock.patch('shakenfist.artifact.Artifacts', return_value=[])
-    def test_ok(self, mock_get_image_meta, mock_image_from_url):
+    def test_ok(self, mock_get_artifacts):
         self.fake_db.set_node_metrics_same({
             'cpu_max_per_instance': 16,
             'cpu_max': 4,
@@ -327,10 +325,9 @@ class CorrectAllocationTestCase(SchedulerTestCase):
                     'node': 'node3',
                     'disk_spec': [{'base': 'cirros', 'size': 21}]
                 })])
-    @mock.patch('shakenfist.images.Image.new')
     @mock.patch('shakenfist.artifact.Artifacts', return_value=[])
     def test_any_node_but_not_network_node(
-            self, mock_get_image_meta, mock_image_from_url, mock_get_instances,
+            self, mock_get_artifacts, mock_get_instances,
             mock_get_instance, mock_instance_attribute):
         self.fake_db.set_node_metrics_same({
             'cpu_max_per_instance': 16,
@@ -376,11 +373,11 @@ class CorrectAllocationTestCase(SchedulerTestCase):
                     'memory': 1024,
                     'disk_spec': [{'base': 'cirros', 'size': 21}]
                 })])
-    @mock.patch('shakenfist.images.Image.new')
     @mock.patch('shakenfist.artifact.Artifacts', return_value=[])
     def test_single_node_that_has_network(
-            self, mock_get_image_meta, mock_image_from_url, mock_get_instances,
-            mock_get_instance, mock_instance_attribute, mock_instance_interfaces):
+            self, mock_get_artifacts, mock_get_instances,
+            mock_get_instance, mock_instance_attribute,
+            mock_instance_interfaces):
         self.fake_db.set_node_metrics_same({
             'cpu_max_per_instance': 16,
             'cpu_max': 4,
@@ -434,9 +431,8 @@ class ForcedCandidatesTestCase(SchedulerTestCase):
         self.mock_get_instances.start()
         self.addCleanup(self.mock_get_instances.stop)
 
-    @mock.patch('shakenfist.images.Image.new')
     @mock.patch('shakenfist.artifact.Artifacts', return_value=[])
-    def test_only_network_node(self, mock_get_image_meta, mock_image_from_url):
+    def test_only_network_node(self, mock_get_artifacts):
         self.fake_db.set_node_metrics_same({
             'cpu_max_per_instance': 16,
             'cpu_max': 4,
@@ -460,9 +456,8 @@ class ForcedCandidatesTestCase(SchedulerTestCase):
             fake_inst, [], candidates=['node1_net'])
         self.assertSetEqual({'node1_net', }, set(nodes))
 
-    @mock.patch('shakenfist.images.Image.new')
     @mock.patch('shakenfist.artifact.Artifacts', return_value=[])
-    def test_only_two(self, mock_get_image_meta, mock_image_from_url):
+    def test_only_two(self, mock_get_artifacts):
         self.fake_db.set_node_metrics_same({
             'cpu_max_per_instance': 16,
             'cpu_max': 4,
@@ -486,9 +481,8 @@ class ForcedCandidatesTestCase(SchedulerTestCase):
             fake_inst, [], candidates=['node1_net', 'node2'])
         self.assertSetEqual({'node2', }, set(nodes))
 
-    @mock.patch('shakenfist.images.Image.new')
     @mock.patch('shakenfist.artifact.Artifacts', return_value=[])
-    def test_no_such_node(self, mock_get_image_meta, mock_image_from_url):
+    def test_no_such_node(self, mock_get_artifacts):
         self.fake_db.set_node_metrics_same({
             'cpu_max_per_instance': 16,
             'cpu_max': 4,
@@ -543,9 +537,8 @@ class MetricsRefreshTestCase(SchedulerTestCase):
         self.mock_get_instances.start()
         self.addCleanup(self.mock_get_instances.stop)
 
-    @mock.patch('shakenfist.images.Image.new')
     @mock.patch('shakenfist.artifact.Artifacts', return_value=[])
-    def test_refresh(self, mock_get_image_meta, mock_image_from_url):
+    def test_refresh(self, mock_get_artifacts):
         fake_inst = FakeInstance({
             'uuid': 'fakeuuid',
             'cpus': 1,
