@@ -8,7 +8,7 @@
     base_image_user: "ubuntu"
 
   tasks:
-    - name: Create a CI network
+    - name: Create a network
       sf_network:
         netblock: "10.0.0.0/24"
         name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}"
@@ -58,7 +58,11 @@
         sf_network_uuid: "{{imagerebuild['meta']['network_interfaces'][0]['network_uuid']}}"
         groups: sfall
 
-    - name: Wait for all instances to present an "OpenSSH" prompt
+    - name: Log instance
+      debug:
+        msg: "{{imagerebuild}}"
+
+    - name: Wait for instance to present an "OpenSSH" prompt
       wait_for:
         port: 22
         host: "{{hostvars[item]['ansible_ssh_host']}}"
