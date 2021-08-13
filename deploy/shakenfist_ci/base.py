@@ -1,3 +1,4 @@
+import copy
 import datetime
 import random
 from socket import error as socket_error
@@ -198,16 +199,33 @@ class BaseTestCase(testtools.TestCase):
             'After time %s, image %s had no event type "%s" (waited 5 mins)'
             % (after, image_uuid, operation))
 
-    def _await_network_ready(self, network_uuid):
+    def _await_objects_ready(self, callback, items):
+        waiting_for = copy.copy(items)
         start_time = time.time()
-        while time.time() - start_time < 2 * 60:
-            n = self.system_client.get_network(network_uuid)
-            if n.get('state') == 'created':
-                return
-            time.sleep(5)
 
-        raise TimeoutException(
-            'Network %s never became ready (waited 5 mins)' % network_uuid)
+        while waiting_for:
+            for item in copy.copy(waiting_for):
+                n = callback(item)
+                if n.get('state') in ['created', 'deleted', 'error']:
+                    waiting_for.remove(item)
+
+            if waiting_for:
+                time.sleep(5)
+
+            if waiting_for and time.time() - start_time > 300:
+                raise TimeoutException(
+                    'Items %s never became ready (waited 5 mins)' % ', '.join(waiting_for))
+
+    def _await_networks_ready(self, network_uuids):
+        self._await_objects_ready(
+            self.system_client.get_network, network_uuids)
+
+    def _await_instances_ready(self, instance_uuids):
+        self._await_objects_ready(
+            self.system_client.get_instance, instance_uuids)
+
+        for instance_uuid in instance_uuids:
+            self.assertInstanceOk(instance_uuid)
 
     def _test_ping(self, instance_uuid, network_uuid, ip, expected, attempts=1):
         while attempts:
@@ -229,6 +247,10 @@ class BaseTestCase(testtools.TestCase):
             sys.stderr.write('Current time: '+time.ctime()+'\n')
             self.fail('Ping test failed. Expected %s != actual %s.\nout: %s\nerr: %s\n'
                       % (expected, actual, output['stdout'], output['stderr']))
+
+    def assertInstanceOk(self, instance_uuid):
+        inst = self.system_client.get_instance(instance_uuid)
+        self.assertTrue(inst['state'] == 'created')
 
 
 class BaseNamespacedTestCase(BaseTestCase):
@@ -289,7 +311,7 @@ class TestDistroBoots(BaseNamespacedTestCase):
         super(TestDistroBoots, self).setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net' % self.namespace)
-        self._await_network_ready(self.net['uuid'])
+        self._await_networks_ready([self.net['uuid']])
 
     def _test_distro_boot(self, base_image):
         inst = self.test_client.create_instance(

@@ -1,5 +1,4 @@
 import base64
-import time
 
 from shakenfist_ci import base
 
@@ -15,8 +14,8 @@ class TestMultipleNics(base.BaseNamespacedTestCase):
             '192.168.242.0/24', True, True, '%s-net-one' % self.namespace)
         self.net_two = self.test_client.allocate_network(
             '192.168.243.0/24', True, True, '%s-net-two' % self.namespace)
-        self._await_network_ready(self.net_one['uuid'])
-        self._await_network_ready(self.net_two['uuid'])
+        self._await_networks_ready([self.net_one['uuid'],
+                                    self.net_two['uuid']])
 
     def test_simple(self):
         ud = """#!/bin/sh
@@ -47,10 +46,7 @@ sudo /etc/init.d/S40network restart"""
 
         self.assertIsNotNone(inst['uuid'])
 
-        while inst['state'] not in ['created', 'error']:
-            time.sleep(1)
-            inst = self.test_client.get_instance(inst['uuid'])
-
+        self._await_instances_ready([inst['uuid']])
         self._await_login_prompt(inst['uuid'])
 
         ifaces = self.test_client.get_instance_interfaces(inst['uuid'])

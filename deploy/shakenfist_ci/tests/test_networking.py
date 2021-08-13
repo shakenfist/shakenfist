@@ -20,10 +20,10 @@ class TestNetworking(base.BaseNamespacedTestCase):
             '192.168.242.0/24', True, True, '%s-net-three' % self.namespace)
         self.net_four = self.test_client.allocate_network(
             '192.168.10.0/24', True, True, '%s-net-four' % self.namespace)
-        self._await_network_ready(self.net_one['uuid'])
-        self._await_network_ready(self.net_two['uuid'])
-        self._await_network_ready(self.net_three['uuid'])
-        self._await_network_ready(self.net_four['uuid'])
+        self._await_networks_ready([self.net_one['uuid'],
+                                    self.net_two['uuid'],
+                                    self.net_three['uuid'],
+                                    self.net_four['uuid']])
 
     def test_network_validity(self):
         self.assertRaises(apiclient.APIException, self.test_client.allocate_network,
@@ -218,10 +218,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                 }
             ], None, None)
 
-        while inst['state'] not in ['created', 'error']:
-            time.sleep(1)
-            inst = self.test_client.get_instance(inst['uuid'])
-
+        self._await_instances_ready([inst['uuid']])
         if inst['state'] != 'created':
             self.fail('Instance is not in created state: %s' % inst)
 
@@ -273,9 +270,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                 }
             ], None, None)
 
-        while inst['state'] not in ['created', 'error']:
-            time.sleep(1)
-            inst = self.test_client.get_instance(inst['uuid'])
+        self._await_instances_ready([inst['uuid']])
 
         # Sometimes the console port is missing. Explicitly check for
         # that.
