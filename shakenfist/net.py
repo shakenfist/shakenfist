@@ -595,11 +595,13 @@ class Network(dbo):
 
             # NOTE(mikal): why not use DNS here? Well, DNS might be outside
             # the control of the deployer if we're running in a public cloud
-            # as an overlay cloud...
+            # as an overlay cloud... Also, we don't include ourselves in the
+            # mesh as that would cause duplicate packets to reflect back to us.
+            # (see bug #859).
             node_ips = set([config.NETWORK_NODE_IP])
             for fqdn in node_fqdns:
                 n = Node.from_db(fqdn)
-                if n:
+                if n and n.ip != config.NODE_MESH_IP:
                     node_ips.add(n.ip)
 
             discovered = list(self.discover_mesh())
