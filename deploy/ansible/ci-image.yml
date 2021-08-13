@@ -4,7 +4,7 @@
   vars:
     identifier: unknown
     source_path: "/home/jenkins/src/shakenfist/"
-    base_image: "https://sfcbr.shakenfist.com/static/ubuntu2004-ci-template.qcow2"
+    base_image: "ubuntu:20.04"
     base_image_user: "ubuntu"
 
   tasks:
@@ -19,17 +19,31 @@
         msg: "Network is {{cinetwork['meta']['uuid']}}"
 
     - name: Create an instance
-      sf_instance:
-        name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}"
-        cpu: 4
-        ram: 4096
-        disks:
-          - "30@{{base_image}}"
-        networkspecs:
-          - network_uuid="{{cinetwork['meta']['uuid']}}",float=True
-        ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+482i1EYa6FYmDrjOQpsm+mVwFs7TW9xOI9o1jc/PHXLDDg5+inp/vVAgKoV6jijwRC9juwjFBPqr8LyXh3lXhPA1LSaQa39o3QIYTLsLuLZPeueUB8UukZzOH0XAHxgAF/qFycf5pWzD4Pzs5HjNi44+9LCDYKJtc45kh3+97iezRMYhucm3wzRAKyA8mr8nNOrQq356sKgXeMP6nnX4bhUJDrcQpfsRFkTcYWAcSuU36eSETVOj9dGUJZlc4g3QBL73R1S5VWbN6DM4UIOSWxRG6oUKprgHSvFmyp5i7S0vKv7q101PcxOw14GOvI8TSirIa8O39WtyX3ugReBj mikal@sf-primary
-        state: present
-      register: imagerebuild
+      block:
+        sf_instance:
+          name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}"
+          cpu: 4
+          ram: 4096
+          disks:
+            - "30@label:sfci-image"
+          networkspecs:
+            - network_uuid="{{cinetwork['meta']['uuid']}}",float=True
+          ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+482i1EYa6FYmDrjOQpsm+mVwFs7TW9xOI9o1jc/PHXLDDg5+inp/vVAgKoV6jijwRC9juwjFBPqr8LyXh3lXhPA1LSaQa39o3QIYTLsLuLZPeueUB8UukZzOH0XAHxgAF/qFycf5pWzD4Pzs5HjNi44+9LCDYKJtc45kh3+97iezRMYhucm3wzRAKyA8mr8nNOrQq356sKgXeMP6nnX4bhUJDrcQpfsRFkTcYWAcSuU36eSETVOj9dGUJZlc4g3QBL73R1S5VWbN6DM4UIOSWxRG6oUKprgHSvFmyp5i7S0vKv7q101PcxOw14GOvI8TSirIa8O39WtyX3ugReBj mikal@sf-primary
+          state: present
+        register: imagerebuild
+
+      rescue:
+        sf_instance:
+          name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}"
+          cpu: 4
+          ram: 4096
+          disks:
+            - "30@{{base_image}}"
+          networkspecs:
+            - network_uuid="{{cinetwork['meta']['uuid']}}",float=True
+          ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+482i1EYa6FYmDrjOQpsm+mVwFs7TW9xOI9o1jc/PHXLDDg5+inp/vVAgKoV6jijwRC9juwjFBPqr8LyXh3lXhPA1LSaQa39o3QIYTLsLuLZPeueUB8UukZzOH0XAHxgAF/qFycf5pWzD4Pzs5HjNi44+9LCDYKJtc45kh3+97iezRMYhucm3wzRAKyA8mr8nNOrQq356sKgXeMP6nnX4bhUJDrcQpfsRFkTcYWAcSuU36eSETVOj9dGUJZlc4g3QBL73R1S5VWbN6DM4UIOSWxRG6oUKprgHSvFmyp5i7S0vKv7q101PcxOw14GOvI8TSirIa8O39WtyX3ugReBj mikal@sf-primary
+          state: present
+        register: imagerebuild
 
     - name: Add to ansible
       add_host:
