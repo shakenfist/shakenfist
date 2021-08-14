@@ -2,13 +2,10 @@
 
 import copy
 import math
-from functools import partial
 import random
 import time
 import uuid
 
-from shakenfist import artifact
-from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import exceptions
@@ -203,38 +200,6 @@ class Scheduler(object):
         # Return list of candidates that has maximum networks
         return candidates_by_network_matches[max_matches]
 
-    def _find_most_matching_images(self, requested_images, candidates):
-        # Determine number of matching images per node
-        candidates_image_matches = {}
-        for n in candidates:
-            candidates_image_matches[n] = 0
-
-        for image in requested_images:
-            for i in artifact.Artifacts(filters=[
-                    partial(artifact.type_filter,
-                            artifact.Artifact.TYPE_IMAGE),
-                    partial(artifact.url_filter, image),
-                    baseobject.active_states_filter]):
-                b = i.most_recent_index
-                if b:
-                    for loc in b.get('locations', []):
-                        candidates_image_matches[loc] += 1
-
-        # Create dict of candidate lists keyed by number of image matches
-        candidates_by_image_matches = {}
-        for n in candidates:
-            matches = candidates_image_matches[n]
-            candidates_by_image_matches.setdefault(matches, [])
-            candidates_by_image_matches[matches].append(n)
-
-        # If no matches, return the original candidate list
-        if len(candidates_by_image_matches) == 0:
-            return candidates
-
-        # Return all candidates that have the highest number of image matches
-        max_matches = max(candidates_by_image_matches.keys())
-        return candidates_by_image_matches[max_matches]
-
     def place_instance(self, instance, network, candidates=None):
         with util.RecordedOperation('schedule', instance):
             log_ctx = self.log.with_object(instance)
@@ -354,19 +319,6 @@ class Scheduler(object):
                     'Scheduling: Have most matching networks')
                 instance.add_event('schedule', 'Have most matching networks',
                                    None, str(candidates))
-
-            # What nodes have the base image already?
-            requested_images = []
-            for disk in instance.disk_spec:
-                if disk.get('base'):
-                    requested_images.append(disk['base'])
-
-            candidates = self._find_most_matching_images(
-                requested_images, candidates)
-            log_ctx.with_field('candidates', candidates).info(
-                'Scheduling: Have most matching images')
-            instance.add_event('schedule', 'Have most matching images',
-                               None, str(candidates))
 
             # Avoid allocating to network node if possible
             net_node = get_network_node()
