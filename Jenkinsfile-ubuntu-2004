@@ -61,7 +61,7 @@ pipeline {
                 cd $SOURCE_PATH/shakenfist
                 . /home/jenkins/sf-ci
                 ansible-playbook -i /home/jenkins/hosts \
-                    --extra-vars "identifier=$BUILD_TAG source_path=$SOURCE_PATH base_image=https://sfcbr.shakenfist.com/static/ubuntu2004-ci-template.qcow2 base_image_user=ubuntu" \
+                    --extra-vars "identifier=$BUILD_TAG source_path=$SOURCE_PATH base_image=label:sfci-image base_image_user=ubuntu" \
                     deploy/ansible/ci.yml
            '''
       }
