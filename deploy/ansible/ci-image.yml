@@ -123,8 +123,13 @@
   tasks:
     - name: Snapshot the instance
       shell: |
-        sf-client instance snapshot "{{hostvars['imagerebuild']['sf_instance_uuid']}}" \
+        sf-client --json instance snapshot "{{hostvars['imagerebuild']['sf_instance_uuid']}}" \
             --label_name sfci-image
+      register: cisnapshot
+
+    - name: Log snapshot details
+      debug:
+        msg: "{{cisnapshot.stdout}}"
 
     - name: Delete instance
       sf_instance:
