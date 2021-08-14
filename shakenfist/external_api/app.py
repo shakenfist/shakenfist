@@ -423,12 +423,21 @@ class Instances(api_base.Resource):
                     Artifact.TYPE_LABEL, '%s%s/%s' % (LABEL_URL, get_jwt_identity(), label))
                 if not a:
                     return api_base.error(404, 'label %s not found' % label)
-                d['blob_uuid'] = a.most_recent_index['blob_uuid']
+                blob_uuid = a.most_recent_index.get('blob_uuid')
+                if not blob_uuid:
+                    return api_base.error(404, 'label %s not found (no versions)' % label)
+                d['blob_uuid'] = blob_uuid
+
             elif disk_base.startswith(SNAPSHOT_URL):
                 a = Artifact.from_db(disk_base[len(SNAPSHOT_URL):])
-                d['blob_uuid'] = a.most_recent_index['blob_uuid']
+                blob_uuid = a.most_recent_index.get('blob_uuid')
+                if not blob_uuid:
+                    return api_base.error(404, 'snapshot not found (no versions)')
+                d['blob_uuid'] = blob_uuid
+
             elif disk_base.startswith(BLOB_URL):
                 d['blob_uuid'] = disk_base[len(BLOB_URL):]
+
             else:
                 # We ensure that the image exists in the database in an initial state
                 # here so that it will show up in image list requests. The image is
