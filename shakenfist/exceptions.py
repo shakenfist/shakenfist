@@ -145,3 +145,20 @@ class NetworkInterfaceException(Exception):
 
 class NetworkInterfaceAlreadyFloating(NetworkInterfaceException):
     pass
+
+
+# Artifacts
+class ArtifactException(Exception):
+    pass
+
+
+class TooManyMatches(ArtifactException):
+    pass
+
+
+class UnknownChecksumType(ArtifactException):
+    pass
+
+
+class ArtifactHasNoBlobs(ArtifactException):
+    pass

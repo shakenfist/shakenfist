@@ -68,7 +68,7 @@ def _get_stats():
     retval.update(ksm_details)
 
     # Disk info
-    s = os.statvfs(config.get('STORAGE_PATH'))
+    s = os.statvfs(config.STORAGE_PATH)
     disk_counters = psutil.disk_io_counters()
     retval.update({
         'disk_total': s.f_frsize * s.f_blocks,
@@ -141,7 +141,7 @@ def _get_stats():
 class Monitor(daemon.Daemon):
     def __init__(self, id):
         super(Monitor, self).__init__(id)
-        start_http_server(config.get('PROMETHEUS_METRICS_PORT'))
+        start_http_server(config.PROMETHEUS_METRICS_PORT)
 
     def run(self):
         LOG.info('Starting')
@@ -175,7 +175,7 @@ class Monitor(daemon.Daemon):
                     time.sleep(0.2)
 
                 timer = time.time() - last_metrics
-                if timer > config.get('SCHEDULER_CACHE_TIMEOUT'):
+                if timer > config.SCHEDULER_CACHE_TIMEOUT:
                     update_metrics()
                     last_metrics = time.time()
 

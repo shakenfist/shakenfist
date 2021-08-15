@@ -1,12 +1,12 @@
 # Copyright 2020 Michael Still
 
-from etcd3gw.client import Etcd3Client
 import ipaddress
 import json
 import time
 
 from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist import etcd
 from shakenfist import instance
 from shakenfist import networkinterface
 from shakenfist.node import Node
@@ -49,7 +49,7 @@ def clean_events_mesh_operations(etcd_client):
 
 
 def main():
-    etcd_client = Etcd3Client()
+    etcd_client = etcd.WrappedEtcdClient()
 
     releases = {}
     old_style_nodes = []
@@ -151,6 +151,15 @@ def main():
                 etcd_client.put(
                     metadata['key'], json.dumps(ipm, indent=4, sort_keys=True))
                 print('--> Upgraded ipmanager %s to version 2' % network_uuid)
+
+            # Bump instance version to support UEFI
+            for data, metadata in etcd_client.get_prefix('/sf/instance/'):
+                i = json.loads(data.decode('utf-8'))
+                if i['version'] == 2:
+                    i['uefi'] = False
+                    i['version'] = 3
+                    etcd_client.put(
+                        metadata['key'], json.dumps(i, indent=4, sort_keys=True))
 
             clean_events_mesh_operations(etcd_client)
 

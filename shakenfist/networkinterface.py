@@ -203,10 +203,6 @@ def interfaces_for_instance(instance):
         nis[ni.order] = ni
         loggable_nis[ni.order] = str(ni)
 
-    LOG.with_fields({
-        'instance': instance,
-        'interfaces': loggable_nis
-    }).debug('Found %d interfaces' % len(nis))
     for order in sorted(nis.keys()):
         yield nis[order]
 
@@ -219,4 +215,4 @@ def interfaces_for_network(network):
 def inactive_network_interfaces():
     return NetworkInterfaces([
         partial(baseobject.state_filter, [dbo.STATE_DELETED, dbo.STATE_ERROR]),
-        partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))])
+        partial(baseobject.state_age_filter, config.CLEANER_DELAY)])

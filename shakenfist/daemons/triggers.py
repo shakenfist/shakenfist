@@ -87,10 +87,8 @@ class Monitor(daemon.Daemon):
                     extra_instances.remove(inst.uuid)
 
                 if inst.uuid not in observers:
-                    console_path = os.path.join(config.get('STORAGE_PATH'),
-                                                'instances',
-                                                inst.uuid,
-                                                'console.log')
+                    console_path = os.path.join(
+                        config.STORAGE_PATH, 'instances', inst.uuid, 'console.log')
                     p = multiprocessing.Process(
                         target=observe, args=(console_path, inst.uuid),
                         name='%s-%s' % (daemon.process_name('triggers'),

@@ -57,7 +57,7 @@ class Node(dbo):
         # We use Node.new here because it acts like a "upsert". It will create
         # the node object if it doesn't already exist, and otherwise use the
         # existing one.
-        n = cls.new(config.NODE_NAME, config.NODE_IP)
+        n = cls.new(config.NODE_NAME, config.NODE_MESH_IP)
         n._db_set_attribute('observed',
                             {
                                 'at': time.time(),

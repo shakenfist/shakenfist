@@ -48,10 +48,20 @@ pipeline {
 
                 SOURCE_PATH="$WORKSPACE/$BUILD_TAG"
 
+                echo "==== shakenfist git log ===="
+                cd $SOURCE_PATH/shakenfist
+                git log -5 --no-merges
+
+                echo "==== client-python git log ===="
+                cd $SOURCE_PATH/client-python
+                git log -5 --no-merges
+
+                echo "==== end git logs ===="
+
                 cd $SOURCE_PATH/shakenfist
                 . /home/jenkins/sf-ci
                 ansible-playbook -i /home/jenkins/hosts \
-                    --extra-vars "identifier=$BUILD_TAG source_path=$SOURCE_PATH base_image=https://sfcbr.shakenfist.com/static/ubuntu2004-ci-template.qcow2 base_image_user=ubuntu" \
+                    --extra-vars "identifier=$BUILD_TAG source_path=$SOURCE_PATH base_image=label:sfci-image base_image_user=ubuntu" \
                     deploy/ansible/ci.yml
            '''
       }
@@ -130,22 +140,24 @@ pipeline {
                   ubuntu@$primary sudo cat /var/log/syslog
 
               echo "=============================="
-              rm -rf $WORKSPACE/$BUILD_TAG
 
+              safe_build_tag=`echo $BUILD_TAG | tr "_" "-"`
               if [ -e $source_path/keepme ]
               then
                 echo "Retaining CI environment because you asked nicely."
               else
-                for uuid in `sf-client --simple instance list | grep $BUILD_TAG | cut -f 1 -d ","`
+                for uuid in `sf-client --simple instance list | grep $safe_build_tag | cut -f 1 -d ","`
                 do
                   sf-client instance delete $uuid
                 done
 
-                for uuid in `sf-client --simple network list | grep $BUILD_TAG | cut -f 1 -d ","`
+                for uuid in `sf-client --simple network list | grep $safe_build_tag | cut -f 1 -d ","`
                 do
                   sf-client network delete $uuid
                 done
               fi
+
+              rm -rf $WORKSPACE/$BUILD_TAG
           '''
     }
   }

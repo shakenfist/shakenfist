@@ -24,6 +24,10 @@
 
     - include: terraform/{{cloud}}/terraform.yml
 
+    - name: The primary node doesn't have a mesh ip, but we need to mimic it later, set one
+      set_fact:
+        node_mesh_ip: "{{node_egress_ip}}"
+
     - name: Wait for instances to boot
       pause:
         minutes: "{{bootdelay}}"
@@ -43,7 +47,7 @@
           ff02::3 ip6-allhosts
 
           {% for svr in groups.hypervisors %}
-          {{hostvars[svr]['node_ip']}}  {{svr}}
+          {{hostvars[svr]['node_egress_ip']}}  {{svr}}
           {% endfor %}
         dest: /etc/hosts
         owner: root
@@ -184,20 +188,8 @@
         mode: u=r,g=r,o=r
       when: is_intel.rc == 0
 
-    # NOTE(mikal): this might not be right if egress and meshes are on different
-    # interfaces.
-    - name: Determine default interface
-      shell: ip route list default | head -1 | cut -f 5 -d " "
-      register: node_egress_nic_complex
-      when: node_egress_nic is not defined
-
-    - name: Extract node default interface
-      set_fact:
-        node_egress_nic: "{{node_egress_nic_complex.stdout}}"
-      when: node_egress_nic is not defined
-
-    - name: Determine default interface MTU
-      shell: ip link show {{node_egress_nic}} | grep mtu | sed -e 's/.*mtu //' -e 's/ .*//'
+    - name: Determine the mesh network interface MTU
+      shell: ip link show {{node_mesh_nic}} | grep mtu | sed -e 's/.*mtu //' -e 's/ .*//'
       register: node_mtu_complex
 
     - name: Extract default interface MTU
@@ -335,51 +327,14 @@
         owner: root
         group: sudo
         mode: u=r,g=r,o=
-      when: hostvars['localhost']['primary_node_ip'] != node_ip
+      when: hostvars['localhost']['primary_node_ip'] != node_egress_ip
 
     - name: Restart syslog
       service:
         name: rsyslog
         enabled: yes
         state: restarted
-      when: hostvars['localhost']['primary_node_ip'] != node_ip
-
-# Install glusterfs
-- hosts: hypervisors
-  any_errors_fatal: true
-  become: yes
-  become_method: sudo
-  gather_facts: yes
-  connection: ssh
-
-  tasks:
-    - name: Install glusterfs on all nodes
-      include: includes/glusterfs-all-initial.yml
-      when: gluster_enabled == "1"
-
-- hosts: sf-1
-  any_errors_fatal: true
-  become: yes
-  become_method: sudo
-  gather_facts: yes
-  connection: ssh
-
-  tasks:
-    - name: Single node gluster configuration
-      include: includes/glusterfs-primary.yml
-      when: gluster_enabled == "1"
-
-- hosts: hypervisors
-  any_errors_fatal: true
-  become: yes
-  become_method: sudo
-  gather_facts: yes
-  connection: ssh
-
-  tasks:
-    - name: Finalize glusterfs on all nodes
-      include: includes/glusterfs-all-final.yml
-      when: gluster_enabled == "1"
+      when: hostvars['localhost']['primary_node_ip'] != node_egress_ip
 
 # Install etcd
 - hosts: etcd
@@ -391,6 +346,8 @@
         etcd_cluster_name: shakenfist
         etcd_enable_v2: False
         etcd_master_group_name: etcd_master
+        etcd_iface_public: "{{node_mesh_nic}}"
+        etcd_iface_cluster: "{{node_mesh_nic}}"
 
 # NOTE(mikal): I am not happy with binding to 0.0.0.0 here for
 # etcd, but I can't bind to lo because of how the ansible role
@@ -497,14 +454,14 @@
               static_configs:
                 - targets: [
                       {% for svr in groups.allsf %}
-                        '{{hostvars[svr]['node_ip']}}:9100',
+                        '{{hostvars[svr]['node_mesh_ip']}}:9100',
                      {% endfor %}
                     ]
             - job_name: 'shakenfist'
               static_configs:
                 - targets: [
                       {% for svr in groups.hypervisors %}
-                        '{{hostvars[svr]['node_ip']}}:13001',
+                        '{{hostvars[svr]['node_mesh_ip']}}:13001',
                       {% endfor %}
                     ]
                 # metric_relabel_configs:
@@ -515,7 +472,7 @@
               static_configs:
                 - targets: [
                       {% for svr in groups.allsf %}
-                        '{{hostvars[svr]['node_ip']}}:2379',
+                        '{{hostvars[svr]['node_mesh_ip']}}:2379',
                       {% endfor %}
                     ]
                 # metric_relabel_configs:
@@ -565,7 +522,7 @@
           - name: Prometheus
             type: prometheus
             orgId: 1
-            url: http://{{node_ip}}:9090
+            url: http://{{node_mesh_ip}}:9090
             isDefault: true
             version: 1
             editable: false
@@ -646,16 +603,6 @@
         group: root
         mode: "0644"
 
-    - name: Determine node IP
-      shell: /usr/bin/dig @resolver1.opendns.com ANY myip.opendns.com +short
-      register: node_ip_complex
-      when: node_ip is not defined
-
-    - name: Extract node IP
-      set_fact:
-        node_ip: "{{node_ip_complex.stdout}}"
-      when: node_ip is not defined
-
     - name: Fetch systemd unit template from remote host
       fetch:
         src: "{{hostvars['localhost']['template_path']}}/sf.service"
@@ -692,22 +639,6 @@
         enabled: yes
         state: restarted
         daemon_reload: yes
-
-    - name: Install apache2
-      apt:
-        name: apache2
-        state: latest
-
-    - name: Write apache site
-      template:
-        src: files/apache-site-hypervisor.conf
-        dest: /etc/apache2/sites-enabled/000-default.conf
-        owner: root
-        group: root
-        mode: u=r,g=r,o=r
-
-    - name: Reload apache
-      shell: apache2ctl graceful
 
 - hosts: localhost
   roles:

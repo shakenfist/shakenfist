@@ -9,6 +9,7 @@ import random
 import re
 import requests
 import secrets
+import stat
 import string
 import sys
 import time
@@ -16,8 +17,8 @@ import traceback
 
 from oslo_concurrency import processutils
 
-from shakenfist import db
 from shakenfist.config import config
+from shakenfist import db
 from shakenfist import logutil
 
 
@@ -66,7 +67,7 @@ class RecordedOperation():
 
 def is_network_node():
     """Test if this node is the network node."""
-    return config.NODE_IP == config.NETWORK_NODE_IP
+    return config.NODE_MESH_IP == config.NETWORK_NODE_IP
 
 
 def check_for_interface(name, namespace=None, up=False):
@@ -197,8 +198,7 @@ def extract_power_state(libvirt, domain):
 
 
 def get_api_token(base_url, namespace='system'):
-    with db.get_lock('namespace', None, namespace,
-                     op='Get API token'):
+    with db.get_lock('namespace', None, namespace, op='Get API token'):
         auth_url = base_url + '/auth'
         LOG.info('Fetching %s auth token from %s', namespace, auth_url)
         ns = db.get_namespace(namespace)
@@ -321,3 +321,13 @@ def noneish(value):
     if value.lower() == 'none':
         return True
     return False
+
+
+def stat_log_fields(path):
+    st = os.stat(path)
+    return {
+        'size': st.st_size,
+        'mode': stat.filemode(st.st_mode),
+        'owner': st.st_uid,
+        'group': st.st_gid,
+    }

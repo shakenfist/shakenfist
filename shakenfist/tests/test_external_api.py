@@ -7,7 +7,7 @@ import mock
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     State)
-from shakenfist.config import config, SFConfigBase, SFConfig
+from shakenfist.config import config, BaseSettings, SFConfig
 from shakenfist.external_api import app as external_api
 from shakenfist.ipmanager import IPManager
 from shakenfist.tests import test_shakenfist
@@ -520,12 +520,20 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(404, resp.status_code)
 
     @mock.patch('shakenfist.instance.Instance._db_get',
-                return_value={'uuid': '123',
-                              'cpus': 2,
-                              'memory': 4096,
-                              'name': 'banana',
-                              'namespace': 'foo',
-                              'disk_spec': [{'size': 4, 'base': 'foo'}]})
+                return_value={
+                    'cpus': 1,
+                    'disk_spec': [{}],
+                    'memory': 2048,
+                    'name': 'barry',
+                    'namespace': 'namespace',
+                    'requested_placement': None,
+                    'ssh_key': 'sshkey',
+                    'user_data': 'userdata',
+                    'uuid': 'uuid42',
+                    'version': 3,
+                    'video': {'memory': 16384, 'model': 'cirrus'},
+                    'uefi': False
+                })
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 return_value={})
     def test_get_instance(self, mock_get_instance_attribute, mock_get_instance):
@@ -533,21 +541,22 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
             '/instances/foo', headers={'Authorization': self.auth_header})
         self.assertEqual({
             'console_port': None,
-            'cpus': 2,
-            'disk_spec': [{'base': 'foo', 'size': 4}],
+            'cpus': 1,
+            'disk_spec': [{}],
             'error_message': None,
-            'memory': 4096,
-            'name': 'banana',
-            'namespace': 'foo',
+            'memory': 2048,
+            'name': 'barry',
+            'namespace': 'namespace',
             'node': None,
             'power_state': None,
-            'ssh_key': None,
+            'ssh_key': 'sshkey',
             'state': None,
-            'user_data': None,
-            'uuid': '123',
-            'version': None,
+            'uefi': False,
+            'user_data': 'userdata',
+            'uuid': 'uuid42',
             'vdi_port': None,
-            'video': None
+            'version': 3,
+            'video': {'memory': 16384, 'model': 'cirrus'}
         }, resp.get_json())
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
@@ -746,7 +755,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         self.mock_virt_from_db = self.virt_from_db.start()
         self.addCleanup(self.virt_from_db.stop)
 
-        class FakeConfig(SFConfigBase):
+        class FakeConfig(BaseSettings):
             API_ASYNC_WAIT: int = 1
             LOG_METHOD_TRACE: int = 1
 
@@ -823,7 +832,8 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
             resp.get_json())
         self.assertEqual(400, resp.status_code)
 
-    def test_post_instance_invalid_network(self):
+    @mock.patch('shakenfist.artifact.Artifact.from_url')
+    def test_post_instance_invalid_network(self, mock_get_artifact):
         resp = self.client.post('/instances',
                                 headers={'Authorization': self.auth_header},
                                 data=json.dumps({
@@ -843,7 +853,8 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
             resp.get_json())
         self.assertEqual(400, resp.status_code)
 
-    def test_post_instance_invalid_network_uuid(self):
+    @mock.patch('shakenfist.artifact.Artifact.from_url')
+    def test_post_instance_invalid_network_uuid(self, mock_get_artifact):
         resp = self.client.post('/instances',
                                 headers={'Authorization': self.auth_header},
                                 data=json.dumps({
@@ -864,6 +875,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
             resp.get_json())
         self.assertEqual(400, resp.status_code)
 
+    @mock.patch('shakenfist.artifact.Artifact.from_url')
     @mock.patch('shakenfist.net.Network._db_get_attribute',
                 return_value={'value': dbo.STATE_CREATED, 'update_time': 2})
     @mock.patch('shakenfist.net.Network.from_db',
@@ -877,7 +889,8 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
     @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.ipmanager.IPManager.from_db')
     def test_post_instance_only_system_specifies_namespaces(
-            self, mock_ipmanager, mock_lock, mock_net, mock_net_attribute):
+            self, mock_ipmanager, mock_lock, mock_net, mock_net_attribute,
+            mock_get_artifact):
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'banana', 'key': 'foo'}))
         self.assertEqual(200, resp.status_code)
@@ -910,12 +923,13 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
     def setUp(self):
         super(ExternalApiNetworkTestCase, self).setUp()
 
-        class FakeConfig(SFConfigBase):
+        class FakeConfig(BaseSettings):
             NODE_NAME: str = 'seriously'
-            NODE_IP: str = '127.0.0.1'
+            NODE_EGRESS_IP: str = '127.0.0.1'
             NETWORK_NODE_IP = '127.0.0.1'
             LOG_METHOD_TRACE: int = 1
             NODE_EGRESS_NIC: str = 'eth0'
+            NODE_MESH_NIC: str = 'eth1'
 
         fake_config_network = FakeConfig()
         self.config = mock.patch('shakenfist.config.config',

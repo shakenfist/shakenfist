@@ -15,13 +15,13 @@ LOG, _ = logutil.setup(__name__)
 def resolve(name):
     # Name is assumed to be in the form cirros or cirros:0.4.0
     if name == 'cirros':
-        resp = requests.get(config.get('LISTING_URL_CIRROS'),
+        resp = requests.get(config.LISTING_URL_CIRROS,
                             allow_redirects=True,
                             headers={'User-Agent': util.get_user_agent()})
         if resp.status_code != 200:
             raise exceptions.HTTPError(
                 'Failed to fetch %s, status code %d'
-                % (config.get('LISTING_URL_CIRROS'), resp.status_code))
+                % (config.LISTING_URL_CIRROS, resp.status_code))
 
         versions = []
         dir_re = re.compile(r'.*<a href="([0-9]+\.[0-9]+\.[0-9]+)/">.*/</a>.*')
@@ -38,9 +38,9 @@ def resolve(name):
             raise exceptions.VersionSpecificationError(
                 'Cannot parse version: %s' % name)
 
-    url = config.get('DOWNLOAD_URL_CIRROS') % {'vernum': vernum}
+    url = config.DOWNLOAD_URL_CIRROS % {'vernum': vernum}
 
-    checksum_url = config.get('CHECKSUM_URL_CIRROS') % {'vernum': vernum}
+    checksum_url = config.CHECKSUM_URL_CIRROS % {'vernum': vernum}
     checksums = resolver_util.fetch_remote_checksum(checksum_url)
     checksum = checksums.get(os.path.basename(url))
     LOG.with_fields({
@@ -49,4 +49,7 @@ def resolve(name):
         'checksum': checksum
     }).info('Image resolved')
 
-    return (url, checksum if checksum else None)
+    if checksum:
+        return url, checksum, 'md5'
+    else:
+        return url, None, None

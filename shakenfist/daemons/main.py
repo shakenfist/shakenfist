@@ -5,8 +5,6 @@ import time
 import os
 import psutil
 
-from shakenfist import baseobject
-from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.daemons import external_api as external_api_daemon
@@ -16,7 +14,6 @@ from shakenfist.daemons import net as net_daemon
 from shakenfist.daemons import resources as resource_daemon
 from shakenfist.daemons import triggers as trigger_daemon
 from shakenfist import db
-from shakenfist import images
 from shakenfist import instance
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
@@ -39,16 +36,17 @@ def restore_instances():
             if ni.network_uuid not in networks:
                 networks.append(ni.network_uuid)
 
-        for disk in inst.disk_spec:
-            if disk.get('base'):
-                img = images.Image.new(disk['base'])
-                # NOTE(mikal): this check isn't great -- it checks for the original
-                # downloaded image, not the post transcode version
-                if (img.state in [dbo.STATE_DELETED, dbo.STATE_ERROR] or
-                        not os.path.exists(img.version_image_path())):
-                    instance_problems.append(
-                        '%s missing from image cache' % disk['base'])
-                    img.delete()
+        # TODO(mikal): do better here.
+        # for disk in inst.disk_spec:
+        #     if disk.get('base'):
+        #         img = images.Image.new(disk['base'])
+        #         # NOTE(mikal): this check isn't great -- it checks for the original
+        #         # downloaded image, not the post transcode version
+        #         if (img.state in [dbo.STATE_DELETED, dbo.STATE_ERROR] or
+        #                 not os.path.exists(img.version_image_path())):
+        #             instance_problems.append(
+        #                 '%s missing from image cache' % disk['base'])
+        #             img.delete()
 
         if instance_problems:
             inst.enqueue_delete_due_error(
@@ -127,61 +125,21 @@ def main():
     # might happen quite early on.
     _start_daemon('resources')
 
-    # We changed the naming scheme for network interfaces between v0.3 and v0.4.
-    # Check if we have any old style names and do the renaming... No locking
-    # required here because we don't have anything else running yet and we don't
-    # want to lock a network across the cluster for a local rename.
-    for n in net.Networks(filters=[baseobject.active_states_filter]):
-        if util.check_for_interface('vxlan-%d' % n.vxid):
-            LOG.with_network(n).warning(
-                'Network requires interface renaming...')
-            for iface in ['vxlan-%s', 'br-vxlan-%s', 'veth-%s-o',
-                          'veth-%s-i', 'phy-%s-o', 'phy-%s-i']:
-                old_name_format = iface % '%d'
-                old_name = old_name_format % n.vxid
-                new_name_format = iface % '%06x'
-                new_name = new_name_format % n.vxid
-
-                in_netns = ''
-                namespace = None
-                if iface.endswith('-i'):
-                    in_netns = 'ip netns exec %s' % n.uuid
-                    namespace = str(n.uuid)
-
-                if util.check_for_interface(old_name, namespace=namespace):
-                    LOG.with_network(n).warning(
-                        'Renaming %s to %s' % (old_name, new_name))
-
-                    util.execute(None, '%s ip link set %s down'
-                                 % (in_netns, old_name))
-                    util.execute(None, '%s ip link set %s name %s'
-                                 % (in_netns, old_name, new_name))
-                    util.execute(None, '%s ip link set %s up'
-                                 % (in_netns, new_name))
-                    LOG.with_network(n).warning(
-                        'Renamed %s to %s' % (old_name, new_name))
-
-            # If this is the network node, then renaming interfaces will
-            # have broken DHCP and possibly iptables...
-            if util.is_network_node():
-                n.enable_nat()
-                n.update_dhcp()
-
     # If I am the network node, I need some setup
     if util.is_network_node():
         # Bootstrap the floating network in the Networks table
         floating_network = net.Network.from_db('floating')
         if not floating_network:
             floating_network = net.Network.create_floating_network(
-                config.get('FLOATING_NETWORK'))
+                config.FLOATING_NETWORK)
 
         subst = {
-            'physical_bridge': util.get_safe_interface_name(
-                'phy-br-%s' % config.get('NODE_EGRESS_NIC')),
-            'physical_nic': config.get('NODE_EGRESS_NIC')
+            'egress_bridge': util.get_safe_interface_name(
+                'egr-br-%s' % config.NODE_EGRESS_NIC),
+            'egress_nic': config.NODE_EGRESS_NIC
         }
 
-        if not util.check_for_interface(subst['physical_bridge']):
+        if not util.check_for_interface(subst['egress_bridge']):
             # NOTE(mikal): Adding the physical interface to the physical bridge
             # is considered outside the scope of the orchestration software as
             # it will cause the node to lose network connectivity. So instead
@@ -194,22 +152,22 @@ def main():
                 subst['master_float'] = ipm.get_address_at_index(1)
                 subst['netmask'] = ipm.netmask
 
-                util.create_interface(subst['physical_bridge'], 'bridge', '')
+                util.create_interface(subst['egress_bridge'], 'bridge', '')
                 util.execute(None,
-                             'ip link set %(physical_bridge)s up' % subst)
+                             'ip link set %(egress_bridge)s up' % subst)
                 util.execute(None,
                              'ip addr add %(master_float)s/%(netmask)s '
-                             'dev %(physical_bridge)s' % subst)
+                             'dev %(egress_bridge)s' % subst)
 
                 util.execute(None,
-                             'iptables -A FORWARD -o %(physical_nic)s '
-                             '-i %(physical_bridge)s -j ACCEPT' % subst)
+                             'iptables -A FORWARD -o %(egress_nic)s '
+                             '-i %(egress_bridge)s -j ACCEPT' % subst)
                 util.execute(None,
-                             'iptables -A FORWARD -i %(physical_nic)s '
-                             '-o %(physical_bridge)s -j ACCEPT' % subst)
+                             'iptables -A FORWARD -i %(egress_nic)s '
+                             '-o %(egress_bridge)s -j ACCEPT' % subst)
                 util.execute(None,
                              'iptables -t nat -A POSTROUTING '
-                             '-o %(physical_nic)s -j MASQUERADE' % subst)
+                             '-o %(egress_nic)s -j MASQUERADE' % subst)
 
     def _audit_daemons():
         running_daemons = []

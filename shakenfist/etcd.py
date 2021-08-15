@@ -27,6 +27,21 @@ LOG, _ = logutil.setup(__name__)
 LOCK_PREFIX = '/sflocks'
 
 
+class WrappedEtcdClient(Etcd3Client):
+    def __init__(self, host='localhost', port=2379, protocol='http',
+                 ca_cert=None, cert_key=None, cert_cert=None, timeout=None,
+                 api_path='/v3beta/'):
+        # Work around https://opendev.org/openstack/etcd3gw/commit/7a1a2b5a672605ae549c73ed18302b7abd9e0e30
+        # making things not work for us.
+        if api_path == '/v3alpha':
+            raise Exception('etcd3 v3alpha endpoint is known not to work')
+
+        return super(WrappedEtcdClient, self).__init__(
+            host=host, port=port, protocol=protocol, ca_cert=ca_cert,
+            cert_key=cert_key, cert_cert=cert_cert, timeout=timeout,
+            api_path=api_path)
+
+
 def retry_etcd_forever(func):
     """Retry the Etcd server forever.
 
@@ -78,7 +93,7 @@ class ActualLock(Lock):
 
     @retry_etcd_forever
     def get_holder(self):
-        value = Etcd3Client().get(self.key, metadata=True)
+        value = WrappedEtcdClient().get(self.key, metadata=True)
         if value is None or len(value) == 0:
             return None, NotImplementedError
 
@@ -91,7 +106,7 @@ class ActualLock(Lock):
     def __enter__(self):
         start_time = time.time()
         slow_warned = False
-        threshold = int(config.get('SLOW_LOCK_THRESHOLD'))
+        threshold = int(config.SLOW_LOCK_THRESHOLD)
 
         while time.time() - start_time < self.timeout:
             res = self.acquire()
@@ -156,7 +171,7 @@ def get_lock(objecttype, subtype, name, ttl=60, timeout=10, log_ctx=LOG,
     acquired on entry and released on exit. Note that the lock acquire process
     will have no timeout.
     """
-    return ActualLock(objecttype, subtype, name, ttl=ttl, client=Etcd3Client(),
+    return ActualLock(objecttype, subtype, name, ttl=ttl, client=WrappedEtcdClient(),
                       log_ctx=log_ctx, timeout=timeout, op=op)
 
 
@@ -176,7 +191,7 @@ def clear_stale_locks():
     # Remove all locks held by former processes on this node. This is required
     # after an unclean restart, otherwise we need to wait for these locks to
     # timeout and that can take a long time.
-    client = Etcd3Client()
+    client = WrappedEtcdClient()
 
     for data, metadata in client.get_prefix(
             LOCK_PREFIX + '/', sort_order='ascend', sort_target='key'):
@@ -196,7 +211,7 @@ def clear_stale_locks():
 @retry_etcd_forever
 def get_existing_locks():
     key_val = {}
-    for value in Etcd3Client().get_prefix(LOCK_PREFIX + '/'):
+    for value in WrappedEtcdClient().get_prefix(LOCK_PREFIX + '/'):
         key_val[value[1]['key'].decode('utf-8')] = json.loads(value[0])
     return key_val
 
@@ -224,20 +239,20 @@ class JSONEncoderTasks(json.JSONEncoder):
 def put(objecttype, subtype, name, data, ttl=None):
     path = _construct_key(objecttype, subtype, name)
     encoded = json.dumps(data, indent=4, sort_keys=True, cls=JSONEncoderTasks)
-    Etcd3Client().put(path, encoded, lease=None)
+    WrappedEtcdClient().put(path, encoded, lease=None)
 
 
 @retry_etcd_forever
 def create(objecttype, subtype, name, data, ttle=None):
     path = _construct_key(objecttype, subtype, name)
     encoded = json.dumps(data, indent=4, sort_keys=True, cls=JSONEncoderTasks)
-    return Etcd3Client().create(path, encoded, lease=None)
+    return WrappedEtcdClient().create(path, encoded, lease=None)
 
 
 @retry_etcd_forever
 def get(objecttype, subtype, name):
     path = _construct_key(objecttype, subtype, name)
-    value = Etcd3Client().get(path, metadata=True)
+    value = WrappedEtcdClient().get(path, metadata=True)
     if value is None or len(value) == 0:
         return None
     return json.loads(value[0][0])
@@ -246,7 +261,7 @@ def get(objecttype, subtype, name):
 @retry_etcd_forever
 def get_all(objecttype, subtype, prefix=None, sort_order=None):
     path = _construct_key(objecttype, subtype, prefix)
-    for data, metadata in Etcd3Client().get_prefix(path, sort_order=sort_order, sort_target='key'):
+    for data, metadata in WrappedEtcdClient().get_prefix(path, sort_order=sort_order, sort_target='key'):
         yield str(metadata['key'].decode('utf-8')), json.loads(data)
 
 
@@ -254,7 +269,7 @@ def get_all(objecttype, subtype, prefix=None, sort_order=None):
 def get_all_dict(objecttype, subtype=None, sort_order=None):
     path = _construct_key(objecttype, subtype, None)
     key_val = {}
-    for value in Etcd3Client().get_prefix(path, sort_order=sort_order, sort_target='key'):
+    for value in WrappedEtcdClient().get_prefix(path, sort_order=sort_order, sort_target='key'):
         key_val[value[1]['key'].decode('utf-8')] = json.loads(value[0])
     return key_val
 
@@ -262,13 +277,13 @@ def get_all_dict(objecttype, subtype=None, sort_order=None):
 @retry_etcd_forever
 def delete(objecttype, subtype, name):
     path = _construct_key(objecttype, subtype, name)
-    Etcd3Client().delete(path)
+    WrappedEtcdClient().delete(path)
 
 
 @retry_etcd_forever
 def delete_all(objecttype, subtype):
     path = _construct_key(objecttype, subtype, None)
-    Etcd3Client().delete_prefix(path)
+    WrappedEtcdClient().delete_prefix(path)
 
 
 def enqueue(queuename, workitem):
@@ -330,7 +345,7 @@ def decodeTasks(obj):
 @retry_etcd_forever
 def dequeue(queuename):
     queue_path = _construct_key('queue', queuename, None)
-    client = Etcd3Client()
+    client = WrappedEtcdClient()
 
     # We only hold the lock if there is anything in the queue
     if not client.get_prefix(queue_path):
@@ -370,7 +385,7 @@ def get_queue_length(queuename):
 def _restart_queue(queuename):
     queue_path = _construct_key('processing', queuename, None)
     with get_lock('queue', None, queuename, op='Restart'):
-        for data, metadata in Etcd3Client().get_prefix(queue_path, sort_order='ascend'):
+        for data, metadata in WrappedEtcdClient().get_prefix(queue_path, sort_order='ascend'):
             jobname = str(metadata['key']).split('/')[-1].rstrip("'")
             workitem = json.loads(data)
             put('queue', queuename, jobname, workitem)

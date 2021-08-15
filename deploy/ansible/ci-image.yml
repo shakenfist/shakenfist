@@ -1,0 +1,148 @@
+- hosts: localhost
+  gather_facts: yes
+  connection: ssh
+  vars:
+    identifier: unknown
+    source_path: "/home/jenkins/src/shakenfist/"
+    base_image: "ubuntu:20.04"
+    base_image_user: "ubuntu"
+
+  tasks:
+    - name: Create a network
+      sf_network:
+        netblock: "10.0.0.0/24"
+        name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}"
+      register: cinetwork
+
+    - name: Log network details
+      debug:
+        msg: "Network is {{cinetwork['meta']['uuid']}}"
+
+    - name: Create an instance
+      block:
+        - name: Attempt to use an existing label
+          sf_instance:
+            name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}"
+            cpu: 4
+            ram: 4096
+            disks:
+              - "30@label:sfci-image"
+            networkspecs:
+              - network_uuid="{{cinetwork['meta']['uuid']}}",float=True
+            ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+482i1EYa6FYmDrjOQpsm+mVwFs7TW9xOI9o1jc/PHXLDDg5+inp/vVAgKoV6jijwRC9juwjFBPqr8LyXh3lXhPA1LSaQa39o3QIYTLsLuLZPeueUB8UukZzOH0XAHxgAF/qFycf5pWzD4Pzs5HjNi44+9LCDYKJtc45kh3+97iezRMYhucm3wzRAKyA8mr8nNOrQq356sKgXeMP6nnX4bhUJDrcQpfsRFkTcYWAcSuU36eSETVOj9dGUJZlc4g3QBL73R1S5VWbN6DM4UIOSWxRG6oUKprgHSvFmyp5i7S0vKv7q101PcxOw14GOvI8TSirIa8O39WtyX3ugReBj mikal@sf-primary
+            state: present
+          register: imagerebuild
+
+      rescue:
+        - name: Fall back to a image from the internet
+          sf_instance:
+            name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}"
+            cpu: 4
+            ram: 4096
+            disks:
+              - "30@{{base_image}}"
+            networkspecs:
+              - network_uuid="{{cinetwork['meta']['uuid']}}",float=True
+            ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+482i1EYa6FYmDrjOQpsm+mVwFs7TW9xOI9o1jc/PHXLDDg5+inp/vVAgKoV6jijwRC9juwjFBPqr8LyXh3lXhPA1LSaQa39o3QIYTLsLuLZPeueUB8UukZzOH0XAHxgAF/qFycf5pWzD4Pzs5HjNi44+9LCDYKJtc45kh3+97iezRMYhucm3wzRAKyA8mr8nNOrQq356sKgXeMP6nnX4bhUJDrcQpfsRFkTcYWAcSuU36eSETVOj9dGUJZlc4g3QBL73R1S5VWbN6DM4UIOSWxRG6oUKprgHSvFmyp5i7S0vKv7q101PcxOw14GOvI8TSirIa8O39WtyX3ugReBj mikal@sf-primary
+            state: present
+          register: imagerebuild
+
+    - name: Add to ansible
+      add_host:
+        hostname: imagerebuild
+        ansible_ssh_host: "{{imagerebuild['meta']['network_interfaces'][0]['floating']}}"
+        ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
+        ansible_ssh_user: "{{base_image_user}}"
+        ansible_ssh_private_key_file: "/home/jenkins/id_ci"
+        sf_instance_uuid: "{{imagerebuild['meta']['uuid']}}"
+        sf_network_uuid: "{{imagerebuild['meta']['network_interfaces'][0]['network_uuid']}}"
+        groups: sfall
+
+    - name: Log instance
+      debug:
+        msg: "{{imagerebuild}}"
+
+    - name: Wait for instance to present an "OpenSSH" prompt
+      wait_for:
+        port: 22
+        host: "{{hostvars[item]['ansible_ssh_host']}}"
+        search_regex: OpenSSH
+        delay: 10
+      with_items: "{{ groups['sfall'] }}"
+
+- hosts: sfall
+  gather_facts: yes
+  become: true
+  vars:
+    source_path: "/home/jenkins/src/shakenfist/"
+
+  tasks:
+    - name: Use CI package cache to speed things up
+      copy:
+        content: |
+          Acquire::http::Proxy "http://192.168.1.50:8000";
+        dest: /etc/apt/apt.conf.d/00proxy
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
+
+    - name: apt-get dist-upgrade
+      apt:
+        update_cache: yes
+        upgrade: dist
+        autoremove: yes
+
+    # TODO(mikal): dial this back once we have things working.
+    - name: Install dependencies
+      apt:
+        name:
+          [
+            git,
+            python3-dev,
+            python3-grpcio,
+            python3-pip,
+            python3-venv,
+            python3-wheel,
+            python3,
+            pwgen,
+            tox,
+          ]
+        state: latest
+
+    - name: pip3 self-upgrade
+      command: pip3 install -U pip
+
+    - name: Remove python3-pip
+      apt:
+        name: python3-pip
+        state: absent
+
+- hosts: localhost
+  gather_facts: yes
+  connection: ssh
+  vars:
+    identifier: cron
+    source_path: "/home/jenkins/src/shakenfist/"
+    base_image: "https://sfcbr.shakenfist.com/static/ubuntu2004-ci-template.qcow2"
+    base_image_user: "ubuntu"
+
+  tasks:
+    - name: Snapshot the instance
+      shell: |
+        sf-client --json instance snapshot "{{hostvars['imagerebuild']['sf_instance_uuid']}}" \
+            --label_name sfci-image
+      register: cisnapshot
+
+    - name: Log snapshot details
+      debug:
+        msg: "{{cisnapshot.stdout}}"
+
+    - name: Delete instance
+      sf_instance:
+        uuid: "{{hostvars['imagerebuild']['sf_instance_uuid']}}"
+        state: absent
+
+    - name: Delete network
+      sf_network:
+        uuid: "{{hostvars['imagerebuild']['sf_network_uuid']}}"
+        state: absent

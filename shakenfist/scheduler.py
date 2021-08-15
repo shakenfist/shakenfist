@@ -2,16 +2,13 @@
 
 import copy
 import math
-from functools import partial
 import random
 import time
 import uuid
 
-from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import exceptions
-from shakenfist import images
 from shakenfist import instance
 from shakenfist import logutil
 from shakenfist import networkinterface
@@ -79,28 +76,45 @@ class Scheduler(object):
         self.metrics_updated = time.time()
 
     # Note this method returns a three-way value: true (yes), false (no), -1 (if you must)
-    def _has_sufficient_cpu(self, cpus, node, cpu_ratio):
+    def _has_sufficient_cpu(self, log_ctx, cpus, node, cpu_ratio):
         preferred_max_cpus = self.metrics[node].get('cpu_max', 0) * cpu_ratio
         hard_max_cpus = (self.metrics[node].get(
-            'cpu_max', 0) * config.get('CPU_OVERCOMMIT_RATIO'))
+            'cpu_max', 0) * config.CPU_OVERCOMMIT_RATIO)
         current_cpu = self.metrics[node].get('cpu_total_instance_vcpus', 0)
 
         if current_cpu + cpus > hard_max_cpus:
+            log_ctx.with_fields({
+                'node': node,
+                'current_cpus': current_cpu,
+                'requested_cpus': cpus,
+                'hard_max_cpus': hard_max_cpus
+            }).debug('Scheduling on node would exceed hard maximum CPUs')
             return False
 
         if current_cpu + cpus > preferred_max_cpus:
+            log_ctx.with_fields({
+                'node': node,
+                'current_cpus': current_cpu,
+                'requested_cpus': cpus,
+                'preferred_max_cpus': preferred_max_cpus
+            }).debug('Scheduling on node would exceed preferred maximum CPUs, a soft failure')
             return -1
 
         return True
 
-    def _has_sufficient_ram(self, memory, node):
+    def _has_sufficient_ram(self, log_ctx, memory, node):
         # There are two things to track here... We must always have
         # RAM_SYSTEM_RESERVATION gb of RAM for operating system tasks -- assume
         # there is no overlap with existing VMs when checking this. Note as
         # well that metrics are in MB...
         available = (self.metrics[node].get('memory_available', 0) -
-                     (config.get('RAM_SYSTEM_RESERVATION') * 1024))
+                     (config.RAM_SYSTEM_RESERVATION * 1024))
         if available - memory < 0.0:
+            log_ctx.with_fields({
+                'node': node,
+                'available': available,
+                'requested_memory': memory
+            }).debug('Insufficient memory')
             return False
 
         # ...Secondly, if we're using KSM and over committing memory, we
@@ -108,12 +122,18 @@ class Scheduler(object):
         instance_memory = (
             self.metrics[node].get('memory_total_instance_actual', 0) + memory)
         if (instance_memory / self.metrics[node].get('memory_max', 0) >
-                config.get('RAM_OVERCOMMIT_RATIO')):
+                config.RAM_OVERCOMMIT_RATIO):
+            log_ctx.with_fields({
+                'node': node,
+                'instance_memory': instance_memory,
+                'memory_max': self.metrics[node].get('memory_max', 0),
+                'overcommit_ratio': config.RAM_OVERCOMMIT_RATIO
+            }).debug('KSM overcommit ratio exceeded')
             return False
 
         return True
 
-    def _has_sufficient_disk(self, instance, node):
+    def _has_sufficient_disk(self, log_ctx, instance, node):
         requested_disk = 0
         for disk in instance.disk_spec:
             # TODO(mikal): this ignores "sizeless disks", that is ones that
@@ -123,6 +143,11 @@ class Scheduler(object):
                     requested_disk += int(disk['size'])
 
         if requested_disk > (int(self.metrics[node].get('disk_free', '0')) / 1024 / 1024 / 1024):
+            log_ctx.with_fields({
+                'node': node,
+                'requested_disk': requested_disk,
+                'disk_free': self.metrics[node].get('disk_free', 0),
+            }).debug('Node has insufficient disk')
             return False
         return True
 
@@ -174,32 +199,6 @@ class Scheduler(object):
 
         # Return list of candidates that has maximum networks
         return candidates_by_network_matches[max_matches]
-
-    def _find_most_matching_images(self, requested_images, candidates):
-        # Determine number of matching images per node
-        candidates_image_matches = {}
-        for n in candidates:
-            candidates_image_matches[n] = 0
-
-        for image in requested_images:
-            for i in images.Images(filters=[partial(images.url_filter, image),
-                                            baseobject.active_states_filter]):
-                candidates_image_matches[i.node] += 1
-
-        # Create dict of candidate lists keyed by number of image matches
-        candidates_by_image_matches = {}
-        for n in candidates:
-            matches = candidates_image_matches[n]
-            candidates_by_image_matches.setdefault(matches, [])
-            candidates_by_image_matches[matches].append(n)
-
-        # If no matches, return the original candidate list
-        if len(candidates_by_image_matches) == 0:
-            return candidates
-
-        # Return all candidates that have the highest number of image matches
-        max_matches = max(candidates_by_image_matches.keys())
-        return candidates_by_image_matches[max_matches]
 
     def place_instance(self, instance, network, candidates=None):
         with util.RecordedOperation('schedule', instance):
@@ -260,14 +259,14 @@ class Scheduler(object):
                     'cpu_total_instance_vcpus', 0)
                 actual_cluster_cpu += self.metrics[node].get(
                     'cpu_available', 0)
-            cpu_ratio = min(config.get('CPU_OVERCOMMIT_RATIO'),
+            cpu_ratio = min(config.CPU_OVERCOMMIT_RATIO,
                             math.ceil(current_cluster_cpu / actual_cluster_cpu))
             log_ctx.info('Current cluster CPU overcommit ratio is %d, configured maximum %d',
-                         cpu_ratio, config.get('CPU_OVERCOMMIT_RATIO'))
+                         cpu_ratio, config.CPU_OVERCOMMIT_RATIO)
 
             for n in copy.copy(candidates):
                 preference = self._has_sufficient_cpu(
-                    instance.cpus, n, cpu_ratio)
+                    log_ctx, instance.cpus, n, cpu_ratio)
                 if preference == -1:
                     candidates.remove(n)
                     candidates.append(n)
@@ -284,8 +283,7 @@ class Scheduler(object):
 
             # Do we have enough idle RAM?
             for n in copy.copy(candidates):
-                if not self._has_sufficient_ram(
-                        instance.memory, n):
+                if not self._has_sufficient_ram(log_ctx, instance.memory, n):
                     candidates.remove(n)
             log_ctx.with_field('candidates', candidates).info(
                 'Scheduling: Have enough idle RAM')
@@ -297,7 +295,7 @@ class Scheduler(object):
 
             # Do we have enough idle disk?
             for n in copy.copy(candidates):
-                if not self._has_sufficient_disk(instance, n):
+                if not self._has_sufficient_disk(log_ctx, instance, n):
                     candidates.remove(n)
             log_ctx.with_field('candidates', candidates).info(
                 'Scheduling: Have enough idle disk')
@@ -322,20 +320,6 @@ class Scheduler(object):
                 instance.add_event('schedule', 'Have most matching networks',
                                    None, str(candidates))
 
-            # What nodes have the base image already?
-            requested_images = []
-            for disk in instance.disk_spec:
-                if disk.get('base'):
-                    img = images.Image.new(disk['base'])
-                    requested_images = img.url
-
-            candidates = self._find_most_matching_images(
-                requested_images, candidates)
-            log_ctx.with_field('candidates', candidates).info(
-                'Scheduling: Have most matching images')
-            instance.add_event('schedule', 'Have most matching images',
-                               None, str(candidates))
-
             # Avoid allocating to network node if possible
             net_node = get_network_node()
             if len(candidates) > 1 and net_node.uuid in candidates:
@@ -347,4 +331,6 @@ class Scheduler(object):
 
             # Return a shuffled list of options
             random.shuffle(candidates)
+            instance.add_event('schedule', 'Final candidates',
+                               None, str(candidates))
             return candidates

@@ -4,12 +4,14 @@ import requests
 import setproctitle
 import time
 
+from shakenfist.artifact import Artifact
+from shakenfist import blob
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import exceptions
-from shakenfist.images import Image
+from shakenfist import images
 from shakenfist import instance
 from shakenfist import logutil
 from shakenfist.tasks import (QueueTask,
@@ -18,7 +20,8 @@ from shakenfist.tasks import (QueueTask,
                               InstanceTask,
                               PreflightInstanceTask,
                               StartInstanceTask,
-                              FloatNetworkInterfaceTask)
+                              FloatNetworkInterfaceTask,
+                              SnapshotTask)
 from shakenfist import net
 from shakenfist import networkinterface
 from shakenfist import scheduler
@@ -50,6 +53,9 @@ def handle(jobname, workitem):
                         task.instance_uuid())
 
             if isinstance(task, FetchImageTask):
+                inst = instance.Instance.from_db(task.instance_uuid())
+
+            if isinstance(task, SnapshotTask):
                 inst = instance.Instance.from_db(task.instance_uuid())
 
             if inst:
@@ -111,6 +117,10 @@ def handle(jobname, workitem):
                 # Just punt it to the network node now that the interface is ready
                 db.enqueue('networknode', task)
 
+            elif isinstance(task, SnapshotTask):
+                snapshot(inst, task.disk(),
+                         task.artifact_uuid(), task.blob_uuid())
+
             else:
                 log_i.with_field('task', task).error(
                     'Unhandled task - dropped')
@@ -142,15 +152,8 @@ def image_fetch(url, inst):
         # TODO(andy): Wait up to 15 mins for another queue process to download
         # the required image. This will be changed to queue on a
         # "waiting_image_fetch" queue but this works now.
-        with db.get_lock('image', config.NODE_NAME, Image.calc_unique_ref(url),
-                         timeout=15*60, op='Image fetch') as lock:
-            # Note that the image might already exist in the database as the API
-            # creates a records so that the image is included in listings before
-            # it is fetched. However, the new() call here handles that case and
-            # will just return the previous entry if one exists.
-            img = Image.new(url)
-            img.get([lock], inst)
-            db.add_event('image', url, 'fetch', None, None, 'success')
+        images.ImageFetchHelper(inst, url).get_image()
+        db.add_event('image', url, 'fetch', None, None, 'success')
 
     except (exceptions.HTTPError, requests.exceptions.RequestException) as e:
         LOG.with_field('image', url).info('Failed to fetch image')
@@ -290,6 +293,13 @@ def instance_delete(inst):
                     # Network not used by any other instance therefore delete
                     with util.RecordedOperation('remove network from node', n):
                         n.delete_on_hypervisor()
+
+
+def snapshot(inst, disk, artifact_uuid, blob_uuid):
+    blob.snapshot_disk(disk, blob_uuid)
+    a = Artifact.from_db(artifact_uuid)
+    if a.state == dbo.STATE_INITIAL:
+        a.state = dbo.STATE_CREATED
 
 
 class Monitor(daemon.Daemon):

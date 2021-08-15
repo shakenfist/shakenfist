@@ -9,7 +9,7 @@ from shakenfist.image_resolver import cirros
 from shakenfist.image_resolver import ubuntu
 from shakenfist import logutil
 from shakenfist.tests import test_shakenfist
-from shakenfist.config import SFConfigBase
+from shakenfist.config import BaseSettings
 
 
 LOG, _ = logutil.setup(__name__)
@@ -30,7 +30,7 @@ class FakeResponse(object):
         pass
 
 
-class FakeConfig(SFConfigBase):
+class FakeConfig(BaseSettings):
     STORAGE_PATH: str = '/a/b/c'
     NODE_NAME: str = 'sf-245'
     DOWNLOAD_URL_CIRROS: AnyHttpUrl = (
@@ -42,8 +42,6 @@ class FakeConfig(SFConfigBase):
         '%(vername)s-server-cloudimg-amd64.img')
     LISTING_URL_UBUNTU: AnyHttpUrl = (
         'https://cloud-images.ubuntu.com/')
-
-    GLUSTER_ENABLED = False
 
 
 fake_config = FakeConfig()
@@ -84,13 +82,13 @@ class ImageResolversTestCase(test_shakenfist.ShakenFistTestCase):
         u = cirros.resolve('cirros')
         self.assertEqual(
             ('http://download.cirros-cloud.net/0.5.1/cirros-0.5.1-x86_64-disk.img',
-             None),
+             None, None),
             u)
 
         u = cirros.resolve('cirros:0.3.4')
         self.assertEqual(
             ('http://download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img',
-             'ee1eca47dc88f4879d8a229cc70a07c6'),
+             'ee1eca47dc88f4879d8a229cc70a07c6', 'md5'),
             u)
 
         self.assertRaises(exceptions.VersionSpecificationError,
@@ -113,23 +111,23 @@ class ImageResolversTestCase(test_shakenfist.ShakenFistTestCase):
     def test_resolve_ubuntu(self, mock_get):
         u = ubuntu.resolve('ubuntu')
         self.assertEqual(
-            ('https://cloud-images.ubuntu.com/groovy/current/'
-             'groovy-server-cloudimg-amd64.img',
-             '1c19b08060b9feb1cd0e7ee28fd463fb'),
+            (('https://cloud-images.ubuntu.com/groovy/current/'
+              'groovy-server-cloudimg-amd64.img'),
+             '1c19b08060b9feb1cd0e7ee28fd463fb', 'md5'),
             u)
 
         u = ubuntu.resolve('ubuntu:bionic')
         self.assertEqual(
-            ('https://cloud-images.ubuntu.com/bionic/current/'
-             'bionic-server-cloudimg-amd64.img',
-             'ed44b9745b8d62bcbbc180b5f36c24bb'),
+            (('https://cloud-images.ubuntu.com/bionic/current/'
+              'bionic-server-cloudimg-amd64.img'),
+             'ed44b9745b8d62bcbbc180b5f36c24bb', 'md5'),
             u)
 
         u = ubuntu.resolve('ubuntu:18.04')
         self.assertEqual(
-            ('https://cloud-images.ubuntu.com/bionic/current/'
-             'bionic-server-cloudimg-amd64.img',
-             'ed44b9745b8d62bcbbc180b5f36c24bb'),
+            (('https://cloud-images.ubuntu.com/bionic/current/'
+              'bionic-server-cloudimg-amd64.img'),
+             'ed44b9745b8d62bcbbc180b5f36c24bb', 'md5'),
             u)
 
         self.assertRaises(exceptions.VersionSpecificationError,
@@ -145,9 +143,9 @@ class ImageResolversTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.image_resolver.ubuntu.resolve',
                 return_value=('!!!ubuntu!!!', '123abc'))
     def test_resolve_image(self, mock_ubuntu, mock_centos):
-        self.assertEqual(('win10', None),
+        self.assertEqual(('win10', None, None),
                          image_resolver.resolve('win10'))
-        self.assertEqual(('http://example.com/image', None),
+        self.assertEqual(('http://example.com/image', None, None),
                          image_resolver.resolve('http://example.com/image'))
         self.assertEqual(('!!!cirros!!!', '123abc'),
                          image_resolver.resolve('cirros'))

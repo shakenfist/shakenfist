@@ -40,7 +40,9 @@ class NetworkGeneralTestCase(NetworkTestCase):
             'namespace': 'finitespace',
             'provide_dhcp': True,
             'provide_nat': True,
-            'physical_nic': 'eth0',
+            'egress_nic': 'eth0',
+            'mesh_nic': 'eth0',
+            'mesh_nic': 'eth0',
             'netblock': '192.168.1.0/24'
         })
 
@@ -52,7 +54,8 @@ class NetworkGeneralTestCase(NetworkTestCase):
             'namespace': 'finitespace',
             'provide_dhcp': True,
             'provide_nat': True,
-            'physical_nic': 'eth0',
+            'egress_nic': 'eth0',
+            'mesh_nic': 'eth0',
             'netblock': '192.168.1.0/24'
         })
         self.assertEqual('network(notauuid)', str(n))
@@ -61,7 +64,9 @@ class NetworkGeneralTestCase(NetworkTestCase):
 class NetworkNormalNodeTestCase(NetworkTestCase):
     def setUp(self):
         super(NetworkNormalNodeTestCase, self).setUp()
-        fake_config = SFConfig(NODE_IP="1.1.1.2", NETWORK_NODE_IP="1.1.1.2")
+        fake_config = SFConfig(NODE_EGRESS_IP="1.1.1.2",
+                               NODE_MESH_IP="1.1.1.2",
+                               NETWORK_NODE_IP="1.1.1.2")
         self.config = mock.patch('shakenfist.config.config', fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
@@ -79,7 +84,8 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
             'namespace': 'finitespace',
             'provide_dhcp': True,
             'provide_nat': True,
-            'physical_nic': 'eth0',
+            'egress_nic': 'eth0',
+            'mesh_nic': 'eth0',
             'netblock': '192.168.1.0/24'
         })
         self.assertTrue(n.is_okay())
@@ -94,14 +100,17 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
             'namespace': 'finitespace',
             'provide_dhcp': True,
             'provide_nat': True,
-            'physical_nic': 'eth0',
+            'egress_nic': 'eth0',
+            'mesh_nic': 'eth0',
             'netblock': '192.168.1.0/24'
         })
         self.assertFalse(n.is_okay())
 
     @mock.patch('shakenfist.net.Network.is_created', return_value=True)
     @mock.patch('shakenfist.net.Network.is_dnsmasq_running', return_value=False)
-    @mock.patch('shakenfist.util.config', SFConfig(NODE_IP="1.1.1.1", NETWORK_NODE_IP="1.1.1.2"))
+    @mock.patch('shakenfist.util.config', SFConfig(NODE_EGRESS_IP="1.1.1.1",
+                                                   NODE_MESH_IP="1.1.1.2",
+                                                   NETWORK_NODE_IP="1.1.1.2"))
     def test_is_okay_no_dns(self, mock_is_dnsmasq, mock_is_created):
         n = net.Network({
             'uuid': 'actualuuid',
@@ -110,17 +119,20 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
             'namespace': 'finitespace',
             'provide_dhcp': True,
             'provide_nat': True,
-            'physical_nic': 'eth0',
+            'egress_nic': 'eth0',
+            'mesh_nic': 'eth0',
             'netblock': '192.168.1.0/24'
         })
-        self.assertTrue(n.is_okay())
+        self.assertFalse(n.is_okay())
 
 
 class NetworkNetNodeTestCase(NetworkTestCase):
     def setUp(self):
         super(NetworkNetNodeTestCase, self).setUp()
 
-        fake_config = SFConfig(NODE_IP="1.1.1.2", NETWORK_NODE_IP="1.1.1.2")
+        fake_config = SFConfig(NODE_EGRESS_IP="1.1.1.2",
+                               NODE_MESH_IP="1.1.1.2",
+                               NETWORK_NODE_IP="1.1.1.2")
         self.config = mock.patch('shakenfist.config.config', fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
@@ -138,7 +150,8 @@ class NetworkNetNodeTestCase(NetworkTestCase):
             'namespace': 'finitespace',
             'provide_dhcp': True,
             'provide_nat': True,
-            'physical_nic': 'eth0',
+            'egress_nic': 'eth0',
+            'mesh_nic': 'eth0',
             'netblock': '192.168.1.0/24'
         })
         self.assertTrue(n.is_okay())
@@ -153,7 +166,8 @@ class NetworkNetNodeTestCase(NetworkTestCase):
             'namespace': 'finitespace',
             'provide_dhcp': True,
             'provide_nat': True,
-            'physical_nic': 'eth0',
+            'egress_nic': 'eth0',
+            'mesh_nic': 'eth0',
             'netblock': '192.168.1.0/24'
         })
         self.assertFalse(n.is_okay())
@@ -168,7 +182,8 @@ class NetworkNetNodeTestCase(NetworkTestCase):
             'namespace': 'finitespace',
             'provide_dhcp': True,
             'provide_nat': False,
-            'physical_nic': 'eth0',
+            'egress_nic': 'eth0',
+            'mesh_nic': 'eth0',
             'netblock': '192.168.1.0/24'
         })
         self.assertFalse(n.is_okay())
@@ -183,7 +198,8 @@ class NetworkNetNodeTestCase(NetworkTestCase):
             'namespace': 'finitespace',
             'provide_dhcp': False,
             'provide_nat': False,
-            'physical_nic': 'eth0',
+            'egress_nic': 'eth0',
+            'mesh_nic': 'eth0',
             'netblock': '192.168.1.0/24'
         })
         self.assertTrue(n.is_okay())
@@ -206,7 +222,8 @@ link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
             'namespace': 'finitespace',
             'provide_dhcp': True,
             'provide_nat': True,
-            'physical_nic': 'eth0',
+            'egress_nic': 'eth0',
+            'mesh_nic': 'eth0',
             'netblock': '192.168.1.0/24'
         })
         self.assertTrue(n.is_created())
@@ -226,7 +243,8 @@ link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
             'namespace': 'finitespace',
             'provide_dhcp': True,
             'provide_nat': True,
-            'physical_nic': 'eth0',
+            'egress_nic': 'eth0',
+            'mesh_nic': 'eth0',
             'netblock': '192.168.1.0/24'
         })
         self.assertFalse(n.is_created())
@@ -243,7 +261,8 @@ link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
             'namespace': 'finitespace',
             'provide_dhcp': True,
             'provide_nat': True,
-            'physical_nic': 'eth0',
+            'egress_nic': 'eth0',
+            'mesh_nic': 'eth0',
             'netblock': '192.168.1.0/24'
         })
         self.assertFalse(n.is_created())
@@ -270,7 +289,8 @@ link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
             'namespace': 'finitespace',
             'provide_dhcp': True,
             'provide_nat': True,
-            'physical_nic': 'eth0',
+            'egress_nic': 'eth0',
+            'mesh_nic': 'eth0',
             'netblock': '192.168.1.0/24'
         })
         with testtools.ExpectedException(exceptions.InvalidStateException):

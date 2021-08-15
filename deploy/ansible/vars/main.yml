@@ -9,10 +9,12 @@ shakenfist_deps:
   - dnsutils
   - etcd-client
   - git
+  - libmagic-dev
   - libssl-dev
   - libvirt-daemon-system
   - libvirt-dev
   - net-tools
+  - ovmf
   - prometheus-node-exporter
   - pwgen
   - python3-libvirt

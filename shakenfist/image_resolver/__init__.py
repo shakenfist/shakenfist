@@ -13,4 +13,4 @@ def resolve(url):
     for resolver in resolvers:
         if url.startswith(resolver):
             return resolvers[resolver].resolve(url)
-    return url, None
+    return url, None, None

@@ -56,8 +56,10 @@ class Network(dbo):
         self.__provide_nat = static_values.get('provide_nat')
         self.__vxid = static_values.get('vxid')
 
-        self.physical_nic = static_values.get(
-            'physical_nic', config.get('NODE_EGRESS_NIC'))
+        self.egress_nic = static_values.get(
+            'egress_nic', config.NODE_EGRESS_NIC)
+        self.mesh_nic = static_values.get(
+            'mesh_nic', config.NODE_MESH_NIC)
 
         ipm = IPManager.from_db(self.uuid)
         self.__ipblock = ipm.network_address
@@ -249,10 +251,10 @@ class Network(dbo):
             'vx_veth_outer': 'veth-%06x-o' % self.vxid,
             'vx_veth_inner': 'veth-%06x-i' % self.vxid,
 
-            'physical_interface': self.physical_nic,
-            'physical_bridge': 'phy-br-%s' % config.get('NODE_EGRESS_NIC'),
-            'physical_veth_outer': 'phy-%06x-o' % self.vxid,
-            'physical_veth_inner': 'phy-%06x-i' % self.vxid,
+            'egress_bridge': 'egr-br-%s' % config.NODE_EGRESS_NIC,
+            'egress_veth_outer': 'egr-%06x-o' % self.vxid,
+            'egress_veth_inner': 'egr-%06x-i' % self.vxid,
+            'mesh_interface': self.mesh_nic,
 
             'netns': self.uuid,
             'in_netns': 'ip netns exec %s' % self.uuid,
@@ -303,7 +305,7 @@ class Network(dbo):
             with util.RecordedOperation('create vxlan interface', self):
                 util.create_interface(
                     subst['vx_interface'], 'vxlan',
-                    'id %(vx_id)s dev %(physical_interface)s dstport 0'
+                    'id %(vx_id)s dev %(mesh_interface)s dstport 0'
                     % subst)
                 util.execute(None, 'sysctl -w net.ipv4.conf.'
                                    '%(vx_interface)s.arp_notify=1' % subst)
@@ -364,19 +366,19 @@ class Network(dbo):
                         '%(in_netns)s ip addr add %(router)s/%(netmask)s '
                         'dev %(vx_veth_inner)s' % subst)
 
-            if not util.check_for_interface(subst['physical_veth_outer']):
-                with util.RecordedOperation('create physical veth', self):
+            if not util.check_for_interface(subst['egress_veth_outer']):
+                with util.RecordedOperation('create egress veth', self):
                     util.create_interface(
-                        subst['physical_veth_outer'], 'veth',
-                        'peer name %(physical_veth_inner)s' % subst)
+                        subst['egress_veth_outer'], 'veth',
+                        'peer name %(egress_veth_inner)s' % subst)
                     util.execute(None,
-                                 'brctl addif %(physical_bridge)s '
-                                 '%(physical_veth_outer)s' % subst)
+                                 'brctl addif %(egress_bridge)s '
+                                 '%(egress_veth_outer)s' % subst)
                     util.execute(None,
-                                 'ip link set %(physical_veth_outer)s up'
+                                 'ip link set %(egress_veth_outer)s up'
                                  % subst)
                     util.execute(None,
-                                 'ip link set %(physical_veth_inner)s '
+                                 'ip link set %(egress_veth_inner)s '
                                  'netns %(netns)s' % subst)
 
             if self.provide_nat:
@@ -398,15 +400,15 @@ class Network(dbo):
                 with util.RecordedOperation('enable virtual routing', self):
                     addresses = util.get_interface_addresses(
                         subst['netns'],
-                        subst['physical_veth_inner'])
+                        subst['egress_veth_inner'])
                     if not subst['floating_gateway'] in list(addresses):
                         util.execute(None,
                                      '%(in_netns)s ip addr add '
                                      '%(floating_gateway)s/%(floating_netmask)s '
-                                     'dev %(physical_veth_inner)s' % subst)
+                                     'dev %(egress_veth_inner)s' % subst)
                         util.execute(None,
                                      '%(in_netns)s ip link set '
-                                     '%(physical_veth_inner)s up' % subst)
+                                     '%(egress_veth_inner)s up' % subst)
 
                     default_routes = util.get_default_routes(subst['netns'])
                     if default_routes != [subst['floating_router']]:
@@ -448,11 +450,11 @@ class Network(dbo):
                         util.execute(
                             None, 'ip link delete %(vx_veth_outer)s' % subst)
 
-                if util.check_for_interface(subst['physical_veth_outer']):
-                    with util.RecordedOperation('delete physical veth', self):
+                if util.check_for_interface(subst['egress_veth_outer']):
+                    with util.RecordedOperation('delete egress veth', self):
                         util.execute(
                             None,
-                            'ip link delete %(physical_veth_outer)s' % subst)
+                            'ip link delete %(egress_veth_outer)s' % subst)
 
                 if os.path.exists('/var/run/netns/%(netns)s' % subst):
                     with util.RecordedOperation('delete netns', self):
@@ -528,16 +530,16 @@ class Network(dbo):
                              'echo 1 > /proc/sys/net/ipv4/ip_forward')
                 util.execute(None,
                              '%(in_netns)s iptables -A FORWARD '
-                             '-o %(physical_veth_inner)s '
+                             '-o %(egress_veth_inner)s '
                              '-i %(vx_veth_inner)s -j ACCEPT' % subst)
                 util.execute(None,
                              '%(in_netns)s iptables -A FORWARD '
-                             '-i %(physical_veth_inner)s '
+                             '-i %(egress_veth_inner)s '
                              '-o %(vx_veth_inner)s -j ACCEPT' % subst)
                 util.execute(None,
                              '%(in_netns)s iptables -t nat -A POSTROUTING '
                              '-s %(ipblock)s/%(netmask)s '
-                             '-o %(physical_veth_inner)s '
+                             '-o %(egress_veth_inner)s '
                              '-j MASQUERADE' % subst)
 
     def remove_nat(self):
@@ -593,11 +595,13 @@ class Network(dbo):
 
             # NOTE(mikal): why not use DNS here? Well, DNS might be outside
             # the control of the deployer if we're running in a public cloud
-            # as an overlay cloud...
+            # as an overlay cloud... Also, we don't include ourselves in the
+            # mesh as that would cause duplicate packets to reflect back to us.
+            # (see bug #859).
             node_ips = set([config.NETWORK_NODE_IP])
             for fqdn in node_fqdns:
                 n = Node.from_db(fqdn)
-                if n:
+                if n and n.ip != config.NODE_MESH_IP:
                     node_ips.add(n.ip)
 
             discovered = list(self.discover_mesh())
@@ -704,7 +708,7 @@ class Networks(dbo_iter):
 def inactive_networks():
     return Networks([
                     baseobject.inactive_states_filter,
-                    partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))])
+                    partial(baseobject.state_age_filter, config.CLEANER_DELAY)])
 
 
 def networks_in_namespace(namespace):

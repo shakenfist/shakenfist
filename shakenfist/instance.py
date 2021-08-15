@@ -13,6 +13,7 @@ import socket
 import time
 from uuid import uuid4
 
+from shakenfist.artifact import Artifact, BLOB_URL
 from shakenfist import baseobject
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
@@ -36,7 +37,7 @@ def _get_defaulted_disk_bus(disk):
     bus = disk.get('bus')
     if bus:
         return bus
-    return config.get('DISK_BUS')
+    return config.DISK_BUS
 
 
 def _get_disk_device_base(bus):
@@ -68,8 +69,6 @@ def _initialize_block_devices(instance_path, disk_spec):
     config_device = _get_disk_device_base(bus) + 'b'
 
     disk_type = 'qcow2'
-    if config.get('DISK_FORMAT') == 'flat':
-        disk_type = 'raw'
 
     block_devices = {
         'devices': [
@@ -80,6 +79,7 @@ def _initialize_block_devices(instance_path, disk_spec):
                 'bus': bus,
                 'path': os.path.join(instance_path, root_device),
                 'base': disk_spec[0].get('base'),
+                'blob_uuid': disk_spec[0].get('blob_uuid'),
                 'present_as': _get_defaulted_disk_type(disk_spec[0]),
                 'snapshot_ignores': False
             },
@@ -105,6 +105,7 @@ def _initialize_block_devices(instance_path, disk_spec):
             'bus': bus,
             'path': os.path.join(instance_path, device),
             'base': d.get('base'),
+            'blob_uuid': d.get('blob_uuid'),
             'present_as': _get_defaulted_disk_type(d),
             'snapshot_ignores': False
         })
@@ -114,13 +115,15 @@ def _initialize_block_devices(instance_path, disk_spec):
     return block_devices
 
 
-def _snapshot_path():
-    return os.path.join(config.get('STORAGE_PATH'), 'snapshots')
+def _blob_path():
+    blob_path = os.path.join(config.STORAGE_PATH, 'blobs')
+    os.makedirs(blob_path, exist_ok=True)
+    return blob_path
 
 
 class Instance(dbo):
     object_type = 'instance'
-    current_version = 2
+    current_version = 3
 
     # docs/development/state_machine.md has a description of these states.
     STATE_INITIAL_ERROR = 'initial-error'
@@ -156,6 +159,7 @@ class Instance(dbo):
         self.__ssh_key = static_values.get('ssh_key')
         self.__user_data = static_values.get('user_data')
         self.__video = static_values.get('video')
+        self.__uefi = static_values.get('uefi', False)
 
         if not self.__disk_spec:
             # This should not occur since the API will filter for zero disks.
@@ -164,7 +168,8 @@ class Instance(dbo):
 
     @classmethod
     def new(cls, name, cpus, memory, namespace, ssh_key=None, disk_spec=None,
-            user_data=None, video=None, requested_placement=None, uuid=None):
+            user_data=None, video=None, requested_placement=None, uuid=None,
+            uefi=False):
 
         if not uuid:
             # uuid should only be specified in testing
@@ -182,6 +187,7 @@ class Instance(dbo):
                 'ssh_key': ssh_key,
                 'user_data': user_data,
                 'video': video,
+                'uefi': uefi,
 
                 'version': cls.current_version
             })
@@ -217,6 +223,7 @@ class Instance(dbo):
             'state': self.state.value,
             'user_data': self.user_data,
             'video': self.video,
+            'uefi': self.uefi,
             'version': self.version,
             'error_message': self.error,
         }
@@ -286,8 +293,12 @@ class Instance(dbo):
         return self.__video
 
     @property
+    def uefi(self):
+        return self.__uefi
+
+    @property
     def instance_path(self):
-        return os.path.join(config.get('STORAGE_PATH'), 'instances', self.uuid)
+        return os.path.join(config.STORAGE_PATH, 'instances', self.uuid)
 
     # Values routed to attributes, writes are via helper methods.
     @property
@@ -396,6 +407,12 @@ class Instance(dbo):
             try:
                 self.power_off()
 
+                nvram_path = os.path.join(
+                    config.STORAGE_PATH, 'instances', self.uuid,
+                    'nvram')
+                if os.path.exists(nvram_path):
+                    os.unlink(nvram_path)
+
                 inst = self._get_domain()
                 if inst:
                     inst.undefine()
@@ -487,21 +504,40 @@ class Instance(dbo):
                     os.path.join(self.instance_path,
                                  block_devices['devices'][1]['path']))
 
-            # Prepare disks
+            # Prepare disks. A this point we have a file for each blob in the image
+            # cache at a well known location (the blob uuid with .qcow2 appended).
             if not block_devices['finalized']:
                 modified_disks = []
                 for disk in block_devices['devices']:
                     disk['source'] = "<source file='%s'/>" % disk['path']
                     disk['source_type'] = 'file'
 
-                    if disk.get('base'):
-                        img = images.Image.new(disk['base'])
-                        hashed_image_path = img.version_image_path()
+                    # All disk bases must have an associated blob, force that
+                    # if an image had to be fetched from outside the cluster.
+                    disk_base = None
+                    if disk.get('blob_uuid'):
+                        disk_base = '%s%s' % (BLOB_URL, disk['blob_uuid'])
+                    elif disk.get('base'):
+                        a = Artifact.from_url(
+                            Artifact.TYPE_IMAGE, disk['base'])
+                        mri = a.most_recent_index
+
+                        if 'blob_uuid' not in mri:
+                            raise exceptions.ArtifactHasNoBlobs(
+                                'Artifact %s of type %s has no versions'
+                                % (a.uuid, a.artifact_type))
+
+                        disk['blob_uuid'] = mri['blob_uuid']
+                        disk_base = '%s%s' % (BLOB_URL, disk['blob_uuid'])
+
+                    if disk_base:
+                        cached_image_path = os.path.join(
+                            config.STORAGE_PATH, 'image_cache', disk['blob_uuid'] + '.qcow2')
 
                         with util.RecordedOperation('detect cdrom images', self):
                             try:
                                 cd = pycdlib.PyCdlib()
-                                cd.open(hashed_image_path)
+                                cd.open(cached_image_path)
                                 disk['present_as'] = 'cdrom'
                             except Exception:
                                 pass
@@ -514,64 +550,32 @@ class Instance(dbo):
                             disk['snapshot_ignores'] = True
 
                             try:
-                                os.link(hashed_image_path, disk['path'])
+                                os.link(cached_image_path, disk['path'])
                             except OSError:
-                                # Different filesystems
-                                util.execute(
-                                    [lock], 'cp %s %s' % (hashed_image_path, disk['path']))
+                                os.symlink(cached_image_path, disk['path'])
 
                             # Due to limitations in some installers, cdroms are always on IDE
                             disk['device'] = 'hd%s' % disk['device'][-1]
                             disk['bus'] = 'ide'
                         else:
-                            if config.get('DISK_FORMAT') == 'qcow':
-                                with util.RecordedOperation('create copy on write layer', self):
-                                    images.create_cow([lock], hashed_image_path,
-                                                      disk['path'], disk['size'])
+                            with util.RecordedOperation('create copy on write layer', self):
+                                images.create_cow([lock], cached_image_path,
+                                                  disk['path'], disk['size'])
+                            shutil.chown(
+                                disk['path'], 'libvirt-qemu', 'libvirt-qemu')
+                            self.log.with_fields(util.stat_log_fields(disk['path'])).info(
+                                'COW layer %s created' % disk['path'])
 
-                                # Record the backing store for modern libvirts
-                                disk['backing'] = (
-                                    '<backingStore type=\'file\'>\n'
-                                    '        <format type=\'qcow2\'/>\n'
-                                    '        <source file=\'%s\'/>\n'
-                                    '      </backingStore>\n'
-                                    % (hashed_image_path))
-
-                            elif config.get('DISK_FORMAT') == 'qcow_flat':
-                                with util.RecordedOperation('resize image', self):
-                                    resized_image_path = img.resize(
-                                        [lock], disk['size'])
-
-                                with util.RecordedOperation('create flat layer', self):
-                                    images.create_flat(
-                                        [lock], resized_image_path, disk['path'])
-
-                            elif config.get('DISK_FORMAT') == 'flat':
-                                with util.RecordedOperation('resize image', self):
-                                    resized_image_path = img.resize(
-                                        [lock], disk['size'])
-
-                                with util.RecordedOperation('create raw disk', self):
-                                    images.create_raw(
-                                        [lock], resized_image_path, disk['path'])
-
-                            else:
-                                raise Exception('Unknown disk format')
+                            # Record the backing store for modern libvirts
+                            disk['backing'] = (
+                                '<backingStore type=\'file\'>\n'
+                                '        <format type=\'qcow2\'/>\n'
+                                '        <source file=\'%s\'/>\n'
+                                '      </backingStore>\n'
+                                % (cached_image_path))
 
                     elif not os.path.exists(disk['path']):
                         images.create_blank([lock], disk['path'], disk['size'])
-
-                    # Tweak the disk if we're using gluster
-                    if config.GLUSTER_ENABLED:
-                        disk['path'] = disk['path'].replace(
-                            os.path.join(config.STORAGE_PATH, 'instances'),
-                            'shakenfist/instances'
-                        )
-                        disk['source'] = ("<source protocol='gluster' name='%s'>"
-                                          "<host name='%s' port='24007' />"
-                                          "</source>"
-                                          % (disk['path'], config.NODE_NAME))
-                        disk['source_type'] = 'network'
 
                     modified_disks.append(disk)
 
@@ -604,7 +608,7 @@ class Instance(dbo):
         md = json.dumps({
             'random_seed': base64.b64encode(os.urandom(512)).decode('ascii'),
             'uuid': self.uuid,
-            'availability_zone': config.get('ZONE'),
+            'availability_zone': config.ZONE,
             'hostname': '%s.local' % self.name,
             'launch_index': 0,
             'devices': [],
@@ -645,29 +649,29 @@ class Instance(dbo):
 
         have_default_route = False
         for iface in networkinterface.interfaces_for_instance(self):
-            devname = 'eth%d' % iface.order
-            nd['links'].append(
-                {
-                    'ethernet_mac_address': iface.macaddr,
-                    'id': devname,
-                    'name': devname,
-                    'mtu': config.get('MAX_HYPERVISOR_MTU') - 50,
-                    'type': 'vif',
-                    'vif_id': iface.uuid
-                }
-            )
-
-            n = net.Network.from_db(iface.network_uuid)
-            nd['networks'].append(
-                {
-                    'id': '%s-%s' % (iface.network_uuid, iface.order),
-                    'link': devname,
-                    'type': 'ipv4',
-                    'network_id': iface.network_uuid
-                }
-            )
-
             if iface.ipv4:
+                devname = 'eth%d' % iface.order
+                nd['links'].append(
+                    {
+                        'ethernet_mac_address': iface.macaddr,
+                        'id': devname,
+                        'name': devname,
+                        'mtu': config.MAX_HYPERVISOR_MTU - 50,
+                        'type': 'vif',
+                        'vif_id': iface.uuid
+                    }
+                )
+
+                n = net.Network.from_db(iface.network_uuid)
+                nd['networks'].append(
+                    {
+                        'id': '%s-%s' % (iface.network_uuid, iface.order),
+                        'link': devname,
+                        'type': 'ipv4',
+                        'network_id': iface.network_uuid
+                    }
+                )
+
                 nd['networks'][-1].update({
                     'ip_address': iface.ipv4,
                     'netmask': str(n.netmask),
@@ -723,7 +727,7 @@ class Instance(dbo):
     def _create_domain_xml(self):
         """Create the domain XML for the instance."""
 
-        with open(os.path.join(config.get('STORAGE_PATH'), 'libvirt.tmpl')) as f:
+        with open(os.path.join(config.STORAGE_PATH, 'libvirt.tmpl')) as f:
             t = jinja2.Template(f.read())
 
         networks = []
@@ -752,7 +756,8 @@ class Instance(dbo):
             console_port=ports.get('console_port'),
             vdi_port=ports.get('vdi_port'),
             video_model=self.video['model'],
-            video_memory=self.video['memory']
+            video_memory=self.video['memory'],
+            uefi=self.uefi
         )
 
     def _get_domain(self):
@@ -824,47 +829,6 @@ class Instance(dbo):
 
         self.update_power_state('off')
         self.add_event('poweroff', 'complete')
-
-    def _snapshot_device(self, source, destination):
-        images.snapshot(None, source, destination)
-
-    def snapshot(self, all=False):
-        disks = self.block_devices['devices']
-        if not all:
-            disks = [disks[0]]
-
-        snapshot_uuid = str(uuid4())
-        snappath = os.path.join(_snapshot_path(), snapshot_uuid)
-        if not os.path.exists(snappath):
-            self.log.debug('Creating snapshot storage at %s', snappath)
-            os.makedirs(snappath, exist_ok=True)
-            with open(os.path.join(_snapshot_path(), 'index.html'), 'w') as f:
-                f.write('<html></html>')
-
-        for d in disks:
-            if not config.GLUSTER_ENABLED and not os.path.exists(d['path']):
-                continue
-
-            if d['snapshot_ignores']:
-                continue
-
-            if d['type'] != 'qcow2':
-                continue
-
-            # If we're using gluster we need to tweak some paths...
-            disk_path = d['path']
-            dest_path = os.path.join(snappath, d['device'])
-            if config.GLUSTER_ENABLED:
-                disk_path = 'gluster:%s' % d['path']
-                dest_path = dest_path.replace(_snapshot_path(),
-                                              'gluster:shakenfist/snapshots')
-
-            with util.RecordedOperation('snapshot %s' % d['device'], self):
-                self._snapshot_device(disk_path, dest_path)
-                db.create_snapshot(snapshot_uuid, d['device'], self.uuid,
-                                   time.time())
-
-        return snapshot_uuid
 
     def reboot(self, hard=False):
         libvirt = util.get_libvirt()
@@ -970,7 +934,7 @@ inactive_states_filter = partial(
 def inactive_instances():
     return Instances([
         inactive_states_filter,
-        partial(baseobject.state_age_filter, config.get('CLEANER_DELAY'))])
+        partial(baseobject.state_age_filter, config.CLEANER_DELAY)])
 
 
 def healthy_instances_on_node(n):

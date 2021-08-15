@@ -48,7 +48,6 @@ class VirtMetaTestCase(test_shakenfist.ShakenFistTestCase):
         fake_config = SFConfig(
             STORAGE_PATH="/a/b/c",
             DISK_BUS="virtio",
-            DISK_FORMAT="qcow",
             ZONE="sfzone",
             NODE_NAME="node01",
         )
@@ -74,7 +73,8 @@ class VirtMetaTestCase(test_shakenfist.ShakenFistTestCase):
                     'user_data': str(base64.b64encode(
                         'thisisuserdata'.encode('utf-8')), 'utf-8'),
                     'video': {'model': 'cirrus', 'memory': 16384},
-                    'version': 2
+                    'uefi': False,
+                    'version': 3
                 })
     @mock.patch('shakenfist.etcd.put')
     @mock.patch('shakenfist.etcd.create')
@@ -103,17 +103,20 @@ class VirtMetaTestCase(test_shakenfist.ShakenFistTestCase):
 
         self.assertEqual(
             ('instance', None, 'uuid42',
-             {'cpus': 1,
-              'disk_spec': [{}],
-              'memory': 2048,
-              'name': 'barry',
-              'namespace': 'namespace',
-              'requested_placement': None,
-              'ssh_key': 'sshkey',
-              'user_data': 'userdata',
-              'uuid': 'uuid42',
-              'version': 2,
-              'video': {'memory': 16384, 'model': 'cirrus'}}),
+             {
+                 'cpus': 1,
+                 'disk_spec': [{}],
+                 'memory': 2048,
+                 'name': 'barry',
+                 'namespace': 'namespace',
+                 'requested_placement': None,
+                 'ssh_key': 'sshkey',
+                 'user_data': 'userdata',
+                 'uuid': 'uuid42',
+                 'version': 3,
+                 'video': {'memory': 16384, 'model': 'cirrus'},
+                 'uefi': False
+             }),
             mock_create.mock_calls[0][1])
 
     @mock.patch('shakenfist.etcd.get',
@@ -127,8 +130,9 @@ class VirtMetaTestCase(test_shakenfist.ShakenFistTestCase):
                     'ssh_key': 'sshkey',
                     'user_data': 'userdata',
                     'uuid': 'uuid42',
-                    'version': 2,
-                    'video': {'memory': 16384, 'model': 'cirrus'}
+                    'version': 3,
+                    'video': {'memory': 16384, 'model': 'cirrus'},
+                    'uefi': False
                 })
     def test_from_db(self, mock_get):
         inst = instance.Instance.from_db('uuid42')
@@ -141,7 +145,7 @@ class VirtMetaTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertEqual('sshkey', inst.ssh_key)
         self.assertEqual('userdata', inst.user_data)
         self.assertEqual('uuid42', inst.uuid)
-        self.assertEqual(2, inst.version)
+        self.assertEqual(3, inst.version)
         self.assertEqual({'memory': 16384, 'model': 'cirrus'}, inst.video)
         self.assertEqual('/a/b/c/instances/uuid42', inst.instance_path)
 
@@ -152,7 +156,6 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
         fake_config = SFConfig(
             STORAGE_PATH="/a/b/c",
             DISK_BUS="virtio",
-            DISK_FORMAT="qcow",
             ZONE="sfzone",
             NODE_NAME="node01",
         )
@@ -186,7 +189,8 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
                     'user_data': str(base64.b64encode(
                         'thisisuserdata'.encode('utf-8')), 'utf-8'),
                     'video': {'model': 'cirrus', 'memory': 16384},
-                    'version': 2
+                    'uefi': False,
+                    'version': 3
                 })
     def _make_instance(self, mock_get_instance, mock_create_instance):
         return instance.Instance.new(
@@ -361,9 +365,6 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertEqual('transition-to-off',
                          etcd_write[1]['power_state_previous'])
 
-    def test_helpers(self):
-        self.assertEqual('/a/b/c/snapshots', instance._snapshot_path())
-
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject.state',
                 new_callable=mock.PropertyMock)
     def test_str(self, mock_update):
@@ -531,7 +532,8 @@ GET_ALL_INSTANCES = [
         'ssh_key': 'thisisasshkey',
         'user_data': None,
         'video': {'model': 'cirrus', 'memory': 16384},
-        'version': 2
+        'uefi': False,
+        'version': 3
     }),
     # Present here, but not in the get (a race?)
     (None, {
@@ -548,7 +550,8 @@ GET_ALL_INSTANCES = [
         'ssh_key': 'thisisasshkey',
         'user_data': None,
         'video': {'model': 'cirrus', 'memory': 16384},
-        'version': 2
+        'uefi': False,
+        'version': 3
     }),
     (None, {
         'uuid': 'a7c5ecec-c3a9-4774-ad1b-249d9e90e806',
@@ -564,7 +567,8 @@ GET_ALL_INSTANCES = [
         'ssh_key': 'thisisasshkey',
         'user_data': None,
         'video': {'model': 'cirrus', 'memory': 16384},
-        'version': 2
+        'uefi': False,
+        'version': 3
     })
 ]
 
@@ -583,7 +587,8 @@ JUST_INSTANCES = [
         'ssh_key': 'thisisasshkey',
         'user_data': None,
         'video': {'model': 'cirrus', 'memory': 16384},
-        'version': 2
+        'uefi': False,
+        'version': 3
     },
     None,
     {
@@ -600,7 +605,8 @@ JUST_INSTANCES = [
         'ssh_key': 'thisisasshkey',
         'user_data': None,
         'video': {'model': 'cirrus', 'memory': 16384},
-        'version': 2
+        'uefi': False,
+        'version': 3
     }
 ]
 
