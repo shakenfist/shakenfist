@@ -237,6 +237,7 @@ class Instance(dbo):
             'power_state',
             'vdi_port'
         ]
+
         # Ensure that missing attributes still get reported
         for attr in external_attribute_key_whitelist:
             i[attr] = None
@@ -252,6 +253,12 @@ class Instance(dbo):
                     continue
 
                 i[key] = d[key]
+
+        # Mix in details of the instance's interfaces to reduce API round trips
+        # for clients.
+        i['interfaces'] = []
+        for ni in networkinterface.interfaces_for_instance(self):
+            i['interfaces'].append(ni.external_view())
 
         return i
 
