@@ -242,7 +242,7 @@ class Instance(dbo):
         for attr in external_attribute_key_whitelist:
             i[attr] = None
 
-        for attrname in ['placement', 'state', 'power_state', 'ports']:
+        for attrname in ['placement', 'power_state', 'ports']:
             d = self._db_get_attribute(attrname)
             for key in d:
                 if key not in external_attribute_key_whitelist:
@@ -253,12 +253,6 @@ class Instance(dbo):
                     continue
 
                 i[key] = d[key]
-
-        # Mix in details of the instance's interfaces to reduce API round trips
-        # for clients.
-        i['interfaces'] = []
-        for ni in networkinterface.interfaces_for_instance(self):
-            i['interfaces'].append(ni.external_view())
 
         return i
 

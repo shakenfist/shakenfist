@@ -377,10 +377,27 @@ class Instances(api_base.Resource):
         if not all:
             filters.append(instance.active_states_filter)
 
+        # Retrieve all interfaces in one query and sort per instance
+        all_interfaces = {}
+        for ni in networkinterface.NetworkInterfaces():
+            interfaces = all_interfaces.setdefault(ni.instance_uuid, [])
+            while len(interfaces) < ni.order:
+                interfaces.append(None)
+            interfaces[ni.order] = ni
+
         retval = []
         for i in instance.Instances(filters):
             # This forces the instance through the external view rehydration
-            retval.append(i.external_view())
+            ext_inst = i.external_view()
+
+            # Mix in details of the instance's interfaces to reduce API round
+            # trips for clients.
+            ext_inst['interfaces'] = []
+            for ni in networkinterface.interfaces_for_instance(self):
+                for ni in all_interfaces[i]:
+                    ext_inst['interfaces'].append(ni.external_view())
+
+            retval.append(ext_inst)
         return retval
 
     @jwt_required
