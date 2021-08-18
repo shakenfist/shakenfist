@@ -30,10 +30,12 @@ from shakenfist.artifact import (
 from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.daemons import daemon
-from shakenfist.external_api import base as api_base
-from shakenfist.external_api import blob as api_blob
-from shakenfist.external_api import label as api_label
-from shakenfist.external_api import snapshot as api_snapshot
+from shakenfist.external_api import (
+    base as api_base,
+    blob as api_blob,
+    label as api_label,
+    node as api_node,
+    snapshot as api_snapshot)
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import exceptions
@@ -43,7 +45,7 @@ from shakenfist import logutil
 from shakenfist import net
 from shakenfist import networkinterface
 from shakenfist.networkinterface import NetworkInterface
-from shakenfist.node import Node, Nodes
+from shakenfist.node import Node
 from shakenfist import scheduler
 from shakenfist.tasks import (
     DeleteInstanceTask,
@@ -1145,22 +1147,6 @@ class NetworkPing(api_base.Resource):
         }
 
 
-class NodesEndpoint(api_base.Resource):
-    @jwt_required
-    @api_base.caller_is_admin
-    @marshal_with({
-        'name': fields.String(attribute='fqdn'),
-        'ip': fields.String,
-        'lastseen': fields.Float,
-        'version': fields.String,
-    })
-    def get(self):
-        out = []
-        for n in Nodes([]):
-            out.append(n.external_view())
-        return out
-
-
 api.add_resource(Root, '/')
 
 api.add_resource(AdminLocks, '/admin/locks')
@@ -1215,4 +1201,4 @@ api.add_resource(NetworkMetadata,
 api.add_resource(NetworkPing,
                  '/networks/<network_uuid>/ping/<address>')
 
-api.add_resource(NodesEndpoint, '/nodes')
+api.add_resource(api_node.NodesEndpoint, '/nodes')
