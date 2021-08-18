@@ -22,14 +22,14 @@ import re
 import uuid
 
 from shakenfist.artifact import (
-    Artifact, Artifacts, BLOB_URL, LABEL_URL, SNAPSHOT_URL,
-    type_filter as artifact_type_filter)
+    Artifact, BLOB_URL, LABEL_URL, SNAPSHOT_URL)
 from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.daemons import daemon
 from shakenfist.external_api import (
     base as api_base,
     blob as api_blob,
+    image as api_image,
     label as api_label,
     network as api_network,
     node as api_node,
@@ -865,43 +865,6 @@ class InstanceConsoleData(api_base.Resource):
         return resp
 
 
-class Images(api_base.Resource):
-    @jwt_required
-    def get(self, node=None):
-        retval = []
-        for i in Artifacts(filters=[
-                partial(artifact_type_filter,
-                        Artifact.TYPE_IMAGE),
-                baseobject.active_states_filter]):
-            b = i.most_recent_index
-            if b:
-                if not node:
-                    retval.append(i.external_view())
-                elif node in b.locations:
-                    retval.append(i.external_view())
-        return retval
-
-    @jwt_required
-    def post(self, url=None):
-        db.add_event('image', url, 'api', 'cache', None, None)
-
-        # We ensure that the image exists in the database in an initial state
-        # here so that it will show up in image list requests. The image is
-        # fetched by the queued job later.
-        a = Artifact.from_url(Artifact.TYPE_IMAGE, url)
-        db.enqueue(config.NODE_NAME, {
-            'tasks': [FetchImageTask(url)],
-        })
-        return a.external_view()
-
-
-class ImageEvents(api_base.Resource):
-    @jwt_required
-    # TODO(andy): Should images be owned? Personalised images should be owned.
-    def get(self, url):
-        return list(db.get_events('image', url))
-
-
 api.add_resource(Root, '/')
 
 api.add_resource(AdminLocks, '/admin/locks')
@@ -940,8 +903,8 @@ api.add_resource(InstanceMetadata,
 api.add_resource(InstanceConsoleData, '/instances/<instance_uuid>/consoledata',
                  defaults={'length': 10240})
 
-api.add_resource(Images, '/images')
-api.add_resource(ImageEvents, '/images/events')
+api.add_resource(api_image.ImagesEndpoint, '/images')
+api.add_resource(api_image.ImageEventsEndpoint, '/images/events')
 
 api.add_resource(api_label.LabelEndpoint, '/label/<label_name>')
 
