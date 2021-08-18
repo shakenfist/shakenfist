@@ -101,7 +101,8 @@ def main():
     global DAEMON_IMPLEMENTATIONS
     global DAEMON_PIDS
 
-    setproctitle.setproctitle(daemon.process_name('main'))
+    setproctitle.setproctitle(daemon.process_name(
+        'main') + '-v%s' % util.get_version())
 
     # Log configuration on startup
     for key, value in config.dict().items():
