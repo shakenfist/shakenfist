@@ -18,9 +18,6 @@ from flask_jwt_extended import get_jwt_identity
 from flask_jwt_extended import JWTManager
 from flask_jwt_extended import jwt_required
 import flask_restful
-from flask_restful import fields
-from flask_restful import marshal_with
-import ipaddress
 import re
 import uuid
 
@@ -34,8 +31,10 @@ from shakenfist.external_api import (
     base as api_base,
     blob as api_blob,
     label as api_label,
+    network as api_network,
     node as api_node,
-    snapshot as api_snapshot)
+    snapshot as api_snapshot,
+    util as api_util)
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import exceptions
@@ -52,7 +51,6 @@ from shakenfist.tasks import (
     FetchImageTask,
     PreflightInstanceTask,
     StartInstanceTask,
-    DestroyNetworkTask,
     FloatNetworkInterfaceTask,
     DefloatNetworkInterfaceTask
 )
@@ -64,23 +62,6 @@ daemon.set_log_level(LOG, 'api')
 
 
 SCHEDULER = None
-
-
-def _metadata_putpost(meta_type, owner, key, value):
-    if meta_type not in ['namespace', 'instance', 'network']:
-        return api_base.error(500, 'invalid meta_type %s' % meta_type)
-    if not key:
-        return api_base.error(400, 'no key specified')
-    if not value:
-        return api_base.error(400, 'no value specified')
-
-    with db.get_lock('metadata', meta_type, owner,
-                     op='Metadata update'):
-        md = db.get_metadata(meta_type, owner)
-        if md is None:
-            md = {}
-        md[key] = value
-        db.persist_metadata(meta_type, owner, md)
 
 
 app = flask.Flask(__name__)
@@ -309,14 +290,14 @@ class AuthMetadatas(api_base.Resource):
     @jwt_required
     @api_base.caller_is_admin
     def post(self, namespace, key=None, value=None):
-        return _metadata_putpost('namespace', namespace, key, value)
+        return api_util.metadata_putpost('namespace', namespace, key, value)
 
 
 class AuthMetadata(api_base.Resource):
     @jwt_required
     @api_base.caller_is_admin
     def put(self, namespace, key=None, value=None):
-        return _metadata_putpost('namespace', namespace, key, value)
+        return api_util.metadata_putpost('namespace', namespace, key, value)
 
     @jwt_required
     @api_base.caller_is_admin
@@ -831,7 +812,7 @@ class InstanceMetadatas(api_base.Resource):
     @api_base.arg_is_instance_uuid
     @api_base.requires_instance_ownership
     def post(self, instance_uuid=None, key=None, value=None, instance_from_db=None):
-        return _metadata_putpost('instance', instance_uuid, key, value)
+        return api_util.metadata_putpost('instance', instance_uuid, key, value)
 
 
 class InstanceMetadata(api_base.Resource):
@@ -839,7 +820,7 @@ class InstanceMetadata(api_base.Resource):
     @api_base.arg_is_instance_uuid
     @api_base.requires_instance_ownership
     def put(self, instance_uuid=None, key=None, value=None, instance_from_db=None):
-        return _metadata_putpost('instance', instance_uuid, key, value)
+        return api_util.metadata_putpost('instance', instance_uuid, key, value)
 
     @jwt_required
     @api_base.arg_is_instance_uuid
@@ -921,232 +902,6 @@ class ImageEvents(api_base.Resource):
         return list(db.get_events('image', url))
 
 
-def _delete_network(network_from_db):
-    # Load network from DB to ensure obtaining correct lock.
-    n = net.Network.from_db(network_from_db.uuid)
-    if not n:
-        LOG.with_fields({'network_uuid': n.uuid}).warning(
-            'delete_network: network does not exist')
-        return api_base.error(404, 'network does not exist')
-
-    if n.is_dead():
-        # The network has been deleted. No need to attempt further effort.
-        LOG.with_fields({'network_uuid': n.uuid,
-                         'state': n.state.value
-                         }).warning('delete_network: network is dead')
-        return api_base.error(404, 'network is deleted')
-
-    n.add_event('api', 'delete')
-    db.enqueue('networknode', DestroyNetworkTask(n.uuid))
-
-
-class Network(api_base.Resource):
-    @jwt_required
-    @api_base.arg_is_network_uuid
-    @api_base.requires_network_ownership
-    def get(self, network_uuid=None, network_from_db=None):
-        return network_from_db.external_view()
-
-    @jwt_required
-    @api_base.arg_is_network_uuid
-    @api_base.requires_network_ownership
-    @api_base.redirect_to_network_node
-    def delete(self, network_uuid=None, network_from_db=None):
-        if network_uuid == 'floating':
-            return api_base.error(403, 'you cannot delete the floating network')
-
-        n = net.Network.from_db(network_from_db.uuid)
-        if not n:
-            LOG.with_fields({'network_uuid': n.uuid}).warning(
-                'delete_network: network does not exist')
-            return api_base.error(404, 'network does not exist')
-
-        # We only delete unused networks
-        ifaces = list(networkinterface.interfaces_for_network(n))
-        if len(ifaces) > 0:
-            for iface in ifaces:
-                LOG.withFields({'network_interface': iface.uuid,
-                                'state': iface.state}).info('Blocks network delete')
-            return api_base.error(403, 'you cannot delete an in use network')
-
-        # Check if network has already been deleted
-        if network_from_db.state.value in dbo.STATE_DELETED:
-            return
-
-        _delete_network(network_from_db)
-
-
-class Networks(api_base.Resource):
-    @marshal_with({
-        'uuid': fields.String,
-        'vxlan_id': fields.Integer,
-        'netblock': fields.String,
-        'provide_dhcp': fields.Boolean,
-        'provide_nat': fields.Boolean,
-        'namespace': fields.String,
-        'name': fields.String,
-        'state': fields.String
-    })
-    @jwt_required
-    def get(self, all=False):
-        filters = [partial(baseobject.namespace_filter, get_jwt_identity())]
-        if not all:
-            filters.append(baseobject.active_states_filter)
-
-        retval = []
-        for n in net.Networks(filters):
-            # This forces the network through the external view rehydration
-            retval.append(n.external_view())
-        return retval
-
-    @jwt_required
-    def post(self, netblock=None, provide_dhcp=None, provide_nat=None, name=None,
-             namespace=None):
-        try:
-            n = ipaddress.ip_network(netblock)
-            if n.num_addresses < 8:
-                return api_base.error(400, 'network is below minimum size of /29')
-        except ValueError as e:
-            return api_base.error(400, 'cannot parse netblock: %s' % e,
-                                  suppress_traceback=True)
-
-        if not namespace:
-            namespace = get_jwt_identity()
-
-        # If accessing a foreign name namespace, we need to be an admin
-        if get_jwt_identity() not in [namespace, 'system']:
-            return api_base.error(
-                401,
-                'only admins can create resources in a different namespace')
-
-        network = net.Network.new(name, namespace, netblock, provide_dhcp,
-                                  provide_nat)
-        return network.external_view()
-
-    @jwt_required
-    @api_base.redirect_to_network_node
-    def delete(self, confirm=False, namespace=None):
-        """Delete all networks in the namespace."""
-
-        if confirm is not True:
-            return api_base.error(400, 'parameter confirm is not set true')
-
-        if get_jwt_identity() == 'system':
-            if not isinstance(namespace, str):
-                # A client using a system key must specify the namespace. This
-                # ensures that deleting all networks in the cluster (by
-                # specifying namespace='system') is a deliberate act.
-                return api_base.error(400, 'system user must specify parameter namespace')
-
-        else:
-            if namespace and namespace != get_jwt_identity():
-                return api_base.error(401, 'you cannot delete other namespaces')
-            namespace = get_jwt_identity()
-
-        networks_del = []
-        networks_unable = []
-        for n in net.Networks([partial(baseobject.namespace_filter, namespace),
-                               baseobject.active_states_filter]):
-            if len(list(networkinterface.interfaces_for_network(n))) > 0:
-                LOG.with_object(n).warning(
-                    'Network in use, cannot be deleted by delete-all')
-                networks_unable.append(n.uuid)
-                continue
-
-            _delete_network(n)
-            networks_del.append(n.uuid)
-
-        if networks_unable:
-            return api_base.error(403, {'deleted': networks_del,
-                                        'unable': networks_unable})
-
-        return networks_del
-
-
-class NetworkEvents(api_base.Resource):
-    @jwt_required
-    @api_base.arg_is_network_uuid
-    @api_base.requires_network_ownership
-    def get(self, network_uuid=None, network_from_db=None):
-        return list(db.get_events('network', network_uuid))
-
-
-class NetworkInterfacesEndpoint(api_base.Resource):
-    @jwt_required
-    @api_base.arg_is_network_uuid
-    @api_base.requires_network_ownership
-    @api_base.requires_network_active
-    def get(self, network_uuid=None, network_from_db=None):
-        out = []
-        for ni in networkinterface.interfaces_for_network(self.network):
-            out.append(ni.external_view())
-        return out
-
-
-class NetworkMetadatas(api_base.Resource):
-    @jwt_required
-    @api_base.arg_is_network_uuid
-    @api_base.requires_network_ownership
-    def get(self, network_uuid=None, network_from_db=None):
-        md = db.get_metadata('network', network_uuid)
-        if not md:
-            return {}
-        return md
-
-    @jwt_required
-    @api_base.arg_is_network_uuid
-    @api_base.requires_network_ownership
-    def post(self, network_uuid=None, key=None, value=None, network_from_db=None):
-        return _metadata_putpost('network', network_uuid, key, value)
-
-
-class NetworkMetadata(api_base.Resource):
-    @jwt_required
-    @api_base.arg_is_network_uuid
-    @api_base.requires_network_ownership
-    def put(self, network_uuid=None, key=None, value=None, network_from_db=None):
-        return _metadata_putpost('network', network_uuid, key, value)
-
-    @jwt_required
-    @api_base.arg_is_network_uuid
-    @api_base.requires_network_ownership
-    def delete(self, network_uuid=None, key=None, network_from_db=None):
-        if not key:
-            return api_base.error(400, 'no key specified')
-
-        with db.get_lock('metadata', 'network', network_uuid, op='Network metadata delete'):
-            md = db.get_metadata('network', network_uuid)
-            if md is None or key not in md:
-                return api_base.error(404, 'key not found')
-            del md[key]
-            db.persist_metadata('network', network_uuid, md)
-
-
-class NetworkPing(api_base.Resource):
-    @jwt_required
-    @api_base.arg_is_network_uuid
-    @api_base.requires_network_ownership
-    @api_base.redirect_to_network_node
-    @api_base.requires_network_active
-    def get(self, network_uuid=None, address=None, network_from_db=None):
-        ipm = IPManager.from_db(network_uuid)
-        if not ipm.is_in_range(address):
-            return api_base.error(400, 'ping request for address outside network block')
-
-        n = net.Network.from_db(network_uuid)
-        if not n:
-            return api_base.error(404, 'network %s not found' % network_uuid)
-
-        out, err = util.execute(
-            None, 'ip netns exec %s ping -c 10 %s' % (
-                network_uuid, address),
-            check_exit_code=[0, 1])
-        return {
-            'stdout': out,
-            'stderr': err
-        }
-
-
 api.add_resource(Root, '/')
 
 api.add_resource(AdminLocks, '/admin/locks')
@@ -1190,15 +945,17 @@ api.add_resource(ImageEvents, '/images/events')
 
 api.add_resource(api_label.LabelEndpoint, '/label/<label_name>')
 
-api.add_resource(Networks, '/networks')
-api.add_resource(Network, '/networks/<network_uuid>')
-api.add_resource(NetworkEvents, '/networks/<network_uuid>/events')
-api.add_resource(NetworkInterfacesEndpoint,
+api.add_resource(api_network.NetworksEndpoint, '/networks')
+api.add_resource(api_network.NetworkEndpoint, '/networks/<network_uuid>')
+api.add_resource(api_network.NetworkEventsEndpoint,
+                 '/networks/<network_uuid>/events')
+api.add_resource(api_network.NetworkInterfacesEndpoint,
                  '/networks/<network_uuid>/interfaces')
-api.add_resource(NetworkMetadatas, '/networks/<network_uuid>/metadata')
-api.add_resource(NetworkMetadata,
+api.add_resource(api_network.NetworkMetadatasEndpoint,
+                 '/networks/<network_uuid>/metadata')
+api.add_resource(api_network.NetworkMetadataEndpoint,
                  '/networks/<network_uuid>/metadata/<key>')
-api.add_resource(NetworkPing,
+api.add_resource(api_network.NetworkPingEndpoint,
                  '/networks/<network_uuid>/ping/<address>')
 
 api.add_resource(api_node.NodesEndpoint, '/nodes')
