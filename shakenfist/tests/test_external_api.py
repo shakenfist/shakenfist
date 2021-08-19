@@ -520,7 +520,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(404, resp.status_code)
 
     # TODO(mikal): do better with covering interfaces here
-    @mock.patch('shakenfist.networkinterface.interfaces_for_instance')
+    @mock.patch('shakenfist.networkinterface.Interface.from_db')
     @mock.patch('shakenfist.instance.Instance._db_get',
                 return_value={
                     'cpus': 1,
@@ -539,7 +539,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 return_value={})
     def test_get_instance(self, mock_get_instance_attribute, mock_get_instance,
-                          mock_get_interfaces):
+                          mock_get_interface):
         resp = self.client.get(
             '/instances/foo', headers={'Authorization': self.auth_header})
         self.assertEqual({

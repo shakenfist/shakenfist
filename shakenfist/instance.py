@@ -257,7 +257,8 @@ class Instance(dbo):
         # Mix in details of the instance's interfaces to reduce API round trips
         # for clients.
         i['interfaces'] = []
-        for ni in networkinterface.interfaces_for_instance(self):
+        for iface_uuid in self.instances:
+            ni = networkinterface.NetworkInterface.from_db(iface_uuid)
             i['interfaces'].append(ni.external_view())
 
         return i
@@ -332,6 +333,14 @@ class Instance(dbo):
     def block_devices(self):
         return self._db_get_attribute('block_devices')
 
+    @property
+    def interfaces(self):
+        return self._db_get_attribute('interfaces')
+
+    @interfaces.setter
+    def interfaces(self, interfaces):
+        self._db_set_attribute('interfaces', interfaces)
+
     # Implementation
     def place_instance(self, location):
         with self.get_lock_attr('placement', 'Instance placement'):
@@ -381,8 +390,9 @@ class Instance(dbo):
     # creation. It is assumed that the image sits in local cache already, and
     # has been transcoded to the right format. This has been done to facilitate
     # moving to a queue and task based creation mechanism.
-    def create(self, lock=None):
+    def create(self, iface_uuids, lock=None):
         self.state = self.STATE_CREATING
+        self.interfaces = iface_uuids
 
         # Ensure we have state on disk
         os.makedirs(self.instance_path, exist_ok=True)
@@ -655,7 +665,8 @@ class Instance(dbo):
         }
 
         have_default_route = False
-        for iface in networkinterface.interfaces_for_instance(self):
+        for iface_uuid in self.interfaces:
+            iface = networkinterface.NetworkInterface.from_db(iface_uuid)
             if iface.ipv4:
                 devname = 'eth%d' % iface.order
                 nd['links'].append(
@@ -738,7 +749,8 @@ class Instance(dbo):
             t = jinja2.Template(f.read())
 
         networks = []
-        for ni in networkinterface.interfaces_for_instance(self):
+        for iface_uuid in self.interfaces:
+            ni = networkinterface.NetworkInterface.from_db(iface_uuid)
             n = net.Network.from_db(ni.network_uuid)
             networks.append(
                 {

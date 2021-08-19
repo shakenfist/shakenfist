@@ -1,10 +1,12 @@
 # Copyright 2019 Michael Still
 
+from functools import partial
 import setproctitle
 import time
 import os
 import psutil
 
+from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.daemons import external_api as external_api_daemon
@@ -15,10 +17,11 @@ from shakenfist.daemons import resources as resource_daemon
 from shakenfist.daemons import triggers as trigger_daemon
 from shakenfist import db
 from shakenfist import instance
+from shakenfist.instance import instance_filter
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
-from shakenfist import networkinterface
+from shakenfist.networkinterface import NetworkInterfaces
 from shakenfist.node import Node
 from shakenfist import util
 
@@ -26,15 +29,30 @@ from shakenfist import util
 LOG, HANDLER = logutil.setup('main')
 
 
+def interfaces_for_instance(instance):
+    nis = {}
+    loggable_nis = {}
+    for ni in NetworkInterfaces([baseobject.active_states_filter,
+                                 partial(instance_filter, instance)]):
+        nis[ni.order] = ni
+        loggable_nis[ni.order] = str(ni)
+
+    for order in sorted(nis.keys()):
+        yield nis[order]
+
+
 def restore_instances():
-    # Ensure all instances for this node are defined
+    # Ensure all instances for this node are defined and have up to date data.
     networks = []
     instances = []
-    for inst in instance.Instances([instance.this_node_filter, instance.healthy_states_filter]):
+    for inst in instance.Instances([instance.this_node_filter,
+                                    instance.healthy_states_filter]):
         instance_problems = []
-        for ni in networkinterface.interfaces_for_instance(inst):
+        for ni in interfaces_for_instance(inst):
             if ni.network_uuid not in networks:
                 networks.append(ni.network_uuid)
+            if ni.network_uuid not in inst.interfaces:
+                inst.interfaces += ni.network_uuid
 
         # TODO(mikal): do better here.
         # for disk in inst.disk_spec:
