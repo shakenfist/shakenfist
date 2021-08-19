@@ -46,15 +46,17 @@ class ImageFetchHelper(object):
                     resp = self._open_connection(url)
 
                     if most_recent_blob.modified != resp.headers.get('Last-Modified'):
-                        self.add_event('image requires fetch', None, None,
-                                       'Last-Modified: %s -> %s' % (most_recent_blob.modified,
-                                                                    resp.headers.get('Last-Modified')))
+                        self.__artifact.add_event(
+                            'image requires fetch', None, None,
+                            'Last-Modified: %s -> %s' % (most_recent_blob.modified,
+                                                         resp.headers.get('Last-Modified')))
                         dirty = True
 
                     if most_recent_blob.size != resp.headers.get('Content-Length'):
-                        self.add_event('image requires fetch', None, None,
-                                       'Content-Length: %s -> %s' % (most_recent_blob.size,
-                                                                     resp.headers.get('Content-Length')))
+                        self.__artifact.add_event(
+                            'image requires fetch', None, None,
+                            'Content-Length: %s -> %s' % (most_recent_blob.size,
+                                                          resp.headers.get('Content-Length')))
                         dirty = True
 
                     self.log.info('Cluster cached image is stale')
