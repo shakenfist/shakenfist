@@ -195,18 +195,6 @@ def network_filter(network, ni):
 
 
 # Convenience helpers
-def interfaces_for_instance(instance):
-    nis = {}
-    loggable_nis = {}
-    for ni in NetworkInterfaces([baseobject.active_states_filter,
-                                 partial(instance_filter, instance)]):
-        nis[ni.order] = ni
-        loggable_nis[ni.order] = str(ni)
-
-    for order in sorted(nis.keys()):
-        yield nis[order]
-
-
 def interfaces_for_network(network):
     return NetworkInterfaces([baseobject.active_states_filter,
                               partial(network_filter, network)])

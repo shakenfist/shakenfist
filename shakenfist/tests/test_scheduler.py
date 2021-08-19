@@ -353,8 +353,8 @@ class CorrectAllocationTestCase(SchedulerTestCase):
         self.assertSetEqual(set(self.fake_db.nodes)-{'node1_net', },
                             set(nodes))
 
-    @mock.patch('shakenfist.networkinterface.interfaces_for_instance',
-                return_value=[FakeInterface('uuid-net1')])
+    @mock.patch('shakenfist.networkinterface.NetworkInterface.from_db',
+                return_value=FakeInterface('uuid-net1'))
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 return_value={
                     'node': 'node3'
@@ -377,7 +377,7 @@ class CorrectAllocationTestCase(SchedulerTestCase):
     def test_single_node_that_has_network(
             self, mock_get_artifacts, mock_get_instances,
             mock_get_instance, mock_instance_attribute,
-            mock_instance_interfaces):
+            mock_get_interface):
         self.fake_db.set_node_metrics_same({
             'cpu_max_per_instance': 16,
             'cpu_max': 4,

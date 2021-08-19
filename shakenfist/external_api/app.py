@@ -487,6 +487,7 @@ class Instances(api_base.Resource):
         # Allocate IP addresses
         order = 0
         float_tasks = []
+        updated_networks = []
         if network:
             for netdesc in network:
                 n = net.Network.from_db(netdesc['network_uuid'])
@@ -543,13 +544,18 @@ class Instances(api_base.Resource):
                     float_tasks.append(FloatNetworkInterfaceTask(
                         netdesc['network_uuid'], iface_uuid))
 
+                # Include the interface uuid in the network description we
+                # pass through to the instance start task.
+                netdesc['iface_uuid'] = iface_uuid
+                updated_networks.append(netdesc)
+
         if not SCHEDULER:
             SCHEDULER = scheduler.Scheduler()
 
         try:
             # Have we been placed?
             if not placed_on:
-                candidates = SCHEDULER.place_instance(inst, network)
+                candidates = SCHEDULER.place_instance(inst, updated_networks)
                 placement = candidates[0]
 
             else:
@@ -634,7 +640,8 @@ class InstanceInterfaces(api_base.Resource):
     @api_base.requires_instance_ownership
     def get(self, instance_uuid=None, instance_from_db=None):
         out = []
-        for ni in networkinterface.interfaces_for_instance(instance_from_db):
+        for iface_uuid in instance_from_db.interfaces:
+            ni = networkinterface.NetworkInterface.from_db(iface_uuid)
             out.append(ni.external_view())
         return out
 
