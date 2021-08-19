@@ -84,12 +84,12 @@ class DatabaseBackedObject(object):
         etcd.delete('attribute/%s' % self.object_type, self.__uuid, attribute)
 
     def get_lock(self, subtype=None, ttl=60, relatedobjects=None, log_ctx=None,
-                 op=None):
+                 op=None, timeout=None):
         if not log_ctx:
             log_ctx = self.log
         return db.get_lock(self.object_type, subtype, self.uuid, ttl=ttl,
                            relatedobjects=relatedobjects, log_ctx=log_ctx,
-                           op=op)
+                           op=op, timeout=db.ETCD_ATTEMPT_TIMEOUT)
 
     def get_lock_attr(self, name, op):
         return db.get_lock('attribute/%s' % self.object_type,

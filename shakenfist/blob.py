@@ -15,6 +15,9 @@ from shakenfist import util
 LOG, _ = logutil.setup(__name__)
 
 
+LOCK_REFRESH_SECONDS = 5
+
+
 class Blob(dbo):
     object_type = 'blob'
     current_version = 2
@@ -158,7 +161,7 @@ def http_fetch(resp, blob_uuid, locks, logs):
                     'Fetch %.02f percent complete' % percentage)
                 previous_percentage = percentage
 
-            if time.time() - last_refresh > 5:
+            if time.time() - last_refresh > LOCK_REFRESH_SECONDS:
                 db.refresh_locks(locks)
                 last_refresh = time.time()
 
