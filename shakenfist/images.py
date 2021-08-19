@@ -4,12 +4,14 @@ import random
 import re
 import requests
 import shutil
+import time
 import uuid
 
 from shakenfist.artifact import Artifact, BLOB_URL
 from shakenfist import blob
 from shakenfist.blob import Blob
 from shakenfist.config import config
+from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import image_resolver
 from shakenfist import logutil
@@ -17,6 +19,10 @@ from shakenfist import util
 
 
 LOG, _ = logutil.setup(__name__)
+
+
+LOCK_REFRESH_SECONDS = 5
+MAX_IMAGE_WAIT_SECONDS = 1800
 
 
 class ImageFetchHelper(object):
@@ -29,7 +35,8 @@ class ImageFetchHelper(object):
             {'url': self.url, 'artifact': self.__artifact.uuid})
 
     def get_image(self):
-        with self.__artifact.get_lock() as lock:
+        with self.__artifact.get_lock(ttl=(12 * LOCK_REFRESH_SECONDS),
+                                      timeout=MAX_IMAGE_WAIT_SECONDS) as lock:
             url, checksum, checksum_type = image_resolver.resolve(self.url)
 
             # If this is a request for a URL, do we have the most recent version
@@ -69,7 +76,7 @@ class ImageFetchHelper(object):
             # "original format" if downloaded from an HTTP source.
             if url.startswith(BLOB_URL):
                 self.log.info('Fetching image from within the cluster')
-                b = self._blob_get(url)
+                b = self._blob_get(lock, url)
             else:
                 self.log.info('Fetching image from the internet')
                 b = self._http_get_inner(lock, url, checksum, checksum_type)
@@ -117,7 +124,7 @@ class ImageFetchHelper(object):
 
             self.__artifact.state = Artifact.STATE_CREATED
 
-    def _blob_get(self, url):
+    def _blob_get(self, lock, url):
         """Fetch a blob from the cluster."""
 
         blob_uuid = url[len(BLOB_URL):]
@@ -141,8 +148,14 @@ class ImageFetchHelper(object):
                                               'User-Agent': util.get_user_agent()})
 
                 with open(blob_path + '.partial', 'wb') as f:
+                    last_refresh = 0
+
                     for chunk in r.iter_content(chunk_size=8192):
                         f.write(chunk)
+
+                        if time.time() - last_refresh > LOCK_REFRESH_SECONDS:
+                            db.refresh_locks([lock])
+                            last_refresh = time.time()
 
                 os.rename(blob_path + '.partial', blob_path)
                 b.observe()
