@@ -374,8 +374,10 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
 
     # create, delete
 
-    @mock.patch('shakenfist.networkinterface.NetworkInterfaces',
-                return_value=[
+    @mock.patch('shakenfist.instance.Instance._db_get_attribute',
+                return_value=['ifaceuuid', 'ifaceuuid2'])
+    @mock.patch('shakenfist.networkinterface.NetworkInterface.from_db',
+                side_effect=[
                     FakeNetworkInterface({
                         'uuid': 'ifaceuuid',
                         'instance_uuid': 'instuuid',
@@ -398,7 +400,7 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject.state',
                 new_callable=mock.PropertyMock)
     def test_make_config_drive(self, mock_update, mock_net_from_db,
-                               mock_interfaces):
+                               mock_interfaces, mock_get_attribute):
         i = self._make_instance()
 
         (fd, cd_file) = tempfile.mkstemp()

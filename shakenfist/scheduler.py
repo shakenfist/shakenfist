@@ -171,7 +171,8 @@ class Scheduler(object):
             # Make a list of networks for the node
             present_networks = []
             for inst in per_node.get(n, []):
-                for ni in networkinterface.interfaces_for_instance(inst):
+                for iface_uuid in inst.interfaces:
+                    ni = networkinterface.NetworkInterface.from_db(iface_uuid)
                     if ni.network_uuid not in present_networks:
                         present_networks.append(ni.network_uuid)
 

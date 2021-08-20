@@ -216,23 +216,23 @@ def instance_preflight(inst, network):
 def instance_start(inst, network):
     with inst.get_lock(ttl=900, op='Instance start') as lock:
         # Ensure networks are connected to this node
-        nets = {}
+        iface_uuids = []
         for netdesc in network:
-            if netdesc['network_uuid'] not in nets:
-                n = net.Network.from_db(netdesc['network_uuid'])
-                if not n:
-                    inst.enqueue_delete_due_error(
-                        'missing network: %s' % netdesc['network_uuid'])
-                    return
+            iface_uuids.append(netdesc['iface_uuid'])
+            n = net.Network.from_db(netdesc['network_uuid'])
+            if not n:
+                inst.enqueue_delete_due_error(
+                    'missing network: %s' % netdesc['network_uuid'])
+                return
 
-                if n.state.value != dbo.STATE_CREATED:
-                    inst.enqueue_delete_due_error(
-                        'network is not active: %s' % n.uuid)
-                    return
+            if n.state.value != dbo.STATE_CREATED:
+                inst.enqueue_delete_due_error(
+                    'network is not active: %s' % n.uuid)
+                return
 
-                n.create_on_hypervisor()
-                n.ensure_mesh()
-                n.update_dhcp()
+            n.create_on_hypervisor()
+            n.ensure_mesh()
+            n.update_dhcp()
 
         # Allocate console and VDI ports
         inst.allocate_instance_ports()
@@ -241,7 +241,7 @@ def instance_start(inst, network):
         libvirt = util.get_libvirt()
         try:
             with util.RecordedOperation('instance creation', inst):
-                inst.create(lock=lock)
+                inst.create(iface_uuids, lock=lock)
 
         except libvirt.libvirtError as e:
             code = e.get_error_code()
@@ -251,7 +251,8 @@ def instance_start(inst, network):
                     'instance failed to start: %s' % e)
                 return
 
-        for ni in networkinterface.interfaces_for_instance(inst):
+        for iface_uuid in inst.interfaces:
+            ni = networkinterface.NetworkInterface.from_db(iface_uuid)
             ni.state = dbo.STATE_CREATED
 
 
@@ -261,7 +262,8 @@ def instance_delete(inst):
 
         # Create list of networks used by instance
         instance_networks = []
-        for ni in networkinterface.interfaces_for_instance(inst):
+        for iface_uuid in inst.interfaces:
+            ni = networkinterface.NetworkInterface.from_db(iface_uuid)
             if ni.network_uuid not in instance_networks:
                 instance_networks.append(ni.network_uuid)
 
@@ -270,7 +272,8 @@ def instance_delete(inst):
         for i in instance.Instances([instance.this_node_filter,
                                      instance.active_states_filter]):
             if not i.uuid == inst.uuid:
-                for ni in networkinterface.interfaces_for_instance(i):
+                for iface_uuid in inst.interfaces:
+                    ni = networkinterface.NetworkInterface.from_db(iface_uuid)
                     if ni.network_uuid not in host_networks:
                         host_networks.append(ni.network_uuid)
 
@@ -278,7 +281,8 @@ def instance_delete(inst):
 
         # Delete the instance's interfaces
         with util.RecordedOperation('release network addresses', inst):
-            for ni in networkinterface.interfaces_for_instance(inst):
+            for iface_uuid in inst.interfaces:
+                ni = networkinterface.NetworkInterface.from_db(iface_uuid)
                 ni.delete()
 
         # Check each network used by the deleted instance
