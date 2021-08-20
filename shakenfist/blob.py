@@ -6,6 +6,7 @@ import time
 
 from shakenfist.baseobject import (DatabaseBackedObject as dbo)
 from shakenfist.config import config
+from shakenfist import constants
 from shakenfist import db
 from shakenfist import images
 from shakenfist import logutil
@@ -13,9 +14,6 @@ from shakenfist import util
 
 
 LOG, _ = logutil.setup(__name__)
-
-
-LOCK_REFRESH_SECONDS = 5
 
 
 class Blob(dbo):
@@ -161,7 +159,7 @@ def http_fetch(resp, blob_uuid, locks, logs):
                     'Fetch %.02f percent complete' % percentage)
                 previous_percentage = percentage
 
-            if time.time() - last_refresh > LOCK_REFRESH_SECONDS:
+            if time.time() - last_refresh > constants.LOCK_REFRESH_SECONDS:
                 db.refresh_locks(locks)
                 last_refresh = time.time()
 

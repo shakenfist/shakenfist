@@ -159,6 +159,10 @@ class SFConfig(BaseSettings):
         description='A URL listing all Ubuntu releases'
     )
 
+    MAX_IMAGE_TRANSFER_SECONDS: int = Field(
+        1800, description='How long to wait for an image transfer to occur before giving up'
+    )
+
     # Other options
     BLOB_REPLICATION_FACTOR: int = Field(
         2, description='How many copies of each blob we like to have.'
