@@ -8,7 +8,6 @@ from shakenfist.baseobject import (DatabaseBackedObject as dbo)
 from shakenfist.config import config
 from shakenfist import constants
 from shakenfist import db
-from shakenfist import images
 from shakenfist import logutil
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
@@ -113,7 +112,7 @@ class Blob(dbo):
                 blob_path = os.path.join(
                     config.STORAGE_PATH, 'blobs', self.uuid)
 
-                info = images.util_image.identify(blob_path)
+                info = util_image.identify(blob_path)
                 info['mime-type'] = magic.Magic(mime=True).from_file(blob_path)
                 self._db_set_attribute('info', info)
 

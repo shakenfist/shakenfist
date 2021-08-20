@@ -5,6 +5,7 @@ import random
 import time
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import logutil
@@ -205,6 +206,22 @@ class Monitor(daemon.Daemon):
                 age = time.time() - n.last_seen
                 if age > config.NODE_CHECKIN_MAXIMUM:
                     n.state = Node.STATE_MISSING
+
+            # Find orphaned blobs
+            for ent in os.listdir(os.path.join(config.STORAGE_PATH, 'blobs')):
+                entpath = os.path.join(config.STORAGE_PATH, 'blobs', ent)
+                st = os.stat(entpath)
+                if time.time() - st.st_mtime > config.CLEANER_DELAY * 2:
+                    # The name of the entity might include .partial at the end,
+                    # remove that for this check
+                    blob_uuid = ent.split('.')[0]
+                    if not Blob.from_db(blob_uuid):
+                        # This blob does not exist and hasn't been modified in
+                        # a reasonable amount of time. Clean it up.
+                        LOG.with_fields({
+                            'blob': blob_uuid,
+                            'entity': ent}).warning('Deleting orphaned blob')
+                        os.unlink(ent)
 
             # Perform etcd maintenance, if we are an etcd master
             if config.NODE_IS_ETCD_MASTER:
