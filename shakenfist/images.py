@@ -11,6 +11,7 @@ from shakenfist.artifact import Artifact, BLOB_URL
 from shakenfist import blob
 from shakenfist.blob import Blob
 from shakenfist.config import config
+from shakenfist import constants
 from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import image_resolver
@@ -19,10 +20,6 @@ from shakenfist import util
 
 
 LOG, _ = logutil.setup(__name__)
-
-
-LOCK_REFRESH_SECONDS = 5
-MAX_IMAGE_WAIT_SECONDS = 1800
 
 
 class ImageFetchHelper(object):
@@ -35,8 +32,8 @@ class ImageFetchHelper(object):
             {'url': self.url, 'artifact': self.__artifact.uuid})
 
     def get_image(self):
-        with self.__artifact.get_lock(ttl=(12 * LOCK_REFRESH_SECONDS),
-                                      timeout=MAX_IMAGE_WAIT_SECONDS) as lock:
+        with self.__artifact.get_lock(ttl=(12 * constants.LOCK_REFRESH_SECONDS),
+                                      timeout=config.MAX_IMAGE_TRANSFER_SECONDS) as lock:
             url, checksum, checksum_type = image_resolver.resolve(self.url)
 
             # If this is a request for a URL, do we have the most recent version
@@ -153,7 +150,7 @@ class ImageFetchHelper(object):
                     for chunk in r.iter_content(chunk_size=8192):
                         f.write(chunk)
 
-                        if time.time() - last_refresh > LOCK_REFRESH_SECONDS:
+                        if time.time() - last_refresh > constants.LOCK_REFRESH_SECONDS:
                             db.refresh_locks([lock])
                             last_refresh = time.time()
 

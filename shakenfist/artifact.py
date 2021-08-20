@@ -6,6 +6,8 @@ from uuid import uuid4
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
+from shakenfist.config import config
+from shakenfist import constants
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
@@ -83,7 +85,9 @@ class Artifact(dbo):
 
     @staticmethod
     def from_url(artifact_type, url):
-        with db.get_lock('artifact', artifact_type, url):
+        with db.get_lock('artifact', artifact_type, url,
+                         ttl=(12 * constants.LOCK_REFRESH_SECONDS),
+                         timeout=config.MAX_IMAGE_TRANSFER_SECONDS):
             artifacts = list(Artifacts([partial(url_filter, url),
                                         partial(type_filter, artifact_type)]))
             if len(artifacts) == 0:
