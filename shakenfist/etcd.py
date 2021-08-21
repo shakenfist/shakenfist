@@ -151,7 +151,7 @@ class ActualLock(Lock):
 
         raise exceptions.LockException(
             'Cannot acquire lock %s, timed out after %.02f seconds'
-            % (self.name, duration))
+            % (self.name, self.timeout))
 
     def __exit__(self, _exception_type, _exception_value, _traceback):
         if not self.release():
