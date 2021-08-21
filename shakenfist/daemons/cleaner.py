@@ -15,7 +15,9 @@ from shakenfist.node import (
     Node, Nodes,
     active_states_filter as node_active_states_filter,
     inactive_states_filter as node_inactive_states_filter)
-from shakenfist import util
+from shakenfist.util import general as util_general
+from shakenfist.util import libvirt as util_libvirt
+from shakenfist.util import process as util_process
 
 
 LOG, _ = logutil.setup(__name__)
@@ -23,7 +25,7 @@ LOG, _ = logutil.setup(__name__)
 
 class Monitor(daemon.Daemon):
     def _update_power_states(self):
-        libvirt = util.get_libvirt()
+        libvirt = util_libvirt.get_libvirt()
         conn = libvirt.open('qemu:///system')
         try:
             seen = []
@@ -42,8 +44,8 @@ class Monitor(daemon.Daemon):
                 if not inst:
                     # Instance is SF but not in database. Kill to reduce load.
                     log_ctx.warning('Destroying unknown instance')
-                    util.execute(None,
-                                 'virsh destroy "sf:%s"' % instance_uuid)
+                    util_process.execute(None,
+                                         'virsh destroy "sf:%s"' % instance_uuid)
                     continue
 
                 inst.place_instance(config.NODE_NAME)
@@ -66,8 +68,8 @@ class Monitor(daemon.Daemon):
                         # hammer instead.
                         log_ctx.warning(
                             'Attempting alternate delete method for instance')
-                        util.execute(None,
-                                     'virsh destroy "sf:%s"' % instance_uuid)
+                        util_process.execute(None,
+                                             'virsh destroy "sf:%s"' % instance_uuid)
 
                         inst.add_event('enforced delete', 'complete')
                     else:
@@ -78,7 +80,7 @@ class Monitor(daemon.Daemon):
 
                     continue
 
-                state = util.extract_power_state(libvirt, domain)
+                state = util_libvirt.extract_power_state(libvirt, domain)
                 inst.update_power_state(state)
                 if state == 'crashed':
                     inst.state = inst.state.value + '-error'
@@ -149,7 +151,7 @@ class Monitor(daemon.Daemon):
             LOG.info('Compacted etcd')
 
         except Exception as e:
-            util.ignore_exception('etcd compaction', e)
+            util_general.ignore_exception('etcd compaction', e)
 
     def run(self):
         LOG.info('Starting')

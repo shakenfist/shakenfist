@@ -14,7 +14,7 @@ from shakenfist import exceptions
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist.tasks import DefloatNetworkInterfaceTask
-from shakenfist import util
+from shakenfist.util import network as util_network
 
 
 LOG, _ = logutil.setup(__name__)
@@ -45,10 +45,10 @@ class NetworkInterface(dbo):
     @classmethod
     def new(cls, interface_uuid, netdesc, instance_uuid, order):
         if 'macaddress' not in netdesc or not netdesc['macaddress']:
-            possible_mac = util.random_macaddr()
+            possible_mac = util_network.random_macaddr()
             mac_iface = {'interface_uuid': interface_uuid}
             while not etcd.create('macaddress', None, possible_mac, mac_iface):
-                possible_mac = util.random_macaddr()
+                possible_mac = util_network.random_macaddr()
             netdesc['macaddress'] = possible_mac
 
         if not interface_uuid:

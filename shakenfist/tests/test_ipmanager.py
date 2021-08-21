@@ -2,10 +2,10 @@ import mock
 
 from shakenfist import exceptions
 from shakenfist.ipmanager import IPManager
-from shakenfist.tests import test_shakenfist
+from shakenfist.tests import base
 
 
-class IPManagerTestCase(test_shakenfist.ShakenFistTestCase):
+class IPManagerTestCase(base.ShakenFistTestCase):
     def test_init(self):
         ipm = IPManager('uuid', '192.168.1.0/24')
         self.assertEqual(

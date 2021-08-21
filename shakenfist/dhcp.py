@@ -9,7 +9,7 @@ import signal
 from shakenfist.config import config
 from shakenfist import instance
 from shakenfist import networkinterface
-from shakenfist import util
+from shakenfist.util import process as util_process
 
 
 class DHCP(object):
@@ -113,5 +113,5 @@ class DHCP(object):
         self._make_config()
         self._make_hosts()
         if not self._send_signal(signal.SIGHUP):
-            util.execute(None,
-                         '%(in_netns)s dnsmasq --conf-file=%(config_dir)s/config' % self.subst)
+            util_process.execute(None,
+                                 '%(in_netns)s dnsmasq --conf-file=%(config_dir)s/config' % self.subst)

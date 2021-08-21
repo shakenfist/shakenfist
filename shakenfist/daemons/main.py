@@ -23,7 +23,9 @@ from shakenfist import logutil
 from shakenfist import net
 from shakenfist.networkinterface import NetworkInterfaces
 from shakenfist.node import Node
-from shakenfist import util
+from shakenfist.util import general as util_general
+from shakenfist.util import process as util_process
+from shakenfist.util import network as util_network
 
 
 LOG, HANDLER = logutil.setup('main')
@@ -72,7 +74,7 @@ def restore_instances():
         else:
             instances.append(inst)
 
-    with util.RecordedOperation('restore networks', None):
+    with util_general.RecordedOperation('restore networks', None):
         for network in networks:
             try:
                 n = net.Network.from_db(network)
@@ -81,9 +83,10 @@ def restore_instances():
                     n.create_on_hypervisor()
                     n.ensure_mesh()
             except Exception as e:
-                util.ignore_exception('restore network %s' % network, e)
+                util_general.ignore_exception(
+                    'restore network %s' % network, e)
 
-    with util.RecordedOperation('restore instances', None):
+    with util_general.RecordedOperation('restore instances', None):
         for inst in instances:
             try:
                 with db.get_lock(
@@ -97,7 +100,8 @@ def restore_instances():
                     LOG.with_object(inst).info('Restoring instance')
                     inst.create_on_hypervisor()
             except Exception as e:
-                util.ignore_exception('restore instance %s' % inst.uuid, e)
+                util_general.ignore_exception(
+                    'restore instance %s' % inst.uuid, e)
                 inst.db.enqueue_delete_due_error(
                     'exception while restoring instance on daemon restart')
 
@@ -120,7 +124,7 @@ def main():
     global DAEMON_PIDS
 
     setproctitle.setproctitle(daemon.process_name(
-        'main') + '-v%s' % util.get_version())
+        'main') + '-v%s' % util_general.get_version())
 
     # Log configuration on startup
     for key, value in config.dict().items():
@@ -145,7 +149,7 @@ def main():
     _start_daemon('resources')
 
     # If I am the network node, I need some setup
-    if util.is_network_node():
+    if util_network.is_network_node():
         # Bootstrap the floating network in the Networks table
         floating_network = net.Network.from_db('floating')
         if not floating_network:
@@ -153,40 +157,41 @@ def main():
                 config.FLOATING_NETWORK)
 
         subst = {
-            'egress_bridge': util.get_safe_interface_name(
+            'egress_bridge': util_network.get_safe_interface_name(
                 'egr-br-%s' % config.NODE_EGRESS_NIC),
             'egress_nic': config.NODE_EGRESS_NIC
         }
 
-        if not util.check_for_interface(subst['egress_bridge']):
+        if not util_network.check_for_interface(subst['egress_bridge']):
             # NOTE(mikal): Adding the physical interface to the physical bridge
             # is considered outside the scope of the orchestration software as
             # it will cause the node to lose network connectivity. So instead
             # all we do is create a bridge if it doesn't exist and the wire
             # everything up to it. We can do egress NAT in that state, even if
             # floating IPs don't work.
-            with util.RecordedOperation('create physical bridge', None):
+            with util_general.RecordedOperation('create physical bridge', None):
                 # No locking as read only
                 ipm = IPManager.from_db('floating')
                 subst['master_float'] = ipm.get_address_at_index(1)
                 subst['netmask'] = ipm.netmask
 
-                util.create_interface(subst['egress_bridge'], 'bridge', '')
-                util.execute(None,
-                             'ip link set %(egress_bridge)s up' % subst)
-                util.execute(None,
-                             'ip addr add %(master_float)s/%(netmask)s '
-                             'dev %(egress_bridge)s' % subst)
+                util_network.create_interface(
+                    subst['egress_bridge'], 'bridge', '')
+                util_process.execute(None,
+                                     'ip link set %(egress_bridge)s up' % subst)
+                util_process.execute(None,
+                                     'ip addr add %(master_float)s/%(netmask)s '
+                                     'dev %(egress_bridge)s' % subst)
 
-                util.execute(None,
-                             'iptables -A FORWARD -o %(egress_nic)s '
-                             '-i %(egress_bridge)s -j ACCEPT' % subst)
-                util.execute(None,
-                             'iptables -A FORWARD -i %(egress_nic)s '
-                             '-o %(egress_bridge)s -j ACCEPT' % subst)
-                util.execute(None,
-                             'iptables -t nat -A POSTROUTING '
-                             '-o %(egress_nic)s -j MASQUERADE' % subst)
+                util_process.execute(None,
+                                     'iptables -A FORWARD -o %(egress_nic)s '
+                                     '-i %(egress_bridge)s -j ACCEPT' % subst)
+                util_process.execute(None,
+                                     'iptables -A FORWARD -i %(egress_nic)s '
+                                     '-o %(egress_bridge)s -j ACCEPT' % subst)
+                util_process.execute(None,
+                                     'iptables -t nat -A POSTROUTING '
+                                     '-o %(egress_nic)s -j MASQUERADE' % subst)
 
     def _audit_daemons():
         running_daemons = []

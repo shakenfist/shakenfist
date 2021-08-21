@@ -3,7 +3,7 @@ import mock
 from shakenfist.baseobject import State
 from shakenfist.config import BaseSettings
 from shakenfist.daemons import cleaner
-from shakenfist.tests import test_shakenfist
+from shakenfist.tests import base
 
 
 class FakeLibvirt(object):
@@ -98,12 +98,12 @@ def fake_get(objecttype, subtype, name):
     return val
 
 
-class CleanerTestCase(test_shakenfist.ShakenFistTestCase):
+class CleanerTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super(CleanerTestCase, self).setUp()
 
         self.libvirt = mock.patch(
-            'shakenfist.util.get_libvirt',
+            'shakenfist.util.libvirt.get_libvirt',
             return_value=FakeLibvirt())
         self.mock_libvirt = self.libvirt.start()
         self.addCleanup(self.libvirt.stop)

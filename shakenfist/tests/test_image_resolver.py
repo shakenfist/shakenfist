@@ -8,7 +8,7 @@ from shakenfist import image_resolver
 from shakenfist.image_resolver import cirros
 from shakenfist.image_resolver import ubuntu
 from shakenfist import logutil
-from shakenfist.tests import test_shakenfist
+from shakenfist.tests import base
 from shakenfist.config import BaseSettings
 
 
@@ -63,7 +63,7 @@ with open('%s/files/ubuntu-download' % TEST_DIR) as f:
     UBUNTU_DOWNLOAD_HTML = f.read()
 
 
-class ImageResolversTestCase(test_shakenfist.ShakenFistTestCase):
+class ImageResolversTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
 

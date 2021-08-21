@@ -26,8 +26,9 @@ from shakenfist import images
 from shakenfist import logutil
 from shakenfist import net
 from shakenfist import networkinterface
-from shakenfist import util
 from shakenfist.tasks import DeleteInstanceTask
+from shakenfist.util import general as util_general
+from shakenfist.util import libvirt as util_libvirt
 
 
 LOG, _ = logutil.setup(__name__)
@@ -403,7 +404,7 @@ class Instance(dbo):
         # Create the actual instance. Sometimes on Ubuntu 20.04 we need to wait
         # for port binding to work. Revisiting this is tracked by issue 320 on
         # github.
-        with util.RecordedOperation('create domain', self):
+        with util_general.RecordedOperation('create domain', self):
             if not self.power_on():
                 attempts = 0
                 while not self.power_on() and attempts < 5:
@@ -420,7 +421,7 @@ class Instance(dbo):
             self.enqueue_delete_due_error('Instance failed to power on')
 
     def delete(self):
-        with util.RecordedOperation('delete domain', self):
+        with util_general.RecordedOperation('delete domain', self):
             try:
                 self.power_off()
 
@@ -434,14 +435,14 @@ class Instance(dbo):
                 if inst:
                     inst.undefine()
             except Exception as e:
-                util.ignore_exception('instance delete', e)
+                util_general.ignore_exception('instance delete', e)
 
-        with util.RecordedOperation('delete disks', self):
+        with util_general.RecordedOperation('delete disks', self):
             try:
                 if os.path.exists(self.instance_path):
                     shutil.rmtree(self.instance_path)
             except Exception as e:
-                util.ignore_exception('instance delete', e)
+                util_general.ignore_exception('instance delete', e)
 
         self.deallocate_instance_ports()
 
@@ -516,7 +517,7 @@ class Instance(dbo):
                                                           self.disk_spec)
 
             # Generate a config drive
-            with util.RecordedOperation('make config drive', self):
+            with util_general.RecordedOperation('make config drive', self):
                 self._make_config_drive(
                     os.path.join(self.instance_path,
                                  block_devices['devices'][1]['path']))
@@ -551,7 +552,7 @@ class Instance(dbo):
                         cached_image_path = os.path.join(
                             config.STORAGE_PATH, 'image_cache', disk['blob_uuid'] + '.qcow2')
 
-                        with util.RecordedOperation('detect cdrom images', self):
+                        with util_general.RecordedOperation('detect cdrom images', self):
                             try:
                                 cd = pycdlib.PyCdlib()
                                 cd.open(cached_image_path)
@@ -575,12 +576,12 @@ class Instance(dbo):
                             disk['device'] = 'hd%s' % disk['device'][-1]
                             disk['bus'] = 'ide'
                         else:
-                            with util.RecordedOperation('create copy on write layer', self):
-                                images.create_cow([lock], cached_image_path,
-                                                  disk['path'], disk['size'])
+                            with util_general.RecordedOperation('create copy on write layer', self):
+                                images.util_image.create_cow([lock], cached_image_path,
+                                                             disk['path'], disk['size'])
                             shutil.chown(
                                 disk['path'], 'libvirt-qemu', 'libvirt-qemu')
-                            self.log.with_fields(util.stat_log_fields(disk['path'])).info(
+                            self.log.with_fields(util_general.stat_log_fields(disk['path'])).info(
                                 'COW layer %s created' % disk['path'])
 
                             # Record the backing store for modern libvirts
@@ -592,7 +593,8 @@ class Instance(dbo):
                                 % (cached_image_path))
 
                     elif not os.path.exists(disk['path']):
-                        images.create_blank([lock], disk['path'], disk['size'])
+                        images.util_image.create_blank(
+                            [lock], disk['path'], disk['size'])
 
                     modified_disks.append(disk)
 
@@ -780,7 +782,7 @@ class Instance(dbo):
         )
 
     def _get_domain(self):
-        libvirt = util.get_libvirt()
+        libvirt = util_libvirt.get_libvirt()
         conn = libvirt.open('qemu:///system')
         try:
             return conn.lookupByName('sf:' + self.uuid)
@@ -793,11 +795,11 @@ class Instance(dbo):
         if not inst:
             return 'off'
 
-        libvirt = util.get_libvirt()
-        return util.extract_power_state(libvirt, inst)
+        libvirt = util_libvirt.get_libvirt()
+        return util_libvirt.extract_power_state(libvirt, inst)
 
     def power_on(self):
-        libvirt = util.get_libvirt()
+        libvirt = util_libvirt.get_libvirt()
         inst = self._get_domain()
         if not inst:
             conn = libvirt.open('qemu:///system')
@@ -831,12 +833,13 @@ class Instance(dbo):
                 return False
 
         inst.setAutostart(1)
-        self.update_power_state(util.extract_power_state(libvirt, inst))
+        self.update_power_state(
+            util_libvirt.extract_power_state(libvirt, inst))
         self.add_event('poweron', 'complete')
         return True
 
     def power_off(self):
-        libvirt = util.get_libvirt()
+        libvirt = util_libvirt.get_libvirt()
         inst = self._get_domain()
         if not inst:
             return
@@ -850,7 +853,7 @@ class Instance(dbo):
         self.add_event('poweroff', 'complete')
 
     def reboot(self, hard=False):
-        libvirt = util.get_libvirt()
+        libvirt = util_libvirt.get_libvirt()
         inst = self._get_domain()
         if not hard:
             inst.reboot(flags=libvirt.VIR_DOMAIN_REBOOT_ACPI_POWER_BTN)
@@ -859,17 +862,19 @@ class Instance(dbo):
         self.add_event('reboot', 'complete')
 
     def pause(self):
-        libvirt = util.get_libvirt()
+        libvirt = util_libvirt.get_libvirt()
         inst = self._get_domain()
         inst.suspend()
-        self.update_power_state(util.extract_power_state(libvirt, inst))
+        self.update_power_state(
+            util_libvirt.extract_power_state(libvirt, inst))
         self.add_event('pause', 'complete')
 
     def unpause(self):
-        libvirt = util.get_libvirt()
+        libvirt = util_libvirt.get_libvirt()
         inst = self._get_domain()
         inst.resume()
-        self.update_power_state(util.extract_power_state(libvirt, inst))
+        self.update_power_state(
+            util_libvirt.extract_power_state(libvirt, inst))
         self.add_event('unpause', 'complete')
 
     def get_console_data(self, length):

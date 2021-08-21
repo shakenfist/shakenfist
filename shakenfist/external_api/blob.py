@@ -8,7 +8,7 @@ import requests
 from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist.external_api import base as api_base
-from shakenfist import util
+from shakenfist.util import general as util_general
 
 
 class BlobEndpoint(api_base.Resource):
@@ -39,7 +39,7 @@ class BlobEndpoint(api_base.Resource):
             return api_base.error(404, 'blob missing')
 
         def read_remote(target, blob_uuid, blob_path=None):
-            api_token = util.get_api_token(
+            api_token = util_general.get_api_token(
                 'http://%s:%d' % (target, config.API_PORT),
                 namespace=get_jwt_identity())
             url = 'http://%s:%d/blob/%s' % (target, config.API_PORT, blob_uuid)
@@ -48,7 +48,7 @@ class BlobEndpoint(api_base.Resource):
                 local_blob = open(blob_path + '.partial', 'wb')
             r = requests.request('GET', url,
                                  headers={'Authorization': api_token,
-                                          'User-Agent': util.get_user_agent()})
+                                          'User-Agent': util_general.get_user_agent()})
             for chunk in r.iter_content(chunk_size=8192):
                 if blob_path:
                     local_blob.write(chunk)

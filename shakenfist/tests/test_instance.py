@@ -16,7 +16,7 @@ from shakenfist import exceptions
 from shakenfist.ipmanager import IPManager
 from shakenfist import instance
 from shakenfist.config import SFConfig
-from shakenfist.tests import test_shakenfist
+from shakenfist.tests import base
 
 
 class FakeNetwork(object):
@@ -42,7 +42,7 @@ class FakeNetworkInterface(object):
         self.order = values['order']
 
 
-class VirtMetaTestCase(test_shakenfist.ShakenFistTestCase):
+class VirtMetaTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super(VirtMetaTestCase, self).setUp()
         fake_config = SFConfig(
@@ -150,7 +150,7 @@ class VirtMetaTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertEqual('/a/b/c/instances/uuid42', inst.instance_path)
 
 
-class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
+class InstanceTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super(InstanceTestCase, self).setUp()
         fake_config = SFConfig(
@@ -613,7 +613,7 @@ JUST_INSTANCES = [
 ]
 
 
-class InstancesTestCase(test_shakenfist.ShakenFistTestCase):
+class InstancesTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
     def test_base_iteration(self, mock_get_all, mock_get):

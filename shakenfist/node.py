@@ -8,7 +8,7 @@ from shakenfist.baseobject import (
 from shakenfist.config import config
 from shakenfist import etcd
 from shakenfist import logutil
-from shakenfist import util
+from shakenfist.util import general as util_general
 
 
 LOG, _ = logutil.setup(__name__)
@@ -61,7 +61,7 @@ class Node(dbo):
         n._db_set_attribute('observed',
                             {
                                 'at': time.time(),
-                                'release': util.get_version()
+                                'release': util_general.get_version()
                             })
 
     @staticmethod
