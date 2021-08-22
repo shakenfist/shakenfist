@@ -89,7 +89,7 @@ class DatabaseBackedObject(object):
             log_ctx = self.log
         return db.get_lock(self.object_type, subtype, self.uuid, ttl=ttl,
                            relatedobjects=relatedobjects, log_ctx=log_ctx,
-                           op=op, timeout=db.ETCD_ATTEMPT_TIMEOUT)
+                           op=op, timeout=timeout)
 
     def get_lock_attr(self, name, op):
         return db.get_lock('attribute/%s' % self.object_type,
