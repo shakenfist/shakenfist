@@ -2,6 +2,7 @@
 from functools import partial
 import time
 
+from shakenfist import constants
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
@@ -84,7 +85,7 @@ class DatabaseBackedObject(object):
         etcd.delete('attribute/%s' % self.object_type, self.__uuid, attribute)
 
     def get_lock(self, subtype=None, ttl=60, relatedobjects=None, log_ctx=None,
-                 op=None, timeout=None):
+                 op=None, timeout=constants.ETCD_ATTEMPT_TIMEOUT):
         if not log_ctx:
             log_ctx = self.log
         return db.get_lock(self.object_type, subtype, self.uuid, ttl=ttl,
