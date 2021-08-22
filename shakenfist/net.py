@@ -42,7 +42,8 @@ class Network(dbo):
     state_targets = {
         None: (dbo.STATE_INITIAL, ),
         dbo.STATE_INITIAL: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR),
-        dbo.STATE_CREATED: (dbo.STATE_DELETED, dbo.STATE_ERROR),
+        dbo.STATE_CREATED: (dbo.STATE_DELETED, dbo.STATE_DELETE_WAIT, dbo.STATE_ERROR),
+        dbo.STATE_DELETE_WAIT: (dbo.STATE_DELETED, dbo.STATE_ERROR),
         dbo.STATE_ERROR: (dbo.STATE_DELETED, dbo.STATE_ERROR),
         dbo.STATE_DELETED: (),
     }

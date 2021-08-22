@@ -20,6 +20,8 @@ from shakenfist.tasks import (QueueTask,
                               InstanceTask,
                               PreflightInstanceTask,
                               StartInstanceTask,
+                              DestroyNetworkTask,
+                              DeleteNetworkWhenClean,
                               FloatNetworkInterfaceTask,
                               SnapshotTask)
 from shakenfist import net
@@ -122,6 +124,24 @@ def handle(jobname, workitem):
             elif isinstance(task, SnapshotTask):
                 snapshot(inst, task.disk(),
                          task.artifact_uuid(), task.blob_uuid())
+
+            elif isinstance(task, DeleteNetworkWhenClean):
+                # Check if any interfaces remain on network
+                # (Only check those present at delete task initiation time.)
+                cur_interfaces = set(
+                    networkinterface.interfaces_for_network(task.network_uuid()))
+                remain_interfaces = set(task.wait_interfaces) - cur_interfaces
+                if remain_interfaces:
+                    # Queue task on a node with an instance
+                    inst_uuid = list(remain_interfaces)[0].instance_uuid
+                    first_instance = instance.Instance.from_db(inst_uuid)
+                    db.enqueue(first_instance.placement,
+                               DeleteNetworkWhenClean(task.network_uuid,
+                                                      remain_interfaces))
+                else:
+                    # All instances deleted, safe to delete network
+                    db.enqueue('networknode',
+                               DestroyNetworkTask(task.network_uuid()))
 
             else:
                 log_i.with_field('task', task).error(

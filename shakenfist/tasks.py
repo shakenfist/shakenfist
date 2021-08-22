@@ -85,11 +85,10 @@ class StartInstanceTask(InstanceTask):
 class DeleteInstanceTask(InstanceTask):
     _name = 'instance_delete'
 
+
 #
 # Network Tasks
 #
-
-
 class NetworkTask(QueueTask):
     def __init__(self, network_uuid):
         super(NetworkTask, self).__init__()
@@ -128,6 +127,17 @@ class RemoveDHCPNetworkTask(NetworkTask):
 
 class RemoveNATNetworkTask(NetworkTask):
     _name = 'network_remove_nat'
+
+
+class DeleteNetworkWhenClean(NetworkTask):
+    _name = 'network_delete_when_clean'
+
+    def __init__(self, network_uuid, wait_interfaces):
+        super(DeleteNetworkWhenClean, self).__init__(network_uuid)
+        self._wait_interfaces = wait_interfaces
+
+    def wait_interfaces(self):
+        return self._wait_interfaces
 
 
 #

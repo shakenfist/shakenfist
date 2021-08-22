@@ -21,6 +21,7 @@ class DatabaseBackedObject(object):
     STATE_CREATING = 'creating'
     STATE_CREATED = 'created'
     STATE_DELETED = 'deleted'
+    STATE_DELETE_WAIT = 'delete_wait'
     STATE_ERROR = 'error'
 
     def __init__(self, object_uuid, version=None):
