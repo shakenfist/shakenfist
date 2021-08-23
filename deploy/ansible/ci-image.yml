@@ -1,17 +1,20 @@
 - hosts: localhost
-  gather_facts: yes
+  gather_facts: no
   connection: ssh
   vars:
     identifier: unknown
     source_path: "/home/jenkins/src/shakenfist/"
     base_image: "ubuntu:20.04"
     base_image_user: "ubuntu"
+    keyfile_private: "/home/jenkins/id_ci"
+    keyfile_public: "/home/jenkins/id_ci.pub"
 
   tasks:
     - name: Create a network
       sf_network:
         netblock: "10.0.0.0/24"
         name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}"
+        namespace: ci
       register: cinetwork
 
     - name: Log network details
@@ -19,33 +22,18 @@
         msg: "Network is {{cinetwork['meta']['uuid']}}"
 
     - name: Create an instance
-      block:
-        - name: Attempt to use an existing label
-          sf_instance:
-            name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}"
-            cpu: 4
-            ram: 4096
-            disks:
-              - "30@label:sfci-image"
-            networkspecs:
-              - network_uuid="{{cinetwork['meta']['uuid']}}",float=True
-            ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+482i1EYa6FYmDrjOQpsm+mVwFs7TW9xOI9o1jc/PHXLDDg5+inp/vVAgKoV6jijwRC9juwjFBPqr8LyXh3lXhPA1LSaQa39o3QIYTLsLuLZPeueUB8UukZzOH0XAHxgAF/qFycf5pWzD4Pzs5HjNi44+9LCDYKJtc45kh3+97iezRMYhucm3wzRAKyA8mr8nNOrQq356sKgXeMP6nnX4bhUJDrcQpfsRFkTcYWAcSuU36eSETVOj9dGUJZlc4g3QBL73R1S5VWbN6DM4UIOSWxRG6oUKprgHSvFmyp5i7S0vKv7q101PcxOw14GOvI8TSirIa8O39WtyX3ugReBj mikal@sf-primary
-            state: present
-          register: imagerebuild
-
-      rescue:
-        - name: Fall back to a image from the internet
-          sf_instance:
-            name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}"
-            cpu: 4
-            ram: 4096
-            disks:
-              - "30@{{base_image}}"
-            networkspecs:
-              - network_uuid="{{cinetwork['meta']['uuid']}}",float=True
-            ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+482i1EYa6FYmDrjOQpsm+mVwFs7TW9xOI9o1jc/PHXLDDg5+inp/vVAgKoV6jijwRC9juwjFBPqr8LyXh3lXhPA1LSaQa39o3QIYTLsLuLZPeueUB8UukZzOH0XAHxgAF/qFycf5pWzD4Pzs5HjNi44+9LCDYKJtc45kh3+97iezRMYhucm3wzRAKyA8mr8nNOrQq356sKgXeMP6nnX4bhUJDrcQpfsRFkTcYWAcSuU36eSETVOj9dGUJZlc4g3QBL73R1S5VWbN6DM4UIOSWxRG6oUKprgHSvFmyp5i7S0vKv7q101PcxOw14GOvI8TSirIa8O39WtyX3ugReBj mikal@sf-primary
-            state: present
-          register: imagerebuild
+      sf_instance:
+        name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}"
+        cpu: 4
+        ram: 4096
+        disks:
+          - "30@{{base_image}}"
+        networkspecs:
+          - network_uuid="{{cinetwork['meta']['uuid']}}",float=True
+        ssh_key: "{{ lookup('file', keyfile_public) }}"
+        namespace: ci
+        state: present
+      register: imagerebuild
 
     - name: Add to ansible
       add_host:
@@ -53,7 +41,7 @@
         ansible_ssh_host: "{{imagerebuild['meta']['network_interfaces'][0]['floating']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
-        ansible_ssh_private_key_file: "/home/jenkins/id_ci"
+        ansible_ssh_private_key_file: "{{keyfile_private}}"
         sf_instance_uuid: "{{imagerebuild['meta']['uuid']}}"
         sf_network_uuid: "{{imagerebuild['meta']['network_interfaces'][0]['network_uuid']}}"
         groups: sfall
@@ -65,10 +53,9 @@
     - name: Wait for instance to present an "OpenSSH" prompt
       wait_for:
         port: 22
-        host: "{{hostvars[item]['ansible_ssh_host']}}"
+        host: "{{hostvars['imagerebuild']['ansible_ssh_host']}}"
         search_regex: OpenSSH
         delay: 10
-      with_items: "{{ groups['sfall'] }}"
 
 - hosts: sfall
   gather_facts: yes
@@ -118,16 +105,30 @@
         state: absent
 
 - hosts: localhost
-  gather_facts: yes
+  gather_facts: no
   connection: ssh
   vars:
     identifier: cron
-    source_path: "/home/jenkins/src/shakenfist/"
-    base_image: "https://sfcbr.shakenfist.com/static/ubuntu2004-ci-template.qcow2"
     base_image_user: "ubuntu"
+    keyfile_private: "/home/jenkins/id_ci"
 
   tasks:
-    - name: Snapshot the instance
+    # - name: Snapshot the instance
+    #   sf_snapshot:
+    #     instance_uuid: "{{hostvars['imagerebuild']['sf_instance_uuid']}}"
+    #     label: sfci-image
+    #     state: present
+    #   register: cisnapshot
+
+    # - name: Log snapshot details
+    #   debug:
+    #     msg: "{{cisnapshot}}"
+
+    # - name: Record the snapshot uuid
+    #   set_fact:
+    #     snapshot_uuid: "{{cisnapshot}}['meta']['vda']['uuid']}}"
+
+    - name: Snapshot the bad way until the ansible module catches up
       shell: |
         sf-client --json instance snapshot "{{hostvars['imagerebuild']['sf_instance_uuid']}}" \
             --label_name sfci-image
@@ -135,14 +136,88 @@
 
     - name: Log snapshot details
       debug:
-        msg: "{{cisnapshot.stdout}}"
+        msg: "{{cisnapshot.stdout | from_json}}"
 
-    - name: Delete instance
+    - name: Record the snapshot uuid
+      set_fact:
+        snapshot_uuid: "{{(cisnapshot.stdout | from_json).get('vda')['blob_uuid']}}"
+
+    - name: Log snapshot uuid
+      debug:
+        msg: "{{hostvars['localhost']['snapshot_uuid']}}"
+
+    - name: Test the snapshot
+      sf_instance:
+        name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-test"
+        cpu: 4
+        ram: 4096
+        disks:
+          - "30@sf://blob/{{hostvars['localhost']['snapshot_uuid']}}"
+        networkspecs:
+          - network_uuid="{{cinetwork['meta']['uuid']}}",float=True
+        ssh_key: "{{ lookup('file', keyfile_public) }}"
+        namespace: ci
+        state: present
+      register: imagetest
+
+    - name: Add to ansible
+      add_host:
+        hostname: imagetest
+        ansible_ssh_host: "{{imagetest['meta']['network_interfaces'][0]['floating']}}"
+        ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
+        ansible_ssh_user: "{{base_image_user}}"
+        ansible_ssh_private_key_file: "{{keyfile_private}}"
+        sf_instance_uuid: "{{imagetest['meta']['uuid']}}"
+        sf_network_uuid: "{{imagetest['meta']['network_interfaces'][0]['network_uuid']}}"
+        groups: sfall
+
+    - name: Log instance
+      debug:
+        msg: "{{imagetest}}"
+
+    - name: Wait for test instance to present an "OpenSSH" prompt
+      wait_for:
+        port: 22
+        host: "{{hostvars['imagetest']['ansible_ssh_host']}}"
+        search_regex: OpenSSH
+        delay: 10
+
+- hosts: imagetest
+  gather_facts: no
+  become: true
+
+  tasks:
+    - name: Do a dist-upgrade to ensure that we can sudo and manage packages
+      apt:
+        update_cache: yes
+        upgrade: dist
+        autoremove: yes
+
+- hosts: localhost
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    # NOTE(mikal): this is obviously a placeholder for now, but it explains
+    # what I need to add to the client to make this work.
+    - name: Add the snapshot to the label
+      shell: |
+        echo sf-client ... "{{hostvars['localhost']['snapshot_uuid']}}"...
+
+    - name: Delete test instance
+      sf_instance:
+        uuid: "{{hostvars['imagetest']['sf_instance_uuid']}}"
+        namespace: ci
+        state: absent
+
+    - name: Delete build instance
       sf_instance:
         uuid: "{{hostvars['imagerebuild']['sf_instance_uuid']}}"
+        namespace: ci
         state: absent
 
     - name: Delete network
       sf_network:
         uuid: "{{hostvars['imagerebuild']['sf_network_uuid']}}"
+        namespace: ci
         state: absent
