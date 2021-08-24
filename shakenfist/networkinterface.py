@@ -177,11 +177,7 @@ class NetworkInterface(dbo):
 class NetworkInterfaces(dbo_iter):
     def __iter__(self):
         for _, ni in etcd.get_all('networkinterface', None):
-            ni = NetworkInterface.from_db(ni['uuid'])
-            if not ni:
-                continue
-
-            out = self.apply_filters(ni)
+            out = self.apply_filters(NetworkInterface(ni))
             if out:
                 yield out
 

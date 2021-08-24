@@ -704,12 +704,7 @@ class Networks(dbo_iter):
         for _, n in etcd.get_all('network', None):
             if n['uuid'] == 'floating':
                 continue
-
-            n = Network.from_db(n['uuid'])
-            if not n:
-                continue
-
-            out = self.apply_filters(n)
+            out = self.apply_filters(Network(n))
             if out:
                 yield out
 
