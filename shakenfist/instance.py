@@ -243,7 +243,7 @@ class Instance(dbo):
         for attr in external_attribute_key_whitelist:
             i[attr] = None
 
-        for attrname in ['placement', 'state', 'power_state', 'ports']:
+        for attrname in ['placement', 'power_state', 'ports']:
             d = self._db_get_attribute(attrname)
             for key in d:
                 if key not in external_attribute_key_whitelist:
@@ -921,11 +921,7 @@ class Instance(dbo):
 class Instances(dbo_iter):
     def __iter__(self):
         for _, i in etcd.get_all('instance', None):
-            i = Instance.from_db(i['uuid'])
-            if not i:
-                continue
-
-            out = self.apply_filters(i)
+            out = self.apply_filters(Instance(i))
             if out:
                 yield out
 
