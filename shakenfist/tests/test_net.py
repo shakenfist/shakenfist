@@ -5,10 +5,10 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist import exceptions
 from shakenfist import net
 from shakenfist.config import SFConfig
-from shakenfist.tests import test_shakenfist
+from shakenfist.tests import base
 
 
-class NetworkTestCase(test_shakenfist.ShakenFistTestCase):
+class NetworkTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super(NetworkTestCase, self).setUp()
 
@@ -64,9 +64,9 @@ class NetworkGeneralTestCase(NetworkTestCase):
 class NetworkNormalNodeTestCase(NetworkTestCase):
     def setUp(self):
         super(NetworkNormalNodeTestCase, self).setUp()
-        fake_config = SFConfig(NODE_EGRESS_IP="1.1.1.2",
-                               NODE_MESH_IP="1.1.1.2",
-                               NETWORK_NODE_IP="1.1.1.2")
+        fake_config = SFConfig(NODE_EGRESS_IP='1.1.1.2',
+                               NODE_MESH_IP='1.1.1.2',
+                               NETWORK_NODE_IP='1.1.1.2')
         self.config = mock.patch('shakenfist.config.config', fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
@@ -108,9 +108,9 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
 
     @mock.patch('shakenfist.net.Network.is_created', return_value=True)
     @mock.patch('shakenfist.net.Network.is_dnsmasq_running', return_value=False)
-    @mock.patch('shakenfist.util.config', SFConfig(NODE_EGRESS_IP="1.1.1.1",
-                                                   NODE_MESH_IP="1.1.1.2",
-                                                   NETWORK_NODE_IP="1.1.1.2"))
+    @mock.patch('shakenfist.config.config', SFConfig(NODE_EGRESS_IP='1.1.1.1',
+                                                     NODE_MESH_IP='1.1.1.2',
+                                                     NETWORK_NODE_IP='1.1.1.2'))
     def test_is_okay_no_dns(self, mock_is_dnsmasq, mock_is_created):
         n = net.Network({
             'uuid': 'actualuuid',
@@ -130,9 +130,9 @@ class NetworkNetNodeTestCase(NetworkTestCase):
     def setUp(self):
         super(NetworkNetNodeTestCase, self).setUp()
 
-        fake_config = SFConfig(NODE_EGRESS_IP="1.1.1.2",
-                               NODE_MESH_IP="1.1.1.2",
-                               NETWORK_NODE_IP="1.1.1.2")
+        fake_config = SFConfig(NODE_EGRESS_IP='1.1.1.2',
+                               NODE_MESH_IP='1.1.1.2',
+                               NETWORK_NODE_IP='1.1.1.2')
         self.config = mock.patch('shakenfist.config.config', fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
@@ -207,12 +207,12 @@ class NetworkNetNodeTestCase(NetworkTestCase):
     #
     # is_created()
     #
-    pgrep = ('1: br-vxlan-5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500'
-             + ''' qdisc noqueue state UP mode DEFAULT group default qlen 1000
+    pgrep = """1: br-vxlan-5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500'
+qdisc noqueue state UP mode DEFAULT group default qlen 1000
 link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
-''')
+"""
 
-    @mock.patch('shakenfist.util.execute',
+    @mock.patch('shakenfist.util.process.execute',
                 return_value=(pgrep, ''))
     def test_is_created_yes(self, mock_execute):
         n = net.Network({
@@ -228,12 +228,12 @@ link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
         })
         self.assertTrue(n.is_created())
 
-    pgrep = ('1: br-vxlan-5: <BROADCAST,MULTICAST,DOWN,LOWER_UP> mtu 1500'
-             + ''' qdisc noqueue state UP mode DEFAULT group default qlen 1000
+    pgrep = """1: br-vxlan-5: <BROADCAST,MULTICAST,DOWN,LOWER_UP> mtu 1500'
+qdisc noqueue state UP mode DEFAULT group default qlen 1000
 link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
-''')
+"""
 
-    @mock.patch('shakenfist.util.execute',
+    @mock.patch('shakenfist.util.process.execute',
                 return_value=(pgrep, ''))
     def test_is_created_no(self, mock_execute):
         n = net.Network({
@@ -249,9 +249,9 @@ link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
         })
         self.assertFalse(n.is_created())
 
-    pgrep = 'Device "br-vxlan-45" does not exist.'
+    pgrep = "Device 'br-vxlan-45' does not exist."
 
-    @mock.patch('shakenfist.util.execute',
+    @mock.patch('shakenfist.util.process.execute',
                 return_value=(pgrep, ''))
     def test_is_created_no_bridge(self, mock_execute):
         n = net.Network({

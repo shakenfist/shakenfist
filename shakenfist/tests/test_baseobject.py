@@ -3,10 +3,10 @@ import testtools
 
 from shakenfist.baseobject import DatabaseBackedObject, State
 from shakenfist import exceptions
-from shakenfist.tests import test_shakenfist
+from shakenfist.tests import base
 
 
-class DatabaseBackedObjectTestCase(test_shakenfist.ShakenFistTestCase):
+class DatabaseBackedObjectTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get_attribute',
                 side_effect=[
                     {'value': None, 'update_time': 2},

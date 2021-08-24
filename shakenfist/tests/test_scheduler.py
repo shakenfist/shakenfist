@@ -5,7 +5,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist import exceptions
 from shakenfist.instance import Instance
 from shakenfist import scheduler
-from shakenfist.tests import test_shakenfist
+from shakenfist.tests import base
 from shakenfist.config import SFConfig
 
 
@@ -56,12 +56,12 @@ fake_config = SFConfig(
 )
 
 
-class SchedulerTestCase(test_shakenfist.ShakenFistTestCase):
+class SchedulerTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super(SchedulerTestCase, self).setUp()
 
         self.recorded_op = mock.patch(
-            'shakenfist.util.RecordedOperation')
+            'shakenfist.util.general.RecordedOperation')
         self.recorded_op.start()
         self.addCleanup(self.recorded_op.stop)
 

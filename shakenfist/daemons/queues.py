@@ -25,7 +25,8 @@ from shakenfist.tasks import (QueueTask,
 from shakenfist import net
 from shakenfist import networkinterface
 from shakenfist import scheduler
-from shakenfist import util
+from shakenfist.util import general as util_general
+from shakenfist.util import libvirt as util_libvirt
 
 
 LOG, _ = logutil.setup(__name__)
@@ -111,7 +112,8 @@ def handle(jobname, workitem):
                     instance_delete(inst)
                     db.enqueue('%s-metrics' % config.NODE_NAME, {})
                 except Exception as e:
-                    util.ignore_exception(daemon.process_name('queues'), e)
+                    util_general.ignore_exception(
+                        daemon.process_name('queues'), e)
 
             elif isinstance(task, FloatNetworkInterfaceTask):
                 # Just punt it to the network node now that the interface is ready
@@ -135,7 +137,7 @@ def handle(jobname, workitem):
 
     except Exception as e:
         # Logging ignored exception - this should be investigated
-        util.ignore_exception(daemon.process_name('queues'), e)
+        util_general.ignore_exception(daemon.process_name('queues'), e)
         if inst:
             inst.enqueue_delete_due_error('Failed queue task: %s' % e)
 
@@ -238,9 +240,9 @@ def instance_start(inst, network):
         inst.allocate_instance_ports()
 
         # Now we can start the instance
-        libvirt = util.get_libvirt()
+        libvirt = util_libvirt.get_libvirt()
         try:
-            with util.RecordedOperation('instance creation', inst):
+            with util_general.RecordedOperation('instance creation', inst):
                 inst.create(iface_uuids, lock=lock)
 
         except libvirt.libvirtError as e:
@@ -280,7 +282,7 @@ def instance_delete(inst):
         inst.delete()
 
         # Delete the instance's interfaces
-        with util.RecordedOperation('release network addresses', inst):
+        with util_general.RecordedOperation('release network addresses', inst):
             for iface_uuid in inst.interfaces:
                 ni = networkinterface.NetworkInterface.from_db(iface_uuid)
                 ni.delete()
@@ -291,11 +293,11 @@ def instance_delete(inst):
             if n:
                 # If network used by another instance, only update
                 if network in host_networks:
-                    with util.RecordedOperation('deallocate ip address', inst):
+                    with util_general.RecordedOperation('deallocate ip address', inst):
                         n.update_dhcp()
                 else:
                     # Network not used by any other instance therefore delete
-                    with util.RecordedOperation('remove network from node', n):
+                    with util_general.RecordedOperation('remove network from node', n):
                         n.delete_on_hypervisor()
 
 
@@ -311,7 +313,7 @@ class Monitor(daemon.Daemon):
         workers = []
         LOG.info('Starting Queues')
 
-        libvirt = util.get_libvirt()
+        libvirt = util_libvirt.get_libvirt()
         conn = libvirt.open('qemu:///system')
         present_cpus, _, _ = conn.getCPUMap()
 
@@ -338,4 +340,4 @@ class Monitor(daemon.Daemon):
                 workers.append(p)
 
             except Exception as e:
-                util.ignore_exception(daemon.process_name('queues'), e)
+                util_general.ignore_exception(daemon.process_name('queues'), e)

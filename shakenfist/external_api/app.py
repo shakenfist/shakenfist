@@ -54,7 +54,7 @@ from shakenfist.tasks import (
     FloatNetworkInterfaceTask,
     DefloatNetworkInterfaceTask
 )
-from shakenfist import util
+from shakenfist.util import general as util_general
 
 
 LOG, HANDLER = logutil.setup(__name__)
@@ -441,7 +441,7 @@ class Instances(api_base.Resource):
                     return api_base.error(400, 'network specification is missing network_uuid')
 
                 net_uuid = netdesc['network_uuid']
-                if netdesc.get('address') and not util.noneish(netdesc.get('address')):
+                if netdesc.get('address') and not util_general.noneish(netdesc.get('address')):
                     # The requested address must be within the ip range specified
                     # for that virtual network, unless it is equivalent to "none".
                     ipm = IPManager.from_db(net_uuid)
@@ -502,7 +502,7 @@ class Instances(api_base.Resource):
                 # (thanks OpenStack Kolla), which are special cased here. To not
                 # have an address, you use a detailed netdesc and specify
                 # address=none.
-                if 'address' in netdesc and util.noneish(netdesc['address']):
+                if 'address' in netdesc and util_general.noneish(netdesc['address']):
                     netdesc['address'] = None
                 else:
                     with db.get_lock('ipmanager', None,  netdesc['network_uuid'],

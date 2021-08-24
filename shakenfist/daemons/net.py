@@ -26,7 +26,7 @@ from shakenfist.tasks import (
     NetworkInterfaceTask,
     FloatNetworkInterfaceTask,
     DefloatNetworkInterfaceTask)
-from shakenfist import util
+from shakenfist.util import network as util_network
 
 
 LOG, _ = logutil.setup(__name__)
@@ -37,13 +37,13 @@ class Monitor(daemon.Daemon):
         LOG.info('Maintaining networks')
 
         # Discover what networks are present
-        _, _, vxid_to_mac = util.discover_interfaces()
+        _, _, vxid_to_mac = util_network.discover_interfaces()
 
         # Determine what networks we should be on
         host_networks = []
         seen_vxids = []
 
-        if not util.is_network_node():
+        if not util_network.is_network_node():
             # For normal nodes, just the ones we have instances for
             for inst in instance.Instances([instance.this_node_filter, instance.active_states_filter]):
                 for iface_uuid in inst.interfaces:
@@ -103,7 +103,7 @@ class Monitor(daemon.Daemon):
                     continue
 
                 if not n.is_okay():
-                    if util.is_network_node():
+                    if util_network.is_network_node():
                         LOG.with_network(n).info(
                             'Recreating not okay network on network node')
                         n.create_on_network_node()
@@ -306,7 +306,7 @@ class Monitor(daemon.Daemon):
         last_management = 0
 
         while True:
-            if util.is_network_node():
+            if util_network.is_network_node():
                 self._process_network_node_workitems()
             else:
                 management_age = time.time() - last_management
@@ -314,6 +314,6 @@ class Monitor(daemon.Daemon):
 
             if time.time() - last_management > 30:
                 self._maintain_networks()
-                if util.is_network_node():
+                if util_network.is_network_node():
                     self._reap_leaked_floating_ips()
                 last_management = time.time()

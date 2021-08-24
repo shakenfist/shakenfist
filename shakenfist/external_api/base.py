@@ -19,7 +19,8 @@ from shakenfist.daemons import daemon
 from shakenfist.instance import Instance
 from shakenfist import logutil
 from shakenfist.net import Network
-from shakenfist import util
+from shakenfist.util import general as util_general
+from shakenfist.util import network as util_network
 
 LOG, HANDLER = logutil.setup(__name__)
 daemon.set_log_level(LOG, 'api')
@@ -99,14 +100,14 @@ def redirect_instance_request(func):
         if placement.get('node') != config.NODE_NAME:
             url = 'http://%s:%d%s' % (placement['node'], config.API_PORT,
                                       flask.request.environ['PATH_INFO'])
-            api_token = util.get_api_token(
+            api_token = util_general.get_api_token(
                 'http://%s:%d' % (placement['node'], config.API_PORT),
                 namespace=get_jwt_identity())
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'], url,
                 data=json.dumps(flask_get_post_body()),
                 headers={'Authorization': api_token,
-                         'User-Agent': util.get_user_agent()})
+                         'User-Agent': util_general.get_user_agent()})
 
             LOG.info('Proxied %s %s returns: %d, %s' % (
                      flask.request.environ['REQUEST_METHOD'], url,
@@ -174,8 +175,8 @@ def arg_is_network_uuid(func):
 def redirect_to_network_node(func):
     # Redirect method to the network node
     def wrapper(*args, **kwargs):
-        if not util.is_network_node():
-            admin_token = util.get_api_token(
+        if not util_network.is_network_node():
+            admin_token = util_general.get_api_token(
                 'http://%s:%d' % (config.NETWORK_NODE_IP,
                                   config.API_PORT),
                 namespace='system')
@@ -186,7 +187,7 @@ def redirect_to_network_node(func):
                    flask.request.environ['PATH_INFO']),
                 data=flask.request.data,
                 headers={'Authorization': admin_token,
-                         'User-Agent': util.get_user_agent()})
+                         'User-Agent': util_general.get_user_agent()})
 
             LOG.info('Returning proxied request: %d, %s'
                      % (r.status_code, r.text))

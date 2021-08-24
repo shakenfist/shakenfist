@@ -1,10 +1,10 @@
 import mock
 
 from shakenfist.config import SFConfig
-from shakenfist.tests import test_shakenfist
+from shakenfist.tests import base
 
 
-class ConfigTestCase(test_shakenfist.ShakenFistTestCase):
+class ConfigTestCase(base.ShakenFistTestCase):
     @mock.patch('socket.getfqdn', return_value='a.b.com')
     def test_hostname(self, mock_fqdn):
         conf = SFConfig()

@@ -17,7 +17,7 @@ from shakenfist import logutil
 from shakenfist import net
 from shakenfist import networkinterface
 from shakenfist.tasks import DestroyNetworkTask
-from shakenfist import util
+from shakenfist.util import process as util_process
 
 
 LOG, HANDLER = logutil.setup(__name__)
@@ -240,7 +240,7 @@ class NetworkPingEndpoint(api_base.Resource):
         if not n:
             return api_base.error(404, 'network %s not found' % network_uuid)
 
-        out, err = util.execute(
+        out, err = util_process.execute(
             None, 'ip netns exec %s ping -c 10 %s' % (
                 network_uuid, address),
             check_exit_code=[0, 1])

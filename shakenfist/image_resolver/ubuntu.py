@@ -6,7 +6,7 @@ from shakenfist.config import config
 from shakenfist import exceptions
 from shakenfist.image_resolver import util as resolver_util
 from shakenfist import logutil
-from shakenfist import util
+from shakenfist.util import general as util_general
 
 LOG, _ = logutil.setup(__name__)
 
@@ -14,7 +14,7 @@ LOG, _ = logutil.setup(__name__)
 def resolve(name):
     # Name is assumed to be in the form ubuntu, ubuntu:18.04, or ubuntu:bionic
     resp = requests.get(config.LISTING_URL_UBUNTU, allow_redirects=True,
-                        headers={'User-Agent': util.get_user_agent()})
+                        headers={'User-Agent': util_general.get_user_agent()})
     if resp.status_code != 200:
         raise exceptions.HTTPError('Failed to fetch %s, status code %d'
                                    % (config.LISTING_URL_UBUNTU, resp.status_code))

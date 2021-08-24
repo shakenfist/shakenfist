@@ -1,7 +1,7 @@
 import mock
 
 from shakenfist.networkinterface import NetworkInterfaces
-from shakenfist.tests import test_shakenfist
+from shakenfist.tests import base
 
 
 GET_ALL_INTERFACES = [
@@ -51,7 +51,7 @@ JUST_INTERFACES = [
 ]
 
 
-class NetworkInterfaceTestCase(test_shakenfist.ShakenFistTestCase):
+class NetworkInterfaceTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.etcd.get', side_effect=JUST_INTERFACES)
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INTERFACES)
     def test_ni_iterator_mocking(self, mock_get_all, mock_get):

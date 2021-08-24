@@ -10,7 +10,7 @@ from shakenfist.baseobject import (
 from shakenfist.config import config, BaseSettings, SFConfig
 from shakenfist.external_api import app as external_api
 from shakenfist.ipmanager import IPManager
-from shakenfist.tests import test_shakenfist
+from shakenfist.tests import base
 
 
 class FakeResponse(object):
@@ -100,7 +100,7 @@ def _clean_traceback(resp):
     return resp
 
 
-class AuthTestCase(test_shakenfist.ShakenFistTestCase):
+class AuthTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super(AuthTestCase, self).setUp()
 
@@ -229,7 +229,7 @@ class AuthTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertEqual(401, resp.status_code)
 
 
-class ExternalApiTestCase(test_shakenfist.ShakenFistTestCase):
+class ExternalApiTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super(ExternalApiTestCase, self).setUp()
 
