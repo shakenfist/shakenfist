@@ -19,7 +19,7 @@ class TestImages(base.BaseTestCase):
         # exist at the moment.
         cache = {}
         start_time = time.time()
-        while time.time() - start_time < 300:
+        while time.time() - start_time < 7 * 60:
             cache = {}
             for img in self.system_client.get_images():
                 cache.setdefault(img['source_url'], [])
@@ -31,5 +31,5 @@ class TestImages(base.BaseTestCase):
 
             time.sleep(5)
 
-        self.fail('Image was not downloaded after five minutes: %s'
+        self.fail('Image was not downloaded after seven minutes: %s'
                   % cache.get(url))
