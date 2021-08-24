@@ -51,8 +51,13 @@ def restore_instances():
         for ni in interfaces_for_instance(inst):
             if ni.network_uuid not in networks:
                 networks.append(ni.network_uuid)
-            if ni.network_uuid not in inst.interfaces:
-                inst.interfaces += ni.network_uuid
+            with inst.get_lock_attr('interfaces', 'Interface list update'):
+                inst_interfaces = inst.interfaces
+                if ni.network_uuid not in inst_interfaces:
+                    if not inst_interfaces:
+                        inst.interfaces = [ni.network_uuid]
+                    else:
+                        inst.interfaces = inst_interfaces.append(ni.network_uuid)
 
         # TODO(mikal): do better here.
         # for disk in inst.disk_spec:

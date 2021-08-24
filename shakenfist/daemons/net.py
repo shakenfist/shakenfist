@@ -48,7 +48,11 @@ class Monitor(daemon.Daemon):
             for inst in instance.Instances([instance.this_node_filter, instance.active_states_filter]):
                 for iface_uuid in inst.interfaces:
                     ni = networkinterface.NetworkInterface.from_db(iface_uuid)
-                    if ni.network_uuid not in host_networks:
+                    if not ni:
+                        LOG.with_instance(
+                            inst).with_networkinterface(
+                            iface_uuid).error('Network interface does not exist')
+                    elif ni.network_uuid not in host_networks:
                         host_networks.append(ni.network_uuid)
         else:
             # For network nodes, its all networks
