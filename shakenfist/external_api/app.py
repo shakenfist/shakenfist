@@ -549,6 +549,9 @@ class Instances(api_base.Resource):
                 netdesc['iface_uuid'] = iface_uuid
                 updated_networks.append(netdesc)
 
+        # Store interfaces soon as they are allocated to the instance
+        inst.interfaces = [i['iface_uuid'] for i in updated_networks]
+
         if not SCHEDULER:
             SCHEDULER = scheduler.Scheduler()
 
