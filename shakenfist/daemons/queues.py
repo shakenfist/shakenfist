@@ -137,9 +137,8 @@ def handle(jobname, workitem):
                 if remain_interfaces:
                     # Queue task on a node with a remaining instance
                     first_iface = cur_interfaces[remain_interfaces[0]]
-                    inst_uuid = first_iface.instance_uuid
-                    first_instance = instance.Instance.from_db(inst_uuid)
-                    db.enqueue(first_instance.placement['node'],
+                    inst = instance.Instance.from_db(first_iface.instance_uuid)
+                    db.enqueue(inst.placement['node'],
                                {'tasks': [
                                    DeleteNetworkWhenClean(task.network_uuid(),
                                                           remain_interfaces)
@@ -332,6 +331,9 @@ def instance_delete(inst):
             if n:
                 # If network used by another instance, only update
                 if network in host_networks:
+                    if n.state.value == net.Network.STATE_DELETE_WAIT:
+                        # Do not update a network about to be deleted
+                        continue
                     with util_general.RecordedOperation('deallocate ip address', inst):
                         n.update_dhcp()
                 else:

@@ -185,7 +185,7 @@ class Monitor(daemon.Daemon):
         if n.is_dead() and n.state.value != net.Network.STATE_DELETE_WAIT:
             log_ctx.with_fields({'state': n.state,
                                  'workitem': workitem}).info(
-                'Received work item for a dead network')
+                'Received work item for a dead network and not delete_wait')
             return
 
         if isinstance(workitem, DestroyNetworkTask):
@@ -209,7 +209,7 @@ class Monitor(daemon.Daemon):
         if n.is_dead():
             log_ctx.with_fields({'state': n.state,
                                  'workitem': workitem}).info(
-                'Received work item for a not live network ie. delete_wait')
+                'Received work item for a dead network')
             return
 
         if isinstance(workitem, DeployNetworkTask):
