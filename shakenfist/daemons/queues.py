@@ -262,12 +262,24 @@ def instance_delete(inst):
     with inst.get_lock(op='Instance delete'):
         db.add_event('instance', inst.uuid, 'queued', 'delete', None, None)
 
-        # Create list of networks used by instance
+        # Create list of networks used by instance. We cannot use the
+        # interfaces cached in the instance here, because the instance
+        # may have failed to get to the point where it populates that
+        # field (an image fetch failure for example).
         instance_networks = []
-        for iface_uuid in inst.interfaces:
-            ni = networkinterface.NetworkInterface.from_db(iface_uuid)
+        interfaces = []
+        for ni in networkinterface.interfaces_for_instance(inst.uuid):
+            interfaces.append(ni)
             if ni.network_uuid not in instance_networks:
                 instance_networks.append(ni.network_uuid)
+
+        # Stop the instance
+        inst.power_off()
+
+        # Delete the instance's interfaces
+        with util_general.RecordedOperation('release network addresses', inst):
+            for ni in interfaces:
+                ni.delete()
 
         # Create list of networks used by all other instances
         host_networks = []
@@ -280,12 +292,6 @@ def instance_delete(inst):
                         host_networks.append(ni.network_uuid)
 
         inst.delete()
-
-        # Delete the instance's interfaces
-        with util_general.RecordedOperation('release network addresses', inst):
-            for iface_uuid in inst.interfaces:
-                ni = networkinterface.NetworkInterface.from_db(iface_uuid)
-                ni.delete()
 
         # Check each network used by the deleted instance
         for network in instance_networks:
