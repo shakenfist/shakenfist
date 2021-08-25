@@ -299,7 +299,9 @@ class Network(dbo):
         callers will wait on a lock before calling this function. In this case
         we definitely need to update the in-memory object model.
         """
-        return self.state.value in (self.STATE_DELETED, self.STATE_ERROR)
+        return self.state.value in (self.STATE_DELETED,
+                                    self.STATE_DELETE_WAIT,
+                                    self.STATE_ERROR)
 
     def _create_common(self):
         subst = self.subst_dict()

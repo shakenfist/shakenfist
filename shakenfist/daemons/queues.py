@@ -127,19 +127,32 @@ def handle(jobname, workitem):
 
             elif isinstance(task, DeleteNetworkWhenClean):
                 # Check if any interfaces remain on network
-                # (Only check those present at delete task initiation time.)
-                cur_interfaces = set(
-                    networkinterface.interfaces_for_network(task.network_uuid()))
-                remain_interfaces = set(task.wait_interfaces) - cur_interfaces
+                task_network = net.Network.from_db(task.network_uuid())
+                ifaces = networkinterface.interfaces_for_network(task_network)
+                cur_interfaces = {i.uuid: i for i in ifaces}
+
+                # Only check those present at delete task initiation time.
+                remain_interfaces = list(set(task.wait_interfaces()) &
+                                         set(cur_interfaces))
                 if remain_interfaces:
-                    # Queue task on a node with an instance
-                    inst_uuid = list(remain_interfaces)[0].instance_uuid
+                    # Queue task on a node with a remaining instance
+                    first_iface = cur_interfaces[remain_interfaces[0]]
+                    inst_uuid = first_iface.instance_uuid
                     first_instance = instance.Instance.from_db(inst_uuid)
-                    db.enqueue(first_instance.placement,
-                               DeleteNetworkWhenClean(task.network_uuid,
-                                                      remain_interfaces))
+                    db.enqueue(first_instance.placement['node'],
+                               {'tasks': [
+                                   DeleteNetworkWhenClean(task.network_uuid(),
+                                                          remain_interfaces)
+                               ]})
+
+                elif cur_interfaces:
+                    LOG.with_network(task_network).error(
+                        'During DeleteNetworkWhenClean new interfaces have '
+                        'connected to network: %s',
+                        [i.uuid for i in cur_interfaces])
+
                 else:
-                    # All instances deleted, safe to delete network
+                    # All original instances deleted, safe to delete network
                     db.enqueue('networknode',
                                DestroyNetworkTask(task.network_uuid()))
 

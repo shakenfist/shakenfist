@@ -139,6 +139,10 @@ class DeleteNetworkWhenClean(NetworkTask):
     def wait_interfaces(self):
         return self._wait_interfaces
 
+    def obj_dict(self):
+        return {**super(DeleteNetworkWhenClean, self).obj_dict(),
+                'wait_interfaces': self._wait_interfaces}
+
 
 #
 # NetworkInterface Tasks

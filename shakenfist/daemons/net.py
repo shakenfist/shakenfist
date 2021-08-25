@@ -164,7 +164,9 @@ class Monitor(daemon.Daemon):
         # worth the complexity right now. Are we really going to be changing
         # networks that much?
 
-        # Tasks valid for a network in any state
+        #
+        # Tasks valid for a network in ANY STATE
+        #
         if isinstance(workitem, RemoveDHCPNetworkTask):
             n.remove_dhcp()
             db.add_event('network', workitem.network_uuid(),
@@ -177,11 +179,37 @@ class Monitor(daemon.Daemon):
                          'network node', 'remove nat', None, None)
             return
 
-        # Tasks that should not operate on a dead network
-        if n.is_dead():
+        #
+        # Tasks that should NOT operate on a DEAD network
+        #
+        if n.is_dead() and n.state.value != net.Network.STATE_DELETE_WAIT:
             log_ctx.with_fields({'state': n.state,
                                  'workitem': workitem}).info(
                 'Received work item for a dead network')
+            return
+
+        if isinstance(workitem, DestroyNetworkTask):
+            interfaces = list(networkinterface.interfaces_for_network(n))
+            if interfaces:
+                log_ctx.error(
+                    'DestroyNetworkTask for network with interfaces: %s',
+                    [i.uuid for i in interfaces])
+                return
+            try:
+                n.delete_on_network_node()
+                db.add_event('network', workitem.network_uuid(),
+                             'network node', 'destroy', None, None)
+            except exceptions.DeadNetwork as e:
+                log_ctx.with_field('exception', e).warning(
+                    'DestroyNetworkTask on dead network')
+
+        #
+        # Tasks that should NOT operate on a DEAD or DELETE_WAIT network
+        #
+        if n.is_dead():
+            log_ctx.with_fields({'state': n.state,
+                                 'workitem': workitem}).info(
+                'Received work item for a not live network ie. delete_wait')
             return
 
         if isinstance(workitem, DeployNetworkTask):
@@ -193,15 +221,6 @@ class Monitor(daemon.Daemon):
             except exceptions.DeadNetwork as e:
                 log_ctx.with_field('exception', e).warning(
                     'DeployNetworkTask on dead network')
-
-        elif isinstance(workitem, DestroyNetworkTask):
-            try:
-                n.delete_on_network_node()
-                db.add_event('network', workitem.network_uuid(),
-                             'network node', 'destroy', None, None)
-            except exceptions.DeadNetwork as e:
-                log_ctx.with_field('exception', e).warning(
-                    'DestroyNetworkTask on dead network')
 
         elif isinstance(workitem, UpdateDHCPNetworkTask):
             try:
@@ -226,17 +245,14 @@ class Monitor(daemon.Daemon):
                 'Received work item for non-existent network interface')
             return
 
-        # Tasks that should not operate on a dead network
-        if n.is_dead():
+        # Tasks that should not operate on a dead or delete waiting network
+        if n.is_dead() and n.state.value != net.Network.STATE_DELETE_WAIT:
             log_ctx.with_fields({'state': n.state,
                                  'workitem': workitem}).info(
-                'Received work item for a dead network')
+                'Received work item for a completely dead network')
             return
 
-        if isinstance(workitem, FloatNetworkInterfaceTask):
-            n.add_floating_ip(ni.floating.get('floating_address'), ni.ipv4)
-
-        elif isinstance(workitem, DefloatNetworkInterfaceTask):
+        if isinstance(workitem, DefloatNetworkInterfaceTask):
             n.remove_floating_ip(ni.floating.get('floating_address'), ni.ipv4)
 
             db.add_event('interface', ni.uuid, 'api', 'defloat', None, None)
@@ -246,6 +262,16 @@ class Monitor(daemon.Daemon):
                 ipm.persist()
 
             ni.floating = None
+
+        # Tasks that should not operate on a dead network
+        if n.is_dead():
+            log_ctx.with_fields({'state': n.state,
+                                 'workitem': workitem}).info(
+                'Received work item for a dead network')
+            return
+
+        if isinstance(workitem, FloatNetworkInterfaceTask):
+            n.add_floating_ip(ni.floating.get('floating_address'), ni.ipv4)
 
     def _process_network_node_workitems(self):
         jobname, workitem = db.dequeue('networknode')
