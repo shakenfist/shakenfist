@@ -10,7 +10,7 @@ Shaken Fist only supports Ubuntu 18.04 or later but we strongly recommend 20.04 
 Note that we used to recommend deployers run the installer from git, but we've outgrown that approach. If you
 see that mentioned in the documentation, you are likely reading outdated guides.
 
-First install some dependancies:
+First install some dependencies:
 
 ```bash
 sudo apt-get update
@@ -18,7 +18,7 @@ sudo apt-get -y dist-upgrade
 sudo apt-get -y install ansible tox pwgen build-essential python3-dev python3-wheel \
     python3-pip python3-venv curl ansible vim git pwgen
     python3-pip curl ansible vim git pwgen
-ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform \
+sudo ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform \
     andrewrothstein.go
 ```
 
@@ -89,24 +89,24 @@ read -r -d '' TOPOLOGY <<'EOF'
 [
     {
         "name": "sf-1",
-        "egress_ip": "10.0.0.1",
-        "egress_nic": "eth0",
-        "mesh_ip": "10.0.1.1",
-        "mesh_nic": "eth1"
+        "node_egress_ip": "10.0.0.1",
+        "node_egress_nic": "eth0",
+        "node_mesh_ip": "10.0.1.1",
+        "node_mesh_nic": "eth1"
     },
     {
         "name": "sf-2",
-        "egress_ip": "10.0.0.2",
-        "egress_nic": "eth0",
-        "mesh_ip": "10.0.1.2",
-        "mesh_nic": "eth1"
+        "node_egress_ip": "10.0.0.2",
+        "node_egress_nic": "eth0",
+        "node_mesh_ip": "10.0.1.2",
+        "node_mesh_nic": "eth1"
     },
     {
         "name": "sf-3",
-        "egress_ip": "10.0.0.3",
-        "egress_nic": "eth0",
-        "mesh_ip": "10.0.1.3",
-        "mesh_nic": "eth1"
+        "node_egress_ip": "10.0.0.3",
+        "node_egress_nic": "eth0",
+        "node_mesh_ip": "10.0.1.3",
+        "node_mesh_nic": "eth1"
     }
 ]
 EOF
@@ -118,8 +118,8 @@ export TOPOLOGY
 And then we can run the installer:
 
 ```
-sudo - bash
-./sf-deploy.sh
+chmod +x sf-deploy.sh
+sudo ./sf-deploy.sh
 ```
 
 
@@ -132,14 +132,14 @@ Before you can start your first instance you'll need to authenticate to Shaken F
 * **~/.shakenfist**, a JSON formatted configuration file
 * **/etc/sf/shakenfist.json**, the same file as above, but global
 
-By default the installer creates **/etc/sf/sfrc**, which sets the required environment variables to authenticate.  
+By default the installer creates **/etc/sf/sfrc**, which sets the required environment variables to authenticate.
 It is customized per installation, setting the following variables:
 
 * **SHAKENFIST_NAMESPACE**, the namespace to create resources in
 * **SHAKENFIST_KEY**, an authentication key for that namespace
 * **SHAKENFIST_API_URL**, a URL to the Shaken Fist API server
 
-Before interacting with Shaken Fist, we need to source the rc file.  
+Before interacting with Shaken Fist, we need to source the rc file.
 
 ```bash
 . /etc/sf/sfrc
@@ -178,8 +178,8 @@ name        : myvm
 namespace   : system
 cpus        : 1
 memory      : 1024
-disk spec   : type=disk   bus=None  size=8   base=cirros  
-video       : model=cirrus  memory=16384  
+disk spec   : type=disk   bus=None  size=8   base=cirros
+video       : model=cirrus  memory=16384
 node        : marvin
 power state : on
 state       : created
@@ -212,7 +212,7 @@ configuration found in deploy/ansible/terraform/<cloud> where "cloud" is one of 
 * aws: Amazon EC2 bare metal (3 node cluster)
 * aws-single-node: Amazon EC2 bare metal (1 node cluster), note that the CI tests will not pass on a single node cluster
 * gcp: Google cloud, using nested virtualization (see additional steps below). **This deployment option is not for production use because of its lack of bare metal support and low MTUs affecting virtual network performance. We mainly use it for CI testing.**
-* metal: Baremetal provisioned outside of terraform
+* metal: Bare metal provisioned outside of terraform
 * openstack: OpenStack, using nested virtualization
 * shakenfist: Shaken Fist can self host, this is useful for CI for example
 
@@ -263,10 +263,10 @@ The installer will also enforce the following sanity checks:
 ### Deployment
 
 Each deployment takes slight different arguments. I tend to write a small shell script to wrap these up for
-convenience. Here's an example for a baremetal deployment:
+convenience. Here's an example for a bare metal deployment:
 
 ```bash
-$ cat ~/sf-deploys/cbr-remote.sh 
+$ cat ~/sf-deploys/cbr-remote.sh
 #!/bin/bash
 
 export CLOUD=metal

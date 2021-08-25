@@ -4,6 +4,7 @@
 - hosts: localhost
   gather_facts: yes
   connection: ssh
+  become: yes
   vars:
     ram_system_reservation: 5.0
 
