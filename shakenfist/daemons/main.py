@@ -1,12 +1,10 @@
 # Copyright 2019 Michael Still
 
-from functools import partial
 import setproctitle
 import time
 import os
 import psutil
 
-from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.daemons import external_api as external_api_daemon
@@ -17,11 +15,10 @@ from shakenfist.daemons import resources as resource_daemon
 from shakenfist.daemons import triggers as trigger_daemon
 from shakenfist import db
 from shakenfist import instance
-from shakenfist.networkinterface import instance_filter as ni_instance_filter
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
-from shakenfist.networkinterface import NetworkInterfaces
+from shakenfist.networkinterface import interfaces_for_instance
 from shakenfist.node import Node
 from shakenfist.util import general as util_general
 from shakenfist.util import process as util_process
@@ -29,18 +26,6 @@ from shakenfist.util import network as util_network
 
 
 LOG, HANDLER = logutil.setup('main')
-
-
-def interfaces_for_instance(instance):
-    nis = {}
-    loggable_nis = {}
-    for ni in NetworkInterfaces([baseobject.active_states_filter,
-                                 partial(ni_instance_filter, instance)]):
-        nis[ni.order] = ni
-        loggable_nis[ni.order] = str(ni)
-
-    for order in sorted(nis.keys()):
-        yield nis[order]
 
 
 def restore_instances():
@@ -59,7 +44,8 @@ def restore_instances():
                     if not inst_interfaces:
                         inst.interfaces = [ni.network_uuid]
                     else:
-                        inst.interfaces = inst_interfaces.append(ni.network_uuid)
+                        inst.interfaces = inst_interfaces.append(
+                            ni.network_uuid)
 
         # TODO(mikal): do better here.
         # for disk in inst.disk_spec:
