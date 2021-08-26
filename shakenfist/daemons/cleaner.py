@@ -206,11 +206,12 @@ class Monitor(daemon.Daemon):
                 if age > config.NODE_CHECKIN_MAXIMUM:
                     n.state = Node.STATE_MISSING
 
-            # Perform etcd maintenance
-            if time.time() - last_compaction > 1800:
-                LOG.info('Compacting etcd')
-                self._compact_etcd()
-                last_compaction = time.time()
+            # Perform etcd maintenance, if we are an etcd master
+            if config.NODE_IS_ETCD_MASTER:
+                if time.time() - last_compaction > 1800:
+                    LOG.info('Compacting etcd')
+                    self._compact_etcd()
+                    last_compaction = time.time()
 
             last_loop_run = time.time()
             time.sleep(60)

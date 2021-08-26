@@ -183,6 +183,10 @@ class SFConfig(BaseSettings):
     NODE_NAME: str = Field(
         default_factory=get_node_name, description='FQDN of this node'
     )
+    NODE_IS_ETCD_MASTER: bool = Field(
+        False, description='True if this node is an etcd master. This controls '
+                           'attempts to compact the master database.'
+    )
     NODE_EGRESS_IP: str = Field(
         '', description='Egress IP of this node'
     )
