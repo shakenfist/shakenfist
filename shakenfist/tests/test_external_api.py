@@ -152,7 +152,7 @@ class AuthTestCase(base.ShakenFistTestCase):
             },
             resp.get_json())
 
-    @mock.patch('shakenfist.external_api.app.Auth._get_keys',
+    @mock.patch('shakenfist.external_api.auth.AuthEndpoint._get_keys',
                 return_value=(None, [_encode_key('cheese')]))
     def test_post_auth(self, mock_get_keys):
         resp = self.client.post(
@@ -160,7 +160,7 @@ class AuthTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
         self.assertIn('access_token', resp.get_json())
 
-    @mock.patch('shakenfist.external_api.app.Auth._get_keys',
+    @mock.patch('shakenfist.external_api.auth.AuthEndpoint._get_keys',
                 return_value=('cheese', [_encode_key('bacon')]))
     def test_post_auth_not_authorized(self, mock_get_keys):
         resp = self.client.post(
@@ -250,7 +250,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
 
         # Make a fake auth token
         self.get_keys = mock.patch(
-            'shakenfist.external_api.app.Auth._get_keys',
+            'shakenfist.external_api.auth.AuthEndpoint._get_keys',
             return_value=('foo', ['bar'])
         )
         self.mock_get_keys = self.get_keys.start()
