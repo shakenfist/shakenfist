@@ -260,7 +260,11 @@ class Instance(dbo):
         i['interfaces'] = []
         for iface_uuid in self.interfaces:
             ni = networkinterface.NetworkInterface.from_db(iface_uuid)
-            i['interfaces'].append(ni.external_view())
+            if not ni:
+                self.log.with_fields({'networkinterface': iface_uuid}).error(
+                    'Network interface missing')
+            else:
+                i['interfaces'].append(ni.external_view())
 
         return i
 
