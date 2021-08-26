@@ -42,7 +42,6 @@ from shakenfist import instance
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
-from shakenfist import networkinterface
 from shakenfist.networkinterface import NetworkInterface
 from shakenfist.node import Node
 from shakenfist import scheduler
@@ -644,7 +643,9 @@ class InstanceInterfaces(api_base.Resource):
     def get(self, instance_uuid=None, instance_from_db=None):
         out = []
         for iface_uuid in instance_from_db.interfaces:
-            ni = networkinterface.NetworkInterface.from_db(iface_uuid)
+            ni, _, err = _safe_get_network_interface(iface_uuid)
+            if err:
+                return err
             out.append(ni.external_view())
         return out
 
