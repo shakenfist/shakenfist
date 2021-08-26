@@ -61,7 +61,7 @@
       sf_instance:
         name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-1"
         cpu: 4
-        ram: 8192
+        ram: 12288
         disks:
           - "50@{{base_image}}"
         networkspecs:
@@ -86,7 +86,7 @@
       sf_instance:
         name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-2"
         cpu: 4
-        ram: 8192
+        ram: 12288
         disks:
           - "50@{{base_image}}"
         networkspecs:
@@ -111,7 +111,7 @@
       sf_instance:
         name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-3"
         cpu: 4
-        ram: 8192
+        ram: 12288
         disks:
           - "50@{{base_image}}"
         networkspecs:
@@ -136,7 +136,7 @@
       sf_instance:
         name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-4"
         cpu: 4
-        ram: 8192
+        ram: 12288
         disks:
           - "50@{{base_image}}"
         networkspecs:
@@ -161,7 +161,7 @@
       sf_instance:
         name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-5"
         cpu: 4
-        ram: 8192
+        ram: 12288
         disks:
           - "50@{{base_image}}"
         networkspecs:
