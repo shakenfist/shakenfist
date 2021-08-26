@@ -92,21 +92,24 @@ read -r -d '' TOPOLOGY <<'EOF'
         "node_egress_ip": "10.0.0.1",
         "node_egress_nic": "eth0",
         "node_mesh_ip": "10.0.1.1",
-        "node_mesh_nic": "eth1"
+        "node_mesh_nic": "eth1",
+        "etcd_master": true
     },
     {
         "name": "sf-2",
         "node_egress_ip": "10.0.0.2",
         "node_egress_nic": "eth0",
         "node_mesh_ip": "10.0.1.2",
-        "node_mesh_nic": "eth1"
+        "node_mesh_nic": "eth1",
+        "etcd_master": true
     },
     {
         "name": "sf-3",
         "node_egress_ip": "10.0.0.3",
         "node_egress_nic": "eth0",
         "node_mesh_ip": "10.0.1.3",
-        "node_mesh_nic": "eth1"
+        "node_mesh_nic": "eth1",
+        "etcd_master": true
     }
 ]
 EOF
@@ -115,7 +118,7 @@ export TOPOLOGY
 /srv/shakenfist/venv/share/shakenfist/installer/install
 ```
 
-And then we can run the installer:
+Not every node needs to be an etcd_master. I'd select three in most situations. And then we can run the installer:
 
 ```
 chmod +x sf-deploy.sh
