@@ -758,7 +758,8 @@ class Instance(dbo):
                 {
                     'macaddr': ni.macaddr,
                     'bridge': n.subst_dict()['vx_bridge'],
-                    'model': ni.model
+                    'model': ni.model,
+                    'mtu': config.MAX_HYPERVISOR_MTU - 50
                 }
             )
 
