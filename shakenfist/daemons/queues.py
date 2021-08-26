@@ -268,7 +268,7 @@ def instance_delete(inst):
         # field (an image fetch failure for example).
         instance_networks = []
         interfaces = []
-        for ni in networkinterface.interfaces_for_instance(inst.uuid):
+        for ni in networkinterface.interfaces_for_instance(inst):
             interfaces.append(ni)
             if ni.network_uuid not in instance_networks:
                 instance_networks.append(ni.network_uuid)
