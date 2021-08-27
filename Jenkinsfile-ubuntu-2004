@@ -94,16 +94,23 @@ pipeline {
                 fi
 
                 # Ensure we didn't log any errors
-                if [ `grep -c "ERROR"` -gt 0 ]
+                if [ `grep -c "ERROR" /var/log/syslog` -gt 0 ]
                 then
                   echo "Errors were logged!"
                   exit 1
                 fi
 
                 # Ensure nothing died
-                if [ `grep -c "died"` -gt 0 ]
+                if [ `grep -c "died" /var/log/syslog` -gt 0 ]
                 then
                   echo "A process died!"
+                  exit 1
+                fi
+
+                # Ensure no leaked vxlans
+                if [ `grep -c "Extra vxlans present" /var/log/syslog` -gt 0 ]
+                then
+                  echo "vxlans leaked!"
                   exit 1
                 fi
           '''
