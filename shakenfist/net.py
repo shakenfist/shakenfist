@@ -22,9 +22,10 @@ from shakenfist import instance
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import networkinterface
-from shakenfist.node import Node
+from shakenfist.node import Node, Nodes, active_states_filter as active_nodes
 from shakenfist.tasks import (
     DeployNetworkTask,
+    HypervisorDestroyNetworkTask,
     UpdateDHCPNetworkTask,
     RemoveDHCPNetworkTask,
     RemoveNATNetworkTask)
@@ -483,6 +484,15 @@ class Network(dbo):
                         self.update_floating_gateway(None)
 
             self.state = self.STATE_DELETED
+
+        # Ensure that all hypervisors remove this network. This is really
+        # just catching strays, apart from on the network node where we
+        # absolutely need to do this thing.
+        for hyp in Nodes([active_nodes]):
+            db.enqueue(hyp.uuid,
+                       {'tasks': [
+                           HypervisorDestroyNetworkTask(self.uuid)
+                       ]})
 
         self.remove_dhcp()
         self.remove_nat()

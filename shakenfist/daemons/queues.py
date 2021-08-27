@@ -17,6 +17,7 @@ from shakenfist import logutil
 from shakenfist.tasks import (QueueTask,
                               DeleteInstanceTask,
                               FetchImageTask,
+                              HypervisorDestroyNetworkTask,
                               InstanceTask,
                               PreflightInstanceTask,
                               StartInstanceTask,
@@ -154,6 +155,10 @@ def handle(jobname, workitem):
                     # All original instances deleted, safe to delete network
                     db.enqueue('networknode',
                                DestroyNetworkTask(task.network_uuid()))
+
+            elif isinstance(task, HypervisorDestroyNetworkTask):
+                n = net.Network.from_db(task.network_uuid())
+                n.delete_on_hypervisor()
 
             else:
                 log_i.with_field('task', task).error(
