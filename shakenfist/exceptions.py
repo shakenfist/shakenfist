@@ -162,3 +162,7 @@ class UnknownChecksumType(ArtifactException):
 
 class ArtifactHasNoBlobs(ArtifactException):
     pass
+
+
+class BlobMissing(ArtifactException):
+    pass

@@ -131,6 +131,9 @@ class ImageFetchHelper(object):
         os.makedirs(blob_dir, exist_ok=True)
 
         b = Blob.from_db(blob_uuid)
+        if not b:
+            raise exceptions.BlobMissing(blob_uuid)
+
         locations = b.locations
         random.shuffle(locations)
         blob_source = locations[0]
