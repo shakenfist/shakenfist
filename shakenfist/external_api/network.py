@@ -5,6 +5,7 @@ from flask_restful import fields
 from flask_restful import marshal_with
 import ipaddress
 
+from shakenfist.config import config
 from shakenfist.external_api import (
     base as api_base,
     util as api_util)
@@ -16,15 +17,15 @@ from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
 from shakenfist import networkinterface
-from shakenfist.tasks import DestroyNetworkTask
 from shakenfist.util import process as util_process
+from shakenfist.tasks import DestroyNetworkTask, DeleteNetworkWhenClean
 
 
 LOG, HANDLER = logutil.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 
-def _delete_network(network_from_db):
+def _delete_network(network_from_db, wait_interfaces=None):
     # Load network from DB to ensure obtaining correct lock.
     n = net.Network.from_db(network_from_db.uuid)
     if not n:
@@ -32,15 +33,22 @@ def _delete_network(network_from_db):
             'delete_network: network does not exist')
         return api_base.error(404, 'network does not exist')
 
-    if n.is_dead():
+    if n.is_dead() and n.state.value != net.Network.STATE_DELETE_WAIT:
         # The network has been deleted. No need to attempt further effort.
+        # We do allow attempts to delete networks in DELETE_WAIT.
         LOG.with_fields({'network_uuid': n.uuid,
                          'state': n.state.value
                          }).warning('delete_network: network is dead')
         return api_base.error(404, 'network is deleted')
 
-    n.add_event('api', 'delete')
-    db.enqueue('networknode', DestroyNetworkTask(n.uuid))
+    if wait_interfaces:
+        n.state = net.Network.STATE_DELETE_WAIT
+        n.add_event('api', 'delete-wait')
+        db.enqueue(config.NODE_NAME,
+                   {'tasks': [DeleteNetworkWhenClean(n.uuid, wait_interfaces)]})
+    else:
+        n.add_event('api', 'delete')
+        db.enqueue('networknode', DestroyNetworkTask(n.uuid))
 
 
 class NetworkEndpoint(api_base.Resource):
@@ -128,8 +136,13 @@ class NetworksEndpoint(api_base.Resource):
 
     @jwt_required
     @api_base.redirect_to_network_node
-    def delete(self, confirm=False, namespace=None):
-        """Delete all networks in the namespace."""
+    def delete(self, confirm=False, namespace=None, clean_wait=False):
+        """Delete all networks in the namespace.
+
+        Set clean_wait to True to have the system wait until all interfaces are
+        deleted from the network. New instances will not be permitted to be
+        added to the network.
+        """
 
         if confirm is not True:
             return api_base.error(400, 'parameter confirm is not set true')
@@ -150,13 +163,18 @@ class NetworksEndpoint(api_base.Resource):
         networks_unable = []
         for n in net.Networks([partial(baseobject.namespace_filter, namespace),
                                baseobject.active_states_filter]):
-            if len(list(networkinterface.interfaces_for_network(n))) > 0:
-                LOG.with_object(n).warning(
-                    'Network in use, cannot be deleted by delete-all')
-                networks_unable.append(n.uuid)
-                continue
+            iface_on_net = list(networkinterface.interfaces_for_network(n))
+            if not iface_on_net:
+                _delete_network(n)
+            else:
+                if clean_wait:
+                    _delete_network(n, [n.uuid for n in iface_on_net])
+                else:
+                    LOG.with_object(n).warning(
+                        'Network in use, cannot be deleted by delete-all')
+                    networks_unable.append(n.uuid)
+                    continue
 
-            _delete_network(n)
             networks_del.append(n.uuid)
 
         if networks_unable:

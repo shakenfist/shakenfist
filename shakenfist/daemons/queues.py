@@ -20,6 +20,8 @@ from shakenfist.tasks import (QueueTask,
                               InstanceTask,
                               PreflightInstanceTask,
                               StartInstanceTask,
+                              DestroyNetworkTask,
+                              DeleteNetworkWhenClean,
                               FloatNetworkInterfaceTask,
                               SnapshotTask)
 from shakenfist import net
@@ -122,6 +124,36 @@ def handle(jobname, workitem):
             elif isinstance(task, SnapshotTask):
                 snapshot(inst, task.disk(),
                          task.artifact_uuid(), task.blob_uuid())
+
+            elif isinstance(task, DeleteNetworkWhenClean):
+                # Check if any interfaces remain on network
+                task_network = net.Network.from_db(task.network_uuid())
+                ifaces = networkinterface.interfaces_for_network(task_network)
+                cur_interfaces = {i.uuid: i for i in ifaces}
+
+                # Only check those present at delete task initiation time.
+                remain_interfaces = list(set(task.wait_interfaces()) &
+                                         set(cur_interfaces))
+                if remain_interfaces:
+                    # Queue task on a node with a remaining instance
+                    first_iface = cur_interfaces[remain_interfaces[0]]
+                    inst = instance.Instance.from_db(first_iface.instance_uuid)
+                    db.enqueue(inst.placement['node'],
+                               {'tasks': [
+                                   DeleteNetworkWhenClean(task.network_uuid(),
+                                                          remain_interfaces)
+                               ]})
+
+                elif cur_interfaces:
+                    LOG.with_network(task_network).error(
+                        'During DeleteNetworkWhenClean new interfaces have '
+                        'connected to network: %s',
+                        [i.uuid for i in cur_interfaces])
+
+                else:
+                    # All original instances deleted, safe to delete network
+                    db.enqueue('networknode',
+                               DestroyNetworkTask(task.network_uuid()))
 
             else:
                 log_i.with_field('task', task).error(
@@ -299,6 +331,9 @@ def instance_delete(inst):
             if n:
                 # If network used by another instance, only update
                 if network in host_networks:
+                    if n.state.value == net.Network.STATE_DELETE_WAIT:
+                        # Do not update a network about to be deleted
+                        continue
                     with util_general.RecordedOperation('deallocate ip address', inst):
                         n.update_dhcp()
                 else:
