@@ -21,7 +21,7 @@
     "editable": true,
     "gnetId": null,
     "graphTooltip": 0,
-    "id": 2,
+    "id": 4,
     "links": [],
     "panels": [
       {
@@ -565,6 +565,41 @@
         }
       },
       {
+        "alert": {
+          "alertRuleTags": {},
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [
+                  100000000000
+                ],
+                "type": "lt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": [
+                  "A",
+                  "5m",
+                  "now"
+                ]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "keep_state",
+          "for": "5m",
+          "frequency": "1m",
+          "handler": 1,
+          "name": "Memory Utilisation alert",
+          "noDataState": "keep_state",
+          "notifications": []
+        },
         "aliasColors": {},
         "bars": false,
         "dashLength": 10,
@@ -618,7 +653,16 @@
             "refId": "B"
           }
         ],
-        "thresholds": [],
+        "thresholds": [
+          {
+            "colorMode": "critical",
+            "fill": true,
+            "line": true,
+            "op": "lt",
+            "value": 100000000000,
+            "visible": true
+          }
+        ],
         "timeFrom": null,
         "timeRegions": [],
         "timeShift": null,
@@ -761,6 +805,41 @@
         }
       },
       {
+        "alert": {
+          "alertRuleTags": {},
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [
+                  10
+                ],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": [
+                  "A",
+                  "5m",
+                  "now"
+                ]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "for": "5m",
+          "frequency": "1m",
+          "handler": 1,
+          "name": "Network queue alert",
+          "noDataState": "no_data",
+          "notifications": []
+        },
         "aliasColors": {},
         "bars": false,
         "dashLength": 10,
@@ -814,7 +893,16 @@
             "refId": "B"
           }
         ],
-        "thresholds": [],
+        "thresholds": [
+          {
+            "colorMode": "critical",
+            "fill": true,
+            "line": true,
+            "op": "gt",
+            "value": 10,
+            "visible": true
+          }
+        ],
         "timeFrom": null,
         "timeRegions": [],
         "timeShift": null,
@@ -860,6 +948,41 @@
         }
       },
       {
+        "alert": {
+          "alertRuleTags": {},
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [
+                  0.2
+                ],
+                "type": "lt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": [
+                  "B",
+                  "5m",
+                  "now"
+                ]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "keep_state",
+          "for": "5m",
+          "frequency": "1m",
+          "handler": 1,
+          "name": "Disk free alert",
+          "noDataState": "keep_state",
+          "notifications": []
+        },
         "aliasColors": {},
         "bars": false,
         "dashLength": 10,
@@ -901,13 +1024,32 @@
         "steppedLine": false,
         "targets": [
           {
-            "expr": "disk_free",
+            "exemplar": true,
+            "expr": "label_replace(disk_free, \"instance\", \"$1\", \"instance\", \"(.*):.*\")",
+            "hide": false,
             "interval": "",
             "legendFormat": "{{instance}}",
             "refId": "A"
+          },
+          {
+            "exemplar": true,
+            "expr": "disk_free / disk_total",
+            "hide": true,
+            "interval": "",
+            "legendFormat": "{{instance}}",
+            "refId": "B"
           }
         ],
-        "thresholds": [],
+        "thresholds": [
+          {
+            "colorMode": "critical",
+            "fill": true,
+            "line": true,
+            "op": "lt",
+            "value": 0.2,
+            "visible": true
+          }
+        ],
         "timeFrom": null,
         "timeRegions": [],
         "timeShift": null,
@@ -917,15 +1059,7 @@
           "sort": 0,
           "value_type": "individual"
         },
-        "transformations": [
-          {
-            "id": "renameByRegex",
-            "options": {
-              "regex": ":13001",
-              "renamePattern": ""
-            }
-          }
-        ],
+        "transformations": [],
         "type": "graph",
         "xaxis": {
           "buckets": null,
@@ -936,6 +1070,7 @@
         },
         "yaxes": [
           {
+            "$$hashKey": "object:651",
             "format": "bytes",
             "label": null,
             "logBase": 1,
@@ -944,6 +1079,7 @@
             "show": true
           },
           {
+            "$$hashKey": "object:652",
             "format": "short",
             "label": null,
             "logBase": 1,
@@ -1154,6 +1290,41 @@
         }
       },
       {
+        "alert": {
+          "alertRuleTags": {},
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [
+                  20
+                ],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": [
+                  "A",
+                  "5m",
+                  "now"
+                ]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "for": "5m",
+          "frequency": "1m",
+          "handler": 1,
+          "name": "Node queues alert",
+          "noDataState": "no_data",
+          "notifications": []
+        },
         "aliasColors": {},
         "bars": false,
         "dashLength": 10,
@@ -1196,13 +1367,22 @@
         "targets": [
           {
             "exemplar": true,
-            "expr": "node_queue_waiting",
+            "expr": "label_replace(node_queue_waiting, \"instance\", \"$1\", \"instance\", \"(.*):.*\")",
             "interval": "",
             "legendFormat": "{{instance}}",
             "refId": "A"
           }
         ],
-        "thresholds": [],
+        "thresholds": [
+          {
+            "colorMode": "critical",
+            "fill": true,
+            "line": true,
+            "op": "gt",
+            "value": 20,
+            "visible": true
+          }
+        ],
         "timeFrom": null,
         "timeRegions": [],
         "timeShift": null,
@@ -1212,15 +1392,7 @@
           "sort": 0,
           "value_type": "individual"
         },
-        "transformations": [
-          {
-            "id": "renameByRegex",
-            "options": {
-              "regex": ":13001",
-              "renamePattern": ""
-            }
-          }
-        ],
+        "transformations": [],
         "type": "graph",
         "xaxis": {
           "buckets": null,
@@ -1558,6 +1730,41 @@
         }
       },
       {
+        "alert": {
+          "alertRuleTags": {},
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [
+                  100000000
+                ],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": [
+                  "A",
+                  "5m",
+                  "now"
+                ]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "keep_state",
+          "for": "5m",
+          "frequency": "1m",
+          "handler": 1,
+          "name": "etcd DB Size alert",
+          "noDataState": "keep_state",
+          "notifications": []
+        },
         "aliasColors": {},
         "bars": false,
         "dashLength": 10,
@@ -1599,13 +1806,23 @@
         "steppedLine": false,
         "targets": [
           {
-            "expr": "etcd_mvcc_db_total_size_in_bytes",
+            "exemplar": true,
+            "expr": "label_replace(etcd_mvcc_db_total_size_in_bytes, \"instance\", \"$1\", \"instance\", \"(.*):.*\")",
             "interval": "",
             "legendFormat": "{{instance}}",
             "refId": "A"
           }
         ],
-        "thresholds": [],
+        "thresholds": [
+          {
+            "colorMode": "critical",
+            "fill": true,
+            "line": true,
+            "op": "gt",
+            "value": 100000000,
+            "visible": true
+          }
+        ],
         "timeFrom": null,
         "timeRegions": [],
         "timeShift": null,
@@ -1615,15 +1832,7 @@
           "sort": 0,
           "value_type": "individual"
         },
-        "transformations": [
-          {
-            "id": "renameByRegex",
-            "options": {
-              "regex": ":13001",
-              "renamePattern": ""
-            }
-          }
-        ],
+        "transformations": [],
         "type": "graph",
         "xaxis": {
           "buckets": null,
@@ -1634,6 +1843,7 @@
         },
         "yaxes": [
           {
+            "$$hashKey": "object:1291",
             "format": "bytes",
             "label": null,
             "logBase": 1,
@@ -1642,6 +1852,7 @@
             "show": true
           },
           {
+            "$$hashKey": "object:1292",
             "format": "short",
             "label": null,
             "logBase": 1,
@@ -1664,8 +1875,8 @@
       "list": []
     },
     "time": {
-        "from": "now-30m",
-        "to": "now"
+      "from": "now-30m",
+      "to": "now"
     },
     "timepicker": {
         "refresh_intervals": [
