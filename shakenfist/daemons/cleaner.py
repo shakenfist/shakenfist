@@ -221,7 +221,7 @@ class Monitor(daemon.Daemon):
                         LOG.with_fields({
                             'blob': blob_uuid,
                             'entity': ent}).warning('Deleting orphaned blob')
-                        os.unlink(ent)
+                        os.unlink(entpath)
 
             # Perform etcd maintenance, if we are an etcd master
             if config.NODE_IS_ETCD_MASTER:
