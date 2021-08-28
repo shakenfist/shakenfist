@@ -106,7 +106,9 @@ pipeline {
                   exit 1
                 fi
 
-                # Ensure we didn't log any errors
+                # Ensure we didn't log any errors -- note the inclusion of the start
+                # of the process name here to avoid errors from things like prometheus
+                # node exporter.
                 if [ `grep -c "ERROR sf" $WORKSPACE_TMP/syslog` -gt 0 ]
                 then
                   echo "Errors were logged!"
@@ -121,7 +123,7 @@ pipeline {
                 fi
 
                 # Ensure no leaked vxlans
-                if [ `grep -c "Extra vxlans present" $WORKSPACE_TMP/syslog` -gt 0 ]
+                if [ `grep -c "Extra vxlan present" $WORKSPACE_TMP/syslog` -gt 0 ]
                 then
                   echo "vxlans leaked!"
                   exit 1

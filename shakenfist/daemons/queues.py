@@ -210,7 +210,7 @@ def image_fetch(url, inst):
 
 
 def instance_preflight(inst, network):
-    inst.state = 'preflight'
+    inst.state = instance.Instance.STATE_PREFLIGHT
 
     # Try to place on this node
     s = scheduler.Scheduler()
@@ -278,6 +278,12 @@ def instance_start(inst, network):
                     'network is not active: %s' % n.uuid)
                 return
 
+            # We must record interfaces very early for the vxlan leak
+            # detection code in the net daemon to work correctly.
+            ni = networkinterface.NetworkInterface.from_db(
+                netdesc['iface_uuid'])
+            ni.state = dbo.STATE_CREATED
+
             n.create_on_hypervisor()
             n.ensure_mesh()
             n.update_dhcp()
@@ -303,10 +309,6 @@ def instance_start(inst, network):
             # This instance is in an error or deleted state. Given the check
             # at the top of this method, that indicates a race.
             return
-
-        for iface_uuid in inst.interfaces:
-            ni = networkinterface.NetworkInterface.from_db(iface_uuid)
-            ni.state = dbo.STATE_CREATED
 
 
 def instance_delete(inst):

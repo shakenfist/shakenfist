@@ -1,3 +1,4 @@
+import copy
 import ipaddress
 import itertools
 import time
@@ -31,6 +32,8 @@ from shakenfist.util import network as util_network
 
 LOG, _ = logutil.setup(__name__)
 
+EXTRA_VLANS_HISTORY = {}
+
 
 class Monitor(daemon.Daemon):
     def _maintain_networks(self):
@@ -44,9 +47,18 @@ class Monitor(daemon.Daemon):
         seen_vxids = []
 
         if not util_network.is_network_node():
-            # For normal nodes, just the ones we have instances for
-            for inst in instance.Instances([instance.this_node_filter, instance.active_states_filter]):
-                for iface_uuid in inst.interfaces:
+            # For normal nodes, just the ones we have instances for. We need
+            # to use the more expensive interfaces_for_instance() method of
+            # looking up instance interfaces here if the instance cachce hasn't
+            # been populated yet (i.e. the instance is still being created)
+            for inst in instance.Instances([instance.this_node_filter,
+                                            instance.active_states_filter]):
+                ifaces = inst.interfaces
+                if not ifaces:
+                    ifaces = list(
+                        networkinterface.interfaces_for_instance(inst))
+
+                for iface_uuid in ifaces:
                     ni = networkinterface.NetworkInterface.from_db(iface_uuid)
                     if not ni:
                         LOG.with_instance(
@@ -144,10 +156,21 @@ class Monitor(daemon.Daemon):
         # Determine if there are any extra vxids
         extra_vxids = set(vxid_to_mac.keys()) - set(seen_vxids)
 
-        # Delete "deleted" SF networks and log unknown vxlans
-        if extra_vxids:
-            LOG.with_field('vxids', extra_vxids).warning(
-                'Extra vxlans present!')
+        # We keep a global cache of extra vxlans we've seen before, so that
+        # we only warn about them when they've been stray for five minutes.
+        global EXTRA_VLANS_HISTORY
+        for vxid in copy.copy(EXTRA_VLANS_HISTORY):
+            if vxid not in extra_vxids:
+                del EXTRA_VLANS_HISTORY[vxid]
+        for vxid in extra_vxids:
+            if vxid not in EXTRA_VLANS_HISTORY:
+                EXTRA_VLANS_HISTORY[vxid] = time.time()
+
+        # Warn of extra vxlans which have been present for more than five minutes
+        for vxid in EXTRA_VLANS_HISTORY:
+            if time.time() - EXTRA_VLANS_HISTORY[vxid] > 5 * 60:
+                LOG.with_field('vxid', vxid).warning(
+                    'Extra vxlan present!')
 
         # And record vxids in the database
         db.persist_node_vxid_mapping(config.NODE_NAME, vxid_to_mac)
