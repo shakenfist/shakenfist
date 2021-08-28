@@ -253,6 +253,15 @@ def instance_preflight(inst, network):
 
 
 def instance_start(inst, network):
+    if inst.state.value.endswith('-error'):
+        LOG.with_instance(inst).warning(
+            'You cannot start an instance in an error state.')
+        return
+    if inst.state.value == dbo.STATE_DELETED:
+        LOG.with_instance(inst).warning(
+            'You cannot start an instance which has been deleted.')
+        return
+
     with inst.get_lock(ttl=900, op='Instance start') as lock:
         # Ensure networks are connected to this node
         iface_uuids = []
@@ -289,6 +298,11 @@ def instance_start(inst, network):
                 inst.enqueue_delete_due_error(
                     'instance failed to start: %s' % e)
                 return
+
+        except exceptions.InvalidStateException:
+            # This instance is in an error or deleted state. Given the check
+            # at the top of this method, that indicates a race.
+            return
 
         for iface_uuid in inst.interfaces:
             ni = networkinterface.NetworkInterface.from_db(iface_uuid)
