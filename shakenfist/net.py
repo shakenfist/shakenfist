@@ -286,6 +286,11 @@ class Network(dbo):
     def is_created(self):
         """Attempt to ensure network has been created successfully."""
 
+        # The floating network always exists, and would fail the vx_bridge
+        # test we apply to other networks.
+        if self.uuid == 'floating':
+            return True
+
         subst = self.subst_dict()
         if not util_network.check_for_interface(subst['vx_bridge'], up=True):
             self.log.warning('%s is not up', subst['vx_bridge'])
@@ -305,6 +310,10 @@ class Network(dbo):
                                     self.STATE_ERROR)
 
     def _create_common(self):
+        # The floating network does not have a vxlan mesh
+        if self.uuid == 'floating':
+            return
+
         subst = self.subst_dict()
 
         if not util_network.check_for_interface(subst['vx_interface']):
@@ -345,6 +354,10 @@ class Network(dbo):
             self.add_event('deploy', 'enqueued')
 
     def create_on_network_node(self):
+        # The floating network does not have a vxlan mesh
+        if self.uuid == 'floating':
+            return
+
         with self.get_lock(op='create_on_network_node'):
             if self.is_dead():
                 raise DeadNetwork('network=%s' % self)
@@ -581,6 +594,10 @@ class Network(dbo):
             self.add_event('remove dhcp', 'enqueued')
 
     def discover_mesh(self):
+        # The floating network does not have a vxlan mesh
+        if self.uuid == 'floating':
+            return
+
         mesh_re = re.compile(r'00:00:00:00:00:00 dst (.*) self permanent')
 
         stdout, _ = util_process.execute(
@@ -592,6 +609,10 @@ class Network(dbo):
                 yield m.group(1)
 
     def ensure_mesh(self):
+        # The floating network does not have a vxlan mesh
+        if self.uuid == 'floating':
+            return
+
         with self.get_lock(op='Network ensure mesh'):
             # Ensure network was not deleted whilst waiting for the lock.
             if self.is_dead():
