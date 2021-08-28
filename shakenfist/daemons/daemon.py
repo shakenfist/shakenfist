@@ -1,8 +1,12 @@
+import copy
 import logging
+import multiprocessing
 import setproctitle
 
 from shakenfist.config import config
+from shakenfist import db
 from shakenfist import logutil
+from shakenfist.util import libvirt as util_libvirt
 
 
 DAEMON_NAMES = {
@@ -43,3 +47,33 @@ class Daemon(object):
         setproctitle.setproctitle(process_name(name))
         log, _ = logutil.setup(name)
         set_log_level(log, name)
+
+
+class WorkerPoolDaemon(Daemon):
+    def __init__(self, name):
+        super(WorkerPoolDaemon, self).__init__(name)
+        self.workers = []
+
+        libvirt = util_libvirt.get_libvirt()
+        conn = libvirt.open('qemu:///system')
+        self.present_cpus, _, _ = conn.getCPUMap()
+
+    def reap_workers(self):
+        for w in copy.copy(self.workers):
+            if not w.is_alive():
+                w.join(1)
+                self.workers.remove(w)
+
+    def dequeue_work_item(self, queue_name, processing_callback):
+        if len(self.workers) > self.present_cpus / 2:
+            return False
+
+        jobname, workitem = db.dequeue(queue_name)
+        if not workitem:
+            return False
+
+        p = multiprocessing.Process(
+            target=processing_callback, args=(jobname, workitem),
+            name='%s-worker' % process_name('queues'))
+        p.start()
+        self.workers.append(p)
