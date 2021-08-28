@@ -107,7 +107,7 @@ pipeline {
                 fi
 
                 # Ensure we didn't log any errors
-                if [ `grep -c "ERROR" $WORKSPACE_TMP/syslog` -gt 0 ]
+                if [ `grep -c "ERROR sf" $WORKSPACE_TMP/syslog` -gt 0 ]
                 then
                   echo "Errors were logged!"
                   exit 1

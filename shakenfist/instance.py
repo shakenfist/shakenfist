@@ -852,7 +852,9 @@ class Instance(dbo):
         try:
             inst.destroy()
         except libvirt.libvirtError as e:
-            self.log.error('Failed to delete domain: %s', e)
+            if not str(e).startswith('Requested operation is not valid: '
+                                     'domain is not running'):
+                self.log.error('Failed to delete domain: %s', e)
 
         self.update_power_state('off')
         self.add_event('poweroff', 'complete')
