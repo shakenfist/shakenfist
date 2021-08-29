@@ -5,8 +5,7 @@ from shakenfist_ci import base
 
 class TestImages(base.BaseTestCase):
     def test_cache_image(self):
-        url = ('http://cdimage.debian.org/cdimage/openstack/archive/'
-               '10.7.2-20201210/debian-10.7.2-20201210-openstack-amd64.qcow2')
+        url = ('https://sfcbr.shakenfist.com/gw-basic/gwbasic.qcow2')
 
         self.system_client.cache_image(url)
         image_urls = []

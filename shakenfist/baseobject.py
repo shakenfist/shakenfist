@@ -52,6 +52,9 @@ class DatabaseBackedObject(object):
     def _db_create(cls, object_uuid, metadata):
         metadata['uuid'] = object_uuid
         etcd.create(cls.object_type, None, object_uuid, metadata)
+        LOG.with_fields({
+            'object_type': cls.object_type
+        }).with_fields(metadata).debug('Object created')
 
     @classmethod
     def _db_get(cls, object_uuid):

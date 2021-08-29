@@ -208,19 +208,25 @@ class Monitor(daemon.Daemon):
                     n.state = Node.STATE_MISSING
 
             # Find orphaned blobs
-            for ent in os.listdir(os.path.join(config.STORAGE_PATH, 'blobs')):
-                entpath = os.path.join(config.STORAGE_PATH, 'blobs', ent)
+            blob_path = os.path.join(config.STORAGE_PATH, 'blobs')
+            os.makedirs(blob_path, exist_ok=True)
+            for ent in os.listdir(blob_path):
+                entpath = os.path.join(blob_path, ent)
                 st = os.stat(entpath)
+
+                # If we've had this file for more than two cleaner delays...
                 if time.time() - st.st_mtime > config.CLEANER_DELAY * 2:
-                    # The name of the entity might include .partial at the end,
-                    # remove that for this check
-                    blob_uuid = ent.split('.')[0]
-                    if not Blob.from_db(blob_uuid):
-                        # This blob does not exist and hasn't been modified in
-                        # a reasonable amount of time. Clean it up.
+                    if ent.endswith('.partial'):
+                        # ... and its a stale partial transfer
                         LOG.with_fields({
-                            'blob': blob_uuid,
-                            'entity': ent}).warning('Deleting orphaned blob')
+                            'blob': ent}).warning(
+                                'Deleting stale partial transfer')
+                        os.unlink(entpath)
+
+                    elif not Blob.from_db(ent):
+                        # ... or it doesn't exist in the database
+                        LOG.with_fields({
+                            'blob': ent}).warning('Deleting orphaned blob')
                         os.unlink(entpath)
 
             # Perform etcd maintenance, if we are an etcd master

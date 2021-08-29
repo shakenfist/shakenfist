@@ -17,6 +17,7 @@ from shakenfist import logutil
 from shakenfist.tasks import (QueueTask,
                               DeleteInstanceTask,
                               FetchImageTask,
+                              HypervisorDestroyNetworkTask,
                               InstanceTask,
                               PreflightInstanceTask,
                               StartInstanceTask,
@@ -155,6 +156,10 @@ def handle(jobname, workitem):
                     db.enqueue('networknode',
                                DestroyNetworkTask(task.network_uuid()))
 
+            elif isinstance(task, HypervisorDestroyNetworkTask):
+                n = net.Network.from_db(task.network_uuid())
+                n.delete_on_hypervisor()
+
             else:
                 log_i.with_field('task', task).error(
                     'Unhandled task - dropped')
@@ -205,7 +210,7 @@ def image_fetch(url, inst):
 
 
 def instance_preflight(inst, network):
-    inst.state = 'preflight'
+    inst.state = instance.Instance.STATE_PREFLIGHT
 
     # Try to place on this node
     s = scheduler.Scheduler()
@@ -248,6 +253,15 @@ def instance_preflight(inst, network):
 
 
 def instance_start(inst, network):
+    if inst.state.value.endswith('-error'):
+        LOG.with_instance(inst).warning(
+            'You cannot start an instance in an error state.')
+        return
+    if inst.state.value == dbo.STATE_DELETED:
+        LOG.with_instance(inst).warning(
+            'You cannot start an instance which has been deleted.')
+        return
+
     with inst.get_lock(ttl=900, op='Instance start') as lock:
         # Ensure networks are connected to this node
         iface_uuids = []
@@ -263,6 +277,12 @@ def instance_start(inst, network):
                 inst.enqueue_delete_due_error(
                     'network is not active: %s' % n.uuid)
                 return
+
+            # We must record interfaces very early for the vxlan leak
+            # detection code in the net daemon to work correctly.
+            ni = networkinterface.NetworkInterface.from_db(
+                netdesc['iface_uuid'])
+            ni.state = dbo.STATE_CREATED
 
             n.create_on_hypervisor()
             n.ensure_mesh()
@@ -285,9 +305,10 @@ def instance_start(inst, network):
                     'instance failed to start: %s' % e)
                 return
 
-        for iface_uuid in inst.interfaces:
-            ni = networkinterface.NetworkInterface.from_db(iface_uuid)
-            ni.state = dbo.STATE_CREATED
+        except exceptions.InvalidStateException:
+            # This instance is in an error or deleted state. Given the check
+            # at the top of this method, that indicates a race.
+            return
 
 
 def instance_delete(inst):
