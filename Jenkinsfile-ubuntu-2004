@@ -77,6 +77,15 @@ pipeline {
            '''
       }
     }
+    stage('Create a base level of activity in the cluster') {
+      steps {
+        sh '''  . $WORKSPACE/$BUILD_TAG/ci-environment.sh
+                ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                    ubuntu@$primary \
+                    'for i in `seq 100`; do . /etc/sf/sfrc; sf-client --async=continue network create background-$i 10.$i.0.0/24; done'
+           '''
+      }
+    }
     stage('Run CI tests on primary') {
       steps {
         sh '''  . $WORKSPACE/$BUILD_TAG/ci-environment.sh

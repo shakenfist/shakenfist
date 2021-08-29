@@ -117,7 +117,6 @@ class Network(dbo):
 
         # Networks should immediately appear on the network node
         db.enqueue('networknode', DeployNetworkTask(uuid))
-        n.add_event('deploy', 'enqueued')
 
         # TODO(andy): Integrate metadata into each object type
         # Initialise metadata
@@ -344,14 +343,14 @@ class Network(dbo):
                     None, 'brctl setageing %(vx_bridge)s 0' % subst)
 
     def create_on_hypervisor(self):
+        # The floating network does not have a vxlan mesh
+        if self.uuid == 'floating':
+            return
+
         with self.get_lock(op='create_on_hypervisor'):
             if self.is_dead():
                 raise DeadNetwork('network=%s' % self)
             self._create_common()
-
-            # TODO(andy): Check with mikal: is this task required here?
-            db.enqueue('networknode', DeployNetworkTask(self.uuid))
-            self.add_event('deploy', 'enqueued')
 
     def create_on_network_node(self):
         # The floating network does not have a vxlan mesh
@@ -543,7 +542,6 @@ class Network(dbo):
                     d.restart_dhcpd()
         else:
             db.enqueue('networknode', UpdateDHCPNetworkTask(self.uuid))
-            self.add_event('update dhcp', 'enqueued')
 
     def remove_dhcp(self):
         if util_network.is_network_node():
@@ -554,7 +552,6 @@ class Network(dbo):
                     d.remove_dhcpd()
         else:
             db.enqueue('networknode', RemoveDHCPNetworkTask(self.uuid))
-            self.add_event('remove dhcp', 'enqueued')
 
     def enable_nat(self):
         if not util_network.is_network_node():
@@ -591,7 +588,6 @@ class Network(dbo):
 
         else:
             db.enqueue('networknode', RemoveNATNetworkTask(self.uuid))
-            self.add_event('remove dhcp', 'enqueued')
 
     def discover_mesh(self):
         # The floating network does not have a vxlan mesh

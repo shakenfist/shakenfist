@@ -1,5 +1,3 @@
-import copy
-import multiprocessing
 import requests
 import setproctitle
 import time
@@ -370,36 +368,15 @@ def snapshot(inst, disk, artifact_uuid, blob_uuid):
         a.state = dbo.STATE_CREATED
 
 
-class Monitor(daemon.Daemon):
+class Monitor(daemon.WorkerPoolDaemon):
     def run(self):
-        workers = []
-        LOG.info('Starting Queues')
-
-        libvirt = util_libvirt.get_libvirt()
-        conn = libvirt.open('qemu:///system')
-        present_cpus, _, _ = conn.getCPUMap()
+        LOG.info('Starting')
 
         while True:
             try:
-                for w in copy.copy(workers):
-                    if not w.is_alive():
-                        w.join(1)
-                        workers.remove(w)
-
-                if len(workers) < present_cpus / 2:
-                    jobname, workitem = db.dequeue(config.NODE_NAME)
-                else:
-                    workitem = None
-
-                if not workitem:
+                self.reap_workers()
+                if not self.dequeue_work_item(config.NODE_NAME, handle):
                     time.sleep(0.2)
-                    continue
-
-                p = multiprocessing.Process(
-                    target=handle, args=(jobname, workitem,),
-                    name='%s-worker' % daemon.process_name('queues'))
-                p.start()
-                workers.append(p)
 
             except Exception as e:
                 util_general.ignore_exception(daemon.process_name('queues'), e)
