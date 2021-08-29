@@ -64,6 +64,14 @@ class WorkerPoolDaemon(Daemon):
                 w.join(1)
                 self.workers.remove(w)
 
+    def start_workitem(self, processing_callback, args, name):
+        p = multiprocessing.Process(
+            target=processing_callback, args=args,
+            name='%s-%s' % (process_name('queues'), name))
+        p.start()
+        self.workers.append(p)
+        return p.pid
+
     def dequeue_work_item(self, queue_name, processing_callback):
         if len(self.workers) > self.present_cpus / 2:
             return False
@@ -71,9 +79,4 @@ class WorkerPoolDaemon(Daemon):
         jobname, workitem = db.dequeue(queue_name)
         if not workitem:
             return False
-
-        p = multiprocessing.Process(
-            target=processing_callback, args=(jobname, workitem),
-            name='%s-worker' % process_name('queues'))
-        p.start()
-        self.workers.append(p)
+        self.start_workitem(processing_callback, (jobname, workitem), 'worker')

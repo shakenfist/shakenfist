@@ -1,5 +1,4 @@
 import copy
-import ipaddress
 import itertools
 import time
 
@@ -35,7 +34,28 @@ LOG, _ = logutil.setup(__name__)
 EXTRA_VLANS_HISTORY = {}
 
 
-class Monitor(daemon.Daemon):
+class Monitor(daemon.WorkerPoolDaemon):
+    def _remove_stray_interfaces(self):
+        for n in net.Networks([baseobject.active_states_filter]):
+            t = time.time()
+            for ni in networkinterface.interfaces_for_network(n):
+                inst = instance.Instance.from_db(ni.instance_uuid)
+                if not inst:
+                    ni.delete()
+                    LOG.with_fields({
+                        'instance': ni.instance_uuid,
+                        'networkinterface': ni.uuid
+                    }).info('Deleted stray network interface for missing instance')
+                else:
+                    s = inst.state
+                    if (s.update_time + 30 < t and
+                            s.value in [dbo.STATE_DELETED, dbo.STATE_ERROR, 'unknown']):
+                        ni.delete()
+                        LOG.with_fields({
+                            'instance': ni.instance_uuid,
+                            'networkinterface': ni.uuid
+                        }).info('Deleted stray network interface')
+
     def _maintain_networks(self):
         LOG.info('Maintaining networks')
 
@@ -70,25 +90,6 @@ class Monitor(daemon.Daemon):
             # For network nodes, its all networks
             for n in net.Networks([baseobject.active_states_filter]):
                 host_networks.append(n.uuid)
-
-                # Network nodes also look for interfaces for absent instances
-                # and delete them
-                t = time.time()
-                for ni in networkinterface.interfaces_for_network(n):
-                    inst = instance.Instance.from_db(ni.instance_uuid)
-                    if not inst:
-                        ni.delete()
-                        LOG.with_instance(
-                            ni.instance_uuid).with_networkinterface(
-                            ni.uuid).info('Deleted stray network interface for missing instance')
-                    else:
-                        s = inst.state
-                        if (s.update_time + 30 < t and
-                                s.value in [dbo.STATE_DELETED, dbo.STATE_ERROR, 'unknown']):
-                            ni.delete()
-                            LOG.with_instance(
-                                ni.instance_uuid).with_networkinterface(
-                                ni.uuid).info('Deleted stray network interface')
 
         # Ensure we are on every network we have a host for
         for network in host_networks:
@@ -342,6 +343,9 @@ class Monitor(daemon.Daemon):
     def run(self):
         LOG.info('Starting')
         last_management = 0
+        stray_interface_worker = None
+        maintain_networks_worker = None
+        floating_ip_reap_worker = None
 
         while True:
             if util_network.is_network_node():
@@ -351,7 +355,26 @@ class Monitor(daemon.Daemon):
                 time.sleep(max(0, 30 - management_age))
 
             if time.time() - last_management > 30:
-                self._maintain_networks()
+                # Management tasks are treated as extra workers, and run in
+                # parallel with other network work items.
+                worker_pids = []
+                for w in self.workers:
+                    worker_pids.append(w.pid)
+
+                if stray_interface_worker not in worker_pids:
+                    LOG.info('Scanning for stray network interfaces')
+                    stray_interface_worker = self.start_workitem(
+                        self._remove_stray_interfaces, [], 'stray-nics')
+
+                if maintain_networks_worker not in worker_pids:
+                    LOG.info('Maintaining existing networks')
+                    maintain_networks_worker = self.start_workitem(
+                        self._maintain_networks, [], 'maintain')
+
                 if util_network.is_network_node():
-                    self._reap_leaked_floating_ips()
+                    LOG.info('Reaping stray floating IPs')
+                    if floating_ip_reap_worker not in worker_pids:
+                        floating_ip_reap_worker = self.start_workitem(
+                            self._reap_leaked_floating_ips, [], 'fip-reaper')
+
                 last_management = time.time()
