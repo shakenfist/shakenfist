@@ -343,13 +343,14 @@ class Network(dbo):
                     None, 'brctl setageing %(vx_bridge)s 0' % subst)
 
     def create_on_hypervisor(self):
+        # The floating network does not have a vxlan mesh
+        if self.uuid == 'floating':
+            return
+
         with self.get_lock(op='create_on_hypervisor'):
             if self.is_dead():
                 raise DeadNetwork('network=%s' % self)
             self._create_common()
-
-            # TODO(andy): Check with mikal: is this task required here?
-            db.enqueue('networknode', DeployNetworkTask(self.uuid))
 
     def create_on_network_node(self):
         # The floating network does not have a vxlan mesh
