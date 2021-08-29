@@ -58,7 +58,7 @@
         delay: 10
 
 - hosts: sfall
-  gather_facts: yes
+  gather_facts: no
   become: true
   vars:
     source_path: "/home/jenkins/src/shakenfist/"

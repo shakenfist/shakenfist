@@ -1,5 +1,5 @@
 - hosts: localhost
-  gather_facts: yes
+  gather_facts: no
   connection: ssh
   vars:
     identifier: unknown
@@ -231,7 +231,7 @@
       with_items: "{{ groups['sfall'] }}"
 
 - hosts: sfall
-  gather_facts: yes
+  gather_facts: no
   become: true
   vars:
     source_path: "/home/jenkins/src/shakenfist/"
@@ -283,7 +283,7 @@
         mount -t tmpfs -o rw,size=2G tmpfs /var/lib/etcd
 
 - hosts: localhost
-  gather_facts: yes
+  gather_facts: no
   vars:
     source_path: "/home/jenkins/src/shakenfist/"
 
@@ -341,7 +341,7 @@
         msg: "Client wheel file: {{client_wheel_file}}"
 
 - hosts: primary
-  gather_facts: yes
+  gather_facts: no
   connection: ssh
   become: true
 
@@ -384,7 +384,7 @@
       shell: python3 -m venv --system-site-packages /srv/shakenfist/venv
 
 - hosts: sfall
-  gather_facts: yes
+  gather_facts: no
   become: true
   vars:
     source_path: "/home/jenkins/src/shakenfist/"
@@ -401,7 +401,7 @@
         /srv/shakenfist/venv/bin/pip install /tmp/shakenfist*whl
 
 - hosts: primary
-  gather_facts: yes
+  gather_facts: no
   become: true
   vars:
     source_path: "/home/jenkins/src/shakenfist/"
