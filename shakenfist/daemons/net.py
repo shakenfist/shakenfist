@@ -69,21 +69,6 @@ class Monitor(daemon.Daemon):
         else:
             # For network nodes, its all networks
             for n in net.Networks([baseobject.active_states_filter]):
-                bad = False
-                try:
-                    netblock = ipaddress.ip_network(n.netblock)
-                    if netblock.num_addresses < 8:
-                        bad = True
-                except ValueError:
-                    bad = True
-
-                if bad:
-                    LOG.with_network(n.uuid).error(
-                        'Network netblock is invalid, deleting network.')
-                    netobj = net.Network.from_db(n.uuid)
-                    netobj.delete()
-                    continue
-
                 host_networks.append(n.uuid)
 
                 # Network nodes also look for interfaces for absent instances
