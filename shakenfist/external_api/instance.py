@@ -306,7 +306,6 @@ class InstancesEndpoint(api_base.Resource):
 
         # Enqueue creation tasks on desired node task queue
         db.enqueue(placement, {'tasks': tasks})
-        inst.add_event('create', 'enqueued', None, None)
         return inst.external_view()
 
     @jwt_required
