@@ -348,6 +348,8 @@ class Monitor(daemon.WorkerPoolDaemon):
         floating_ip_reap_worker = None
 
         while True:
+            self.reap_workers()
+
             if util_network.is_network_node():
                 self._process_network_node_workitems()
             else:
