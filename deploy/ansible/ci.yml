@@ -440,7 +440,8 @@
               "node_egress_nic": "eth0",
               "node_mesh_ip": "{{hostvars['sf1']['mesh_ip']}}",
               "node_mesh_nic": "eth1",
-              "etcd_master": true
+              "etcd_master": true,
+              "network_node": true
             },
             {
               "name": "sf-2",

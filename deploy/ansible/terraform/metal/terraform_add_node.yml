@@ -12,6 +12,12 @@
     groups: etcd_master
   when: item.get('etcd_master', False)
 
+- name: Add {{item['name']}} as a network node (if configured, should only be one)
+  add_host:
+    hostname: "{{item['name']}}"
+    groups: network_node
+  when: item.get('network_node', False)
+
 - name: Add node facts
   set_fact:
     node_name: "{{item['name']}}"
