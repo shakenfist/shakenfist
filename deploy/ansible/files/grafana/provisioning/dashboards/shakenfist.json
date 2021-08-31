@@ -571,9 +571,9 @@
             {
               "evaluator": {
                 "params": [
-                  0.85
+                  0.15
                 ],
-                "type": "gt"
+                "type": "lt"
               },
               "operator": {
                 "type": "and"
@@ -669,8 +669,8 @@
             "colorMode": "critical",
             "fill": false,
             "line": false,
-            "op": "gt",
-            "value": 0.85,
+            "op": "lt",
+            "value": 0.15,
             "visible": true
           }
         ],
