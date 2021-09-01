@@ -1,3 +1,4 @@
+import json
 import os
 import random
 import re
@@ -6,6 +7,7 @@ import re
 # set of shakenfist modules, mainly exceptions, logutils, and specific
 # other util modules.
 from shakenfist.config import config
+from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist.util import process
 
@@ -17,6 +19,45 @@ def is_network_node():
     return config.NODE_MESH_IP == config.NETWORK_NODE_IP
 
 
+def _clean_ip_json(data):
+    # For reasons I can't explain, the ip command sometimes returns
+    # slightly bogus JSON like this:
+    #
+    # $ ip -pretty -json addr show enp5s0
+    # [ {},{},{},{
+    #         "ifindex": 2,
+    #         "ifname": "enp5s0",
+    #         "flags": [ "BROADCAST","MULTICAST","UP","LOWER_UP" ],
+    #         "mtu": 9000,
+    #         "qdisc": "pfifo_fast",
+    #         "operstate": "UP",
+    #         "group": "default",
+    #         "txqlen": 1000,
+    #         "link_type": "ether",
+    #         "address": "18:c0:4d:75:50:b9",
+    #         "broadcast": "ff:ff:ff:ff:ff:ff",
+    #         "addr_info": [ {
+    #                 "family": "inet",
+    #                 "local": "192.168.1.52",
+    #                 "prefixlen": 24,
+    #                 "broadcast": "192.168.1.255",
+    #                 "scope": "global",
+    #                 "dynamic": true,
+    #                 "label": "enp5s0",
+    #                 "valid_life_time": 3449,
+    #                 "preferred_life_time": 3449
+    #             } ]
+    #     },{},{},{},{},...,{} ]
+    #
+    # This method strips out all those empty entries in the list
+
+    if not data:
+        return []
+
+    j = json.loads(data)
+    return [x for x in j if x]
+
+
 def check_for_interface(name, namespace=None, up=False):
     in_netns = ''
     if namespace:
@@ -26,40 +67,57 @@ def check_for_interface(name, namespace=None, up=False):
         in_netns = 'ip netns exec %s ' % namespace
 
     stdout, stderr = process.execute(
-        None, '%sip link show %s' % (in_netns, name),
+        None, '%sip -pretty -json link show %s' % (in_netns, name),
         check_exit_code=[0, 1])
 
     if stderr.rstrip('\n').endswith(' does not exist.'):
         return False
 
     if up:
-        return bool(re.match(r'.*[<,]UP[,>].*', stdout))
+        j = _clean_ip_json(stdout)
+        return 'UP' in j[0]['flags']
 
     return True
 
 
+# TODO(mikal): make the signature here consistent with others.
 def get_interface_addresses(namespace, name):
     in_namespace = ''
     if namespace:
         in_namespace = 'ip netns exec %s ' % namespace
 
     stdout, _ = process.execute(None,
-                                '%(in_namespace)sip addr show %(name)s'
+                                '%(in_namespace)sip -pretty -json addr show %(name)s'
                                 % {
                                     'in_namespace': in_namespace,
                                     'name': name
                                 },
                                 check_exit_code=[0, 1])
+
+    for elem in _clean_ip_json(stdout):
+        if 'addr_info' in elem:
+            yield elem['addr_info'][0]['local']
+
+
+def get_interface_statistics(name, namespace=None):
+    in_namespace = ''
+    if namespace:
+        in_namespace = 'ip netns exec %s ' % namespace
+
+    stdout, _ = process.execute(None,
+                                '%(in_namespace)sip -s -pretty -json link show %(name)s'
+                                % {
+                                    'in_namespace': in_namespace,
+                                    'name': name
+                                },
+                                check_exit_code=[0, 1])
+
     if not stdout:
-        return
+        raise exceptions.NoInterfaceStatistics(
+            'No statistics for interface %s in namespace %s' % (name, namespace))
 
-    inet_re = re.compile(r' +inet (.*)/[0-9]+.*')
-    for line in stdout.split('\n'):
-        m = inet_re.match(line)
-        if m:
-            yield m.group(1)
-
-    return
+    stats = _clean_ip_json(stdout)
+    return stats.get('stats64')
 
 
 def get_default_routes(namespace):
