@@ -450,6 +450,10 @@ class Network(dbo):
                 self.enable_nat()
 
         self.update_dhcp()
+
+        # A final check to ensure we haven't raced with a delete
+        if self.is_dead():
+            raise DeadNetwork('network=%s' % self)
         self.state = self.STATE_CREATED
 
     def delete_on_hypervisor(self):
