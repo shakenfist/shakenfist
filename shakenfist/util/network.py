@@ -95,9 +95,11 @@ def get_safe_interface_name(interface):
 def create_interface(interface, interface_type, extra):
     interface = get_safe_interface_name(interface)
     process.execute(None,
-                    'ip link add %(interface)s type %(interface_type)s %(extra)s'
+                    'ip link add %(interface)s mtu %(mtu)s '
+                    'type %(interface_type)s %(extra)s'
                     % {'interface': interface,
                        'interface_type': interface_type,
+                       'mtu': config.MAX_HYPERVISOR_MTU,
                        'extra': extra})
 
 
