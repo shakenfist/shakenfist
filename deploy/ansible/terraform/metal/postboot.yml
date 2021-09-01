@@ -26,15 +26,18 @@
     network_node_ip: "{{hostvars[groups.network_node[0]]['node_mesh_ip']}}"
   delegate_to: localhost
   delegate_facts: true
+  run_once: true
 
 - name: Determine primary node
   set_fact:
     primary_node_ip: "{{hostvars['localhost']['node_egress_ip']}}"
   delegate_to: localhost
   delegate_facts: true
+  run_once: true
 
 - name: Log network and primary node
   debug:
     msg:
-      - "Primary node mesh IP is {{hostvars['localhost']['primary_node_ip']}}"
+      - "Primary node IP is {{hostvars['localhost']['primary_node_ip']}}"
       - "Network node is {{hostvars['localhost']['network_node_name']}} with mesh IP {{hostvars['localhost']['network_node_ip']}}"
+  run_once: true
