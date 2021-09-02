@@ -170,6 +170,11 @@ class InstancesEndpoint(api_base.Resource):
 
         if not video:
             video = {'model': 'cirrus', 'memory': 16384}
+        else:
+            if 'model' not in video:
+                return api_base.error(400, 'video specification requires "model"')
+            if 'memory' not in video:
+                return api_base.error(400, 'video specification requires "memory"')
 
         if not namespace:
             namespace = get_jwt_identity()
