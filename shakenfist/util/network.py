@@ -95,7 +95,10 @@ def get_interface_addresses(name, namespace=None):
 
     for elem in _clean_ip_json(stdout):
         if 'addr_info' in elem:
-            yield elem['addr_info'][0]['local']
+            try:
+                yield elem['addr_info'][0]['local']
+            except IndexError:
+                pass
 
 
 def get_interface_statistics(name, namespace=None):
