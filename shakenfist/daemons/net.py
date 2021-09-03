@@ -304,21 +304,37 @@ class Monitor(daemon.WorkerPoolDaemon):
 
     def _reap_leaked_floating_ips(self):
         # Ensure we haven't leaked any floating IPs (because we use to)
-        floating_gateways = []
-        for n in net.Networks([baseobject.active_states_filter]):
-            if n.floating_gateway:
-                floating_gateways.append(n.floating_gateway)
-        LOG.info('Found floating gateways: %s' % floating_gateways)
-
-        floating_addresses = []
-        for ni in networkinterface.NetworkInterfaces([baseobject.active_states_filter]):
-            if ni.floating.get('floating_address'):
-                floating_addresses.append(ni.floating.get('floating_address'))
-        LOG.info('Found floating addresses: %s' % floating_addresses)
-
         with db.get_lock('ipmanager', None, 'floating', ttl=120,
                          op='Cleanup leaks'):
             floating_ipm = IPManager.from_db('floating')
+
+            # Collect floating gateways and floating IPs, while ensuring that
+            # they are correctly reserved on the floating network as well
+            floating_gateways = []
+            for n in net.Networks([baseobject.active_states_filter]):
+                fg = n.floating_gateway
+                if fg:
+                    floating_gateways.append(fg)
+                    if floating_ipm.is_free(fg):
+                        LOG.with_fields({
+                            'network': n.uuid,
+                            'address': fg
+                        }).error('Floating gateway not reserved correctly')
+
+            LOG.info('Found floating gateways: %s' % floating_gateways)
+
+            floating_addresses = []
+            for ni in networkinterface.NetworkInterfaces([baseobject.active_states_filter]):
+                fa = ni.floating.get('floating_address')
+                if fa:
+                    floating_addresses.append(fa)
+                    if floating_ipm.is_free(fg):
+                        LOG.with_fields({
+                            'networkinterface': ni.uuid,
+                            'address': fa
+                        }).error('Floating address not reserved correctly')
+            LOG.info('Found floating addresses: %s' % floating_addresses)
+
             floating_reserved = [
                 floating_ipm.get_address_at_index(0),
                 floating_ipm.get_address_at_index(1),
@@ -327,6 +343,8 @@ class Monitor(daemon.WorkerPoolDaemon):
             ]
             LOG.info('Found floating reservations: %s' % floating_reserved)
 
+            # Now the reverse check. Test if there are any reserved IPs which
+            # are not actually in use. Free any we find.
             leaks = []
             for ip in floating_ipm.in_use:
                 if ip not in itertools.chain(floating_gateways,
@@ -341,11 +359,20 @@ class Monitor(daemon.WorkerPoolDaemon):
             floating_ipm.persist()
 
     def _validate_mtus(self):
+        by_mtu = {}
         for iface, mtu in util_network.get_interface_mtus():
-            if mtu == 1500:
-                LOG.with_fields({
-                    'interface': iface
-                }).info('Interface MTU is 1500 bytes')
+            by_mtu.setdefault(mtu, [])
+            by_mtu[mtu].append(iface)
+
+        for mtu in sorted(by_mtu):
+            log = LOG.with_fields({
+                'mtu': mtu,
+                'interfaces': by_mtu[mtu]
+            })
+            if mtu < 1501:
+                log.warning('Interface MTU is 1500 bytes or less')
+            else:
+                log.debug('Interface MTU is normal')
 
     def run(self):
         LOG.info('Starting')
