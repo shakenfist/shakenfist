@@ -340,12 +340,20 @@ class Monitor(daemon.WorkerPoolDaemon):
                 floating_ipm.release(ip)
             floating_ipm.persist()
 
+    def _validate_mtus(self):
+        for iface, mtu in util_network.get_interface_mtus():
+            if mtu == 1500:
+                LOG.with_fields({
+                    'interface': iface
+                }).info('Interface MTU is 1500 bytes')
+
     def run(self):
         LOG.info('Starting')
         last_management = 0
         stray_interface_worker = None
         maintain_networks_worker = None
         floating_ip_reap_worker = None
+        mtu_validation_worker = None
 
         while True:
             self.reap_workers()
@@ -372,6 +380,11 @@ class Monitor(daemon.WorkerPoolDaemon):
                     LOG.info('Maintaining existing networks')
                     maintain_networks_worker = self.start_workitem(
                         self._maintain_networks, [], 'maintain')
+
+                if mtu_validation_worker not in worker_pids:
+                    LOG.info('Validating network interface MTUs')
+                    mtu_validation_worker = self.start_workitem(
+                        self._validate_mtus, [], 'mtus')
 
                 if util_network.is_network_node():
                     LOG.info('Reaping stray floating IPs')

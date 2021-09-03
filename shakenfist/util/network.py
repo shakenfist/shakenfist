@@ -119,6 +119,22 @@ def get_interface_statistics(name, namespace=None):
     return stats.get('stats64')
 
 
+def get_interface_mtus(namespace=None):
+    in_namespace = ''
+    if namespace:
+        in_namespace = 'ip netns exec %s ' % namespace
+
+    stdout, _ = process.execute(None,
+                                '%(in_namespace)sip -pretty -json link show'
+                                % {
+                                    'in_namespace': in_namespace
+                                },
+                                check_exit_code=[0, 1])
+
+    for elem in _clean_ip_json(stdout):
+        yield elem['ifname'], elem['mtu']
+
+
 def get_default_routes(namespace):
     in_namespace = ''
     if namespace:
