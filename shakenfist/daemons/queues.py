@@ -255,7 +255,7 @@ def instance_start(inst, network):
         LOG.with_instance(inst).warning(
             'You cannot start an instance in an error state.')
         return
-    if inst.state.value == dbo.STATE_DELETED:
+    if inst.state.value in (dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED):
         LOG.with_instance(inst).warning(
             'You cannot start an instance which has been deleted.')
         return
@@ -311,6 +311,14 @@ def instance_start(inst, network):
 
 def instance_delete(inst):
     with inst.get_lock(op='Instance delete'):
+        # There are two delete state flows:
+        #   - error transition states (preflight-error etc) to error
+        #   - created to deleted
+        #
+        # We don't need delete_wait for the error states as they're already
+        # in a transition state.
+        if not inst.state.value.endswith('-error'):
+            inst.state = dbo.STATE_DELETE_WAIT
         db.add_event('instance', inst.uuid, 'queued', 'delete', None, None)
 
         # Create list of networks used by instance. We cannot use the
