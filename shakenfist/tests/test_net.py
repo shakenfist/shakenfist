@@ -207,13 +207,21 @@ class NetworkNetNodeTestCase(NetworkTestCase):
     #
     # is_created()
     #
-    pgrep = """1: br-vxlan-5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500'
-qdisc noqueue state UP mode DEFAULT group default qlen 1000
-link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
-"""
-
     @mock.patch('shakenfist.util.process.execute',
-                return_value=(pgrep, ''))
+                return_value=(
+                    """[ {},{
+        "ifindex": 1,
+        "ifname": "br-vxlan-5",
+        "flags": [ "BROADCAST","MULTICAST","UP","LOWER_UP" ],
+        "mtu": 1500,
+        "qdisc": "noqueue",
+        "operstate": "UP",
+        "group": "default",
+        "txqlen": 1000,
+        "link_type": "ether",
+        "address": "1a:46:97:a1:c2:3a",
+        "broadcast": "ff:ff:ff:ff:ff:ff"
+    },{},{},{} ]""", ''))
     def test_is_created_yes(self, mock_execute):
         n = net.Network({
             'uuid': '8abbc9a6-d923-4441-b498-4f8e3c166804',
@@ -228,13 +236,20 @@ link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
         })
         self.assertTrue(n.is_created())
 
-    pgrep = """1: br-vxlan-5: <BROADCAST,MULTICAST,DOWN,LOWER_UP> mtu 1500'
-qdisc noqueue state UP mode DEFAULT group default qlen 1000
-link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
-"""
-
     @mock.patch('shakenfist.util.process.execute',
-                return_value=(pgrep, ''))
+                return_value=("""[ {},{
+        "ifindex": 1,
+        "ifname": "br-vxlan-5",
+        "flags": [ "BROADCAST","MULTICAST","DOWN","LOWER_UP" ],
+        "mtu": 1500,
+        "qdisc": "noqueue",
+        "operstate": "UP",
+        "group": "default",
+        "txqlen": 1000,
+        "link_type": "ether",
+        "address": "1a:46:97:a1:c2:3a",
+        "broadcast": "ff:ff:ff:ff:ff:ff"
+    },{},{},{} ]""", ''))
     def test_is_created_no(self, mock_execute):
         n = net.Network({
             'uuid': '8abbc9a6-d923-4441-b498-4f8e3c166804',
@@ -249,10 +264,8 @@ link/ether 1a:46:97:a1:c2:3a brd ff:ff:ff:ff:ff:ff
         })
         self.assertFalse(n.is_created())
 
-    pgrep = "Device 'br-vxlan-45' does not exist."
-
     @mock.patch('shakenfist.util.process.execute',
-                return_value=(pgrep, ''))
+                return_value=('', "Device 'br-vxlan-45' does not exist."))
     def test_is_created_no_bridge(self, mock_execute):
         n = net.Network({
             'uuid': '8abbc9a6-d923-4441-b498-4f8e3c166804',

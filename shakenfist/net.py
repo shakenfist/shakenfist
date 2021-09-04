@@ -423,8 +423,7 @@ class Network(dbo):
 
                 with util_general.RecordedOperation('enable virtual routing', self):
                     addresses = util_network.get_interface_addresses(
-                        subst['netns'],
-                        subst['egress_veth_inner'])
+                        subst['egress_veth_inner'], namespace=subst['netns'])
                     if not subst['floating_gateway'] in list(addresses):
                         util_process.execute(None,
                                              '%(in_netns)s ip addr add '

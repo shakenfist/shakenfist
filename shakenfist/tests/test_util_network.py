@@ -29,8 +29,9 @@ class UtilTestCase(base.ShakenFistTestCase):
     def test_check_for_interface_missing_interface(self, mock_execute):
         found = util_network.check_for_interface('banana0')
         self.assertEqual(False, found)
-        mock_execute.assert_called_with(None, 'ip link show banana0',
-                                        check_exit_code=[0, 1])
+        mock_execute.assert_called_with(
+            None, 'ip -pretty -json link show banana0',
+            check_exit_code=[0, 1])
 
     @mock.patch(
         'shakenfist.util.process.execute',
@@ -46,50 +47,89 @@ class UtilTestCase(base.ShakenFistTestCase):
     def test_check_for_interface_present_interface(self, mock_execute):
         found = util_network.check_for_interface('eth0')
         self.assertEqual(True, found)
-        mock_execute.assert_called_with(None, 'ip link show eth0',
-                                        check_exit_code=[0, 1])
+        mock_execute.assert_called_with(
+            None, 'ip -pretty -json link show eth0',
+            check_exit_code=[0, 1])
 
     @mock.patch(
         'shakenfist.util.process.execute',
         return_value=(None, 'Device "banana0" does not exist.'))
     def test_get_interface_addresses_missing_interface(self, mock_execute):
-        found = list(util_network.get_interface_addresses(None, 'eth0'))
+        found = list(util_network.get_interface_addresses('eth0'))
         self.assertEqual([], found)
-        mock_execute.assert_called_with(None, 'ip addr show eth0',
-                                        check_exit_code=[0, 1])
+        mock_execute.assert_called_with(
+            None, 'ip -pretty -json addr show eth0',
+            check_exit_code=[0, 1])
 
     @mock.patch(
         'shakenfist.util.process.execute',
         return_value=(
-            '19: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000\n'
-            '    link/ether 8c:ae:4c:f1:4c:31 brd ff:ff:ff:ff:ff:ff\n'
-            '    inet 192.168.1.28/24 brd 192.168.1.255 scope global dynamic noprefixroute eth0\n'
-            '       valid_lft 2563sec preferred_lft 2563sec\n'
-            '    inet6 fe80::7323:4d91:332c:6a76/64 scope link noprefixroute\n'
-            '       valid_lft forever preferred_lft forever\n',
-            ''))
+            """[ {},{
+        "ifindex": 19,
+        "ifname": "eth0",
+        "flags": [ "BROADCAST","MULTICAST","UP","LOWER_UP" ],
+        "mtu": 1500,
+        "qdisc": "fq_codel",
+        "operstate": "UP",
+        "group": "default",
+        "txqlen": 1000,
+        "link_type": "ether",
+        "address": "8c:ae:4c:f1:4c:31",
+        "broadcast": "ff:ff:ff:ff:ff:ff",
+        "addr_info": [ {
+                "family": "inet",
+                "local": "192.168.1.28",
+                "prefixlen": 24,
+                "broadcast": "192.168.1.255",
+                "scope": "global",
+                "dynamic": true,
+                "noprefixroute": true,
+                "label": "enp0s31f6",
+                "valid_life_time": 3049,
+                "preferred_life_time": 3049
+            } ]
+    },{},{},{} ]""", ''))
     def test_get_interface_addresses_no_namespace(self, mock_execute):
-        found = list(util_network.get_interface_addresses(None, 'eth0'))
-        self.assertEqual(['192.168.1.28'], found)
-        mock_execute.assert_called_with(None, 'ip addr show eth0',
-                                        check_exit_code=[0, 1])
-
-    @mock.patch(
-        'shakenfist.util.process.execute',
-        return_value=(
-            '19: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000\n'
-            '    link/ether 8c:ae:4c:f1:4c:31 brd ff:ff:ff:ff:ff:ff\n'
-            '    inet 192.168.1.28/24 brd 192.168.1.255 scope global dynamic noprefixroute eth0\n'
-            '       valid_lft 2563sec preferred_lft 2563sec\n'
-            '    inet6 fe80::7323:4d91:332c:6a76/64 scope link noprefixroute\n'
-            '       valid_lft forever preferred_lft forever\n',
-            ''))
-    def test_get_interface_addresses_namespace(self, mock_execute):
-        found = list(util_network.get_interface_addresses(
-            'bananarama', 'eth0'))
+        found = list(util_network.get_interface_addresses('eth0'))
         self.assertEqual(['192.168.1.28'], found)
         mock_execute.assert_called_with(
-            None, 'ip netns exec bananarama ip addr show eth0',
+            None, 'ip -pretty -json addr show eth0',
+            check_exit_code=[0, 1])
+
+    @mock.patch(
+        'shakenfist.util.process.execute',
+        return_value=(
+            """[ {},{
+        "ifindex": 19,
+        "ifname": "eth0",
+        "flags": [ "BROADCAST","MULTICAST","UP","LOWER_UP" ],
+        "mtu": 1500,
+        "qdisc": "fq_codel",
+        "operstate": "UP",
+        "group": "default",
+        "txqlen": 1000,
+        "link_type": "ether",
+        "address": "8c:ae:4c:f1:4c:31",
+        "broadcast": "ff:ff:ff:ff:ff:ff",
+        "addr_info": [ {
+                "family": "inet",
+                "local": "192.168.1.28",
+                "prefixlen": 24,
+                "broadcast": "192.168.1.255",
+                "scope": "global",
+                "dynamic": true,
+                "noprefixroute": true,
+                "label": "enp0s31f6",
+                "valid_life_time": 3049,
+                "preferred_life_time": 3049
+            } ]
+    },{},{},{} ]""", ''))
+    def test_get_interface_addresses_namespace(self, mock_execute):
+        found = list(util_network.get_interface_addresses(
+            'eth0', namespace='bananarama'))
+        self.assertEqual(['192.168.1.28'], found)
+        mock_execute.assert_called_with(
+            None, 'ip netns exec bananarama ip -pretty -json addr show eth0',
             check_exit_code=[0, 1])
 
     @mock.patch(
