@@ -98,6 +98,23 @@ class Monitor(daemon.WorkerPoolDaemon):
                 if not n:
                     continue
 
+                # Ensure that the network's floating gateway is reserved
+                # correctly (if it has one).
+                fg = n.floating_gateway
+                if fg:
+                    with db.get_lock('ipmanager', None, 'floating', ttl=120,
+                                     op='Maintain networks'):
+                        ipm = IPManager.from_db('floating')
+                        if ipm.is_free(fg):
+                            ipm.reserve(fg, n.unique_label())
+                            ipm.persist()
+                            LOG.with_fields(
+                                {
+                                    'network': n.uuid,
+                                    'address': fg
+                                }).info('Re-reserving floating gateway')
+
+                # Track what vxlan ids we've seen
                 seen_vxids.append(n.vxid)
 
                 if time.time() - n.state.update_time < 60:
