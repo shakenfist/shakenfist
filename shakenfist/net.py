@@ -698,10 +698,9 @@ class Network(dbo):
             ipaddress.IPv4Address(floating_address))
         subst['inner_address'] = inner_address
 
-        util_process.execute(None,
-                             'ip link add flt-%(floating_address_as_hex)s-o type veth '
-                             'peer name flt-%(floating_address_as_hex)s-i'
-                             % subst)
+        util_network.create_interface(
+            'flt-%(floating_address_as_hex)s-o' % subst, 'veth',
+            'peer name flt-%(floating_address_as_hex)s-i' % subst)
         util_process.execute(None,
                              'ip link set flt-%(floating_address_as_hex)s-i netns %(netns)s'
                              % subst)
