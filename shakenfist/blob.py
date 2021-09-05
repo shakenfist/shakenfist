@@ -49,7 +49,6 @@ class Blob(dbo):
 
         b = Blob.from_db(blob_uuid)
         b.state = Blob.STATE_CREATED
-        b.add_event('db record creation', None)
         return b
 
     @staticmethod

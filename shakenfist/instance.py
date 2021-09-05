@@ -204,7 +204,6 @@ class Instance(dbo):
         i.state = cls.STATE_INITIAL
         i._db_set_attribute(
             'power_state', {'power_state': cls.STATE_INITIAL})
-        i.add_event('db record creation', None)
         return i
 
     @staticmethod

@@ -55,6 +55,8 @@ class DatabaseBackedObject(object):
         LOG.with_fields({
             'object_type': cls.object_type
         }).with_fields(metadata).debug('Object created')
+        db.add_event(
+            cls.object_type, object_uuid, 'db record created', None, None, None)
 
     @classmethod
     def _db_get(cls, object_uuid):
@@ -112,14 +114,6 @@ class DatabaseBackedObject(object):
     def state(self, new_value):
         with self.get_lock_attr('state', 'State update'):
             orig = self.state
-            LOG.with_fields(
-                {
-                    'uuid': self.uuid,
-                    'object_type': self.object_type,
-                    'original state': orig,
-                    'new state': new_value,
-                    'targets': self.state_targets
-                }).debug('Verifying state transition')
 
             if orig.value == new_value:
                 return

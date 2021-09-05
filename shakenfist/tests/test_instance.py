@@ -93,14 +93,14 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             ('attribute/instance', 'uuid42', 'state',
              State(instance.Instance.STATE_INITIAL, 1234)),
-            mock_put.mock_calls[0][1])
+            mock_put.mock_calls[1][1])
         self.assertEqual(
             ('attribute/instance', 'uuid42', 'error', {'message': None}),
-            mock_put.mock_calls[2][1])
+            mock_put.mock_calls[3][1])
         self.assertEqual(
             ('attribute/instance', 'uuid42',
              'power_state', {'power_state': instance.Instance.STATE_INITIAL}),
-            mock_put.mock_calls[3][1])
+            mock_put.mock_calls[4][1])
 
         self.assertEqual(
             ('instance', None, 'uuid42',
