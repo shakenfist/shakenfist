@@ -366,7 +366,7 @@
         autoremove: yes
 
     - name: Install ansible roles
-      shell: ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform andrewrothstein.go
+      shell: ansible-galaxy install andrewrothstein.etcd-cluster
 
     - name: Copy client wheel file
       copy:

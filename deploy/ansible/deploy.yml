@@ -226,11 +226,11 @@
   tasks:
     - name: Find hypervisor with lowest MTU
       set_fact:
-       lowest_mtu_hypervisor: "{{ groups['hypervisors'] | sort('node_mtu' | int) | first }}"
+        lowest_mtu_hypervisor: "{{ groups['hypervisors'] | sort('node_mtu' | int) | first }}"
 
     - name: Find lowest MTU
       set_fact:
-       lowest_mtu: "{{ hostvars[lowest_mtu_hypervisor]['node_mtu'] }}"
+        lowest_mtu: "{{ hostvars[lowest_mtu_hypervisor]['node_mtu'] }}"
 
     - name: Write syslog file
       template:
@@ -643,14 +643,6 @@
         enabled: yes
         state: restarted
         daemon_reload: yes
-
-- hosts: localhost
-  roles:
-    - role: andrewrothstein.terraform
-      vars:
-        terraform_binary_dir: /usr/local/bin/terraform_install
-
-    - role: andrewrothstein.go
 
 - hosts: localhost
   any_errors_fatal: true
