@@ -331,8 +331,8 @@ class Monitor(daemon.WorkerPoolDaemon):
                 fa = ni.floating.get('floating_address')
                 if fa:
                     floating_addresses.append(fa)
-                    if floating_ipm.is_free(fg):
-                        floating_ipm.reserve(fg, ni.unique_label())
+                    if floating_ipm.is_free(fa):
+                        floating_ipm.reserve(fa, ni.unique_label())
                         floating_ipm.persist()
                         LOG.with_fields({
                             'networkinterface': ni.uuid,
