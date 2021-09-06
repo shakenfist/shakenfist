@@ -377,9 +377,18 @@ class Network(dbo):
                     util_process.execute(
                         None,
                         'ip link set %(vx_veth_inner)s netns %(netns)s' % subst)
+
+                    # Refer to bug 952 for more details here, but it turns out
+                    # that adding an interface to a bridge overwrites the MTU of
+                    # the bridge in an undesirable way. So we lookup the existing
+                    # MTU and then re-specify it here.
+                    subst['vx_bridge_mtu'] = util_network.get_interface_mtu(
+                        subst['vx_bridge'])
                     util_process.execute(
                         None,
-                        'brctl addif %(vx_bridge)s %(vx_veth_outer)s' % subst)
+                        'ip link set %(vx_veth_outer)s master %(vx_bridge)s '
+                        'mtu %(vx_bridge_mtu)s' % subst)
+
                     util_process.execute(
                         None, 'ip link set %(vx_veth_outer)s up' % subst)
                     util_process.execute(
@@ -395,9 +404,18 @@ class Network(dbo):
                     util_network.create_interface(
                         subst['egress_veth_outer'], 'veth',
                         'peer name %(egress_veth_inner)s' % subst)
-                    util_process.execute(None,
-                                         'brctl addif %(egress_bridge)s '
-                                         '%(egress_veth_outer)s' % subst)
+
+                    # Refer to bug 952 for more details here, but it turns out
+                    # that adding an interface to a bridge overwrites the MTU of
+                    # the bridge in an undesirable way. So we lookup the existing
+                    # MTU and then re-specify it here.
+                    subst['egress_bridge_mtu'] = util_network.get_interface_mtu(
+                        subst['egress_bridge'])
+                    util_process.execute(
+                        None,
+                        'ip link set %(egress_veth_outer)s master %(egress_bridge)s '
+                        'mtu %(egress_bridge_mtu)s' % subst)
+
                     util_process.execute(None,
                                          'ip link set %(egress_veth_outer)s up'
                                          % subst)
