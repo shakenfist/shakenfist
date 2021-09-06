@@ -14,7 +14,7 @@
         <link rel="canonical" href="https://shakenfist.com/installation/">
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.2.2, mkdocs-material-7.2.4">
+      <meta name="generator" content="mkdocs-1.2.2, mkdocs-material-7.2.6">
     
     
       
@@ -22,7 +22,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.f7f47774.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.802231af.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.3f5d1f46.min.css">
@@ -827,13 +827,13 @@
 <p>Shaken Fist only supports Ubuntu 18.04 or later but we strongly recommend 20.04 or higher, so if you're running on localhost that implies that you must be running a recent Ubuntu on your development machine. Note as well that the deployer installs software and changes the configuration of your networking, so be careful when running it on machines you are fond of.</p>
 <p>Note that we used to recommend deployers run the installer from git, but we've outgrown that approach. If you
 see that mentioned in the documentation, you are likely reading outdated guides.</p>
-<p>First install some dependancies:</p>
+<p>First install some dependencies:</p>
 <pre><code class="language-bash">sudo apt-get update
 sudo apt-get -y dist-upgrade
 sudo apt-get -y install ansible tox pwgen build-essential python3-dev python3-wheel \
     python3-pip python3-venv curl ansible vim git pwgen
     python3-pip curl ansible vim git pwgen
-ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform \
+sudo ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform \
     andrewrothstein.go
 </code></pre>
 <p>And then manually upgrade pip:</p>
@@ -882,24 +882,27 @@ read -r -d '' TOPOLOGY &lt;&lt;'EOF'
 [
     {
         &quot;name&quot;: &quot;sf-1&quot;,
-        &quot;egress_ip&quot;: &quot;10.0.0.1&quot;,
-        &quot;egress_nic&quot;: &quot;eth0&quot;,
-        &quot;mesh_ip&quot;: &quot;10.0.1.1&quot;,
-        &quot;mesh_nic&quot;: &quot;eth1&quot;
+        &quot;node_egress_ip&quot;: &quot;10.0.0.1&quot;,
+        &quot;node_egress_nic&quot;: &quot;eth0&quot;,
+        &quot;node_mesh_ip&quot;: &quot;10.0.1.1&quot;,
+        &quot;node_mesh_nic&quot;: &quot;eth1&quot;,
+        &quot;etcd_master&quot;: true
     },
     {
         &quot;name&quot;: &quot;sf-2&quot;,
-        &quot;egress_ip&quot;: &quot;10.0.0.2&quot;,
-        &quot;egress_nic&quot;: &quot;eth0&quot;,
-        &quot;mesh_ip&quot;: &quot;10.0.1.2&quot;,
-        &quot;mesh_nic&quot;: &quot;eth1&quot;
+        &quot;node_egress_ip&quot;: &quot;10.0.0.2&quot;,
+        &quot;node_egress_nic&quot;: &quot;eth0&quot;,
+        &quot;node_mesh_ip&quot;: &quot;10.0.1.2&quot;,
+        &quot;node_mesh_nic&quot;: &quot;eth1&quot;,
+        &quot;etcd_master&quot;: true
     },
     {
         &quot;name&quot;: &quot;sf-3&quot;,
-        &quot;egress_ip&quot;: &quot;10.0.0.3&quot;,
-        &quot;egress_nic&quot;: &quot;eth0&quot;,
-        &quot;mesh_ip&quot;: &quot;10.0.1.3&quot;,
-        &quot;mesh_nic&quot;: &quot;eth1&quot;
+        &quot;node_egress_ip&quot;: &quot;10.0.0.3&quot;,
+        &quot;node_egress_nic&quot;: &quot;eth0&quot;,
+        &quot;node_mesh_ip&quot;: &quot;10.0.1.3&quot;,
+        &quot;node_mesh_nic&quot;: &quot;eth1&quot;,
+        &quot;etcd_master&quot;: true
     }
 ]
 EOF
@@ -907,9 +910,9 @@ export TOPOLOGY
 
 /srv/shakenfist/venv/share/shakenfist/installer/install
 </code></pre>
-<p>And then we can run the installer:</p>
-<pre><code>sudo - bash
-./sf-deploy.sh
+<p>Not every node needs to be an etcd_master. I'd select three in most situations. And then we can run the installer:</p>
+<pre><code>chmod +x sf-deploy.sh
+sudo ./sf-deploy.sh
 </code></pre>
 <h2 id="your-first-instance">Your first instance</h2>
 <p>Before you can start your first instance you'll need to authenticate to Shaken Fist, and create a network. Shaken Fist's python api client (as used by the command line client) looks for authentication details in the following locations:</p>
@@ -919,14 +922,14 @@ export TOPOLOGY
 <li><strong>~/.shakenfist</strong>, a JSON formatted configuration file</li>
 <li><strong>/etc/sf/shakenfist.json</strong>, the same file as above, but global</li>
 </ul>
-<p>By default the installer creates <strong>/etc/sf/sfrc</strong>, which sets the required environment variables to authenticate.<br />
+<p>By default the installer creates <strong>/etc/sf/sfrc</strong>, which sets the required environment variables to authenticate.
 It is customized per installation, setting the following variables:</p>
 <ul>
 <li><strong>SHAKENFIST_NAMESPACE</strong>, the namespace to create resources in</li>
 <li><strong>SHAKENFIST_KEY</strong>, an authentication key for that namespace</li>
 <li><strong>SHAKENFIST_API_URL</strong>, a URL to the Shaken Fist API server</li>
 </ul>
-<p>Before interacting with Shaken Fist, we need to source the rc file.  </p>
+<p>Before interacting with Shaken Fist, we need to source the rc file.</p>
 <pre><code class="language-bash">. /etc/sf/sfrc
 </code></pre>
 <p>Instances must be launched attached to a network.</p>
@@ -954,8 +957,8 @@ name        : myvm
 namespace   : system
 cpus        : 1
 memory      : 1024
-disk spec   : type=disk   bus=None  size=8   base=cirros  
-video       : model=cirrus  memory=16384  
+disk spec   : type=disk   bus=None  size=8   base=cirros
+video       : model=cirrus  memory=16384
 node        : marvin
 power state : on
 state       : created
@@ -985,7 +988,7 @@ configuration found in deploy/ansible/terraform/<cloud> where "cloud" is one of 
 <li>aws: Amazon EC2 bare metal (3 node cluster)</li>
 <li>aws-single-node: Amazon EC2 bare metal (1 node cluster), note that the CI tests will not pass on a single node cluster</li>
 <li>gcp: Google cloud, using nested virtualization (see additional steps below). <strong>This deployment option is not for production use because of its lack of bare metal support and low MTUs affecting virtual network performance. We mainly use it for CI testing.</strong></li>
-<li>metal: Baremetal provisioned outside of terraform</li>
+<li>metal: Bare metal provisioned outside of terraform</li>
 <li>openstack: OpenStack, using nested virtualization</li>
 <li>shakenfist: Shaken Fist can self host, this is useful for CI for example</li>
 </ul>
@@ -1021,8 +1024,8 @@ Performance counters:
 </ul>
 <h3 id="deployment">Deployment</h3>
 <p>Each deployment takes slight different arguments. I tend to write a small shell script to wrap these up for
-convenience. Here's an example for a baremetal deployment:</p>
-<pre><code class="language-bash">$ cat ~/sf-deploys/cbr-remote.sh 
+convenience. Here's an example for a bare metal deployment:</p>
+<pre><code class="language-bash">$ cat ~/sf-deploys/cbr-remote.sh
 #!/bin/bash
 
 export CLOUD=metal
@@ -1197,10 +1200,10 @@ with real users.</p>
     <div class="md-dialog" data-md-component="dialog">
       <div class="md-dialog__inner md-typeset"></div>
     </div>
-    <script id="__config" type="application/json">{"base": "..", "features": [], "translations": {"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing", "select.version.title": "Select version"}, "search": "../assets/javascripts/workers/search.709b4209.min.js", "version": null}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": [], "translations": {"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing", "select.version.title": "Select version"}, "search": "../assets/javascripts/workers/search.409db549.min.js", "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.febc23d1.min.js"></script>
+      <script src="../assets/javascripts/bundle.756773cc.min.js"></script>
       
     
   </body>
