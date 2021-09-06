@@ -172,8 +172,13 @@ def main():
                 subst['master_float'] = ipm.get_address_at_index(1)
                 subst['netmask'] = ipm.netmask
 
+                # We need to copy the MTU of the interface we are bridging to
+                # or weird networking things happen.
+                mtu = util_network.get_interface_mtu(config.NODE_EGRESS_NIC)
+
                 util_network.create_interface(
-                    subst['egress_bridge'], 'bridge', '')
+                    subst['egress_bridge'], 'bridge', '', mtu=mtu)
+
                 util_process.execute(None,
                                      'ip link set %(egress_bridge)s up' % subst)
                 util_process.execute(None,

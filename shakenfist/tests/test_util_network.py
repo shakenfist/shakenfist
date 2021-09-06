@@ -147,14 +147,14 @@ class UtilTestCase(base.ShakenFistTestCase):
     def test_create_interface_bridge(self, mock_execute):
         util_network.create_interface('eth0', 'bridge', '')
         mock_execute.assert_called_with(
-            None, 'ip link add eth0 mtu 8000 type bridge ')
+            None, 'ip link add eth0 mtu 7950 type bridge ')
 
     @mock.patch('shakenfist.util.process.execute')
     def test_create_interface_bridge_truncates(self, mock_execute):
         util_network.create_interface(
             'eth0rjkghjkfshgjksfhdjkghfdsjkg', 'bridge', '')
         mock_execute.assert_called_with(
-            None, 'ip link add eth0rjkghjkfshg mtu 8000 type bridge ')
+            None, 'ip link add eth0rjkghjkfshg mtu 7950 type bridge ')
 
     @mock.patch('shakenfist.util.process.execute')
     def test_create_interface_vxlan(self, mock_execute):
@@ -162,7 +162,7 @@ class UtilTestCase(base.ShakenFistTestCase):
             'vxlan1', 'vxlan', 'id 123 dev eth0 dstport 0')
         mock_execute.assert_called_with(
             None,
-            'ip link add vxlan1 mtu 8000 type vxlan id 123 dev eth0 dstport 0')
+            'ip link add vxlan1 mtu 7950 type vxlan id 123 dev eth0 dstport 0')
 
     @mock.patch('shakenfist.util.process.execute')
     def test_create_interface_veth(self, mock_execute):
@@ -170,7 +170,7 @@ class UtilTestCase(base.ShakenFistTestCase):
             'veth-foo-o', 'veth', 'peer name veth-foo-i')
         mock_execute.assert_called_with(
             None,
-            'ip link add veth-foo-o mtu 8000 type veth peer name veth-foo-i')
+            'ip link add veth-foo-o mtu 7950 type veth peer name veth-foo-i')
 
     @mock.patch(
         'shakenfist.util.process.execute',
