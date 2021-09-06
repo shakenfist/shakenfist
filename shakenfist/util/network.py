@@ -138,6 +138,24 @@ def get_interface_mtus(namespace=None):
         yield elem['ifname'], elem['mtu']
 
 
+def get_interface_mtu(interface, namespace=None):
+    in_namespace = ''
+    if namespace:
+        in_namespace = 'ip netns exec %s ' % namespace
+
+    stdout, _ = process.execute(None,
+                                '%(in_namespace)sip -pretty -json link show '
+                                '%(interface)s'
+                                % {
+                                    'in_namespace': in_namespace,
+                                    'interface': interface
+                                },
+                                check_exit_code=[0, 1])
+
+    for elem in _clean_ip_json(stdout):
+        return elem['mtu']
+
+
 def get_default_routes(namespace):
     in_namespace = ''
     if namespace:
@@ -168,14 +186,17 @@ def get_safe_interface_name(interface):
     return interface
 
 
-def create_interface(interface, interface_type, extra):
+def create_interface(interface, interface_type, extra, mtu=None):
+    if not mtu:
+        mtu = config.MAX_HYPERVISOR_MTU - 50
+
     interface = get_safe_interface_name(interface)
     process.execute(None,
                     'ip link add %(interface)s mtu %(mtu)s '
                     'type %(interface_type)s %(extra)s'
                     % {'interface': interface,
                        'interface_type': interface_type,
-                       'mtu': config.MAX_HYPERVISOR_MTU,
+                       'mtu': mtu,
                        'extra': extra})
 
 
