@@ -6,7 +6,6 @@ from uuid import uuid4
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
-from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import logutil
@@ -83,14 +82,13 @@ class Artifact(dbo):
 
     @staticmethod
     def from_url(artifact_type, url):
-        with db.get_lock('artifact', artifact_type, url):
-            artifacts = list(Artifacts([partial(url_filter, url),
-                                        partial(type_filter, artifact_type)]))
-            if len(artifacts) == 0:
-                return Artifact.new(artifact_type, url)
-            if len(artifacts) == 1:
-                return artifacts[0]
-            raise exceptions.TooManyMatches()
+        artifacts = list(Artifacts([partial(url_filter, url),
+                                    partial(type_filter, artifact_type)]))
+        if len(artifacts) == 0:
+            return Artifact.new(artifact_type, url)
+        if len(artifacts) == 1:
+            return artifacts[0]
+        raise exceptions.TooManyMatches()
 
     @property
     def most_recent_index(self):

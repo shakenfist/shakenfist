@@ -1,8 +1,10 @@
----
+# yaml-language-server: $schema=https://json.schemastore.org/ansible-playbook.json
+
 # Install shakenfist on a series of Ubuntu or Debian machines
 - hosts: localhost
   gather_facts: yes
   connection: ssh
+  become: yes
   vars:
     ram_system_reservation: 5.0
 
@@ -223,10 +225,12 @@
 
   tasks:
     - name: Find hypervisor with lowest MTU
-      set_fact: lowest_mtu_hypervisor={{ groups['hypervisors'] | sort('node_mtu' | int) | first }}
+      set_fact:
+        lowest_mtu_hypervisor: "{{ groups['hypervisors'] | sort('node_mtu' | int) | first }}"
 
     - name: Find lowest MTU
-      set_fact: lowest_mtu={{ hostvars[lowest_mtu_hypervisor]['node_mtu'] }}
+      set_fact:
+        lowest_mtu: "{{ hostvars[lowest_mtu_hypervisor]['node_mtu'] }}"
 
     - name: Write syslog file
       template:
@@ -641,14 +645,6 @@
         daemon_reload: yes
 
 - hosts: localhost
-  roles:
-    - role: andrewrothstein.terraform
-      vars:
-        terraform_binary_dir: /usr/local/bin/terraform_install
-
-    - role: andrewrothstein.go
-
-- hosts: localhost
   any_errors_fatal: true
   become: yes
   become_method: sudo
@@ -686,6 +682,15 @@
         src: /srv/shakenfist/venv/share/shakenfist/ansible/sf_network.py
         remote_src: yes
         dest: /usr/share/ansible/plugins/modules/sf_network.py
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Install ansible snapshot module
+      copy:
+        src: /srv/shakenfist/venv/share/shakenfist/ansible/sf_snapshot.py
+        remote_src: yes
+        dest: /usr/share/ansible/plugins/modules/sf_snapshot.py
         owner: root
         group: root
         mode: "0644"

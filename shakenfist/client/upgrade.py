@@ -10,7 +10,7 @@ from shakenfist import etcd
 from shakenfist import instance
 from shakenfist import networkinterface
 from shakenfist.node import Node
-from shakenfist import util
+from shakenfist.util import process as util_process
 
 # Very simple data upgrader
 
@@ -23,9 +23,9 @@ def clean_events_mesh_operations(etcd_client):
     # can return at one time.
 
     # Save time and use the already available etcdctl client.
-    net_keys, stderr = util.execute(None,
-                                    'etcdctl get --prefix /sf/event/network/ | grep sf/event',
-                                    check_exit_code=[0, 1])
+    net_keys, stderr = util_process.execute(None,
+                                            'etcdctl get --prefix /sf/event/network/ | grep sf/event',
+                                            check_exit_code=[0, 1])
     if stderr:
         print('ERROR: Unable to retrieve network keys:%s' % stderr)
         return

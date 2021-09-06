@@ -1,5 +1,3 @@
-import copy
-import multiprocessing
 import requests
 import setproctitle
 import time
@@ -17,15 +15,19 @@ from shakenfist import logutil
 from shakenfist.tasks import (QueueTask,
                               DeleteInstanceTask,
                               FetchImageTask,
+                              HypervisorDestroyNetworkTask,
                               InstanceTask,
                               PreflightInstanceTask,
                               StartInstanceTask,
+                              DestroyNetworkTask,
+                              DeleteNetworkWhenClean,
                               FloatNetworkInterfaceTask,
                               SnapshotTask)
 from shakenfist import net
 from shakenfist import networkinterface
 from shakenfist import scheduler
-from shakenfist import util
+from shakenfist.util import general as util_general
+from shakenfist.util import libvirt as util_libvirt
 
 
 LOG, _ = logutil.setup(__name__)
@@ -111,7 +113,8 @@ def handle(jobname, workitem):
                     instance_delete(inst)
                     db.enqueue('%s-metrics' % config.NODE_NAME, {})
                 except Exception as e:
-                    util.ignore_exception(daemon.process_name('queues'), e)
+                    util_general.ignore_exception(
+                        daemon.process_name('queues'), e)
 
             elif isinstance(task, FloatNetworkInterfaceTask):
                 # Just punt it to the network node now that the interface is ready
@@ -120,6 +123,40 @@ def handle(jobname, workitem):
             elif isinstance(task, SnapshotTask):
                 snapshot(inst, task.disk(),
                          task.artifact_uuid(), task.blob_uuid())
+
+            elif isinstance(task, DeleteNetworkWhenClean):
+                # Check if any interfaces remain on network
+                task_network = net.Network.from_db(task.network_uuid())
+                ifaces = networkinterface.interfaces_for_network(task_network)
+                cur_interfaces = {i.uuid: i for i in ifaces}
+
+                # Only check those present at delete task initiation time.
+                remain_interfaces = list(set(task.wait_interfaces()) &
+                                         set(cur_interfaces))
+                if remain_interfaces:
+                    # Queue task on a node with a remaining instance
+                    first_iface = cur_interfaces[remain_interfaces[0]]
+                    inst = instance.Instance.from_db(first_iface.instance_uuid)
+                    db.enqueue(inst.placement['node'],
+                               {'tasks': [
+                                   DeleteNetworkWhenClean(task.network_uuid(),
+                                                          remain_interfaces)
+                               ]})
+
+                elif cur_interfaces:
+                    LOG.with_network(task_network).error(
+                        'During DeleteNetworkWhenClean new interfaces have '
+                        'connected to network: %s',
+                        [i.uuid for i in cur_interfaces])
+
+                else:
+                    # All original instances deleted, safe to delete network
+                    db.enqueue('networknode',
+                               DestroyNetworkTask(task.network_uuid()))
+
+            elif isinstance(task, HypervisorDestroyNetworkTask):
+                n = net.Network.from_db(task.network_uuid())
+                n.delete_on_hypervisor()
 
             else:
                 log_i.with_field('task', task).error(
@@ -135,7 +172,7 @@ def handle(jobname, workitem):
 
     except Exception as e:
         # Logging ignored exception - this should be investigated
-        util.ignore_exception(daemon.process_name('queues'), e)
+        util_general.ignore_exception(daemon.process_name('queues'), e)
         if inst:
             inst.enqueue_delete_due_error('Failed queue task: %s' % e)
 
@@ -171,7 +208,7 @@ def image_fetch(url, inst):
 
 
 def instance_preflight(inst, network):
-    inst.state = 'preflight'
+    inst.state = instance.Instance.STATE_PREFLIGHT
 
     # Try to place on this node
     s = scheduler.Scheduler()
@@ -214,34 +251,49 @@ def instance_preflight(inst, network):
 
 
 def instance_start(inst, network):
+    if inst.state.value.endswith('-error'):
+        LOG.with_instance(inst).warning(
+            'You cannot start an instance in an error state.')
+        return
+    if inst.state.value in (dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED):
+        LOG.with_instance(inst).warning(
+            'You cannot start an instance which has been deleted.')
+        return
+
     with inst.get_lock(ttl=900, op='Instance start') as lock:
         # Ensure networks are connected to this node
-        nets = {}
+        iface_uuids = []
         for netdesc in network:
-            if netdesc['network_uuid'] not in nets:
-                n = net.Network.from_db(netdesc['network_uuid'])
-                if not n:
-                    inst.enqueue_delete_due_error(
-                        'missing network: %s' % netdesc['network_uuid'])
-                    return
+            iface_uuids.append(netdesc['iface_uuid'])
+            n = net.Network.from_db(netdesc['network_uuid'])
+            if not n:
+                inst.enqueue_delete_due_error(
+                    'missing network: %s' % netdesc['network_uuid'])
+                return
 
-                if n.state.value != dbo.STATE_CREATED:
-                    inst.enqueue_delete_due_error(
-                        'network is not active: %s' % n.uuid)
-                    return
+            if n.state.value != dbo.STATE_CREATED:
+                inst.enqueue_delete_due_error(
+                    'network is not active: %s' % n.uuid)
+                return
 
-                n.create_on_hypervisor()
-                n.ensure_mesh()
-                n.update_dhcp()
+            # We must record interfaces very early for the vxlan leak
+            # detection code in the net daemon to work correctly.
+            ni = networkinterface.NetworkInterface.from_db(
+                netdesc['iface_uuid'])
+            ni.state = dbo.STATE_CREATED
+
+            n.create_on_hypervisor()
+            n.ensure_mesh()
+            n.update_dhcp()
 
         # Allocate console and VDI ports
         inst.allocate_instance_ports()
 
         # Now we can start the instance
-        libvirt = util.get_libvirt()
+        libvirt = util_libvirt.get_libvirt()
         try:
-            with util.RecordedOperation('instance creation', inst):
-                inst.create(lock=lock)
+            with util_general.RecordedOperation('instance creation', inst):
+                inst.create(iface_uuids, lock=lock)
 
         except libvirt.libvirtError as e:
             code = e.get_error_code()
@@ -251,35 +303,54 @@ def instance_start(inst, network):
                     'instance failed to start: %s' % e)
                 return
 
-        for ni in networkinterface.interfaces_for_instance(inst):
-            ni.state = dbo.STATE_CREATED
+        except exceptions.InvalidStateException:
+            # This instance is in an error or deleted state. Given the check
+            # at the top of this method, that indicates a race.
+            return
 
 
 def instance_delete(inst):
     with inst.get_lock(op='Instance delete'):
+        # There are two delete state flows:
+        #   - error transition states (preflight-error etc) to error
+        #   - created to deleted
+        #
+        # We don't need delete_wait for the error states as they're already
+        # in a transition state.
+        if not inst.state.value.endswith('-error'):
+            inst.state = dbo.STATE_DELETE_WAIT
         db.add_event('instance', inst.uuid, 'queued', 'delete', None, None)
 
-        # Create list of networks used by instance
+        # Create list of networks used by instance. We cannot use the
+        # interfaces cached in the instance here, because the instance
+        # may have failed to get to the point where it populates that
+        # field (an image fetch failure for example).
         instance_networks = []
+        interfaces = []
         for ni in networkinterface.interfaces_for_instance(inst):
+            interfaces.append(ni)
             if ni.network_uuid not in instance_networks:
                 instance_networks.append(ni.network_uuid)
+
+        # Stop the instance
+        inst.power_off()
+
+        # Delete the instance's interfaces
+        with util_general.RecordedOperation('release network addresses', inst):
+            for ni in interfaces:
+                ni.delete()
 
         # Create list of networks used by all other instances
         host_networks = []
         for i in instance.Instances([instance.this_node_filter,
                                      instance.active_states_filter]):
             if not i.uuid == inst.uuid:
-                for ni in networkinterface.interfaces_for_instance(i):
+                for iface_uuid in inst.interfaces:
+                    ni = networkinterface.NetworkInterface.from_db(iface_uuid)
                     if ni.network_uuid not in host_networks:
                         host_networks.append(ni.network_uuid)
 
         inst.delete()
-
-        # Delete the instance's interfaces
-        with util.RecordedOperation('release network addresses', inst):
-            for ni in networkinterface.interfaces_for_instance(inst):
-                ni.delete()
 
         # Check each network used by the deleted instance
         for network in instance_networks:
@@ -287,11 +358,14 @@ def instance_delete(inst):
             if n:
                 # If network used by another instance, only update
                 if network in host_networks:
-                    with util.RecordedOperation('deallocate ip address', inst):
+                    if n.state.value == net.Network.STATE_DELETE_WAIT:
+                        # Do not update a network about to be deleted
+                        continue
+                    with util_general.RecordedOperation('deallocate ip address', inst):
                         n.update_dhcp()
                 else:
                     # Network not used by any other instance therefore delete
-                    with util.RecordedOperation('remove network from node', n):
+                    with util_general.RecordedOperation('remove network from node', n):
                         n.delete_on_hypervisor()
 
 
@@ -302,36 +376,15 @@ def snapshot(inst, disk, artifact_uuid, blob_uuid):
         a.state = dbo.STATE_CREATED
 
 
-class Monitor(daemon.Daemon):
+class Monitor(daemon.WorkerPoolDaemon):
     def run(self):
-        workers = []
-        LOG.info('Starting Queues')
-
-        libvirt = util.get_libvirt()
-        conn = libvirt.open('qemu:///system')
-        present_cpus, _, _ = conn.getCPUMap()
+        LOG.info('Starting')
 
         while True:
             try:
-                for w in copy.copy(workers):
-                    if not w.is_alive():
-                        w.join(1)
-                        workers.remove(w)
-
-                if len(workers) < present_cpus / 2:
-                    jobname, workitem = db.dequeue(config.NODE_NAME)
-                else:
-                    workitem = None
-
-                if not workitem:
+                self.reap_workers()
+                if not self.dequeue_work_item(config.NODE_NAME, handle):
                     time.sleep(0.2)
-                    continue
-
-                p = multiprocessing.Process(
-                    target=handle, args=(jobname, workitem,),
-                    name='%s-worker' % daemon.process_name('queues'))
-                p.start()
-                workers.append(p)
 
             except Exception as e:
-                util.ignore_exception(daemon.process_name('queues'), e)
+                util_general.ignore_exception(daemon.process_name('queues'), e)

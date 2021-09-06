@@ -159,6 +159,10 @@ class SFConfig(BaseSettings):
         description='A URL listing all Ubuntu releases'
     )
 
+    MAX_IMAGE_TRANSFER_SECONDS: int = Field(
+        1800, description='How long to wait for an image transfer to occur before giving up'
+    )
+
     # Other options
     BLOB_REPLICATION_FACTOR: int = Field(
         2, description='How many copies of each blob we like to have.'
@@ -178,6 +182,10 @@ class SFConfig(BaseSettings):
     )
     NODE_NAME: str = Field(
         default_factory=get_node_name, description='FQDN of this node'
+    )
+    NODE_IS_ETCD_MASTER: bool = Field(
+        False, description='True if this node is an etcd master. This controls '
+                           'attempts to compact the master database.'
     )
     NODE_EGRESS_IP: str = Field(
         '', description='Egress IP of this node'

@@ -2,6 +2,7 @@
 from functools import partial
 import time
 
+from shakenfist import constants
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
@@ -20,6 +21,7 @@ class DatabaseBackedObject(object):
     STATE_CREATING = 'creating'
     STATE_CREATED = 'created'
     STATE_DELETED = 'deleted'
+    STATE_DELETE_WAIT = 'delete_wait'
     STATE_ERROR = 'error'
 
     def __init__(self, object_uuid, version=None):
@@ -50,6 +52,9 @@ class DatabaseBackedObject(object):
     def _db_create(cls, object_uuid, metadata):
         metadata['uuid'] = object_uuid
         etcd.create(cls.object_type, None, object_uuid, metadata)
+        LOG.with_fields({
+            'object_type': cls.object_type
+        }).with_fields(metadata).debug('Object created')
 
     @classmethod
     def _db_get(cls, object_uuid):
@@ -84,12 +89,12 @@ class DatabaseBackedObject(object):
         etcd.delete('attribute/%s' % self.object_type, self.__uuid, attribute)
 
     def get_lock(self, subtype=None, ttl=60, relatedobjects=None, log_ctx=None,
-                 op=None):
+                 op=None, timeout=constants.ETCD_ATTEMPT_TIMEOUT):
         if not log_ctx:
             log_ctx = self.log
         return db.get_lock(self.object_type, subtype, self.uuid, ttl=ttl,
                            relatedobjects=relatedobjects, log_ctx=log_ctx,
-                           op=op)
+                           op=op, timeout=timeout)
 
     def get_lock_attr(self, name, op):
         return db.get_lock('attribute/%s' % self.object_type,

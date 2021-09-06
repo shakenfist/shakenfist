@@ -24,6 +24,12 @@ class WrongEventException(Exception):
     pass
 
 
+# NOTE(mikal): this is a hack to "turn up the knob" on how slow image
+# downloads can be while my ISP is congested because of COVID. We should
+# turn this back down as things improve.
+NETWORK_PATIENCE_FACTOR = 3
+
+
 class BaseTestCase(testtools.TestCase):
     def setUp(self):
         super(BaseTestCase, self).setUp()
@@ -116,7 +122,7 @@ class BaseTestCase(testtools.TestCase):
         # morning it can take over 2 minutes to download a Ubuntu image.
         start_time = time.time()
         final = False
-        while time.time() - start_time < 300:
+        while time.time() - start_time < 5 * 60 * NETWORK_PATIENCE_FACTOR:
             i = self.system_client.get_instance(instance_uuid)
             if i['state'] in ['created', 'error']:
                 final = True
@@ -133,9 +139,9 @@ class BaseTestCase(testtools.TestCase):
                 'Instance %s was not created in a reasonable time (%s)'
                 % (instance_uuid, i))
 
-        # Once created, we shouldn't need more than five minutes for boot.
+        # Once created, we shouldn't need more than another 2 minutes for boot.
         start_time = time.time()
-        while time.time() - start_time < 600:
+        while time.time() - start_time < 2 * 60:
             for event in self.system_client.get_instance_events(instance_uuid):
                 if after and event['timestamp'] <= after:
                     continue
@@ -171,7 +177,7 @@ class BaseTestCase(testtools.TestCase):
     def _await_image_event(
             self, image_uuid, operation, message=None, after=None):
         start_time = time.time()
-        while time.time() - start_time < 900:
+        while time.time() - start_time < 5 * 60 * NETWORK_PATIENCE_FACTOR:
             for event in self.system_client.get_image_events(image_uuid):
                 if after and event['timestamp'] <= after:
                     continue
@@ -194,7 +200,7 @@ class BaseTestCase(testtools.TestCase):
 
     def _await_network_ready(self, network_uuid):
         start_time = time.time()
-        while time.time() - start_time < 300:
+        while time.time() - start_time < 2 * 60:
             n = self.system_client.get_network(network_uuid)
             if n.get('state') == 'created':
                 return
@@ -251,7 +257,7 @@ class BaseNamespacedTestCase(BaseTestCase):
             non_blocking_client.delete_instance(inst['uuid'])
 
         start_time = time.time()
-        while time.time() - start_time < 300:
+        while time.time() - start_time < 5 * 60:
             if not list(non_blocking_client.get_instances()):
                 break
             time.sleep(5)
@@ -265,7 +271,7 @@ class BaseNamespacedTestCase(BaseTestCase):
             non_blocking_client.delete_network(net['uuid'])
 
         start_time = time.time()
-        while time.time() - start_time < 300:
+        while time.time() - start_time < 5 * 60:
             if not list(non_blocking_client.get_networks()):
                 break
             time.sleep(5)

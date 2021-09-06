@@ -4,12 +4,10 @@ import time
 import uuid
 
 from shakenfist.config import config
+from shakenfist import constants
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import logutil
-
-
-ETCD_ATTEMPT_TIMEOUT = 60
 
 
 LOG, _ = logutil.setup(__name__)
@@ -19,7 +17,7 @@ LOG, _ = logutil.setup(__name__)
 #####################################################################
 
 
-def get_lock(objecttype, subtype, name, ttl=60, timeout=ETCD_ATTEMPT_TIMEOUT,
+def get_lock(objecttype, subtype, name, ttl=60, timeout=constants.ETCD_ATTEMPT_TIMEOUT,
              relatedobjects=None, log_ctx=LOG, op=None):
     return etcd.get_lock(objecttype, subtype, name, ttl=ttl, timeout=timeout,
                          log_ctx=log_ctx, op=op)

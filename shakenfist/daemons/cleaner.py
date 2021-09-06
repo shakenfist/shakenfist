@@ -5,6 +5,7 @@ import random
 import time
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import logutil
@@ -15,7 +16,9 @@ from shakenfist.node import (
     Node, Nodes,
     active_states_filter as node_active_states_filter,
     inactive_states_filter as node_inactive_states_filter)
-from shakenfist import util
+from shakenfist.util import general as util_general
+from shakenfist.util import libvirt as util_libvirt
+from shakenfist.util import process as util_process
 
 
 LOG, _ = logutil.setup(__name__)
@@ -23,7 +26,7 @@ LOG, _ = logutil.setup(__name__)
 
 class Monitor(daemon.Daemon):
     def _update_power_states(self):
-        libvirt = util.get_libvirt()
+        libvirt = util_libvirt.get_libvirt()
         conn = libvirt.open('qemu:///system')
         try:
             seen = []
@@ -42,8 +45,8 @@ class Monitor(daemon.Daemon):
                 if not inst:
                     # Instance is SF but not in database. Kill to reduce load.
                     log_ctx.warning('Destroying unknown instance')
-                    util.execute(None,
-                                 'virsh destroy "sf:%s"' % instance_uuid)
+                    util_process.execute(None,
+                                         'virsh destroy "sf:%s"' % instance_uuid)
                     continue
 
                 inst.place_instance(config.NODE_NAME)
@@ -66,8 +69,8 @@ class Monitor(daemon.Daemon):
                         # hammer instead.
                         log_ctx.warning(
                             'Attempting alternate delete method for instance')
-                        util.execute(None,
-                                     'virsh destroy "sf:%s"' % instance_uuid)
+                        util_process.execute(None,
+                                             'virsh destroy "sf:%s"' % instance_uuid)
 
                         inst.add_event('enforced delete', 'complete')
                     else:
@@ -78,7 +81,7 @@ class Monitor(daemon.Daemon):
 
                     continue
 
-                state = util.extract_power_state(libvirt, domain)
+                state = util_libvirt.extract_power_state(libvirt, domain)
                 inst.update_power_state(state)
                 if state == 'crashed':
                     inst.state = inst.state.value + '-error'
@@ -149,7 +152,7 @@ class Monitor(daemon.Daemon):
             LOG.info('Compacted etcd')
 
         except Exception as e:
-            util.ignore_exception('etcd compaction', e)
+            util_general.ignore_exception('etcd compaction', e)
 
     def run(self):
         LOG.info('Starting')
@@ -204,11 +207,34 @@ class Monitor(daemon.Daemon):
                 if age > config.NODE_CHECKIN_MAXIMUM:
                     n.state = Node.STATE_MISSING
 
-            # Perform etcd maintenance
-            if time.time() - last_compaction > 1800:
-                LOG.info('Compacting etcd')
-                self._compact_etcd()
-                last_compaction = time.time()
+            # Find orphaned blobs
+            blob_path = os.path.join(config.STORAGE_PATH, 'blobs')
+            os.makedirs(blob_path, exist_ok=True)
+            for ent in os.listdir(blob_path):
+                entpath = os.path.join(blob_path, ent)
+                st = os.stat(entpath)
+
+                # If we've had this file for more than two cleaner delays...
+                if time.time() - st.st_mtime > config.CLEANER_DELAY * 2:
+                    if ent.endswith('.partial'):
+                        # ... and its a stale partial transfer
+                        LOG.with_fields({
+                            'blob': ent}).warning(
+                                'Deleting stale partial transfer')
+                        os.unlink(entpath)
+
+                    elif not Blob.from_db(ent):
+                        # ... or it doesn't exist in the database
+                        LOG.with_fields({
+                            'blob': ent}).warning('Deleting orphaned blob')
+                        os.unlink(entpath)
+
+            # Perform etcd maintenance, if we are an etcd master
+            if config.NODE_IS_ETCD_MASTER:
+                if time.time() - last_compaction > 1800:
+                    LOG.info('Compacting etcd')
+                    self._compact_etcd()
+                    last_compaction = time.time()
 
             last_loop_run = time.time()
             time.sleep(60)

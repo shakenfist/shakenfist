@@ -1,4 +1,4 @@
-import ipaddress
+import copy
 import itertools
 import time
 
@@ -26,67 +26,70 @@ from shakenfist.tasks import (
     NetworkInterfaceTask,
     FloatNetworkInterfaceTask,
     DefloatNetworkInterfaceTask)
-from shakenfist import util
+from shakenfist.util import network as util_network
 
 
 LOG, _ = logutil.setup(__name__)
 
+EXTRA_VLANS_HISTORY = {}
 
-class Monitor(daemon.Daemon):
+
+class Monitor(daemon.WorkerPoolDaemon):
+    def _remove_stray_interfaces(self):
+        for n in net.Networks([baseobject.active_states_filter]):
+            t = time.time()
+            for ni in networkinterface.interfaces_for_network(n):
+                inst = instance.Instance.from_db(ni.instance_uuid)
+                if not inst:
+                    ni.delete()
+                    LOG.with_fields({
+                        'instance': ni.instance_uuid,
+                        'networkinterface': ni.uuid
+                    }).info('Deleted stray network interface for missing instance')
+                else:
+                    s = inst.state
+                    if (s.update_time + 30 < t and
+                            s.value in [dbo.STATE_DELETED, dbo.STATE_ERROR, 'unknown']):
+                        ni.delete()
+                        LOG.with_fields({
+                            'instance': ni.instance_uuid,
+                            'networkinterface': ni.uuid
+                        }).info('Deleted stray network interface')
+
     def _maintain_networks(self):
         LOG.info('Maintaining networks')
 
         # Discover what networks are present
-        _, _, vxid_to_mac = util.discover_interfaces()
+        _, _, vxid_to_mac = util_network.discover_interfaces()
 
         # Determine what networks we should be on
         host_networks = []
         seen_vxids = []
 
-        if not util.is_network_node():
-            # For normal nodes, just the ones we have instances for
-            for inst in instance.Instances([instance.this_node_filter, instance.active_states_filter]):
-                for ni in networkinterface.interfaces_for_instance(inst):
-                    if ni.network_uuid not in host_networks:
+        if not util_network.is_network_node():
+            # For normal nodes, just the ones we have instances for. We need
+            # to use the more expensive interfaces_for_instance() method of
+            # looking up instance interfaces here if the instance cachce hasn't
+            # been populated yet (i.e. the instance is still being created)
+            for inst in instance.Instances([instance.this_node_filter,
+                                            instance.active_states_filter]):
+                ifaces = inst.interfaces
+                if not ifaces:
+                    ifaces = list(
+                        networkinterface.interfaces_for_instance(inst))
+
+                for iface_uuid in ifaces:
+                    ni = networkinterface.NetworkInterface.from_db(iface_uuid)
+                    if not ni:
+                        LOG.with_instance(
+                            inst).with_networkinterface(
+                            iface_uuid).error('Network interface does not exist')
+                    elif ni.network_uuid not in host_networks:
                         host_networks.append(ni.network_uuid)
         else:
             # For network nodes, its all networks
             for n in net.Networks([baseobject.active_states_filter]):
-                bad = False
-                try:
-                    netblock = ipaddress.ip_network(n.netblock)
-                    if netblock.num_addresses < 8:
-                        bad = True
-                except ValueError:
-                    bad = True
-
-                if bad:
-                    LOG.with_network(n.uuid).error(
-                        'Network netblock is invalid, deleting network.')
-                    netobj = net.Network.from_db(n.uuid)
-                    netobj.delete()
-                    continue
-
                 host_networks.append(n.uuid)
-
-                # Network nodes also look for interfaces for absent instances
-                # and delete them
-                t = time.time()
-                for ni in networkinterface.interfaces_for_network(n):
-                    inst = instance.Instance.from_db(ni.instance_uuid)
-                    if not inst:
-                        ni.delete()
-                        LOG.with_instance(
-                            ni.instance_uuid).with_networkinterface(
-                            ni.uuid).info('Deleted stray network interface for missing instance')
-                    else:
-                        s = inst.state
-                        if (s.update_time + 30 < t and
-                                s.value in [dbo.STATE_DELETED, dbo.STATE_ERROR, 'unknown']):
-                            ni.delete()
-                            LOG.with_instance(
-                                ni.instance_uuid).with_networkinterface(
-                                ni.uuid).info('Deleted stray network interface')
 
         # Ensure we are on every network we have a host for
         for network in host_networks:
@@ -95,6 +98,7 @@ class Monitor(daemon.Daemon):
                 if not n:
                     continue
 
+                # Track what vxlan ids we've seen
                 seen_vxids.append(n.vxid)
 
                 if time.time() - n.state.update_time < 60:
@@ -102,7 +106,7 @@ class Monitor(daemon.Daemon):
                     continue
 
                 if not n.is_okay():
-                    if util.is_network_node():
+                    if util_network.is_network_node():
                         LOG.with_network(n).info(
                             'Recreating not okay network on network node')
                         n.create_on_network_node()
@@ -139,10 +143,21 @@ class Monitor(daemon.Daemon):
         # Determine if there are any extra vxids
         extra_vxids = set(vxid_to_mac.keys()) - set(seen_vxids)
 
-        # Delete "deleted" SF networks and log unknown vxlans
-        if extra_vxids:
-            LOG.with_field('vxids', extra_vxids).warning(
-                'Extra vxlans present!')
+        # We keep a global cache of extra vxlans we've seen before, so that
+        # we only warn about them when they've been stray for five minutes.
+        global EXTRA_VLANS_HISTORY
+        for vxid in copy.copy(EXTRA_VLANS_HISTORY):
+            if vxid not in extra_vxids:
+                del EXTRA_VLANS_HISTORY[vxid]
+        for vxid in extra_vxids:
+            if vxid not in EXTRA_VLANS_HISTORY:
+                EXTRA_VLANS_HISTORY[vxid] = time.time()
+
+        # Warn of extra vxlans which have been present for more than five minutes
+        for vxid in EXTRA_VLANS_HISTORY:
+            if time.time() - EXTRA_VLANS_HISTORY[vxid] > 5 * 60:
+                LOG.with_field('vxid', vxid).warning(
+                    'Extra vxlan present!')
 
         # And record vxids in the database
         db.persist_node_vxid_mapping(config.NODE_NAME, vxid_to_mac)
@@ -159,7 +174,9 @@ class Monitor(daemon.Daemon):
         # worth the complexity right now. Are we really going to be changing
         # networks that much?
 
-        # Tasks valid for a network in any state
+        #
+        # Tasks valid for a network in ANY STATE
+        #
         if isinstance(workitem, RemoveDHCPNetworkTask):
             n.remove_dhcp()
             db.add_event('network', workitem.network_uuid(),
@@ -172,7 +189,33 @@ class Monitor(daemon.Daemon):
                          'network node', 'remove nat', None, None)
             return
 
-        # Tasks that should not operate on a dead network
+        #
+        # Tasks that should NOT operate on a DEAD network
+        #
+        if n.is_dead() and n.state.value != net.Network.STATE_DELETE_WAIT:
+            log_ctx.with_fields({'state': n.state,
+                                 'workitem': workitem}).info(
+                'Received work item for a dead network and not delete_wait')
+            return
+
+        if isinstance(workitem, DestroyNetworkTask):
+            interfaces = list(networkinterface.interfaces_for_network(n))
+            if interfaces:
+                log_ctx.error(
+                    'DestroyNetworkTask for network with interfaces: %s',
+                    [i.uuid for i in interfaces])
+                return
+            try:
+                n.delete_on_network_node()
+                db.add_event('network', workitem.network_uuid(),
+                             'network node', 'destroy', None, None)
+            except exceptions.DeadNetwork as e:
+                log_ctx.with_field('exception', e).warning(
+                    'DestroyNetworkTask on dead network')
+
+        #
+        # Tasks that should NOT operate on a DEAD or DELETE_WAIT network
+        #
         if n.is_dead():
             log_ctx.with_fields({'state': n.state,
                                  'workitem': workitem}).info(
@@ -188,15 +231,6 @@ class Monitor(daemon.Daemon):
             except exceptions.DeadNetwork as e:
                 log_ctx.with_field('exception', e).warning(
                     'DeployNetworkTask on dead network')
-
-        elif isinstance(workitem, DestroyNetworkTask):
-            try:
-                n.delete_on_network_node()
-                db.add_event('network', workitem.network_uuid(),
-                             'network node', 'destroy', None, None)
-            except exceptions.DeadNetwork as e:
-                log_ctx.with_field('exception', e).warning(
-                    'DestroyNetworkTask on dead network')
 
         elif isinstance(workitem, UpdateDHCPNetworkTask):
             try:
@@ -221,17 +255,14 @@ class Monitor(daemon.Daemon):
                 'Received work item for non-existent network interface')
             return
 
-        # Tasks that should not operate on a dead network
-        if n.is_dead():
+        # Tasks that should not operate on a dead or delete waiting network
+        if n.is_dead() and n.state.value != net.Network.STATE_DELETE_WAIT:
             log_ctx.with_fields({'state': n.state,
                                  'workitem': workitem}).info(
-                'Received work item for a dead network')
+                'Received work item for a completely dead network')
             return
 
-        if isinstance(workitem, FloatNetworkInterfaceTask):
-            n.add_floating_ip(ni.floating.get('floating_address'), ni.ipv4)
-
-        elif isinstance(workitem, DefloatNetworkInterfaceTask):
+        if isinstance(workitem, DefloatNetworkInterfaceTask):
             n.remove_floating_ip(ni.floating.get('floating_address'), ni.ipv4)
 
             db.add_event('interface', ni.uuid, 'api', 'defloat', None, None)
@@ -241,6 +272,16 @@ class Monitor(daemon.Daemon):
                 ipm.persist()
 
             ni.floating = None
+
+        # Tasks that should not operate on a dead network
+        if n.is_dead():
+            log_ctx.with_fields({'state': n.state,
+                                 'workitem': workitem}).info(
+                'Received work item for a dead network')
+            return
+
+        if isinstance(workitem, FloatNetworkInterfaceTask):
+            n.add_floating_ip(ni.floating.get('floating_address'), ni.ipv4)
 
     def _process_network_node_workitems(self):
         jobname, workitem = db.dequeue('networknode')
@@ -264,21 +305,41 @@ class Monitor(daemon.Daemon):
 
     def _reap_leaked_floating_ips(self):
         # Ensure we haven't leaked any floating IPs (because we use to)
-        floating_gateways = []
-        for n in net.Networks([baseobject.active_states_filter]):
-            if n.floating_gateway:
-                floating_gateways.append(n.floating_gateway)
-        LOG.info('Found floating gateways: %s' % floating_gateways)
-
-        floating_addresses = []
-        for ni in networkinterface.NetworkInterfaces([baseobject.active_states_filter]):
-            if ni.floating.get('floating_address'):
-                floating_addresses.append(ni.floating.get('floating_address'))
-        LOG.info('Found floating addresses: %s' % floating_addresses)
-
         with db.get_lock('ipmanager', None, 'floating', ttl=120,
                          op='Cleanup leaks'):
             floating_ipm = IPManager.from_db('floating')
+
+            # Collect floating gateways and floating IPs, while ensuring that
+            # they are correctly reserved on the floating network as well
+            floating_gateways = []
+            for n in net.Networks([baseobject.active_states_filter]):
+                fg = n.floating_gateway
+                if fg:
+                    floating_gateways.append(fg)
+                    if floating_ipm.is_free(fg):
+                        floating_ipm.reserve(fg, n.unique_label())
+                        floating_ipm.persist()
+                        LOG.with_fields({
+                            'network': n.uuid,
+                            'address': fg
+                        }).error('Floating gateway not reserved correctly')
+
+            LOG.info('Found floating gateways: %s' % floating_gateways)
+
+            floating_addresses = []
+            for ni in networkinterface.NetworkInterfaces([baseobject.active_states_filter]):
+                fa = ni.floating.get('floating_address')
+                if fa:
+                    floating_addresses.append(fa)
+                    if floating_ipm.is_free(fg):
+                        floating_ipm.reserve(fg, ni.unique_label())
+                        floating_ipm.persist()
+                        LOG.with_fields({
+                            'networkinterface': ni.uuid,
+                            'address': fa
+                        }).error('Floating address not reserved correctly')
+            LOG.info('Found floating addresses: %s' % floating_addresses)
+
             floating_reserved = [
                 floating_ipm.get_address_at_index(0),
                 floating_ipm.get_address_at_index(1),
@@ -287,6 +348,8 @@ class Monitor(daemon.Daemon):
             ]
             LOG.info('Found floating reservations: %s' % floating_reserved)
 
+            # Now the reverse check. Test if there are any reserved IPs which
+            # are not actually in use. Free any we find.
             leaks = []
             for ip in floating_ipm.in_use:
                 if ip not in itertools.chain(floating_gateways,
@@ -300,19 +363,65 @@ class Monitor(daemon.Daemon):
                 floating_ipm.release(ip)
             floating_ipm.persist()
 
+    def _validate_mtus(self):
+        by_mtu = {}
+        for iface, mtu in util_network.get_interface_mtus():
+            by_mtu.setdefault(mtu, [])
+            by_mtu[mtu].append(iface)
+
+        for mtu in sorted(by_mtu):
+            log = LOG.with_fields({
+                'mtu': mtu,
+                'interfaces': by_mtu[mtu]
+            })
+            if mtu < 1501:
+                log.warning('Interface MTU is 1500 bytes or less')
+            else:
+                log.debug('Interface MTU is normal')
+
     def run(self):
         LOG.info('Starting')
         last_management = 0
+        stray_interface_worker = None
+        maintain_networks_worker = None
+        floating_ip_reap_worker = None
+        mtu_validation_worker = None
 
         while True:
-            if util.is_network_node():
+            self.reap_workers()
+
+            if util_network.is_network_node():
                 self._process_network_node_workitems()
             else:
                 management_age = time.time() - last_management
                 time.sleep(max(0, 30 - management_age))
 
             if time.time() - last_management > 30:
-                self._maintain_networks()
-                if util.is_network_node():
-                    self._reap_leaked_floating_ips()
+                # Management tasks are treated as extra workers, and run in
+                # parallel with other network work items.
+                worker_pids = []
+                for w in self.workers:
+                    worker_pids.append(w.pid)
+
+                if stray_interface_worker not in worker_pids:
+                    LOG.info('Scanning for stray network interfaces')
+                    stray_interface_worker = self.start_workitem(
+                        self._remove_stray_interfaces, [], 'stray-nics')
+
+                if maintain_networks_worker not in worker_pids:
+                    LOG.info('Maintaining existing networks')
+                    maintain_networks_worker = self.start_workitem(
+                        self._maintain_networks, [], 'maintain')
+
+                if mtu_validation_worker not in worker_pids:
+                    LOG.info('Validating network interface MTUs')
+                    mtu_validation_worker = self.start_workitem(
+                        self._validate_mtus, [], 'mtus')
+
+                if util_network.is_network_node():
+                    LOG.info('Reaping stray floating IPs')
+                    if floating_ip_reap_worker not in worker_pids:
+                        floating_ip_reap_worker = self.start_workitem(
+                            self._reap_leaked_floating_ips, [], 'fip-reaper')
+
                 last_management = time.time()

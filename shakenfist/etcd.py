@@ -7,13 +7,13 @@ from etcd3gw.client import Etcd3Client
 from etcd3gw.exceptions import InternalServerError
 from etcd3gw.lock import Lock
 
+from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import logutil
-from shakenfist import util
 from shakenfist.tasks import QueueTask
-from shakenfist import baseobject
+from shakenfist.util import network as util_network
 
 
 ####################################################################
@@ -151,7 +151,7 @@ class ActualLock(Lock):
 
         raise exceptions.LockException(
             'Cannot acquire lock %s, timed out after %.02f seconds'
-            % (self.name, duration))
+            % (self.name, self.timeout))
 
     def __exit__(self, _exception_type, _exception_value, _traceback):
         if not self.release():
@@ -398,6 +398,6 @@ def _restart_queue(queuename):
 def restart_queues():
     # Move things which were in processing back to the queue because
     # we didn't complete them before crashing.
-    if util.is_network_node():
+    if util_network.is_network_node():
         _restart_queue('networknode')
     _restart_queue(config.NODE_NAME)

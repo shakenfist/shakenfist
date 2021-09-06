@@ -1,19 +1,23 @@
 import hashlib
 import os
 import random
-import re
 import requests
 import shutil
+import time
 import uuid
 
 from shakenfist.artifact import Artifact, BLOB_URL
 from shakenfist import blob
 from shakenfist.blob import Blob
 from shakenfist.config import config
+from shakenfist import constants
+from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import image_resolver
 from shakenfist import logutil
-from shakenfist import util
+from shakenfist.util import general as util_general
+from shakenfist.util import image as util_image
+from shakenfist.util import process as util_process
 
 
 LOG, _ = logutil.setup(__name__)
@@ -29,7 +33,8 @@ class ImageFetchHelper(object):
             {'url': self.url, 'artifact': self.__artifact.uuid})
 
     def get_image(self):
-        with self.__artifact.get_lock() as lock:
+        with self.__artifact.get_lock(ttl=(12 * constants.LOCK_REFRESH_SECONDS),
+                                      timeout=config.MAX_IMAGE_TRANSFER_SECONDS) as lock:
             url, checksum, checksum_type = image_resolver.resolve(self.url)
 
             # If this is a request for a URL, do we have the most recent version
@@ -46,15 +51,17 @@ class ImageFetchHelper(object):
                     resp = self._open_connection(url)
 
                     if most_recent_blob.modified != resp.headers.get('Last-Modified'):
-                        self.add_event('image requires fetch', None, None,
-                                       'Last-Modified: %s -> %s' % (most_recent_blob.modified,
-                                                                    resp.headers.get('Last-Modified')))
+                        self.__artifact.add_event(
+                            'image requires fetch', None, None,
+                            'Last-Modified: %s -> %s' % (most_recent_blob.modified,
+                                                         resp.headers.get('Last-Modified')))
                         dirty = True
 
                     if most_recent_blob.size != resp.headers.get('Content-Length'):
-                        self.add_event('image requires fetch', None, None,
-                                       'Content-Length: %s -> %s' % (most_recent_blob.size,
-                                                                     resp.headers.get('Content-Length')))
+                        self.__artifact.add_event(
+                            'image requires fetch', None, None,
+                            'Content-Length: %s -> %s' % (most_recent_blob.size,
+                                                          resp.headers.get('Content-Length')))
                         dirty = True
 
                     self.log.info('Cluster cached image is stale')
@@ -67,7 +74,7 @@ class ImageFetchHelper(object):
             # "original format" if downloaded from an HTTP source.
             if url.startswith(BLOB_URL):
                 self.log.info('Fetching image from within the cluster')
-                b = self._blob_get(url)
+                b = self._blob_get(lock, url)
             else:
                 self.log.info('Fetching image from the internet')
                 b = self._http_get_inner(lock, url, checksum, checksum_type)
@@ -82,16 +89,16 @@ class ImageFetchHelper(object):
                 if b.info.get('mime-type', '') == 'application/gzip':
                     cache_path = os.path.join(
                         config.STORAGE_PATH, 'image_cache', b.uuid)
-                    with util.RecordedOperation('decompress image', self.instance):
-                        util.execute([lock], 'gunzip -k -q -c %s > %s'
-                                     % (blob_path, cache_path))
+                    with util_general.RecordedOperation('decompress image', self.instance):
+                        util_process.execute([lock], 'gunzip -k -q -c %s > %s'
+                                             % (blob_path, cache_path))
                     blob_path = cache_path
 
                 os.makedirs(
                     os.path.join(config.STORAGE_PATH, 'image_cache'), exist_ok=True)
                 cache_path = os.path.join(
                     config.STORAGE_PATH, 'image_cache', b.uuid + '.qcow2')
-                if identify(blob_path).get('file format', '') == 'qcow2':
+                if util_image.identify(blob_path).get('file format', '') == 'qcow2':
                     try:
                         os.link(blob_path, cache_path)
                         self.log.with_fields({'blob': b}).info(
@@ -104,18 +111,18 @@ class ImageFetchHelper(object):
                     shutil.chown(cache_path, config.LIBVIRT_USER,
                                  config.LIBVIRT_GROUP)
                 else:
-                    with util.RecordedOperation('transcode image', self.instance):
+                    with util_general.RecordedOperation('transcode image', self.instance):
                         self.log.with_fields({'blob': b}).info(
                             'Transcoding %s -> %s' % (blob_path, cache_path))
-                        create_qcow2([lock], blob_path, cache_path)
+                        util_image.create_qcow2([lock], blob_path, cache_path)
 
                 shutil.chown(cache_path, 'libvirt-qemu', 'libvirt-qemu')
-                self.log.with_fields(util.stat_log_fields(cache_path)).info(
+                self.log.with_fields(util_general.stat_log_fields(cache_path)).info(
                     'Cache file %s created' % cache_path)
 
             self.__artifact.state = Artifact.STATE_CREATED
 
-    def _blob_get(self, url):
+    def _blob_get(self, lock, url):
         """Fetch a blob from the cluster."""
 
         blob_uuid = url[len(BLOB_URL):]
@@ -124,23 +131,32 @@ class ImageFetchHelper(object):
         os.makedirs(blob_dir, exist_ok=True)
 
         b = Blob.from_db(blob_uuid)
+        if not b:
+            raise exceptions.BlobMissing(blob_uuid)
+
         locations = b.locations
         random.shuffle(locations)
         blob_source = locations[0]
 
         if not os.path.exists(blob_path):
-            with util.RecordedOperation('fetch blob', self.instance):
+            with util_general.RecordedOperation('fetch blob', self.instance):
                 url = 'http://%s:%d/blob/%s' % (blob_source, config.API_PORT,
                                                 blob_uuid)
-                admin_token = util.get_api_token(
+                admin_token = util_general.get_api_token(
                     'http://%s:%d' % (blob_source, config.API_PORT))
                 r = requests.request('GET', url,
                                      headers={'Authorization': admin_token,
-                                              'User-Agent': util.get_user_agent()})
+                                              'User-Agent': util_general.get_user_agent()})
 
                 with open(blob_path + '.partial', 'wb') as f:
+                    last_refresh = 0
+
                     for chunk in r.iter_content(chunk_size=8192):
                         f.write(chunk)
+
+                        if time.time() - last_refresh > constants.LOCK_REFRESH_SECONDS:
+                            db.refresh_locks([lock])
+                            last_refresh = time.time()
 
                 os.rename(blob_path + '.partial', blob_path)
                 b.observe()
@@ -150,7 +166,7 @@ class ImageFetchHelper(object):
     def _http_get_inner(self, lock, url, checksum, checksum_type):
         """Fetch image if not downloaded and return image path."""
 
-        with util.RecordedOperation('fetch image', self.instance):
+        with util_general.RecordedOperation('fetch image', self.instance):
             resp = self._open_connection(url)
             blob_uuid = str(uuid.uuid4())
             self.log.with_fields({
@@ -176,7 +192,8 @@ class ImageFetchHelper(object):
             proxies['http'] = config.HTTP_PROXY_SERVER
 
         resp = requests.get(url, allow_redirects=True, stream=True,
-                            headers={'User-Agent': util.get_user_agent()},
+                            headers={
+                                'User-Agent': util_general.get_user_agent()},
                             proxies=proxies)
         if resp.status_code != 200:
             raise exceptions.HTTPError(
@@ -210,104 +227,3 @@ def verify_checksum(image_name, checksum, checksum_type):
 
     else:
         raise exceptions.UnknownChecksumType(checksum_type)
-
-
-VALUE_WITH_BRACKETS_RE = re.compile(r'.* \(([0-9]+) bytes\)')
-
-
-def identify(path):
-    """Work out what an image is."""
-
-    if not os.path.exists(path):
-        return {}
-
-    out, _ = util.execute(None, 'qemu-img info %s' % path)
-
-    data = {}
-    for line in out.split('\n'):
-        line = line.lstrip().rstrip()
-        elems = line.split(': ')
-        if len(elems) > 1:
-            key = elems[0]
-            value = ': '.join(elems[1:])
-
-            m = VALUE_WITH_BRACKETS_RE.match(value)
-            if m:
-                value = float(m.group(1))
-
-            elif value.endswith('K'):
-                value = float(value[:-1]) * 1024
-            elif value.endswith('M'):
-                value = float(value[:-1]) * 1024 * 1024
-            elif value.endswith('G'):
-                value = float(value[:-1]) * 1024 * 1024 * 1024
-            elif value.endswith('T'):
-                value = float(value[:-1]) * 1024 * 1024 * 1024 * 1024
-
-            try:
-                data[key] = float(value)
-            except Exception:
-                data[key] = value
-
-    return data
-
-
-def create_cow(locks, cache_file, disk_file, disk_size):
-    """Create a COW layer on top of the image cache.
-
-    disk_size is specified in Gigabytes.
-    """
-
-    if os.path.exists(disk_file):
-        return
-
-    if disk_size:
-        util.execute(locks,
-                     'qemu-img create -b %s -f qcow2 %s %dG'
-                     % (cache_file, disk_file, int(disk_size)))
-    else:
-        util.execute(locks,
-                     'qemu-img create -b %s -f qcow2 %s'
-                     % (cache_file, disk_file))
-
-
-def create_qcow2(locks, cache_file, disk_file):
-    """Make a qcow2 copy of the disk from the image cache."""
-
-    if os.path.exists(disk_file):
-        return
-
-    util.execute(locks,
-                 'qemu-img convert -t none -O qcow2 %s %s'
-                 % (cache_file, disk_file))
-
-
-def create_blank(locks, disk_file, disk_size):
-    """Make an empty image."""
-
-    if os.path.exists(disk_file):
-        return
-
-    util.execute(locks, 'qemu-img create -f qcow2 %s %sG'
-                 % (disk_file, disk_size))
-
-
-def snapshot(locks, source, destination):
-    """Convert a possibly COW layered disk file into a snapshot."""
-
-    util.execute(locks,
-                 'qemu-img convert --force-share -O qcow2 %s %s'
-                 % (source, destination))
-
-
-def resize(locks, input, output, size):
-    if os.path.exists(output):
-        return
-
-    current_size = identify(input).get('virtual size')
-
-    if current_size == size * 1024 * 1024 * 1024:
-        os.link(input, output)
-        return
-
-    create_cow(locks, input, output, size)

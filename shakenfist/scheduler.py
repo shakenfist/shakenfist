@@ -14,7 +14,7 @@ from shakenfist import logutil
 from shakenfist import networkinterface
 from shakenfist.node import (
     Nodes, active_states_filter as node_active_states_filter)
-from shakenfist import util
+from shakenfist.util import general as util_general
 
 
 LOG, _ = logutil.setup(__name__)
@@ -171,7 +171,8 @@ class Scheduler(object):
             # Make a list of networks for the node
             present_networks = []
             for inst in per_node.get(n, []):
-                for ni in networkinterface.interfaces_for_instance(inst):
+                for iface_uuid in inst.interfaces:
+                    ni = networkinterface.NetworkInterface.from_db(iface_uuid)
                     if ni.network_uuid not in present_networks:
                         present_networks.append(ni.network_uuid)
 
@@ -201,7 +202,7 @@ class Scheduler(object):
         return candidates_by_network_matches[max_matches]
 
     def place_instance(self, instance, network, candidates=None):
-        with util.RecordedOperation('schedule', instance):
+        with util_general.RecordedOperation('schedule', instance):
             log_ctx = self.log.with_object(instance)
 
             # Refresh metrics if its too old, or there are no nodes.

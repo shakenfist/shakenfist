@@ -10,7 +10,7 @@ from shakenfist.baseobject import (
 from shakenfist.config import config, BaseSettings, SFConfig
 from shakenfist.external_api import app as external_api
 from shakenfist.ipmanager import IPManager
-from shakenfist.tests import test_shakenfist
+from shakenfist.tests import base
 
 
 class FakeResponse(object):
@@ -67,6 +67,7 @@ class FakeInstance(BaseFakeObject):
         self.power_state = {'power_state': power_state}
         self.placement = {'node': placement}
         self.version = 2
+        self.interfaces = []
 
 
 class FakeNetwork(BaseFakeObject):
@@ -99,7 +100,7 @@ def _clean_traceback(resp):
     return resp
 
 
-class AuthTestCase(test_shakenfist.ShakenFistTestCase):
+class AuthTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super(AuthTestCase, self).setUp()
 
@@ -151,7 +152,7 @@ class AuthTestCase(test_shakenfist.ShakenFistTestCase):
             },
             resp.get_json())
 
-    @mock.patch('shakenfist.external_api.app.Auth._get_keys',
+    @mock.patch('shakenfist.external_api.auth.AuthEndpoint._get_keys',
                 return_value=(None, [_encode_key('cheese')]))
     def test_post_auth(self, mock_get_keys):
         resp = self.client.post(
@@ -159,7 +160,7 @@ class AuthTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
         self.assertIn('access_token', resp.get_json())
 
-    @mock.patch('shakenfist.external_api.app.Auth._get_keys',
+    @mock.patch('shakenfist.external_api.auth.AuthEndpoint._get_keys',
                 return_value=('cheese', [_encode_key('bacon')]))
     def test_post_auth_not_authorized(self, mock_get_keys):
         resp = self.client.post(
@@ -228,7 +229,7 @@ class AuthTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertEqual(401, resp.status_code)
 
 
-class ExternalApiTestCase(test_shakenfist.ShakenFistTestCase):
+class ExternalApiTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super(ExternalApiTestCase, self).setUp()
 
@@ -249,7 +250,7 @@ class ExternalApiTestCase(test_shakenfist.ShakenFistTestCase):
 
         # Make a fake auth token
         self.get_keys = mock.patch(
-            'shakenfist.external_api.app.Auth._get_keys',
+            'shakenfist.external_api.auth.AuthEndpoint._get_keys',
             return_value=('foo', ['bar'])
         )
         self.mock_get_keys = self.get_keys.start()
@@ -519,6 +520,8 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
                          resp.get_json())
         self.assertEqual(404, resp.status_code)
 
+    # TODO(mikal): do better with covering interfaces here
+    @mock.patch('shakenfist.networkinterface.NetworkInterface.from_db')
     @mock.patch('shakenfist.instance.Instance._db_get',
                 return_value={
                     'cpus': 1,
@@ -536,7 +539,8 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
                 })
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 return_value={})
-    def test_get_instance(self, mock_get_instance_attribute, mock_get_instance):
+    def test_get_instance(self, mock_get_instance_attribute, mock_get_instance,
+                          mock_get_interface):
         resp = self.client.get(
             '/instances/foo', headers={'Authorization': self.auth_header})
         self.assertEqual({
@@ -544,6 +548,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
             'cpus': 1,
             'disk_spec': [{}],
             'error_message': None,
+            'interfaces': [],
             'memory': 2048,
             'name': 'barry',
             'namespace': 'namespace',

@@ -26,8 +26,9 @@ from shakenfist import images
 from shakenfist import logutil
 from shakenfist import net
 from shakenfist import networkinterface
-from shakenfist import util
 from shakenfist.tasks import DeleteInstanceTask
+from shakenfist.util import general as util_general
+from shakenfist.util import libvirt as util_libvirt
 
 
 LOG, _ = logutil.setup(__name__)
@@ -134,15 +135,21 @@ class Instance(dbo):
 
     state_targets = {
         None: (dbo.STATE_INITIAL, dbo.STATE_ERROR),
-        dbo.STATE_INITIAL: (STATE_PREFLIGHT, dbo.STATE_DELETED, STATE_INITIAL_ERROR),
-        STATE_PREFLIGHT: (dbo.STATE_CREATING, dbo.STATE_DELETED, STATE_PREFLIGHT_ERROR),
-        dbo.STATE_CREATING: (dbo.STATE_CREATED, dbo.STATE_DELETED, STATE_CREATING_ERROR),
-        dbo.STATE_CREATED: (dbo.STATE_DELETED, STATE_CREATED_ERROR),
+        dbo.STATE_INITIAL: (STATE_PREFLIGHT, dbo.STATE_DELETE_WAIT,
+                            dbo.STATE_DELETED, STATE_INITIAL_ERROR),
+        STATE_PREFLIGHT: (dbo.STATE_CREATING, dbo.STATE_DELETE_WAIT,
+                          dbo.STATE_DELETED, STATE_PREFLIGHT_ERROR),
+        dbo.STATE_CREATING: (dbo.STATE_CREATED, dbo.STATE_DELETE_WAIT,
+                             dbo.STATE_DELETED, STATE_CREATING_ERROR),
+        dbo.STATE_CREATED: (dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED,
+                            STATE_CREATED_ERROR),
         STATE_INITIAL_ERROR: (dbo.STATE_ERROR),
         STATE_PREFLIGHT_ERROR: (dbo.STATE_ERROR),
         STATE_CREATING_ERROR: (dbo.STATE_ERROR),
         STATE_CREATED_ERROR: (dbo.STATE_ERROR),
-        dbo.STATE_ERROR: (dbo.STATE_DELETED, dbo.STATE_ERROR),
+        dbo.STATE_ERROR: (dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED,
+                          dbo.STATE_ERROR),
+        dbo.STATE_DELETE_WAIT: (dbo.STATE_DELETED),
         dbo.STATE_DELETED: None,
     }
 
@@ -237,11 +244,12 @@ class Instance(dbo):
             'power_state',
             'vdi_port'
         ]
+
         # Ensure that missing attributes still get reported
         for attr in external_attribute_key_whitelist:
             i[attr] = None
 
-        for attrname in ['placement', 'state', 'power_state', 'ports']:
+        for attrname in ['placement', 'power_state', 'ports']:
             d = self._db_get_attribute(attrname)
             for key in d:
                 if key not in external_attribute_key_whitelist:
@@ -252,6 +260,17 @@ class Instance(dbo):
                     continue
 
                 i[key] = d[key]
+
+        # Mix in details of the instance's interfaces to reduce API round trips
+        # for clients.
+        i['interfaces'] = []
+        for iface_uuid in self.interfaces:
+            ni = networkinterface.NetworkInterface.from_db(iface_uuid)
+            if not ni:
+                self.log.with_fields({'networkinterface': iface_uuid}).error(
+                    'Network interface missing')
+            else:
+                i['interfaces'].append(ni.external_view())
 
         return i
 
@@ -325,6 +344,14 @@ class Instance(dbo):
     def block_devices(self):
         return self._db_get_attribute('block_devices')
 
+    @property
+    def interfaces(self):
+        return self._db_get_attribute('interfaces')
+
+    @interfaces.setter
+    def interfaces(self, interfaces):
+        self._db_set_attribute('interfaces', interfaces)
+
     # Implementation
     def place_instance(self, location):
         with self.get_lock_attr('placement', 'Instance placement'):
@@ -374,8 +401,9 @@ class Instance(dbo):
     # creation. It is assumed that the image sits in local cache already, and
     # has been transcoded to the right format. This has been done to facilitate
     # moving to a queue and task based creation mechanism.
-    def create(self, lock=None):
+    def create(self, iface_uuids, lock=None):
         self.state = self.STATE_CREATING
+        self.interfaces = iface_uuids
 
         # Ensure we have state on disk
         os.makedirs(self.instance_path, exist_ok=True)
@@ -386,7 +414,7 @@ class Instance(dbo):
         # Create the actual instance. Sometimes on Ubuntu 20.04 we need to wait
         # for port binding to work. Revisiting this is tracked by issue 320 on
         # github.
-        with util.RecordedOperation('create domain', self):
+        with util_general.RecordedOperation('create domain', self):
             if not self.power_on():
                 attempts = 0
                 while not self.power_on() and attempts < 5:
@@ -403,7 +431,7 @@ class Instance(dbo):
             self.enqueue_delete_due_error('Instance failed to power on')
 
     def delete(self):
-        with util.RecordedOperation('delete domain', self):
+        with util_general.RecordedOperation('delete domain', self):
             try:
                 self.power_off()
 
@@ -417,14 +445,14 @@ class Instance(dbo):
                 if inst:
                     inst.undefine()
             except Exception as e:
-                util.ignore_exception('instance delete', e)
+                util_general.ignore_exception('instance delete', e)
 
-        with util.RecordedOperation('delete disks', self):
+        with util_general.RecordedOperation('delete disks', self):
             try:
                 if os.path.exists(self.instance_path):
                     shutil.rmtree(self.instance_path)
             except Exception as e:
-                util.ignore_exception('instance delete', e)
+                util_general.ignore_exception('instance delete', e)
 
         self.deallocate_instance_ports()
 
@@ -499,7 +527,7 @@ class Instance(dbo):
                                                           self.disk_spec)
 
             # Generate a config drive
-            with util.RecordedOperation('make config drive', self):
+            with util_general.RecordedOperation('make config drive', self):
                 self._make_config_drive(
                     os.path.join(self.instance_path,
                                  block_devices['devices'][1]['path']))
@@ -534,7 +562,7 @@ class Instance(dbo):
                         cached_image_path = os.path.join(
                             config.STORAGE_PATH, 'image_cache', disk['blob_uuid'] + '.qcow2')
 
-                        with util.RecordedOperation('detect cdrom images', self):
+                        with util_general.RecordedOperation('detect cdrom images', self):
                             try:
                                 cd = pycdlib.PyCdlib()
                                 cd.open(cached_image_path)
@@ -558,12 +586,12 @@ class Instance(dbo):
                             disk['device'] = 'hd%s' % disk['device'][-1]
                             disk['bus'] = 'ide'
                         else:
-                            with util.RecordedOperation('create copy on write layer', self):
-                                images.create_cow([lock], cached_image_path,
-                                                  disk['path'], disk['size'])
+                            with util_general.RecordedOperation('create copy on write layer', self):
+                                images.util_image.create_cow([lock], cached_image_path,
+                                                             disk['path'], disk['size'])
                             shutil.chown(
                                 disk['path'], 'libvirt-qemu', 'libvirt-qemu')
-                            self.log.with_fields(util.stat_log_fields(disk['path'])).info(
+                            self.log.with_fields(util_general.stat_log_fields(disk['path'])).info(
                                 'COW layer %s created' % disk['path'])
 
                             # Record the backing store for modern libvirts
@@ -575,7 +603,8 @@ class Instance(dbo):
                                 % (cached_image_path))
 
                     elif not os.path.exists(disk['path']):
-                        images.create_blank([lock], disk['path'], disk['size'])
+                        images.util_image.create_blank(
+                            [lock], disk['path'], disk['size'])
 
                     modified_disks.append(disk)
 
@@ -648,7 +677,8 @@ class Instance(dbo):
         }
 
         have_default_route = False
-        for iface in networkinterface.interfaces_for_instance(self):
+        for iface_uuid in self.interfaces:
+            iface = networkinterface.NetworkInterface.from_db(iface_uuid)
             if iface.ipv4:
                 devname = 'eth%d' % iface.order
                 nd['links'].append(
@@ -731,13 +761,15 @@ class Instance(dbo):
             t = jinja2.Template(f.read())
 
         networks = []
-        for ni in networkinterface.interfaces_for_instance(self):
+        for iface_uuid in self.interfaces:
+            ni = networkinterface.NetworkInterface.from_db(iface_uuid)
             n = net.Network.from_db(ni.network_uuid)
             networks.append(
                 {
                     'macaddr': ni.macaddr,
                     'bridge': n.subst_dict()['vx_bridge'],
-                    'model': ni.model
+                    'model': ni.model,
+                    'mtu': config.MAX_HYPERVISOR_MTU - 50
                 }
             )
 
@@ -761,7 +793,7 @@ class Instance(dbo):
         )
 
     def _get_domain(self):
-        libvirt = util.get_libvirt()
+        libvirt = util_libvirt.get_libvirt()
         conn = libvirt.open('qemu:///system')
         try:
             return conn.lookupByName('sf:' + self.uuid)
@@ -774,11 +806,11 @@ class Instance(dbo):
         if not inst:
             return 'off'
 
-        libvirt = util.get_libvirt()
-        return util.extract_power_state(libvirt, inst)
+        libvirt = util_libvirt.get_libvirt()
+        return util_libvirt.extract_power_state(libvirt, inst)
 
     def power_on(self):
-        libvirt = util.get_libvirt()
+        libvirt = util_libvirt.get_libvirt()
         inst = self._get_domain()
         if not inst:
             conn = libvirt.open('qemu:///system')
@@ -812,12 +844,13 @@ class Instance(dbo):
                 return False
 
         inst.setAutostart(1)
-        self.update_power_state(util.extract_power_state(libvirt, inst))
+        self.update_power_state(
+            util_libvirt.extract_power_state(libvirt, inst))
         self.add_event('poweron', 'complete')
         return True
 
     def power_off(self):
-        libvirt = util.get_libvirt()
+        libvirt = util_libvirt.get_libvirt()
         inst = self._get_domain()
         if not inst:
             return
@@ -825,13 +858,15 @@ class Instance(dbo):
         try:
             inst.destroy()
         except libvirt.libvirtError as e:
-            self.log.error('Failed to delete domain: %s', e)
+            if not str(e).startswith('Requested operation is not valid: '
+                                     'domain is not running'):
+                self.log.error('Failed to delete domain: %s', e)
 
         self.update_power_state('off')
         self.add_event('poweroff', 'complete')
 
     def reboot(self, hard=False):
-        libvirt = util.get_libvirt()
+        libvirt = util_libvirt.get_libvirt()
         inst = self._get_domain()
         if not hard:
             inst.reboot(flags=libvirt.VIR_DOMAIN_REBOOT_ACPI_POWER_BTN)
@@ -840,17 +875,19 @@ class Instance(dbo):
         self.add_event('reboot', 'complete')
 
     def pause(self):
-        libvirt = util.get_libvirt()
+        libvirt = util_libvirt.get_libvirt()
         inst = self._get_domain()
         inst.suspend()
-        self.update_power_state(util.extract_power_state(libvirt, inst))
+        self.update_power_state(
+            util_libvirt.extract_power_state(libvirt, inst))
         self.add_event('pause', 'complete')
 
     def unpause(self):
-        libvirt = util.get_libvirt()
+        libvirt = util_libvirt.get_libvirt()
         inst = self._get_domain()
         inst.resume()
-        self.update_power_state(util.extract_power_state(libvirt, inst))
+        self.update_power_state(
+            util_libvirt.extract_power_state(libvirt, inst))
         self.add_event('unpause', 'complete')
 
     def get_console_data(self, length):
@@ -897,11 +934,7 @@ class Instance(dbo):
 class Instances(dbo_iter):
     def __iter__(self):
         for _, i in etcd.get_all('instance', None):
-            i = Instance.from_db(i['uuid'])
-            if not i:
-                continue
-
-            out = self.apply_filters(i)
+            out = self.apply_filters(Instance(i))
             if out:
                 yield out
 

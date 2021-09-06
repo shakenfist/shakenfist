@@ -6,10 +6,11 @@ import time
 
 from shakenfist.baseobject import (DatabaseBackedObject as dbo)
 from shakenfist.config import config
+from shakenfist import constants
 from shakenfist import db
-from shakenfist import images
 from shakenfist import logutil
-from shakenfist import util
+from shakenfist.util import general as util_general
+from shakenfist.util import image as util_image
 
 
 LOG, _ = logutil.setup(__name__)
@@ -111,7 +112,7 @@ class Blob(dbo):
                 blob_path = os.path.join(
                     config.STORAGE_PATH, 'blobs', self.uuid)
 
-                info = images.identify(blob_path)
+                info = util_image.identify(blob_path)
                 info['mime-type'] = magic.Magic(mime=True).from_file(blob_path)
                 self._db_set_attribute('info', info)
 
@@ -128,8 +129,8 @@ def snapshot_disk(disk, blob_uuid, related_object=None):
     dest_path = os.path.join(config.STORAGE_PATH, 'blobs', blob_uuid)
 
     # Actually make the snapshot
-    with util.RecordedOperation('snapshot %s' % disk['device'], related_object):
-        images.snapshot(None, disk['path'], dest_path)
+    with util_general.RecordedOperation('snapshot %s' % disk['device'], related_object):
+        util_image.snapshot(None, disk['path'], dest_path)
         st = os.stat(dest_path)
 
     # And make the associated blob
@@ -158,7 +159,7 @@ def http_fetch(resp, blob_uuid, locks, logs):
                     'Fetch %.02f percent complete' % percentage)
                 previous_percentage = percentage
 
-            if time.time() - last_refresh > 5:
+            if time.time() - last_refresh > constants.LOCK_REFRESH_SECONDS:
                 db.refresh_locks(locks)
                 last_refresh = time.time()
 

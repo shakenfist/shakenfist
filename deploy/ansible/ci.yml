@@ -44,7 +44,7 @@
         networkspecs:
           - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
           - network_uuid="{{meshnetwork['meta']['uuid']}}"
-        ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+482i1EYa6FYmDrjOQpsm+mVwFs7TW9xOI9o1jc/PHXLDDg5+inp/vVAgKoV6jijwRC9juwjFBPqr8LyXh3lXhPA1LSaQa39o3QIYTLsLuLZPeueUB8UukZzOH0XAHxgAF/qFycf5pWzD4Pzs5HjNi44+9LCDYKJtc45kh3+97iezRMYhucm3wzRAKyA8mr8nNOrQq356sKgXeMP6nnX4bhUJDrcQpfsRFkTcYWAcSuU36eSETVOj9dGUJZlc4g3QBL73R1S5VWbN6DM4UIOSWxRG6oUKprgHSvFmyp5i7S0vKv7q101PcxOw14GOvI8TSirIa8O39WtyX3ugReBj mikal@sf-primary
+        ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
         state: present
       register: primary
 
@@ -61,13 +61,13 @@
       sf_instance:
         name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-1"
         cpu: 4
-        ram: 16384
+        ram: 12288
         disks:
           - "50@{{base_image}}"
         networkspecs:
           - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
           - network_uuid="{{meshnetwork['meta']['uuid']}}"
-        ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+482i1EYa6FYmDrjOQpsm+mVwFs7TW9xOI9o1jc/PHXLDDg5+inp/vVAgKoV6jijwRC9juwjFBPqr8LyXh3lXhPA1LSaQa39o3QIYTLsLuLZPeueUB8UukZzOH0XAHxgAF/qFycf5pWzD4Pzs5HjNi44+9LCDYKJtc45kh3+97iezRMYhucm3wzRAKyA8mr8nNOrQq356sKgXeMP6nnX4bhUJDrcQpfsRFkTcYWAcSuU36eSETVOj9dGUJZlc4g3QBL73R1S5VWbN6DM4UIOSWxRG6oUKprgHSvFmyp5i7S0vKv7q101PcxOw14GOvI8TSirIa8O39WtyX3ugReBj mikal@sf-primary
+        ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
         state: present
       register: sf1
 
@@ -86,13 +86,13 @@
       sf_instance:
         name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-2"
         cpu: 4
-        ram: 16384
+        ram: 12288
         disks:
           - "50@{{base_image}}"
         networkspecs:
           - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
           - network_uuid="{{meshnetwork['meta']['uuid']}}"
-        ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+482i1EYa6FYmDrjOQpsm+mVwFs7TW9xOI9o1jc/PHXLDDg5+inp/vVAgKoV6jijwRC9juwjFBPqr8LyXh3lXhPA1LSaQa39o3QIYTLsLuLZPeueUB8UukZzOH0XAHxgAF/qFycf5pWzD4Pzs5HjNi44+9LCDYKJtc45kh3+97iezRMYhucm3wzRAKyA8mr8nNOrQq356sKgXeMP6nnX4bhUJDrcQpfsRFkTcYWAcSuU36eSETVOj9dGUJZlc4g3QBL73R1S5VWbN6DM4UIOSWxRG6oUKprgHSvFmyp5i7S0vKv7q101PcxOw14GOvI8TSirIa8O39WtyX3ugReBj mikal@sf-primary
+        ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
         state: present
       register: sf2
 
@@ -111,13 +111,13 @@
       sf_instance:
         name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-3"
         cpu: 4
-        ram: 16384
+        ram: 12288
         disks:
           - "50@{{base_image}}"
         networkspecs:
           - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
           - network_uuid="{{meshnetwork['meta']['uuid']}}"
-        ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+482i1EYa6FYmDrjOQpsm+mVwFs7TW9xOI9o1jc/PHXLDDg5+inp/vVAgKoV6jijwRC9juwjFBPqr8LyXh3lXhPA1LSaQa39o3QIYTLsLuLZPeueUB8UukZzOH0XAHxgAF/qFycf5pWzD4Pzs5HjNi44+9LCDYKJtc45kh3+97iezRMYhucm3wzRAKyA8mr8nNOrQq356sKgXeMP6nnX4bhUJDrcQpfsRFkTcYWAcSuU36eSETVOj9dGUJZlc4g3QBL73R1S5VWbN6DM4UIOSWxRG6oUKprgHSvFmyp5i7S0vKv7q101PcxOw14GOvI8TSirIa8O39WtyX3ugReBj mikal@sf-primary
+        ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
         state: present
       register: sf3
 
@@ -127,6 +127,56 @@
         egress_ip: "{{sf3['meta']['network_interfaces'][0]['ipv4']}}"
         mesh_ip: "{{sf3['meta']['network_interfaces'][1]['ipv4']}}"
         ansible_ssh_host: "{{sf3['meta']['network_interfaces'][0]['floating']}}"
+        ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
+        ansible_ssh_user: "{{base_image_user}}"
+        ansible_ssh_private_key_file: "/home/jenkins/id_ci"
+        groups: hypervisors, sfall
+
+    - name: Create sf-4
+      sf_instance:
+        name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-4"
+        cpu: 4
+        ram: 12288
+        disks:
+          - "50@{{base_image}}"
+        networkspecs:
+          - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
+          - network_uuid="{{meshnetwork['meta']['uuid']}}"
+        ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
+        state: present
+      register: sf4
+
+    - name: Add sf-4 to ansible
+      add_host:
+        hostname: sf4
+        egress_ip: "{{sf4['meta']['network_interfaces'][0]['ipv4']}}"
+        mesh_ip: "{{sf4['meta']['network_interfaces'][1]['ipv4']}}"
+        ansible_ssh_host: "{{sf4['meta']['network_interfaces'][0]['floating']}}"
+        ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
+        ansible_ssh_user: "{{base_image_user}}"
+        ansible_ssh_private_key_file: "/home/jenkins/id_ci"
+        groups: hypervisors, sfall
+
+    - name: Create sf-5
+      sf_instance:
+        name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-5"
+        cpu: 4
+        ram: 12288
+        disks:
+          - "50@{{base_image}}"
+        networkspecs:
+          - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
+          - network_uuid="{{meshnetwork['meta']['uuid']}}"
+        ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
+        state: present
+      register: sf5
+
+    - name: Add sf-5 to ansible
+      add_host:
+        hostname: sf5
+        egress_ip: "{{sf5['meta']['network_interfaces'][0]['ipv4']}}"
+        mesh_ip: "{{sf5['meta']['network_interfaces'][1]['ipv4']}}"
+        ansible_ssh_host: "{{sf5['meta']['network_interfaces'][0]['floating']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/home/jenkins/id_ci"
@@ -316,7 +366,7 @@
         autoremove: yes
 
     - name: Install ansible roles
-      shell: ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform andrewrothstein.go
+      shell: ansible-galaxy install andrewrothstein.etcd-cluster
 
     - name: Copy client wheel file
       copy:
@@ -389,20 +439,38 @@
               "node_egress_ip": "{{hostvars['sf1']['egress_ip']}}",
               "node_egress_nic": "eth0",
               "node_mesh_ip": "{{hostvars['sf1']['mesh_ip']}}",
-              "node_mesh_nic": "eth1"
+              "node_mesh_nic": "eth1",
+              "etcd_master": true,
+              "network_node": true
             },
             {
               "name": "sf-2",
               "node_egress_ip": "{{hostvars['sf2']['egress_ip']}}",
               "node_egress_nic": "eth0",
               "node_mesh_ip": "{{hostvars['sf2']['mesh_ip']}}",
-              "node_mesh_nic": "eth1"
+              "node_mesh_nic": "eth1",
+              "etcd_master": true
             },
             {
               "name": "sf-3",
               "node_egress_ip": "{{hostvars['sf3']['egress_ip']}}",
               "node_egress_nic": "eth0",
               "node_mesh_ip": "{{hostvars['sf3']['mesh_ip']}}",
+              "node_mesh_nic": "eth1",
+              "etcd_master": true
+            },
+            {
+              "name": "sf-4",
+              "node_egress_ip": "{{hostvars['sf4']['egress_ip']}}",
+              "node_egress_nic": "eth0",
+              "node_mesh_ip": "{{hostvars['sf4']['mesh_ip']}}",
+              "node_mesh_nic": "eth1"
+            },
+            {
+              "name": "sf-5",
+              "node_egress_ip": "{{hostvars['sf5']['egress_ip']}}",
+              "node_egress_nic": "eth0",
+              "node_mesh_ip": "{{hostvars['sf5']['mesh_ip']}}",
               "node_mesh_nic": "eth1"
             },
           ]

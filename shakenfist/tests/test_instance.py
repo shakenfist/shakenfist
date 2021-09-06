@@ -16,7 +16,7 @@ from shakenfist import exceptions
 from shakenfist.ipmanager import IPManager
 from shakenfist import instance
 from shakenfist.config import SFConfig
-from shakenfist.tests import test_shakenfist
+from shakenfist.tests import base
 
 
 class FakeNetwork(object):
@@ -42,7 +42,7 @@ class FakeNetworkInterface(object):
         self.order = values['order']
 
 
-class VirtMetaTestCase(test_shakenfist.ShakenFistTestCase):
+class VirtMetaTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super(VirtMetaTestCase, self).setUp()
         fake_config = SFConfig(
@@ -150,7 +150,7 @@ class VirtMetaTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertEqual('/a/b/c/instances/uuid42', inst.instance_path)
 
 
-class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
+class InstanceTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super(InstanceTestCase, self).setUp()
         fake_config = SFConfig(
@@ -374,8 +374,10 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
 
     # create, delete
 
-    @mock.patch('shakenfist.networkinterface.NetworkInterfaces',
-                return_value=[
+    @mock.patch('shakenfist.instance.Instance._db_get_attribute',
+                return_value=['ifaceuuid', 'ifaceuuid2'])
+    @mock.patch('shakenfist.networkinterface.NetworkInterface.from_db',
+                side_effect=[
                     FakeNetworkInterface({
                         'uuid': 'ifaceuuid',
                         'instance_uuid': 'instuuid',
@@ -398,7 +400,7 @@ class InstanceTestCase(test_shakenfist.ShakenFistTestCase):
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject.state',
                 new_callable=mock.PropertyMock)
     def test_make_config_drive(self, mock_update, mock_net_from_db,
-                               mock_interfaces):
+                               mock_interfaces, mock_get_attribute):
         i = self._make_instance()
 
         (fd, cd_file) = tempfile.mkstemp()
@@ -572,73 +574,34 @@ GET_ALL_INSTANCES = [
     })
 ]
 
-JUST_INSTANCES = [
-    {
-        'uuid': '373a165e-9720-4e14-bd0e-9612de79ff15',
-        'cpus': 1,
-        'disk_spec': [{
-            'base': 'cirros',
-            'size': 8
-        }],
-        'memory': 1024,
-        'name': 'cirros',
-        'namespace': 'gerkin',
-        'requested_placement': None,
-        'ssh_key': 'thisisasshkey',
-        'user_data': None,
-        'video': {'model': 'cirrus', 'memory': 16384},
-        'uefi': False,
-        'version': 3
-    },
-    None,
-    {
-        'uuid': 'a7c5ecec-c3a9-4774-ad1b-249d9e90e806',
-        'cpus': 1,
-        'disk_spec': [{
-            'base': 'cirros',
-            'size': 8
-        }],
-        'memory': 1024,
-        'name': 'cirros',
-        'namespace': 'namespace',
-        'requested_placement': None,
-        'ssh_key': 'thisisasshkey',
-        'user_data': None,
-        'video': {'model': 'cirrus', 'memory': 16384},
-        'uefi': False,
-        'version': 3
-    }
-]
 
-
-class InstancesTestCase(test_shakenfist.ShakenFistTestCase):
-    @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
+class InstancesTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
-    def test_base_iteration(self, mock_get_all, mock_get):
+    def test_base_iteration(self, mock_get_all):
         uuids = []
         for i in instance.Instances([]):
             uuids.append(i.uuid)
 
         self.assertEqual(['373a165e-9720-4e14-bd0e-9612de79ff15',
+                          'b078cb4e-857c-4f04-b011-751742ef5817',
                           'a7c5ecec-c3a9-4774-ad1b-249d9e90e806'], uuids)
 
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 return_value={'node': 'node1'})
-    @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
-    def test_placement_filter_all(self, mock_get_all, mock_get, mock_attr):
+    def test_placement_filter_all(self, mock_get_all, mock_attr):
         uuids = []
         for i in instance.Instances([partial(instance.placement_filter, 'node1')]):
             uuids.append(i.uuid)
 
         self.assertEqual(['373a165e-9720-4e14-bd0e-9612de79ff15',
+                          'b078cb4e-857c-4f04-b011-751742ef5817',
                           'a7c5ecec-c3a9-4774-ad1b-249d9e90e806'], uuids)
 
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 return_value={'node': 'node2'})
-    @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
-    def test_placement_filter_none(self, mock_get_all, mock_get, mock_attr):
+    def test_placement_filter_none(self, mock_get_all, mock_attr):
         uuids = []
         for i in instance.Instances([partial(instance.placement_filter, 'node1')]):
             uuids.append(i.uuid)
@@ -647,21 +610,20 @@ class InstancesTestCase(test_shakenfist.ShakenFistTestCase):
 
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 return_value={'value': dbo.STATE_CREATED, 'update_time': 1})
-    @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
-    def test_state_filter_all(self, mock_get_all, mock_get, mock_attr):
+    def test_state_filter_all(self, mock_get_all, mock_attr):
         uuids = []
         for i in instance.Instances([partial(baseobject.state_filter, dbo.STATE_CREATED)]):
             uuids.append(i.uuid)
 
         self.assertEqual(['373a165e-9720-4e14-bd0e-9612de79ff15',
+                          'b078cb4e-857c-4f04-b011-751742ef5817',
                           'a7c5ecec-c3a9-4774-ad1b-249d9e90e806'], uuids)
 
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 return_value={'value': instance.Instance.STATE_DELETED, 'update_time': 1})
-    @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
-    def test_state_filter_none(self, mock_get_all, mock_get, mock_attr):
+    def test_state_filter_none(self, mock_get_all, mock_attr):
         uuids = []
         for i in instance.Instances([partial(baseobject.state_filter, dbo.STATE_CREATED)]):
             uuids.append(i.uuid)
@@ -670,10 +632,10 @@ class InstancesTestCase(test_shakenfist.ShakenFistTestCase):
 
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 side_effect=[{'value': instance.Instance.STATE_DELETED, 'update_time': 1},
+                             {'value': instance.Instance.STATE_DELETED, 'update_time': 1},
                              {'value': instance.Instance.STATE_INITIAL, 'update_time': 1}])
-    @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
-    def test_state_filter_active(self, mock_get_all, mock_get, mock_attr):
+    def test_state_filter_active(self, mock_get_all, mock_attr):
         uuids = []
         for i in instance.Instances([instance.active_states_filter]):
             uuids.append(i.uuid)
@@ -682,10 +644,10 @@ class InstancesTestCase(test_shakenfist.ShakenFistTestCase):
 
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 side_effect=[{'value': instance.Instance.STATE_DELETED, 'update_time': 1},
+                             {'value': instance.Instance.STATE_INITIAL, 'update_time': 1},
                              {'value': instance.Instance.STATE_INITIAL, 'update_time': 1}])
-    @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
-    def test_state_filter_inactive(self, mock_get_all, mock_get, mock_attr):
+    def test_state_filter_inactive(self, mock_get_all, mock_attr):
         uuids = []
         for i in instance.Instances([instance.inactive_states_filter]):
             uuids.append(i.uuid)
@@ -693,13 +655,13 @@ class InstancesTestCase(test_shakenfist.ShakenFistTestCase):
         self.assertEqual(['373a165e-9720-4e14-bd0e-9612de79ff15'], uuids)
 
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
-                side_effect=[{'value': instance.Instance.STATE_DELETED, 'update_time': time.time()},
-                             {'value': instance.Instance.STATE_DELETED,
-                                 'update_time': time.time()},
-                             {'value': instance.Instance.STATE_INITIAL, 'update_time': 1}])
-    @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
+                side_effect=[{'value': instance.Instance.STATE_DELETED, 'update_time': 'not_used'},
+                             {'value': 'not_used', 'update_time': time.time()},
+                             {'value': instance.Instance.STATE_DELETED, 'update_time': 'not_used'},
+                             {'value': 'not_used', 'update_time': time.time()},
+                             {'value': instance.Instance.STATE_INITIAL, 'update_time': 'not_used'}])
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
-    def test_state_hard_delete_later(self, mock_get_all, mock_get, mock_attr):
+    def test_state_hard_delete_later(self, mock_get_all, mock_attr):
         uuids = []
         for i in instance.Instances([instance.inactive_states_filter,
                                      partial(baseobject.state_age_filter, 500)]):
@@ -709,14 +671,13 @@ class InstancesTestCase(test_shakenfist.ShakenFistTestCase):
 
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 side_effect=[
-                    {'value': instance.Instance.STATE_DELETED,
-                        'update_time': time.time() - 1000},
-                    {'value': instance.Instance.STATE_DELETED,
-                        'update_time': time.time() - 1000},
+                    {'value': instance.Instance.STATE_DELETED, 'update_time': time.time() - 1000},
+                    {'value': instance.Instance.STATE_DELETED, 'update_time': time.time() - 1000},
+                    {'value': instance.Instance.STATE_DELETED, 'update_time': time.time()},
+                    {'value': instance.Instance.STATE_DELETED, 'update_time': time.time()},
                     {'value': instance.Instance.STATE_INITIAL, 'update_time': 1}])
-    @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
-    def test_state_hard_delete_now(self, mock_get_all, mock_get, mock_attr):
+    def test_state_hard_delete_now(self, mock_get_all, mock_attr):
         uuids = []
         for i in instance.Instances([instance.inactive_states_filter,
                                      partial(baseobject.state_age_filter, 500)]):
@@ -724,9 +685,8 @@ class InstancesTestCase(test_shakenfist.ShakenFistTestCase):
 
         self.assertEqual(['373a165e-9720-4e14-bd0e-9612de79ff15'], uuids)
 
-    @mock.patch('shakenfist.etcd.get', side_effect=JUST_INSTANCES)
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
-    def test_namespace_filter(self, mock_get_all, mock_get):
+    def test_namespace_filter(self, mock_get_all):
         uuids = []
         for i in instance.Instances([partial(baseobject.namespace_filter, 'gerkin')]):
             uuids.append(i.uuid)

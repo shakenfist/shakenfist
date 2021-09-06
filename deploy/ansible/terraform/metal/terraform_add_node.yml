@@ -4,7 +4,19 @@
     ansible_ssh_host: "{{item['node_egress_ip']}}"
     ansible_ssh_user: "{{ssh_user}}"
     ansible_ssh_private_key_filename: "{{ssh_key_filename}}"
-    groups: hypervisors, etcd_master
+    groups: hypervisors
+
+- name: Add {{item['name']}} as an etcd master (if configured)
+  add_host:
+    hostname: "{{item['name']}}"
+    groups: etcd_master
+  when: item.get('etcd_master', False)
+
+- name: Add {{item['name']}} as a network node (if configured, should only be one)
+  add_host:
+    hostname: "{{item['name']}}"
+    groups: network_node
+  when: item.get('network_node', False)
 
 - name: Add node facts
   set_fact:
@@ -13,5 +25,6 @@
     node_egress_nic: "{{item['node_egress_nic']}}"
     node_mesh_ip: "{{item['node_mesh_ip']}}"
     node_mesh_nic: "{{item['node_mesh_nic']}}"
+    node_is_etcd_master: "{{item['etcd_master'] | default(False)}}"
   delegate_to: "{{item['name']}}"
   delegate_facts: true

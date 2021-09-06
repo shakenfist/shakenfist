@@ -9,14 +9,16 @@ from shakenfist.daemons import daemon
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import logutil
-from shakenfist import util
+from shakenfist.util import general as util_general
+from shakenfist.util import libvirt as util_libvirt
+from shakenfist.util import network as util_network
 
 
 LOG, _ = logutil.setup(__name__)
 
 
 def _get_stats():
-    libvirt = util.get_libvirt()
+    libvirt = util_libvirt.get_libvirt()
     retval = {}
     conn = libvirt.open('qemu:///system')
 
@@ -43,7 +45,7 @@ def _get_stats():
             'cpu_load_15': load_15,
         })
     except Exception as e:
-        util.ignore_exception('load average', e)
+        util_general.ignore_exception('load average', e)
 
     # System memory info, converting bytes to mb
     stats = psutil.virtual_memory()
@@ -126,7 +128,7 @@ def _get_stats():
         'node_queue_waiting': node_queue_waiting,
     })
 
-    if util.is_network_node():
+    if util_network.is_network_node():
         network_queue_processing, network_queue_waiting = db.get_queue_length(
             'networknode')
 
@@ -180,4 +182,4 @@ class Monitor(daemon.Daemon):
                     last_metrics = time.time()
 
             except Exception as e:
-                util.ignore_exception('resource statistics', e)
+                util_general.ignore_exception('resource statistics', e)

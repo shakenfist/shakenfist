@@ -219,7 +219,7 @@ class DHCPTestCase(testtools.TestCase):
     @mock.patch('shakenfist.dhcp.DHCP._send_signal', return_value=False)
     @mock.patch('shakenfist.dhcp.DHCP._make_config')
     @mock.patch('shakenfist.dhcp.DHCP._make_hosts')
-    @mock.patch('shakenfist.util.execute')
+    @mock.patch('shakenfist.util.process.execute')
     def test_restart_dhcpd(self, mock_execute, mock_hosts, mock_config,
                            mock_signal, mock_exists):
         d = dhcp.DHCP(FakeNetwork(), 'eth0')
