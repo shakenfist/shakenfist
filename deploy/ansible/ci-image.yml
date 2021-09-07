@@ -111,6 +111,7 @@
     identifier: cron
     base_image_user: "ubuntu"
     keyfile_private: "/home/jenkins/id_ci"
+    keyfile_public: "/home/jenkins/id_ci.pub"
 
   tasks:
     # - name: Snapshot the instance
