@@ -20,7 +20,7 @@ from shakenfist.external_api import (
     auth as api_auth,
     base as api_base,
     blob as api_blob,
-    image as api_image,
+    artifact as api_artifact,
     interface as api_interface,
     instance as api_instance,
     label as api_label,
@@ -114,8 +114,8 @@ api.add_resource(api_interface.InterfaceFloatEndpoint,
 api.add_resource(api_interface.InterfaceDefloatEndpoint,
                  '/interfaces/<interface_uuid>/defloat')
 
-api.add_resource(api_image.ImagesEndpoint, '/images')
-api.add_resource(api_image.ImageEventsEndpoint, '/images/events')
+api.add_resource(api_artifact.ArtifactsEndpoint, '/artifacts')
+api.add_resource(api_artifact.ArtifactEventsEndpoint, '/artifacts/events')
 
 api.add_resource(api_label.LabelEndpoint, '/label/<label_name>')
 

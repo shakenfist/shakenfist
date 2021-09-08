@@ -73,7 +73,7 @@ class BaseTestCase(testtools.TestCase):
 
     def _log_image_events(self, image_uuid):
         self._log_events(
-            image_uuid, self.system_client.get_image_events(image_uuid))
+            image_uuid, self.system_client.get_artifact_events(image_uuid))
 
     def _log_events(self, uuid, event_source):
         x = PrettyTable()
@@ -178,7 +178,7 @@ class BaseTestCase(testtools.TestCase):
             self, image_uuid, operation, message=None, after=None):
         start_time = time.time()
         while time.time() - start_time < 5 * 60 * NETWORK_PATIENCE_FACTOR:
-            for event in self.system_client.get_image_events(image_uuid):
+            for event in self.system_client.get_artifact_events(image_uuid):
                 if after and event['timestamp'] <= after:
                     continue
 

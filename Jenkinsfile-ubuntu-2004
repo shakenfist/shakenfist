@@ -13,6 +13,7 @@ pipeline {
                 then
                   echo "Detected existing git checkout."
                   git remote -v
+                  gitmsg=`git log -1 --no-merges`
 
                   if [ "https://github.com/shakenfist/shakenfist" == "https://github.com/shakenfist/shakenfist" ]
                   then
@@ -31,19 +32,41 @@ pipeline {
                 if [ ! -e $WORKSPACE/$BUILD_TAG/shakenfist ]
                 then
                   echo "Performing shakenfist git checkout."
+                  project="shakenfist"
+                  search=" Depends on https://github.com/shakenfist/$project/"
+                  deppr=`echo $gitmsg | egrep "$search" | sed "s|.*$search||"`
+
                   cd $WORKSPACE/$BUILD_TAG
                   git clone https://github.com/shakenfist/shakenfist
                   cd shakenfist
-                  git checkout
+
+                  if [ "%$deppr%" == "%%" ]
+                  then
+                    git checkout master
+                  else
+                    git fetch origin $deppr/head:dependson
+                    git checkout dependson
+                  fi
                 fi
 
                 if [ ! -e $WORKSPACE/$BUILD_TAG/client-python ]
                 then
                   echo "Performing client-python git checkout."
+                  project="client-python"
+                  search=" Depends on https://github.com/shakenfist/$project/"
+                  deppr=`echo $gitmsg | egrep "$search" | sed "s|.*$search||"`
+
                   cd $WORKSPACE/$BUILD_TAG
                   git clone https://github.com/shakenfist/client-python
                   cd client-python
-                  git checkout master
+
+                  if [ "%$deppr%" == "%%" ]
+                  then
+                    git checkout master
+                  else
+                    git fetch origin $deppr/head:dependson
+                    git checkout dependson
+                  fi
                 fi
 
                 SOURCE_PATH="$WORKSPACE/$BUILD_TAG"
