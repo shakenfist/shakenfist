@@ -192,7 +192,8 @@ active_states_filter = partial(
     state_filter, [DatabaseBackedObject.STATE_INITIAL,
                    DatabaseBackedObject.STATE_CREATING,
                    DatabaseBackedObject.STATE_CREATED,
-                   DatabaseBackedObject.STATE_ERROR])
+                   DatabaseBackedObject.STATE_ERROR,
+                   DatabaseBackedObject.STATE_DELETE_WAIT])
 inactive_states_filter = partial(
     state_filter, [DatabaseBackedObject.STATE_DELETED])
 
