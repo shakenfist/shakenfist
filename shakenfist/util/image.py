@@ -5,6 +5,7 @@ import re
 # To avoid circular imports, util modules should only import a limited
 # set of shakenfist modules, mainly exceptions, logutils, and specific
 # other util modules.
+from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist.util import process as util_process
 
@@ -60,6 +61,13 @@ def create_cow(locks, cache_file, disk_file, disk_size):
 
     if os.path.exists(disk_file):
         return
+
+    info = identify(cache_file)
+    if int(info['virtual size']) > disk_size * 1024 * 1024 * 1024:
+        raise exceptions.ImagesCannotShrinkException(
+            'The specified size of %dgb (%d bytes) is smaller than the existing size '
+            'of the image of %s bytes.'
+            % (disk_size, disk_size * 1024 * 1024 * 1024, info['virtual size']))
 
     if disk_size:
         util_process.execute(locks,

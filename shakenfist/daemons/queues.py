@@ -34,6 +34,8 @@ LOG, _ = logutil.setup(__name__)
 
 
 def handle(jobname, workitem):
+    libvirt = util_libvirt.get_libvirt()
+
     log = LOG.with_field('workitem', jobname)
     log.info('Processing workitem')
 
@@ -168,7 +170,22 @@ def handle(jobname, workitem):
         # Usually caused by external issue and not an application error
         log.info('Fetch Image Error: %s', e)
         if inst:
-            inst.enqueue_delete_due_error('Failed queue task: %s' % e)
+            inst.enqueue_delete_due_error('Image fetch failed: %s' % e)
+
+    except exceptions.ImagesCannotShrinkException as e:
+        log.info('Fetch Resize Error: %s', e)
+        if inst:
+            inst.enqueue_delete_due_error('Image resize failed: %s' % e)
+
+    except libvirt.libvirtError as e:
+        log.info('Libvirt Error: %s', e)
+        if inst:
+            inst.enqueue_delete_due_error('Instance task failed: %s' % e)
+
+    except exceptions.InstanceException as e:
+        log.info('Instance Error: %s', e)
+        if inst:
+            inst.enqueue_delete_due_error('Instance task failed: %s' % e)
 
     except Exception as e:
         # Logging ignored exception - this should be investigated
@@ -290,18 +307,9 @@ def instance_start(inst, network):
         inst.allocate_instance_ports()
 
         # Now we can start the instance
-        libvirt = util_libvirt.get_libvirt()
         try:
             with util_general.RecordedOperation('instance creation', inst):
                 inst.create(iface_uuids, lock=lock)
-
-        except libvirt.libvirtError as e:
-            code = e.get_error_code()
-            if code in (libvirt.VIR_ERR_CONFIG_UNSUPPORTED,
-                        libvirt.VIR_ERR_XML_ERROR):
-                inst.enqueue_delete_due_error(
-                    'instance failed to start: %s' % e)
-                return
 
         except exceptions.InvalidStateException:
             # This instance is in an error or deleted state. Given the check
