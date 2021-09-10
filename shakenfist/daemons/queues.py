@@ -141,7 +141,8 @@ def handle(jobname, workitem):
                                {'tasks': [
                                    DeleteNetworkWhenClean(task.network_uuid(),
                                                           remain_interfaces)
-                               ]})
+                               ]},
+                               delay=60)
 
                 elif cur_interfaces:
                     LOG.with_network(task_network).error(
