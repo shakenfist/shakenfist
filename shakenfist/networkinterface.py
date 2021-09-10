@@ -11,8 +11,10 @@ from shakenfist.config import config
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
+from shakenfist.instance import Instance
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
+from shakenfist.net import Network
 from shakenfist.tasks import DefloatNetworkInterfaceTask
 from shakenfist.util import network as util_network
 
@@ -100,10 +102,15 @@ class NetworkInterface(dbo):
     def external_view(self):
         # If this is an external view, then mix back in attributes that users
         # expect
-        n = {
+        n = Network.from_db(self.network_uuid)
+        i = Instance.from_db(self.instance_uuid)
+
+        ni = {
             'uuid': self.uuid,
             'network_uuid': self.network_uuid,
+            'network_state': n.state.value,
             'instance_uuid': self.instance_uuid,
+            'instance_state': i.state.value,
             'macaddr': self.macaddr,
             'ipv4': self.ipv4,
             'order': self.order,
@@ -112,9 +119,9 @@ class NetworkInterface(dbo):
             'version': self.version
         }
 
-        n['floating'] = self._db_get_attribute(
+        ni['floating'] = self._db_get_attribute(
             'floating').get('floating_address')
-        return n
+        return ni
 
     # Static values
     @property
