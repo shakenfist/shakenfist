@@ -381,8 +381,7 @@ def instance_delete(inst):
 def snapshot(inst, disk, artifact_uuid, blob_uuid):
     blob.snapshot_disk(disk, blob_uuid)
     a = Artifact.from_db(artifact_uuid)
-    if a.state == dbo.STATE_INITIAL:
-        a.state = dbo.STATE_CREATED
+    a.state = dbo.STATE_CREATED
 
 
 class Monitor(daemon.WorkerPoolDaemon):
