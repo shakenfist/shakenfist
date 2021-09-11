@@ -17,7 +17,7 @@ class TestImages(base.BaseNamespacedTestCase):
     def test_cache_image(self):
         url = ('https://sfcbr.shakenfist.com/gw-basic/gwbasic.qcow2')
 
-        a = self.system_client.cache_artifact(url)
+        img = self.system_client.cache_artifact(url)
 
         # Get all artifacts once to make sure we get added to the list
         image_urls = []
@@ -28,19 +28,19 @@ class TestImages(base.BaseNamespacedTestCase):
         # And then just lookup the single artifact
         start_time = time.time()
         while time.time() - start_time < 7 * 60:
-            img = self.system_client.get_artifact(a['uuid'])
+            img = self.system_client.get_artifact(img['uuid'])
             if img['state'] == 'created':
                 return
             time.sleep(5)
 
         self.fail('Image was not downloaded after seven minutes: %s'
-                  % a['uuid'])
+                  % img['uuid'])
 
     def test_cache_invalid_image(self):
         url = ('http://nosuch.shakenfist.com/centos/6/images/'
                'CentOS-6-x86_64-GenericCloud-1604.qcow2.xz')
-        self.system_client.cache_artifact(url)
-        self._await_image_download_error(url, after=time.time())
+        img = self.system_client.cache_artifact(url)
+        self._await_image_download_error(img['uuid'], after=time.time())
 
     def test_instance_invalid_image(self):
         # Start our test instance

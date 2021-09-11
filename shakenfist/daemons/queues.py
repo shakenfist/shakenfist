@@ -203,12 +203,13 @@ def handle(jobname, workitem):
 
 
 def image_fetch(url, inst):
+    a = Artifact.from_url(Artifact.TYPE_IMAGE, url)
     try:
         # TODO(andy): Wait up to 15 mins for another queue process to download
         # the required image. This will be changed to queue on a
         # "waiting_image_fetch" queue but this works now.
         images.ImageFetchHelper(inst, url).get_image()
-        db.add_event('image', url, 'fetch', None, None, 'success')
+        a.add_event('fetch', None, None, 'success')
 
     except (exceptions.HTTPError, requests.exceptions.RequestException) as e:
         LOG.with_field('image', url).info('Failed to fetch image')
@@ -219,7 +220,7 @@ def image_fetch(url, inst):
             msg = 'DNS error'
         if msg.find('No address associated with hostname'):
             msg = 'DNS error'
-        db.add_event('image', url, 'fetch', None, None, msg)
+        a.add_event('fetch', None, None, msg)
 
         raise exceptions.ImageFetchTaskFailedException(
             'Failed to fetch image: %s Exception: %s' % (url, e))

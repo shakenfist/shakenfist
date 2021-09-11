@@ -116,7 +116,8 @@ api.add_resource(api_interface.InterfaceDefloatEndpoint,
 
 api.add_resource(api_artifact.ArtifactEndpoint, '/artifacts/<artifact_uuid>')
 api.add_resource(api_artifact.ArtifactsEndpoint, '/artifacts')
-api.add_resource(api_artifact.ArtifactEventsEndpoint, '/artifacts/events')
+api.add_resource(api_artifact.ArtifactEventsEndpoint,
+                 '/artifacts/events/<artifact_uuid>')
 
 api.add_resource(api_label.LabelEndpoint, '/label/<label_name>')
 

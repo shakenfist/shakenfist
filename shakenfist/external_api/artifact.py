@@ -67,5 +67,5 @@ class ArtifactsEndpoint(api_base.Resource):
 class ArtifactEventsEndpoint(api_base.Resource):
     @jwt_required
     # TODO(andy): Should images be owned? Personalised images should be owned.
-    def get(self, url):
-        return list(db.get_events('image', url))
+    def get(self, artifact_uuid):
+        return list(db.get_events('artifact', artifact_uuid))
