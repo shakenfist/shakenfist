@@ -100,4 +100,4 @@ class TestImages(base.BaseNamespacedTestCase):
             time.sleep(1)
             inst = self.test_client.get_instance(inst['uuid'])
 
-        self.assertEqual('creating-error', inst['state'])
+        self.assertTrue(inst['state'] in ['creating-error', 'error'])
