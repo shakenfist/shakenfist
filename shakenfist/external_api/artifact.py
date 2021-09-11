@@ -2,10 +2,37 @@ from flask_jwt_extended import jwt_required
 
 from shakenfist.artifact import Artifact, Artifacts
 from shakenfist import baseobject
+from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist.config import config
 from shakenfist import db
+from shakenfist import logutil
 from shakenfist.tasks import FetchImageTask
+
+
+LOG, HANDLER = logutil.setup(__name__)
+daemon.set_log_level(LOG, 'api')
+
+
+def arg_is_artifact_uuid(func):
+    def wrapper(*args, **kwargs):
+        if 'artifact_uuid' in kwargs:
+            kwargs['artifact_from_db'] = Artifact.from_db(
+                kwargs['artifact_uuid'])
+        if not kwargs.get('artifact_from_db'):
+            LOG.with_field('artifact', kwargs['artifact_uuid']).info(
+                'Artifact not found, missing or deleted')
+            return api_base.error(404, 'artifact not found')
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
+class ArtifactEndpoint(api_base.Resource):
+    @jwt_required
+    @arg_is_artifact_uuid
+    def get(self, artifact_uuid=None, artifact_from_db=None):
+        return artifact_from_db.external_view()
 
 
 class ArtifactsEndpoint(api_base.Resource):
