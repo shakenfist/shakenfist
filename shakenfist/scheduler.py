@@ -173,7 +173,12 @@ class Scheduler(object):
             for inst in per_node.get(n, []):
                 for iface_uuid in inst.interfaces:
                     ni = networkinterface.NetworkInterface.from_db(iface_uuid)
-                    if ni.network_uuid not in present_networks:
+                    if not ni:
+                        LOG.with_fields({
+                            'instance': inst.uuid,
+                            'networkinterface': iface_uuid
+                        }).error('Interface missing while attempting schedule')
+                    elif ni.network_uuid not in present_networks:
                         present_networks.append(ni.network_uuid)
 
             # Count the requested networks present on this node
