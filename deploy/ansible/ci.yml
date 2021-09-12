@@ -237,6 +237,18 @@
     source_path: "/home/jenkins/src/shakenfist/"
 
   tasks:
+    - name: Disable logrotate
+      service:
+        name: logrotate
+        enabled: no
+        state: stopped
+
+    - name: Disable logrotate.timer
+      service:
+        name: logrotate.timer
+        enabled: no
+        state: stopped
+
     - name: Use CI package cache to speed things up
       copy:
         content: |
