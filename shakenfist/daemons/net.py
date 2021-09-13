@@ -101,7 +101,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                 # If this network is in state delete_wait, then we should remove
                 # it if it has no interfaces left.
                 if n.state.value == dbo.STATE_DELETE_WAIT:
-                    if not networkinterface.interfaces_for_network():
+                    if not networkinterface.interfaces_for_network(n):
                         LOG.with_network(n).info(
                             'Removing stray delete_wait network')
                         db.enqueue('networknode', DestroyNetworkTask(n.uuid))
