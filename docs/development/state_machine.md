@@ -11,6 +11,7 @@ Instances
 * `Creating`: the instance is being created.
 * `Created`: the instance is now running.
 * `Deleted`: the instance is now deleted.
+* `Error`: the instance is unable to be used.
 
 * Instances marked as Deleted are deleted from the DB after sitting deleted for
   some period of time.
@@ -24,10 +25,13 @@ Networks
 * `Created`: the network has been created on the `networknode`.
 * `Delete_Wait`: the network has been scheduled for deletion. Waiting for
   instances on the network to be deleted.
-* `Deleted`: the instance is now deleted.
+* `Deleted`: the network is now deleted.
+* `Error`: the network has encountered an error and cannot be used.
 
 * Networks marked as Deleted are deleted from the DB after sitting deleted for
   some period of time.
+
+* A network is regarded as `Dead` when it is in state `Deleted`, `Delete_Wait` or `Error`.
 
 Nodes
 -----
