@@ -98,6 +98,17 @@ class Monitor(daemon.WorkerPoolDaemon):
                 if not n:
                     continue
 
+                # If this network is in state delete_wait, then we should remove
+                # it if it has no interfaces left.
+                if n.state.value == dbo.STATE_DELETE_WAIT:
+                    if not networkinterface.interfaces_for_network():
+                        LOG.with_network(n).info(
+                            'Removing stray delete_wait network')
+                        db.enqueue('networknode', DestroyNetworkTask(n.uuid))
+
+                    # We skip maintenance on all delete_wait networks
+                    continue
+
                 # Track what vxlan ids we've seen
                 seen_vxids.append(n.vxid)
 

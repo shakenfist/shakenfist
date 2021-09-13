@@ -127,8 +127,7 @@ class NetworksEndpoint(api_base.Resource):
         # If accessing a foreign name namespace, we need to be an admin
         if get_jwt_identity() not in [namespace, 'system']:
             return api_base.error(
-                401,
-                'only admins can create resources in a different namespace')
+                401, 'only admins can create resources in a different namespace')
 
         network = net.Network.new(name, namespace, netblock, provide_dhcp,
                                   provide_nat)
@@ -196,7 +195,6 @@ class NetworkInterfacesEndpoint(api_base.Resource):
     @jwt_required
     @api_base.arg_is_network_uuid
     @api_base.requires_network_ownership
-    @api_base.requires_network_active
     def get(self, network_uuid=None, network_from_db=None):
         out = []
         for ni in networkinterface.interfaces_for_network(self.network):
