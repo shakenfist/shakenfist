@@ -132,6 +132,12 @@ def handle(jobname, workitem):
                 ifaces = networkinterface.interfaces_for_network(task_network)
                 cur_interfaces = {i.uuid: i for i in ifaces}
 
+                if cur_interfaces:
+                    LOG.with_network(task_network).error(
+                        'During DeleteNetworkWhenClean new interfaces have '
+                        'connected to network: %s',
+                        [i.uuid for i in cur_interfaces])
+
                 # Only check those present at delete task initiation time.
                 remain_interfaces = list(set(task.wait_interfaces()) &
                                          set(cur_interfaces))
@@ -145,12 +151,6 @@ def handle(jobname, workitem):
                                                           remain_interfaces)
                                ]},
                                delay=60)
-
-                elif cur_interfaces:
-                    LOG.with_network(task_network).error(
-                        'During DeleteNetworkWhenClean new interfaces have '
-                        'connected to network: %s',
-                        [i.uuid for i in cur_interfaces])
 
                 else:
                     # All original instances deleted, safe to delete network
@@ -367,7 +367,7 @@ def instance_delete(inst):
             if n:
                 # If network used by another instance, only update
                 if network in host_networks:
-                    if n.state.value == net.Network.STATE_DELETE_WAIT:
+                    if n.state.value == dbo.STATE_DELETE_WAIT:
                         # Do not update a network about to be deleted
                         continue
                     with util_general.RecordedOperation('deallocate ip address', inst):
