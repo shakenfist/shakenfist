@@ -111,7 +111,14 @@ class Blob(dbo):
                 blob_path = os.path.join(
                     config.STORAGE_PATH, 'blobs', self.uuid)
 
+                # We put a bunch of information from "qemu-img info" into the
+                # blob because its helpful. However, there are some values we
+                # don't want to persist.
                 info = util_image.identify(blob_path)
+                for key in ['corrupt', 'image', 'lazy refcounts', 'refcount bits']:
+                    if key in info:
+                        del info[key]
+
                 info['mime-type'] = magic.Magic(mime=True).from_file(blob_path)
                 self._db_set_attribute('info', info)
 
