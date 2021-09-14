@@ -17,48 +17,30 @@ class TestImages(base.BaseNamespacedTestCase):
     def test_cache_image(self):
         url = ('https://sfcbr.shakenfist.com/gw-basic/gwbasic.qcow2')
 
-        self.system_client.cache_artifact(url)
+        img = self.system_client.cache_artifact(url)
+
+        # Get all artifacts once to make sure we get added to the list
         image_urls = []
         for image in self.system_client.get_artifacts():
             image_urls.append(image['source_url'])
-
         self.assertIn(url, image_urls)
 
-        # It would be better if this used a get_artifact() call, but that doesn't
-        # exist at the moment.
-        cache = {}
+        # And then just lookup the single artifact
         start_time = time.time()
         while time.time() - start_time < 7 * 60:
-            cache = {}
-            for img in self.system_client.get_artifacts():
-                cache.setdefault(img['source_url'], [])
-                cache[img['source_url']].append(img)
-
-            self.assertIn(url, cache)
-            if cache[url][0]['state'] == 'created':
+            img = self.system_client.get_artifact(img['uuid'])
+            if img['state'] == 'created':
                 return
-
             time.sleep(5)
 
         self.fail('Image was not downloaded after seven minutes: %s'
-                  % cache.get(url))
-
-    def test_cache_image_specific(self):
-        self.skip('Requires API reworking')
-
-        # It is currently not possible to check if an image is
-        # in the cache via API, so for now we just cache this and
-        # see if any errors come back.
-        url = ('https://cloud.centos.org/centos/6/images/'
-               'CentOS-6-x86_64-GenericCloud.qcow2.xz')
-        img = self.system_client.cache_artifact(url)
-        self._await_image_download_success(img['uuid'], after=time.time())
+                  % img['uuid'])
 
     def test_cache_invalid_image(self):
         url = ('http://nosuch.shakenfist.com/centos/6/images/'
                'CentOS-6-x86_64-GenericCloud-1604.qcow2.xz')
-        self.system_client.cache_artifact(url)
-        self._await_image_download_error(url, after=time.time())
+        img = self.system_client.cache_artifact(url)
+        self._await_image_download_error(img['uuid'], after=time.time())
 
     def test_instance_invalid_image(self):
         # Start our test instance
