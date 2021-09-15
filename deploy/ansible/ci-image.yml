@@ -112,12 +112,13 @@
     base_image_user: "ubuntu"
     keyfile_private: "/home/jenkins/id_ci"
     keyfile_public: "/home/jenkins/id_ci.pub"
+    label: "sfci-image"
 
   tasks:
     # - name: Snapshot the instance
     #   sf_snapshot:
     #     instance_uuid: "{{hostvars['imagerebuild']['sf_instance_uuid']}}"
-    #     label: sfci-image
+    #     label: "{{label}}"
     #     state: present
     #   register: cisnapshot
 
@@ -132,7 +133,7 @@
     - name: Snapshot the bad way until the ansible module catches up
       shell: |
         sf-client --json instance snapshot "{{hostvars['imagerebuild']['sf_instance_uuid']}}" \
-            --label_name sfci-image
+            --label_name "{{label}}"
       register: cisnapshot
 
     - name: Log snapshot details
