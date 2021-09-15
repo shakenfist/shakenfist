@@ -62,7 +62,7 @@ class NetworkEndpoint(api_base.Resource):
     @api_base.arg_is_network_uuid
     @api_base.requires_network_ownership
     @api_base.redirect_to_network_node
-    def delete(self, network_uuid=None, network_from_db=None):
+    def delete(self, network_uuid=None, network_from_db=None, namespace=None):
         if network_uuid == 'floating':
             return api_base.error(403, 'you cannot delete the floating network')
 
@@ -71,6 +71,11 @@ class NetworkEndpoint(api_base.Resource):
             LOG.with_fields({'network_uuid': n.uuid}).warning(
                 'delete_network: network does not exist')
             return api_base.error(404, 'network does not exist')
+
+        # If a namespace is specified, ensure the network is in it
+        if namespace:
+            if network_from_db.namespace != namespace:
+                return api_base.error(404, 'network not in namespace')
 
         # We only delete unused networks
         ifaces = list(networkinterface.interfaces_for_network(n))
