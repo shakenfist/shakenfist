@@ -190,14 +190,6 @@
           - "   sf-2: is {{sf2['meta']['uuid']}} at {{sf2['meta']['network_interfaces'][0]['ipv4']}}, {{sf2['meta']['network_interfaces'][0]['floating']}}"
           - "   sf-3: is {{sf3['meta']['uuid']}} at {{sf3['meta']['network_interfaces'][0]['ipv4']}}, {{sf3['meta']['network_interfaces'][0]['floating']}}"
 
-    - name: Wait for all instances to present an "OpenSSH" prompt
-      wait_for:
-        port: 22
-        host: "{{hostvars[item]['ansible_ssh_host']}}"
-        search_regex: OpenSSH
-        delay: 10
-      with_items: "{{ groups['sfall'] }}"
-
     - name: Ensure we have somewhere to write the build details to
       file:
         path: "{{ lookup('env', 'WORKSPACE') }}/{{ lookup('env', 'BUILD_TAG') }}"
