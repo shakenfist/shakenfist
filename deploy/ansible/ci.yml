@@ -189,6 +189,8 @@
           - "   sf-1: is {{sf1['meta']['uuid']}} at {{sf1['meta']['network_interfaces'][0]['ipv4']}}, {{sf1['meta']['network_interfaces'][0]['floating']}}"
           - "   sf-2: is {{sf2['meta']['uuid']}} at {{sf2['meta']['network_interfaces'][0]['ipv4']}}, {{sf2['meta']['network_interfaces'][0]['floating']}}"
           - "   sf-3: is {{sf3['meta']['uuid']}} at {{sf3['meta']['network_interfaces'][0]['ipv4']}}, {{sf3['meta']['network_interfaces'][0]['floating']}}"
+          - "   sf-4: is {{sf4['meta']['uuid']}} at {{sf4['meta']['network_interfaces'][0]['ipv4']}}, {{sf4['meta']['network_interfaces'][0]['floating']}}"
+          - "   sf-5: is {{sf5['meta']['uuid']}} at {{sf5['meta']['network_interfaces'][0]['ipv4']}}, {{sf5['meta']['network_interfaces'][0]['floating']}}"
 
     - name: Ensure we have somewhere to write the build details to
       file:
