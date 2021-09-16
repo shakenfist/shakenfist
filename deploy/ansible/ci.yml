@@ -82,6 +82,10 @@
         ansible_ssh_private_key_file: "/home/jenkins/id_ci"
         groups: hypervisors, sfall
 
+    - name: Ugh
+      wait_for:
+        timeout: 30
+
     - name: Create sf-2
       sf_instance:
         name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-2"
@@ -106,6 +110,10 @@
         ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/home/jenkins/id_ci"
         groups: hypervisors, sfall
+
+    - name: Ugh
+      wait_for:
+        timeout: 30
 
     - name: Create sf-3
       sf_instance:
@@ -132,6 +140,10 @@
         ansible_ssh_private_key_file: "/home/jenkins/id_ci"
         groups: hypervisors, sfall
 
+    - name: Ugh
+      wait_for:
+        timeout: 30
+
     - name: Create sf-4
       sf_instance:
         name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-4"
@@ -157,6 +169,10 @@
         ansible_ssh_private_key_file: "/home/jenkins/id_ci"
         groups: hypervisors, sfall
 
+    - name: Ugh
+      wait_for:
+        timeout: 30
+
     - name: Create sf-5
       sf_instance:
         name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-5"
@@ -181,6 +197,10 @@
         ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/home/jenkins/id_ci"
         groups: hypervisors, sfall
+
+    - name: Ugh
+      wait_for:
+        timeout: 30
 
     - name: Log instance details
       debug:
