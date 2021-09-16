@@ -315,7 +315,13 @@ class Monitor(daemon.WorkerPoolDaemon):
                 db.resolve('networknode', jobname)
 
     def _reap_leaked_floating_ips(self):
-        # Ensure we haven't leaked any floating IPs (because we use to)
+        # Block until the network node queue is idle to avoid races
+        processing, waiting = db.get_queue_length('networknode')
+        while processing + waiting > 0:
+            time.sleep(1)
+            processing, waiting = db.get_queue_length('networknode')
+
+        # Ensure we haven't leaked any floating IPs (because we used to)
         with db.get_lock('ipmanager', None, 'floating', ttl=120,
                          op='Cleanup leaks'):
             floating_ipm = IPManager.from_db('floating')
@@ -367,7 +373,11 @@ class Monitor(daemon.WorkerPoolDaemon):
                                              floating_addresses,
                                              floating_reserved):
                     LOG.error('Floating IP %s has leaked.' % ip)
-                    leaks.append(ip)
+
+                    # This IP needs to have been allocated more than 300 seconds
+                    # ago to ensure that the network setup isn't still queueud.
+                    if time.time() - floating_ipm.in_use[ip]['when'] > 300:
+                        leaks.append(ip)
 
             for ip in leaks:
                 LOG.error('Leaked floating IP %s has been released.' % ip)

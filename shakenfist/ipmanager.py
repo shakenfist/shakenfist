@@ -1,5 +1,6 @@
 import ipaddress
 import random
+import time
 
 from shakenfist import db
 from shakenfist import exceptions
@@ -30,8 +31,14 @@ class IPManager(object):
         else:
             self.in_use_counter = 0
             self.in_use = {
-                self.network_address: self.unique_label(),
-                self.broadcast_address: self.unique_label()
+                self.network_address: {
+                    'user': self.unique_label(),
+                    'when': time.time()
+                },
+                self.broadcast_address: {
+                    'user': self.unique_label(),
+                    'when': time.time()
+                }
             }
 
     def unique_label(self):
@@ -50,12 +57,26 @@ class IPManager(object):
     @staticmethod
     def from_db(uuid):
         db_data = db.get_ipmanager(uuid)
-        ipm = IPManager(**db_data['ipmanager.v2'])
+
+        if 'ipmanager.v3' in db_data:
+            ipm = IPManager(**db_data['ipmanager.v3'])
+        else:
+            db_data['ipmanager.v3'] = {}
+            db_data['ipmanager.v3']['ipblock'] = db_data['ipmanager.v2']['ipblock']
+            db_data['ipmanager.v3']['in_use'] = {}
+
+            for addr in db_data['ipmanager.v2']['in_use']:
+                db_data['ipmanager.v3']['in_use'][addr] = {
+                    'user': db_data['ipmanager.v2']['in_use'][addr],
+                    'when': time.time()
+                }
+            ipm = IPManager(**db_data['ipmanager.v3'])
+
         return ipm
 
     def persist(self):
         d = {
-            'ipmanager.v2': {
+            'ipmanager.v3': {
                 'ipblock': self.ipblock,
                 'in_use': self.in_use,
                 'uuid': self.uuid
@@ -81,7 +102,10 @@ class IPManager(object):
 
         self.log.with_field(*unique_label_tuple).with_field(
             'address', address).info('Reserving address')
-        self.in_use[address] = unique_label_tuple
+        self.in_use[address] = {
+            'user': unique_label_tuple,
+            'when': time.time()
+        }
         self.in_use_counter += 1
         return True
 
