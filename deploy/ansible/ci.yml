@@ -275,14 +275,6 @@
           ]
         state: latest
 
-    - name: pip3 self-upgrade
-      command: pip3 install -U pip
-
-    - name: Remove python3-pip
-      apt:
-        name: python3-pip
-        state: absent
-
     - name: Create a RAM disk for etcd to make it more reliable in CI
       shell: |
         mkdir -p /var/lib/etcd
@@ -404,6 +396,7 @@
     - name: Make venv and install server wheel
       shell: |
         python3 -m venv --system-site-packages /srv/shakenfist/venv
+        /srv/shakenfist/venv/bin/pip install -U pip
         /srv/shakenfist/venv/bin/pip install /tmp/shakenfist*whl
 
 - hosts: primary
