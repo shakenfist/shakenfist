@@ -100,14 +100,6 @@
           ]
         state: latest
 
-    - name: pip3 self-upgrade
-      command: pip3 install -U pip
-
-    - name: Remove python3-pip
-      apt:
-        name: python3-pip
-        state: absent
-
 - hosts: localhost
   gather_facts: no
   connection: ssh
