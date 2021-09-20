@@ -27,6 +27,7 @@ class DHCP(object):
             'broadcast': network.broadcast,
             'dns_server': config.DNS_SERVER,
             'mtu': config.MAX_HYPERVISOR_MTU - 50,
+            'provide_nat': network.provide_nat,
 
             'netns': self.network.uuid,
             'in_netns': 'ip netns exec %s' % self.network.uuid,

@@ -132,6 +132,7 @@ class Instance(dbo):
     STATE_PREFLIGHT_ERROR = 'preflight-error'
     STATE_CREATING_ERROR = 'creating-error'
     STATE_CREATED_ERROR = 'created-error'
+    STATE_DELETE_WAIT_ERROR = 'delete-wait-error'
 
     state_targets = {
         None: (dbo.STATE_INITIAL, dbo.STATE_ERROR),
@@ -149,7 +150,8 @@ class Instance(dbo):
         STATE_CREATED_ERROR: (dbo.STATE_ERROR),
         dbo.STATE_ERROR: (dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED,
                           dbo.STATE_ERROR),
-        dbo.STATE_DELETE_WAIT: (dbo.STATE_DELETED),
+        dbo.STATE_DELETE_WAIT: (dbo.STATE_DELETED, STATE_DELETE_WAIT_ERROR),
+        STATE_DELETE_WAIT_ERROR: (dbo.STATE_ERROR),
         dbo.STATE_DELETED: None,
     }
 
