@@ -191,6 +191,14 @@
       when: is_intel.rc == 0
 
     - name: Determine the mesh network interface MTU
+      shell: ip link show
+      register: ip_links
+
+    - name: Log network interfaces
+      debug:
+        msg: "{{ip_links.stdout}}"
+
+    - name: Determine the mesh network interface MTU
       shell: ip link show {{node_mesh_nic}} | grep mtu | sed -e 's/.*mtu //' -e 's/ .*//'
       register: node_mtu_complex
 

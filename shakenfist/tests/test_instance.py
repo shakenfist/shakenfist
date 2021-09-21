@@ -28,6 +28,7 @@ class FakeNetwork(object):
         self.netmask = '255.0.0.0'
         self.dhcp_start = '127.0.0.2'
         self.broadcast = '127.255.255.255'
+        self.provide_nat = True
 
 
 class FakeNetworkInterface(object):
@@ -632,7 +633,8 @@ class InstancesTestCase(base.ShakenFistTestCase):
 
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 side_effect=[{'value': instance.Instance.STATE_DELETED, 'update_time': 1},
-                             {'value': instance.Instance.STATE_DELETED, 'update_time': 1},
+                             {'value': instance.Instance.STATE_DELETED,
+                                 'update_time': 1},
                              {'value': instance.Instance.STATE_INITIAL, 'update_time': 1}])
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
     def test_state_filter_active(self, mock_get_all, mock_attr):
@@ -644,7 +646,8 @@ class InstancesTestCase(base.ShakenFistTestCase):
 
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 side_effect=[{'value': instance.Instance.STATE_DELETED, 'update_time': 1},
-                             {'value': instance.Instance.STATE_INITIAL, 'update_time': 1},
+                             {'value': instance.Instance.STATE_INITIAL,
+                                 'update_time': 1},
                              {'value': instance.Instance.STATE_INITIAL, 'update_time': 1}])
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
     def test_state_filter_inactive(self, mock_get_all, mock_attr):
@@ -657,7 +660,8 @@ class InstancesTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 side_effect=[{'value': instance.Instance.STATE_DELETED, 'update_time': 'not_used'},
                              {'value': 'not_used', 'update_time': time.time()},
-                             {'value': instance.Instance.STATE_DELETED, 'update_time': 'not_used'},
+                             {'value': instance.Instance.STATE_DELETED,
+                                 'update_time': 'not_used'},
                              {'value': 'not_used', 'update_time': time.time()},
                              {'value': instance.Instance.STATE_INITIAL, 'update_time': 'not_used'}])
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
@@ -671,10 +675,14 @@ class InstancesTestCase(base.ShakenFistTestCase):
 
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 side_effect=[
-                    {'value': instance.Instance.STATE_DELETED, 'update_time': time.time() - 1000},
-                    {'value': instance.Instance.STATE_DELETED, 'update_time': time.time() - 1000},
-                    {'value': instance.Instance.STATE_DELETED, 'update_time': time.time()},
-                    {'value': instance.Instance.STATE_DELETED, 'update_time': time.time()},
+                    {'value': instance.Instance.STATE_DELETED,
+                        'update_time': time.time() - 1000},
+                    {'value': instance.Instance.STATE_DELETED,
+                        'update_time': time.time() - 1000},
+                    {'value': instance.Instance.STATE_DELETED,
+                        'update_time': time.time()},
+                    {'value': instance.Instance.STATE_DELETED,
+                        'update_time': time.time()},
                     {'value': instance.Instance.STATE_INITIAL, 'update_time': 1}])
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
     def test_state_hard_delete_now(self, mock_get_all, mock_attr):

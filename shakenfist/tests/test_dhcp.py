@@ -21,6 +21,7 @@ class FakeNetwork(object):
         self.dhcp_start = '10.0.0.2'
         self.netmask = '255.0.0.0'
         self.broadcast = '10.255.255.255'
+        self.provide_nat = True
 
 
 class FakeNetworkInterface(object):
