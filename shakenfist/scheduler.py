@@ -75,9 +75,7 @@ class Scheduler(object):
         self.metrics = metrics
         self.metrics_updated = time.time()
 
-    # Note this method returns a three-way value: true (yes), false (no), -1 (if you must)
-    def _has_sufficient_cpu(self, log_ctx, cpus, node, cpu_ratio):
-        preferred_max_cpus = self.metrics[node].get('cpu_max', 0) * cpu_ratio
+    def _has_sufficient_cpu(self, log_ctx, cpus, node):
         hard_max_cpus = (self.metrics[node].get(
             'cpu_max', 0) * config.CPU_OVERCOMMIT_RATIO)
         current_cpu = self.metrics[node].get('cpu_total_instance_vcpus', 0)
@@ -90,15 +88,6 @@ class Scheduler(object):
                 'hard_max_cpus': hard_max_cpus
             }).debug('Scheduling on node would exceed hard maximum CPUs')
             return False
-
-        if current_cpu + cpus > preferred_max_cpus:
-            log_ctx.with_fields({
-                'node': node,
-                'current_cpus': current_cpu,
-                'requested_cpus': cpus,
-                'preferred_max_cpus': preferred_max_cpus
-            }).debug('Scheduling on node would exceed preferred maximum CPUs, a soft failure')
-            return -1
 
         return True
 
@@ -252,33 +241,10 @@ class Scheduler(object):
                 raise exceptions.LowResourceException(
                     'Requested vCPUs exceeds vCPU limit')
 
-            # Do we have enough idle CPU? The config value CPU_OVERCOMMIT_RATIO
-            # specifies the maximum overcommit that the cluster is willing to do
-            # on a per-node basis. However, we try to keep the actual overcommit
-            # even across the hypervisor nodes. So, we calculate the current
-            # overcommit ratio for the cluster, and then cap that at the configured
-            # maximum. That is then compared with the overcommit ratio for this node.
-            current_cluster_cpu = 0
-            actual_cluster_cpu = 0
-            for node in self.metrics:
-                current_cluster_cpu += self.metrics[node].get(
-                    'cpu_total_instance_vcpus', 0)
-                actual_cluster_cpu += self.metrics[node].get(
-                    'cpu_available', 0)
-            cpu_ratio = min(config.CPU_OVERCOMMIT_RATIO,
-                            math.ceil(current_cluster_cpu / actual_cluster_cpu))
-            log_ctx.info('Current cluster CPU overcommit ratio is %d, configured maximum %d',
-                         cpu_ratio, config.CPU_OVERCOMMIT_RATIO)
-
+            # Do we have enough idle CPU?
             for n in copy.copy(candidates):
-                preference = self._has_sufficient_cpu(
-                    log_ctx, instance.cpus, n, cpu_ratio)
-                if preference == -1:
+                if not self._has_sufficient_cpu(log_ctx, instance.cpus, n):
                     candidates.remove(n)
-                    candidates.append(n)
-                elif not preference:
-                    candidates.remove(n)
-
             log_ctx.with_field('candidates', candidates).info(
                 'Scheduling: have enough idle CPU')
             instance.add_event('schedule',
@@ -311,21 +277,6 @@ class Scheduler(object):
                 raise exceptions.LowResourceException(
                     'No nodes with enough disk space')
 
-            # What nodes have the highest number of networks already present?
-            if network:
-                requested_networks = []
-                for net in network:
-                    network_uuid = net['network_uuid']
-                    if network_uuid not in requested_networks:
-                        requested_networks.append(network_uuid)
-
-                candidates = self._find_most_matching_networks(
-                    requested_networks, candidates)
-                log_ctx.with_field('candidates', candidates).info(
-                    'Scheduling: Have most matching networks')
-                instance.add_event('schedule', 'Have most matching networks',
-                                   None, str(candidates))
-
             # Avoid allocating to network node if possible
             net_node = get_network_node()
             if len(candidates) > 1 and net_node.uuid in candidates:
@@ -334,6 +285,17 @@ class Scheduler(object):
                     'Scheduling: Are non-network nodes')
                 instance.add_event('schedule', 'Are non-network nodes',
                                    None, str(candidates))
+
+            # Order candidates by current CPU load
+            by_load = {}
+            for n in copy.copy(candidates):
+                load = math.floor(self.metrics[n].get('cpu_load_1', 0))
+                by_load.setdefault(load, [])
+                by_load[load].append(n)
+            lowest_load = sorted(by_load.keys())[0]
+            candidates = by_load[lowest_load]
+            instance.add_event('schedule', 'Have lowest CPU load',
+                               None, str(candidates))
 
             # Return a shuffled list of options
             random.shuffle(candidates)
