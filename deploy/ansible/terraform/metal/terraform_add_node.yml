@@ -18,6 +18,18 @@
     groups: network_node
   when: item.get('network_node', False)
 
+- name: Add {{item['name']}} as a primary node (if configured, should only be one)
+  add_host:
+    hostname: "{{item['name']}}"
+    groups: primary_node
+  when: item.get('primary_node', False)
+
+- name: Record API URL from primary node
+  set_fact:
+    api_url: "{{item['api_url']}}"
+    delegate_to: "localhost"
+  when: item.get('primary_node', False)
+
 - name: Add node facts
   set_fact:
     node_name: "{{item['name']}}"
