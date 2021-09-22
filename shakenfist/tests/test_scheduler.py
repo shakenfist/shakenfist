@@ -353,52 +353,6 @@ class CorrectAllocationTestCase(SchedulerTestCase):
         self.assertSetEqual(set(self.fake_db.nodes)-{'node1_net', },
                             set(nodes))
 
-    @mock.patch('shakenfist.networkinterface.NetworkInterface.from_db',
-                return_value=FakeInterface('uuid-net1'))
-    @mock.patch('shakenfist.instance.Instance._db_get_attribute',
-                return_value={
-                    'node': 'node3'
-                })
-    @mock.patch('shakenfist.instance.Instance._db_get',
-                return_value={
-                    'uuid': 'inst-1',
-                    'cpus': 1,
-                    'memory': 1024,
-                    'disk_spec': [{'base': 'cirros', 'size': 21}]
-                })
-    @mock.patch('shakenfist.etcd.get_all',
-                return_value=[(None, {
-                    'uuid': 'inst-1',
-                    'cpus': 1,
-                    'memory': 1024,
-                    'disk_spec': [{'base': 'cirros', 'size': 21}]
-                })])
-    @mock.patch('shakenfist.artifact.Artifacts', return_value=[])
-    def test_single_node_that_has_network(
-            self, mock_get_artifacts, mock_get_instances,
-            mock_get_instance, mock_instance_attribute,
-            mock_get_interface):
-        self.fake_db.set_node_metrics_same({
-            'cpu_max_per_instance': 16,
-            'cpu_max': 4,
-            'memory_available': 22000,
-            'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024,
-            'cpu_total_instance_vcpus': 4,
-            'cpu_available': 12
-        })
-
-        fake_inst = FakeInstance({
-            'uuid': 'fakeuuid',
-            'cpus': 1,
-            'memory': 1024,
-            'disk_spec': [{'base': 'cirros', 'size': 8}]
-        })
-        nets = [{'network_uuid': 'uuid-net1'}]
-
-        nodes = scheduler.Scheduler().place_instance(fake_inst, nets)
-        self.assertSetEqual(set(['node3']), set(nodes))
-
 
 class ForcedCandidatesTestCase(SchedulerTestCase):
     """Test when we force candidates."""
