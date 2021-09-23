@@ -97,7 +97,7 @@ class ImageFetchHelper(object):
                 blob_path = os.path.join(config.STORAGE_PATH, 'blobs', b.uuid)
                 mimetype = b.info.get('mime-type', '')
 
-                if mimetype == 'application/x-cd-image':
+                if mimetype in ['application/x-cd-image', 'application/x-iso9660-image']:
                     cache_path = os.path.join(
                         config.STORAGE_PATH, 'image_cache', b.uuid + '.iso')
                     util_general.link(blob_path, cache_path)
@@ -151,7 +151,7 @@ class ImageFetchHelper(object):
                                                 blob_uuid)
                 admin_token = util_general.get_api_token(
                     'http://%s:%d' % (blob_source, config.API_PORT))
-                r = requests.request('GET', url,
+                r = requests.request('GET', url, stream=True,
                                      headers={'Authorization': admin_token,
                                               'User-Agent': util_general.get_user_agent()})
 

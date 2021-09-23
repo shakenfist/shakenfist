@@ -76,7 +76,7 @@ class ActualLock(Lock):
         self.objecttype = objecttype
         self.objectname = name
         self.timeout = min(timeout, 1000000000)
-        self.log_ctx = log_ctx.with_field('path', self.path)
+        self.log_ctx = log_ctx.with_field('lock', self.path)
         self.operation = op
 
         # We override the UUID of the lock with something more helpful to debugging
