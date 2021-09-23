@@ -3,11 +3,13 @@ localhost ansible_connection=local
 
 [primary_node]
 [network_node]
+[eventlog_node]
 [hypervisors]
 
 [allsf:children]
   primary_node
   network_node
+  eventlog_node
   hypervisors
 
 [allsf:vars]

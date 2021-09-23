@@ -69,9 +69,11 @@ class InstanceTask(QueueTask):
         return self._network
 
     def obj_dict(self):
-        return {**super(InstanceTask, self).obj_dict(),
-                'instance_uuid': self._instance_uuid,
-                'network': self._network}
+        return {
+            **super(InstanceTask, self).obj_dict(),
+            'instance_uuid': self._instance_uuid,
+            'network': self._network
+        }
 
 
 class PreflightInstanceTask(InstanceTask):
@@ -105,8 +107,10 @@ class NetworkTask(QueueTask):
         return self._network_uuid
 
     def obj_dict(self):
-        return {**super(NetworkTask, self).obj_dict(),
-                'network_uuid': self._network_uuid}
+        return {
+            **super(NetworkTask, self).obj_dict(),
+            'network_uuid': self._network_uuid
+        }
 
 
 class DeployNetworkTask(NetworkTask):
@@ -144,8 +148,10 @@ class DeleteNetworkWhenClean(NetworkTask):
         return self._wait_interfaces
 
     def obj_dict(self):
-        return {**super(DeleteNetworkWhenClean, self).obj_dict(),
-                'wait_interfaces': self._wait_interfaces}
+        return {
+            **super(DeleteNetworkWhenClean, self).obj_dict(),
+            'wait_interfaces': self._wait_interfaces
+        }
 
 
 #
@@ -178,9 +184,11 @@ class NetworkInterfaceTask(QueueTask):
         return self._interface_uuid
 
     def obj_dict(self):
-        return {**super(NetworkInterfaceTask, self).obj_dict(),
-                'network_uuid': self._network_uuid,
-                'interface_uuid': self._interface_uuid}
+        return {
+            **super(NetworkInterfaceTask, self).obj_dict(),
+            'network_uuid': self._network_uuid,
+            'interface_uuid': self._interface_uuid
+        }
 
 
 class FloatNetworkInterfaceTask(NetworkInterfaceTask):
@@ -204,8 +212,10 @@ class ImageTask(QueueTask):
             raise NoURLImageFetchTaskException
 
     def obj_dict(self):
-        return {**super(ImageTask, self).obj_dict(),
-                'url': self._url}
+        return {
+            **super(ImageTask, self).obj_dict(),
+            'url': self._url
+        }
 
     # Data methods
     def url(self):
@@ -220,8 +230,10 @@ class FetchImageTask(ImageTask):
         self._instance_uuid = instance_uuid
 
     def obj_dict(self):
-        return {**super(FetchImageTask, self).obj_dict(),
-                'instance_uuid': self._instance_uuid}
+        return {
+            **super(FetchImageTask, self).obj_dict(),
+            'instance_uuid': self._instance_uuid
+        }
 
     # Data methods
     def instance_uuid(self):
@@ -243,11 +255,13 @@ class SnapshotTask(QueueTask):
         self._blob_uuid = blob_uuid
 
     def obj_dict(self):
-        return {**super(SnapshotTask, self).obj_dict(),
-                'instance_uuid': self._instance_uuid,
-                'disk': self._disk,
-                'artifact_uuid': self._artifact_uuid,
-                'blob_uuid': self._blob_uuid}
+        return {
+            **super(SnapshotTask, self).obj_dict(),
+            'instance_uuid': self._instance_uuid,
+            'disk': self._disk,
+            'artifact_uuid': self._artifact_uuid,
+            'blob_uuid': self._blob_uuid
+        }
 
     # Data methods
     def instance_uuid(self):
@@ -261,3 +275,58 @@ class SnapshotTask(QueueTask):
 
     def blob_uuid(self):
         return self._blob_uuid
+
+
+#
+# EventLog Tasks
+#
+
+
+class EventLogTask(QueueTask):
+    def __init__(self, object_type, object_uuid):
+        super(EventLogTask, self).__init__()
+        self._object_type = object_type
+        self._object_uuid = object_uuid
+
+    def obj_dict(self):
+        return {
+            **super(EventLogTask, self).obj_dict(),
+            'object_type': self._object_type,
+            'object_uuid': self._object_uuid
+        }
+
+    # Data methods
+    def object_type(self):
+        return self._object_type
+
+    def object_uuid(self):
+        return self._object_uuid
+
+
+class EventLogMessageTask(EventLogTask):
+    _name = 'eventlog_message'
+
+    def __init__(self, object_type, object_uuid, timestamp, message):
+        super(EventLogMessageTask, self).__init__(object_type, object_uuid)
+        self._timestamp = timestamp
+        self._message = message
+
+    def timestamp(self):
+        return self._timestamp
+
+    def message(self):
+        return self._message
+
+    def obj_dict(self):
+        return {
+            **super(EventLogMessageTask, self).obj_dict(),
+            'timestamp': self._timestamp,
+            'message': self._message
+        }
+
+
+class EventLogDeleteTask(EventLogTask):
+    _name = 'eventlog_delete'
+
+    def __init__(self, object_type, object_uuid):
+        super(EventLogMessageTask, self).__init__(object_type, object_uuid)

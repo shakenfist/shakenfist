@@ -51,6 +51,9 @@ class SFConfig(BaseSettings):
         ),
         description='The gunicorn command line to use'
     )
+    EVENTLOG_NODE_IP: str = Field(
+        '', description='Mesh IP of the node which stores event logs',
+    )
 
     # Scheduler Options
     SCHEDULER_CACHE_TIMEOUT: int = Field(

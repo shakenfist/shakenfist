@@ -83,40 +83,6 @@ def get_instance_snapshots(instance_uuid):
                              sort_order='ascend'):
         yield m
 
-#####################################################################
-# Events
-#####################################################################
-
-
-def add_event(object_type, object_uuid, operation, phase, duration, message):
-    t = time.time()
-    LOG.with_fields(
-        {
-            object_type: object_uuid,
-            'fqdn': config.NODE_NAME,
-            'operation': operation,
-            'phase': phase,
-            'duration': duration,
-            'message': message
-        }).info('Added event')
-    etcd.put(
-        'event/%s' % object_type, object_uuid, t,
-        {
-            'timestamp': t,
-            'object_type': object_type,
-            'object_uuid': object_uuid,
-            'fqdn': config.NODE_NAME,
-            'operation': operation,
-            'phase': phase,
-            'duration': duration,
-            'message': message
-        })
-
-
-def get_events(object_type, object_uuid):
-    for _, m in etcd.get_all('event/%s' % object_type, object_uuid,
-                             sort_order='ascend'):
-        yield m
 
 #####################################################################
 # Metrics

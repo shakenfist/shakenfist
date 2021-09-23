@@ -20,3 +20,13 @@
   # This include is to work around the lack of blocks in loops
   include: terraform_add_node.yml
   loop: "{{topology}}"
+
+- name: Fail if there are too many network nodes
+  fail:
+    msg: "There should only be one network node. We have {{groups['network_node']}}"
+  when: groups['network_node'] | length != 1
+
+- name: Fail if there are too many eventlog nodes
+  fail:
+    msg: "There should only be one network node. We have {{groups['eventlog_node']}}"
+  when: groups['eventlog_node'] | length != 1

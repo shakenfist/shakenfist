@@ -25,4 +25,5 @@
     msg:
       - "Primary node IP is {{hostvars[groups['primary_node'][0]]['node_mesh_ip']}}"
       - "Network node is {{hostvars[groups['network_node'][0]]['node_name']}} with mesh IP {{hostvars[groups['network_node'][0]]['node_mesh_ip']}}"
+      - "Event log node is {{hostvars[groups['eventlog_node'][0]]['node_name']}} with mesh IP {{hostvars[groups['eventlog_node'][0]]['node_mesh_ip']}}"
   run_once: true
