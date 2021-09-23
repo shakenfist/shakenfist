@@ -460,6 +460,15 @@
           read -r -d '' TOPOLOGY <<'EOF'
           [
             {
+              "name": "sf-primary",
+              "node_egress_ip": "{{hostvars['primary']['egress_ip']}}",
+              "node_egress_nic": "eth0",
+              "node_mesh_ip": "{{hostvars['primary']['mesh_ip']}}",
+              "node_mesh_nic": "eth1",
+              "primary_node": true,
+              "api_url": "http://localhost:13000"
+            },
+            {
               "name": "sf-1",
               "node_egress_ip": "{{hostvars['sf1']['egress_ip']}}",
               "node_egress_nic": "eth0",

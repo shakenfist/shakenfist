@@ -15,13 +15,13 @@ Environment=SHAKENFIST_NODE_NAME="{{node_name}}"
 Environment=SHAKENFIST_NODE_IS_ETCD_MASTER="{{node_is_etcd_master}}"
 
 Environment=SHAKENFIST_FLOATING_NETWORK="{{floating_network_ipblock}}"
-Environment=SHAKENFIST_NETWORK_NODE_IP="{{hostvars['localhost']['network_node_ip']}}"
+Environment=SHAKENFIST_NETWORK_NODE_IP="{{hostvars[groups['network_node'][0]]['node_mesh_ip']}}"
 Environment=SHAKENFIST_AUTH_SECRET_SEED="{{hostvars['localhost']['auth_secret']}}"
 Environment=SHAKENFIST_INCLUDE_TRACEBACKS="{{hostvars['localhost']['include_tracebacks']}}"
 
 # Cluster tuning.
 Environment=SHAKENFIST_RAM_SYSTEM_RESERVATION={{hostvars['localhost']['ram_system_reservation']}}
-Environment=SHAKENFIST_MAX_HYPERVISOR_MTU={{hostvars['localhost']['lowest_mtu']}}
+Environment=SHAKENFIST_MAX_HYPERVISOR_MTU={{hostvars[groups['primary_node'][0]]['lowest_mtu']}}
 Environment=SHAKENFIST_DNS_SERVER="{{dns_server}}"
 
 {% if http_proxy != '' %}

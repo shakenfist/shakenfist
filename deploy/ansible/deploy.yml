@@ -26,10 +26,6 @@
 
     - include: terraform/{{cloud}}/terraform.yml
 
-    - name: The primary node doesn't have a mesh ip, but we need to mimic it later, set one
-      set_fact:
-        node_mesh_ip: "{{node_egress_ip}}"
-
     - name: Wait for instances to boot
       pause:
         minutes: "{{bootdelay}}"
@@ -224,7 +220,7 @@
     - name: Install gunicorn
       shell: /srv/shakenfist/venv/bin/pip install -U gunicorn
 
-- hosts: localhost
+- hosts: primary_node
   any_errors_fatal: true
   become: yes
   become_method: sudo
@@ -330,7 +326,7 @@
 
     - name: Syslog server is the primary server
       set_fact:
-        syslog: "{{hostvars['localhost']['primary_node_ip']}}"
+        syslog: "{{hostvars[groups['primary_node'][0]]['node_mesh_ip']}}"
 
     - name: Send syslog to the primary server, unless I am the primary server
       template:
@@ -339,14 +335,14 @@
         owner: root
         group: sudo
         mode: u=r,g=r,o=
-      when: hostvars['localhost']['primary_node_ip'] != node_egress_ip
+      when: hostvars[groups['primary_node'][0]]['node_mesh_ip'] != node_mesh_ip
 
     - name: Restart syslog
       service:
         name: rsyslog
         enabled: yes
         state: restarted
-      when: hostvars['localhost']['primary_node_ip'] != node_egress_ip
+      when: hostvars[groups['primary_node'][0]]['node_mesh_ip'] != node_mesh_ip
 
 # Install etcd
 - hosts: etcd
@@ -389,7 +385,7 @@
     - name: Stop the SF daemon
       shell: systemctl stop sf || true
 
-- hosts: localhost
+- hosts: primary_node
   any_errors_fatal: true
   become: yes
   become_method: sudo
@@ -635,7 +631,7 @@
       run_once: true
 
     - name: Create an admin namespace called "system" with one key configured
-      shell: "{{hostvars['localhost']['utility_path']}}/sf-passwd deploy {{hostvars['localhost']['system_key']}}"
+      shell: "{{hostvars['localhost']['utility_path']}}/sf-passwd deploy {{hostvars[groups['primary_node'][0]]['system_key']}}"
       run_once: true
 
     - name: Rotate logs and remove old logs
@@ -652,7 +648,7 @@
         state: restarted
         daemon_reload: yes
 
-- hosts: localhost
+- hosts: primary_node
   any_errors_fatal: true
   become: yes
   become_method: sudo
