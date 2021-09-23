@@ -105,7 +105,7 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
             fields = {}
 
         # Handle "special fields" which might be internal objects
-        for key in ['instance', 'network', 'networkinterface', 'image']:
+        for key in ['artifact', 'blob', 'instance', 'network', 'networkinterface', 'node']:
             if key in fields:
                 value = fields[key]
                 if not isinstance(value, str):

@@ -561,8 +561,10 @@ class Instance(dbo):
                         disk_base = '%s%s' % (BLOB_URL, disk['blob_uuid'])
 
                     if disk_base:
-                        cached_image_path = os.path.join(
-                            config.STORAGE_PATH, 'image_cache', disk['blob_uuid'] + '.qcow2')
+                        cached_image_path = util_general.file_permutation_exists(
+                            os.path.join(config.STORAGE_PATH,
+                                         'image_cache', disk['blob_uuid']),
+                            ['iso', 'qcow2'])
 
                         with util_general.RecordedOperation('detect cdrom images', self):
                             try:
@@ -578,11 +580,7 @@ class Instance(dbo):
                                 '.qcow2', '.raw')
                             disk['type'] = 'raw'
                             disk['snapshot_ignores'] = True
-
-                            try:
-                                os.link(cached_image_path, disk['path'])
-                            except OSError:
-                                os.symlink(cached_image_path, disk['path'])
+                            util_general.link(cached_image_path, disk['path'])
 
                             # Due to limitations in some installers, cdroms are always on IDE
                             disk['device'] = 'hd%s' % disk['device'][-1]
