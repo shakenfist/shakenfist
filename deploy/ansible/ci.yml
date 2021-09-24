@@ -466,7 +466,7 @@
               "node_mesh_ip": "{{hostvars['primary']['mesh_ip']}}",
               "node_mesh_nic": "eth1",
               "primary_node": true,
-              "api_url": "http://localhost:13000"
+              "api_url": "http://sf-primary/api"
             },
             {
               "name": "sf-1",
@@ -475,7 +475,8 @@
               "node_mesh_ip": "{{hostvars['sf1']['mesh_ip']}}",
               "node_mesh_nic": "eth1",
               "etcd_master": true,
-              "network_node": true
+              "network_node": true,
+              "hypervisor": true
             },
             {
               "name": "sf-2",
@@ -483,7 +484,8 @@
               "node_egress_nic": "eth0",
               "node_mesh_ip": "{{hostvars['sf2']['mesh_ip']}}",
               "node_mesh_nic": "eth1",
-              "etcd_master": true
+              "etcd_master": true,
+              "hypervisor": true
             },
             {
               "name": "sf-3",
@@ -491,21 +493,24 @@
               "node_egress_nic": "eth0",
               "node_mesh_ip": "{{hostvars['sf3']['mesh_ip']}}",
               "node_mesh_nic": "eth1",
-              "etcd_master": true
+              "etcd_master": true,
+              "hypervisor": true
             },
             {
               "name": "sf-4",
               "node_egress_ip": "{{hostvars['sf4']['egress_ip']}}",
               "node_egress_nic": "eth0",
               "node_mesh_ip": "{{hostvars['sf4']['mesh_ip']}}",
-              "node_mesh_nic": "eth1"
+              "node_mesh_nic": "eth1",
+              "hypervisor": true
             },
             {
               "name": "sf-5",
               "node_egress_ip": "{{hostvars['sf5']['egress_ip']}}",
               "node_egress_nic": "eth0",
               "node_mesh_ip": "{{hostvars['sf5']['mesh_ip']}}",
-              "node_mesh_nic": "eth1"
+              "node_mesh_nic": "eth1",
+              "hypervisor": true
             },
           ]
           EOF
