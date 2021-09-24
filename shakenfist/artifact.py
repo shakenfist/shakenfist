@@ -65,7 +65,6 @@ class Artifact(dbo):
 
         a = Artifact.from_db(artifact_uuid)
         a.state = Artifact.STATE_INITIAL
-        a.add_event('db record creation', None)
 
         return a
 

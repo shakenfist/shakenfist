@@ -113,7 +113,6 @@ class Network(dbo):
 
         n = Network.from_db(uuid)
         n.state = Network.STATE_INITIAL
-        n.add_event('db record creation', None)
 
         # Networks should immediately appear on the network node
         db.enqueue('networknode', DeployNetworkTask(uuid))

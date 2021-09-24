@@ -78,7 +78,6 @@ class NetworkInterface(dbo):
         ni = NetworkInterface.from_db(interface_uuid)
         ni._db_set_attribute('floating', {'floating_address': None})
         ni.state = NetworkInterface.STATE_INITIAL
-        ni.add_event('db record creation', None)
 
         # TODO(andy): Integrate metadata into each object type
         # Initialise metadata
