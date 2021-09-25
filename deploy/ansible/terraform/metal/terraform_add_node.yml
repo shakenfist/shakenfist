@@ -4,7 +4,12 @@
     ansible_ssh_host: "{{item['node_egress_ip']}}"
     ansible_ssh_user: "{{ssh_user}}"
     ansible_ssh_private_key_filename: "{{ssh_key_filename}}"
+
+- name: Add {{item['name']}} as a hypervisor (if configured)
+  add_host:
+    hostname: "{{item['name']}}"
     groups: hypervisors
+  when: item.get('hypervisor', False)
 
 - name: Add {{item['name']}} as an etcd master (if configured)
   add_host:

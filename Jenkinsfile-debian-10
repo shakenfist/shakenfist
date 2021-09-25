@@ -42,7 +42,7 @@ pipeline {
 
                   if [ "%$deppr%" == "%%" ]
                   then
-                    git checkout master
+                    git checkout
                   else
                     git fetch origin $deppr/head:dependson
                     git checkout dependson
@@ -97,6 +97,12 @@ pipeline {
                 ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no \
                     -o UserKnownHostsFile=/dev/null \
                     debian@$primary sudo /root/sf-deploy.sh
+                echo ""
+                echo ""
+                ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no \
+                    -o UserKnownHostsFile=/dev/null \
+                    debian@$primary \
+                    'sudo rm /etc/apache2/sites-enabled/*; sudo a2ensite sf-example.conf; sudo apachectl graceful'
            '''
       }
     }
@@ -105,7 +111,12 @@ pipeline {
         sh '''  . $WORKSPACE/$BUILD_TAG/ci-environment.sh
                 ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
                     debian@$primary \
-                    'for i in `seq 100`; do . /etc/sf/sfrc; sf-client --async=continue network create background-$i 10.$i.0.0/24; done'
+                    'echo "==== sfrc ===="; cat /etc/sf/sfrc; echo "==== end sfrc ===="'
+                echo ""
+                echo ""
+                ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                    debian@$primary \
+                    '. /etc/sf/sfrc; for i in `seq 100`; do sf-client --async=continue network create background-$i 10.$i.0.0/24; done'
            '''
       }
     }

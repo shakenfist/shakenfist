@@ -17,9 +17,6 @@
 
     - include_tasks: tasks/distro-check.yml
 
-    - name: Load default vars
-      include_vars: main.yml
-
     - name: Generate a random auth secret
       set_fact:
         auth_secret: "{{ lookup('password', '/dev/null length=30 chars=ascii_letters') }}"
@@ -102,9 +99,6 @@
   connection: ssh
 
   tasks:
-    - name: Load default vars
-      include_vars: main.yml
-
     - name: apt-get dist-upgrade
       apt:
         update_cache: yes
@@ -113,7 +107,31 @@
 
     - name: Install dependencies
       apt:
-        name: "{{ shakenfist_deps }}"
+        name:
+          - ack
+          - arping
+          - bridge-utils
+          - cpu-checker
+          - dnsmasq
+          - dnsutils
+          - etcd-client
+          - git
+          - hddtemp
+          - libmagic-dev
+          - libssl-dev
+          - libvirt-daemon-system
+          - libvirt-dev
+          - lm-sensors
+          - net-tools
+          - ovmf
+          - prometheus-node-exporter
+          - pwgen
+          - python3-libvirt
+          - python3-venv
+          - qemu-kvm
+          - rsync
+          - telnet
+          - unzip
         state: latest
 
     # - name: Ensure we have the Ubuntu package key (helps with Debian)
@@ -479,7 +497,7 @@
             - job_name: 'etcd'
               static_configs:
                 - targets: [
-                      {% for svr in groups.allsf %}
+                      {% for svr in groups.etcd_master %}
                         '{{hostvars[svr]['node_mesh_ip']}}:2379',
                       {% endfor %}
                     ]
