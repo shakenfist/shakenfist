@@ -87,7 +87,7 @@ pipeline {
                     --extra-vars "identifier=$BUILD_TAG source_path=$SOURCE_PATH \
                     base_image=label:sfci-debian-10 \
                     base_image_user=debian" \
-                    deploy/ansible/ci.yml
+                    deploy/ansible/ci-topology-localhost.yml
            '''
       }
     }

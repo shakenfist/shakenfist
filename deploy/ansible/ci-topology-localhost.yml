@@ -1,0 +1,291 @@
+- hosts: localhost
+  gather_facts: yes
+  connection: ssh
+  vars:
+    identifier: unknown
+    source_path: "/home/jenkins/src/shakenfist/"
+    base_image: "https://sfcbr.shakenfist.com/static/ubuntu2004-ci-template.qcow2"
+    base_image_user: "ubuntu"
+
+  tasks:
+    - name: Create a network for outgoing traffic
+      sf_network:
+        netblock: "10.0.0.0/24"
+        name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-public"
+      register: publicnetwork
+
+    - name: Log network details
+      debug:
+        msg:
+          - "Public network is {{publicnetwork['meta']['uuid']}}"
+
+    - name: Create a primary instance
+      sf_instance:
+        name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-primary"
+        cpu: 8
+        ram: 12288
+        disks:
+          - "50@{{base_image}}"
+        networkspecs:
+          - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
+        ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
+        state: present
+      register: primary
+
+    - name: Add primary node to ansible
+      add_host:
+        hostname: primary
+        egress_ip: "{{primary['meta']['network_interfaces'][0]['ipv4']}}"
+        ansible_ssh_host: "{{primary['meta']['network_interfaces'][0]['floating']}}"
+        ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
+        ansible_ssh_user: "{{base_image_user}}"
+        ansible_ssh_private_key_file: "/home/jenkins/id_ci"
+        groups: sfall
+
+    - name: Log instance details
+      debug:
+        msg:
+          - "Primary: is {{primary['meta']['uuid']}} at {{primary['meta']['network_interfaces'][0]['ipv4']}}, {{primary['meta']['network_interfaces'][0]['floating']}}"
+
+    - name: Ensure we have somewhere to write the build details to
+      file:
+        path: "{{ lookup('env', 'WORKSPACE') }}/{{ lookup('env', 'BUILD_TAG') }}"
+        state: directory
+        mode: "0755"
+
+    - name: Write details of instances to workspace
+      copy:
+        content: |
+          {% for svr in groups.sfall%}
+          export {{svr}}={{hostvars[svr]['ansible_ssh_host']}}
+          {% endfor %}
+
+          export identifier={{identifier}}
+          export source_path={{source_path}}
+        dest: "{{ lookup('env', 'WORKSPACE') }}/{{ lookup('env', 'BUILD_TAG') }}/ci-environment.sh"
+        owner: jenkins
+        group: jenkins
+        mode: u=r,g=r,o=r
+
+    - name: Log environment details path
+      debug:
+        msg: "Environment details written to {{ lookup('env', 'WORKSPACE') }}/{{ lookup('env', 'BUILD_TAG') }}/ci-environment.sh"
+
+    - name: Wait for all instances to present an "OpenSSH" prompt
+      wait_for:
+        port: 22
+        host: "{{hostvars[item]['ansible_ssh_host']}}"
+        search_regex: OpenSSH
+        delay: 10
+      with_items: "{{ groups['sfall'] }}"
+
+- hosts: primary
+  gather_facts: yes
+  become: true
+  vars:
+    source_path: "/home/jenkins/src/shakenfist/"
+
+  tasks:
+    - name: Disable logrotate
+      service:
+        name: logrotate
+        enabled: no
+        state: stopped
+
+    - name: Disable logrotate.timer
+      service:
+        name: logrotate.timer
+        enabled: no
+        state: stopped
+
+    - name: Use CI package cache to speed things up
+      copy:
+        content: |
+          Acquire::http::Proxy "http://192.168.1.50:8000";
+        dest: /etc/apt/apt.conf.d/00proxy
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
+
+    - name: apt-get dist-upgrade
+      apt:
+        update_cache: yes
+        upgrade: dist
+        autoremove: yes
+
+    # TODO(mikal): dial this back once we have things working.
+    - name: Install dependencies
+      apt:
+        name:
+          [
+            git,
+            python3-dev,
+            python3-grpcio,
+            python3-pip,
+            python3-venv,
+            python3-wheel,
+            python3,
+            pwgen,
+            tox,
+          ]
+        state: latest
+
+    - name: Create a RAM disk for etcd to make it more reliable in CI
+      shell: |
+        mkdir -p /var/lib/etcd
+        mount -t tmpfs -o rw,size=2G tmpfs /var/lib/etcd
+
+- hosts: localhost
+  gather_facts: yes
+  vars:
+    source_path: "/home/jenkins/src/shakenfist/"
+
+  tasks:
+    - name: Remove old deploy tarball
+      file:
+        path: "{{source_path}}/shakenfist/deploy.tgz"
+        state: absent
+
+    - name: Remove old docs tarball
+      file:
+        path: "{{source_path}}/shakenfist/docs.tgz"
+        state: absent
+
+    - name: Build Shaken Fist wheel
+      shell: |
+        tar czf deploy.tgz deploy
+        tar czf docs.tgz docs
+        rm dist/*
+        python3 setup.py sdist bdist_wheel
+      args:
+        chdir: "{{source_path}}/shakenfist"
+
+    - name: Determine wheel filename
+      shell: ls dist | egrep "shakenfist.*\.whl"
+      args:
+        chdir: "{{source_path}}/shakenfist"
+      register: server_wheel_file_complex
+
+    - name: Extract the wheel filename
+      set_fact:
+        server_wheel_file: "{{server_wheel_file_complex.stdout}}"
+
+    - debug:
+        msg: "Server wheel file: {{server_wheel_file}}"
+
+    - name: Build Shaken Fist client wheel
+      shell: |
+        rm dist/*
+        python3 setup.py sdist bdist_wheel
+      args:
+        chdir: "{{source_path}}/client-python"
+
+    - name: Determine wheel filename
+      shell: ls dist | egrep "shakenfist_client.*\.whl"
+      args:
+        chdir: "{{source_path}}/client-python"
+      register: client_wheel_file_complex
+
+    - name: Extract the wheel filename
+      set_fact:
+        client_wheel_file: "{{client_wheel_file_complex.stdout}}"
+
+    - debug:
+        msg: "Client wheel file: {{client_wheel_file}}"
+
+- hosts: primary
+  gather_facts: yes
+  connection: ssh
+  become: true
+
+  tasks:
+    - name: Install modern ansible
+      apt:
+        name: ansible
+        state: latest
+        update_cache: yes
+        autoremove: yes
+
+    - name: Install ansible roles
+      shell: ansible-galaxy install andrewrothstein.etcd-cluster
+
+    - name: Copy client wheel file
+      copy:
+        src: "{{source_path}}/client-python/dist/{{hostvars['localhost']['client_wheel_file']}}"
+        dest: "/tmp/{{hostvars['localhost']['client_wheel_file']}}"
+
+    # This needs to be in system packages for tox to pick it up correctly, which we
+    # want in order for CI to see unreleased client changes. You wouldn't do this
+    # for a real deployment
+    - name: Install client wheel into system packages
+      shell: |
+        pip3 install /tmp/shakenfist_client*whl
+
+    - name: Make Shaken Fist venv
+      shell: python3 -m venv --system-site-packages /srv/shakenfist/venv
+
+    - name: Copy server wheel file
+      copy:
+        src: "{{source_path}}/shakenfist/dist/{{hostvars['localhost']['server_wheel_file']}}"
+        dest: "/tmp/{{hostvars['localhost']['server_wheel_file']}}"
+
+    - name: Make venv and install server wheel
+      shell: |
+        python3 -m venv --system-site-packages /srv/shakenfist/venv
+        /srv/shakenfist/venv/bin/pip install -U pip
+        /srv/shakenfist/venv/bin/pip install /tmp/shakenfist*whl
+
+    # We need to install into the shakenfist venv as well so that the ansible modules
+    # are in the right place to be found later. In a normal universe we'd only install
+    # here, but we need the system packages above for tox to work.
+    - name: Install client wheel into shakenfist venv (in addition to system above)
+      shell: |
+        /srv/shakenfist/venv/bin/pip install -U --force-reinstall /tmp/shakenfist_client*whl
+
+    - name: Copy install configuration to primary node
+      copy:
+        content: |
+          #!/bin/bash
+          export CLOUD=metal
+          export ADMIN_PASSWORD=foobar
+          export FLOATING_IP_BLOCK="10.10.10.0/24"
+          export BOOTDELAY=0
+          export DEPLOY_NAME="metalci"
+          export METAL_SSH_USER="{{base_image_user}}"
+          export METAL_SSH_KEY_FILENAME="/root/.ssh/id_rsa"
+          export HTTP_PROXY="http://192.168.1.50:3128"
+          export INCLUDE_TRACEBACKS="True"
+
+          export KSM_ENABLED=0
+
+          read -r -d '' TOPOLOGY <<'EOF'
+          [
+            {
+              "name": "sf-1",
+              "node_egress_ip": "{{hostvars['primary']['egress_ip']}}",
+              "node_egress_nic": "eth0",
+              "node_mesh_ip": "{{hostvars['primary']['egress_ip']}}",
+              "node_mesh_nic": "eth0",
+              "primary_node": true,
+              "hypervisor": true,
+              "network_node": true,
+              "etcd_master": true,
+              "api_url": "http://localhost:13000"
+            }
+          ]
+          EOF
+          export TOPOLOGY
+
+          /srv/shakenfist/venv/share/shakenfist/installer/install
+        dest: "/root/sf-deploy.sh"
+        owner: root
+        group: root
+        mode: u=rx
+
+    - name: Copy ssh key to primary node
+      copy:
+        src: /home/jenkins/id_ci
+        dest: /root/.ssh/id_rsa
+        owner: root
+        group: root
+        mode: u=r,g=,o=
