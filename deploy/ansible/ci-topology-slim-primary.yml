@@ -26,14 +26,6 @@
           - "Public network is {{publicnetwork['meta']['uuid']}}"
           - "Mesh traffic network is {{meshnetwork['meta']['uuid']}}"
 
-    # NOTE(mikal): we used to use placement here to force the virtual network to be across
-    # at least two nodes so that we were testing the mesh networking nicely. This was great,
-    # except when the CI cluster was busy and a single node filled, and then CI tests failed
-    # instead of scheduling around the busy node. This means we weren't testing the scheduler
-    # as well as we could either. It also doesn't make sense on a CI cluster with more than
-    # two or three nodes. So instead we've stopped doing that until we can come up with
-    # some sort of anti-affinity thing instead to cause more node diversity.
-
     - name: Create a primary instance
       sf_instance:
         name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-primary"
