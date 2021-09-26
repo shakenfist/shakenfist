@@ -60,7 +60,7 @@ class SFConfig(BaseSettings):
         16, description='How many vCPUS per real CPU'
     )
     RAM_OVERCOMMIT_RATIO: float = Field(
-        1.5,
+        3.0,
         description='How much vRAM per real unit of RAM, that is if Kernel '
                     'Shared Memory (KSM) is enabled, how much to overcommit '
                     'memory because of shared pages.'

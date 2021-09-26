@@ -34,6 +34,8 @@ LOG, _ = logutil.setup(__name__)
 
 
 def handle(jobname, workitem):
+    libvirt = util_libvirt.get_libvirt()
+
     log = LOG.with_field('workitem', jobname)
     log.info('Processing workitem')
 
@@ -130,6 +132,12 @@ def handle(jobname, workitem):
                 ifaces = networkinterface.interfaces_for_network(task_network)
                 cur_interfaces = {i.uuid: i for i in ifaces}
 
+                if cur_interfaces:
+                    LOG.with_network(task_network).error(
+                        'During DeleteNetworkWhenClean new interfaces have '
+                        'connected to network: %s',
+                        [i.uuid for i in cur_interfaces])
+
                 # Only check those present at delete task initiation time.
                 remain_interfaces = list(set(task.wait_interfaces()) &
                                          set(cur_interfaces))
@@ -141,13 +149,8 @@ def handle(jobname, workitem):
                                {'tasks': [
                                    DeleteNetworkWhenClean(task.network_uuid(),
                                                           remain_interfaces)
-                               ]})
-
-                elif cur_interfaces:
-                    LOG.with_network(task_network).error(
-                        'During DeleteNetworkWhenClean new interfaces have '
-                        'connected to network: %s',
-                        [i.uuid for i in cur_interfaces])
+                               ]},
+                               delay=60)
 
                 else:
                     # All original instances deleted, safe to delete network
@@ -168,7 +171,22 @@ def handle(jobname, workitem):
         # Usually caused by external issue and not an application error
         log.info('Fetch Image Error: %s', e)
         if inst:
-            inst.enqueue_delete_due_error('Failed queue task: %s' % e)
+            inst.enqueue_delete_due_error('Image fetch failed: %s' % e)
+
+    except exceptions.ImagesCannotShrinkException as e:
+        log.info('Fetch Resize Error: %s', e)
+        if inst:
+            inst.enqueue_delete_due_error('Image resize failed: %s' % e)
+
+    except libvirt.libvirtError as e:
+        log.info('Libvirt Error: %s', e)
+        if inst:
+            inst.enqueue_delete_due_error('Instance task failed: %s' % e)
+
+    except exceptions.InstanceException as e:
+        log.info('Instance Error: %s', e)
+        if inst:
+            inst.enqueue_delete_due_error('Instance task failed: %s' % e)
 
     except Exception as e:
         # Logging ignored exception - this should be investigated
@@ -185,12 +203,13 @@ def handle(jobname, workitem):
 
 
 def image_fetch(url, inst):
+    a = Artifact.from_url(Artifact.TYPE_IMAGE, url)
     try:
         # TODO(andy): Wait up to 15 mins for another queue process to download
         # the required image. This will be changed to queue on a
         # "waiting_image_fetch" queue but this works now.
         images.ImageFetchHelper(inst, url).get_image()
-        db.add_event('image', url, 'fetch', None, None, 'success')
+        a.add_event('fetch', None, None, 'success')
 
     except (exceptions.HTTPError, requests.exceptions.RequestException) as e:
         LOG.with_field('image', url).info('Failed to fetch image')
@@ -201,7 +220,7 @@ def image_fetch(url, inst):
             msg = 'DNS error'
         if msg.find('No address associated with hostname'):
             msg = 'DNS error'
-        db.add_event('image', url, 'fetch', None, None, msg)
+        a.add_event('fetch', None, None, msg)
 
         raise exceptions.ImageFetchTaskFailedException(
             'Failed to fetch image: %s Exception: %s' % (url, e))
@@ -290,18 +309,9 @@ def instance_start(inst, network):
         inst.allocate_instance_ports()
 
         # Now we can start the instance
-        libvirt = util_libvirt.get_libvirt()
         try:
             with util_general.RecordedOperation('instance creation', inst):
                 inst.create(iface_uuids, lock=lock)
-
-        except libvirt.libvirtError as e:
-            code = e.get_error_code()
-            if code in (libvirt.VIR_ERR_CONFIG_UNSUPPORTED,
-                        libvirt.VIR_ERR_XML_ERROR):
-                inst.enqueue_delete_due_error(
-                    'instance failed to start: %s' % e)
-                return
 
         except exceptions.InvalidStateException:
             # This instance is in an error or deleted state. Given the check
@@ -358,7 +368,7 @@ def instance_delete(inst):
             if n:
                 # If network used by another instance, only update
                 if network in host_networks:
-                    if n.state.value == net.Network.STATE_DELETE_WAIT:
+                    if n.state.value == dbo.STATE_DELETE_WAIT:
                         # Do not update a network about to be deleted
                         continue
                     with util_general.RecordedOperation('deallocate ip address', inst):
@@ -372,8 +382,7 @@ def instance_delete(inst):
 def snapshot(inst, disk, artifact_uuid, blob_uuid):
     blob.snapshot_disk(disk, blob_uuid)
     a = Artifact.from_db(artifact_uuid)
-    if a.state == dbo.STATE_INITIAL:
-        a.state = dbo.STATE_CREATED
+    a.state = dbo.STATE_CREATED
 
 
 class Monitor(daemon.WorkerPoolDaemon):

@@ -50,23 +50,27 @@ class ImageFetchHelper(object):
                     most_recent_blob = Blob.from_db(most_recent['blob_uuid'])
                     resp = self._open_connection(url)
 
-                    if most_recent_blob.modified != resp.headers.get('Last-Modified'):
+                    if not most_recent_blob.modified:
+                        dirty = True
+                    elif most_recent_blob.modified != resp.headers.get('Last-Modified'):
                         self.__artifact.add_event(
                             'image requires fetch', None, None,
                             'Last-Modified: %s -> %s' % (most_recent_blob.modified,
                                                          resp.headers.get('Last-Modified')))
                         dirty = True
 
-                    if most_recent_blob.size != resp.headers.get('Content-Length'):
+                    if not most_recent_blob.size:
+                        dirty = True
+                    elif most_recent_blob.size != resp.headers.get('Content-Length'):
                         self.__artifact.add_event(
                             'image requires fetch', None, None,
                             'Content-Length: %s -> %s' % (most_recent_blob.size,
                                                           resp.headers.get('Content-Length')))
                         dirty = True
 
+                if dirty:
                     self.log.info('Cluster cached image is stale')
-
-                if not dirty:
+                else:
                     url = '%s%s' % (BLOB_URL, most_recent_blob.uuid)
                     self.log.info('Using cached image from cluster')
 
@@ -84,39 +88,42 @@ class ImageFetchHelper(object):
                 self.__artifact.add_index(b.uuid)
 
             # Transcode if required, placing the transcoded file in a well known location.
-            if not os.path.exists(os.path.join(config.STORAGE_PATH, 'image_cache', b.uuid + '.qcow2')):
+            os.makedirs(
+                os.path.join(config.STORAGE_PATH, 'image_cache'), exist_ok=True)
+            cached = util_general.file_permutation_exists(
+                os.path.join(config.STORAGE_PATH, 'image_cache', b.uuid),
+                ['iso', 'qcow2'])
+            if not cached:
                 blob_path = os.path.join(config.STORAGE_PATH, 'blobs', b.uuid)
-                if b.info.get('mime-type', '') == 'application/gzip':
+                mimetype = b.info.get('mime-type', '')
+
+                if mimetype in ['application/x-cd-image', 'application/x-iso9660-image']:
                     cache_path = os.path.join(
-                        config.STORAGE_PATH, 'image_cache', b.uuid)
-                    with util_general.RecordedOperation('decompress image', self.instance):
-                        util_process.execute([lock], 'gunzip -k -q -c %s > %s'
-                                             % (blob_path, cache_path))
-                    blob_path = cache_path
+                        config.STORAGE_PATH, 'image_cache', b.uuid + '.iso')
+                    util_general.link(blob_path, cache_path)
 
-                os.makedirs(
-                    os.path.join(config.STORAGE_PATH, 'image_cache'), exist_ok=True)
-                cache_path = os.path.join(
-                    config.STORAGE_PATH, 'image_cache', b.uuid + '.qcow2')
-                if util_image.identify(blob_path).get('file format', '') == 'qcow2':
-                    try:
-                        os.link(blob_path, cache_path)
-                        self.log.with_fields({'blob': b}).info(
-                            'Hard linking %s -> %s' % (blob_path, cache_path))
-                    except OSError:
-                        os.symlink(blob_path, cache_path)
-                        self.log.with_fields({'blob': b}).info(
-                            'Symbolic linking %s -> %s' % (blob_path, cache_path))
-
-                    shutil.chown(cache_path, config.LIBVIRT_USER,
-                                 config.LIBVIRT_GROUP)
                 else:
-                    with util_general.RecordedOperation('transcode image', self.instance):
-                        self.log.with_fields({'blob': b}).info(
-                            'Transcoding %s -> %s' % (blob_path, cache_path))
-                        util_image.create_qcow2([lock], blob_path, cache_path)
+                    if mimetype == 'application/gzip':
+                        cache_path = os.path.join(
+                            config.STORAGE_PATH, 'image_cache', b.uuid)
+                        with util_general.RecordedOperation('decompress image', self.instance):
+                            util_process.execute(
+                                [lock], 'gunzip -k -q -c %s > %s' % (blob_path, cache_path))
+                        blob_path = cache_path
 
-                shutil.chown(cache_path, 'libvirt-qemu', 'libvirt-qemu')
+                    cache_path = os.path.join(
+                        config.STORAGE_PATH, 'image_cache', b.uuid + '.qcow2')
+                    if util_image.identify(blob_path).get('file format', '') == 'qcow2':
+                        util_general.link(blob_path, cache_path)
+                    else:
+                        with util_general.RecordedOperation('transcode image', self.instance):
+                            self.log.with_fields({'blob': b}).info(
+                                'Transcoding %s -> %s' % (blob_path, cache_path))
+                            util_image.create_qcow2(
+                                [lock], blob_path, cache_path)
+
+                shutil.chown(cache_path, config.LIBVIRT_USER,
+                             config.LIBVIRT_GROUP)
                 self.log.with_fields(util_general.stat_log_fields(cache_path)).info(
                     'Cache file %s created' % cache_path)
 
@@ -144,7 +151,7 @@ class ImageFetchHelper(object):
                                                 blob_uuid)
                 admin_token = util_general.get_api_token(
                     'http://%s:%d' % (blob_source, config.API_PORT))
-                r = requests.request('GET', url,
+                r = requests.request('GET', url, stream=True,
                                      headers={'Authorization': admin_token,
                                               'User-Agent': util_general.get_user_agent()})
 

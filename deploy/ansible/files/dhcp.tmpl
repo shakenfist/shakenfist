@@ -18,8 +18,10 @@ local=/{{zone}}/
 
 dhcp-range={{interface}},{{dhcp_start}},static,{{netmask}},{{broadcast}},1h
 dhcp-option={{interface}},1,{{netmask}}
+{% if provide_nat %}
 dhcp-option={{interface}},3,{{router}}
 dhcp-option={{interface}},6,{{dns_server}}
+{% endif %}
 dhcp-option={{interface}},15,{{zone}}
 dhcp-option={{interface}},26,{{mtu}}
 dhcp-hostsfile={{config_dir}}/hosts

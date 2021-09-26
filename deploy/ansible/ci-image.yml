@@ -73,6 +73,10 @@
         group: root
         mode: u=r,g=r,o=r
 
+    # I am unsure why I need to manually force this, but I do need to.
+    - name: Force an apt-get update
+      shell: apt-get update
+
     - name: apt-get dist-upgrade
       apt:
         update_cache: yes
@@ -96,14 +100,6 @@
           ]
         state: latest
 
-    - name: pip3 self-upgrade
-      command: pip3 install -U pip
-
-    - name: Remove python3-pip
-      apt:
-        name: python3-pip
-        state: absent
-
 - hosts: localhost
   gather_facts: no
   connection: ssh
@@ -111,12 +107,14 @@
     identifier: cron
     base_image_user: "ubuntu"
     keyfile_private: "/home/jenkins/id_ci"
+    keyfile_public: "/home/jenkins/id_ci.pub"
+    label: "sfci-image"
 
   tasks:
     # - name: Snapshot the instance
     #   sf_snapshot:
     #     instance_uuid: "{{hostvars['imagerebuild']['sf_instance_uuid']}}"
-    #     label: sfci-image
+    #     label: "{{label}}"
     #     state: present
     #   register: cisnapshot
 
@@ -131,7 +129,7 @@
     - name: Snapshot the bad way until the ansible module catches up
       shell: |
         sf-client --json instance snapshot "{{hostvars['imagerebuild']['sf_instance_uuid']}}" \
-            --label_name sfci-image
+            --label_name "{{label}}"
       register: cisnapshot
 
     - name: Log snapshot details
