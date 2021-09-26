@@ -124,3 +124,20 @@ def stat_log_fields(path):
         'owner': st.st_uid,
         'group': st.st_gid,
     }
+
+
+def file_permutation_exists(basename, extensions):
+    """ Find if any of the possible extensions exists. """
+    for extn in extensions:
+        filename = '%s.%s' % (basename, extn)
+        if os.path.exists(filename):
+            return filename
+    return None
+
+
+def link(source, destination):
+    """ Hardlink a file, unless we have to symlink. """
+    try:
+        os.link(source, destination)
+    except OSError:
+        os.symlink(source, destination)

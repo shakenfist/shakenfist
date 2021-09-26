@@ -268,7 +268,7 @@ class TaskDequeueTestCase(base.ShakenFistTestCase):
             }
         ''',
         {
-            'key': '/somejob'
+            'key': '/1631269187.890441'
         },
     )])
     @mock.patch('shakenfist.etcd.get_lock')
@@ -276,7 +276,7 @@ class TaskDequeueTestCase(base.ShakenFistTestCase):
     @mock.patch('etcd3gw.Etcd3Client.delete')
     def test_dequeue_preflight(self, m_delete, m_put, m_get_lock, m_get_prefix):
         jobname, workitem = etcd.dequeue('node01')
-        self.assertEqual('somejob', jobname)
+        self.assertEqual('1631269187.890441', jobname)
         expected = [
             tasks.PreflightInstanceTask('diff_uuid'),
         ]
@@ -295,7 +295,7 @@ class TaskDequeueTestCase(base.ShakenFistTestCase):
             }
         ''',
         {
-            'key': '/somejob'
+            'key': '/1631269187.890441'
         },
     )])
     @mock.patch('shakenfist.etcd.get_lock')
@@ -303,7 +303,7 @@ class TaskDequeueTestCase(base.ShakenFistTestCase):
     @mock.patch('etcd3gw.Etcd3Client.delete')
     def test_dequeue_start(self, m_delete, m_put, m_get_lock, m_get_prefix):
         jobname, workitem = etcd.dequeue('node01')
-        self.assertEqual('somejob', jobname)
+        self.assertEqual('1631269187.890441', jobname)
         expected = [
             tasks.StartInstanceTask('fake_uuid'),
         ]
@@ -323,7 +323,7 @@ class TaskDequeueTestCase(base.ShakenFistTestCase):
             }
         ''',
         {
-            'key': '/somejob'
+            'key': '/1631269187.890441'
         },
     )])
     @mock.patch('shakenfist.etcd.get_lock')
@@ -331,7 +331,7 @@ class TaskDequeueTestCase(base.ShakenFistTestCase):
     @mock.patch('etcd3gw.Etcd3Client.delete')
     def test_dequeue_error(self, m_delete, m_put, m_get_lock, m_get_prefix):
         jobname, workitem = etcd.dequeue('node01')
-        self.assertEqual('somejob', jobname)
+        self.assertEqual('1631269187.890441', jobname)
         expected = [
             tasks.DeleteInstanceTask('fake_uuid'),
         ]
@@ -361,7 +361,7 @@ class TaskDequeueTestCase(base.ShakenFistTestCase):
             }
         ''',
         {
-            'key': '/somejob'
+            'key': '/1631269187.890441'
         },
     )])
     @mock.patch('shakenfist.etcd.get_lock')
@@ -369,7 +369,7 @@ class TaskDequeueTestCase(base.ShakenFistTestCase):
     @mock.patch('etcd3gw.Etcd3Client.delete')
     def test_dequeue_multi(self, m_delete, m_put, m_get_lock, m_get_prefix):
         jobname, workitem = etcd.dequeue('node01')
-        self.assertEqual('somejob', jobname)
+        self.assertEqual('1631269187.890441', jobname)
         expected = [
             tasks.PreflightInstanceTask('diff_uuid'),
             tasks.StartInstanceTask('fake_uuid'),
@@ -391,7 +391,7 @@ class TaskDequeueTestCase(base.ShakenFistTestCase):
             }
         ''',
         {
-            'key': '/somejob'
+            'key': '/1631269187.890441'
         },
     )])
     @mock.patch('shakenfist.etcd.get_lock')
@@ -399,7 +399,7 @@ class TaskDequeueTestCase(base.ShakenFistTestCase):
     @mock.patch('etcd3gw.Etcd3Client.delete')
     def test_dequeue_delete(self, m_delete, m_put, m_get_lock, m_get_prefix):
         jobname, workitem = etcd.dequeue('node01')
-        self.assertEqual('somejob', jobname)
+        self.assertEqual('1631269187.890441', jobname)
         expected = [
             tasks.DeleteInstanceTask('fake_uuid'),
         ]
@@ -419,7 +419,7 @@ class TaskDequeueTestCase(base.ShakenFistTestCase):
             }
         ''',
         {
-            'key': '/somejob'
+            'key': '/1631269187.890441'
         },
     )])
     @mock.patch('shakenfist.etcd.get_lock')
@@ -427,7 +427,7 @@ class TaskDequeueTestCase(base.ShakenFistTestCase):
     @mock.patch('etcd3gw.Etcd3Client.delete')
     def test_dequeue_image_fetch(self, m_delete, m_put, m_get_lock, m_get_prefix):
         jobname, workitem = etcd.dequeue('node01')
-        self.assertEqual('somejob', jobname)
+        self.assertEqual('1631269187.890441', jobname)
         expected = [
             tasks.FetchImageTask('http://whoknows', 'fake_uuid'),
         ]

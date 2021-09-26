@@ -50,10 +50,15 @@ class InstanceEndpoint(api_base.Resource):
     @jwt_required
     @api_base.arg_is_instance_uuid
     @api_base.requires_instance_ownership
-    def delete(self, instance_uuid=None, instance_from_db=None):
+    def delete(self, instance_uuid=None, instance_from_db=None, namespace=None):
         # Check if instance has already been deleted
         if instance_from_db.state.value == dbo.STATE_DELETED:
             return api_base.error(404, 'instance not found')
+
+        # If a namespace is specified, ensure the instance is in it
+        if namespace:
+            if instance_from_db.namespace != namespace:
+                return api_base.error(404, 'instance not in namespace')
 
         # If this instance is not on a node, just do the DB cleanup locally
         placement = instance_from_db.placement

@@ -62,7 +62,7 @@ class NetworkEndpoint(api_base.Resource):
     @api_base.arg_is_network_uuid
     @api_base.requires_network_ownership
     @api_base.redirect_to_network_node
-    def delete(self, network_uuid=None, network_from_db=None):
+    def delete(self, network_uuid=None, network_from_db=None, namespace=None):
         if network_uuid == 'floating':
             return api_base.error(403, 'you cannot delete the floating network')
 
@@ -71,6 +71,11 @@ class NetworkEndpoint(api_base.Resource):
             LOG.with_fields({'network_uuid': n.uuid}).warning(
                 'delete_network: network does not exist')
             return api_base.error(404, 'network does not exist')
+
+        # If a namespace is specified, ensure the network is in it
+        if namespace:
+            if network_from_db.namespace != namespace:
+                return api_base.error(404, 'network not in namespace')
 
         # We only delete unused networks
         ifaces = list(networkinterface.interfaces_for_network(n))
@@ -127,8 +132,7 @@ class NetworksEndpoint(api_base.Resource):
         # If accessing a foreign name namespace, we need to be an admin
         if get_jwt_identity() not in [namespace, 'system']:
             return api_base.error(
-                401,
-                'only admins can create resources in a different namespace')
+                401, 'only admins can create resources in a different namespace')
 
         network = net.Network.new(name, namespace, netblock, provide_dhcp,
                                   provide_nat)
@@ -196,7 +200,6 @@ class NetworkInterfacesEndpoint(api_base.Resource):
     @jwt_required
     @api_base.arg_is_network_uuid
     @api_base.requires_network_ownership
-    @api_base.requires_network_active
     def get(self, network_uuid=None, network_from_db=None):
         out = []
         for ni in networkinterface.interfaces_for_network(self.network):

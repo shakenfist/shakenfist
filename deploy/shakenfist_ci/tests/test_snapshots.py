@@ -49,6 +49,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
             time.sleep(5)
 
         self.assertEqual(1, len(snapshots))
+        self.assertEqual('created', snapshots[0]['state'])
 
         # Take another snapshot, we only get the new snapshot returned
         snap2 = self.test_client.snapshot_instance(inst1['uuid'])

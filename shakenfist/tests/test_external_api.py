@@ -82,6 +82,7 @@ class FakeNetwork(BaseFakeObject):
         self.name = name
         self.netblock = netblock
         self.version = 2
+        self.provide_nat = True
 
     def is_dead(self):
         return False

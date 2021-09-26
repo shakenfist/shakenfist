@@ -42,7 +42,7 @@ pipeline {
 
                   if [ "%$deppr%" == "%%" ]
                   then
-                    git checkout master
+                    git checkout
                   else
                     git fetch origin $deppr/head:dependson
                     git checkout dependson
@@ -85,8 +85,8 @@ pipeline {
                 . /home/jenkins/sf-ci
                 ansible-playbook -i /home/jenkins/hosts \
                     --extra-vars "identifier=$BUILD_TAG source_path=$SOURCE_PATH \
-                    base_image=label:sfci-image \
-                    base_image_user=ubuntu" \
+                    base_image=label:sfci-debian-10 \
+                    base_image_user=debian" \
                     deploy/ansible/ci.yml
            '''
       }
@@ -96,7 +96,13 @@ pipeline {
         sh '''  . $WORKSPACE/$BUILD_TAG/ci-environment.sh
                 ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no \
                     -o UserKnownHostsFile=/dev/null \
-                    ubuntu@$primary sudo /root/sf-deploy.sh
+                    debian@$primary sudo /root/sf-deploy.sh
+                echo ""
+                echo ""
+                ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no \
+                    -o UserKnownHostsFile=/dev/null \
+                    debian@$primary \
+                    'sudo rm /etc/apache2/sites-enabled/*; sudo a2ensite sf-example.conf; sudo apachectl graceful'
            '''
       }
     }
@@ -104,8 +110,13 @@ pipeline {
       steps {
         sh '''  . $WORKSPACE/$BUILD_TAG/ci-environment.sh
                 ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                    ubuntu@$primary \
-                    'for i in `seq 100`; do . /etc/sf/sfrc; sf-client --async=continue network create background-$i 10.$i.0.0/24; done'
+                    debian@$primary \
+                    'echo "==== sfrc ===="; cat /etc/sf/sfrc; echo "==== end sfrc ===="'
+                echo ""
+                echo ""
+                ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                    debian@$primary \
+                    '. /etc/sf/sfrc; for i in `seq 100`; do sf-client --async=continue network create background-$i 10.$i.0.0/24; done'
            '''
       }
     }
@@ -115,9 +126,9 @@ pipeline {
                 scp -rp -i /home/jenkins/id_ci -o StrictHostKeyChecking=no \
                     -o UserKnownHostsFile=/dev/null \
                     $source_path/shakenfist \
-                    ubuntu@$primary:shakenfist
+                    debian@$primary:shakenfist
                 ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                    ubuntu@$primary "cd shakenfist/deploy; tox -epy3"
+                    debian@$primary "cd shakenfist/deploy; tox -epy3"
            '''
       }
     }
@@ -128,7 +139,7 @@ pipeline {
                 . $WORKSPACE/$BUILD_TAG/ci-environment.sh
                 scp -rp -i /home/jenkins/id_ci -o StrictHostKeyChecking=no \
                     -o UserKnownHostsFile=/dev/null \
-                    ubuntu@$primary:/var/log/syslog \
+                    debian@$primary:/var/log/syslog \
                     $WORKSPACE_TMP/syslog
 
                 # Ensure we don't have any tracebacks
@@ -183,17 +194,17 @@ pipeline {
 
               echo "=============================="
               ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                  ubuntu@$primary sudo cat /etc/sf/sfrc || true
+                  debian@$primary sudo cat /etc/sf/sfrc || true
 
               echo "=============================="
               ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                  ubuntu@$primary sudo cat /etc/sf/shakenfist.json || true
+                  debian@$primary sudo cat /etc/sf/shakenfist.json || true
 
               echo "=============================="
               # We do not use the locally cached syslog from the log check here,
               # because if the CI run failed earlier, the log check was skipped.
               ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                  ubuntu@$primary sudo cat /var/log/syslog || true
+                  debian@$primary sudo cat /var/log/syslog || true
 
               echo "=============================="
 

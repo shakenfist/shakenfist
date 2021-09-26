@@ -6,25 +6,43 @@ from shakenfist.tests import base
 
 
 class IPManagerTestCase(base.ShakenFistTestCase):
-    def test_init(self):
+    @mock.patch('time.time', return_value=1632261535.027476)
+    def test_init(self, mock_time):
         ipm = IPManager('uuid', '192.168.1.0/24')
         self.assertEqual(
             {
-                '192.168.1.0': ('ipmanager', 'uuid'),
-                '192.168.1.255': ('ipmanager', 'uuid')
+                '192.168.1.0': {
+                    'user': ('ipmanager', 'uuid'),
+                    'when': 1632261535.027476
+                },
+                '192.168.1.255': {
+                    'user': ('ipmanager', 'uuid'),
+                    'when': 1632261535.027476
+                }
             }, ipm.in_use)
 
+    @mock.patch('time.time', return_value=1632261535.027476)
     @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.ipmanager.IPManager.persist')
-    def test_new(self, mock_persist, mock_lock):
+    def test_new(self, mock_persist, mock_lock, mock_time):
         ipm = IPManager.new('uuid', '192.168.1.0/24')
         self.assertEqual(
             {
-                '192.168.1.0': ('ipmanager', 'uuid'),
-                '192.168.1.255': ('ipmanager', 'uuid'),
-                '192.168.1.1': ('ipmanager', 'uuid')
+                '192.168.1.0': {
+                    'user': ('ipmanager', 'uuid'),
+                    'when': 1632261535.027476
+                },
+                '192.168.1.255': {
+                    'user': ('ipmanager', 'uuid'),
+                    'when': 1632261535.027476
+                },
+                '192.168.1.1': {
+                    'user': ('ipmanager', 'uuid'),
+                    'when': 1632261535.027476
+                }
             }, ipm.in_use)
 
+    @mock.patch('time.time', return_value=1632261535.027476)
     @mock.patch('shakenfist.db.get_ipmanager',
                 return_value={
                     'ipmanager.v2': {
@@ -38,15 +56,30 @@ class IPManagerTestCase(base.ShakenFistTestCase):
                         'ipblock': '192.168.20.0/24'
                     }}
                 )
-    def test_from_db(self, mock_get):
+    def test_from_db(self, mock_get, mock_time):
         ipm = IPManager.from_db('floating')
         self.assertEqual(
             {
-                '192.168.20.0': ('ipmanager', 'uuid'),
-                '192.168.20.255': ('ipmanager', 'uuid'),
-                '192.168.20.1': ('ipmanager', 'uuid'),
-                '192.168.20.75': ('ipmanager', 'uuid'),
-                '192.168.20.101': ('ipmanager', 'uuid')
+                '192.168.20.0': {
+                    'user': ('ipmanager', 'uuid'),
+                    'when': 1632261535.027476
+                },
+                '192.168.20.1': {
+                    'user': ('ipmanager', 'uuid'),
+                    'when': 1632261535.027476
+                },
+                '192.168.20.101': {
+                    'user': ('ipmanager', 'uuid'),
+                    'when': 1632261535.027476
+                },
+                '192.168.20.255': {
+                    'user': ('ipmanager', 'uuid'),
+                    'when': 1632261535.027476
+                },
+                '192.168.20.75': {
+                    'user': ('ipmanager', 'uuid'),
+                    'when': 1632261535.027476
+                }
             }, ipm.in_use)
 
     def test_get_address_at_index(self):
@@ -59,25 +92,42 @@ class IPManagerTestCase(base.ShakenFistTestCase):
         self.assertTrue(ipm.is_in_range('192.168.1.21'))
         self.assertFalse(ipm.is_in_range('10.1.1.1'))
 
-    def test_reserve(self):
+    @mock.patch('time.time', return_value=1632261535.027476)
+    def test_reserve(self, mock_time):
         ipm = IPManager('uuid', '192.168.1.0/24')
         ipm.reserve('192.168.1.10', ('test', '123'))
         self.assertEqual(
             {
-                '192.168.1.0': ('ipmanager', 'uuid'),
-                '192.168.1.255': ('ipmanager', 'uuid'),
-                '192.168.1.10': ('test', '123')
+                '192.168.1.0': {
+                    'user': ('ipmanager', 'uuid'),
+                    'when': 1632261535.027476
+                },
+                '192.168.1.10': {
+                    'user': ('test', '123'),
+                    'when': 1632261535.027476
+                },
+                '192.168.1.255': {
+                    'user': ('ipmanager', 'uuid'),
+                    'when': 1632261535.027476
+                }
             }, ipm.in_use)
 
-    def test_release(self):
+    @mock.patch('time.time', return_value=1632261535.027476)
+    def test_release(self, mock_time):
         ipm = IPManager('uuid', '192.168.1.0/24')
         ipm.reserve('192.168.1.10', ('test', '123'))
         ipm.release('10.0.0.1')
         ipm.release('192.168.1.10')
         self.assertEqual(
             {
-                '192.168.1.0': ('ipmanager', 'uuid'),
-                '192.168.1.255': ('ipmanager', 'uuid')
+                '192.168.1.0': {
+                    'user': ('ipmanager', 'uuid'),
+                    'when': 1632261535.027476
+                },
+                '192.168.1.255': {
+                    'user': ('ipmanager', 'uuid'),
+                    'when': 1632261535.027476
+                }
             }, ipm.in_use)
 
     def test_is_free_and_reserve(self):

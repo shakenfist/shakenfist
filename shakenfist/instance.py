@@ -132,6 +132,7 @@ class Instance(dbo):
     STATE_PREFLIGHT_ERROR = 'preflight-error'
     STATE_CREATING_ERROR = 'creating-error'
     STATE_CREATED_ERROR = 'created-error'
+    STATE_DELETE_WAIT_ERROR = 'delete-wait-error'
 
     state_targets = {
         None: (dbo.STATE_INITIAL, dbo.STATE_ERROR),
@@ -149,7 +150,8 @@ class Instance(dbo):
         STATE_CREATED_ERROR: (dbo.STATE_ERROR),
         dbo.STATE_ERROR: (dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED,
                           dbo.STATE_ERROR),
-        dbo.STATE_DELETE_WAIT: (dbo.STATE_DELETED),
+        dbo.STATE_DELETE_WAIT: (dbo.STATE_DELETED, STATE_DELETE_WAIT_ERROR),
+        STATE_DELETE_WAIT_ERROR: (dbo.STATE_ERROR),
         dbo.STATE_DELETED: None,
     }
 
@@ -202,7 +204,6 @@ class Instance(dbo):
         i.state = cls.STATE_INITIAL
         i._db_set_attribute(
             'power_state', {'power_state': cls.STATE_INITIAL})
-        i.add_event('db record creation', None)
         return i
 
     @staticmethod
@@ -559,8 +560,10 @@ class Instance(dbo):
                         disk_base = '%s%s' % (BLOB_URL, disk['blob_uuid'])
 
                     if disk_base:
-                        cached_image_path = os.path.join(
-                            config.STORAGE_PATH, 'image_cache', disk['blob_uuid'] + '.qcow2')
+                        cached_image_path = util_general.file_permutation_exists(
+                            os.path.join(config.STORAGE_PATH,
+                                         'image_cache', disk['blob_uuid']),
+                            ['iso', 'qcow2'])
 
                         with util_general.RecordedOperation('detect cdrom images', self):
                             try:
@@ -576,11 +579,7 @@ class Instance(dbo):
                                 '.qcow2', '.raw')
                             disk['type'] = 'raw'
                             disk['snapshot_ignores'] = True
-
-                            try:
-                                os.link(cached_image_path, disk['path'])
-                            except OSError:
-                                os.symlink(cached_image_path, disk['path'])
+                            util_general.link(cached_image_path, disk['path'])
 
                             # Due to limitations in some installers, cdroms are always on IDE
                             disk['device'] = 'hd%s' % disk['device'][-1]

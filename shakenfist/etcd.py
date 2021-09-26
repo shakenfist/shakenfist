@@ -76,7 +76,7 @@ class ActualLock(Lock):
         self.objecttype = objecttype
         self.objectname = name
         self.timeout = min(timeout, 1000000000)
-        self.log_ctx = log_ctx.with_field('path', self.path)
+        self.log_ctx = log_ctx.with_field('lock', self.path)
         self.operation = op
 
         # We override the UUID of the lock with something more helpful to debugging
@@ -286,10 +286,10 @@ def delete_all(objecttype, subtype):
     WrappedEtcdClient().delete_prefix(path)
 
 
-def enqueue(queuename, workitem):
+def enqueue(queuename, workitem, delay=0):
     with get_lock('queue', None, queuename, op='Enqueue'):
         i = 0
-        entry_time = time.time()
+        entry_time = time.time() + delay
         jobname = '%s-%03d' % (entry_time, i)
 
         while get('queue', queuename, jobname):
@@ -352,8 +352,14 @@ def dequeue(queuename):
         return None, None
 
     with get_lock('queue', None, queuename, op='Dequeue'):
-        for data, metadata in client.get_prefix(queue_path, sort_order='ascend', sort_target='key'):
+        for data, metadata in client.get_prefix(queue_path, sort_order='ascend',
+                                                sort_target='key'):
             jobname = str(metadata['key']).split('/')[-1].rstrip("'")
+
+            # Ensure that this task isn't in the future
+            if float(jobname.split('-')[0]) > time.time():
+                return None, None
+
             workitem = json.loads(data, object_hook=decodeTasks)
             put('processing', queuename, jobname, workitem)
             client.delete(metadata['key'])

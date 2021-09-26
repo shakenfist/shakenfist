@@ -1,23 +1,5 @@
 # Fake terraform for hard coded metal
 
-- name: Determine the default interface
-  shell: ip route | grep default | sed -e 's/.* dev //' -e 's/ .*//' | head -1
-  register: primary_ip_interface_complex
-  ignore_errors: True
-
-- name: Determine node_ip for the primary node
-  shell: ip addr show dev "{{primary_ip_interface_complex.stdout}}" | grep "inet " | sed -e 's/.*inet //' -e 's/\/.*//'
-  register: primary_ip_complex
-  ignore_errors: True
-
-- name: Set primary node_ip
-  set_fact:
-    node_name: "sf-primary"
-    node_egress_ip: "{{primary_ip_complex.stdout}}"
-    primary_node_ip: "{{primary_ip_complex.stdout}}"
-  delegate_to: localhost
-  delegate_facts: true
-
 # Metal topology is in JSON
 # [
 #   {
