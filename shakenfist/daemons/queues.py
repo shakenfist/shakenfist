@@ -135,8 +135,7 @@ def handle(jobname, workitem):
                 if cur_interfaces:
                     LOG.with_network(task_network).error(
                         'During DeleteNetworkWhenClean new interfaces have '
-                        'connected to network: %s',
-                        [i.uuid for i in cur_interfaces])
+                        'connected to network: %s', cur_interfaces)
 
                 # Only check those present at delete task initiation time.
                 remain_interfaces = list(set(task.wait_interfaces()) &
