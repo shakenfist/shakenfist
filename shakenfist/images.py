@@ -35,99 +35,112 @@ class ImageFetchHelper(object):
     def get_image(self):
         with self.__artifact.get_lock(ttl=(12 * constants.LOCK_REFRESH_SECONDS),
                                       timeout=config.MAX_IMAGE_TRANSFER_SECONDS) as lock:
-            url, checksum, checksum_type = image_resolver.resolve(self.url)
+            b = self.transfer_image(lock)
+            self.transcode_image(lock, b)
 
-            # If this is a request for a URL, do we have the most recent version
-            # somewhere in the cluster?
-            if not url.startswith(BLOB_URL):
-                most_recent = self.__artifact.most_recent_index
-                dirty = False
+    def transfer_image(self, lock):
+        # NOTE(mikal): it is assumed the caller holds a lock on the artifact, and passes
+        # it in lock.
 
-                if most_recent.get('index', 0) == 0:
-                    self.log.info('Cluster does not have a copy of image')
-                    dirty = True
-                else:
-                    most_recent_blob = Blob.from_db(most_recent['blob_uuid'])
-                    resp = self._open_connection(url)
+        url, checksum, checksum_type = image_resolver.resolve(self.url)
 
-                    if not most_recent_blob.modified:
-                        dirty = True
-                    elif most_recent_blob.modified != resp.headers.get('Last-Modified'):
-                        self.__artifact.add_event(
-                            'image requires fetch', None, None,
-                            'Last-Modified: %s -> %s' % (most_recent_blob.modified,
-                                                         resp.headers.get('Last-Modified')))
-                        dirty = True
+        # If this is a request for a URL, do we have the most recent version
+        # somewhere in the cluster?
+        if not url.startswith(BLOB_URL):
+            most_recent = self.__artifact.most_recent_index
+            dirty = False
 
-                    if not most_recent_blob.size:
-                        dirty = True
-                    elif most_recent_blob.size != resp.headers.get('Content-Length'):
-                        self.__artifact.add_event(
-                            'image requires fetch', None, None,
-                            'Content-Length: %s -> %s' % (most_recent_blob.size,
-                                                          resp.headers.get('Content-Length')))
-                        dirty = True
-
-                if dirty:
-                    self.log.info('Cluster cached image is stale')
-                else:
-                    url = '%s%s' % (BLOB_URL, most_recent_blob.uuid)
-                    self.log.info('Using cached image from cluster')
-
-            # Ensure that we have the blob in the local store. This blob is in the
-            # "original format" if downloaded from an HTTP source.
-            if url.startswith(BLOB_URL):
-                self.log.info('Fetching image from within the cluster')
-                b = self._blob_get(lock, url)
+            if most_recent.get('index', 0) == 0:
+                self.log.info('Cluster does not have a copy of image')
+                dirty = True
             else:
-                self.log.info('Fetching image from the internet')
-                b = self._http_get_inner(lock, url, checksum, checksum_type)
+                most_recent_blob = Blob.from_db(most_recent['blob_uuid'])
+                resp = self._open_connection(url)
 
-            # If this blob uuid is not the most recent index for the artifact, set that
-            if self.__artifact.most_recent_index.get('blob_uuid') != b.uuid:
-                self.__artifact.add_index(b.uuid)
+                if not most_recent_blob.modified:
+                    dirty = True
+                elif most_recent_blob.modified != resp.headers.get('Last-Modified'):
+                    self.__artifact.add_event(
+                        'image requires fetch', None, None,
+                        'Last-Modified: %s -> %s' % (most_recent_blob.modified,
+                                                     resp.headers.get('Last-Modified')))
+                    dirty = True
 
-            # Transcode if required, placing the transcoded file in a well known location.
-            os.makedirs(
-                os.path.join(config.STORAGE_PATH, 'image_cache'), exist_ok=True)
-            cached = util_general.file_permutation_exists(
-                os.path.join(config.STORAGE_PATH, 'image_cache', b.uuid),
-                ['iso', 'qcow2'])
-            if not cached:
-                blob_path = os.path.join(config.STORAGE_PATH, 'blobs', b.uuid)
-                mimetype = b.info.get('mime-type', '')
+                if not most_recent_blob.size:
+                    dirty = True
+                elif most_recent_blob.size != resp.headers.get('Content-Length'):
+                    self.__artifact.add_event(
+                        'image requires fetch', None, None,
+                        'Content-Length: %s -> %s' % (most_recent_blob.size,
+                                                      resp.headers.get('Content-Length')))
+                    dirty = True
 
-                if mimetype in ['application/x-cd-image', 'application/x-iso9660-image']:
+            if dirty:
+                self.log.info('Cluster cached image is stale')
+            else:
+                url = '%s%s' % (BLOB_URL, most_recent_blob.uuid)
+                self.log.info('Using cached image from cluster')
+
+        # Ensure that we have the blob in the local store. This blob is in the
+        # "original format" if downloaded from an HTTP source.
+        if url.startswith(BLOB_URL):
+            self.log.info('Fetching image from within the cluster')
+            b = self._blob_get(lock, url)
+        else:
+            self.log.info('Fetching image from the internet')
+            b = self._http_get_inner(lock, url, checksum, checksum_type)
+
+        return b
+
+    def transcode_image(self, lock, b):
+        # NOTE(mikal): it is assumed the caller holds a lock on the artifact, and passes
+        # it in lock.
+
+        # If this blob uuid is not the most recent index for the artifact, set that
+        if self.__artifact.most_recent_index.get('blob_uuid') != b.uuid:
+            self.__artifact.add_index(b.uuid)
+
+        # Transcode if required, placing the transcoded file in a well known location.
+        os.makedirs(
+            os.path.join(config.STORAGE_PATH, 'image_cache'), exist_ok=True)
+        cached = util_general.file_permutation_exists(
+            os.path.join(config.STORAGE_PATH, 'image_cache', b.uuid),
+            ['iso', 'qcow2'])
+        if not cached:
+            blob_path = os.path.join(config.STORAGE_PATH, 'blobs', b.uuid)
+            mimetype = b.info.get('mime-type', '')
+
+            if mimetype in ['application/x-cd-image', 'application/x-iso9660-image']:
+                cache_path = os.path.join(
+                    config.STORAGE_PATH, 'image_cache', b.uuid + '.iso')
+                util_general.link(blob_path, cache_path)
+
+            else:
+                if mimetype == 'application/gzip':
                     cache_path = os.path.join(
-                        config.STORAGE_PATH, 'image_cache', b.uuid + '.iso')
+                        config.STORAGE_PATH, 'image_cache', b.uuid)
+                    with util_general.RecordedOperation('decompress image', self.instance):
+                        util_process.execute(
+                            [lock], 'gunzip -k -q -c %s > %s' % (blob_path, cache_path))
+                    blob_path = cache_path
+
+                cache_path = os.path.join(
+                    config.STORAGE_PATH, 'image_cache', b.uuid + '.qcow2')
+                if util_image.identify(blob_path).get('file format', '') == 'qcow2':
                     util_general.link(blob_path, cache_path)
-
                 else:
-                    if mimetype == 'application/gzip':
-                        cache_path = os.path.join(
-                            config.STORAGE_PATH, 'image_cache', b.uuid)
-                        with util_general.RecordedOperation('decompress image', self.instance):
-                            util_process.execute(
-                                [lock], 'gunzip -k -q -c %s > %s' % (blob_path, cache_path))
-                        blob_path = cache_path
+                    with util_general.RecordedOperation('transcode image', self.instance):
+                        self.log.with_fields({'blob': b}).info(
+                            'Transcoding %s -> %s' % (blob_path, cache_path))
+                        util_image.create_qcow2(
+                            [lock], blob_path, cache_path)
 
-                    cache_path = os.path.join(
-                        config.STORAGE_PATH, 'image_cache', b.uuid + '.qcow2')
-                    if util_image.identify(blob_path).get('file format', '') == 'qcow2':
-                        util_general.link(blob_path, cache_path)
-                    else:
-                        with util_general.RecordedOperation('transcode image', self.instance):
-                            self.log.with_fields({'blob': b}).info(
-                                'Transcoding %s -> %s' % (blob_path, cache_path))
-                            util_image.create_qcow2(
-                                [lock], blob_path, cache_path)
+            shutil.chown(cache_path, config.LIBVIRT_USER,
+                         config.LIBVIRT_GROUP)
+            self.log.with_fields(util_general.stat_log_fields(cache_path)).info(
+                'Cache file %s created' % cache_path)
 
-                shutil.chown(cache_path, config.LIBVIRT_USER,
-                             config.LIBVIRT_GROUP)
-                self.log.with_fields(util_general.stat_log_fields(cache_path)).info(
-                    'Cache file %s created' % cache_path)
-
-            self.__artifact.state = Artifact.STATE_CREATED
+        self.__artifact.state = Artifact.STATE_CREATED
 
     def _blob_get(self, lock, url):
         """Fetch a blob from the cluster."""

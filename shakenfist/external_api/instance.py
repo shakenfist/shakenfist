@@ -6,7 +6,7 @@ import re
 import uuid
 
 from shakenfist.artifact import (
-    Artifact, BLOB_URL, LABEL_URL, SNAPSHOT_URL)
+    Artifact, BLOB_URL, LABEL_URL, SNAPSHOT_URL, UPLOAD_URL)
 from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
@@ -134,6 +134,13 @@ class InstancesEndpoint(api_base.Resource):
                 blob_uuid = a.most_recent_index.get('blob_uuid')
                 if not blob_uuid:
                     return api_base.error(404, 'snapshot not found (no versions)')
+                d['blob_uuid'] = blob_uuid
+
+            elif disk_base.startswith(UPLOAD_URL) or disk_base.startswith(LABEL_URL):
+                a = Artifact.from_db(disk_base)
+                blob_uuid = a.most_recent_index.get('blob_uuid')
+                if not blob_uuid:
+                    return api_base.error(404, 'artifact not found (no versions)')
                 d['blob_uuid'] = blob_uuid
 
             elif disk_base.startswith(BLOB_URL):

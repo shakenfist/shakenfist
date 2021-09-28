@@ -3,9 +3,7 @@ from flask_jwt_extended import get_jwt_identity
 from flask_jwt_extended import jwt_required
 
 from shakenfist.artifact import Artifact, Artifacts, LABEL_URL, type_filter, url_filter
-from shakenfist.baseobject import (
-    active_states_filter,
-    DatabaseBackedObject as dbo)
+from shakenfist.baseobject import active_states_filter, DatabaseBackedObject as dbo
 from shakenfist.external_api import base as api_base
 
 

@@ -4,7 +4,7 @@ import magic
 import os
 import time
 
-from shakenfist.baseobject import (DatabaseBackedObject as dbo)
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist import constants
 from shakenfist import db

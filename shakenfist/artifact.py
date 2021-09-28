@@ -18,6 +18,7 @@ BLOB_URL = 'sf://blob/'
 INSTANCE_URL = 'sf://instance/'
 LABEL_URL = 'sf://label/'
 SNAPSHOT_URL = 'sf://snapshot/'
+UPLOAD_URL = 'sf://upload/'
 
 
 class Artifact(dbo):
