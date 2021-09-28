@@ -344,33 +344,38 @@ def decodeTasks(obj):
 
 @retry_etcd_forever
 def dequeue(queuename):
-    queue_path = _construct_key('queue', queuename, None)
-    client = WrappedEtcdClient()
+    try:
+        queue_path = _construct_key('queue', queuename, None)
+        client = WrappedEtcdClient()
 
-    # We only hold the lock if there is anything in the queue
-    if not client.get_prefix(queue_path):
+        # We only hold the lock if there is anything in the queue
+        if not client.get_prefix(queue_path):
+            return None, None
+
+        with get_lock('queue', None, queuename, op='Dequeue'):
+            for data, metadata in client.get_prefix(queue_path, sort_order='ascend',
+                                                    sort_target='key'):
+                jobname = str(metadata['key']).split('/')[-1].rstrip("'")
+
+                # Ensure that this task isn't in the future
+                if float(jobname.split('-')[0]) > time.time():
+                    return None, None
+
+                workitem = json.loads(data, object_hook=decodeTasks)
+                put('processing', queuename, jobname, workitem)
+                client.delete(metadata['key'])
+                LOG.with_fields({'jobname': jobname,
+                                 'queuename': queuename,
+                                 'workitem': workitem,
+                                 }).info('Moved workitem from queue to processing')
+
+                return jobname, workitem
+
         return None, None
-
-    with get_lock('queue', None, queuename, op='Dequeue'):
-        for data, metadata in client.get_prefix(queue_path, sort_order='ascend',
-                                                sort_target='key'):
-            jobname = str(metadata['key']).split('/')[-1].rstrip("'")
-
-            # Ensure that this task isn't in the future
-            if float(jobname.split('-')[0]) > time.time():
-                return None, None
-
-            workitem = json.loads(data, object_hook=decodeTasks)
-            put('processing', queuename, jobname, workitem)
-            client.delete(metadata['key'])
-            LOG.with_fields({'jobname': jobname,
-                             'queuename': queuename,
-                             'workitem': workitem,
-                             }).info('Moved workitem from queue to processing')
-
-            return jobname, workitem
-
-    return None, None
+    except exceptions.LockException:
+        # We didn't acquire the lock, we should just try again later. This probably
+        # indicates congestion.
+        return None, None
 
 
 def resolve(queuename, jobname):

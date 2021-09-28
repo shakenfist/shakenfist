@@ -9,6 +9,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
+from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist.ipmanager import IPManager
@@ -104,7 +105,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                     if not networkinterface.interfaces_for_network(n):
                         LOG.with_network(n).info(
                             'Removing stray delete_wait network')
-                        db.enqueue('networknode', DestroyNetworkTask(n.uuid))
+                        etcd.enqueue('networknode', DestroyNetworkTask(n.uuid))
 
                     # We skip maintenance on all delete_wait networks
                     continue
@@ -295,7 +296,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             n.add_floating_ip(ni.floating.get('floating_address'), ni.ipv4)
 
     def _process_network_node_workitems(self):
-        jobname, workitem = db.dequeue('networknode')
+        jobname, workitem = etcd.dequeue('networknode')
         try:
             if not workitem:
                 time.sleep(0.2)
@@ -312,14 +313,14 @@ class Monitor(daemon.WorkerPoolDaemon):
 
         finally:
             if jobname:
-                db.resolve('networknode', jobname)
+                etcd.resolve('networknode', jobname)
 
     def _reap_leaked_floating_ips(self):
         # Block until the network node queue is idle to avoid races
-        processing, waiting = db.get_queue_length('networknode')
+        processing, waiting = etcd.get_queue_length('networknode')
         while processing + waiting > 0:
             time.sleep(1)
-            processing, waiting = db.get_queue_length('networknode')
+            processing, waiting = etcd.get_queue_length('networknode')
 
         # Ensure we haven't leaked any floating IPs (because we used to)
         with db.get_lock('ipmanager', None, 'floating', ttl=120,

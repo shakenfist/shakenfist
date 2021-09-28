@@ -772,7 +772,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
 
         self.addCleanup(self.config.stop)
 
-    @mock.patch('shakenfist.db.enqueue')
+    @mock.patch('shakenfist.etcd.enqueue')
     @mock.patch('shakenfist.instance.Instances',
                 return_value=[
                     FakeInstance(

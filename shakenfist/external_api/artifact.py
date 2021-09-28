@@ -6,6 +6,7 @@ from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist.config import config
 from shakenfist import db
+from shakenfist import etcd
 from shakenfist import logutil
 from shakenfist.tasks import FetchImageTask
 
@@ -58,7 +59,7 @@ class ArtifactsEndpoint(api_base.Resource):
         # here so that it will show up in image list requests. The image is
         # fetched by the queued job later.
         a = Artifact.from_url(Artifact.TYPE_IMAGE, url)
-        db.enqueue(config.NODE_NAME, {
+        etcd.enqueue(config.NODE_NAME, {
             'tasks': [FetchImageTask(url)],
         })
         return a.external_view()

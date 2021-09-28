@@ -911,7 +911,7 @@ class Instance(dbo):
         self.enqueue_delete_remote(config.NODE_NAME)
 
     def enqueue_delete_remote(self, node):
-        db.enqueue(node, {
+        etcd.enqueue(node, {
             'tasks': [DeleteInstanceTask(self.uuid)]
         })
 

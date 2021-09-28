@@ -153,7 +153,7 @@ class NetworkInterface(dbo):
 
     def delete(self):
         if self.floating['floating_address']:
-            db.enqueue(
+            etcd.enqueue(
                 'networknode',
                 DefloatNetworkInterfaceTask(self.network_uuid, self.uuid))
 
