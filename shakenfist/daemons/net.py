@@ -298,7 +298,7 @@ class Monitor(daemon.WorkerPoolDaemon):
 
     def _process_network_node_workitems(self):
         while True:
-            jobname, workitem = db.dequeue('networknode')
+            jobname, workitem = etcd.dequeue('networknode')
             if not workitem:
                 time.sleep(0.2)
             else:
@@ -314,7 +314,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                             'Network workitem was not decoded: %s' % workitem)
 
                 finally:
-                    db.resolve('networknode', jobname)
+                    etcd.resolve('networknode', jobname)
 
     def _reap_leaked_floating_ips(self):
         # Block until the network node queue is idle to avoid races
