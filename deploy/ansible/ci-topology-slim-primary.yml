@@ -46,6 +46,7 @@
         hostname: primary
         egress_ip: "{{primary['meta']['network_interfaces'][0]['ipv4']}}"
         mesh_ip: "10.0.1.10"
+        mesh_mac: "{{primary['meta']['network_interfaces'][1]['macaddr']}}"
         ansible_ssh_host: "{{primary['meta']['network_interfaces'][0]['floating']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
@@ -71,6 +72,7 @@
         hostname: sf1
         egress_ip: "{{sf1['meta']['network_interfaces'][0]['ipv4']}}"
         mesh_ip: "10.0.1.11"
+        mesh_mac: "{{sf1['meta']['network_interfaces'][1]['macaddr']}}"
         ansible_ssh_host: "{{sf1['meta']['network_interfaces'][0]['floating']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
@@ -96,6 +98,7 @@
         hostname: sf2
         egress_ip: "{{sf2['meta']['network_interfaces'][0]['ipv4']}}"
         mesh_ip: "10.0.1.12"
+        mesh_mac: "{{sf2['meta']['network_interfaces'][1]['macaddr']}}"
         ansible_ssh_host: "{{sf2['meta']['network_interfaces'][0]['floating']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
@@ -121,6 +124,7 @@
         hostname: sf3
         egress_ip: "{{sf3['meta']['network_interfaces'][0]['ipv4']}}"
         mesh_ip: "10.0.1.13"
+        mesh_mac: "{{sf3['meta']['network_interfaces'][1]['macaddr']}}"
         ansible_ssh_host: "{{sf3['meta']['network_interfaces'][0]['floating']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
@@ -146,6 +150,7 @@
         hostname: sf4
         egress_ip: "{{sf4['meta']['network_interfaces'][0]['ipv4']}}"
         mesh_ip: "10.0.1.14"
+        mesh_mac: "{{sf4['meta']['network_interfaces'][1]['macaddr']}}"
         ansible_ssh_host: "{{sf4['meta']['network_interfaces'][0]['floating']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
@@ -171,6 +176,7 @@
         hostname: sf5
         egress_ip: "{{sf5['meta']['network_interfaces'][0]['ipv4']}}"
         mesh_ip: "10.0.1.15"
+        mesh_mac: "{{sf5['meta']['network_interfaces'][1]['macaddr']}}"
         ansible_ssh_host: "{{sf5['meta']['network_interfaces'][0]['floating']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
@@ -252,7 +258,7 @@
     # which breaks networking. So we configure this interface after cloud-init
     # has run. We also need to specify the MTU manually here because we're not
     # fetching it from dhcp any more.
-    - name: Configure the mesh interface
+    - name: Configure the mesh interface (Debian)
       copy:
         content: |
           auto eth1
@@ -263,12 +269,27 @@
         owner: root
         group: root
         mode: u=r,g=r,o=r
+      when: ansible_distribution == 'Debian'
 
-    - name: Enable eth1
+    - name: Enable eth1 (Debian)
       shell: |
         ifdown eth1
         sleep 1
         ifup eth1
+      when: ansible_distribution == 'Debian'
+
+    - name: Configure the mesh interface (Ubuntu)
+      template:
+        src: files/netplan-eth1.yaml
+        dest: /etc/netplan/99-sfci.yaml
+      vars:
+        address: "{{mesh_ip}}/24"
+        macaddr: "{{mesh_mac}}"
+      when: ansible_distribution == 'Ubuntu'
+
+    - name: Enable eth1 (Ubuntu)
+      shell: netplan apply
+      when: ansible_distribution == 'Ubuntu'
 
     - name: apt-get dist-upgrade
       apt:
@@ -362,18 +383,6 @@
   become: true
 
   tasks:
-    # - name: Ensure we have the Ubuntu package key (helps with Debian)
-    #   shell: apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367
-
-    # - name: Setup ansible package repository
-    #   copy:
-    #     content: |
-    #       deb http://ppa.launchpad.net/ansible/ansible/ubuntu trusty main
-    #     dest: "/etc/apt/sources.list.d/ansible.list"
-    #     owner: root
-    #     group: root
-    #     mode: u=r,g=r,o=r
-
     - name: Install modern ansible
       apt:
         name: ansible
@@ -448,7 +457,7 @@
 
           export KSM_ENABLED=0
 
-          # Metal topology is in JSON
+          # Topology
           read -r -d '' TOPOLOGY <<'EOF'
           [
             {
