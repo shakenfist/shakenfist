@@ -4,7 +4,7 @@ import multiprocessing
 import setproctitle
 
 from shakenfist.config import config
-from shakenfist import db
+from shakenfist import etcd
 from shakenfist import logutil
 from shakenfist.util import libvirt as util_libvirt
 
@@ -76,7 +76,7 @@ class WorkerPoolDaemon(Daemon):
         if len(self.workers) > self.present_cpus / 2:
             return False
 
-        jobname, workitem = db.dequeue(queue_name)
+        jobname, workitem = etcd.dequeue(queue_name)
         if not workitem:
             return False
         self.start_workitem(processing_callback, (jobname, workitem), 'worker')

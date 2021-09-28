@@ -115,7 +115,7 @@ class Network(dbo):
         n.state = Network.STATE_INITIAL
 
         # Networks should immediately appear on the network node
-        db.enqueue('networknode', DeployNetworkTask(uuid))
+        etcd.enqueue('networknode', DeployNetworkTask(uuid))
 
         # TODO(andy): Integrate metadata into each object type
         # Initialise metadata
@@ -521,10 +521,10 @@ class Network(dbo):
         # just catching strays, apart from on the network node where we
         # absolutely need to do this thing.
         for hyp in Nodes([active_nodes]):
-            db.enqueue(hyp.uuid,
-                       {'tasks': [
-                           HypervisorDestroyNetworkTask(self.uuid)
-                       ]})
+            etcd.enqueue(hyp.uuid,
+                         {'tasks': [
+                             HypervisorDestroyNetworkTask(self.uuid)
+                         ]})
 
         self.remove_dhcp()
         self.remove_nat()
@@ -561,7 +561,7 @@ class Network(dbo):
                     d = dhcp.DHCP(self, subst['vx_veth_inner'])
                     d.restart_dhcpd()
         else:
-            db.enqueue('networknode', UpdateDHCPNetworkTask(self.uuid))
+            etcd.enqueue('networknode', UpdateDHCPNetworkTask(self.uuid))
 
     def remove_dhcp(self):
         if util_network.is_network_node():
@@ -571,7 +571,7 @@ class Network(dbo):
                     d = dhcp.DHCP(self, subst['vx_veth_inner'])
                     d.remove_dhcpd()
         else:
-            db.enqueue('networknode', RemoveDHCPNetworkTask(self.uuid))
+            etcd.enqueue('networknode', RemoveDHCPNetworkTask(self.uuid))
 
     def enable_nat(self):
         if not util_network.is_network_node():
@@ -607,7 +607,7 @@ class Network(dbo):
                     self.update_floating_gateway(None)
 
         else:
-            db.enqueue('networknode', RemoveNATNetworkTask(self.uuid))
+            etcd.enqueue('networknode', RemoveNATNetworkTask(self.uuid))
 
     def discover_mesh(self):
         # The floating network does not have a vxlan mesh

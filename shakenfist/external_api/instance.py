@@ -12,6 +12,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
+from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist.external_api import (
     base as api_base,
@@ -315,7 +316,7 @@ class InstancesEndpoint(api_base.Resource):
         tasks.extend(float_tasks)
 
         # Enqueue creation tasks on desired node task queue
-        db.enqueue(placement, {'tasks': tasks})
+        etcd.enqueue(placement, {'tasks': tasks})
         return inst.external_view()
 
     @jwt_required
@@ -353,7 +354,7 @@ class InstancesEndpoint(api_base.Resource):
             waiting_for.append(inst.uuid)
 
         for node in tasks_by_node:
-            db.enqueue(node, {'tasks': tasks_by_node[node]})
+            etcd.enqueue(node, {'tasks': tasks_by_node[node]})
 
         return waiting_for
 

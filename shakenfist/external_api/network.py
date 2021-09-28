@@ -13,6 +13,7 @@ from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.daemons import daemon
 from shakenfist import db
+from shakenfist import etcd
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
@@ -44,11 +45,11 @@ def _delete_network(network_from_db, wait_interfaces=None):
     if wait_interfaces:
         n.state = net.Network.STATE_DELETE_WAIT
         n.add_event('api', 'delete-wait')
-        db.enqueue(config.NODE_NAME,
-                   {'tasks': [DeleteNetworkWhenClean(n.uuid, wait_interfaces)]})
+        etcd.enqueue(config.NODE_NAME,
+                     {'tasks': [DeleteNetworkWhenClean(n.uuid, wait_interfaces)]})
     else:
         n.add_event('api', 'delete')
-        db.enqueue('networknode', DestroyNetworkTask(n.uuid))
+        etcd.enqueue('networknode', DestroyNetworkTask(n.uuid))
 
 
 class NetworkEndpoint(api_base.Resource):

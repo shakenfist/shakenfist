@@ -8,7 +8,7 @@ from shakenfist.artifact import Artifact, Artifacts
 from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist.daemons import daemon
-from shakenfist import db
+from shakenfist import etcd
 from shakenfist.external_api import base as api_base
 from shakenfist import logutil
 from shakenfist.tasks import SnapshotTask
@@ -50,7 +50,7 @@ class InstanceSnapshotEndpoint(api_base.Resource):
                 'blob_uuid': blob_uuid
             }
 
-            db.enqueue(config.NODE_NAME, {
+            etcd.enqueue(config.NODE_NAME, {
                 'tasks': [SnapshotTask(instance_uuid, disk, a.uuid, blob_uuid)],
             })
             instance_from_db.add_event('api', 'snapshot of %s requested' % disk,

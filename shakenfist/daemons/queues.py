@@ -8,6 +8,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
+from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import images
 from shakenfist import instance
@@ -96,7 +97,7 @@ def handle(jobname, workitem):
                 if redirect_to:
                     log_i.info('Redirecting instance start to %s'
                                % redirect_to)
-                    db.enqueue(redirect_to, workitem)
+                    etcd.enqueue(redirect_to, workitem)
                     return
 
             elif isinstance(task, StartInstanceTask):
@@ -108,19 +109,19 @@ def handle(jobname, workitem):
                     continue
 
                 instance_start(inst, task.network())
-                db.enqueue('%s-metrics' % config.NODE_NAME, {})
+                etcd.enqueue('%s-metrics' % config.NODE_NAME, {})
 
             elif isinstance(task, DeleteInstanceTask):
                 try:
                     instance_delete(inst)
-                    db.enqueue('%s-metrics' % config.NODE_NAME, {})
+                    etcd.enqueue('%s-metrics' % config.NODE_NAME, {})
                 except Exception as e:
                     util_general.ignore_exception(
                         daemon.process_name('queues'), e)
 
             elif isinstance(task, FloatNetworkInterfaceTask):
                 # Just punt it to the network node now that the interface is ready
-                db.enqueue('networknode', task)
+                etcd.enqueue('networknode', task)
 
             elif isinstance(task, SnapshotTask):
                 snapshot(inst, task.disk(),
@@ -144,17 +145,17 @@ def handle(jobname, workitem):
                     # Queue task on a node with a remaining instance
                     first_iface = cur_interfaces[remain_interfaces[0]]
                     inst = instance.Instance.from_db(first_iface.instance_uuid)
-                    db.enqueue(inst.placement['node'],
-                               {'tasks': [
-                                   DeleteNetworkWhenClean(task.network_uuid(),
-                                                          remain_interfaces)
-                               ]},
-                               delay=60)
+                    etcd.enqueue(inst.placement['node'],
+                                 {'tasks': [
+                                     DeleteNetworkWhenClean(task.network_uuid(),
+                                                            remain_interfaces)
+                                 ]},
+                                 delay=60)
 
                 else:
                     # All original instances deleted, safe to delete network
-                    db.enqueue('networknode',
-                               DestroyNetworkTask(task.network_uuid()))
+                    etcd.enqueue('networknode',
+                                 DestroyNetworkTask(task.network_uuid()))
 
             elif isinstance(task, HypervisorDestroyNetworkTask):
                 n = net.Network.from_db(task.network_uuid())
@@ -194,7 +195,7 @@ def handle(jobname, workitem):
             inst.enqueue_delete_due_error('Failed queue task: %s' % e)
 
     finally:
-        db.resolve(config.NODE_NAME, jobname)
+        etcd.resolve(config.NODE_NAME, jobname)
         if inst:
             inst.add_event('tasks complete', 'dequeued',
                            msg='Work item %s' % jobname)

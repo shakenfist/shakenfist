@@ -8,6 +8,7 @@ from prometheus_client import start_http_server
 from shakenfist.daemons import daemon
 from shakenfist.config import config
 from shakenfist import db
+from shakenfist import etcd
 from shakenfist import logutil
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
@@ -114,7 +115,7 @@ def _get_stats():
             total_instance_cpu_time += cpu_time
 
     # Queue health statistics
-    node_queue_processing, node_queue_waiting = db.get_queue_length(
+    node_queue_processing, node_queue_waiting = etcd.get_queue_length(
         config.NODE_NAME)
 
     retval.update({
@@ -129,7 +130,7 @@ def _get_stats():
     })
 
     if util_network.is_network_node():
-        network_queue_processing, network_queue_waiting = db.get_queue_length(
+        network_queue_processing, network_queue_waiting = etcd.get_queue_length(
             'networknode')
 
         retval.update({
@@ -167,12 +168,12 @@ class Monitor(daemon.Daemon):
 
         while True:
             try:
-                jobname, _ = db.dequeue('%s-metrics' % config.NODE_NAME)
+                jobname, _ = etcd.dequeue('%s-metrics' % config.NODE_NAME)
                 if jobname:
                     if time.time() - last_metrics > 2:
                         update_metrics()
                         last_metrics = time.time()
-                    db.resolve('%s-metrics' % config.NODE_NAME, jobname)
+                    etcd.resolve('%s-metrics' % config.NODE_NAME, jobname)
                 else:
                     time.sleep(0.2)
 

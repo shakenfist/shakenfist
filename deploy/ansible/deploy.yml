@@ -644,10 +644,6 @@
         group: root
         mode: u=r,g=r,o=r
 
-    - name: Run any upgrade steps
-      shell: "{{hostvars['localhost']['utility_path']}}/sf-upgrade"
-      run_once: true
-
     - name: Create an admin namespace called "system" with one key configured
       shell: "{{hostvars['localhost']['utility_path']}}/sf-passwd deploy {{hostvars[groups['primary_node'][0]]['system_key']}}"
       run_once: true
