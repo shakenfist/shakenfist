@@ -26,7 +26,8 @@ from shakenfist.external_api import (
     label as api_label,
     network as api_network,
     node as api_node,
-    snapshot as api_snapshot)
+    snapshot as api_snapshot,
+    upload as api_upload)
 from shakenfist import logutil
 
 
@@ -116,6 +117,8 @@ api.add_resource(api_interface.InterfaceDefloatEndpoint,
 
 api.add_resource(api_artifact.ArtifactEndpoint, '/artifacts/<artifact_uuid>')
 api.add_resource(api_artifact.ArtifactsEndpoint, '/artifacts')
+api.add_resource(api_artifact.ArtifactUploadEndpoint,
+                 '/artifacts/upload/<artifact_name>')
 api.add_resource(api_artifact.ArtifactEventsEndpoint,
                  '/artifacts/events/<artifact_uuid>')
 
@@ -135,3 +138,6 @@ api.add_resource(api_network.NetworkPingEndpoint,
                  '/networks/<network_uuid>/ping/<address>')
 
 api.add_resource(api_node.NodesEndpoint, '/nodes')
+
+api.add_resource(api_upload.UploadCreateEndpoint, '/upload')
+api.add_resource(api_upload.UploadDataEndpoint, '/upload/<upload_uuid>')
