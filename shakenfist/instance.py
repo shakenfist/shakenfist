@@ -581,9 +581,15 @@ class Instance(dbo):
                             disk['snapshot_ignores'] = True
                             util_general.link(cached_image_path, disk['path'])
 
-                            # Due to limitations in some installers, cdroms are always on IDE
-                            disk['device'] = 'hd%s' % disk['device'][-1]
-                            disk['bus'] = 'ide'
+                            # qemu does not support removable media on virtio buses. It also
+                            # only supports one IDE bus. This is quite limiting. Instead, we
+                            # use USB for cdrom drives, unless you've specified a bus other
+                            # than virtio in the creation request.
+                            if disk['bus'] == 'virtio':
+                                disk['bus'] = 'usb'
+                                disk['device'] = '%s%s' % (_get_disk_device_base(disk['bus']),
+                                                           disk['device'][-1])
+
                         else:
                             with util_general.RecordedOperation('create copy on write layer', self):
                                 images.util_image.create_cow([lock], cached_image_path,
