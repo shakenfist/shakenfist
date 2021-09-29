@@ -41,14 +41,20 @@ def _get_defaulted_disk_bus(disk):
     return config.DISK_BUS
 
 
-def _get_disk_device_base(bus):
+LETTERS = 'abcdefghijklmnopqrstuvwxyz'
+NUMBERS = '0123456789'
+
+
+def _get_disk_device(bus, index):
     bases = {
-        'ide': 'hd',
-        'scsi': 'sd',
-        'usb': 'sd',
-        'virtio': 'vd'
+        'ide': ('hd', LETTERS),
+        'scsi': ('sd', LETTERS),
+        'usb': ('sd', LETTERS),
+        'virtio': ('vd', LETTERS),
+        'nvme': ('nvme', NUMBERS),
     }
-    return bases.get(bus, 'sd')
+    prefix, index_scheme = bases.get(bus, 'sd')
+    return '%s%s' % (prefix, index_scheme[index])
 
 
 def _get_defaulted_disk_type(disk):
@@ -66,8 +72,8 @@ def _safe_int_cast(i):
 
 def _initialize_block_devices(instance_path, disk_spec):
     bus = _get_defaulted_disk_bus(disk_spec[0])
-    root_device = _get_disk_device_base(bus) + 'a'
-    config_device = _get_disk_device_base(bus) + 'b'
+    root_device = _get_disk_device(bus, 0)
+    config_device = _get_disk_device(bus, 1)
 
     disk_type = 'qcow2'
 
@@ -92,24 +98,40 @@ def _initialize_block_devices(instance_path, disk_spec):
                 'present_as': 'disk',
                 'snapshot_ignores': True
             }
-        ]
+        ],
+        'extracommands': []
     }
 
     i = 0
+    nvme_counter = 0
     for d in disk_spec[1:]:
         bus = _get_defaulted_disk_bus(d)
-        device = _get_disk_device_base(bus) + chr(ord('c') + i)
-        block_devices['devices'].append({
-            'type': disk_type,
-            'size': _safe_int_cast(d.get('size')),
-            'device': device,
-            'bus': bus,
-            'path': os.path.join(instance_path, device),
-            'base': d.get('base'),
-            'blob_uuid': d.get('blob_uuid'),
-            'present_as': _get_defaulted_disk_type(d),
-            'snapshot_ignores': False
-        })
+        device = _get_disk_device(bus, i + 2)
+        disk_path = os.path.join(instance_path, device)
+
+        if bus != 'nvme':
+            block_devices['devices'].append({
+                'type': disk_type,
+                'size': _safe_int_cast(d.get('size')),
+                'device': device,
+                'bus': bus,
+                'path': disk_path,
+                'base': d.get('base'),
+                'blob_uuid': d.get('blob_uuid'),
+                'present_as': _get_defaulted_disk_type(d),
+                'snapshot_ignores': False
+            })
+        else:
+            nvme_counter += 1
+            block_devices['extracommands'].extend([
+                '-drive',
+                ('file=%s,format=qcow2,if=none,id=NVME%d'
+                 % (disk_path, nvme_counter)),
+                '-device',
+                ('nvme,drive=NVME%d,serial=nvme-%d'
+                 % (nvme_counter, nvme_counter))
+            ])
+
         i += 1
 
     block_devices['finalized'] = False
@@ -587,8 +609,8 @@ class Instance(dbo):
                             # than virtio in the creation request.
                             if disk['bus'] == 'virtio':
                                 disk['bus'] = 'usb'
-                                disk['device'] = '%s%s' % (_get_disk_device_base(disk['bus']),
-                                                           disk['device'][-1])
+                                disk['device'] = _get_disk_device(
+                                    disk['bus'], LETTERS.find(disk['device'][-1]))
 
                         else:
                             with util_general.RecordedOperation('create copy on write layer', self):
@@ -794,7 +816,8 @@ class Instance(dbo):
             vdi_port=ports.get('vdi_port'),
             video_model=self.video['model'],
             video_memory=self.video['memory'],
-            uefi=self.uefi
+            uefi=self.uefi,
+            extracommands=block_devices.get('extracommands')
         )
 
     def _get_domain(self):
