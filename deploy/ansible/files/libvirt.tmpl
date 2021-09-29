@@ -104,4 +104,11 @@
       <address type='pci' domain='0x0000' bus='0x00' slot='0x06' function='0x0'/>
     </memballoon>
   </devices>
+
+  <!-- NOTE(mikal): this is required to support things like NVME disks. -->
+  <qemu:commandline>
+  {% for extra in extracommands %}
+    <qemu:arg value='{{extra}}'/>
+  {% endfor %}
+  </qemu:commandline>
 </domain>
