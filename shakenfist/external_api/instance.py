@@ -131,13 +131,22 @@ class InstancesEndpoint(api_base.Resource):
 
             elif disk_base.startswith(SNAPSHOT_URL):
                 a = Artifact.from_db(disk_base[len(SNAPSHOT_URL):])
+                if not a:
+                    return api_base.error(
+                        404, 'snapshot %s not found' % disk_base[len(SNAPSHOT_URL):])
                 blob_uuid = a.most_recent_index.get('blob_uuid')
                 if not blob_uuid:
                     return api_base.error(404, 'snapshot not found (no versions)')
                 d['blob_uuid'] = blob_uuid
 
             elif disk_base.startswith(UPLOAD_URL) or disk_base.startswith(LABEL_URL):
-                a = Artifact.from_db(disk_base)
+                if disk_base.startswith(UPLOAD_URL):
+                    a = Artifact.from_url(Artifact.TYPE_IMAGE, disk_base)
+                else:
+                    a = Artifact.from_url(Artifact.TYPE_LABEL, disk_base)
+                if not a:
+                    return api_base.error(404, 'artifact %s not found' % disk_base)
+
                 blob_uuid = a.most_recent_index.get('blob_uuid')
                 if not blob_uuid:
                     return api_base.error(404, 'artifact not found (no versions)')
