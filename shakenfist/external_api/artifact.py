@@ -4,6 +4,7 @@ from flask_jwt_extended import jwt_required
 import json
 import os
 import requests
+import shutil
 import time
 import uuid
 
@@ -116,7 +117,9 @@ class ArtifactUploadEndpoint(api_base.Resource):
             upload_dir = os.path.join(config.STORAGE_PATH, 'uploads')
             upload_path = os.path.join(upload_dir, u.uuid)
 
-            os.rename(upload_path, blob_path)
+            # NOTE(mikal): we can't use os.rename() here because these paths
+            # might be on different filesystems.
+            shutil.move(upload_path, blob_path)
             st = os.stat(blob_path)
             b = Blob.new(
                 blob_uuid, st.st_size,
