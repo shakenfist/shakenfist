@@ -913,9 +913,6 @@ class Instance(dbo):
             length, len(d))
         return d
 
-    def enqueue_delete(self):
-        self.enqueue_delete_remote(config.NODE_NAME)
-
     def enqueue_delete_remote(self, node):
         etcd.enqueue(node, {
             'tasks': [DeleteInstanceTask(self.uuid)]
@@ -933,7 +930,7 @@ class Instance(dbo):
             self.state = self.STATE_ERROR
 
         self.error = error_msg
-        self.enqueue_delete()
+        self.enqueue_delete_remote(config.NODE_NAME)
 
 
 class Instances(dbo_iter):
