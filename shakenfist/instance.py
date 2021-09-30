@@ -109,27 +109,25 @@ def _initialize_block_devices(instance_path, disk_spec):
         device = _get_disk_device(bus, i + 2)
         disk_path = os.path.join(instance_path, device)
 
-        if bus != 'nvme':
-            block_devices['devices'].append({
-                'type': disk_type,
-                'size': _safe_int_cast(d.get('size')),
-                'device': device,
-                'bus': bus,
-                'path': disk_path,
-                'base': d.get('base'),
-                'blob_uuid': d.get('blob_uuid'),
-                'present_as': _get_defaulted_disk_type(d),
-                'snapshot_ignores': False
-            })
-        else:
+        block_devices['devices'].append({
+            'type': disk_type,
+            'size': _safe_int_cast(d.get('size')),
+            'device': device,
+            'bus': bus,
+            'path': disk_path,
+            'base': d.get('base'),
+            'blob_uuid': d.get('blob_uuid'),
+            'present_as': _get_defaulted_disk_type(d),
+            'snapshot_ignores': False
+        })
+
+        if bus == 'nvme':
             nvme_counter += 1
             block_devices['extracommands'].extend([
-                '-drive',
-                ('file=%s,format=qcow2,if=none,id=NVME%d'
-                 % (disk_path, nvme_counter)),
-                '-device',
-                ('nvme,drive=NVME%d,serial=nvme-%d'
-                 % (nvme_counter, nvme_counter))
+                '-drive', ('file=%s,format=qcow2,if=none,id=NVME%d'
+                           % (disk_path, nvme_counter)),
+                '-device', ('nvme,drive=NVME%d,serial=nvme-%d'
+                            % (nvme_counter, nvme_counter))
             ])
 
         i += 1
@@ -616,8 +614,6 @@ class Instance(dbo):
                             with util_general.RecordedOperation('create copy on write layer', self):
                                 images.util_image.create_cow([lock], cached_image_path,
                                                              disk['path'], disk['size'])
-                            shutil.chown(
-                                disk['path'], 'libvirt-qemu', 'libvirt-qemu')
                             self.log.with_fields(util_general.stat_log_fields(disk['path'])).info(
                                 'COW layer %s created' % disk['path'])
 
@@ -633,6 +629,7 @@ class Instance(dbo):
                         images.util_image.create_blank(
                             [lock], disk['path'], disk['size'])
 
+                    shutil.chown(disk['path'], 'libvirt-qemu', 'libvirt-qemu')
                     modified_disks.append(disk)
 
                 block_devices['devices'] = modified_disks
@@ -805,7 +802,7 @@ class Instance(dbo):
         # I hadn't spent _ages_ finding a bug related to it.
         block_devices = self.block_devices
         ports = self.ports
-        return t.render(
+        x = t.render(
             uuid=self.uuid,
             memory=self.memory * 1024,
             vcpus=self.cpus,
@@ -817,8 +814,17 @@ class Instance(dbo):
             video_model=self.video['model'],
             video_memory=self.video['memory'],
             uefi=self.uefi,
-            extracommands=block_devices.get('extracommands')
+            extracommands=block_devices.get('extracommands', [])
         )
+
+        # Libvirt re-writes the domain XML once loaded, so we store the XML
+        # as generated as well so that we can debug. Note that this is _not_
+        # the XML actually used by libvirt.
+        os.makedirs(self.instance_path, exist_ok=True)
+        with open(os.path.join(self.instance_path, 'original_domain.xml'), 'w') as f:
+            f.write(x)
+
+        return x
 
     def _get_domain(self):
         libvirt = util_libvirt.get_libvirt()

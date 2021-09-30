@@ -629,6 +629,34 @@
         group: root
         mode: "0644"
 
+    - name: Check that the /etc/apparmor.d/local/abstractions/libvirt-qemu exists
+      stat:
+        path: /etc/apparmor.d/local/abstractions/libvirt-qemu
+      register: stat_result
+
+    # NOTE(mikal): this wont work if the user has configured a different
+    # path for the instance path. We should fix that.
+    - name: Add an apparmor rule for NVMe disks (modern Debian)
+      lineinfile:
+        path: /etc/apparmor.d/local/abstractions/libvirt-qemu
+        regexp: "/srv/shakenfist/instances.*nvme.*"
+        line: "/srv/shakenfist/instances/*/nvme[0-9] rwk,"
+      when: stat_result.stat.exists
+
+    # NOTE(mikal): and fix it here too.
+    - name: Add an apparmor rule for NVMe disks (older Debian)
+      lineinfile:
+        path: /etc/apparmor.d/abstractions/libvirt-qemu
+        regexp: "/srv/shakenfist/instances.*nvme.*"
+        line: "/srv/shakenfist/instances/*/nvme[0-9] rwk,"
+      when: not stat_result.stat.exists
+
+    - name: Restart apparmor
+      service:
+        name: apparmor
+        enabled: yes
+        state: restarted
+
     - name: Fetch systemd unit template from remote host
       fetch:
         src: "{{hostvars['localhost']['template_path']}}/sf.service"
