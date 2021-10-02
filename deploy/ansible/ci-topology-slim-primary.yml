@@ -11,14 +11,16 @@
     - name: Create a network for outgoing traffic
       sf_network:
         netblock: "10.0.0.0/24"
-        name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-public"
+        name: "public"
+        namespace: "{{identifier}}"
       register: publicnetwork
 
     - name: Create a network for virtual network mesh traffic
       sf_network:
         netblock: "10.0.1.0/24"
         nat: False
-        name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-mesh"
+        name: "mesh"
+        namespace: "{{identifier}}"
       register: meshnetwork
 
     - name: Log network details
@@ -29,7 +31,7 @@
 
     - name: Create a primary instance
       sf_instance:
-        name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-primary"
+        name: "primary"
         cpu: 4
         ram: 4096
         disks:
@@ -38,6 +40,7 @@
           - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
           - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
         ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
+        namespace: "{{identifier}}"
         state: present
       register: primary
 
@@ -55,7 +58,7 @@
 
     - name: Create sf-1
       sf_instance:
-        name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-1"
+        name: "sf-1"
         cpu: 4
         ram: 12288
         disks:
@@ -64,6 +67,7 @@
           - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
           - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
         ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
+        namespace: "{{identifier}}"
         state: present
       register: sf1
 
@@ -81,7 +85,7 @@
 
     - name: Create sf-2
       sf_instance:
-        name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-2"
+        name: "sf-2"
         cpu: 4
         ram: 12288
         disks:
@@ -90,6 +94,7 @@
           - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
           - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
         ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
+        namespace: "{{identifier}}"
         state: present
       register: sf2
 
@@ -107,7 +112,7 @@
 
     - name: Create sf-3
       sf_instance:
-        name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-3"
+        name: "sf-3"
         cpu: 4
         ram: 12288
         disks:
@@ -116,6 +121,7 @@
           - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
           - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
         ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
+        namespace: "{{identifier}}"
         state: present
       register: sf3
 
@@ -133,7 +139,7 @@
 
     - name: Create sf-4
       sf_instance:
-        name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-4"
+        name: "sf-4"
         cpu: 4
         ram: 12288
         disks:
@@ -142,6 +148,7 @@
           - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
           - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
         ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
+        namespace: "{{identifier}}"
         state: present
       register: sf4
 
@@ -159,7 +166,7 @@
 
     - name: Create sf-5
       sf_instance:
-        name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-5"
+        name: "sf-5"
         cpu: 4
         ram: 12288
         disks:
@@ -168,6 +175,7 @@
           - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
           - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
         ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
+        namespace: "{{identifier}}"
         state: present
       register: sf5
 
