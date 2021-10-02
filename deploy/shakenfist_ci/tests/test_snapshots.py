@@ -224,3 +224,67 @@ class TestSnapshots(base.BaseNamespacedTestCase):
 
         self.test_client.delete_instance(inst1['uuid'])
         self.test_client.delete_instance(inst2['uuid'])
+
+    def test_specific_device_snapshots(self):
+        inst = self.test_client.create_instance(
+            'cirros', 1, 1024,
+            [
+                {
+                    'network_uuid': self.net['uuid']
+                }
+            ],
+            [
+                {
+                    'size': 8,
+                    'base': 'cirros',
+                    'type': 'disk'
+                },
+                {
+                    'size': 8,
+                    'type': 'disk'
+                },
+                {
+                    'size': 8,
+                    'base': 'cirros',
+                    'type': 'disk'
+                }
+            ], None, None)
+
+        self.assertIsNotNone(inst['uuid'])
+        self.assertIsNotNone(inst['node'])
+        self._await_login_prompt(inst['uuid'])
+
+        snap1 = self.test_client.snapshot_instance(inst['uuid'], device='vdc')
+        self.assertIsNotNone(snap1)
+
+        # Wait until the blob uuid specified above is the one used for the
+        # current snapshot
+        start_time = time.time()
+        while time.time() - start_time < 300:
+            snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
+            if snapshots and snapshots[-1].get('blob_uuid') == snap1['vdc']['blob_uuid']:
+                break
+            time.sleep(5)
+
+        self.assertEqual(1, len(snapshots))
+
+        snap2 = self.test_client.snapshot_instance(inst['uuid'], device='vdc')
+        self.assertIsNotNone(snap2)
+
+        # Wait until the blob uuid specified above is the one used for the
+        # current snapshot
+        start_time = time.time()
+        while time.time() - start_time < 300:
+            snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
+            if snapshots and snapshots[-1].get('blob_uuid') == snap2['vdc']['blob_uuid']:
+                break
+            time.sleep(5)
+
+        self.assertEqual(2, len(snapshots))
+
+        for snap in snapshots:
+            self.assertEqual('vdc', snap['source_url'].split('/')[-1])
+            self.assertTrue(snap['source_url'].startswith(
+                'sf://instance/%s' % inst['uuid']))
+
+        self.test_client.delete_instance(inst['uuid'])
