@@ -23,9 +23,18 @@ class InstanceSnapshotEndpoint(api_base.Resource):
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
-    def post(self, instance_uuid=None, instance_from_db=None, all=None):
+    def post(self, instance_uuid=None, instance_from_db=None, all=None,
+             device=None):
         disks = instance_from_db.block_devices['devices']
-        if not all:
+
+        # Filter if requested
+        if device:
+            new_disks = []
+            for d in disks:
+                if d['device'] == device:
+                    new_disks.append(d)
+            disks = new_disks
+        elif not all:
             disks = [disks[0]]
 
         out = {}
