@@ -338,9 +338,10 @@ def instance_delete(inst):
         instance_networks = []
         interfaces = []
         for ni in networkinterface.interfaces_for_instance(inst):
-            interfaces.append(ni)
-            if ni.network_uuid not in instance_networks:
-                instance_networks.append(ni.network_uuid)
+            if ni:
+                interfaces.append(ni)
+                if ni.network_uuid not in instance_networks:
+                    instance_networks.append(ni.network_uuid)
 
         # Stop the instance
         inst.power_off()
