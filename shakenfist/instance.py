@@ -22,12 +22,12 @@ from shakenfist.config import config
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
-from shakenfist import images
 from shakenfist import logutil
 from shakenfist import net
 from shakenfist import networkinterface
 from shakenfist.tasks import DeleteInstanceTask
 from shakenfist.util import general as util_general
+from shakenfist.util import image as util_image
 from shakenfist.util import libvirt as util_libvirt
 
 
@@ -102,11 +102,10 @@ def _initialize_block_devices(instance_path, disk_spec):
         'extracommands': []
     }
 
-    i = 0
-    nvme_counter = 0
+    i = 2
     for d in disk_spec[1:]:
         bus = _get_defaulted_disk_bus(d)
-        device = _get_disk_device(bus, i + 2)
+        device = _get_disk_device(bus, i)
         disk_path = os.path.join(instance_path, device)
 
         block_devices['devices'].append({
@@ -120,17 +119,20 @@ def _initialize_block_devices(instance_path, disk_spec):
             'present_as': _get_defaulted_disk_type(d),
             'snapshot_ignores': False
         })
+        i += 1
 
-        if bus == 'nvme':
+    # NVME disks require a different treatment because libvirt doesn't natively
+    # support them yet.
+    nvme_counter = 0
+    for d in block_devices['devices']:
+        if d['bus'] == 'nvme':
             nvme_counter += 1
             block_devices['extracommands'].extend([
-                '-drive', ('file=%s,format=qcow2,if=none,id=NVME%d'
-                           % (disk_path, nvme_counter)),
+                '-drive', ('file=%s,format=%s,if=none,id=NVME%d'
+                           % (d['path'], d['type'], nvme_counter)),
                 '-device', ('nvme,drive=NVME%d,serial=nvme-%d'
                             % (nvme_counter, nvme_counter))
             ])
-
-        i += 1
 
     block_devices['finalized'] = False
     return block_devices
@@ -610,10 +612,18 @@ class Instance(dbo):
                                 disk['device'] = _get_disk_device(
                                     disk['bus'], LETTERS.find(disk['device'][-1]))
 
+                        elif disk['bus'] == 'nvme':
+                            # NVMe disks do not currently support a COW layer for the instance
+                            # disk. This is because we don't have a libvirt <disk/> element for
+                            # them and therefore can't specify their backing store. Instead we
+                            # produce a flat layer here.
+                            util_image.create_qcow2([lock], cached_image_path,
+                                                    disk['path'], disk_size=disk['size'])
+
                         else:
                             with util_general.RecordedOperation('create copy on write layer', self):
-                                images.util_image.create_cow([lock], cached_image_path,
-                                                             disk['path'], disk['size'])
+                                util_image.create_cow([lock], cached_image_path,
+                                                      disk['path'], disk['size'])
                             self.log.with_fields(util_general.stat_log_fields(disk['path'])).info(
                                 'COW layer %s created' % disk['path'])
 
@@ -626,7 +636,7 @@ class Instance(dbo):
                                 % (cached_image_path))
 
                     elif not os.path.exists(disk['path']):
-                        images.util_image.create_blank(
+                        util_image.create_blank(
                             [lock], disk['path'], disk['size'])
 
                     shutil.chown(disk['path'], 'libvirt-qemu', 'libvirt-qemu')
