@@ -268,7 +268,8 @@ class TestSnapshots(base.BaseNamespacedTestCase):
 
         self.assertEqual(1, len(snapshots))
 
-        snap2 = self.test_client.snapshot_instance(inst['uuid'], device='vdc')
+        snap2 = self.test_client.snapshot_instance(
+            inst['uuid'], device='vdc', label_name='foo')
         self.assertIsNotNone(snap2)
 
         # Wait until the blob uuid specified above is the one used for the
