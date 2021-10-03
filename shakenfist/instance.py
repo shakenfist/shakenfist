@@ -878,6 +878,15 @@ class Instance(dbo):
                 ports = self.ports
                 self._free_console_port(ports['console_port'])
                 self._free_console_port(ports['vdi_port'])
+
+                # We need to delete the nvram file before we can undefine
+                # the domain. This will be recreated by libvirt on the next
+                # attempt.
+                nvram_path = os.path.join(
+                    config.STORAGE_PATH, 'instances', self.uuid, 'nvram')
+                if os.path.exists(nvram_path):
+                    os.unlink(nvram_path)
+
                 inst.undefine()
 
                 self.ports = None
