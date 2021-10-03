@@ -86,7 +86,7 @@ def create_cow(locks, cache_file, disk_file, disk_size):
                              % (cache_file, disk_file))
 
 
-def create_qcow2(locks, cache_file, disk_file):
+def create_qcow2(locks, cache_file, disk_file, disk_size=None):
     """Make a qcow2 copy of the disk from the image cache."""
 
     if os.path.exists(disk_file):
@@ -95,6 +95,9 @@ def create_qcow2(locks, cache_file, disk_file):
     util_process.execute(locks,
                          'qemu-img convert -t none -O qcow2 %s %s'
                          % (cache_file, disk_file))
+    if disk_size:
+        util_process.execute(locks,
+                             'qemu-img resize %s %dG' % (disk_file, int(disk_size)))
 
 
 def create_blank(locks, disk_file, disk_size):
