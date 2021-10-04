@@ -192,7 +192,7 @@ pipeline {
   post {
     always {
       sh '''  . /home/jenkins/sf-ci
-              . $WORKSPACE/$BUILD_TAG/ci-environment.sh
+              . $WORKSPACE/$BUILD_TAG/ci-environment.sh || true
 
               echo "=============================="
               ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
