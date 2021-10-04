@@ -62,6 +62,7 @@ class NetworkEndpoint(api_base.Resource):
     @jwt_required
     @api_base.arg_is_network_uuid
     @api_base.requires_network_ownership
+    @api_base.requires_namespace_exist
     @api_base.redirect_to_network_node
     def delete(self, network_uuid=None, network_from_db=None, namespace=None):
         if network_uuid == 'floating':
@@ -117,6 +118,7 @@ class NetworksEndpoint(api_base.Resource):
         return retval
 
     @jwt_required
+    @api_base.requires_namespace_exist
     def post(self, netblock=None, provide_dhcp=None, provide_nat=None, name=None,
              namespace=None):
         try:
@@ -140,6 +142,7 @@ class NetworksEndpoint(api_base.Resource):
         return network.external_view()
 
     @jwt_required
+    @api_base.requires_namespace_exist
     @api_base.redirect_to_network_node
     def delete(self, confirm=False, namespace=None, clean_wait=False):
         """Delete all networks in the namespace.
