@@ -92,11 +92,20 @@ class InstancesEndpoint(api_base.Resource):
              video=None, uefi=False):
         global SCHEDULER
 
+        if not namespace:
+            namespace = get_jwt_identity()
+
+        # If accessing a foreign namespace, we need to be an admin
+        if get_jwt_identity() not in [namespace, 'system']:
+            return api_base.error(
+                401, 'only admins can create resources in a different namespace')
+
         # Check that the instance name is safe for use as a DNS host name
         if name != re.sub(r'([^a-zA-Z0-9\-])', '', name) or len(name) > 63:
-            return api_base.error(400, ('instance name %s is not useable as a DNS and Linux host name. '
-                                        'That is, less than 63 characters and in the character set: '
-                                        'a-z, A-Z, 0-9, or hyphen (-).' % name))
+            return api_base.error(
+                400, ('instance name %s is not useable as a DNS and Linux host name. '
+                      'That is, less than 63 characters and in the character set: '
+                      'a-z, A-Z, 0-9, or hyphen (-).' % name))
 
         # If we are placed, make sure that node exists
         if placed_on:
@@ -191,6 +200,8 @@ class InstancesEndpoint(api_base.Resource):
                     return api_base.error(404, 'network %s does not exist' % net_uuid)
                 if n.state.value != net.Network.STATE_CREATED:
                     return api_base.error(406, 'network %s is not ready (%s)' % (n.uuid, n.state.value))
+                if n.namespace != namespace:
+                    return api_base.error(404, 'network %s does not exist' % net_uuid)
 
         if not video:
             video = {'model': 'cirrus', 'memory': 16384}
@@ -199,14 +210,6 @@ class InstancesEndpoint(api_base.Resource):
                 return api_base.error(400, 'video specification requires "model"')
             if 'memory' not in video:
                 return api_base.error(400, 'video specification requires "memory"')
-
-        if not namespace:
-            namespace = get_jwt_identity()
-
-        # If accessing a foreign namespace, we need to be an admin
-        if get_jwt_identity() not in [namespace, 'system']:
-            return api_base.error(401,
-                                  'only admins can create resources in a different namespace')
 
         # Create instance object
         inst = instance.Instance.new(
