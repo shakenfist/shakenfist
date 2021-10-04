@@ -16,6 +16,7 @@ import traceback
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
+from shakenfist import db
 from shakenfist.instance import Instance
 from shakenfist import logutil
 from shakenfist.net import Network
@@ -232,6 +233,18 @@ def requires_network_active(func):
             return error(406,
                          'network %s is not ready (%s)'
                          % (kwargs['network_from_db'].uuid, state.value))
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
+def requires_namespace_exist(func):
+    def wrapper(*args, **kwargs):
+        if kwargs.get('namespace'):
+            if not db.get_namespace(kwargs['namespace']):
+                LOG.with_field('namespace', kwargs['namespace']).warning(
+                    'Attempt to use non-existent namespace')
+                return error(404, 'namespace not found')
 
         return func(*args, **kwargs)
     return wrapper

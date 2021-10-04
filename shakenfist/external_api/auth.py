@@ -29,6 +29,7 @@ class AuthEndpoint(api_base.Resource):
             keys.append(base64.b64decode(rec['keys'][key_name]))
         return (rec.get('service_key'), keys)
 
+    @api_base.requires_namespace_exist
     def post(self, namespace=None, key=None):
         if not namespace:
             return api_base.error(400, 'missing namespace in request')
@@ -154,18 +155,17 @@ def _namespace_keys_putpost(namespace=None, key_name=None, key=None):
 class AuthNamespaceKeysEndpoint(api_base.Resource):
     @jwt_required
     @api_base.caller_is_admin
+    @api_base.requires_namespace_exist
     def get(self, namespace=None):
-        rec = db.get_namespace(namespace)
-        if not rec:
-            return api_base.error(404, 'namespace does not exist')
-
         out = []
+        rec = db.get_namespace(namespace)
         for keyname in rec['keys']:
             out.append(keyname)
         return out
 
     @jwt_required
     @api_base.caller_is_admin
+    @api_base.requires_namespace_exist
     def post(self, namespace=None, key_name=None, key=None):
         return _namespace_keys_putpost(namespace, key_name, key)
 
@@ -173,10 +173,9 @@ class AuthNamespaceKeysEndpoint(api_base.Resource):
 class AuthNamespaceKeyEndpoint(api_base.Resource):
     @jwt_required
     @api_base.caller_is_admin
+    @api_base.requires_namespace_exist
     def put(self, namespace=None, key_name=None, key=None):
         rec = db.get_namespace(namespace)
-        if not rec:
-            return api_base.error(404, 'namespace does not exist')
         if key_name not in rec['keys']:
             return api_base.error(404, 'key does not exist')
 
@@ -202,7 +201,8 @@ class AuthNamespaceKeyEndpoint(api_base.Resource):
 class AuthMetadatasEndpoint(api_base.Resource):
     @jwt_required
     @api_base.caller_is_admin
-    def get(self, namespace):
+    @api_base.requires_namespace_exist
+    def get(self, namespace=None):
         md = db.get_metadata('namespace', namespace)
         if not md:
             return {}
@@ -210,19 +210,22 @@ class AuthMetadatasEndpoint(api_base.Resource):
 
     @jwt_required
     @api_base.caller_is_admin
-    def post(self, namespace, key=None, value=None):
+    @api_base.requires_namespace_exist
+    def post(self, namespace=None, key=None, value=None):
         return api_util.metadata_putpost('namespace', namespace, key, value)
 
 
 class AuthMetadataEndpoint(api_base.Resource):
     @jwt_required
     @api_base.caller_is_admin
-    def put(self, namespace, key=None, value=None):
+    @api_base.requires_namespace_exist
+    def put(self, namespace=None, key=None, value=None):
         return api_util.metadata_putpost('namespace', namespace, key, value)
 
     @jwt_required
     @api_base.caller_is_admin
-    def delete(self, namespace, key=None, value=None):
+    @api_base.requires_namespace_exist
+    def delete(self, namespace=None, key=None, value=None):
         if not key:
             return api_base.error(400, 'no key specified')
 

@@ -51,6 +51,7 @@ class InstanceEndpoint(api_base.Resource):
     @jwt_required
     @api_base.arg_is_instance_uuid
     @api_base.requires_instance_ownership
+    @api_base.requires_namespace_exist
     def delete(self, instance_uuid=None, instance_from_db=None, namespace=None):
         # Check if instance has already been deleted
         if instance_from_db.state.value == dbo.STATE_DELETED:
@@ -85,6 +86,7 @@ class InstancesEndpoint(api_base.Resource):
         return retval
 
     @jwt_required
+    @api_base.requires_namespace_exist
     def post(self, name=None, cpus=None, memory=None, network=None, disk=None,
              ssh_key=None, user_data=None, placed_on=None, namespace=None,
              video=None, uefi=False):
@@ -336,6 +338,7 @@ class InstancesEndpoint(api_base.Resource):
         return inst.external_view()
 
     @jwt_required
+    @api_base.requires_namespace_exist
     def delete(self, confirm=False, namespace=None):
         """Delete all instances in the namespace."""
 

@@ -1,6 +1,7 @@
 import base64
 import bcrypt
 import json
+import logging
 import mock
 
 
@@ -108,6 +109,17 @@ class AuthTestCase(base.ShakenFistTestCase):
         external_api.TESTING = True
         external_api.app.testing = True
         external_api.app.debug = False
+
+        external_api.app.logger.addHandler(logging.StreamHandler())
+        external_api.app.logger.setLevel(logging.DEBUG)
+        logging.root.setLevel(logging.DEBUG)
+
+        self.get_namespace = mock.patch('shakenfist.db.get_namespace')
+        self.mock_get_namespace = self.get_namespace.start()
+        self.addCleanup(self.get_namespace.stop)
+
+        # The client must be created after all the mocks, or the mocks are not
+        # correctly applied.
         self.client = external_api.app.test_client()
 
     def test_post_auth_no_args(self):
@@ -174,20 +186,6 @@ class AuthTestCase(base.ShakenFistTestCase):
             },
             resp.get_json())
 
-    @mock.patch('shakenfist.etcd.get',
-                return_value={
-                    'service_key': 'cheese',
-                    'keys': {
-                        'key1': str(base64.b64encode(_encode_key('bacon')), 'utf-8'),
-                        'key2': str(base64.b64encode(_encode_key('sausage')), 'utf-8')
-                    }
-                })
-    def test_post_auth_service_key(self, mock_get):
-        resp = self.client.post(
-            '/auth', data=json.dumps({'namespace': 'banana', 'key': 'cheese'}))
-        self.assertEqual(200, resp.status_code)
-        self.assertIn('access_token', resp.get_json())
-
     def test_no_auth_header(self):
         resp = self.client.post('/auth/namespaces',
                                 data=json.dumps({
@@ -230,6 +228,37 @@ class AuthTestCase(base.ShakenFistTestCase):
         self.assertEqual(401, resp.status_code)
 
 
+class AuthNoNamespaceMockTestCase(base.ShakenFistTestCase):
+    def setUp(self):
+        super(AuthNoNamespaceMockTestCase, self).setUp()
+
+        external_api.TESTING = True
+        external_api.app.testing = True
+        external_api.app.debug = False
+
+        external_api.app.logger.addHandler(logging.StreamHandler())
+        external_api.app.logger.setLevel(logging.DEBUG)
+        logging.root.setLevel(logging.DEBUG)
+
+        # The client must be created after all the mocks, or the mocks are not
+        # correctly applied.
+        self.client = external_api.app.test_client()
+
+    @mock.patch('shakenfist.etcd.get',
+                return_value={
+                    'service_key': 'cheese',
+                    'keys': {
+                        'key1': str(base64.b64encode(_encode_key('bacon')), 'utf-8'),
+                        'key2': str(base64.b64encode(_encode_key('sausage')), 'utf-8')
+                    }
+                })
+    def test_post_auth_service_key(self, mock_get):
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'banana', 'key': 'cheese'}))
+        self.assertEqual(200, resp.status_code)
+        self.assertIn('access_token', resp.get_json())
+
+
 class ExternalApiTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super(ExternalApiTestCase, self).setUp()
@@ -247,21 +276,10 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         external_api.TESTING = True
         external_api.app.testing = True
         external_api.app.debug = False
-        self.client = external_api.app.test_client()
 
-        # Make a fake auth token
-        self.get_keys = mock.patch(
-            'shakenfist.external_api.auth.AuthEndpoint._get_keys',
-            return_value=('foo', ['bar'])
-        )
-        self.mock_get_keys = self.get_keys.start()
-        self.addCleanup(self.get_keys.stop)
-
-        resp = self.client.post(
-            '/auth', data=json.dumps({'namespace': 'system', 'key': 'foo'}))
-        print(resp.get_json())
-        self.assertEqual(200, resp.status_code)
-        self.auth_header = 'Bearer %s' % resp.get_json()['access_token']
+        external_api.app.logger.addHandler(logging.StreamHandler())
+        external_api.app.logger.setLevel(logging.DEBUG)
+        logging.root.setLevel(logging.DEBUG)
 
         fake_config = SFConfig(
             NODE_NAME='node1',
@@ -271,6 +289,22 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
                                  fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
+
+        self.get_namespace = mock.patch('shakenfist.db.get_namespace')
+        self.mock_get_namespace = self.get_namespace.start()
+        self.addCleanup(self.get_namespace.stop)
+
+        # The client must be created after all the mocks, or the mocks are not
+        # correctly applied.
+        self.client = external_api.app.test_client()
+
+        # Make a fake auth token
+        with mock.patch('shakenfist.external_api.auth.AuthEndpoint._get_keys',
+                        return_value=('foo', ['bar'])):
+            resp = self.client.post(
+                '/auth', data=json.dumps({'namespace': 'system', 'key': 'foo'}))
+            self.assertEqual(200, resp.status_code)
+            self.auth_header = 'Bearer %s' % resp.get_json()['access_token']
 
 
 class ExternalApiGeneralTestCase(ExternalApiTestCase):
@@ -340,24 +374,6 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
             },
             resp.get_json())
         self.assertEqual(403, resp.status_code)
-
-    @mock.patch('shakenfist.db.get_lock')
-    @mock.patch('shakenfist.etcd.get', return_value=None)
-    @mock.patch('shakenfist.etcd.put')
-    @mock.patch('bcrypt.hashpw', return_value='terminator'.encode('utf-8'))
-    def test_auth_add_key_new_namespace(self, mock_hashpw, mock_put, mock_get, mock_lock):
-        resp = self.client.post('/auth/namespaces',
-                                headers={'Authorization': self.auth_header},
-                                data=json.dumps({
-                                    'namespace': 'foo',
-                                    'key_name': 'bernard',
-                                    'key': 'cheese'
-                                }))
-        self.assertEqual(200, resp.status_code)
-        self.assertEqual('foo', resp.get_json())
-        mock_put.assert_called_with(
-            'namespace', None, 'foo',
-            {'name': 'foo', 'keys': {'bernard': 'dGVybWluYXRvcg=='}})
 
     @mock.patch('shakenfist.etcd.get_all',
                 return_value=[
@@ -440,15 +456,6 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
                 'status': 404
             },
             resp.get_json())
-
-    @mock.patch('shakenfist.db.get_lock')
-    @mock.patch('shakenfist.etcd.get', return_value={'keys': {'mykey': 'foo'}})
-    @mock.patch('shakenfist.etcd.put')
-    def test_delete_namespace_key(self, mock_put, mock_get, mock_lock):
-        resp = self.client.delete('/auth/namespaces/system/keys/mykey',
-                                  headers={'Authorization': self.auth_header})
-        self.assertEqual(200, resp.status_code)
-        mock_put.assert_called_with('namespace', None, 'system', {'keys': {}})
 
     @mock.patch('shakenfist.db.get_metadata', return_value={'a': 'a', 'b': 'b'})
     def test_get_namespace_metadata(self, mock_md_get):
@@ -897,10 +904,13 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
     def test_post_instance_only_system_specifies_namespaces(
             self, mock_ipmanager, mock_lock, mock_net, mock_net_attribute,
             mock_get_artifact):
-        resp = self.client.post(
-            '/auth', data=json.dumps({'namespace': 'banana', 'key': 'foo'}))
-        self.assertEqual(200, resp.status_code)
-        non_system_auth_header = 'Bearer %s' % resp.get_json()['access_token']
+        with mock.patch('shakenfist.external_api.auth.AuthEndpoint._get_keys',
+                        return_value=('foo', ['bar'])):
+            resp = self.client.post(
+                '/auth', data=json.dumps({'namespace': 'banana', 'key': 'foo'}))
+            self.assertEqual(200, resp.status_code)
+            non_system_auth_header = 'Bearer %s' % resp.get_json()[
+                'access_token']
 
         resp = self.client.post('/instances',
                                 headers={
@@ -1032,3 +1042,76 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
                                       'namespace': 'foo'
                                   }))
         self.assertEqual([], resp.get_json())
+
+
+class ExternalApiNoNamespaceMockTestCase(base.ShakenFistTestCase):
+    def setUp(self):
+        super(ExternalApiNoNamespaceMockTestCase, self).setUp()
+
+        self.add_event = mock.patch(
+            'shakenfist.db.add_event')
+        self.mock_add_event = self.add_event.start()
+        self.addCleanup(self.add_event.stop)
+
+        self.scheduler = mock.patch(
+            'shakenfist.scheduler.Scheduler', FakeScheduler)
+        self.mock_scheduler = self.scheduler.start()
+        self.addCleanup(self.scheduler.stop)
+
+        external_api.TESTING = True
+        external_api.app.testing = True
+        external_api.app.debug = False
+
+        external_api.app.logger.addHandler(logging.StreamHandler())
+        external_api.app.logger.setLevel(logging.DEBUG)
+        logging.root.setLevel(logging.DEBUG)
+
+        fake_config = SFConfig(
+            NODE_NAME='node1',
+        )
+
+        self.config = mock.patch('shakenfist.instance.config',
+                                 fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        # The client must be created after all the mocks, or the mocks are not
+        # correctly applied.
+        self.client = external_api.app.test_client()
+
+        # Make a fake auth token
+        with mock.patch('shakenfist.external_api.auth.AuthEndpoint._get_keys',
+                        return_value=('foo', ['bar'])):
+            with mock.patch('shakenfist.db.get_namespace'):
+                resp = self.client.post(
+                    '/auth', data=json.dumps({'namespace': 'system', 'key': 'foo'}))
+                self.assertEqual(200, resp.status_code)
+                self.auth_header = 'Bearer %s' % resp.get_json()[
+                    'access_token']
+
+    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.etcd.get', return_value={'keys': {'mykey': 'foo'}})
+    @mock.patch('shakenfist.etcd.put')
+    def test_delete_namespace_key(self, mock_put, mock_get, mock_lock):
+        resp = self.client.delete('/auth/namespaces/system/keys/mykey',
+                                  headers={'Authorization': self.auth_header})
+        self.assertEqual(200, resp.status_code)
+        mock_put.assert_called_with('namespace', None, 'system', {'keys': {}})
+
+    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.etcd.get', return_value=None)
+    @mock.patch('shakenfist.etcd.put')
+    @mock.patch('bcrypt.hashpw', return_value='terminator'.encode('utf-8'))
+    def test_auth_add_key_new_namespace(self, mock_hashpw, mock_put, mock_get, mock_lock):
+        resp = self.client.post('/auth/namespaces',
+                                headers={'Authorization': self.auth_header},
+                                data=json.dumps({
+                                    'namespace': 'foo',
+                                    'key_name': 'bernard',
+                                    'key': 'cheese'
+                                }))
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual('foo', resp.get_json())
+        mock_put.assert_called_with(
+            'namespace', None, 'foo',
+            {'name': 'foo', 'keys': {'bernard': 'dGVybWluYXRvcg=='}})
