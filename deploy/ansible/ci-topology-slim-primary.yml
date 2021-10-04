@@ -8,6 +8,9 @@
     base_image_user: "ubuntu"
 
   tasks:
+    - name: Create the namespace
+      shell: sf-client namespace create "{{identifier}}"
+
     - name: Create a network for outgoing traffic
       sf_network:
         netblock: "10.0.0.0/24"
