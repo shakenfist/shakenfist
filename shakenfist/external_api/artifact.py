@@ -53,25 +53,26 @@ class ArtifactsEndpoint(api_base.Resource):
     @jwt_required
     def get(self, node=None):
         retval = []
-        for i in Artifacts(filters=[baseobject.active_states_filter]):
-            b = i.most_recent_index
-            if b:
-                if not node:
-                    retval.append(i.external_view())
-                elif node in b.locations:
-                    retval.append(i.external_view())
+        for a in Artifacts(filters=[baseobject.active_states_filter]):
+            if node:
+                idx = a.most_recent_index
+                if 'blob_uuid' in idx:
+                    b = Blob.from_db(idx['blob_uuid'])
+                    if b and node in b.locations:
+                        retval.append(a.external_view())
+            else:
+                retval.append(a.external_view())
+
         return retval
 
     @jwt_required
     def post(self, url=None):
         # The only artifact type you can force the cluster to fetch is an
-        # image, so TYPE_IMAGE is assumed here.
-        db.add_event('image', url, 'api', 'cache', None, None)
-
-        # We ensure that the image exists in the database in an initial state
-        # here so that it will show up in image list requests. The image is
-        # fetched by the queued job later.
+        # image, so TYPE_IMAGE is assumed here. We ensure that the image exists
+        # in the database in an initial state here so that it will show up in
+        # image list requests. The image is fetched by the queued job later.
         a = Artifact.from_url(Artifact.TYPE_IMAGE, url)
+
         etcd.enqueue(config.NODE_NAME, {
             'tasks': [FetchImageTask(url)],
         })
@@ -79,7 +80,7 @@ class ArtifactsEndpoint(api_base.Resource):
 
 
 class ArtifactUploadEndpoint(api_base.Resource):
-    @jwt_required
+    @ jwt_required
     def post(self, artifact_name=None, upload_uuid=None):
         url = '%s%s/%s' % (UPLOAD_URL, get_jwt_identity(), artifact_name)
         a = Artifact.from_url(Artifact.TYPE_IMAGE, url)
@@ -133,7 +134,20 @@ class ArtifactUploadEndpoint(api_base.Resource):
 
 
 class ArtifactEventsEndpoint(api_base.Resource):
-    @jwt_required
+    @ jwt_required
     # TODO(andy): Should images be owned? Personalised images should be owned.
     def get(self, artifact_uuid):
         return list(db.get_events('artifact', artifact_uuid))
+
+
+class ArtifactVersionsEndpoint(api_base.Resource):
+    @ jwt_required
+    @ arg_is_artifact_uuid
+    def get(self, artifact_uuid=None, artifact_from_db=None):
+        retval = []
+        for idx in artifact_from_db.get_all_indexes():
+            b = Blob.from_db(idx['blob_uuid'])
+            bout = b.external_view()
+            bout['index'] = idx['index']
+            retval.append(bout)
+        return retval
