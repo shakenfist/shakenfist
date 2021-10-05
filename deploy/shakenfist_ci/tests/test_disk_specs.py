@@ -20,11 +20,7 @@ class TestDiskSpecifications(base.BaseNamespacedTestCase):
         self.assertIsNotNone(inst['uuid'])
         self._await_login_prompt(inst['uuid'])
 
-        # We need to refresh our view of the instance, as it might have
-        # changed as it started up
-        inst = self.test_client.get_instance(inst['uuid'])
-
-        console = base.LoggingSocket(inst['node'], inst['console_port'])
+        console = base.LoggingSocket(self.test_client, inst)
         out = console.execute('df -h')
         if not out.find('vda'):
             self.fail('Disk is not virtio!\n\n%s' % out)
@@ -44,11 +40,7 @@ class TestDiskSpecifications(base.BaseNamespacedTestCase):
         self.assertIsNotNone(inst['uuid'])
         self._await_login_prompt(inst['uuid'])
 
-        # We need to refresh our view of the instance, as it might have
-        # changed as it started up
-        inst = self.test_client.get_instance(inst['uuid'])
-
-        console = base.LoggingSocket(inst['node'], inst['console_port'])
+        console = base.LoggingSocket(self.test_client, inst)
         out = console.execute('df -h')
         if not out.find('sda'):
             self.fail('Disk is not IDE!\n\n%s' % out)
@@ -89,11 +81,7 @@ class TestDiskSpecifications(base.BaseNamespacedTestCase):
         self.assertIsNotNone(inst['uuid'])
         self._await_login_prompt(inst['uuid'])
 
-        # We need to refresh our view of the instance, as it might have
-        # changed as it started up
-        inst = self.test_client.get_instance(inst['uuid'])
-
-        console = base.LoggingSocket(inst['node'], inst['console_port'])
+        console = base.LoggingSocket(self.test_client, inst)
 
         # Boot disk
         out = console.execute('dmesg | grep sda')

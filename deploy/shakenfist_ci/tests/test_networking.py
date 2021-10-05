@@ -73,18 +73,13 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self._await_login_prompt(inst1['uuid'])
         self._await_login_prompt(inst2['uuid'])
 
-        # We need to refresh our view of the instances, as it might have
-        # changed as they started up
-        inst1 = self.test_client.get_instance(inst1['uuid'])
-        inst2 = self.test_client.get_instance(inst2['uuid'])
-
         nics = self.test_client.get_instance_interfaces(inst2['uuid'])
         self.assertEqual(1, len(nics))
         for iface in nics:
             self.assertEqual('created', iface['state'],
                              'Interface %s is not in correct state' % iface['uuid'])
 
-        console = base.LoggingSocket(inst1['node'], inst1['console_port'])
+        console = base.LoggingSocket(self.test_client, inst1)
         out = console.execute('ping -c 3 %s' % nics[0]['ipv4'])
         if not out.find('100% packet'):
             self.fail('Ping should have failed!\n\n%s' % out)
@@ -126,18 +121,13 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self._await_login_prompt(inst1['uuid'])
         self._await_login_prompt(inst2['uuid'])
 
-        # We need to refresh our view of the instances, as it might have
-        # changed as they started up
-        inst1 = self.test_client.get_instance(inst1['uuid'])
-        inst2 = self.test_client.get_instance(inst2['uuid'])
-
         nics = self.test_client.get_instance_interfaces(inst2['uuid'])
         self.assertEqual(1, len(nics))
         for iface in nics:
             self.assertEqual('created', iface['state'],
                              'Interface %s is not in correct state' % iface['uuid'])
 
-        console = base.LoggingSocket(inst1['node'], inst1['console_port'])
+        console = base.LoggingSocket(self.test_client, inst1)
         out = console.execute('ping -c 3 %s' % nics[0]['ipv4'])
         if not out.find('100% packet'):
             self.fail('Ping should have failed!\n\n%s' % out)
@@ -179,11 +169,6 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self._await_login_prompt(inst1['uuid'])
         self._await_login_prompt(inst2['uuid'])
 
-        # We need to refresh our view of the instances, as it might have
-        # changed as they started up
-        inst1 = self.test_client.get_instance(inst1['uuid'])
-        inst2 = self.test_client.get_instance(inst2['uuid'])
-
         nics = self.test_client.get_instance_interfaces(inst2['uuid'])
         self.assertEqual(1, len(nics))
         for iface in nics:
@@ -191,7 +176,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                              'Interface %s is not in correct state' % iface['uuid'])
 
         # Ping the other instance on this network
-        console = base.LoggingSocket(inst1['node'], inst1['console_port'])
+        console = base.LoggingSocket(self.test_client, inst1)
         out = console.execute('ping -c 3 %s' % nics[0]['ipv4'])
         if not out.find(' 0% packet'):
             self.fail('Ping should have worked!\n\n%s' % out)
@@ -272,12 +257,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
 
         self._await_instances_ready([inst['uuid']])
 
-        # Sometimes the console port is missing. Explicitly check for
-        # that.
-        if 'console_port' not in inst:
-            self.fail('Missing console port: %s' % inst)
-
-        console = base.LoggingSocket(inst['node'], inst['console_port'])
+        console = base.LoggingSocket(self.test_client, inst)
         out = console.execute('ip link')
         if not out.find('04:ed:33:c0:2e:6c'):
             self.fail('Requested macaddress not used!\n\n%s' % out)

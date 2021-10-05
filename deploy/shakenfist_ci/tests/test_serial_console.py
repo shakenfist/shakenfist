@@ -33,9 +33,5 @@ class TestSerialConsole(base.BaseNamespacedTestCase):
 
         self._await_login_prompt(inst['uuid'])
 
-        # We need to refresh our view of the instance, as it might have
-        # changed as it started up
-        inst = self.test_client.get_instance(inst['uuid'])
-
-        console = base.LoggingSocket(inst['node'], inst['console_port'])
+        console = base.LoggingSocket(self.test_client, inst)
         self.assertTrue(console.execute('uptime').find('load average'))

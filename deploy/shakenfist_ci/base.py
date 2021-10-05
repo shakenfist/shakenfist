@@ -344,12 +344,19 @@ class TestDistroBoots(BaseNamespacedTestCase):
 class LoggingSocket(object):
     ctrlc = '\x03'
 
-    def __init__(self, host, port):
+    def __init__(self, client, inst):
+        inst = client.get_instance(inst['uuid'])
+        if not inst['node']:
+            raise Exception('Host is None!')
+        if not inst['console_port']:
+            raise Exception('Port is None!')
+
         attempts = 5
         while attempts:
             try:
                 attempts -= 1
-                self.s = telnetlib.Telnet(host, port, 30)
+                self.s = telnetlib.Telnet(
+                    inst['node'], inst['console_port'], 30)
                 return
 
             except ConnectionRefusedError:
@@ -357,8 +364,8 @@ class LoggingSocket(object):
                 time.sleep(5)
 
         raise ConnectionRefusedError(
-            'Repeated telnet connection attempts failed: host=%s port=%s' %
-            (host, port))
+            'Repeated telnet connection attempts failed: host=%s port=%s'
+            % (inst['node'], inst['console_port']))
 
     def ensure_fresh(self):
         for d in [self.ctrlc, self.ctrlc, '\nexit\n', 'cirros\n', 'gocubsgo\n']:
