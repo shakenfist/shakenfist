@@ -299,3 +299,71 @@ class TestNetworking(base.BaseNamespacedTestCase):
         for iface in nics:
             self.assertEqual(
                 'deleted', self.test_client.get_interface(iface['uuid'])['state'])
+
+    def test_extraneous_network_duplicates(self):
+        dupnet = self.test_client.allocate_network(
+            '10.0.0.0/24', True, True, '%s-dups' % self.namespace)
+        self._await_networks_ready([dupnet['uuid']])
+
+        try:
+            inst_hyp1_vm1 = self.test_client.create_instance(
+                'dup1', 1, 1024,
+                [
+                    {
+                        'network_uuid': dupnet['uuid']
+                    }
+                ],
+                [
+                    {
+                        'size': 8,
+                        'base': 'cirros',
+                        'type': 'disk'
+                    }
+                ], None, None, force_placement='sf-2')
+
+            inst_hyp1_vm2 = self.test_client.create_instance(
+                'dup2', 1, 1024,
+                [
+                    {
+                        'network_uuid': dupnet['uuid']
+                    }
+                ],
+                [
+                    {
+                        'size': 8,
+                        'base': 'ubuntu:20.04',
+                        'type': 'disk'
+                    }
+                ], None, None, force_placement='sf-2')
+
+            inst_hyp2_vm1 = self.test_client.create_instance(
+                'dup3', 1, 1024,
+                [
+                    {
+                        'network_uuid': dupnet['uuid']
+                    }
+                ],
+                [
+                    {
+                        'size': 8,
+                        'base': 'ubuntu:20.04',
+                        'type': 'disk'
+                    }
+                ], None, None, force_placement='sf-3')
+
+        except apiclient.ResourceNotFoundException as e:
+            self.skip('Target node does not exist. %s' % e)
+            return
+
+        self.assertIsNotNone(inst_hyp1_vm1['uuid'])
+        self._await_login_prompt(inst_hyp1_vm1['uuid'])
+        self.assertIsNotNone(inst_hyp1_vm2['uuid'])
+        self._await_login_prompt(inst_hyp1_vm2['uuid'])
+        self.assertIsNotNone(inst_hyp2_vm1['uuid'])
+        self._await_login_prompt(inst_hyp2_vm1['uuid'])
+
+        nics = self.test_client.get_instance_interfaces(inst_hyp1_vm2['uuid'])
+        console = base.LoggingSocket(
+            inst_hyp1_vm1['node'], inst_hyp1_vm1['console_port'])
+        out = console.execute('ping -c 3 %s' % nics[0]['ipv4'])
+        self.assertFalse('DUP' in out)
