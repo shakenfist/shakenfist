@@ -1,0 +1,83 @@
+- name: Ensure we have somewhere to write the build details to
+  file:
+    path: "{{ lookup('env', 'WORKSPACE') }}/{{ lookup('env', 'BUILD_TAG') }}"
+    state: directory
+    mode: "0755"
+
+- name: Write details of instances to workspace
+  copy:
+    content: |
+      {% for svr in groups.sfall%}
+      export {{svr}}={{hostvars[svr]['ansible_ssh_host']}}
+      {% endfor %}
+
+      export identifier={{identifier}}
+      export source_path={{source_path}}
+    dest: "{{ lookup('env', 'WORKSPACE') }}/{{ lookup('env', 'BUILD_TAG') }}/ci-environment.sh"
+    owner: jenkins
+    group: jenkins
+    mode: u=r,g=r,o=r
+
+- name: Log environment details path
+  debug:
+    msg: "Environment details written to {{ lookup('env', 'WORKSPACE') }}/{{ lookup('env', 'BUILD_TAG') }}/ci-environment.sh"
+
+- name: Wait for all instances to present an "OpenSSH" prompt
+  wait_for:
+    port: 22
+    host: "{{hostvars[item]['ansible_ssh_host']}}"
+    search_regex: OpenSSH
+    delay: 10
+  with_items: "{{ groups['sfall'] }}"
+
+- name: Remove old deploy tarball
+  file:
+    path: "{{source_path}}/shakenfist/deploy.tgz"
+    state: absent
+
+- name: Remove old docs tarball
+  file:
+    path: "{{source_path}}/shakenfist/docs.tgz"
+    state: absent
+
+- name: Build Shaken Fist wheel
+  shell: |
+    tar czf deploy.tgz deploy
+    tar czf docs.tgz docs
+    rm dist/*
+    python3 setup.py sdist bdist_wheel
+  args:
+    chdir: "{{source_path}}/shakenfist"
+
+- name: Determine wheel filename
+  shell: ls dist | egrep "shakenfist.*\.whl"
+  args:
+    chdir: "{{source_path}}/shakenfist"
+  register: server_wheel_file_complex
+
+- name: Extract the wheel filename
+  set_fact:
+    server_wheel_file: "{{server_wheel_file_complex.stdout}}"
+
+- debug:
+    msg: "Server wheel file: {{server_wheel_file}}"
+
+- name: Build Shaken Fist client wheel
+  shell: |
+    rm dist/*
+    python3 setup.py sdist bdist_wheel
+  args:
+    chdir: "{{source_path}}/client-python"
+
+- name: Determine wheel filename
+  shell: ls dist | egrep "shakenfist_client.*\.whl"
+  args:
+    chdir: "{{source_path}}/client-python"
+  register: client_wheel_file_complex
+
+- name: Extract the wheel filename
+  set_fact:
+    client_wheel_file: "{{client_wheel_file_complex.stdout}}"
+
+- debug:
+    msg: "Client wheel file: {{client_wheel_file}}"

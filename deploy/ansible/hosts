@@ -16,5 +16,6 @@ localhost ansible_connection=local
 
 [etcd:children]
   hypervisors
+  etcd_master
 
 [etcd_master]
