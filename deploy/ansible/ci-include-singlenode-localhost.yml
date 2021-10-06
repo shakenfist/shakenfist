@@ -16,8 +16,8 @@
 - name: Create a primary instance
   sf_instance:
     name: "primary"
-    cpu: 8
-    ram: 12288
+    cpu: 12
+    ram: 32768
     disks:
       - "50@{{base_image}}"
     networkspecs:
