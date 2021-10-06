@@ -80,7 +80,7 @@ class ArtifactsEndpoint(api_base.Resource):
 
 
 class ArtifactUploadEndpoint(api_base.Resource):
-    @ jwt_required
+    @jwt_required
     def post(self, artifact_name=None, upload_uuid=None):
         url = '%s%s/%s' % (UPLOAD_URL, get_jwt_identity(), artifact_name)
         a = Artifact.from_url(Artifact.TYPE_IMAGE, url)
@@ -134,15 +134,15 @@ class ArtifactUploadEndpoint(api_base.Resource):
 
 
 class ArtifactEventsEndpoint(api_base.Resource):
-    @ jwt_required
+    @jwt_required
     # TODO(andy): Should images be owned? Personalised images should be owned.
     def get(self, artifact_uuid):
         return list(db.get_events('artifact', artifact_uuid))
 
 
 class ArtifactVersionsEndpoint(api_base.Resource):
-    @ jwt_required
-    @ arg_is_artifact_uuid
+    @jwt_required
+    @arg_is_artifact_uuid
     def get(self, artifact_uuid=None, artifact_from_db=None):
         retval = []
         for idx in artifact_from_db.get_all_indexes():
