@@ -363,7 +363,6 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self._await_login_prompt(inst_hyp2_vm1['uuid'])
 
         nics = self.test_client.get_instance_interfaces(inst_hyp1_vm2['uuid'])
-        console = base.LoggingSocket(
-            inst_hyp1_vm1['node'], inst_hyp1_vm1['console_port'])
+        console = base.LoggingSocket(self.test_client, inst_hyp1_vm1)
         out = console.execute('ping -c 3 %s' % nics[0]['ipv4'])
         self.assertFalse('DUP' in out)

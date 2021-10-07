@@ -280,42 +280,43 @@ def instance_start(inst, network):
         return
 
     with inst.get_lock(ttl=900, op='Instance start') as lock:
-        # Ensure networks are connected to this node
-        iface_uuids = []
-        for netdesc in network:
-            iface_uuids.append(netdesc['iface_uuid'])
-            n = net.Network.from_db(netdesc['network_uuid'])
-            if not n:
-                inst.enqueue_delete_due_error(
-                    'missing network: %s' % netdesc['network_uuid'])
-                return
-
-            if n.state.value != dbo.STATE_CREATED:
-                inst.enqueue_delete_due_error(
-                    'network is not active: %s' % n.uuid)
-                return
-
-            # We must record interfaces very early for the vxlan leak
-            # detection code in the net daemon to work correctly.
-            ni = networkinterface.NetworkInterface.from_db(
-                netdesc['iface_uuid'])
-            ni.state = dbo.STATE_CREATED
-
-            n.create_on_hypervisor()
-            n.ensure_mesh()
-            n.update_dhcp()
-
-        # Allocate console and VDI ports
-        inst.allocate_instance_ports()
-
-        # Now we can start the instance
         try:
+            # Ensure networks are connected to this node
+            iface_uuids = []
+            for netdesc in network:
+                iface_uuids.append(netdesc['iface_uuid'])
+                n = net.Network.from_db(netdesc['network_uuid'])
+                if not n:
+                    inst.enqueue_delete_due_error(
+                        'missing network: %s' % netdesc['network_uuid'])
+                    return
+
+                if n.state.value != dbo.STATE_CREATED:
+                    inst.enqueue_delete_due_error(
+                        'network is not active: %s' % n.uuid)
+                    return
+
+                # We must record interfaces very early for the vxlan leak
+                # detection code in the net daemon to work correctly.
+                ni = networkinterface.NetworkInterface.from_db(
+                    netdesc['iface_uuid'])
+                ni.state = dbo.STATE_CREATED
+
+                n.create_on_hypervisor()
+                n.ensure_mesh()
+                n.update_dhcp()
+
+            # Allocate console and VDI ports
+            inst.allocate_instance_ports()
+
+            # Now we can start the instance
             with util_general.RecordedOperation('instance creation', inst):
                 inst.create(iface_uuids, lock=lock)
 
-        except exceptions.InvalidStateException:
+        except exceptions.InvalidStateException as e:
             # This instance is in an error or deleted state. Given the check
             # at the top of this method, that indicates a race.
+            inst.enqueue_delete_due_error('invalid state transition: %s' % e)
             return
 
 
