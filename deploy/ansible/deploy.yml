@@ -91,6 +91,100 @@
   tasks:
     - include: terraform/{{cloud}}/postboot.yml
 
+    - name: apt-get dist-upgrade
+      apt:
+        update_cache: yes
+        upgrade: dist
+        autoremove: yes
+
+    # We install libvirt, even on non-hypervisors, because we use it to track
+    # the CPU topology and load of the node.
+    - name: Install non-hypervisor dependencies
+      apt:
+        name:
+          - arping
+          - bridge-utils
+          - cpu-checker
+          - dnsmasq
+          - dnsutils
+          - hddtemp
+          - libmagic-dev
+          - libssl-dev
+          - libssl-dev
+          - libvirt-daemon-system
+          - libvirt-dev
+          - lm-sensors
+          - net-tools
+          - ovmf
+          - prometheus-node-exporter
+          - python3-libvirt
+          - python3-venv
+          - qemu-kvm
+          - unzip
+        state: latest
+
+    - name: Determine the mesh network interface MTU
+      shell: ip link show
+      register: ip_links
+
+    - name: Log network interfaces
+      debug:
+        msg: "{{ip_links.stdout}}"
+
+    - name: Determine the mesh network interface MTU
+      shell: ip link show {{node_mesh_nic}} | grep mtu | sed -e 's/.*mtu //' -e 's/ .*//'
+      register: node_mtu_complex
+
+    - name: Extract default interface MTU
+      set_fact:
+        node_mtu: "{{node_mtu_complex.stdout}}"
+
+    - name: Log node MTU
+      debug:
+        msg: "Node MTU is {{node_mtu}}"
+
+    - name: Abort if default interface MTU is too low
+      fail:
+        msg: "Node MTU is too low."
+      when: ignore_mtu != "1" and node_mtu|int < 2000
+
+    - name: Make /srv/shakenfist/
+      file:
+        path: /srv/shakenfist
+        state: directory
+        mode: "0755"
+
+    - name: Install gunicorn
+      shell: /srv/shakenfist/venv/bin/pip install -U gunicorn
+
+    - name: Configure IPv6 to be disabled on boot
+      copy:
+        content: |
+          net.ipv6.conf.all.disable_ipv6 = 1
+          net.ipv6.conf.default.disable_ipv6 = 1
+        dest: /etc/sysctl.d/10-sf-ipv6.conf
+        owner: root
+        mode: u=r,g=r,o=r
+
+    - name: Configure IPv6 to be disabled now
+      shell: |
+        sysctl -w net.ipv6.conf.all.disable_ipv6=1
+        sysctl -w net.ipv6.conf.default.disable_ipv6=1
+      ignore_errors: True
+
+    - name: Configure ipforwarding to be enabled on boot
+      copy:
+        content: |
+          net.ipv4.ip_forward = 1
+        dest: /etc/sysctl.d/10-sf-ipforwarding.conf
+        owner: root
+        mode: u=r,g=r,o=r
+
+    - name: Configure ipforwarding to be enabled now
+      shell: |
+        sysctl -w net.ipv4.ip_forward=1
+      ignore_errors: True
+
 - hosts: hypervisors
   any_errors_fatal: true
   become: yes
@@ -99,53 +193,6 @@
   connection: ssh
 
   tasks:
-    - name: apt-get dist-upgrade
-      apt:
-        update_cache: yes
-        upgrade: dist
-        autoremove: yes
-
-    - name: Install dependencies
-      apt:
-        name:
-          - ack
-          - arping
-          - bridge-utils
-          - cpu-checker
-          - dnsmasq
-          - dnsutils
-          - etcd-client
-          - git
-          - hddtemp
-          - libmagic-dev
-          - libssl-dev
-          - libvirt-daemon-system
-          - libvirt-dev
-          - lm-sensors
-          - net-tools
-          - ovmf
-          - prometheus-node-exporter
-          - pwgen
-          - python3-libvirt
-          - python3-venv
-          - qemu-kvm
-          - rsync
-          - telnet
-          - unzip
-        state: latest
-
-    # - name: Ensure we have the Ubuntu package key (helps with Debian)
-    #   shell: apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367
-
-    # - name: Setup ansible package repository
-    #   copy:
-    #     content: |
-    #       deb http://ppa.launchpad.net/ansible/ansible/ubuntu trusty main
-    #     dest: "/etc/apt/sources.list.d/ansible.list"
-    #     owner: root
-    #     group: root
-    #     mode: u=r,g=r,o=r
-
     - name: Install modern ansible
       apt:
         name: ansible
@@ -204,39 +251,43 @@
         mode: u=r,g=r,o=r
       when: is_intel.rc == 0
 
-    - name: Determine the mesh network interface MTU
-      shell: ip link show
-      register: ip_links
+    - name: Configure KSM to run on boot
+      copy:
+        content: |
+          w /sys/kernel/mm/ksm/run - - - - 1
+          w /sys/kernel/mm/ksm/pages_to_scan - - - - 1000000
+          w /sys/kernel/mm/ksm/merge_across_nodes - - - - 0
+        dest: /etc/tmpfiles.d/sf-ksm.conf
+        owner: root
+        mode: u=r,g=r,o=r
+      when: ksm_enabled == "1"
 
-    - name: Log network interfaces
-      debug:
-        msg: "{{ip_links.stdout}}"
+    # merge_across_nodes requires a reboot, so is skipped below
+    - name: Configure KSM to run now
+      shell: |
+        echo "1" > /sys/kernel/mm/ksm/run
+        echo "100000" > /sys/kernel/mm/ksm/pages_to_scan
+      ignore_errors: True
+      when: ksm_enabled == "1"
 
-    - name: Determine the mesh network interface MTU
-      shell: ip link show {{node_mesh_nic}} | grep mtu | sed -e 's/.*mtu //' -e 's/ .*//'
-      register: node_mtu_complex
+    - name: Configure KSM to not run on boot
+      copy:
+        content: |
+          w /sys/kernel/mm/ksm/run - - - - 0
+          w /sys/kernel/mm/ksm/pages_to_scan - - - - 0
+          w /sys/kernel/mm/ksm/merge_across_nodes - - - - 0
+        dest: /etc/tmpfiles.d/sf-ksm.conf
+        owner: root
+        mode: u=r,g=r,o=r
+      when: ksm_enabled != "1"
 
-    - name: Extract default interface MTU
-      set_fact:
-        node_mtu: "{{node_mtu_complex.stdout}}"
-
-    - name: Log node MTU
-      debug:
-        msg: "Node MTU is {{node_mtu}}"
-
-    - name: Abort if default interface MTU is too low
-      fail:
-        msg: "Node MTU is too low."
-      when: ignore_mtu != "1" and node_mtu|int < 2000
-
-    - name: Make /srv/shakenfist/
-      file:
-        path: /srv/shakenfist
-        state: directory
-        mode: "0755"
-
-    - name: Install gunicorn
-      shell: /srv/shakenfist/venv/bin/pip install -U gunicorn
+    # merge_across_nodes requires a reboot, so is skipped below
+    - name: Configure KSM to not run now
+      shell: |
+        echo "0" > /sys/kernel/mm/ksm/run
+        echo "0" > /sys/kernel/mm/ksm/pages_to_scan
+      ignore_errors: True
+      when: ksm_enabled != "1"
 
 - hosts: primary_node
   any_errors_fatal: true
@@ -276,72 +327,6 @@
   connection: ssh
 
   tasks:
-    - name: Configure KSM to run on boot
-      copy:
-        content: |
-          w /sys/kernel/mm/ksm/run - - - - 1
-          w /sys/kernel/mm/ksm/pages_to_scan - - - - 1000000
-          w /sys/kernel/mm/ksm/merge_across_nodes - - - - 0
-        dest: /etc/tmpfiles.d/sf-ksm.conf
-        owner: root
-        mode: u=r,g=r,o=r
-      when: ksm_enabled == "1"
-
-    # merge_across_nodes requires a reboot, so is skipped below
-    - name: Configure KSM to run now
-      shell: |
-        echo "1" > /sys/kernel/mm/ksm/run
-        echo "100000" > /sys/kernel/mm/ksm/pages_to_scan
-      ignore_errors: True
-      when: ksm_enabled == "1"
-
-    - name: Configure KSM to not run on boot
-      copy:
-        content: |
-          w /sys/kernel/mm/ksm/run - - - - 0
-          w /sys/kernel/mm/ksm/pages_to_scan - - - - 0
-          w /sys/kernel/mm/ksm/merge_across_nodes - - - - 0
-        dest: /etc/tmpfiles.d/sf-ksm.conf
-        owner: root
-        mode: u=r,g=r,o=r
-      when: ksm_enabled != "1"
-
-    # merge_across_nodes requires a reboot, so is skipped below
-    - name: Configure KSM to not run now
-      shell: |
-        echo "0" > /sys/kernel/mm/ksm/run
-        echo "0" > /sys/kernel/mm/ksm/pages_to_scan
-      ignore_errors: True
-      when: ksm_enabled != "1"
-
-    - name: Configure IPv6 to be disabled on boot
-      copy:
-        content: |
-          net.ipv6.conf.all.disable_ipv6 = 1
-          net.ipv6.conf.default.disable_ipv6 = 1
-        dest: /etc/sysctl.d/10-sf-ipv6.conf
-        owner: root
-        mode: u=r,g=r,o=r
-
-    - name: Configure IPv6 to be disabled now
-      shell: |
-        sysctl -w net.ipv6.conf.all.disable_ipv6=1
-        sysctl -w net.ipv6.conf.default.disable_ipv6=1
-      ignore_errors: True
-
-    - name: Configure ipforwarding to be enabled on boot
-      copy:
-        content: |
-          net.ipv4.ip_forward = 1
-        dest: /etc/sysctl.d/10-sf-ipforwarding.conf
-        owner: root
-        mode: u=r,g=r,o=r
-
-    - name: Configure ipforwarding to be enabled now
-      shell: |
-        sysctl -w net.ipv4.ip_forward=1
-      ignore_errors: True
-
     - name: Syslog server is the primary server
       set_fact:
         syslog: "{{hostvars[groups['primary_node'][0]]['node_mesh_ip']}}"
@@ -657,6 +642,14 @@
         enabled: yes
         state: restarted
 
+- hosts: hypervisors, network_node
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
     - name: Fetch systemd unit template from remote host
       fetch:
         src: "{{hostvars['localhost']['template_path']}}/sf.service"
@@ -672,23 +665,16 @@
         group: root
         mode: u=r,g=r,o=r
 
-    - name: Create an admin namespace called "system" with one key configured
-      shell: "{{hostvars['localhost']['utility_path']}}/sf-passwd deploy {{hostvars[groups['primary_node'][0]]['system_key']}}"
-      run_once: true
-
-    - name: Rotate logs and remove old logs
-      shell: |
-        journalctl --rotate
-        journalctl --vacuum-time=2d
-        /usr/sbin/logrotate -f /etc/logrotate.conf
-      ignore_errors: True
-
     - name: Start the SF daemon
       service:
         name: sf
         enabled: yes
         state: restarted
         daemon_reload: yes
+
+    - name: Create an admin namespace called "system" with one key configured
+      shell: "{{hostvars['localhost']['utility_path']}}/sf-passwd deploy {{hostvars[groups['primary_node'][0]]['system_key']}}"
+      run_once: true
 
 - hosts: primary_node
   any_errors_fatal: true
@@ -698,6 +684,13 @@
   connection: ssh
 
   tasks:
+    - name: Rotate logs and remove old logs
+      shell: |
+        journalctl --rotate
+        journalctl --vacuum-time=2d
+        /usr/sbin/logrotate -f /etc/logrotate.conf
+      ignore_errors: True
+
     - name: Clear out old terraform providers
       file:
         path: /srv/shakenfist/terraform-provider-shakenfist
