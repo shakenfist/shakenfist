@@ -69,8 +69,8 @@ class Monitor(daemon.Daemon):
                         # hammer instead.
                         log_ctx.warning(
                             'Attempting alternate delete method for instance')
-                        util_process.execute(None,
-                                             'virsh destroy "sf:%s"' % instance_uuid)
+                        util_process.execute(
+                            None, 'virsh destroy "sf:%s"' % instance_uuid)
 
                         inst.add_event('enforced delete', 'complete')
                     else:
@@ -84,7 +84,12 @@ class Monitor(daemon.Daemon):
                 state = util_libvirt.extract_power_state(libvirt, domain)
                 inst.update_power_state(state)
                 if state == 'crashed':
-                    inst.state = inst.state.value + '-error'
+                    if inst.state.value in [dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED]:
+                        util_process.execute(
+                            None, 'virsh destroy "sf:%s"' % instance_uuid)
+                        inst.state.value = dbo.STATE_DELETED
+                    else:
+                        inst.state = inst.state.value + '-error'
 
             # Inactive VMs just have a name, and are powered off
             # in our state system.
