@@ -15,10 +15,6 @@ from shakenfist.util import process
 LOG, _ = logutil.setup(__name__)
 
 
-def is_network_node():
-    return config.NODE_MESH_IP == config.NETWORK_NODE_IP
-
-
 def _clean_ip_json(data):
     # For reasons I can't explain, the ip command sometimes returns
     # slightly bogus JSON like this:

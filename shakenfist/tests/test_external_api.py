@@ -285,8 +285,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
             NODE_NAME='node1',
         )
 
-        self.config = mock.patch('shakenfist.instance.config',
-                                 fake_config)
+        self.config = mock.patch('shakenfist.instance.config', fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
@@ -935,26 +934,56 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         self.assertEqual(401, resp.status_code)
 
 
-class ExternalApiNetworkTestCase(ExternalApiTestCase):
+class ExternalApiNetworkTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super(ExternalApiNetworkTestCase, self).setUp()
 
-        class FakeConfig(BaseSettings):
-            NODE_NAME: str = 'seriously'
-            NODE_EGRESS_IP: str = '127.0.0.1'
-            NETWORK_NODE_IP = '127.0.0.1'
-            LOG_METHOD_TRACE: int = 1
-            NODE_EGRESS_NIC: str = 'eth0'
-            NODE_MESH_NIC: str = 'eth1'
+        self.add_event = mock.patch('shakenfist.db.add_event')
+        self.mock_add_event = self.add_event.start()
+        self.addCleanup(self.add_event.stop)
 
-        fake_config_network = FakeConfig()
-        self.config = mock.patch('shakenfist.config.config',
-                                 fake_config_network)
+        self.scheduler = mock.patch(
+            'shakenfist.scheduler.Scheduler', FakeScheduler)
+        self.mock_scheduler = self.scheduler.start()
+        self.addCleanup(self.scheduler.stop)
+
+        external_api.TESTING = True
+        external_api.app.testing = True
+        external_api.app.debug = False
+
+        external_api.app.logger.addHandler(logging.StreamHandler())
+        external_api.app.logger.setLevel(logging.DEBUG)
+        logging.root.setLevel(logging.DEBUG)
+
+        fake_config = SFConfig(
+            NODE_NAME='seriously',
+            NODE_EGRESS_IP='127.0.0.1',
+            NETWORK_NODE_IP='127.0.0.1',
+            LOG_METHOD_TRACE=1,
+            NODE_EGRESS_NIC='eth0',
+            NODE_MESH_NIC='eth1',
+            NODE_IS_NETWORK_NODE=True
+        )
+        self.config = mock.patch(
+            'shakenfist.external_api.base.config', fake_config)
         self.mock_config = self.config.start()
-        # Without this cleanup, other test classes will have
-        # 'shakenfist.config.config.get' mocked during parallel testing
-        # by stestr.
         self.addCleanup(self.config.stop)
+
+        self.get_namespace = mock.patch('shakenfist.db.get_namespace')
+        self.mock_get_namespace = self.get_namespace.start()
+        self.addCleanup(self.get_namespace.stop)
+
+        # The client must be created after all the mocks, or the mocks are not
+        # correctly applied.
+        self.client = external_api.app.test_client()
+
+        # Make a fake auth token
+        with mock.patch('shakenfist.external_api.auth.AuthEndpoint._get_keys',
+                        return_value=('foo', ['bar'])):
+            resp = self.client.post(
+                '/auth', data=json.dumps({'namespace': 'system', 'key': 'foo'}))
+            self.assertEqual(200, resp.status_code)
+            self.auth_header = 'Bearer %s' % resp.get_json()['access_token']
 
     @mock.patch('shakenfist.net.Network._db_get_attribute',
                 return_value={'value': dbo.STATE_CREATED, 'update_time': 2})
@@ -1000,14 +1029,14 @@ class ExternalApiNetworkTestCase(ExternalApiTestCase):
                                  mock_ipmanager_from_db,
                                  mock_net_attribute):
 
+        self.client = external_api.app.test_client()
         resp = self.client.delete('/networks',
                                   headers={'Authorization': self.auth_header},
                                   data=json.dumps({
                                       'confirm': True,
                                       'namespace': 'foo'
                                   }))
-        self.assertEqual(['30f6da44-look-i-am-uuid'],
-                         resp.get_json())
+        self.assertEqual(['30f6da44-look-i-am-uuid'], resp.get_json())
         self.assertEqual(200, resp.status_code)
 
     @mock.patch('shakenfist.net.Network.from_db',

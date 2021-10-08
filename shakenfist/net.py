@@ -275,7 +275,7 @@ class Network(dbo):
         if not self.is_created():
             return False
 
-        if self.provide_dhcp and util_network.is_network_node():
+        if self.provide_dhcp and config.NODE_IS_NETWORK_NODE:
             if not self.is_dnsmasq_running():
                 return False
 
@@ -490,7 +490,7 @@ class Network(dbo):
         with self.get_lock(op='Network delete'):
             subst = self.subst_dict()
 
-            if util_network.is_network_node():
+            if config.NODE_IS_NETWORK_NODE:
                 if util_network.check_for_interface(subst['vx_veth_outer']):
                     with util_general.RecordedOperation('delete router veth', self):
                         util_process.execute(
@@ -554,7 +554,7 @@ class Network(dbo):
         if not self.provide_dhcp:
             return
 
-        if util_network.is_network_node():
+        if config.NODE_IS_NETWORK_NODE:
             subst = self.subst_dict()
             with util_general.RecordedOperation('update dhcp', self):
                 with self.get_lock(op='Network update DHCP'):
@@ -564,7 +564,7 @@ class Network(dbo):
             etcd.enqueue('networknode', UpdateDHCPNetworkTask(self.uuid))
 
     def remove_dhcp(self):
-        if util_network.is_network_node():
+        if config.NODE_IS_NETWORK_NODE:
             subst = self.subst_dict()
             with util_general.RecordedOperation('remove dhcp', self):
                 with self.get_lock(op='Network remove DHCP'):
@@ -574,7 +574,7 @@ class Network(dbo):
             etcd.enqueue('networknode', RemoveDHCPNetworkTask(self.uuid))
 
     def enable_nat(self):
-        if not util_network.is_network_node():
+        if not config.NODE_IS_NETWORK_NODE:
             return
 
         subst = self.subst_dict()
@@ -597,7 +597,7 @@ class Network(dbo):
                                      '-j MASQUERADE' % subst)
 
     def remove_nat(self):
-        if util_network.is_network_node():
+        if config.NODE_IS_NETWORK_NODE:
             if self.floating_gateway:
                 with db.get_lock('ipmanager', None, 'floating', ttl=120,
                                  op='Remove NAT'):

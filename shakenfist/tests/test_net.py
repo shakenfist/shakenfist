@@ -67,7 +67,7 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
         fake_config = SFConfig(NODE_EGRESS_IP='1.1.1.2',
                                NODE_MESH_IP='1.1.1.2',
                                NETWORK_NODE_IP='1.1.1.2')
-        self.config = mock.patch('shakenfist.config.config', fake_config)
+        self.config = mock.patch('shakenfist.net.config', fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
@@ -108,9 +108,10 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
 
     @mock.patch('shakenfist.net.Network.is_created', return_value=True)
     @mock.patch('shakenfist.net.Network.is_dnsmasq_running', return_value=False)
-    @mock.patch('shakenfist.config.config', SFConfig(NODE_EGRESS_IP='1.1.1.1',
-                                                     NODE_MESH_IP='1.1.1.2',
-                                                     NETWORK_NODE_IP='1.1.1.2'))
+    @mock.patch('shakenfist.net.config', SFConfig(NODE_EGRESS_IP='1.1.1.1',
+                                                  NODE_MESH_IP='1.1.1.2',
+                                                  NETWORK_NODE_IP='1.1.1.2',
+                                                  NODE_IS_NETWORK_NODE=True))
     def test_is_okay_no_dns(self, mock_is_dnsmasq, mock_is_created):
         n = net.Network({
             'uuid': 'actualuuid',
@@ -132,8 +133,9 @@ class NetworkNetNodeTestCase(NetworkTestCase):
 
         fake_config = SFConfig(NODE_EGRESS_IP='1.1.1.2',
                                NODE_MESH_IP='1.1.1.2',
-                               NETWORK_NODE_IP='1.1.1.2')
-        self.config = mock.patch('shakenfist.config.config', fake_config)
+                               NETWORK_NODE_IP='1.1.1.2',
+                               NODE_IS_NETWORK_NODE=True)
+        self.config = mock.patch('shakenfist.net.config', fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 

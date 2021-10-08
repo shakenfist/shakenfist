@@ -21,7 +21,6 @@ from shakenfist.instance import Instance
 from shakenfist import logutil
 from shakenfist.net import Network
 from shakenfist.util import general as util_general
-from shakenfist.util import network as util_network
 
 LOG, HANDLER = logutil.setup(__name__)
 daemon.set_log_level(LOG, 'api')
@@ -176,10 +175,9 @@ def arg_is_network_uuid(func):
 def redirect_to_network_node(func):
     # Redirect method to the network node
     def wrapper(*args, **kwargs):
-        if not util_network.is_network_node():
+        if not config.NODE_IS_NETWORK_NODE:
             admin_token = util_general.get_api_token(
-                'http://%s:%d' % (config.NETWORK_NODE_IP,
-                                  config.API_PORT),
+                'http://%s:%d' % (config.NETWORK_NODE_IP, config.API_PORT),
                 namespace='system')
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'],
@@ -192,8 +190,7 @@ def redirect_to_network_node(func):
 
             LOG.info('Returning proxied request: %d, %s'
                      % (r.status_code, r.text))
-            resp = flask.Response(r.text,
-                                  mimetype='application/json')
+            resp = flask.Response(r.text, mimetype='application/json')
             resp.status_code = r.status_code
             return resp
 
