@@ -4,43 +4,8 @@ from collections import defaultdict
 import json
 
 from shakenfist import etcd
-from shakenfist.util import process as util_process
 
 # Very simple data upgrader
-
-
-def clean_events_mesh_operations(etcd_client):
-    # TODO(andy): This can be removed when older releases do not exist
-
-    # We probably need to cleanup excess network mesh events. We also need to
-    # try and fetch small batches because of limits in the amount of data etcd3
-    # can return at one time.
-
-    # Save time and use the already available etcdctl client.
-    net_keys, stderr = util_process.execute(
-        None,
-        'etcdctl get --prefix /sf/event/network/ | grep sf/event',
-        check_exit_code=[0, 1])
-    if stderr:
-        print('ERROR: Unable to retrieve network keys:%s' % stderr)
-        return
-
-    # Split network events into networks
-    network_events = defaultdict(list)
-    for key in net_keys.split('\n'):
-        if not key:
-            continue
-        _blank, _sf, _event, _network, uuid, _time = key.split('/')
-        network_events[uuid].append(key)
-
-    # Delete all but last 50 events
-    count = 0
-    for keys in network_events.values():
-        for k in keys[:-50]:
-            print('--> Removing verbose network event %s' % k)
-            etcd_client.delete(k)
-            count += 1
-    print(' - Cleaned up %d old network mesh events' % count)
 
 
 def main():
@@ -79,8 +44,6 @@ def main():
 
     if major == 0:
         if minor <= 4:
-            clean_events_mesh_operations(etcd_client)
-
             for data, metadata in etcd_client.get_prefix('/sf/instance/'):
                 i = json.loads(data.decode('utf-8'))
                 changed = False

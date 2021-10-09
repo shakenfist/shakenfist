@@ -1,14 +1,25 @@
 import copy
 import flask
+from etcd3gw.client import Etcd3Client
+import importlib
+import json
 import logging
 from logging import handlers as logging_handlers
 import os
 from pylogrus import TextFormatter
 from pylogrus.base import PyLogrusBase
 import setproctitle
+import time
+
 
 from shakenfist.config import config
+from shakenfist import constants
+from shakenfist.tasks import EventLogMessageTask
 from shakenfist.util import callstack as util_callstack
+from shakenfist.util import random as util_random
+
+
+JSONEncoderCustomTypes = None
 
 
 # These classes are extensions of the work in https://github.com/vmig/pylogrus
@@ -19,9 +30,11 @@ class SFPyLogrus(logging.Logger, PyLogrusBase):
         self._extra_fields = extra or {}
         super(SFPyLogrus, self).__init__(*args, **kwargs)
 
+    # This method is required by the interface, we prefer with_prefix.
     def withPrefix(self, prefix=None):
         return self.with_prefix(prefix)
 
+    # This method is required by the interface, we prefer with_fields
     def withFields(self, fields=None):
         return self.with_fields(fields)
 
@@ -98,11 +111,22 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
 
     @staticmethod
     def _normalize(fields):
-        return {k.lower(): v for k, v in fields.items()} if isinstance(fields, dict) else {}
+        out = {}
+        if isinstance(fields, dict):
+            for k, v in fields.items():
+                # Some field names are reserved by the python logging implementation
+                # and cannot be used.
+                if k in ['name', 'level', 'fn', 'lno', 'msg', 'args', 'exc_info',
+                         'func', 'sinfo']:
+                    k = '_%s' % k
+                out[k.lower()] = v
+        return out
 
+    # This method is required by the interface, we prefer with_prefix.
     def withPrefix(self, prefix=None):
         return self.with_prefix(prefix)
 
+    # This method is required by the interface, we prefer with_fields.
     def withFields(self, fields=None):
         return self.with_fields(fields)
 
@@ -112,7 +136,7 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
             fields = {}
 
         # Handle "special fields" which might be internal objects
-        for key in ['artifact', 'blob', 'instance', 'network', 'networkinterface', 'node']:
+        for key in constants.OBJECT_NAMES:
             if key in fields:
                 value = fields[key]
                 if not isinstance(value, str):
@@ -131,14 +155,53 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
     def with_prefix(self, prefix=None):
         return self if prefix is None else SFCustomAdapter(self._logger, self._extra, prefix)
 
-    def process(self, msg, kwargs):
-        msg = '%s[%s] %s' % (setproctitle.getproctitle(), os.getpid(), msg)
-        kwargs["extra"] = self.extra
+    def is_event(self):
+        return self.with_field('is_event', True)
 
+    def process(self, msg, kwargs):
         if config.LOG_METHOD_TRACE:
             self._extra['method'] = util_callstack.get_caller(-5)
 
+        # Emit log message
+        msg = '%s[%s] %s' % (setproctitle.getproctitle(), os.getpid(),
+                             msg)
+        kwargs['extra'] = self.extra
+
+        # Emit events
+        # if self.extra.get('is_event', False):
+        self._emit_event(msg, self.extra)
+
         return msg, kwargs
+
+    def _emit_event(self, msg, extra):
+        global JSONEncoderCustomTypes
+
+        # We only record events for known object types
+        object_count = 0
+        for objtype in constants.OBJECT_NAMES:
+            if objtype in extra:
+                object_count += 1
+
+        if object_count == 0:
+            self.warning('Event had no associated objects: %s' % msg)
+            return
+
+        # We do not use the etcd abstraction here because it logs
+        try:
+            if not JSONEncoderCustomTypes:
+                JSONEncoderCustomTypes = importlib.import_module(
+                    'shakenfist.etcd').JSONEncoderCustomTypes
+
+            encoded = json.dumps(
+                EventLogMessageTask(time.time(), msg, extra),
+                indent=4, sort_keys=True, cls=JSONEncoderCustomTypes)
+            Etcd3Client().put(
+                '/sf/queue/eventlog/%s-%s'
+                % (time.time(), util_random.random_id),
+                encoded, lease=None)
+        except Exception as e:
+            self._extra['is_event'] = False
+            self.critical('Failed to log event: %s' % e)
 
     #
     # Convenience methods

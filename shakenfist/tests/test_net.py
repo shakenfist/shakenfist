@@ -12,6 +12,10 @@ class NetworkTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super(NetworkTestCase, self).setUp()
 
+        self.add_event = mock.patch('shakenfist.db.add_event')
+        self.mock_add_event = self.add_event.start()
+        self.addCleanup(self.add_event.stop)
+
         self.ipmanager_get = mock.patch(
             'shakenfist.ipmanager.IPManager.from_db')
         self.mock_ipmanager_get = self.ipmanager_get.start()

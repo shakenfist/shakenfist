@@ -24,6 +24,10 @@ class SchedulerTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super(SchedulerTestCase, self).setUp()
 
+        self.add_event = mock.patch('shakenfist.db.add_event')
+        self.mock_add_event = self.add_event.start()
+        self.addCleanup(self.add_event.stop)
+
         self.recorded_op = mock.patch(
             'shakenfist.util.general.RecordedOperation')
         self.recorded_op.start()
@@ -56,7 +60,8 @@ class LowResourceTestCase(SchedulerTestCase):
             'cpu_available': 12
         })
 
-        fake_inst = self.mock_etcd.createInstance('fake-inst', 'fakeuuid', cpus=6)
+        fake_inst = self.mock_etcd.createInstance(
+            'fake-inst', 'fakeuuid', cpus=6)
         exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().place_instance,
                                 fake_inst,
@@ -131,9 +136,9 @@ class LowResourceTestCase(SchedulerTestCase):
 
         fake_inst = self.mock_etcd.createInstance(
             'fake-inst', 'fakeuuid', disk_spec=[{
-                    'base': 'cirros',
-                            'size': 21
-                }])
+                'base': 'cirros',
+                'size': 21
+            }])
 
         exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().place_instance,
@@ -237,12 +242,12 @@ class CPUloadAffinityTestCase(SchedulerTestCase):
         # Start test
         inst = self.mock_etcd.createInstance('instance-3', 'uuid-inst-3',
                                              metadata={
-                                                "affinity": {
-                                                    "cpu": {
-                                                        "socialite": 2,
-                                                        "nerd": -100,
-                                                    }
-                                                },
+                                                 "affinity": {
+                                                     "cpu": {
+                                                         "socialite": 2,
+                                                         "nerd": -100,
+                                                     }
+                                                 },
                                              })
 
         nodes = scheduler.Scheduler().place_instance(inst, [])
@@ -256,12 +261,12 @@ class CPUloadAffinityTestCase(SchedulerTestCase):
         # Start test
         inst = self.mock_etcd.createInstance('instance-3', 'uuid-inst-3',
                                              metadata={
-                                                "affinity": {
-                                                    "cpu": {
-                                                        "socialite": 2,
-                                                        "nerd": -100,
-                                                    }
-                                                },
+                                                 "affinity": {
+                                                     "cpu": {
+                                                         "socialite": 2,
+                                                         "nerd": -100,
+                                                     }
+                                                 },
                                              })
         nodes = scheduler.Scheduler().place_instance(inst, [])
         self.assertSetEqual({'node2', 'node4'}, set(nodes))
@@ -278,12 +283,12 @@ class CPUloadAffinityTestCase(SchedulerTestCase):
         # Start test
         inst = self.mock_etcd.createInstance('instance-3', 'uuid-inst-3',
                                              metadata={
-                                                "affinity": {
-                                                    "cpu": {
-                                                        "socialite": 2,
-                                                        "nerd": -100,
-                                                    }
-                                                },
+                                                 "affinity": {
+                                                     "cpu": {
+                                                         "socialite": 2,
+                                                         "nerd": -100,
+                                                     }
+                                                 },
                                              })
         nodes = scheduler.Scheduler().place_instance(inst, [])
         self.assertSetEqual({'node2'}, set(nodes))
@@ -300,12 +305,12 @@ class CPUloadAffinityTestCase(SchedulerTestCase):
         # Start test
         inst = self.mock_etcd.createInstance('instance-3', 'uuid-inst-3',
                                              metadata={
-                                                "affinity": {
-                                                    "cpu": {
-                                                        "socialite": 2,
-                                                        "nerd": -100,
-                                                    }
-                                                },
+                                                 "affinity": {
+                                                     "cpu": {
+                                                         "socialite": 2,
+                                                         "nerd": -100,
+                                                     }
+                                                 },
                                              })
         nodes = scheduler.Scheduler().place_instance(inst, [])
         self.assertSetEqual({'node3'}, set(nodes))

@@ -13,6 +13,7 @@ from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import etcd
+from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist.external_api import (
     base as api_base,
@@ -367,7 +368,7 @@ class InstancesEndpoint(api_base.Resource):
                     netdesc['model'] = 'virtio'
 
                 iface_uuid = str(uuid.uuid4())
-                LOG.with_object(inst).with_object(n).withFields({
+                LOG.with_object(inst).with_object(n).with_fields({
                     'networkinterface': iface_uuid
                 }).info('Interface allocated')
                 ni = NetworkInterface.new(
@@ -495,8 +496,10 @@ class InstanceEventsEndpoint(api_base.Resource):
     @jwt_required
     @api_base.arg_is_instance_uuid
     @api_base.requires_instance_ownership
+    @api_base.redirect_to_eventlog_node
     def get(self, instance_uuid=None, instance_from_db=None):
-        return list(db.get_events('instance', instance_uuid))
+        with eventlog.EventLog('instance', instance_uuid) as eventdb:
+            return list(eventdb.read_events())
 
 
 class InstanceRebootSoftEndpoint(api_base.Resource):

@@ -13,6 +13,7 @@ DAEMON_NAMES = {
     'api': 'sf-api',
     'cleaner': 'sf-cleaner',
     'cluster': 'sf-cluster',
+    'eventlog': 'sf-eventlog',
     'main': 'sf-main',
     'net': 'sf-net',
     'queues': 'sf-queues',

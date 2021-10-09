@@ -56,6 +56,7 @@
               "node_mesh_nic": "eth1",
               "primary_node": true,
               "network_node": true,
+              "eventlog_node": true,
               "hypervisor": false,
               "api_url": "http://sf-primary/api"
             },

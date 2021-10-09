@@ -93,12 +93,10 @@ class BaseTestCase(testtools.TestCase):
 
     def _log_events(self, uuid, event_source):
         x = PrettyTable()
-        x.field_names = ['timestamp', 'node',
-                         'operation', 'phase', 'duration', 'message']
+        x.field_names = ['timestamp', 'message', 'extra']
         for e in event_source:
             e['timestamp'] = datetime.datetime.fromtimestamp(e['timestamp'])
-            x.add_row([e['timestamp'], e['fqdn'], e['operation'], e['phase'],
-                       e['duration'], e['message']])
+            x.add_row([e['timestamp'], e['message'], e['extra']])
 
         sys.stderr.write(
             '----------------------- start %s events -----------------------\n'
@@ -162,7 +160,7 @@ class BaseTestCase(testtools.TestCase):
                 if after and event['timestamp'] <= after:
                     continue
 
-                if (event['operation'] == operation and
+                if (event['extra'].get('operation') == operation and
                         (not message or event['message'] == message)):
                     return event['timestamp']
 
@@ -180,8 +178,8 @@ class BaseTestCase(testtools.TestCase):
         self._log_console(instance_uuid)
         self._log_instance_events(instance_uuid)
         raise TimeoutException(
-            'After time %s, instance %s had no event "%s:%s" (waited 10 mins)' % (
-                after, instance_uuid, operation, message))
+            'After time %s, instance %s had no event "%s:%s"'
+            % (after, instance_uuid, operation, message))
 
     def _await_image_download_success(self, image_uuid, after=None):
         return self._await_image_event(image_uuid, 'fetch', 'success', after)

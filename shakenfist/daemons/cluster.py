@@ -4,6 +4,7 @@
 # maintenance daemon per cluster.
 
 from collections import defaultdict
+import json
 import setproctitle
 import time
 
@@ -15,6 +16,7 @@ from shakenfist.config import config
 from shakenfist.constants import OBJECT_NAMES
 from shakenfist.daemons import daemon
 from shakenfist import etcd
+from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import logutil
@@ -244,6 +246,28 @@ class Monitor(daemon.Daemon):
             age = time.time() - n.last_seen
             if age > config.NODE_CHECKIN_MAXIMUM:
                 n.state = Node.STATE_MISSING
+
+        # Convert old style events to new style
+        # NOTE(mikal): remove in 0.6
+        processed = 0
+        for data, metadata in etcd.WrappedEtcdClient().get_prefix('/sf/event'):
+            event = json.loads(data)
+            with eventlog.EventLog(event['object_type'],
+                                   event['object_uuid']) as eventdb:
+                eventdb.write_event(
+                    event['timestamp'], event['message'],
+                    {
+                        'fqdn': event['fqdn'],
+                        'operation': event['operation'],
+                        'phase': event['phase'],
+                        'duration': event['duration'],
+                    })
+                processed += 1
+            etcd.delete(metadata['key'])
+
+            if processed > 100:
+                break
+        LOG.info('Converted %d old style events' % processed)
 
         # And we're done
         LOG.info('Cluster maintenance loop complete')
