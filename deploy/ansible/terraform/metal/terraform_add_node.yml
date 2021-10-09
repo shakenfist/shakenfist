@@ -43,6 +43,5 @@
     node_egress_nic: "{{item['node_egress_nic']}}"
     node_mesh_ip: "{{item['node_mesh_ip']}}"
     node_mesh_nic: "{{item['node_mesh_nic']}}"
-    node_is_etcd_master: "{{item['etcd_master'] | default(False)}}"
   delegate_to: "{{item['name']}}"
   delegate_facts: true

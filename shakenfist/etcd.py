@@ -13,7 +13,6 @@ from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist.tasks import QueueTask
-from shakenfist.util import network as util_network
 
 
 ####################################################################
@@ -409,6 +408,6 @@ def _restart_queue(queuename):
 def restart_queues():
     # Move things which were in processing back to the queue because
     # we didn't complete them before crashing.
-    if util_network.is_network_node():
+    if config.NODE_IS_NETWORK_NODE:
         _restart_queue('networknode')
     _restart_queue(config.NODE_NAME)

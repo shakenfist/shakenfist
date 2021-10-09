@@ -1,0 +1,67 @@
+- name: Create the namespace
+  shell: sf-client namespace create "{{identifier}}"
+
+- name: Create a network for outgoing traffic
+  sf_network:
+    netblock: "10.0.0.0/24"
+    name: "public"
+    namespace: "{{identifier}}"
+  register: publicnetwork
+
+- name: Log network details
+  debug:
+    msg:
+      - "Public network is {{publicnetwork['meta']['uuid']}}"
+
+- name: Create a primary instance
+  sf_instance:
+    name: "primary"
+    cpu: 12
+    ram: 32768
+    disks:
+      - "50@{{base_image}}"
+    networkspecs:
+      - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
+    ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
+    namespace: "{{identifier}}"
+    state: present
+  register: primary
+
+- name: Add primary node to ansible
+  add_host:
+    hostname: primary
+    egress_ip: "{{primary['meta']['network_interfaces'][0]['ipv4']}}"
+    ansible_ssh_host: "{{primary['meta']['network_interfaces'][0]['floating']}}"
+    ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
+    ansible_ssh_user: "{{base_image_user}}"
+    ansible_ssh_private_key_file: "/home/jenkins/id_ci"
+    groups: sfall
+
+- name: Log instance details
+  debug:
+    msg:
+      - "Primary: is {{primary['meta']['uuid']}} at {{primary['meta']['network_interfaces'][0]['ipv4']}}, {{primary['meta']['network_interfaces'][0]['floating']}}"
+
+- name: Ensure we have somewhere to write the build details to
+  file:
+    path: "{{ lookup('env', 'WORKSPACE') }}/{{ lookup('env', 'BUILD_TAG') }}"
+    state: directory
+    mode: "0755"
+
+- name: Write details of instances to workspace
+  copy:
+    content: |
+      {% for svr in groups.sfall%}
+      export {{svr}}={{hostvars[svr]['ansible_ssh_host']}}
+      {% endfor %}
+
+      export identifier={{identifier}}
+      export source_path={{source_path}}
+    dest: "{{ lookup('env', 'WORKSPACE') }}/{{ lookup('env', 'BUILD_TAG') }}/ci-environment.sh"
+    owner: jenkins
+    group: jenkins
+    mode: u=r,g=r,o=r
+
+- name: Log environment details path
+  debug:
+    msg: "Environment details written to {{ lookup('env', 'WORKSPACE') }}/{{ lookup('env', 'BUILD_TAG') }}/ci-environment.sh"

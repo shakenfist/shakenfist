@@ -1,0 +1,37 @@
+# We cannot do this in the shaken fist network configuration because
+# cloud-init will randomly use the mesh interface as the default route
+# which breaks networking. So we configure this interface after cloud-init
+# has run. We also need to specify the MTU manually here because we're not
+# fetching it from dhcp any more.
+- name: Configure the mesh interface (Debian)
+  copy:
+    content: |
+      auto eth1
+      iface eth1 inet static
+        mtu 8950
+        address {{mesh_ip}}/24
+    dest: /etc/network/interfaces.d/60-sf-mesh-net
+    owner: root
+    group: root
+    mode: u=r,g=r,o=r
+  when: ansible_distribution == 'Debian'
+
+- name: Enable eth1 (Debian)
+  shell: |
+    ifdown eth1
+    sleep 1
+    ifup eth1
+  when: ansible_distribution == 'Debian'
+
+- name: Configure the mesh interface (Ubuntu)
+  template:
+    src: files/netplan-eth1.yaml
+    dest: /etc/netplan/99-sfci.yaml
+  vars:
+    address: "{{mesh_ip}}/24"
+    macaddr: "{{mesh_mac}}"
+  when: ansible_distribution == 'Ubuntu'
+
+- name: Enable eth1 (Ubuntu)
+  shell: netplan apply
+  when: ansible_distribution == 'Ubuntu'

@@ -6,6 +6,11 @@ class VersionSpecificationError(Exception):
     pass
 
 
+# Configuration
+class NoNetworkNode(Exception):
+    pass
+
+
 # Objects
 class ObjectException(Exception):
     pass

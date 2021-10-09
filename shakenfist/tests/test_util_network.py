@@ -16,14 +16,6 @@ class FakeConfigNormalNode(BaseSettings):
 
 
 class UtilTestCase(base.ShakenFistTestCase):
-    @mock.patch('shakenfist.util.network.config', FakeConfigNetworkNode())
-    def test_is_network_node_yes(self):
-        self.assertTrue(util_network.is_network_node())
-
-    @mock.patch('shakenfist.util.network.config', FakeConfigNormalNode())
-    def test_is_network_node_no(self):
-        self.assertFalse(util_network.is_network_node())
-
     @mock.patch('shakenfist.util.process.execute',
                 return_value=(None, 'Device "banana0" does not exist.'))
     def test_check_for_interface_missing_interface(self, mock_execute):

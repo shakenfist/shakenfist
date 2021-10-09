@@ -147,7 +147,7 @@ def main():
     _start_daemon('resources')
 
     # If I am the network node, I need some setup
-    if util_network.is_network_node():
+    if config.NODE_IS_NETWORK_NODE:
         # Bootstrap the floating network in the Networks table
         floating_network = net.Network.from_db('floating')
         if not floating_network:

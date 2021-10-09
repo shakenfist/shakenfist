@@ -68,7 +68,7 @@ class Monitor(daemon.WorkerPoolDaemon):
         host_networks = []
         seen_vxids = []
 
-        if not util_network.is_network_node():
+        if not config.NODE_IS_NETWORK_NODE:
             # For normal nodes, just the ones we have instances for. We need
             # to use the more expensive interfaces_for_instance() method of
             # looking up instance interfaces here if the instance cachce hasn't
@@ -119,7 +119,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                     continue
 
                 if not n.is_okay():
-                    if util_network.is_network_node():
+                    if config.NODE_IS_NETWORK_NODE:
                         LOG.with_network(n).info(
                             'Recreating not okay network on network node')
                         n.create_on_network_node()
@@ -419,7 +419,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                 for w in self.workers:
                     worker_pids.append(w.pid)
 
-                if util_network.is_network_node() and network_worker not in worker_pids:
+                if config.NODE_IS_NETWORK_NODE and network_worker not in worker_pids:
                     network_worker = self.start_workitem(
                         self._process_network_node_workitems, [], 'net-worker')
 
@@ -441,7 +441,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                         mtu_validation_worker = self.start_workitem(
                             self._validate_mtus, [], 'mtus')
 
-                    if util_network.is_network_node():
+                    if config.NODE_IS_NETWORK_NODE:
                         LOG.info('Reaping stray floating IPs')
                         if floating_ip_reap_worker not in worker_pids:
                             floating_ip_reap_worker = self.start_workitem(
