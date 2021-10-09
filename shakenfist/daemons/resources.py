@@ -24,6 +24,7 @@ def _get_stats():
     # What's special about this node?
     retval = {
         'is_etcd_master': config.NODE_IS_ETCD_MASTER,
+        'is_eventlog_node': config.NODE_IS_EVENTLOG_NODE,
         'is_hypervisor': config.NODE_IS_HYPERVISOR,
         'is_network_node': config.NODE_IS_NETWORK_NODE,
     }

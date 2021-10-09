@@ -187,6 +187,9 @@ class SFConfig(BaseSettings):
         False, description='True if this node is an etcd master. This controls '
                            'attempts to compact the master database.'
     )
+    NODE_IS_EVENTLOG_NODE: bool = Field(
+        False, description='True if this node is a the eventlog node.'
+    )
     NODE_IS_HYPERVISOR: bool = Field(
         False, description='True if this node is a hypervisor. This controls if '
                            'VMs are started on this node or not.'

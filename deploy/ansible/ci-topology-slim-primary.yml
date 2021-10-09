@@ -66,6 +66,7 @@
               "node_mesh_nic": "eth1",
               "etcd_master": true,
               "network_node": true,
+              "eventlog_node": true,
               "hypervisor": true
             },
             {

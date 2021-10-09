@@ -56,6 +56,7 @@
               "primary_node": true,
               "hypervisor": true,
               "network_node": true,
+              "eventlog_node": true,
               "etcd_master": true,
               "api_url": "http://localhost:13000"
             }

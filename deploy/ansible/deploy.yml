@@ -115,7 +115,7 @@
           - unzip
         state: latest
 
-- hosts: hypervisors, network_node
+- hosts: hypervisors, network_node, eventlog_node
   any_errors_fatal: true
   become: yes
   become_method: sudo
@@ -320,6 +320,12 @@
   connection: ssh
 
   tasks:
+    - name: Create storage directory
+      file:
+        path: /srv/shakenfist
+        state: directory
+        mode: "0755"
+
     - name: Syslog server is the primary server
       set_fact:
         syslog: "{{hostvars[groups['primary_node'][0]]['node_mesh_ip']}}"
