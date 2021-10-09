@@ -123,6 +123,14 @@
           - unzip
         state: latest
 
+- hosts: hypervisors, network_node
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
     - name: Determine the mesh network interface MTU
       shell: ip link show
       register: ip_links
@@ -193,13 +201,6 @@
   connection: ssh
 
   tasks:
-    - name: Install modern ansible
-      apt:
-        name: ansible
-        state: latest
-        update_cache: yes
-        autoremove: yes
-
     - name: Disable dnsmasq
       service:
         name: dnsmasq
@@ -442,6 +443,13 @@
         owner: root
         group: sudo
         mode: u=r,g=r,o=
+
+    - name: Install modern ansible
+      apt:
+        name: ansible
+        state: latest
+        update_cache: yes
+        autoremove: yes
 
     - name: Install prometheus
       apt:
