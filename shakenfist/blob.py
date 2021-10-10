@@ -8,6 +8,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist import constants
 from shakenfist import db
+from shakenfist import instance
 from shakenfist import logutil
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
@@ -99,6 +100,23 @@ class Blob(dbo):
     @property
     def info(self):
         return self._db_get_attribute('info')
+
+    # Derived values
+    @property
+    def instances(self):
+        '''Build a list of instances that specify the blob as block device.
+
+        Returns a list of instance UUIDs.
+        '''
+        locs = self.locations
+        instance_uuids = []
+        for inst in instance.Instances([instance.active_states_filter]):
+            if inst.placement['node'] not in locs:
+                continue
+            for d in inst.block_devices.get('devices'):
+                if d.get('blob_uuid') == self.uuid:
+                    instance_uuids.append(inst.uuid)
+        return instance_uuids
 
     def observe(self):
         with self.get_lock_attr('locations', 'Observe blob'):
