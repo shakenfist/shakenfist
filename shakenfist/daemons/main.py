@@ -121,8 +121,9 @@ def main():
     global DAEMON_IMPLEMENTATIONS
     global DAEMON_PIDS
 
-    setproctitle.setproctitle(daemon.process_name(
-        'main') + '-v%s' % util_general.get_version())
+    LOG.info('Starting...')
+    setproctitle.setproctitle(
+        daemon.process_name('main') + '-v%s' % util_general.get_version())
 
     # Log configuration on startup
     for key, value in config.dict().items():
@@ -131,7 +132,7 @@ def main():
     daemon.set_log_level(LOG, 'main')
 
     # Check in early and often, also reset processing queue items.
-    db.clear_stale_locks()
+    etcd.clear_stale_locks()
     Node.observe_this_node()
     etcd.restart_queues()
 
