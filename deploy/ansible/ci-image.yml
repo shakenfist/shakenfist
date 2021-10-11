@@ -111,34 +111,19 @@
     label: "sfci-image"
 
   tasks:
-    # - name: Snapshot the instance
-    #   sf_snapshot:
-    #     instance_uuid: "{{hostvars['imagerebuild']['sf_instance_uuid']}}"
-    #     label: "{{label}}"
-    #     state: present
-    #   register: cisnapshot
-
-    # - name: Log snapshot details
-    #   debug:
-    #     msg: "{{cisnapshot}}"
-
-    # - name: Record the snapshot uuid
-    #   set_fact:
-    #     snapshot_uuid: "{{cisnapshot}}['meta']['vda']['uuid']}}"
-
-    - name: Snapshot the bad way until the ansible module catches up
-      shell: |
-        sf-client --json instance snapshot "{{hostvars['imagerebuild']['sf_instance_uuid']}}" \
-            --label_name "{{label}}"
+    - name: Snapshot the instance
+      sf_snapshot:
+        instance_uuid: "{{hostvars['imagerebuild']['sf_instance_uuid']}}"
+        state: present
       register: cisnapshot
 
     - name: Log snapshot details
       debug:
-        msg: "{{cisnapshot.stdout | from_json}}"
+        msg: "{{cisnapshot}}"
 
     - name: Record the snapshot uuid
       set_fact:
-        snapshot_uuid: "{{(cisnapshot.stdout | from_json).get('vda')['blob_uuid']}}"
+        snapshot_uuid: "{{cisnapshot}}['meta']['vda']['uuid']}}"
 
     - name: Log snapshot uuid
       debug:
@@ -200,7 +185,7 @@
     # what I need to add to the client to make this work.
     - name: Add the snapshot to the label
       shell: |
-        echo sf-client ... "{{hostvars['localhost']['snapshot_uuid']}}"...
+        sf-client label update "{{label}}" "{{hostvars['localhost']['snapshot_uuid']}}"
 
     - name: Delete test instance
       sf_instance:
