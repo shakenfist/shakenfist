@@ -33,10 +33,6 @@ def refresh_locks(locks, relatedobjects=None, log_ctx=LOG):
             refresh_lock(lock, log_ctx=log_ctx)
 
 
-def clear_stale_locks():
-    etcd.clear_stale_locks()
-
-
 def get_existing_locks():
     return etcd.get_existing_locks()
 

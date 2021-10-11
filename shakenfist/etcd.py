@@ -13,6 +13,7 @@ from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist.tasks import QueueTask
+from shakenfist.util import random as util_random
 
 
 ####################################################################
@@ -237,14 +238,16 @@ class JSONEncoderTasks(json.JSONEncoder):
 @retry_etcd_forever
 def put(objecttype, subtype, name, data, ttl=None):
     path = _construct_key(objecttype, subtype, name)
-    encoded = json.dumps(data, indent=4, sort_keys=True, cls=JSONEncoderTasks)
+    encoded = json.dumps(data, indent=4, sort_keys=True,
+                         cls=JSONEncoderTasks)
     WrappedEtcdClient().put(path, encoded, lease=None)
 
 
 @retry_etcd_forever
 def create(objecttype, subtype, name, data, ttle=None):
     path = _construct_key(objecttype, subtype, name)
-    encoded = json.dumps(data, indent=4, sort_keys=True, cls=JSONEncoderTasks)
+    encoded = json.dumps(data, indent=4, sort_keys=True,
+                         cls=JSONEncoderTasks)
     return WrappedEtcdClient().create(path, encoded, lease=None)
 
 
@@ -287,14 +290,8 @@ def delete_all(objecttype, subtype):
 
 def enqueue(queuename, workitem, delay=0):
     with get_lock('queue', None, queuename, op='Enqueue'):
-        i = 0
         entry_time = time.time() + delay
-        jobname = '%s-%03d' % (entry_time, i)
-
-        while get('queue', queuename, jobname):
-            i += 1
-            jobname = '%s-%03d' % (entry_time, i)
-
+        jobname = '%s-%s' % (entry_time, util_random.random_id())
         put('queue', queuename, jobname, workitem)
         LOG.with_fields({'jobname': jobname,
                          'queuename': queuename,
