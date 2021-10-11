@@ -123,7 +123,7 @@
 
     - name: Record the snapshot uuid
       set_fact:
-        snapshot_uuid: "{{cisnapshot}}['meta']['vda']['uuid']}}"
+        snapshot_uuid: "{{cisnapshot['meta']['vda']['blob_uuid']}}"
 
     - name: Log snapshot uuid
       debug:
