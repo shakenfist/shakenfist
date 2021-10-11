@@ -104,15 +104,12 @@ class Blob(dbo):
     # Derived values
     @property
     def instances(self):
-        '''Build a list of instances that specify the blob as block device.
+        '''Build a list of instances that are using the blob as a block device.
 
         Returns a list of instance UUIDs.
         '''
-        locs = self.locations
         instance_uuids = []
-        for inst in instance.Instances([instance.active_states_filter]):
-            if inst.placement['node'] not in locs:
-                continue
+        for inst in instance.Instances([instance.healthy_states_filter]):
             for d in inst.block_devices.get('devices'):
                 if d.get('blob_uuid') == self.uuid:
                     instance_uuids.append(inst.uuid)
