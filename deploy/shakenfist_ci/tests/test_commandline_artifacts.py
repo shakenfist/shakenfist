@@ -92,3 +92,81 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         versions = json.loads(self._exec_client(
             'artifact versions %s' % artifact_uuid))
         self.assertEqual(5, len(versions))
+
+    def test_artifact_show(self):
+        # Create an instance
+        inst1 = self.test_client.create_instance(
+            'test-cirros-boot-no-network', 1, 1024, None,
+            [
+                {
+                    'size': 8,
+                    'base': 'cirros',
+                    'type': 'disk'
+                }
+            ], None, None)
+
+        self._await_login_prompt(inst1['uuid'])
+
+        # Take a snapshot
+        snap1 = json.loads(self._exec_client(
+            '--json instance snapshot %s' % inst1['uuid']))
+        self.assertIn('vda', snap1)
+        self.assertIn('artifact_uuid', snap1['vda'])
+        snap_uuid = snap1['vda']['artifact_uuid']
+
+        # Check the blobs information for the first version
+        show_info = json.loads(self._exec_client(
+            '--json artifact show %s' % snap_uuid))
+        self.assertIn('blobs', show_info)
+        self.assertEqual(len(show_info['blobs'], 1))
+        self.assertIn('1', show_info['blobs'])
+
+        self.assertIn('size', show_info['blobs']['1'])
+        self.assertIsInstance(show_info['blobs']['1']['size'], int)
+        self.assertGreater(show_info['blobs']['1']['size'], 100000)
+
+        self.assertIn('instances', show_info['blobs']['1'])
+        self.assertEqual(len(show_info['blobs']['1']['instances']), 0)
+
+        # Start an instance on the snapshot
+        inst2 = self.test_client.create_instance(
+            'test-cirros-boot-no-network', 1, 1024, None,
+            [
+                {
+                    'size': 8,
+                    'base': 'sf://snapshot/%s' % snap_uuid,
+                    'type': 'disk'
+                }
+            ], None, None)
+
+        # Test instance is listed against blob in snapshot listing
+        show_info = json.loads(self._exec_client(
+            '--json artifact show %s' % snap_uuid))
+        self.assertIn('blobs', show_info)
+        self.assertEqual(len(show_info['blobs'], 1))
+
+        self.assertIn('instances', show_info['blobs']['1'])
+        self.assertEqual(len(show_info['blobs']['1']['instances']), 1)
+        self.assertEqual(show_info['blobs']['1']['instances'][0], inst2['uuid'])
+
+        # Take a second snapshot of the original instance
+        self._exec_client('--json instance snapshot %s' % inst1['uuid'])
+
+        # Check the second snapshot is listed
+        show_info = json.loads(self._exec_client(
+            '--json artifact show %s' % snap_uuid))
+        self.assertIn('blobs', show_info)
+        self.assertEqual(len(show_info['blobs'], 2))
+
+        self.assertIn('1', show_info['blobs'])
+        self.assertIn('instances', show_info['blobs']['1'])
+        self.assertEqual(len(show_info['blobs']['1']['instances']), 1)
+        self.assertEqual(show_info['blobs']['1']['instances'][0], inst2['uuid'])
+
+        self.assertIn('2', show_info['blobs'])
+        self.assertIn('size', show_info['blobs']['2'])
+        self.assertIsInstance(show_info['blobs']['2']['size'], int)
+        self.assertGreater(show_info['blobs']['2']['size'], 100000)
+
+        self.assertIn('instances', show_info['blobs']['2'])
+        self.assertEqual(len(show_info['blobs']['2']['instances']), 0)

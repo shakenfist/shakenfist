@@ -6,6 +6,7 @@ from uuid import uuid4
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
+from shakenfist import blob
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import logutil
@@ -134,6 +135,14 @@ class Artifact(dbo):
         # expect
         a = self.external_view_without_index()
         a.update(self.most_recent_index)
+        blobs = {}
+        for blob_index in self.get_all_indexes():
+            b = blob.Blob.from_db(blob_index['blob_uuid'])
+            blobs[blob_index['index']] = {
+                'instances': b.instances,
+                'size': b.size,
+            }
+        a['blobs'] = blobs
         return a
 
     # Static values
