@@ -14,21 +14,21 @@ Environment=SHAKENFIST_NODE_MESH_NIC="{{node_mesh_nic}}"
 Environment=SHAKENFIST_NODE_NAME="{{node_name}}"
 
 {% if ansible_fqdn in groups['etcd_master'] %}
-Environment=SHAKENFIST_IS_ETCD_MASTER=True
+Environment=SHAKENFIST_NODE_IS_ETCD_MASTER=True
 {% else %}
-Environment=SHAKENFIST_IS_ETCD_MASTER=False
+Environment=SHAKENFIST_NODE_IS_ETCD_MASTER=False
 {% endif %}
 
 {% if ansible_fqdn in groups['hypervisors'] %}
-Environment=SHAKENFIST_IS_HYPERVISOR=True
+Environment=SHAKENFIST_NODE_IS_HYPERVISOR=True
 {% else %}
-Environment=SHAKENFIST_IS_HYPERVISOR=False
+Environment=SHAKENFIST_NODE_IS_HYPERVISOR=False
 {% endif %}
 
 {% if ansible_fqdn in groups['network_node'] %}
-Environment=SHAKENFIST_IS_NETWORK_NODE=True
+Environment=SHAKENFIST_NODE_IS_NETWORK_NODE=True
 {% else %}
-Environment=SHAKENFIST_IS_NETWORK_NODE=False
+Environment=SHAKENFIST_NODE_IS_NETWORK_NODE=False
 {% endif %}
 
 Environment=SHAKENFIST_FLOATING_NETWORK="{{floating_network_ipblock}}"
