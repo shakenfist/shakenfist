@@ -5,9 +5,6 @@
     update_cache: yes
     autoremove: yes
 
-- name: Install ansible roles
-  shell: ansible-galaxy install andrewrothstein.etcd-cluster
-
 - name: Copy client wheel file
   copy:
     src: "{{source_path}}/client-python/dist/{{hostvars['localhost']['client_wheel_file']}}"
