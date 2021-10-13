@@ -168,6 +168,9 @@ class Monitor(daemon.Daemon):
 
         last_loop_run = time.time()
         while True:
+            if not self.running:
+                return
+
             # Update power state of all instances on this hypervisor
             LOG.info('Updating power states')
             self._update_power_states()

@@ -172,6 +172,9 @@ class Monitor(daemon.Daemon):
             gauges['updated_at'].set_to_current_time()
 
         while True:
+            if not self.running:
+                return
+
             try:
                 jobname, _ = etcd.dequeue('%s-metrics' % config.NODE_NAME)
                 if jobname:

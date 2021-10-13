@@ -393,10 +393,21 @@ class Monitor(daemon.WorkerPoolDaemon):
         LOG.info('Starting')
 
         while True:
+            if not self.running:
+                return
+
             try:
                 self.reap_workers()
-                if not self.dequeue_work_item(config.NODE_NAME, handle):
+
+                if self.running:
+                    if not self.dequeue_work_item(config.NODE_NAME, handle):
+                        time.sleep(0.2)
+                elif len(self.workers) > 0:
+                    LOG.info('Waiting for %d workers to finish'
+                             % len(self.workers))
                     time.sleep(0.2)
+                else:
+                    return
 
             except Exception as e:
                 util_general.ignore_exception(daemon.process_name('queues'), e)

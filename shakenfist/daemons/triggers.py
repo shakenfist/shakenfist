@@ -81,6 +81,9 @@ class Monitor(daemon.Daemon):
         observers = {}
 
         while True:
+            if not self.running:
+                return
+
             # Cleanup terminated observers
             all_observers = list(observers.keys())
             for instance_uuid in all_observers:

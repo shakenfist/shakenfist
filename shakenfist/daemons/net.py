@@ -415,39 +415,48 @@ class Monitor(daemon.WorkerPoolDaemon):
         while True:
             try:
                 self.reap_workers()
-                worker_pids = []
-                for w in self.workers:
-                    worker_pids.append(w.pid)
 
-                if config.NODE_IS_NETWORK_NODE and network_worker not in worker_pids:
-                    network_worker = self.start_workitem(
-                        self._process_network_node_workitems, [], 'net-worker')
+                if self.running:
+                    worker_pids = []
+                    for w in self.workers:
+                        worker_pids.append(w.pid)
 
-                if time.time() - last_management > 30:
-                    # Management tasks are treated as extra workers, and run in
-                    # parallel with other network work items.
-                    if stray_interface_worker not in worker_pids:
-                        LOG.info('Scanning for stray network interfaces')
-                        stray_interface_worker = self.start_workitem(
-                            self._remove_stray_interfaces, [], 'stray-nics')
+                    if config.NODE_IS_NETWORK_NODE and network_worker not in worker_pids:
+                        network_worker = self.start_workitem(
+                            self._process_network_node_workitems, [], 'net-worker')
 
-                    if maintain_networks_worker not in worker_pids:
-                        LOG.info('Maintaining existing networks')
-                        maintain_networks_worker = self.start_workitem(
-                            self._maintain_networks, [], 'maintain')
+                    if time.time() - last_management > 30:
+                        # Management tasks are treated as extra workers, and run in
+                        # parallel with other network work items.
+                        if stray_interface_worker not in worker_pids:
+                            LOG.info('Scanning for stray network interfaces')
+                            stray_interface_worker = self.start_workitem(
+                                self._remove_stray_interfaces, [], 'stray-nics')
 
-                    if mtu_validation_worker not in worker_pids:
-                        LOG.info('Validating network interface MTUs')
-                        mtu_validation_worker = self.start_workitem(
-                            self._validate_mtus, [], 'mtus')
+                        if maintain_networks_worker not in worker_pids:
+                            LOG.info('Maintaining existing networks')
+                            maintain_networks_worker = self.start_workitem(
+                                self._maintain_networks, [], 'maintain')
 
-                    if config.NODE_IS_NETWORK_NODE:
-                        LOG.info('Reaping stray floating IPs')
-                        if floating_ip_reap_worker not in worker_pids:
-                            floating_ip_reap_worker = self.start_workitem(
-                                self._reap_leaked_floating_ips, [], 'fip-reaper')
+                        if mtu_validation_worker not in worker_pids:
+                            LOG.info('Validating network interface MTUs')
+                            mtu_validation_worker = self.start_workitem(
+                                self._validate_mtus, [], 'mtus')
 
-                    last_management = time.time()
+                        if config.NODE_IS_NETWORK_NODE:
+                            LOG.info('Reaping stray floating IPs')
+                            if floating_ip_reap_worker not in worker_pids:
+                                floating_ip_reap_worker = self.start_workitem(
+                                    self._reap_leaked_floating_ips, [], 'fip-reaper')
+
+                        last_management = time.time()
+
+                    elif len(self.workers) > 0:
+                        LOG.info('Waiting for %d workers to finish'
+                                 % len(self.workers))
+
+                    else:
+                        return
 
                 time.sleep(1)
 

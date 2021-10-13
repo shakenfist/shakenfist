@@ -668,6 +668,34 @@
   connection: ssh
 
   tasks:
+    - name: Check if we have an existing config
+      stat:
+        path: /etc/sf/config
+      register: config_stat_result
+
+    - name: Fetch config template from remote host
+      fetch:
+        src: "{{hostvars['localhost']['template_path']}}/config"
+        dest: /tmp/{{ansible_host}}_config
+        flat: yes
+        fail_on_missing: yes
+      when: not config_stat_result.stat.exists
+
+    - name: Ensure /etc/sf exists
+      file:
+        path: /etc/sf
+        state: directory
+      when: not config_stat_result.stat.exists
+
+    - name: Write config file on remote host
+      template:
+        src: /tmp/{{ansible_host}}_config
+        dest: /etc/sf/config
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
+      when: not config_stat_result.stat.exists
+
     - name: Fetch systemd unit template from remote host
       fetch:
         src: "{{hostvars['localhost']['template_path']}}/sf.service"
@@ -675,13 +703,27 @@
         flat: yes
         fail_on_missing: yes
 
-    - name: Write systemd unit
+    - name: Write systemd unit on remote host
       template:
         src: /tmp/{{ansible_host}}_sf.service
-        dest: /lib/systemd/system/sf.service
+        dest: /etc/systemd/system/sf.service
         owner: root
         group: root
         mode: u=r,g=r,o=r
+
+    - name: Remove old systemd units
+      file:
+        dest: /lib/systemd/system/sf.service
+        state: absent
+
+    - name: Ensure /var/run/sf exists
+      file:
+        path: /var/run/sf
+        state: directory
+        owner: root
+        group: root
+        mode: u=rw,g=r,o=r
+      when: not config_stat_result.stat.exists
 
     - name: Start the SF daemon
       service:
@@ -691,7 +733,7 @@
         daemon_reload: yes
 
     - name: Create an admin namespace called "system" with one key configured
-      shell: "{{hostvars['localhost']['utility_path']}}/sf-passwd deploy {{hostvars[groups['primary_node'][0]]['system_key']}}"
+      shell: "{{hostvars['localhost']['utility_path']}}/sf-ctl bootstrap-system-key deploy {{hostvars[groups['primary_node'][0]]['system_key']}}"
       run_once: true
 
 - hosts: primary_node
