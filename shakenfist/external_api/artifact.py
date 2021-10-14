@@ -50,7 +50,7 @@ class ArtifactEndpoint(api_base.Resource):
 
     @jwt_required
     def delete(self, artifact_uuid=None):
-        '''Delete an artifact from the cluster
+        """Delete an artifact from the cluster
 
         Artifacts can only be deleted from the system if they are not in use.
         The actual deletion of the on-disk files is left to the cleaner daemon.
@@ -60,7 +60,7 @@ class ArtifactEndpoint(api_base.Resource):
         deleted. This is only caused by a user simultaneously deleting an
         artifact and attempting to start a VM using it. It is recommended that
         the user does not do that.
-        '''
+        """
         a = Artifact.from_db(artifact_uuid)
         if not a:
             return api_base.error(404, 'artifact %s not found' % artifact_uuid)

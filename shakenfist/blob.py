@@ -108,7 +108,7 @@ class Blob(dbo):
 
     @property
     def ref_count(self):
-        '''Counts artifact references to the blob'''
+        """Counts artifact references to the blob"""
         count = self._db_get_attribute('ref_count')
         if not count:
             return 0

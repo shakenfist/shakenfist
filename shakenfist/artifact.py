@@ -86,8 +86,7 @@ class Artifact(dbo):
     def from_url(artifact_type, url):
         artifacts = list(Artifacts([partial(url_filter, url),
                                     partial(type_filter, artifact_type),
-                                    not_dead_states_filter,
-                                    ]))
+                                    not_dead_states_filter]))
         if len(artifacts) == 0:
             return Artifact.new(artifact_type, url)
         if len(artifacts) == 1:
@@ -144,7 +143,7 @@ class Artifact(dbo):
             blobs[blob_index['index']] = {
                 'instances': b.instances,
                 'size': b.size,
-                'ref_count': b.ref_count,
+                'reference_count': b.ref_count,
             }
         a['blobs'] = blobs
         return a
