@@ -8,6 +8,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist import constants
 from shakenfist import db
+from shakenfist.exceptions import BlobRefCountDecrementBelowZero, BlobDeleted
 from shakenfist import instance
 from shakenfist import logutil
 from shakenfist.util import general as util_general
@@ -97,9 +98,21 @@ class Blob(dbo):
             return []
         return locs.get('locations', [])
 
+    @locations.setter
+    def locations(self, new_locations):
+        self._db_set_attribute('locations', {'locations': new_locations})
+
     @property
     def info(self):
         return self._db_get_attribute('info')
+
+    @property
+    def ref_count(self):
+        '''Counts artifact references to the blob'''
+        count = self._db_get_attribute('ref_count')
+        if not count:
+            return 0
+        return int(count.get('ref_count', 0))
 
     # Derived values
     @property
@@ -118,13 +131,29 @@ class Blob(dbo):
                     instance_uuids.append(inst.uuid)
         return instance_uuids
 
-    def observe(self):
-        with self.get_lock_attr('locations', 'Observe blob'):
+    # Operations
+    def add_node_location(self):
+        with self.get_lock_attr('locations', 'Add node to location'):
             locs = self.locations
             if config.NODE_NAME not in locs:
                 locs.append(config.NODE_NAME)
-            self._db_set_attribute('locations', {'locations': locs})
+            self.locations = locs
 
+    def drop_node_location(self):
+        with self.get_lock_attr('locations', 'Remove node from location'):
+            locs = self.locations
+            try:
+                locs.remove(config.NODE_NAME)
+            except ValueError:
+                pass
+            else:
+                self.locations = locs
+        return locs
+
+    def observe(self):
+        self.add_node_location()
+
+        with self.get_lock_attr('locations', 'Set blob info'):
             if not self.info:
                 blob_path = os.path.join(
                     config.STORAGE_PATH, 'blobs', self.uuid)
@@ -140,6 +169,32 @@ class Blob(dbo):
                 info['mime-type'] = magic.Magic(mime=True).from_file(blob_path)
                 self._db_set_attribute('info', info)
 
+    def ref_count_inc(self):
+        with self.get_lock_attr('ref_count', 'Increase ref count'):
+            if self.state.value == self.STATE_DELETED:
+                raise BlobDeleted
+            new_count = self.ref_count + 1
+            self._db_set_attribute('ref_count', {'ref_count': new_count})
+            return new_count
+
+    def ref_count_dec(self):
+        with self.get_lock_attr('ref_count', 'Increase ref count'):
+            new_count = self.ref_count - 1
+            if new_count < 0:
+                raise BlobRefCountDecrementBelowZero
+
+            self._db_set_attribute('ref_count', {'ref_count': new_count})
+
+            # If no references then the blob cannot be used, therefore delete.
+            if new_count == 0:
+                self.state = self.STATE_DELETED
+
+            return new_count
+
+    @staticmethod
+    def filepath(blob_uuid):
+        return os.path.join(config.STORAGE_PATH, 'blobs', blob_uuid)
+
 
 def _ensure_blob_path():
     blobs_path = os.path.join(config.STORAGE_PATH, 'blobs')
@@ -150,7 +205,7 @@ def snapshot_disk(disk, blob_uuid, related_object=None):
     if not os.path.exists(disk['path']):
         return
     _ensure_blob_path()
-    dest_path = os.path.join(config.STORAGE_PATH, 'blobs', blob_uuid)
+    dest_path = Blob.filepath(blob_uuid)
 
     # Actually make the snapshot
     with util_general.RecordedOperation('snapshot %s' % disk['device'], related_object):
@@ -170,7 +225,7 @@ def http_fetch(resp, blob_uuid, locks, logs):
     total_size = int(resp.headers.get('Content-Length'))
     previous_percentage = 0.0
     last_refresh = 0
-    dest_path = os.path.join(config.STORAGE_PATH, 'blobs', blob_uuid)
+    dest_path = Blob.filepath(blob_uuid)
 
     with open(dest_path, 'wb') as f:
         for chunk in resp.iter_content(chunk_size=8192):
