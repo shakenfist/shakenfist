@@ -83,3 +83,76 @@ class TestImages(base.BaseNamespacedTestCase):
             inst = self.test_client.get_instance(inst['uuid'])
 
         self.assertTrue(inst['state'] in ['creating-error', 'error'])
+
+    def test_artifact_ref_count_label(self):
+        url = ('https://sfcbr.shakenfist.com/gw-basic/gwbasic.qcow2')
+
+        img = self.system_client.cache_artifact(url)
+
+        # Get all artifacts once to make sure we get added to the list
+        image_urls = []
+        for image in self.system_client.get_artifacts():
+            image_urls.append(image['source_url'])
+        self.assertIn(url, image_urls)
+
+        # And then just lookup the single artifact
+        start_time = time.time()
+        found = False
+        while time.time() - start_time < 7 * 60:
+            img = self.system_client.get_artifact(img['uuid'])
+            if img['state'] == 'created':
+                found = True
+            time.sleep(5)
+
+        if not found:
+            self.fail('Image was not downloaded after seven minutes: %s' % (
+                img['uuid']))
+
+        self.assertIn('blobs', img)
+        self.assertEqual(1, len(img['blobs']))
+        self.assertIn('1', img['blobs'])
+        self.assertIn('reference_count', img['blobs']['1'])
+        self.assertEqual(1, img['blobs']['1']['reference_count'])
+
+        self.assertIn('blob_uuid', img)
+        blob_uuid = img['blob_uuid']
+
+        # Create a label artifact pointing at the blob
+        label_name1 = 'test_label_01'
+        lbl = self.test_client.update_label(label_name1, blob_uuid)
+        self.assertIn('blobs', lbl)
+        self.assertEqual(1, len(lbl['blobs']))
+        self.assertIn('1', lbl['blobs'])
+        self.assertIn('reference_count', lbl['blobs']['1'])
+        self.assertEqual(2, lbl['blobs']['1']['reference_count'])
+
+        # Create second label also pointing at the blob
+        label_name2 = 'test_label_02'
+        lbl2 = self.test_client.update_label(label_name2, blob_uuid)
+        self.assertIn('blobs', lbl2)
+        self.assertEqual(3, lbl['blobs']['1']['reference_count'])
+
+        # Delete the first label
+        self.assertIn('uuid', lbl)
+        self.test_client.delete_artifact(lbl['uuid'])
+        lbl_del = self.test_client.get_artifact(img['uuid'])
+        self.assertEqual(2, lbl_del['blobs']['1']['reference_count'])
+
+        # Delete the second label
+        self.assertIn('uuid', lbl2)
+        self.test_client.delete_artifact(lbl2['uuid'])
+        lbl_del = self.test_client.get_artifact(img['uuid'])
+        self.assertEqual(1, lbl_del['blobs']['1']['reference_count'])
+
+        # Delete image artifact
+        self.test_client.delete_artifact(img['uuid'])
+
+        # Check reference count is now zero
+        img_del = self.test_client.get_artifact(img['uuid'])
+        self.assertEqual(0, img_del['blobs']['1']['reference_count'])
+        self.assertEqual('deleted', img_del['state'])
+
+        # Delete image artifact again (this is idempotent)
+        self.test_client.delete_artifact(img['uuid'])
+        img_del = self.test_client.get_artifact(img['uuid'])
+        self.assertEqual(0, img_del['blobs']['1']['reference_count'])
