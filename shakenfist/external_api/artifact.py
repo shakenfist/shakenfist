@@ -63,8 +63,12 @@ class ArtifactEndpoint(api_base.Resource):
         '''
         a = Artifact.from_db(artifact_uuid)
         if not a:
-            return api_base.error(404, 'snapshot %s not found' % artifact_uuid)
+            return api_base.error(404, 'artifact %s not found' % artifact_uuid)
         # TODO(andy): Enforce namespace permissions when snapshots have namespaces
+
+        if a.state.value == Artifact.STATE_DELETED:
+            # Already deleted, nothing to do.
+            return
 
         # Check for instances using a blob referenced by the artifact.
         blobs = []
