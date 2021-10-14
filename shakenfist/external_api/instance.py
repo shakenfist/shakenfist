@@ -9,6 +9,7 @@ from shakenfist.artifact import (
     Artifact, BLOB_URL, LABEL_URL, SNAPSHOT_URL, UPLOAD_URL)
 from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
@@ -135,9 +136,17 @@ class InstancesEndpoint(api_base.Resource):
                     Artifact.TYPE_LABEL, '%s%s/%s' % (LABEL_URL, get_jwt_identity(), label))
                 if not a:
                     return api_base.error(404, 'label %s not found' % label)
+                if a.state.value != Artifact.STATE_CREATED:
+                    return api_base.error(404, 'label %s is not ready (state=%s)'
+                                          % (label, a.state.value))
                 blob_uuid = a.most_recent_index.get('blob_uuid')
                 if not blob_uuid:
                     return api_base.error(404, 'label %s not found (no versions)' % label)
+                b = Blob.from_db(blob_uuid)
+                if not b:
+                    return api_base.error(404, 'artifact references non-existent blob (%s)' % blob_uuid)
+                if b.state == Blob.STATE_DELETED:
+                    return api_base.error(404, 'artifact references deleted blob (%s)' % blob_uuid)
                 d['blob_uuid'] = blob_uuid
 
             elif disk_base.startswith(SNAPSHOT_URL):
@@ -145,9 +154,17 @@ class InstancesEndpoint(api_base.Resource):
                 if not a:
                     return api_base.error(
                         404, 'snapshot %s not found' % disk_base[len(SNAPSHOT_URL):])
+                if a.state.value != Artifact.STATE_CREATED:
+                    return api_base.error(404, 'label %s is not ready (state=%s)'
+                                          % (label, a.state.value))
                 blob_uuid = a.most_recent_index.get('blob_uuid')
                 if not blob_uuid:
                     return api_base.error(404, 'snapshot not found (no versions)')
+                b = Blob.from_db(blob_uuid)
+                if not b:
+                    return api_base.error(404, 'artifact references non-existent blob (%s)' % blob_uuid)
+                if b.state == Blob.STATE_DELETED:
+                    return api_base.error(404, 'artifact references deleted blob (%s)' % blob_uuid)
                 d['blob_uuid'] = blob_uuid
 
             elif disk_base.startswith(UPLOAD_URL) or disk_base.startswith(LABEL_URL):
@@ -157,10 +174,18 @@ class InstancesEndpoint(api_base.Resource):
                     a = Artifact.from_url(Artifact.TYPE_LABEL, disk_base)
                 if not a:
                     return api_base.error(404, 'artifact %s not found' % disk_base)
+                if a.state.value != Artifact.STATE_CREATED:
+                    return api_base.error(404, 'label %s is not ready (state=%s)'
+                                          % (label, a.state.value))
 
                 blob_uuid = a.most_recent_index.get('blob_uuid')
                 if not blob_uuid:
                     return api_base.error(404, 'artifact not found (no versions)')
+                b = Blob.from_db(blob_uuid)
+                if not b:
+                    return api_base.error(404, 'artifact references non-existent blob (%s)' % blob_uuid)
+                if b.state == Blob.STATE_DELETED:
+                    return api_base.error(404, 'artifact references deleted blob (%s)' % blob_uuid)
                 d['blob_uuid'] = blob_uuid
 
             elif disk_base.startswith(BLOB_URL):
