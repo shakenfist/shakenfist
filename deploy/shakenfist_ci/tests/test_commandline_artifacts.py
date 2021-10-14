@@ -118,7 +118,7 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         show_info = json.loads(self._exec_client(
             '--json artifact show %s' % snap_uuid))
         self.assertIn('blobs', show_info)
-        self.assertEqual(len(show_info['blobs'], 1))
+        self.assertEqual(1, len(show_info['blobs']))
         self.assertIn('1', show_info['blobs'])
 
         self.assertIn('size', show_info['blobs']['1'])
@@ -126,7 +126,7 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         self.assertGreater(show_info['blobs']['1']['size'], 100000)
 
         self.assertIn('instances', show_info['blobs']['1'])
-        self.assertEqual(len(show_info['blobs']['1']['instances']), 0)
+        self.assertEqual(0, len(show_info['blobs']['1']['instances']))
 
         # Start an instance on the snapshot
         inst2 = self.test_client.create_instance(
@@ -143,11 +143,12 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         show_info = json.loads(self._exec_client(
             '--json artifact show %s' % snap_uuid))
         self.assertIn('blobs', show_info)
-        self.assertEqual(len(show_info['blobs'], 1))
+        self.assertEqual(1, len(show_info['blobs']))
 
         self.assertIn('instances', show_info['blobs']['1'])
-        self.assertEqual(len(show_info['blobs']['1']['instances']), 1)
-        self.assertEqual(show_info['blobs']['1']['instances'][0], inst2['uuid'])
+        self.assertEqual(1, len(show_info['blobs']['1']['instances']))
+        self.assertEqual(show_info['blobs']['1']
+                         ['instances'][0], inst2['uuid'])
 
         # Take a second snapshot of the original instance
         self._exec_client('--json instance snapshot %s' % inst1['uuid'])
@@ -156,12 +157,13 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         show_info = json.loads(self._exec_client(
             '--json artifact show %s' % snap_uuid))
         self.assertIn('blobs', show_info)
-        self.assertEqual(len(show_info['blobs'], 2))
+        self.assertEqual(2, len(show_info['blobs']))
 
         self.assertIn('1', show_info['blobs'])
         self.assertIn('instances', show_info['blobs']['1'])
-        self.assertEqual(len(show_info['blobs']['1']['instances']), 1)
-        self.assertEqual(show_info['blobs']['1']['instances'][0], inst2['uuid'])
+        self.assertEqual(1, len(show_info['blobs']['1']['instances']))
+        self.assertEqual(show_info['blobs']['1']
+                         ['instances'][0], inst2['uuid'])
 
         self.assertIn('2', show_info['blobs'])
         self.assertIn('size', show_info['blobs']['2'])
@@ -169,4 +171,4 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         self.assertGreater(show_info['blobs']['2']['size'], 100000)
 
         self.assertIn('instances', show_info['blobs']['2'])
-        self.assertEqual(len(show_info['blobs']['2']['instances']), 0)
+        self.assertEqual(0, len(show_info['blobs']['2']['instances']))
