@@ -3,7 +3,7 @@ autocancelConsecutiveBuilds()
 pipeline {
   agent any
   options {
-    timeout(time: 1, unit: 'HOURS')
+    timeout(time: 1.5, unit: 'HOURS')
   }
 
   stages {
@@ -191,12 +191,17 @@ pipeline {
 
   post {
     always {
-      sh '''  . /home/jenkins/sf-ci
+      sh '''  set -x
+              . /home/jenkins/sf-ci
               . $WORKSPACE/$BUILD_TAG/ci-environment.sh || true
 
               echo "=============================="
               ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
                   ubuntu@$primary sudo cat /etc/sf/sfrc || true
+
+              echo "=============================="
+              ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                  ubuntu@$primary ps -ef || true | grep sf
 
               echo "=============================="
               ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
