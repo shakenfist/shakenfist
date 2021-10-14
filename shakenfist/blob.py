@@ -104,13 +104,16 @@ class Blob(dbo):
     # Derived values
     @property
     def instances(self):
-        '''Build a list of instances that are using the blob as a block device.
+        """Build a list of instances that are using the blob as a block device.
 
         Returns a list of instance UUIDs.
-        '''
+        """
         instance_uuids = []
         for inst in instance.Instances([instance.healthy_states_filter]):
-            for d in inst.block_devices.get('devices'):
+            # inst.block_devices isn't populated until the instance is created,
+            # so it may not be ready yet. This means we will miss instances
+            # which have been requested but not yet started.
+            for d in inst.block_devices.get('devices', []):
                 if d.get('blob_uuid') == self.uuid:
                     instance_uuids.append(inst.uuid)
         return instance_uuids
