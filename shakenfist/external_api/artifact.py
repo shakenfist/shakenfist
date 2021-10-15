@@ -35,7 +35,7 @@ def arg_is_artifact_uuid(func):
                 kwargs['artifact_uuid'])
         if not kwargs.get('artifact_from_db'):
             LOG.with_field('artifact', kwargs['artifact_uuid']).info(
-                'Artifact not found, missing or deleted')
+                'Artifact not found')
             return api_base.error(404, 'artifact not found')
 
         return func(*args, **kwargs)
@@ -49,7 +49,8 @@ class ArtifactEndpoint(api_base.Resource):
         return artifact_from_db.external_view()
 
     @jwt_required
-    def delete(self, artifact_uuid=None):
+    @arg_is_artifact_uuid
+    def delete(self, artifact_uuid=None, artifact_from_db=None):
         """Delete an artifact from the cluster
 
         Artifacts can only be deleted from the system if they are not in use.
@@ -61,19 +62,16 @@ class ArtifactEndpoint(api_base.Resource):
         artifact and attempting to start a VM using it. It is recommended that
         the user does not do that.
         """
-        a = Artifact.from_db(artifact_uuid)
-        if not a:
-            return api_base.error(404, 'artifact %s not found' % artifact_uuid)
         # TODO(andy): Enforce namespace permissions when snapshots have namespaces
 
-        if a.state.value == Artifact.STATE_DELETED:
+        if artifact_from_db.state.value == Artifact.STATE_DELETED:
             # Already deleted, nothing to do.
             return
 
         # Check for instances using a blob referenced by the artifact.
         blobs = []
         sole_ref_in_use = []
-        for blob_index in a.get_all_indexes():
+        for blob_index in artifact_from_db.get_all_indexes():
             b = Blob.from_db(blob_index['blob_uuid'])
             blobs.append(b)
             if b.ref_count == 1:
@@ -83,7 +81,7 @@ class ArtifactEndpoint(api_base.Resource):
                 400, 'Cannot delete last reference to blob in use by instance (%s)' % (
                     ', '.join(sole_ref_in_use), ))
 
-        a.state = Artifact.STATE_DELETED
+        artifact_from_db.state = Artifact.STATE_DELETED
         for b in blobs:
             b.ref_count_dec()
 
