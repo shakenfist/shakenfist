@@ -5,10 +5,9 @@ title: Installation
 
 This guide will assume that you want to install Shaken Fist on a single local machine (that is, the one you're going to run ansible on). This is by no means the only installation option, but is the most simple to get people started.
 
-Shaken Fist only supports Ubuntu 18.04 or later but we strongly recommend 20.04 or higher, so if you're running on localhost that implies that you must be running a recent Ubuntu on your development machine. Note as well that the deployer installs software and changes the configuration of your networking, so be careful when running it on machines you are fond of.
+Shaken Fist only supports Ubuntu 20.04, Debian 10, and Debian 11, so if you're running on localhost that implies that you must be running a recent Ubuntu or Debian on your development machine. Note as well that the deployer installs software and changes the configuration of your networking, so be careful when running it on machines you are fond of.
 
-Note that we used to recommend deployers run the installer from git, but we've outgrown that approach. If you
-see that mentioned in the documentation, you are likely reading outdated guides.
+Note that we used to recommend deployers run the installer from git, but we've outgrown that approach. If you see that mentioned in the documentation, you are likely reading outdated guides.
 
 First install some dependencies:
 
@@ -18,8 +17,6 @@ sudo apt-get -y dist-upgrade
 sudo apt-get -y install ansible tox pwgen build-essential python3-dev python3-wheel \
     python3-pip python3-venv curl ansible vim git pwgen
     python3-pip curl ansible vim git pwgen
-sudo ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform \
-    andrewrothstein.go
 ```
 
 And then manually upgrade pip:
@@ -47,6 +44,12 @@ Because we're fancy, we should also create a symlink to the `sf-client` command 
 
 ```
 sudo ln -s /srv/shakenfist/venv/bin/sf-client /usr/local/bin/sf-client
+```
+
+We need to install required ansible-galaxy roles, which are described by a requirements file packaged with the server package. Do that like this:
+
+```
+ansible-galaxy install -r /srv/shakenfist/venv/share/installer/requirements.yml
 ```
 
 And then run the installer. We describe the correct invocation for a local development environment in the section below.

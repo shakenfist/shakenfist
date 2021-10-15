@@ -32,6 +32,8 @@
       copy:
         content: |
           #!/bin/bash
+          ansible-galaxy install -r /srv/shakenfist/venv/share/shakenfist/installer/requirements.yml
+
           export CLOUD=metal
           export ADMIN_PASSWORD=foobar
           export FLOATING_IP_BLOCK="10.10.10.0/24"
