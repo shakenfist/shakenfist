@@ -130,7 +130,7 @@ pipeline {
                     $source_path/shakenfist \
                     ubuntu@$primary:shakenfist
                 ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                    ubuntu@$primary "cd shakenfist/deploy; tox -epy3"
+                    ubuntu@$primary "cd shakenfist/deploy; SHAKENFIST_CI_CONCURRENCY=2 tox -epy3"
            '''
       }
     }
