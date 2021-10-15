@@ -146,8 +146,7 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
 
         self.assertIn('instances', show_info['blobs']['1'])
         self.assertEqual(1, len(show_info['blobs']['1']['instances']))
-        self.assertEqual(show_info['blobs']['1']
-                         ['instances'][0], inst2['uuid'])
+        self.assertEqual(inst2['uuid'], show_info['blobs']['1']['instances'][0])
 
         # Take a second snapshot of the original instance
         self._exec_client('--json instance snapshot %s' % inst1['uuid'])
@@ -161,8 +160,7 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         self.assertIn('1', show_info['blobs'])
         self.assertIn('instances', show_info['blobs']['1'])
         self.assertEqual(1, len(show_info['blobs']['1']['instances']))
-        self.assertEqual(show_info['blobs']['1']
-                         ['instances'][0], inst2['uuid'])
+        self.assertEqual(inst2['uuid'], show_info['blobs']['1']['instances'][0])
 
         self.assertIn('2', show_info['blobs'])
         self.assertIn('size', show_info['blobs']['2'])

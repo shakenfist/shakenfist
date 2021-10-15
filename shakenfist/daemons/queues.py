@@ -382,7 +382,8 @@ def instance_delete(inst):
 
 
 def snapshot(inst, disk, artifact_uuid, blob_uuid):
-    blob.snapshot_disk(disk, blob_uuid)
+    b = blob.snapshot_disk(disk, blob_uuid)
+    b.ref_count_inc()
     a = Artifact.from_db(artifact_uuid)
     a.state = dbo.STATE_CREATED
 

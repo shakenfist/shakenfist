@@ -48,6 +48,45 @@ class ArtifactEndpoint(api_base.Resource):
     def get(self, artifact_uuid=None, artifact_from_db=None):
         return artifact_from_db.external_view()
 
+    @jwt_required
+    def delete(self, artifact_uuid=None):
+        """Delete an artifact from the cluster
+
+        Artifacts can only be deleted from the system if they are not in use.
+        The actual deletion of the on-disk files is left to the cleaner daemon.
+
+        It is acknowledged that there is a potential race condition between the
+        check that an artifact is not in use and the marking of the artifact as
+        deleted. This is only caused by a user simultaneously deleting an
+        artifact and attempting to start a VM using it. It is recommended that
+        the user does not do that.
+        """
+        a = Artifact.from_db(artifact_uuid)
+        if not a:
+            return api_base.error(404, 'artifact %s not found' % artifact_uuid)
+        # TODO(andy): Enforce namespace permissions when snapshots have namespaces
+
+        if a.state.value == Artifact.STATE_DELETED:
+            # Already deleted, nothing to do.
+            return
+
+        # Check for instances using a blob referenced by the artifact.
+        blobs = []
+        sole_ref_in_use = []
+        for blob_index in a.get_all_indexes():
+            b = Blob.from_db(blob_index['blob_uuid'])
+            blobs.append(b)
+            if b.ref_count == 1:
+                sole_ref_in_use += b.instances
+        if sole_ref_in_use:
+            return api_base.error(
+                400, 'Cannot delete last reference to blob in use by instance (%s)' % (
+                    ', '.join(sole_ref_in_use), ))
+
+        a.state = Artifact.STATE_DELETED
+        for b in blobs:
+            b.ref_count_dec()
+
 
 class ArtifactsEndpoint(api_base.Resource):
     @jwt_required
@@ -126,6 +165,7 @@ class ArtifactUploadEndpoint(api_base.Resource):
                 blob_uuid, st.st_size,
                 time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime()),
                 time.time())
+            b.ref_count_inc()
             b.observe()
             helper.transcode_image(lock, b)
 

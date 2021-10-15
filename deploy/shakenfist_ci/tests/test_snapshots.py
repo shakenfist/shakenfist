@@ -51,6 +51,11 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self.assertEqual(1, len(snapshots))
         self.assertEqual('created', snapshots[0]['state'])
 
+        # Check blob exists and has correct reference count
+        snap1_info = self.test_client.get_artifact(snapshots[-1]['uuid'])
+        self.assertEqual(1, len(snap1_info.get('blobs', [])))
+        self.assertEqual(1, snap1_info['blobs']['1']['reference_count'])
+
         # Take another snapshot, we only get the new snapshot returned
         snap2 = self.test_client.snapshot_instance(inst1['uuid'])
         self.assertEqual(2, snap2['vda']['artifact_index'])

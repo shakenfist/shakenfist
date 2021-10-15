@@ -68,7 +68,7 @@ class TestNamespace(base.BaseNamespacedTestCase):
                 break
             time.sleep(5)
 
-        self.assertEqual(len(inst_uuids), 0,
+        self.assertEqual(0, len(inst_uuids),
                          'Instances not deleted: %s' % inst_uuids)
 
         start_time = time.time()
@@ -78,5 +78,5 @@ class TestNamespace(base.BaseNamespacedTestCase):
                 break
             time.sleep(5)
 
-        self.assertEqual(test_net['state'], 'deleted',
+        self.assertEqual('deleted', test_net['state'],
                          'Network not deleted by delete_all_networks()')

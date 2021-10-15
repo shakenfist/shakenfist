@@ -228,11 +228,12 @@ class Monitor(daemon.Daemon):
                                 'Deleting stale partial transfer')
                         os.unlink(entpath)
 
-                    elif not Blob.from_db(ent):
-                        # ... or it doesn't exist in the database
-                        LOG.with_fields({
-                            'blob': ent}).warning('Deleting orphaned blob')
-                        os.unlink(entpath)
+                    else:
+                        b = Blob.from_db(ent)
+                        if not b or b.state.value == Blob.STATE_DELETED:
+                            LOG.with_fields({
+                                'blob': ent}).warning('Deleting orphaned blob')
+                            os.unlink(entpath)
 
             # Perform etcd maintenance, if we are an etcd master
             if config.NODE_IS_ETCD_MASTER:

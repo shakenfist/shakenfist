@@ -130,7 +130,7 @@ class Network(dbo):
 
         # NOTE(mikal): we used to lock around this fetch from the database,
         # but I am hoping that moving state into an attribute means that's
-        # not nessesary any more.
+        # not necessary any more.
         static_values = Network._db_get(uuid)
         if not static_values:
             return None

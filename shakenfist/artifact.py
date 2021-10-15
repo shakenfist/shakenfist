@@ -3,6 +3,7 @@
 from functools import partial
 from uuid import uuid4
 
+from shakenfist import baseobject
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
@@ -84,7 +85,8 @@ class Artifact(dbo):
     @staticmethod
     def from_url(artifact_type, url):
         artifacts = list(Artifacts([partial(url_filter, url),
-                                    partial(type_filter, artifact_type)]))
+                                    partial(type_filter, artifact_type),
+                                    not_dead_states_filter]))
         if len(artifacts) == 0:
             return Artifact.new(artifact_type, url)
         if len(artifacts) == 1:
@@ -141,6 +143,7 @@ class Artifact(dbo):
             blobs[blob_index['index']] = {
                 'instances': b.instances,
                 'size': b.size,
+                'reference_count': b.ref_count,
             }
         a['blobs'] = blobs
         return a
@@ -179,3 +182,11 @@ def instance_snapshot_filter(instance_uuid, a):
     if a.artifact_type != Artifact.TYPE_SNAPSHOT:
         return False
     return a.source_url.startswith('%s%s' % (INSTANCE_URL, instance_uuid))
+
+
+not_dead_states_filter = partial(
+    baseobject.state_filter, [
+        Artifact.STATE_INITIAL,
+        Artifact.STATE_CREATING,
+        Artifact.STATE_CREATED,
+        ])
