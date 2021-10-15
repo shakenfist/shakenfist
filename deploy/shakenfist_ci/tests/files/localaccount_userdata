@@ -1,0 +1,11 @@
+#cloud-config
+ssh_pwauth: True
+chpasswd: { expire: False }
+
+users:
+  - name: cirros
+    lock-passwd: False
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    shell: /bin/bash
+    # This password hash is generated with mkpasswd --method=SHA-512 --rounds=4096
+    passwd: "$6$rounds=4096$UJBV9yhdw$5k7CUFpCyksqh9IqM0UZTa.YvPZr43YRM8qRD.XVvlJM6OBqShzQNM.bb18KsdkCF7HBBmaQaYubs.GTtaNMU1"

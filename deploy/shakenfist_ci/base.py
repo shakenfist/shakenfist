@@ -428,6 +428,7 @@ class TestDistroBoots(BaseNamespacedTestCase):
 
 class LoggingSocket(object):
     ctrlc = '\x03'
+    ctrld = '\x04'
 
     def __init__(self, client, inst):
         inst = client.get_instance(inst['uuid'])
@@ -453,7 +454,7 @@ class LoggingSocket(object):
             % (inst['node'], inst['console_port']))
 
     def ensure_fresh(self):
-        for d in [self.ctrlc, self.ctrlc, '\nexit\n', 'cirros\n', 'gocubsgo\n']:
+        for d in [self.ctrlc, self.ctrlc, self.ctrld, 'cirros\n', 'gocubsgo\n']:
             self.send(d)
             time.sleep(0.5)
             self.recv()

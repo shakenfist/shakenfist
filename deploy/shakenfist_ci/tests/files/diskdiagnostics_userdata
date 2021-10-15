@@ -1,0 +1,6 @@
+#cloud-config
+
+runcmd:
+  - ls -l /dev/disk/by-path/ | sed 's/^/[DISKDIAG disk-by-path] /' > /dev/console
+  - df -h | sed 's/^/[DISKDIAG df] /' > /dev/console
+  - mount | sed 's/^/[DISKDIAG mount] /' > /dev/console
