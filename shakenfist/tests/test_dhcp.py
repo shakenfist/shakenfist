@@ -227,4 +227,5 @@ class DHCPTestCase(testtools.TestCase):
         d.restart_dhcpd()
         mock_signal.assert_called_with(signal.SIGHUP)
         mock_execute.assert_called_with(
-            None, 'ip netns exec notauuid dnsmasq --conf-file=/a/b/c/dhcp/notauuid/config')
+            None, 'dnsmasq --conf-file=/a/b/c/dhcp/notauuid/config',
+            namespace='notauuid')
