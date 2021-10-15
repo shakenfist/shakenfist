@@ -67,8 +67,7 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         self.assertEqual(1, len(versions))
 
     def test_artifact_commands_multiple_versions(self):
-        url = ('http://www.randomnumberapi.com/api/v1.0/'
-               'random?min=100&max=1000&count=1')
+        url = 'http://uuid.com/'
         self._exec_client('artifact cache "%s"' % url)
         self._exec_client('artifact cache "%s"' % url)
         self._exec_client('artifact cache "%s"' % url)
@@ -86,7 +85,7 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         self.assertIsNotNone(artifact_uuid)
 
         # Wait for downloads
-        time.sleep(10)
+        time.sleep(60)
 
         # Ensure we have the right number of versions
         versions = json.loads(self._exec_client(
