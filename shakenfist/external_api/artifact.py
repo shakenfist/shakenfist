@@ -191,3 +191,25 @@ class ArtifactVersionsEndpoint(api_base.Resource):
             bout['index'] = idx['index']
             retval.append(bout)
         return retval
+
+
+class ArtifactVersionEndpoint(api_base.Resource):
+    @jwt_required
+    @arg_is_artifact_uuid
+    def delete(self, artifact_uuid=None, artifact_from_db=None, version_id=0):
+        try:
+            ver_index = int(version_id)
+        except ValueError:
+            return api_base.error(400, 'version index is not an integer')
+
+        indexes = list(artifact_from_db.get_all_indexes())
+        for idx in indexes:
+            if idx['index'] == ver_index:
+                artifact_from_db.del_index(idx['index'])
+                b = Blob.from_db(idx['blob_uuid'])
+                b.ref_count_dec()
+                if len(indexes) == 1:
+                    artifact_from_db.state = Artifact.STATE_DELETED
+                return
+
+        return api_base.error(404, 'artifact index not found')

@@ -52,7 +52,8 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self.assertEqual('created', snapshots[0]['state'])
 
         # Check blob exists and has correct reference count
-        snap1_info = self.test_client.get_artifact(snapshots[-1]['uuid'])
+        snapshot_uuid = snapshots[-1]['uuid']
+        snap1_info = self.test_client.get_artifact(snapshot_uuid)
         self.assertEqual(1, len(snap1_info.get('blobs', [])))
         self.assertEqual(1, snap1_info['blobs']['1']['reference_count'])
 
@@ -116,6 +117,21 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self.test_client.delete_instance(inst1['uuid'])
         self.test_client.delete_instance(inst2['uuid'])
         self.test_client.delete_instance(inst3['uuid'])
+
+        # Test deleting snapshot versions
+        versions = self.test_client.get_artifact_versions(snapshot_uuid)
+        self.assertEqual(2, len(versions))
+
+        self.test_client.delete_artifact_version(snapshot_uuid, 2)
+        versions = self.test_client.get_artifact_versions(snapshot_uuid)
+        self.assertEqual(1, len(versions))
+
+        self.test_client.delete_artifact_version(snapshot_uuid, 1)
+        versions = self.test_client.get_artifact_versions(snapshot_uuid)
+        self.assertEqual(0, len(versions))
+
+        snap_info = self.test_client.get_artifact(snapshot_uuid)
+        self.assertEqual('deleted', snap_info['state'])
 
     def test_multiple_disk_snapshots(self):
         inst = self.test_client.create_instance(
