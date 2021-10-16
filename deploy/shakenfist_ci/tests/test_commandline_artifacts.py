@@ -69,9 +69,13 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
     def test_artifact_commands_multiple_versions(self):
         url = 'http://uuid.com/'
         self._exec_client('artifact cache "%s"' % url)
+        time.sleep(5)
         self._exec_client('artifact cache "%s"' % url)
+        time.sleep(5)
         self._exec_client('artifact cache "%s"' % url)
+        time.sleep(5)
         self._exec_client('artifact cache "%s"' % url)
+        time.sleep(5)
         self._exec_client('artifact cache "%s"' % url)
 
         # Ensure that our download appears in the list of artifacts
@@ -85,17 +89,18 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         self.assertIsNotNone(artifact_uuid)
 
         # Wait for downloads
-        time.sleep(60)
+        time.sleep(30)
 
         # Ensure we have the right number of versions
-        for _ in range(5):
+        start_time = time.time()
+        while time.time() - start_time < 5 * 60 * base.NETWORK_PATIENCE_FACTOR:
             versions = json.loads(self._exec_client(
                 'artifact versions %s' % artifact_uuid))
             if len(versions) == 5:
                 return
             time.sleep(30)
 
-        self.fail('Never recieved the correct number of versions. I have %d'
+        self.fail('Never received the correct number of versions. I have %d'
                   % len(versions))
 
     def test_artifact_show(self):
