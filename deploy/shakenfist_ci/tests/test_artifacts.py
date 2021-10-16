@@ -130,7 +130,7 @@ class TestImages(base.BaseNamespacedTestCase):
         label_name2 = 'test_label_02'
         lbl2 = self.test_client.update_label(label_name2, blob_uuid)
         self.assertIn('blobs', lbl2)
-        self.assertEqual(3, lbl['blobs']['1']['reference_count'])
+        self.assertEqual(3, lbl2['blobs']['1']['reference_count'])
 
         # Delete the first label
         self.assertIn('uuid', lbl)
