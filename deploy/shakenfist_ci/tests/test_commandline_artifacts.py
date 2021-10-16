@@ -88,9 +88,15 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         time.sleep(60)
 
         # Ensure we have the right number of versions
-        versions = json.loads(self._exec_client(
-            'artifact versions %s' % artifact_uuid))
-        self.assertEqual(5, len(versions))
+        for _ in range(5):
+            versions = json.loads(self._exec_client(
+                'artifact versions %s' % artifact_uuid))
+            if len(versions) == 5:
+                return
+            time.sleep(30)
+
+        self.fail('Never recieved the correct number of versions. I have %d'
+                  % len(versions))
 
     def test_artifact_show(self):
         # Create an instance
@@ -146,7 +152,8 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
 
         self.assertIn('instances', show_info['blobs']['1'])
         self.assertEqual(1, len(show_info['blobs']['1']['instances']))
-        self.assertEqual(inst2['uuid'], show_info['blobs']['1']['instances'][0])
+        self.assertEqual(
+            inst2['uuid'], show_info['blobs']['1']['instances'][0])
 
         # Take a second snapshot of the original instance
         self._exec_client('--json instance snapshot %s' % inst1['uuid'])
@@ -160,7 +167,8 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         self.assertIn('1', show_info['blobs'])
         self.assertIn('instances', show_info['blobs']['1'])
         self.assertEqual(1, len(show_info['blobs']['1']['instances']))
-        self.assertEqual(inst2['uuid'], show_info['blobs']['1']['instances'][0])
+        self.assertEqual(
+            inst2['uuid'], show_info['blobs']['1']['instances'][0])
 
         self.assertIn('2', show_info['blobs'])
         self.assertIn('size', show_info['blobs']['2'])
