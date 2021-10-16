@@ -3,7 +3,7 @@ autocancelConsecutiveBuilds()
 pipeline {
   agent any
   options {
-    timeout(time: 1.5, unit: 'HOURS')
+    timeout(time: 90, unit: 'MINUTES')
   }
 
   stages {
