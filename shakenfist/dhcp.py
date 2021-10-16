@@ -29,8 +29,6 @@ class DHCP(object):
             'mtu': config.MAX_HYPERVISOR_MTU - 50,
             'provide_nat': network.provide_nat,
 
-            'netns': self.network.uuid,
-            'in_netns': 'ip netns exec %s' % self.network.uuid,
             'interface': interface
         }
 
@@ -108,11 +106,12 @@ class DHCP(object):
         self._remove_config()
 
     def restart_dhcpd(self):
-        if not os.path.exists('/var/run/netns/%(netns)s' % self.subst):
+        if not os.path.exists('/var/run/netns/%s' % self.network.uuid):
             return
 
         self._make_config()
         self._make_hosts()
         if not self._send_signal(signal.SIGHUP):
-            util_process.execute(None,
-                                 '%(in_netns)s dnsmasq --conf-file=%(config_dir)s/config' % self.subst)
+            util_process.execute(
+                None, 'dnsmasq --conf-file=%(config_dir)s/config' % self.subst,
+                namespace=self.network.uuid)

@@ -18,7 +18,11 @@ def _lock_refresher(locks):
         time.sleep(10)
 
 
-def execute(locks, command, check_exit_code=[0], env_variables=None):
+def execute(locks, command, check_exit_code=[0], env_variables=None,
+            namespace=None):
+    if namespace:
+        command = 'ip netns exec %s %s' % (namespace, command)
+
     LOG.info('Executing %s with locks %s', command, locks)
 
     if not locks:
