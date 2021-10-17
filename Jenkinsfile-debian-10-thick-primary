@@ -7,93 +7,89 @@ pipeline {
     stage('Build infra') {
       steps {
         script {
-          try {
-            timeout(time: 20, unit: 'MINUTES', activity: true) {
-              sh '''  mkdir -p $WORKSPACE/$BUILD_TAG
+          timeout(time: 20, unit: 'MINUTES', activity: true) {
+            sh '''  mkdir -p $WORKSPACE/$BUILD_TAG
 
-                      if [ -e .git ]
+                    if [ -e .git ]
+                    then
+                      echo "Detected existing git checkout."
+                      git remote -v
+                      gitmsg=`git log -1 --no-merges`
+
+                      if [ "https://github.com/shakenfist/shakenfist" == "https://github.com/shakenfist/shakenfist" ]
                       then
-                        echo "Detected existing git checkout."
-                        git remote -v
-                        gitmsg=`git log -1 --no-merges`
-
-                        if [ "https://github.com/shakenfist/shakenfist" == "https://github.com/shakenfist/shakenfist" ]
-                        then
-                          mkdir $WORKSPACE/$BUILD_TAG/shakenfist
-                          ls -A | grep -v $BUILD_TAG | xargs -t -I '__' mv __ $WORKSPACE/$BUILD_TAG/shakenfist/
-                        elif [ "https://github.com/shakenfist/shakenfist" == "https://github.com/shakenfist/client-python" ]
-                        then
-                          mkdir $WORKSPACE/$BUILD_TAG/client-python
-                          ls -A | grep -v $BUILD_TAG | xargs -t -I '__' mv __ $WORKSPACE/$BUILD_TAG/client-python/
-                        else
-                          echo "Unknown github_url!"
-                          exit 1
-                        fi
-                      fi
-
-                      if [ ! -e $WORKSPACE/$BUILD_TAG/shakenfist ]
+                        mkdir $WORKSPACE/$BUILD_TAG/shakenfist
+                        ls -A | grep -v $BUILD_TAG | xargs -t -I '__' mv __ $WORKSPACE/$BUILD_TAG/shakenfist/
+                      elif [ "https://github.com/shakenfist/shakenfist" == "https://github.com/shakenfist/client-python" ]
                       then
-                        echo "Performing shakenfist git checkout."
-                        project="shakenfist"
-                        search=" Depends on https://github.com/shakenfist/$project/"
-                        deppr=`echo $gitmsg | egrep "$search" | sed "s|.*$search||"`
-
-                        cd $WORKSPACE/$BUILD_TAG
-                        git clone https://github.com/shakenfist/shakenfist
-                        cd shakenfist
-
-                        if [ "%$deppr%" == "%%" ]
-                        then
-                          git checkout
-                        else
-                          git fetch origin $deppr/head:dependson
-                          git checkout dependson
-                        fi
+                        mkdir $WORKSPACE/$BUILD_TAG/client-python
+                        ls -A | grep -v $BUILD_TAG | xargs -t -I '__' mv __ $WORKSPACE/$BUILD_TAG/client-python/
+                      else
+                        echo "Unknown github_url!"
+                        exit 1
                       fi
+                    fi
 
-                      if [ ! -e $WORKSPACE/$BUILD_TAG/client-python ]
+                    if [ ! -e $WORKSPACE/$BUILD_TAG/shakenfist ]
+                    then
+                      echo "Performing shakenfist git checkout."
+                      project="shakenfist"
+                      search=" Depends on https://github.com/shakenfist/$project/"
+                      deppr=`echo $gitmsg | egrep "$search" | sed "s|.*$search||"`
+
+                      cd $WORKSPACE/$BUILD_TAG
+                      git clone https://github.com/shakenfist/shakenfist
+                      cd shakenfist
+
+                      if [ "%$deppr%" == "%%" ]
                       then
-                        echo "Performing client-python git checkout."
-                        project="client-python"
-                        search=" Depends on https://github.com/shakenfist/$project/"
-                        deppr=`echo $gitmsg | egrep "$search" | sed "s|.*$search||"`
-
-                        cd $WORKSPACE/$BUILD_TAG
-                        git clone https://github.com/shakenfist/client-python
-                        cd client-python
-
-                        if [ "%$deppr%" == "%%" ]
-                        then
-                          git checkout master
-                        else
-                          git fetch origin $deppr/head:dependson
-                          git checkout dependson
-                        fi
+                        git checkout
+                      else
+                        git fetch origin $deppr/head:dependson
+                        git checkout dependson
                       fi
+                    fi
 
-                      SOURCE_PATH="$WORKSPACE/$BUILD_TAG"
+                    if [ ! -e $WORKSPACE/$BUILD_TAG/client-python ]
+                    then
+                      echo "Performing client-python git checkout."
+                      project="client-python"
+                      search=" Depends on https://github.com/shakenfist/$project/"
+                      deppr=`echo $gitmsg | egrep "$search" | sed "s|.*$search||"`
 
-                      echo "==== shakenfist git log ===="
-                      cd $SOURCE_PATH/shakenfist
-                      git log -5 --no-merges
+                      cd $WORKSPACE/$BUILD_TAG
+                      git clone https://github.com/shakenfist/client-python
+                      cd client-python
 
-                      echo "==== client-python git log ===="
-                      cd $SOURCE_PATH/client-python
-                      git log -5 --no-merges
+                      if [ "%$deppr%" == "%%" ]
+                      then
+                        git checkout master
+                      else
+                        git fetch origin $deppr/head:dependson
+                        git checkout dependson
+                      fi
+                    fi
 
-                      echo "==== end git logs ===="
+                    SOURCE_PATH="$WORKSPACE/$BUILD_TAG"
 
-                      cd $SOURCE_PATH/shakenfist
-                      . /home/jenkins/sf-ci
-                      ansible-playbook -i /home/jenkins/hosts \
-                          --extra-vars "identifier=$BUILD_TAG source_path=$SOURCE_PATH \
-                          base_image=label:sfci-debian-10 \
-                          base_image_user=debian" \
-                          deploy/ansible/ci-topology-thick-primary.yml
-                '''
-            }
-          } catch (Exception e) {
-            currentBuild.result = 'FAILURE'
+                    echo "==== shakenfist git log ===="
+                    cd $SOURCE_PATH/shakenfist
+                    git log -5 --no-merges
+
+                    echo "==== client-python git log ===="
+                    cd $SOURCE_PATH/client-python
+                    git log -5 --no-merges
+
+                    echo "==== end git logs ===="
+
+                    cd $SOURCE_PATH/shakenfist
+                    . /home/jenkins/sf-ci
+                    ansible-playbook -i /home/jenkins/hosts \
+                        --extra-vars "identifier=$BUILD_TAG source_path=$SOURCE_PATH \
+                        base_image=label:sfci-debian-10 \
+                        base_image_user=debian" \
+                        deploy/ansible/ci-topology-thick-primary.yml
+              '''
           }
         }
       }
@@ -101,22 +97,18 @@ pipeline {
     stage('Run installer on primary') {
       steps {
         script {
-          try {
-            timeout(time: 20, unit: 'MINUTES', activity: true) {
-              sh '''  . $WORKSPACE/$BUILD_TAG/ci-environment.sh
-                      ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no \
-                          -o UserKnownHostsFile=/dev/null \
-                          debian@$primary sudo /root/sf-deploy.sh
-                      echo ""
-                      echo ""
-                      ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no \
-                          -o UserKnownHostsFile=/dev/null \
-                          debian@$primary \
-                          'sudo rm /etc/apache2/sites-enabled/*; sudo a2ensite sf-example.conf; sudo apachectl graceful'
-                '''
-            }
-          } catch (Exception e) {
-            currentBuild.result = 'FAILURE'
+          timeout(time: 20, unit: 'MINUTES', activity: true) {
+            sh '''  . $WORKSPACE/$BUILD_TAG/ci-environment.sh
+                    ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no \
+                        -o UserKnownHostsFile=/dev/null \
+                        debian@$primary sudo /root/sf-deploy.sh
+                    echo ""
+                    echo ""
+                    ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no \
+                        -o UserKnownHostsFile=/dev/null \
+                        debian@$primary \
+                        'sudo rm /etc/apache2/sites-enabled/*; sudo a2ensite sf-example.conf; sudo apachectl graceful'
+              '''
           }
         }
       }
@@ -124,21 +116,17 @@ pipeline {
     stage('Create a base level of activity in the cluster') {
       steps {
         script {
-          try {
-            timeout(time: 2, unit: 'MINUTES', activity: true) {
-              sh '''  . $WORKSPACE/$BUILD_TAG/ci-environment.sh
-                      ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                          debian@$primary \
-                          'echo "==== sfrc ===="; cat /etc/sf/sfrc; echo "==== end sfrc ===="'
-                      echo ""
-                      echo ""
-                      ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                          debian@$primary \
-                          '. /etc/sf/sfrc; for i in `seq 100`; do sf-client --async=continue network create background-$i 10.$i.0.0/24; done'
-                '''
-            }
-          } catch (Exception e) {
-            currentBuild.result = 'FAILURE'
+          timeout(time: 2, unit: 'MINUTES', activity: true) {
+            sh '''  . $WORKSPACE/$BUILD_TAG/ci-environment.sh
+                    ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                        debian@$primary \
+                        'echo "==== sfrc ===="; cat /etc/sf/sfrc; echo "==== end sfrc ===="'
+                    echo ""
+                    echo ""
+                    ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                        debian@$primary \
+                        '. /etc/sf/sfrc; for i in `seq 100`; do sf-client --async=continue network create background-$i 10.$i.0.0/24; done'
+              '''
           }
         }
       }
@@ -146,19 +134,15 @@ pipeline {
     stage('Run CI tests on primary') {
       steps {
         script {
-          try {
-            timeout(time: 60, unit: 'MINUTES', activity: true) {
-              sh '''  . $WORKSPACE/$BUILD_TAG/ci-environment.sh
-                      scp -rp -i /home/jenkins/id_ci -o StrictHostKeyChecking=no \
-                          -o UserKnownHostsFile=/dev/null \
-                          $source_path/shakenfist \
-                          debian@$primary:shakenfist
-                      ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                          debian@$primary "cd shakenfist/deploy; SHAKENFIST_CI_CONCURRENCY=6 tox -epy3"
-                '''
-            }
-          } catch (Exception e) {
-            currentBuild.result = 'FAILURE'
+          timeout(time: 60, unit: 'MINUTES', activity: true) {
+            sh '''  . $WORKSPACE/$BUILD_TAG/ci-environment.sh
+                    scp -rp -i /home/jenkins/id_ci -o StrictHostKeyChecking=no \
+                        -o UserKnownHostsFile=/dev/null \
+                        $source_path/shakenfist \
+                        debian@$primary:shakenfist
+                    ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                        debian@$primary "cd shakenfist/deploy; SHAKENFIST_CI_CONCURRENCY=6 tox -epy3"
+              '''
           }
         }
       }
