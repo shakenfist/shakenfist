@@ -123,6 +123,9 @@ class Artifact(dbo):
             self.log.with_fields(entry).info('Added index to artifact')
             return entry
 
+    def del_index(self, index):
+        self._db_delete_attribute('index_%012d' % index)
+
     def external_view_without_index(self):
         return {
             'uuid': self.uuid,

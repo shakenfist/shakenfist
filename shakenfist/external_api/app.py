@@ -123,6 +123,8 @@ api.add_resource(api_artifact.ArtifactEventsEndpoint,
                  '/artifacts/<artifact_uuid>/events')
 api.add_resource(api_artifact.ArtifactVersionsEndpoint,
                  '/artifacts/<artifact_uuid>/versions')
+api.add_resource(api_artifact.ArtifactVersionEndpoint,
+                 '/artifacts/<artifact_uuid>/versions/<version_id>')
 
 api.add_resource(api_label.LabelEndpoint, '/label/<label_name>')
 
