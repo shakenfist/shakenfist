@@ -115,10 +115,6 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self.assertIsNotNone(inst3['node'])
         self._await_login_prompt(inst3['uuid'])
 
-        self.test_client.delete_instance(inst1['uuid'])
-        self.test_client.delete_instance(inst2['uuid'])
-        self.test_client.delete_instance(inst3['uuid'])
-
         # Test deleting snapshot versions
         versions = self.test_client.get_artifact_versions(snapshot_uuid)
         self.assertEqual(2, len(versions))
@@ -141,6 +137,10 @@ class TestSnapshots(base.BaseNamespacedTestCase):
 
         snap_info = self.test_client.get_artifact(snapshot_uuid)
         self.assertEqual('deleted', snap_info['state'])
+
+        self.test_client.delete_instance(inst1['uuid'])
+        self.test_client.delete_instance(inst2['uuid'])
+        self.test_client.delete_instance(inst3['uuid'])
 
     def test_multiple_disk_snapshots(self):
         inst = self.test_client.create_instance(
