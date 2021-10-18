@@ -13,19 +13,19 @@ Environment=SHAKENFIST_NODE_MESH_IP="{{node_mesh_ip}}"
 Environment=SHAKENFIST_NODE_MESH_NIC="{{node_mesh_nic}}"
 Environment=SHAKENFIST_NODE_NAME="{{node_name}}"
 
-{% if ansible_fqdn in groups['etcd_master'] %}
+{% if inventory_hostname in groups['etcd_master'] %}
 Environment=SHAKENFIST_NODE_IS_ETCD_MASTER=True
 {% else %}
 Environment=SHAKENFIST_NODE_IS_ETCD_MASTER=False
 {% endif %}
 
-{% if ansible_fqdn in groups['hypervisors'] %}
+{% if inventory_hostname in groups['hypervisors'] %}
 Environment=SHAKENFIST_NODE_IS_HYPERVISOR=True
 {% else %}
 Environment=SHAKENFIST_NODE_IS_HYPERVISOR=False
 {% endif %}
 
-{% if ansible_fqdn in groups['network_node'] %}
+{% if inventory_hostname in groups['network_node'] %}
 Environment=SHAKENFIST_NODE_IS_NETWORK_NODE=True
 {% else %}
 Environment=SHAKENFIST_NODE_IS_NETWORK_NODE=False

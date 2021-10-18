@@ -1,7 +1,6 @@
 - name: Add {{item['name']}} to ansible
   add_host:
     hostname: "{{item['name']}}"
-    ansible_fqdn: "{{item['name']}}"
     ansible_ssh_host: "{{item['node_egress_ip']}}"
     ansible_ssh_user: "{{ssh_user}}"
     ansible_ssh_private_key_filename: "{{ssh_key_filename}}"
