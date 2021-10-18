@@ -38,6 +38,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         # Take a snapshot
         snap1 = self.test_client.snapshot_instance(inst1['uuid'])
         self.assertIsNotNone(snap1)
+        self.assertEqual(1, snap1['vda']['artifact_index'])
 
         # Wait until the blob uuid specified above is the one used for the
         # current snapshot
@@ -126,6 +127,14 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         versions = self.test_client.get_artifact_versions(snapshot_uuid)
         self.assertEqual(1, len(versions))
 
+        # Take snapshot and check the index increases (does not reuse index 2)
+        snap3 = self.test_client.snapshot_instance(inst1['uuid'])
+        self.assertEqual(3, snap3['vda']['artifact_index'])
+
+        # Quickly delete snapshot whilst still in progress
+        self.test_client.delete_artifact_version(snapshot_uuid, 3)
+
+        # Delete only version in artifact
         self.test_client.delete_artifact_version(snapshot_uuid, 1)
         versions = self.test_client.get_artifact_versions(snapshot_uuid)
         self.assertEqual(0, len(versions))

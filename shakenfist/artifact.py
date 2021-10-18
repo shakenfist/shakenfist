@@ -114,7 +114,10 @@ class Artifact(dbo):
 
     def add_index(self, blob_uuid):
         with self.get_lock_attr('index', 'Artifact index creation'):
-            index = self.most_recent_index.get('index', 0) + 1
+            highest_index = self._db_get_attribute('highest_index')
+            index = highest_index.get('index', 0) + 1
+            self._db_set_attribute('highest_index', {'index': index})
+
             entry = {
                 'index': index,
                 'blob_uuid': blob_uuid
