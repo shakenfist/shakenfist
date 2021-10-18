@@ -22,12 +22,12 @@ from shakenfist.config import config
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
-from shakenfist import images
 from shakenfist import logutil
 from shakenfist import net
 from shakenfist import networkinterface
 from shakenfist.tasks import DeleteInstanceTask
 from shakenfist.util import general as util_general
+from shakenfist.util import image as util_image
 from shakenfist.util import libvirt as util_libvirt
 
 
@@ -41,14 +41,20 @@ def _get_defaulted_disk_bus(disk):
     return config.DISK_BUS
 
 
-def _get_disk_device_base(bus):
+LETTERS = 'abcdefghijklmnopqrstuvwxyz'
+NUMBERS = '0123456789'
+
+
+def _get_disk_device(bus, index):
     bases = {
-        'ide': 'hd',
-        'scsi': 'sd',
-        'usb': 'sd',
-        'virtio': 'vd'
+        'ide': ('hd', LETTERS),
+        'scsi': ('sd', LETTERS),
+        'usb': ('sd', LETTERS),
+        'virtio': ('vd', LETTERS),
+        'nvme': ('nvme', NUMBERS),
     }
-    return bases.get(bus, 'sd')
+    prefix, index_scheme = bases.get(bus, 'sd')
+    return '%s%s' % (prefix, index_scheme[index])
 
 
 def _get_defaulted_disk_type(disk):
@@ -66,8 +72,8 @@ def _safe_int_cast(i):
 
 def _initialize_block_devices(instance_path, disk_spec):
     bus = _get_defaulted_disk_bus(disk_spec[0])
-    root_device = _get_disk_device_base(bus) + 'a'
-    config_device = _get_disk_device_base(bus) + 'b'
+    root_device = _get_disk_device(bus, 0)
+    config_device = _get_disk_device(bus, 1)
 
     disk_type = 'qcow2'
 
@@ -92,19 +98,22 @@ def _initialize_block_devices(instance_path, disk_spec):
                 'present_as': 'disk',
                 'snapshot_ignores': True
             }
-        ]
+        ],
+        'extracommands': []
     }
 
-    i = 0
+    i = 2
     for d in disk_spec[1:]:
         bus = _get_defaulted_disk_bus(d)
-        device = _get_disk_device_base(bus) + chr(ord('c') + i)
+        device = _get_disk_device(bus, i)
+        disk_path = os.path.join(instance_path, device)
+
         block_devices['devices'].append({
             'type': disk_type,
             'size': _safe_int_cast(d.get('size')),
             'device': device,
             'bus': bus,
-            'path': os.path.join(instance_path, device),
+            'path': disk_path,
             'base': d.get('base'),
             'blob_uuid': d.get('blob_uuid'),
             'present_as': _get_defaulted_disk_type(d),
@@ -112,14 +121,21 @@ def _initialize_block_devices(instance_path, disk_spec):
         })
         i += 1
 
+    # NVME disks require a different treatment because libvirt doesn't natively
+    # support them yet.
+    nvme_counter = 0
+    for d in block_devices['devices']:
+        if d['bus'] == 'nvme':
+            nvme_counter += 1
+            block_devices['extracommands'].extend([
+                '-drive', ('file=%s,format=%s,if=none,id=NVME%d'
+                           % (d['path'], d['type'], nvme_counter)),
+                '-device', ('nvme,drive=NVME%d,serial=nvme-%d'
+                            % (nvme_counter, nvme_counter))
+            ])
+
     block_devices['finalized'] = False
     return block_devices
-
-
-def _blob_path():
-    blob_path = os.path.join(config.STORAGE_PATH, 'blobs')
-    os.makedirs(blob_path, exist_ok=True)
-    return blob_path
 
 
 class Instance(dbo):
@@ -581,15 +597,27 @@ class Instance(dbo):
                             disk['snapshot_ignores'] = True
                             util_general.link(cached_image_path, disk['path'])
 
-                            # Due to limitations in some installers, cdroms are always on IDE
-                            disk['device'] = 'hd%s' % disk['device'][-1]
-                            disk['bus'] = 'ide'
+                            # qemu does not support removable media on virtio buses. It also
+                            # only supports one IDE bus. This is quite limiting. Instead, we
+                            # use USB for cdrom drives, unless you've specified a bus other
+                            # than virtio in the creation request.
+                            if disk['bus'] == 'virtio':
+                                disk['bus'] = 'usb'
+                                disk['device'] = _get_disk_device(
+                                    disk['bus'], LETTERS.find(disk['device'][-1]))
+
+                        elif disk['bus'] == 'nvme':
+                            # NVMe disks do not currently support a COW layer for the instance
+                            # disk. This is because we don't have a libvirt <disk/> element for
+                            # them and therefore can't specify their backing store. Instead we
+                            # produce a flat layer here.
+                            util_image.create_qcow2([lock], cached_image_path,
+                                                    disk['path'], disk_size=disk['size'])
+
                         else:
                             with util_general.RecordedOperation('create copy on write layer', self):
-                                images.util_image.create_cow([lock], cached_image_path,
-                                                             disk['path'], disk['size'])
-                            shutil.chown(
-                                disk['path'], 'libvirt-qemu', 'libvirt-qemu')
+                                util_image.create_cow([lock], cached_image_path,
+                                                      disk['path'], disk['size'])
                             self.log.with_fields(util_general.stat_log_fields(disk['path'])).info(
                                 'COW layer %s created' % disk['path'])
 
@@ -602,9 +630,10 @@ class Instance(dbo):
                                 % (cached_image_path))
 
                     elif not os.path.exists(disk['path']):
-                        images.util_image.create_blank(
+                        util_image.create_blank(
                             [lock], disk['path'], disk['size'])
 
+                    shutil.chown(disk['path'], 'libvirt-qemu', 'libvirt-qemu')
                     modified_disks.append(disk)
 
                 block_devices['devices'] = modified_disks
@@ -777,7 +806,7 @@ class Instance(dbo):
         # I hadn't spent _ages_ finding a bug related to it.
         block_devices = self.block_devices
         ports = self.ports
-        return t.render(
+        x = t.render(
             uuid=self.uuid,
             memory=self.memory * 1024,
             vcpus=self.cpus,
@@ -788,8 +817,18 @@ class Instance(dbo):
             vdi_port=ports.get('vdi_port'),
             video_model=self.video['model'],
             video_memory=self.video['memory'],
-            uefi=self.uefi
+            uefi=self.uefi,
+            extracommands=block_devices.get('extracommands', [])
         )
+
+        # Libvirt re-writes the domain XML once loaded, so we store the XML
+        # as generated as well so that we can debug. Note that this is _not_
+        # the XML actually used by libvirt.
+        os.makedirs(self.instance_path, exist_ok=True)
+        with open(os.path.join(self.instance_path, 'original_domain.xml'), 'w') as f:
+            f.write(x)
+
+        return x
 
     def _get_domain(self):
         libvirt = util_libvirt.get_libvirt()
@@ -833,6 +872,15 @@ class Instance(dbo):
                 ports = self.ports
                 self._free_console_port(ports['console_port'])
                 self._free_console_port(ports['vdi_port'])
+
+                # We need to delete the nvram file before we can undefine
+                # the domain. This will be recreated by libvirt on the next
+                # attempt.
+                nvram_path = os.path.join(
+                    config.STORAGE_PATH, 'instances', self.uuid, 'nvram')
+                if os.path.exists(nvram_path):
+                    os.unlink(nvram_path)
+
                 inst.undefine()
 
                 self.ports = None
@@ -907,11 +955,8 @@ class Instance(dbo):
             length, len(d))
         return d
 
-    def enqueue_delete(self):
-        self.enqueue_delete_remote(config.NODE_NAME)
-
     def enqueue_delete_remote(self, node):
-        db.enqueue(node, {
+        etcd.enqueue(node, {
             'tasks': [DeleteInstanceTask(self.uuid)]
         })
 
@@ -927,7 +972,7 @@ class Instance(dbo):
             self.state = self.STATE_ERROR
 
         self.error = error_msg
-        self.enqueue_delete()
+        self.enqueue_delete_remote(config.NODE_NAME)
 
 
 class Instances(dbo_iter):

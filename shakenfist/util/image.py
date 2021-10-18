@@ -77,24 +77,32 @@ def create_cow(locks, cache_file, disk_file, disk_size):
             % (disk_size, disk_size * 1024 * 1024 * 1024, info['virtual size']))
 
     if disk_size:
-        util_process.execute(locks,
-                             'qemu-img create -b %s -f qcow2 %s %dG'
-                             % (cache_file, disk_file, int(disk_size)))
+        util_process.execute(
+            locks,
+            ('qemu-img create -b %s -f qcow2 %s %dG'
+             % (cache_file, disk_file, int(disk_size))),
+            iopriority=util_process.PRIORITY_LOW)
     else:
-        util_process.execute(locks,
-                             'qemu-img create -b %s -f qcow2 %s'
-                             % (cache_file, disk_file))
+        util_process.execute(
+            locks,
+            'qemu-img create -b %s -f qcow2 %s' % (cache_file, disk_file),
+            iopriority=util_process.PRIORITY_LOW)
 
 
-def create_qcow2(locks, cache_file, disk_file):
+def create_qcow2(locks, cache_file, disk_file, disk_size=None):
     """Make a qcow2 copy of the disk from the image cache."""
 
     if os.path.exists(disk_file):
         return
 
-    util_process.execute(locks,
-                         'qemu-img convert -t none -O qcow2 %s %s'
-                         % (cache_file, disk_file))
+    util_process.execute(
+        locks,
+        'qemu-img convert -t none -O qcow2 %s %s' % (cache_file, disk_file),
+        iopriority=util_process.PRIORITY_LOW)
+    if disk_size:
+        util_process.execute(
+            locks, 'qemu-img resize %s %dG' % (disk_file, int(disk_size)),
+            iopriority=util_process.PRIORITY_LOW)
 
 
 def create_blank(locks, disk_file, disk_size):
@@ -103,13 +111,16 @@ def create_blank(locks, disk_file, disk_size):
     if os.path.exists(disk_file):
         return
 
-    util_process.execute(locks, 'qemu-img create -f qcow2 %s %sG'
-                         % (disk_file, disk_size))
+    util_process.execute(
+        locks, 'qemu-img create -f qcow2 %s %sG' % (disk_file, disk_size),
+        iopriority=util_process.PRIORITY_LOW)
 
 
 def snapshot(locks, source, destination):
     """Convert a possibly COW layered disk file into a snapshot."""
 
-    util_process.execute(locks,
-                         'qemu-img convert --force-share -O qcow2 %s %s'
-                         % (source, destination))
+    util_process.execute(
+        locks,
+        ('qemu-img convert --force-share -O qcow2 %s %s'
+         % (source, destination)),
+        iopriority=util_process.PRIORITY_LOW)

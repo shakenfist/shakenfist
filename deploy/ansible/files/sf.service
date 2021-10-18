@@ -12,7 +12,24 @@ Environment=SHAKENFIST_NODE_EGRESS_NIC="{{node_egress_nic}}"
 Environment=SHAKENFIST_NODE_MESH_IP="{{node_mesh_ip}}"
 Environment=SHAKENFIST_NODE_MESH_NIC="{{node_mesh_nic}}"
 Environment=SHAKENFIST_NODE_NAME="{{node_name}}"
-Environment=SHAKENFIST_NODE_IS_ETCD_MASTER="{{node_is_etcd_master}}"
+
+{% if ansible_fqdn in groups['etcd_master'] %}
+Environment=SHAKENFIST_NODE_IS_ETCD_MASTER=True
+{% else %}
+Environment=SHAKENFIST_NODE_IS_ETCD_MASTER=False
+{% endif %}
+
+{% if ansible_fqdn in groups['hypervisors'] %}
+Environment=SHAKENFIST_NODE_IS_HYPERVISOR=True
+{% else %}
+Environment=SHAKENFIST_NODE_IS_HYPERVISOR=False
+{% endif %}
+
+{% if ansible_fqdn in groups['network_node'] %}
+Environment=SHAKENFIST_NODE_IS_NETWORK_NODE=True
+{% else %}
+Environment=SHAKENFIST_NODE_IS_NETWORK_NODE=False
+{% endif %}
 
 Environment=SHAKENFIST_FLOATING_NETWORK="{{floating_network_ipblock}}"
 Environment=SHAKENFIST_NETWORK_NODE_IP="{{hostvars[groups['network_node'][0]]['node_mesh_ip']}}"

@@ -175,6 +175,18 @@ class SFConfig(BaseSettings):
     # Node Specific #
     #################
 
+    NODE_IS_ETCD_MASTER: bool = Field(
+        False, description='True if this node is an etcd master. This controls '
+                           'attempts to compact the master database.'
+    )
+    NODE_IS_HYPERVISOR: bool = Field(
+        False, description='True if this node is a hypervisor. This controls if '
+                           'VMs are started on this node or not.'
+    )
+    NODE_IS_NETWORK_NODE: bool = Field(
+        False, description='True if this node is the network node.'
+    )
+
     DISK_BUS: str = Field(
         'virtio',
         description='The bus to use for disk devices. One of virtio, scsi, '
@@ -182,10 +194,6 @@ class SFConfig(BaseSettings):
     )
     NODE_NAME: str = Field(
         default_factory=get_node_name, description='FQDN of this node'
-    )
-    NODE_IS_ETCD_MASTER: bool = Field(
-        False, description='True if this node is an etcd master. This controls '
-                           'attempts to compact the master database.'
     )
     NODE_EGRESS_IP: str = Field(
         '', description='Egress IP of this node'

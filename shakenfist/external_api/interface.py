@@ -2,7 +2,7 @@
 from flask_jwt_extended import jwt_required
 
 from shakenfist.daemons import daemon
-from shakenfist import db
+from shakenfist import etcd
 from shakenfist.external_api import (
     base as api_base,
     util as api_util)
@@ -38,8 +38,8 @@ class InterfaceFloatEndpoint(api_base.Resource):
         if err:
             return err
 
-        db.enqueue('networknode',
-                   FloatNetworkInterfaceTask(n.uuid, interface_uuid))
+        etcd.enqueue('networknode',
+                     FloatNetworkInterfaceTask(n.uuid, interface_uuid))
 
 
 class InterfaceDefloatEndpoint(api_base.Resource):
@@ -55,5 +55,5 @@ class InterfaceDefloatEndpoint(api_base.Resource):
 
         # Address is freed as part of the job, so code is "unbalanced" compared
         # to above for reasons.
-        db.enqueue('networknode',
-                   DefloatNetworkInterfaceTask(n.uuid, interface_uuid))
+        etcd.enqueue('networknode',
+                     DefloatNetworkInterfaceTask(n.uuid, interface_uuid))

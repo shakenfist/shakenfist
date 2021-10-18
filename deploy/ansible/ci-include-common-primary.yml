@@ -1,0 +1,36 @@
+- name: Install modern ansible
+  apt:
+    name: ansible
+    state: latest
+    update_cache: yes
+    autoremove: yes
+
+- name: Copy client wheel file
+  copy:
+    src: "{{source_path}}/client-python/dist/{{hostvars['localhost']['client_wheel_file']}}"
+    dest: "/tmp/{{hostvars['localhost']['client_wheel_file']}}"
+
+# This needs to be in system packages for tox to pick it up correctly, which we
+# want in order for CI to see unreleased client changes. You wouldn't do this
+# for a real deployment
+- name: Install client wheel into system packages
+  shell: |
+    pip3 install /tmp/shakenfist_client*whl
+
+- name: Make Shaken Fist venv
+  shell: python3 -m venv --system-site-packages /srv/shakenfist/venv
+
+# We need to install into the shakenfist venv as well so that the ansible modules
+# are in the right place to be found later. In a normal universe we'd only install
+# here, but we need the system packages above for tox to work.
+- name: Install client wheel into shakenfist venv (in addition to system above)
+  shell: |
+    /srv/shakenfist/venv/bin/pip install -U --force-reinstall /tmp/shakenfist_client*whl
+
+- name: Copy ssh key to primary node
+  copy:
+    src: /home/jenkins/id_ci
+    dest: /root/.ssh/id_rsa
+    owner: root
+    group: root
+    mode: u=r,g=,o=

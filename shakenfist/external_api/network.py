@@ -13,6 +13,7 @@ from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.daemons import daemon
 from shakenfist import db
+from shakenfist import etcd
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
@@ -44,11 +45,11 @@ def _delete_network(network_from_db, wait_interfaces=None):
     if wait_interfaces:
         n.state = net.Network.STATE_DELETE_WAIT
         n.add_event('api', 'delete-wait')
-        db.enqueue(config.NODE_NAME,
-                   {'tasks': [DeleteNetworkWhenClean(n.uuid, wait_interfaces)]})
+        etcd.enqueue(config.NODE_NAME,
+                     {'tasks': [DeleteNetworkWhenClean(n.uuid, wait_interfaces)]})
     else:
         n.add_event('api', 'delete')
-        db.enqueue('networknode', DestroyNetworkTask(n.uuid))
+        etcd.enqueue('networknode', DestroyNetworkTask(n.uuid))
 
 
 class NetworkEndpoint(api_base.Resource):
@@ -61,6 +62,7 @@ class NetworkEndpoint(api_base.Resource):
     @jwt_required
     @api_base.arg_is_network_uuid
     @api_base.requires_network_ownership
+    @api_base.requires_namespace_exist
     @api_base.redirect_to_network_node
     def delete(self, network_uuid=None, network_from_db=None, namespace=None):
         if network_uuid == 'floating':
@@ -116,6 +118,7 @@ class NetworksEndpoint(api_base.Resource):
         return retval
 
     @jwt_required
+    @api_base.requires_namespace_exist
     def post(self, netblock=None, provide_dhcp=None, provide_nat=None, name=None,
              namespace=None):
         try:
@@ -139,6 +142,7 @@ class NetworksEndpoint(api_base.Resource):
         return network.external_view()
 
     @jwt_required
+    @api_base.requires_namespace_exist
     @api_base.redirect_to_network_node
     def delete(self, confirm=False, namespace=None, clean_wait=False):
         """Delete all networks in the namespace.

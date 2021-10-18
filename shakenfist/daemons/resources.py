@@ -8,10 +8,10 @@ from prometheus_client import start_http_server
 from shakenfist.daemons import daemon
 from shakenfist.config import config
 from shakenfist import db
+from shakenfist import etcd
 from shakenfist import logutil
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
-from shakenfist.util import network as util_network
 
 
 LOG, _ = logutil.setup(__name__)
@@ -19,8 +19,14 @@ LOG, _ = logutil.setup(__name__)
 
 def _get_stats():
     libvirt = util_libvirt.get_libvirt()
-    retval = {}
     conn = libvirt.open('qemu:///system')
+
+    # What's special about this node?
+    retval = {
+        'is_etcd_master': config.NODE_IS_ETCD_MASTER,
+        'is_hypervisor': config.NODE_IS_HYPERVISOR,
+        'is_network_node': config.NODE_IS_NETWORK_NODE,
+    }
 
     # CPU info
     present_cpus, _, available_cpus = conn.getCPUMap()
@@ -114,7 +120,7 @@ def _get_stats():
             total_instance_cpu_time += cpu_time
 
     # Queue health statistics
-    node_queue_processing, node_queue_waiting = db.get_queue_length(
+    node_queue_processing, node_queue_waiting = etcd.get_queue_length(
         config.NODE_NAME)
 
     retval.update({
@@ -128,8 +134,8 @@ def _get_stats():
         'node_queue_waiting': node_queue_waiting,
     })
 
-    if util_network.is_network_node():
-        network_queue_processing, network_queue_waiting = db.get_queue_length(
+    if config.NODE_IS_NETWORK_NODE:
+        network_queue_processing, network_queue_waiting = etcd.get_queue_length(
             'networknode')
 
         retval.update({
@@ -167,12 +173,12 @@ class Monitor(daemon.Daemon):
 
         while True:
             try:
-                jobname, _ = db.dequeue('%s-metrics' % config.NODE_NAME)
+                jobname, _ = etcd.dequeue('%s-metrics' % config.NODE_NAME)
                 if jobname:
                     if time.time() - last_metrics > 2:
                         update_metrics()
                         last_metrics = time.time()
-                    db.resolve('%s-metrics' % config.NODE_NAME, jobname)
+                    etcd.resolve('%s-metrics' % config.NODE_NAME, jobname)
                 else:
                     time.sleep(0.2)
 

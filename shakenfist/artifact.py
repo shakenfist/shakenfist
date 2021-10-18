@@ -3,9 +3,11 @@
 from functools import partial
 from uuid import uuid4
 
+from shakenfist import baseobject
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
+from shakenfist import blob
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import logutil
@@ -18,6 +20,7 @@ BLOB_URL = 'sf://blob/'
 INSTANCE_URL = 'sf://instance/'
 LABEL_URL = 'sf://label/'
 SNAPSHOT_URL = 'sf://snapshot/'
+UPLOAD_URL = 'sf://upload/'
 
 
 class Artifact(dbo):
@@ -82,7 +85,8 @@ class Artifact(dbo):
     @staticmethod
     def from_url(artifact_type, url):
         artifacts = list(Artifacts([partial(url_filter, url),
-                                    partial(type_filter, artifact_type)]))
+                                    partial(type_filter, artifact_type),
+                                    not_dead_states_filter]))
         if len(artifacts) == 0:
             return Artifact.new(artifact_type, url)
         if len(artifacts) == 1:
@@ -110,7 +114,10 @@ class Artifact(dbo):
 
     def add_index(self, blob_uuid):
         with self.get_lock_attr('index', 'Artifact index creation'):
-            index = self.most_recent_index.get('index', 0) + 1
+            highest_index = self._db_get_attribute('highest_index')
+            index = highest_index.get('index', 0) + 1
+            self._db_set_attribute('highest_index', {'index': index})
+
             entry = {
                 'index': index,
                 'blob_uuid': blob_uuid
@@ -118,6 +125,9 @@ class Artifact(dbo):
             self._db_set_attribute('index_%012d' % index, entry)
             self.log.with_fields(entry).info('Added index to artifact')
             return entry
+
+    def del_index(self, index):
+        self._db_delete_attribute('index_%012d' % index)
 
     def external_view_without_index(self):
         return {
@@ -133,6 +143,15 @@ class Artifact(dbo):
         # expect
         a = self.external_view_without_index()
         a.update(self.most_recent_index)
+        blobs = {}
+        for blob_index in self.get_all_indexes():
+            b = blob.Blob.from_db(blob_index['blob_uuid'])
+            blobs[blob_index['index']] = {
+                'instances': b.instances,
+                'size': b.size,
+                'reference_count': b.ref_count,
+            }
+        a['blobs'] = blobs
         return a
 
     # Static values
@@ -169,3 +188,11 @@ def instance_snapshot_filter(instance_uuid, a):
     if a.artifact_type != Artifact.TYPE_SNAPSHOT:
         return False
     return a.source_url.startswith('%s%s' % (INSTANCE_URL, instance_uuid))
+
+
+not_dead_states_filter = partial(
+    baseobject.state_filter, [
+        Artifact.STATE_INITIAL,
+        Artifact.STATE_CREATING,
+        Artifact.STATE_CREATED,
+        ])

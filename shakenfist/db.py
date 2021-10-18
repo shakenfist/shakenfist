@@ -6,7 +6,6 @@ import uuid
 from shakenfist.config import config
 from shakenfist import constants
 from shakenfist import etcd
-from shakenfist import exceptions
 from shakenfist import logutil
 
 
@@ -32,10 +31,6 @@ def refresh_locks(locks, relatedobjects=None, log_ctx=LOG):
     if locks:
         for lock in locks:
             refresh_lock(lock, log_ctx=log_ctx)
-
-
-def clear_stale_locks():
-    etcd.clear_stale_locks()
 
 
 def get_existing_locks():
@@ -189,32 +184,3 @@ def persist_node_vxid_mapping(node, vxid_to_mac):
 
 def get_node_vxid_mapping(node):
     etcd.get('vxid_mapping', None, node)
-
-#####################################################################
-# Queues
-#####################################################################
-
-
-def enqueue(queuename, workitem):
-    etcd.enqueue(queuename, workitem)
-
-
-def dequeue(queuename):
-    try:
-        return etcd.dequeue(queuename)
-    except exceptions.LockException:
-        # We didn't acquire the lock, we should just try again later. This probably
-        # indicates congestion.
-        return None, None
-
-
-def resolve(queuename, jobname):
-    etcd.resolve(queuename, jobname)
-
-
-def get_queue_length(queuename):
-    return etcd.get_queue_length(queuename)
-
-
-def restart_queues():
-    etcd.restart_queues()

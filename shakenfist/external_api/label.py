@@ -3,10 +3,16 @@ from flask_jwt_extended import get_jwt_identity
 from flask_jwt_extended import jwt_required
 
 from shakenfist.artifact import Artifact, Artifacts, LABEL_URL, type_filter, url_filter
-from shakenfist.baseobject import (
-    active_states_filter,
-    DatabaseBackedObject as dbo)
+from shakenfist.baseobject import active_states_filter, DatabaseBackedObject as dbo
+from shakenfist.blob import Blob
+from shakenfist.daemons import daemon
+from shakenfist.exceptions import BlobDeleted
 from shakenfist.external_api import base as api_base
+from shakenfist import logutil
+
+
+LOG, HANDLER = logutil.setup(__name__)
+daemon.set_log_level(LOG, 'api')
 
 
 def _label_url(label_name):
@@ -17,6 +23,14 @@ class LabelEndpoint(api_base.Resource):
 
     @jwt_required
     def post(self, label_name=None, blob_uuid=None):
+        b = Blob.from_db(blob_uuid)
+        if not b:
+            return api_base.error(404, 'blob not found')
+        try:
+            b.ref_count_inc()
+        except BlobDeleted:
+            return api_base.error(400, 'blob has been deleted')
+
         a = Artifact.from_url(Artifact.TYPE_LABEL, _label_url(label_name))
         a.add_index(blob_uuid)
         a.state = dbo.STATE_CREATED
@@ -45,3 +59,6 @@ class LabelEndpoint(api_base.Resource):
 
         for a in artifacts:
             a.state = dbo.STATE_DELETED
+            for blob_index in a.get_all_indexes():
+                b = Blob.from_db(blob_index['blob_uuid'])
+                b.ref_count_dec()

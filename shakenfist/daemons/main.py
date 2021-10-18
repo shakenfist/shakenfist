@@ -14,6 +14,7 @@ from shakenfist.daemons import net as net_daemon
 from shakenfist.daemons import resources as resource_daemon
 from shakenfist.daemons import triggers as trigger_daemon
 from shakenfist import db
+from shakenfist import etcd
 from shakenfist import instance
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
@@ -99,7 +100,7 @@ def restore_instances():
             except Exception as e:
                 util_general.ignore_exception(
                     'restore instance %s' % inst.uuid, e)
-                inst.db.enqueue_delete_due_error(
+                inst.etcd.enqueue_delete_due_error(
                     'exception while restoring instance on daemon restart')
 
 
@@ -120,8 +121,9 @@ def main():
     global DAEMON_IMPLEMENTATIONS
     global DAEMON_PIDS
 
-    setproctitle.setproctitle(daemon.process_name(
-        'main') + '-v%s' % util_general.get_version())
+    LOG.info('Starting...')
+    setproctitle.setproctitle(
+        daemon.process_name('main') + '-v%s' % util_general.get_version())
 
     # Log configuration on startup
     for key, value in config.dict().items():
@@ -130,9 +132,9 @@ def main():
     daemon.set_log_level(LOG, 'main')
 
     # Check in early and often, also reset processing queue items.
-    db.clear_stale_locks()
+    etcd.clear_stale_locks()
     Node.observe_this_node()
-    db.restart_queues()
+    etcd.restart_queues()
 
     def _start_daemon(d):
         pid = os.fork()
@@ -146,7 +148,7 @@ def main():
     _start_daemon('resources')
 
     # If I am the network node, I need some setup
-    if util_network.is_network_node():
+    if config.NODE_IS_NETWORK_NODE:
         # Bootstrap the floating network in the Networks table
         floating_network = net.Network.from_db('floating')
         if not floating_network:

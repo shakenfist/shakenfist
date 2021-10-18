@@ -13,7 +13,7 @@ from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist.tasks import QueueTask
-from shakenfist.util import network as util_network
+from shakenfist.util import random as util_random
 
 
 ####################################################################
@@ -238,14 +238,16 @@ class JSONEncoderTasks(json.JSONEncoder):
 @retry_etcd_forever
 def put(objecttype, subtype, name, data, ttl=None):
     path = _construct_key(objecttype, subtype, name)
-    encoded = json.dumps(data, indent=4, sort_keys=True, cls=JSONEncoderTasks)
+    encoded = json.dumps(data, indent=4, sort_keys=True,
+                         cls=JSONEncoderTasks)
     WrappedEtcdClient().put(path, encoded, lease=None)
 
 
 @retry_etcd_forever
 def create(objecttype, subtype, name, data, ttle=None):
     path = _construct_key(objecttype, subtype, name)
-    encoded = json.dumps(data, indent=4, sort_keys=True, cls=JSONEncoderTasks)
+    encoded = json.dumps(data, indent=4, sort_keys=True,
+                         cls=JSONEncoderTasks)
     return WrappedEtcdClient().create(path, encoded, lease=None)
 
 
@@ -288,14 +290,8 @@ def delete_all(objecttype, subtype):
 
 def enqueue(queuename, workitem, delay=0):
     with get_lock('queue', None, queuename, op='Enqueue'):
-        i = 0
         entry_time = time.time() + delay
-        jobname = '%s-%03d' % (entry_time, i)
-
-        while get('queue', queuename, jobname):
-            i += 1
-            jobname = '%s-%03d' % (entry_time, i)
-
+        jobname = '%s-%s' % (entry_time, util_random.random_id())
         put('queue', queuename, jobname, workitem)
         LOG.with_fields({'jobname': jobname,
                          'queuename': queuename,
@@ -344,33 +340,38 @@ def decodeTasks(obj):
 
 @retry_etcd_forever
 def dequeue(queuename):
-    queue_path = _construct_key('queue', queuename, None)
-    client = WrappedEtcdClient()
+    try:
+        queue_path = _construct_key('queue', queuename, None)
+        client = WrappedEtcdClient()
 
-    # We only hold the lock if there is anything in the queue
-    if not client.get_prefix(queue_path):
+        # We only hold the lock if there is anything in the queue
+        if not client.get_prefix(queue_path):
+            return None, None
+
+        with get_lock('queue', None, queuename, op='Dequeue'):
+            for data, metadata in client.get_prefix(queue_path, sort_order='ascend',
+                                                    sort_target='key'):
+                jobname = str(metadata['key']).split('/')[-1].rstrip("'")
+
+                # Ensure that this task isn't in the future
+                if float(jobname.split('-')[0]) > time.time():
+                    return None, None
+
+                workitem = json.loads(data, object_hook=decodeTasks)
+                put('processing', queuename, jobname, workitem)
+                client.delete(metadata['key'])
+                LOG.with_fields({'jobname': jobname,
+                                 'queuename': queuename,
+                                 'workitem': workitem,
+                                 }).info('Moved workitem from queue to processing')
+
+                return jobname, workitem
+
         return None, None
-
-    with get_lock('queue', None, queuename, op='Dequeue'):
-        for data, metadata in client.get_prefix(queue_path, sort_order='ascend',
-                                                sort_target='key'):
-            jobname = str(metadata['key']).split('/')[-1].rstrip("'")
-
-            # Ensure that this task isn't in the future
-            if float(jobname.split('-')[0]) > time.time():
-                return None, None
-
-            workitem = json.loads(data, object_hook=decodeTasks)
-            put('processing', queuename, jobname, workitem)
-            client.delete(metadata['key'])
-            LOG.with_fields({'jobname': jobname,
-                             'queuename': queuename,
-                             'workitem': workitem,
-                             }).info('Moved workitem from queue to processing')
-
-            return jobname, workitem
-
-    return None, None
+    except exceptions.LockException:
+        # We didn't acquire the lock, we should just try again later. This probably
+        # indicates congestion.
+        return None, None
 
 
 def resolve(queuename, jobname):
@@ -404,6 +405,6 @@ def _restart_queue(queuename):
 def restart_queues():
     # Move things which were in processing back to the queue because
     # we didn't complete them before crashing.
-    if util_network.is_network_node():
+    if config.NODE_IS_NETWORK_NODE:
         _restart_queue('networknode')
     _restart_queue(config.NODE_NAME)

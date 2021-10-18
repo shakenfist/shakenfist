@@ -69,8 +69,8 @@ class Monitor(daemon.Daemon):
                         # hammer instead.
                         log_ctx.warning(
                             'Attempting alternate delete method for instance')
-                        util_process.execute(None,
-                                             'virsh destroy "sf:%s"' % instance_uuid)
+                        util_process.execute(
+                            None, 'virsh destroy "sf:%s"' % instance_uuid)
 
                         inst.add_event('enforced delete', 'complete')
                     else:
@@ -84,7 +84,12 @@ class Monitor(daemon.Daemon):
                 state = util_libvirt.extract_power_state(libvirt, domain)
                 inst.update_power_state(state)
                 if state == 'crashed':
-                    inst.state = inst.state.value + '-error'
+                    if inst.state.value in [dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED]:
+                        util_process.execute(
+                            None, 'virsh destroy "sf:%s"' % instance_uuid)
+                        inst.state.value = dbo.STATE_DELETED
+                    else:
+                        inst.state = inst.state.value + '-error'
 
             # Inactive VMs just have a name, and are powered off
             # in our state system.
@@ -223,11 +228,12 @@ class Monitor(daemon.Daemon):
                                 'Deleting stale partial transfer')
                         os.unlink(entpath)
 
-                    elif not Blob.from_db(ent):
-                        # ... or it doesn't exist in the database
-                        LOG.with_fields({
-                            'blob': ent}).warning('Deleting orphaned blob')
-                        os.unlink(entpath)
+                    else:
+                        b = Blob.from_db(ent)
+                        if not b or b.state.value == Blob.STATE_DELETED:
+                            LOG.with_fields({
+                                'blob': ent}).warning('Deleting orphaned blob')
+                            os.unlink(entpath)
 
             # Perform etcd maintenance, if we are an etcd master
             if config.NODE_IS_ETCD_MASTER:

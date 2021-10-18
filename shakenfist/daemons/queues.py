@@ -8,6 +8,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
+from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import images
 from shakenfist import instance
@@ -96,7 +97,7 @@ def handle(jobname, workitem):
                 if redirect_to:
                     log_i.info('Redirecting instance start to %s'
                                % redirect_to)
-                    db.enqueue(redirect_to, workitem)
+                    etcd.enqueue(redirect_to, workitem)
                     return
 
             elif isinstance(task, StartInstanceTask):
@@ -108,19 +109,19 @@ def handle(jobname, workitem):
                     continue
 
                 instance_start(inst, task.network())
-                db.enqueue('%s-metrics' % config.NODE_NAME, {})
+                etcd.enqueue('%s-metrics' % config.NODE_NAME, {})
 
             elif isinstance(task, DeleteInstanceTask):
                 try:
                     instance_delete(inst)
-                    db.enqueue('%s-metrics' % config.NODE_NAME, {})
+                    etcd.enqueue('%s-metrics' % config.NODE_NAME, {})
                 except Exception as e:
                     util_general.ignore_exception(
                         daemon.process_name('queues'), e)
 
             elif isinstance(task, FloatNetworkInterfaceTask):
                 # Just punt it to the network node now that the interface is ready
-                db.enqueue('networknode', task)
+                etcd.enqueue('networknode', task)
 
             elif isinstance(task, SnapshotTask):
                 snapshot(inst, task.disk(),
@@ -135,8 +136,7 @@ def handle(jobname, workitem):
                 if cur_interfaces:
                     LOG.with_network(task_network).error(
                         'During DeleteNetworkWhenClean new interfaces have '
-                        'connected to network: %s',
-                        [i.uuid for i in cur_interfaces])
+                        'connected to network: %s', cur_interfaces)
 
                 # Only check those present at delete task initiation time.
                 remain_interfaces = list(set(task.wait_interfaces()) &
@@ -145,17 +145,17 @@ def handle(jobname, workitem):
                     # Queue task on a node with a remaining instance
                     first_iface = cur_interfaces[remain_interfaces[0]]
                     inst = instance.Instance.from_db(first_iface.instance_uuid)
-                    db.enqueue(inst.placement['node'],
-                               {'tasks': [
-                                   DeleteNetworkWhenClean(task.network_uuid(),
-                                                          remain_interfaces)
-                               ]},
-                               delay=60)
+                    etcd.enqueue(inst.placement['node'],
+                                 {'tasks': [
+                                     DeleteNetworkWhenClean(task.network_uuid(),
+                                                            remain_interfaces)
+                                 ]},
+                                 delay=60)
 
                 else:
                     # All original instances deleted, safe to delete network
-                    db.enqueue('networknode',
-                               DestroyNetworkTask(task.network_uuid()))
+                    etcd.enqueue('networknode',
+                                 DestroyNetworkTask(task.network_uuid()))
 
             elif isinstance(task, HypervisorDestroyNetworkTask):
                 n = net.Network.from_db(task.network_uuid())
@@ -195,7 +195,7 @@ def handle(jobname, workitem):
             inst.enqueue_delete_due_error('Failed queue task: %s' % e)
 
     finally:
-        db.resolve(config.NODE_NAME, jobname)
+        etcd.resolve(config.NODE_NAME, jobname)
         if inst:
             inst.add_event('tasks complete', 'dequeued',
                            msg='Work item %s' % jobname)
@@ -280,42 +280,43 @@ def instance_start(inst, network):
         return
 
     with inst.get_lock(ttl=900, op='Instance start') as lock:
-        # Ensure networks are connected to this node
-        iface_uuids = []
-        for netdesc in network:
-            iface_uuids.append(netdesc['iface_uuid'])
-            n = net.Network.from_db(netdesc['network_uuid'])
-            if not n:
-                inst.enqueue_delete_due_error(
-                    'missing network: %s' % netdesc['network_uuid'])
-                return
-
-            if n.state.value != dbo.STATE_CREATED:
-                inst.enqueue_delete_due_error(
-                    'network is not active: %s' % n.uuid)
-                return
-
-            # We must record interfaces very early for the vxlan leak
-            # detection code in the net daemon to work correctly.
-            ni = networkinterface.NetworkInterface.from_db(
-                netdesc['iface_uuid'])
-            ni.state = dbo.STATE_CREATED
-
-            n.create_on_hypervisor()
-            n.ensure_mesh()
-            n.update_dhcp()
-
-        # Allocate console and VDI ports
-        inst.allocate_instance_ports()
-
-        # Now we can start the instance
         try:
+            # Ensure networks are connected to this node
+            iface_uuids = []
+            for netdesc in network:
+                iface_uuids.append(netdesc['iface_uuid'])
+                n = net.Network.from_db(netdesc['network_uuid'])
+                if not n:
+                    inst.enqueue_delete_due_error(
+                        'missing network: %s' % netdesc['network_uuid'])
+                    return
+
+                if n.state.value != dbo.STATE_CREATED:
+                    inst.enqueue_delete_due_error(
+                        'network is not active: %s' % n.uuid)
+                    return
+
+                # We must record interfaces very early for the vxlan leak
+                # detection code in the net daemon to work correctly.
+                ni = networkinterface.NetworkInterface.from_db(
+                    netdesc['iface_uuid'])
+                ni.state = dbo.STATE_CREATED
+
+                n.create_on_hypervisor()
+                n.ensure_mesh()
+                n.update_dhcp()
+
+            # Allocate console and VDI ports
+            inst.allocate_instance_ports()
+
+            # Now we can start the instance
             with util_general.RecordedOperation('instance creation', inst):
                 inst.create(iface_uuids, lock=lock)
 
-        except exceptions.InvalidStateException:
+        except exceptions.InvalidStateException as e:
             # This instance is in an error or deleted state. Given the check
             # at the top of this method, that indicates a race.
+            inst.enqueue_delete_due_error('invalid state transition: %s' % e)
             return
 
 
@@ -338,9 +339,10 @@ def instance_delete(inst):
         instance_networks = []
         interfaces = []
         for ni in networkinterface.interfaces_for_instance(inst):
-            interfaces.append(ni)
-            if ni.network_uuid not in instance_networks:
-                instance_networks.append(ni.network_uuid)
+            if ni:
+                interfaces.append(ni)
+                if ni.network_uuid not in instance_networks:
+                    instance_networks.append(ni.network_uuid)
 
         # Stop the instance
         inst.power_off()
@@ -380,7 +382,8 @@ def instance_delete(inst):
 
 
 def snapshot(inst, disk, artifact_uuid, blob_uuid):
-    blob.snapshot_disk(disk, blob_uuid)
+    b = blob.snapshot_disk(disk, blob_uuid)
+    b.ref_count_inc()
     a = Artifact.from_db(artifact_uuid)
     a.state = dbo.STATE_CREATED
 

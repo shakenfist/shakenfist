@@ -9,6 +9,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
+from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist.ipmanager import IPManager
@@ -26,6 +27,7 @@ from shakenfist.tasks import (
     NetworkInterfaceTask,
     FloatNetworkInterfaceTask,
     DefloatNetworkInterfaceTask)
+from shakenfist.util import general as util_general
 from shakenfist.util import network as util_network
 
 
@@ -66,7 +68,7 @@ class Monitor(daemon.WorkerPoolDaemon):
         host_networks = []
         seen_vxids = []
 
-        if not util_network.is_network_node():
+        if not config.NODE_IS_NETWORK_NODE:
             # For normal nodes, just the ones we have instances for. We need
             # to use the more expensive interfaces_for_instance() method of
             # looking up instance interfaces here if the instance cachce hasn't
@@ -104,7 +106,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                     if not networkinterface.interfaces_for_network(n):
                         LOG.with_network(n).info(
                             'Removing stray delete_wait network')
-                        db.enqueue('networknode', DestroyNetworkTask(n.uuid))
+                        etcd.enqueue('networknode', DestroyNetworkTask(n.uuid))
 
                     # We skip maintenance on all delete_wait networks
                     continue
@@ -117,7 +119,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                     continue
 
                 if not n.is_okay():
-                    if util_network.is_network_node():
+                    if config.NODE_IS_NETWORK_NODE:
                         LOG.with_network(n).info(
                             'Recreating not okay network on network node')
                         n.create_on_network_node()
@@ -295,31 +297,31 @@ class Monitor(daemon.WorkerPoolDaemon):
             n.add_floating_ip(ni.floating.get('floating_address'), ni.ipv4)
 
     def _process_network_node_workitems(self):
-        jobname, workitem = db.dequeue('networknode')
-        try:
+        while True:
+            jobname, workitem = etcd.dequeue('networknode')
             if not workitem:
                 time.sleep(0.2)
-                return
-
-            log_ctx = LOG.with_field('workitem', workitem)
-            if NetworkTask.__subclasscheck__(type(workitem)):
-                self._process_network_workitem(log_ctx, workitem)
-            elif NetworkInterfaceTask.__subclasscheck__(type(workitem)):
-                self._process_networkinterface_workitem(log_ctx, workitem)
             else:
-                raise exceptions.UnknownTaskException(
-                    'Network workitem was not decoded: %s' % workitem)
+                try:
+                    log_ctx = LOG.with_field('workitem', workitem)
+                    if NetworkTask.__subclasscheck__(type(workitem)):
+                        self._process_network_workitem(log_ctx, workitem)
+                    elif NetworkInterfaceTask.__subclasscheck__(type(workitem)):
+                        self._process_networkinterface_workitem(
+                            log_ctx, workitem)
+                    else:
+                        raise exceptions.UnknownTaskException(
+                            'Network workitem was not decoded: %s' % workitem)
 
-        finally:
-            if jobname:
-                db.resolve('networknode', jobname)
+                finally:
+                    etcd.resolve('networknode', jobname)
 
     def _reap_leaked_floating_ips(self):
         # Block until the network node queue is idle to avoid races
-        processing, waiting = db.get_queue_length('networknode')
+        processing, waiting = etcd.get_queue_length('networknode')
         while processing + waiting > 0:
             time.sleep(1)
-            processing, waiting = db.get_queue_length('networknode')
+            processing, waiting = etcd.get_queue_length('networknode')
 
         # Ensure we haven't leaked any floating IPs (because we used to)
         with db.get_lock('ipmanager', None, 'floating', ttl=120,
@@ -403,46 +405,51 @@ class Monitor(daemon.WorkerPoolDaemon):
     def run(self):
         LOG.info('Starting')
         last_management = 0
+
+        network_worker = None
         stray_interface_worker = None
         maintain_networks_worker = None
         floating_ip_reap_worker = None
         mtu_validation_worker = None
 
         while True:
-            self.reap_workers()
-
-            if util_network.is_network_node():
-                self._process_network_node_workitems()
-            else:
-                management_age = time.time() - last_management
-                time.sleep(max(0, 30 - management_age))
-
-            if time.time() - last_management > 30:
-                # Management tasks are treated as extra workers, and run in
-                # parallel with other network work items.
+            try:
+                self.reap_workers()
                 worker_pids = []
                 for w in self.workers:
                     worker_pids.append(w.pid)
 
-                if stray_interface_worker not in worker_pids:
-                    LOG.info('Scanning for stray network interfaces')
-                    stray_interface_worker = self.start_workitem(
-                        self._remove_stray_interfaces, [], 'stray-nics')
+                if config.NODE_IS_NETWORK_NODE and network_worker not in worker_pids:
+                    network_worker = self.start_workitem(
+                        self._process_network_node_workitems, [], 'net-worker')
 
-                if maintain_networks_worker not in worker_pids:
-                    LOG.info('Maintaining existing networks')
-                    maintain_networks_worker = self.start_workitem(
-                        self._maintain_networks, [], 'maintain')
+                if time.time() - last_management > 30:
+                    # Management tasks are treated as extra workers, and run in
+                    # parallel with other network work items.
+                    if stray_interface_worker not in worker_pids:
+                        LOG.info('Scanning for stray network interfaces')
+                        stray_interface_worker = self.start_workitem(
+                            self._remove_stray_interfaces, [], 'stray-nics')
 
-                if mtu_validation_worker not in worker_pids:
-                    LOG.info('Validating network interface MTUs')
-                    mtu_validation_worker = self.start_workitem(
-                        self._validate_mtus, [], 'mtus')
+                    if maintain_networks_worker not in worker_pids:
+                        LOG.info('Maintaining existing networks')
+                        maintain_networks_worker = self.start_workitem(
+                            self._maintain_networks, [], 'maintain')
 
-                if util_network.is_network_node():
-                    LOG.info('Reaping stray floating IPs')
-                    if floating_ip_reap_worker not in worker_pids:
-                        floating_ip_reap_worker = self.start_workitem(
-                            self._reap_leaked_floating_ips, [], 'fip-reaper')
+                    if mtu_validation_worker not in worker_pids:
+                        LOG.info('Validating network interface MTUs')
+                        mtu_validation_worker = self.start_workitem(
+                            self._validate_mtus, [], 'mtus')
 
-                last_management = time.time()
+                    if config.NODE_IS_NETWORK_NODE:
+                        LOG.info('Reaping stray floating IPs')
+                        if floating_ip_reap_worker not in worker_pids:
+                            floating_ip_reap_worker = self.start_workitem(
+                                self._reap_leaked_floating_ips, [], 'fip-reaper')
+
+                    last_management = time.time()
+
+                time.sleep(1)
+
+            except Exception as e:
+                util_general.ignore_exception(daemon.process_name('queues'), e)

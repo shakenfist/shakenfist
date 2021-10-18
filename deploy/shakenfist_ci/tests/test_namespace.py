@@ -15,7 +15,7 @@ class TestNamespace(base.BaseNamespacedTestCase):
         super(TestNamespace, self).setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net' % self.namespace)
-        self._await_network_ready(self.net['uuid'])
+        self._await_networks_ready([self.net['uuid']])
 
     def test_namespace_clean(self):
         """Check that instances and networks are cleaned from namespace
@@ -33,20 +33,20 @@ class TestNamespace(base.BaseNamespacedTestCase):
         inst_uuids = set()
         for i in range(NUM_INSTANCES):
             new_inst = self.test_client.create_instance(
-                    'test-cirros-%s' % i, 1, 1024,
-                    [
-                        {
-                            'network_uuid': self.net['uuid']
-                        }
-                    ],
-                    [
-                        {
-                            'size': 8,
-                            'base': 'cirros',
-                            'type': 'disk'
-                        }
-                    ], None, None,
-                    namespace=self.namespace)
+                'test-cirros-%s' % i, 1, 1024,
+                [
+                    {
+                        'network_uuid': self.net['uuid']
+                    }
+                ],
+                [
+                    {
+                        'size': 8,
+                        'base': 'cirros',
+                        'type': 'disk'
+                    }
+                ], None, None,
+                namespace=self.namespace)
             inst_uuids.add(new_inst['uuid'])
 
         # Wait for all instances to start
@@ -68,7 +68,7 @@ class TestNamespace(base.BaseNamespacedTestCase):
                 break
             time.sleep(5)
 
-        self.assertEqual(len(inst_uuids), 0,
+        self.assertEqual(0, len(inst_uuids),
                          'Instances not deleted: %s' % inst_uuids)
 
         start_time = time.time()
@@ -78,5 +78,5 @@ class TestNamespace(base.BaseNamespacedTestCase):
                 break
             time.sleep(5)
 
-        self.assertEqual(test_net['state'], 'deleted',
+        self.assertEqual('deleted', test_net['state'],
                          'Network not deleted by delete_all_networks()')

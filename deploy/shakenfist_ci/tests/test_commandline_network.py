@@ -19,12 +19,12 @@ def _exec(cmd):
     return out
 
 
-class TestCommandLine(base.BaseNamespacedTestCase):
+class TestNetworkCommandLine(base.BaseNamespacedTestCase):
     """Make sure the command line client works."""
 
     def __init__(self, *args, **kwargs):
-        kwargs['namespace_prefix'] = 'commandline'
-        super(TestCommandLine, self).__init__(*args, **kwargs)
+        kwargs['namespace_prefix'] = 'network-commandline'
+        super(TestNetworkCommandLine, self).__init__(*args, **kwargs)
 
     def _exec_client(self, cmd):
         return _exec('sf-client --apiurl %s --namespace %s --key %s %s'
@@ -79,3 +79,4 @@ class TestCommandLine(base.BaseNamespacedTestCase):
         self._exec_client('--simple network events %s' % net_uuid)
 
         # UPDATE_DHCP_RE = re.compile('.*update dhcp.*finish.*')
+        # TODO(mikal): finish this!

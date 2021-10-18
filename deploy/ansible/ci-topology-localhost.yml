@@ -1,0 +1,71 @@
+- hosts: localhost
+  gather_facts: yes
+  connection: ssh
+  vars:
+    identifier: unknown
+    source_path: "/home/jenkins/src/shakenfist/"
+    base_image: "https://sfcbr.shakenfist.com/static/ubuntu2004-ci-template.qcow2"
+    base_image_user: "ubuntu"
+
+  tasks:
+    - include_tasks: ci-include-singlenode-localhost.yml
+    - include_tasks: ci-include-common-localhost.yml
+
+- hosts: sfall
+  gather_facts: yes
+  become: true
+  vars:
+    source_path: "/home/jenkins/src/shakenfist/"
+
+  tasks:
+    - include_tasks: ci-include-common-sfnodes.yml
+
+- hosts: primary
+  gather_facts: yes
+  connection: ssh
+  become: true
+
+  tasks:
+    - include_tasks: ci-include-common-primary.yml
+
+    - name: Copy install configuration to primary node
+      copy:
+        content: |
+          #!/bin/bash
+          ansible-galaxy install -r /srv/shakenfist/venv/share/shakenfist/installer/requirements.yml
+
+          export CLOUD=metal
+          export ADMIN_PASSWORD=foobar
+          export FLOATING_IP_BLOCK="10.10.10.0/24"
+          export BOOTDELAY=0
+          export DEPLOY_NAME="metalci"
+          export METAL_SSH_USER="{{base_image_user}}"
+          export METAL_SSH_KEY_FILENAME="/root/.ssh/id_rsa"
+          export HTTP_PROXY="http://192.168.1.50:3128"
+          export INCLUDE_TRACEBACKS="True"
+
+          export KSM_ENABLED=0
+
+          read -r -d '' TOPOLOGY <<'EOF'
+          [
+            {
+              "name": "sf-1",
+              "node_egress_ip": "{{hostvars['primary']['egress_ip']}}",
+              "node_egress_nic": "eth0",
+              "node_mesh_ip": "{{hostvars['primary']['egress_ip']}}",
+              "node_mesh_nic": "eth0",
+              "primary_node": true,
+              "hypervisor": true,
+              "network_node": true,
+              "etcd_master": true,
+              "api_url": "http://localhost:13000"
+            }
+          ]
+          EOF
+          export TOPOLOGY
+
+          /srv/shakenfist/venv/share/shakenfist/installer/install
+        dest: "/root/sf-deploy.sh"
+        owner: root
+        group: root
+        mode: u=rx

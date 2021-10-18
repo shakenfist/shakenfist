@@ -16,11 +16,11 @@ import traceback
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
+from shakenfist import db
 from shakenfist.instance import Instance
 from shakenfist import logutil
 from shakenfist.net import Network
 from shakenfist.util import general as util_general
-from shakenfist.util import network as util_network
 
 LOG, HANDLER = logutil.setup(__name__)
 daemon.set_log_level(LOG, 'api')
@@ -175,10 +175,9 @@ def arg_is_network_uuid(func):
 def redirect_to_network_node(func):
     # Redirect method to the network node
     def wrapper(*args, **kwargs):
-        if not util_network.is_network_node():
+        if not config.NODE_IS_NETWORK_NODE:
             admin_token = util_general.get_api_token(
-                'http://%s:%d' % (config.NETWORK_NODE_IP,
-                                  config.API_PORT),
+                'http://%s:%d' % (config.NETWORK_NODE_IP, config.API_PORT),
                 namespace='system')
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'],
@@ -191,8 +190,7 @@ def redirect_to_network_node(func):
 
             LOG.info('Returning proxied request: %d, %s'
                      % (r.status_code, r.text))
-            resp = flask.Response(r.text,
-                                  mimetype='application/json')
+            resp = flask.Response(r.text, mimetype='application/json')
             resp.status_code = r.status_code
             return resp
 
@@ -232,6 +230,18 @@ def requires_network_active(func):
             return error(406,
                          'network %s is not ready (%s)'
                          % (kwargs['network_from_db'].uuid, state.value))
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
+def requires_namespace_exist(func):
+    def wrapper(*args, **kwargs):
+        if kwargs.get('namespace'):
+            if not db.get_namespace(kwargs['namespace']):
+                LOG.with_field('namespace', kwargs['namespace']).warning(
+                    'Attempt to use non-existent namespace')
+                return error(404, 'namespace not found')
 
         return func(*args, **kwargs)
     return wrapper

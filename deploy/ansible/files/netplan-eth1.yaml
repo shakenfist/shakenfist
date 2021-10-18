@@ -1,0 +1,10 @@
+network:
+  version: 2
+  ethernets:
+    eth1:
+      addresses:
+        - "{{ address }}"
+      match:
+        macaddress: "{{ macaddress }}"
+      mtu: 8950
+      set-name: eth1

@@ -16,14 +16,6 @@ class FakeConfigNormalNode(BaseSettings):
 
 
 class UtilTestCase(base.ShakenFistTestCase):
-    @mock.patch('shakenfist.util.network.config', FakeConfigNetworkNode())
-    def test_is_network_node_yes(self):
-        self.assertTrue(util_network.is_network_node())
-
-    @mock.patch('shakenfist.util.network.config', FakeConfigNormalNode())
-    def test_is_network_node_no(self):
-        self.assertFalse(util_network.is_network_node())
-
     @mock.patch('shakenfist.util.process.execute',
                 return_value=(None, 'Device "banana0" does not exist.'))
     def test_check_for_interface_missing_interface(self, mock_execute):
@@ -31,7 +23,7 @@ class UtilTestCase(base.ShakenFistTestCase):
         self.assertEqual(False, found)
         mock_execute.assert_called_with(
             None, 'ip -pretty -json link show banana0',
-            check_exit_code=[0, 1])
+            check_exit_code=[0, 1], namespace=None)
 
     @mock.patch(
         'shakenfist.util.process.execute',
@@ -49,7 +41,7 @@ class UtilTestCase(base.ShakenFistTestCase):
         self.assertEqual(True, found)
         mock_execute.assert_called_with(
             None, 'ip -pretty -json link show eth0',
-            check_exit_code=[0, 1])
+            check_exit_code=[0, 1], namespace=None)
 
     @mock.patch(
         'shakenfist.util.process.execute',
@@ -59,7 +51,7 @@ class UtilTestCase(base.ShakenFistTestCase):
         self.assertEqual([], found)
         mock_execute.assert_called_with(
             None, 'ip -pretty -json addr show eth0',
-            check_exit_code=[0, 1])
+            check_exit_code=[0, 1], namespace=None)
 
     @mock.patch(
         'shakenfist.util.process.execute',
@@ -94,7 +86,7 @@ class UtilTestCase(base.ShakenFistTestCase):
         self.assertEqual(['192.168.1.28'], found)
         mock_execute.assert_called_with(
             None, 'ip -pretty -json addr show eth0',
-            check_exit_code=[0, 1])
+            check_exit_code=[0, 1], namespace=None)
 
     @mock.patch(
         'shakenfist.util.process.execute',
@@ -129,8 +121,8 @@ class UtilTestCase(base.ShakenFistTestCase):
             'eth0', namespace='bananarama'))
         self.assertEqual(['192.168.1.28'], found)
         mock_execute.assert_called_with(
-            None, 'ip netns exec bananarama ip -pretty -json addr show eth0',
-            check_exit_code=[0, 1])
+            None, 'ip -pretty -json addr show eth0',
+            check_exit_code=[0, 1], namespace='bananarama')
 
     @mock.patch(
         'shakenfist.util.process.execute',
@@ -141,7 +133,7 @@ class UtilTestCase(base.ShakenFistTestCase):
         found = util_network.get_default_routes('mynamespace')
         self.assertEqual(['192.168.1.247'], found)
         mock_execute.assert_called_with(
-            None, 'ip netns exec mynamespace ip route list default')
+            None, 'ip route list default', namespace='mynamespace')
 
     @mock.patch('shakenfist.util.process.execute')
     def test_create_interface_bridge(self, mock_execute):

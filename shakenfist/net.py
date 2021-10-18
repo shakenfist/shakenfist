@@ -115,7 +115,7 @@ class Network(dbo):
         n.state = Network.STATE_INITIAL
 
         # Networks should immediately appear on the network node
-        db.enqueue('networknode', DeployNetworkTask(uuid))
+        etcd.enqueue('networknode', DeployNetworkTask(uuid))
 
         # TODO(andy): Integrate metadata into each object type
         # Initialise metadata
@@ -130,7 +130,7 @@ class Network(dbo):
 
         # NOTE(mikal): we used to lock around this fetch from the database,
         # but I am hoping that moving state into an attribute means that's
-        # not nessesary any more.
+        # not necessary any more.
         static_values = Network._db_get(uuid)
         if not static_values:
             return None
@@ -259,7 +259,6 @@ class Network(dbo):
             'mesh_interface': self.mesh_nic,
 
             'netns': self.uuid,
-            'in_netns': 'ip netns exec %s' % self.uuid,
 
             'ipblock': self.ipblock,
             'netmask': self.netmask,
@@ -275,7 +274,7 @@ class Network(dbo):
         if not self.is_created():
             return False
 
-        if self.provide_dhcp and util_network.is_network_node():
+        if self.provide_dhcp and config.NODE_IS_NETWORK_NODE:
             if not self.is_dnsmasq_running():
                 return False
 
@@ -363,10 +362,9 @@ class Network(dbo):
             self._create_common()
 
             subst = self.subst_dict()
-            if not os.path.exists('/var/run/netns/%(netns)s' % subst):
+            if not os.path.exists('/var/run/netns/%s' % self.uuid):
                 with util_general.RecordedOperation('create netns', self):
-                    util_process.execute(
-                        None, 'ip netns add %(netns)s' % subst)
+                    util_process.execute(None, 'ip netns add %s' % self.uuid)
 
             if not util_network.check_for_interface(subst['vx_veth_outer']):
                 with util_general.RecordedOperation('create router veth', self):
@@ -374,8 +372,7 @@ class Network(dbo):
                         subst['vx_veth_outer'], 'veth',
                         'peer name %(vx_veth_inner)s' % subst)
                     util_process.execute(
-                        None,
-                        'ip link set %(vx_veth_inner)s netns %(netns)s' % subst)
+                        None, 'ip link set %(vx_veth_inner)s netns %(netns)s' % subst)
 
                     # Refer to bug 952 for more details here, but it turns out
                     # that adding an interface to a bridge overwrites the MTU of
@@ -391,12 +388,13 @@ class Network(dbo):
                     util_process.execute(
                         None, 'ip link set %(vx_veth_outer)s up' % subst)
                     util_process.execute(
-                        None,
-                        '%(in_netns)s ip link set %(vx_veth_inner)s up' % subst)
+                        None, 'ip link set %(vx_veth_inner)s up' % subst,
+                        namespace=self.uuid)
                     util_process.execute(
                         None,
-                        '%(in_netns)s ip addr add %(router)s/%(netmask)s '
-                        'dev %(vx_veth_inner)s' % subst)
+                        'ip addr add %(router)s/%(netmask)s '
+                        'dev %(vx_veth_inner)s' % subst,
+                        namespace=self.uuid)
 
             if not util_network.check_for_interface(subst['egress_veth_outer']):
                 with util_general.RecordedOperation('create egress veth', self):
@@ -415,12 +413,10 @@ class Network(dbo):
                         'ip link set %(egress_veth_outer)s master %(egress_bridge)s '
                         'mtu %(egress_bridge_mtu)s' % subst)
 
-                    util_process.execute(None,
-                                         'ip link set %(egress_veth_outer)s up'
-                                         % subst)
-                    util_process.execute(None,
-                                         'ip link set %(egress_veth_inner)s '
-                                         'netns %(netns)s' % subst)
+                    util_process.execute(
+                        None, 'ip link set %(egress_veth_outer)s up' % subst)
+                    util_process.execute(
+                        None, 'ip link set %(egress_veth_inner)s netns %(netns)s' % subst)
 
             if self.provide_nat:
                 # We don't always need this lock, but acquiring it here means
@@ -442,26 +438,27 @@ class Network(dbo):
                     addresses = util_network.get_interface_addresses(
                         subst['egress_veth_inner'], namespace=subst['netns'])
                     if not subst['floating_gateway'] in list(addresses):
-                        util_process.execute(None,
-                                             '%(in_netns)s ip addr add '
-                                             '%(floating_gateway)s/%(floating_netmask)s '
-                                             'dev %(egress_veth_inner)s' % subst)
-                        util_process.execute(None,
-                                             '%(in_netns)s ip link set '
-                                             '%(egress_veth_inner)s up' % subst)
+                        util_process.execute(
+                            None,
+                            'ip addr add %(floating_gateway)s/%(floating_netmask)s '
+                            'dev %(egress_veth_inner)s' % subst,
+                            namespace=self.uuid)
+                        util_process.execute(
+                            None, 'ip link set  %(egress_veth_inner)s up' % subst,
+                            namespace=self.uuid)
 
                     default_routes = util_network.get_default_routes(
                         subst['netns'])
                     if default_routes != [subst['floating_router']]:
                         if default_routes:
                             for default_route in default_routes:
-                                util_process.execute(None,
-                                                     '%s route del default gw %s'
-                                                     % (subst['in_netns'], default_route))
+                                util_process.execute(
+                                    None, 'route del default gw %s' % default_route,
+                                    namespace=self.uuid)
 
-                        util_process.execute(None,
-                                             '%(in_netns)s route add default '
-                                             'gw %(floating_router)s' % subst)
+                        util_process.execute(
+                            None, 'route add default gw %(floating_router)s' % subst,
+                            namespace=self.uuid)
 
                 self.enable_nat()
 
@@ -490,7 +487,7 @@ class Network(dbo):
         with self.get_lock(op='Network delete'):
             subst = self.subst_dict()
 
-            if util_network.is_network_node():
+            if config.NODE_IS_NETWORK_NODE:
                 if util_network.check_for_interface(subst['vx_veth_outer']):
                     with util_general.RecordedOperation('delete router veth', self):
                         util_process.execute(
@@ -502,10 +499,10 @@ class Network(dbo):
                             None,
                             'ip link delete %(egress_veth_outer)s' % subst)
 
-                if os.path.exists('/var/run/netns/%(netns)s' % subst):
+                if os.path.exists('/var/run/netns/%s' % self.uuid):
                     with util_general.RecordedOperation('delete netns', self):
                         util_process.execute(
-                            None, 'ip netns del %(netns)s' % subst)
+                            None, 'ip netns del %s' % self.uuid)
 
                 if self.floating_gateway:
                     with db.get_lock('ipmanager', None, 'floating', ttl=120,
@@ -521,10 +518,10 @@ class Network(dbo):
         # just catching strays, apart from on the network node where we
         # absolutely need to do this thing.
         for hyp in Nodes([active_nodes]):
-            db.enqueue(hyp.uuid,
-                       {'tasks': [
-                           HypervisorDestroyNetworkTask(self.uuid)
-                       ]})
+            etcd.enqueue(hyp.uuid,
+                         {'tasks': [
+                             HypervisorDestroyNetworkTask(self.uuid)
+                         ]})
 
         self.remove_dhcp()
         self.remove_nat()
@@ -554,50 +551,52 @@ class Network(dbo):
         if not self.provide_dhcp:
             return
 
-        if util_network.is_network_node():
+        if config.NODE_IS_NETWORK_NODE:
             subst = self.subst_dict()
             with util_general.RecordedOperation('update dhcp', self):
                 with self.get_lock(op='Network update DHCP'):
                     d = dhcp.DHCP(self, subst['vx_veth_inner'])
                     d.restart_dhcpd()
         else:
-            db.enqueue('networknode', UpdateDHCPNetworkTask(self.uuid))
+            etcd.enqueue('networknode', UpdateDHCPNetworkTask(self.uuid))
 
     def remove_dhcp(self):
-        if util_network.is_network_node():
+        if config.NODE_IS_NETWORK_NODE:
             subst = self.subst_dict()
             with util_general.RecordedOperation('remove dhcp', self):
                 with self.get_lock(op='Network remove DHCP'):
                     d = dhcp.DHCP(self, subst['vx_veth_inner'])
                     d.remove_dhcpd()
         else:
-            db.enqueue('networknode', RemoveDHCPNetworkTask(self.uuid))
+            etcd.enqueue('networknode', RemoveDHCPNetworkTask(self.uuid))
 
     def enable_nat(self):
-        if not util_network.is_network_node():
+        if not config.NODE_IS_NETWORK_NODE:
             return
 
         subst = self.subst_dict()
         if not util_network.nat_rules_for_ipblock(self.network_address):
             with util_general.RecordedOperation('enable nat', self):
-                util_process.execute(None,
-                                     'echo 1 > /proc/sys/net/ipv4/ip_forward')
-                util_process.execute(None,
-                                     '%(in_netns)s iptables -A FORWARD '
-                                     '-o %(egress_veth_inner)s '
-                                     '-i %(vx_veth_inner)s -j ACCEPT' % subst)
-                util_process.execute(None,
-                                     '%(in_netns)s iptables -A FORWARD '
-                                     '-i %(egress_veth_inner)s '
-                                     '-o %(vx_veth_inner)s -j ACCEPT' % subst)
-                util_process.execute(None,
-                                     '%(in_netns)s iptables -t nat -A POSTROUTING '
-                                     '-s %(ipblock)s/%(netmask)s '
-                                     '-o %(egress_veth_inner)s '
-                                     '-j MASQUERADE' % subst)
+                util_process.execute(
+                    None, 'echo 1 > /proc/sys/net/ipv4/ip_forward')
+                util_process.execute(
+                    None,
+                    'iptables -A FORWARD -o %(egress_veth_inner)s '
+                    '-i %(vx_veth_inner)s -j ACCEPT' % subst,
+                    namespace=self.uuid)
+                util_process.execute(
+                    None,
+                    'iptables -A FORWARD -i %(egress_veth_inner)s '
+                    '-o %(vx_veth_inner)s -j ACCEPT' % subst,
+                    namespace=self.uuid)
+                util_process.execute(
+                    None,
+                    'iptables -t nat -A POSTROUTING -s %(ipblock)s/%(netmask)s '
+                    '-o %(egress_veth_inner)s -j MASQUERADE' % subst,
+                    namespace=self.uuid)
 
     def remove_nat(self):
-        if util_network.is_network_node():
+        if config.NODE_IS_NETWORK_NODE:
             if self.floating_gateway:
                 with db.get_lock('ipmanager', None, 'floating', ttl=120,
                                  op='Remove NAT'):
@@ -607,7 +606,7 @@ class Network(dbo):
                     self.update_floating_gateway(None)
 
         else:
-            db.enqueue('networknode', RemoveNATNetworkTask(self.uuid))
+            etcd.enqueue('networknode', RemoveNATNetworkTask(self.uuid))
 
     def discover_mesh(self):
         # The floating network does not have a vxlan mesh
@@ -718,18 +717,18 @@ class Network(dbo):
         util_network.create_interface(
             'flt-%(floating_address_as_hex)s-o' % subst, 'veth',
             'peer name flt-%(floating_address_as_hex)s-i' % subst)
-        util_process.execute(None,
-                             'ip link set flt-%(floating_address_as_hex)s-i netns %(netns)s'
-                             % subst)
-        util_process.execute(None,
-                             '%(in_netns)s ip addr add %(floating_address)s/32 '
-                             'dev flt-%(floating_address_as_hex)s-i'
-                             % subst)
-        util_process.execute(None,
-                             '%(in_netns)s iptables -t nat -A PREROUTING '
-                             '-d %(floating_address)s -j DNAT '
-                             '--to-destination %(inner_address)s'
-                             % subst)
+        util_process.execute(
+            None,  'ip link set flt-%(floating_address_as_hex)s-i netns %(netns)s' % subst)
+        util_process.execute(
+            None,
+            'ip addr add %(floating_address)s/32 '
+            'dev flt-%(floating_address_as_hex)s-i' % subst,
+            namespace=self.uuid)
+        util_process.execute(
+            None,
+            'iptables -t nat -A PREROUTING -d %(floating_address)s -j DNAT '
+            '--to-destination %(inner_address)s' % subst,
+            namespace=self.uuid)
 
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.

@@ -8,7 +8,7 @@ from shakenfist.artifact import Artifact, Artifacts
 from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist.daemons import daemon
-from shakenfist import db
+from shakenfist import etcd
 from shakenfist.external_api import base as api_base
 from shakenfist import logutil
 from shakenfist.tasks import SnapshotTask
@@ -23,9 +23,18 @@ class InstanceSnapshotEndpoint(api_base.Resource):
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
-    def post(self, instance_uuid=None, instance_from_db=None, all=None):
+    def post(self, instance_uuid=None, instance_from_db=None, all=None,
+             device=None):
         disks = instance_from_db.block_devices['devices']
-        if not all:
+
+        # Filter if requested
+        if device:
+            new_disks = []
+            for d in disks:
+                if d['device'] == device:
+                    new_disks.append(d)
+            disks = new_disks
+        elif not all:
             disks = [disks[0]]
 
         out = {}
@@ -50,7 +59,7 @@ class InstanceSnapshotEndpoint(api_base.Resource):
                 'blob_uuid': blob_uuid
             }
 
-            db.enqueue(config.NODE_NAME, {
+            etcd.enqueue(config.NODE_NAME, {
                 'tasks': [SnapshotTask(instance_uuid, disk, a.uuid, blob_uuid)],
             })
             instance_from_db.add_event('api', 'snapshot of %s requested' % disk,

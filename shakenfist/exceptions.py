@@ -6,6 +6,11 @@ class VersionSpecificationError(Exception):
     pass
 
 
+# Configuration
+class NoNetworkNode(Exception):
+    pass
+
+
 # Objects
 class ObjectException(Exception):
     pass
@@ -169,4 +174,12 @@ class ArtifactHasNoBlobs(ArtifactException):
 
 
 class BlobMissing(ArtifactException):
+    pass
+
+
+class BlobRefCountDecrementBelowZero(ArtifactException):
+    pass
+
+
+class BlobDeleted(ArtifactException):
     pass

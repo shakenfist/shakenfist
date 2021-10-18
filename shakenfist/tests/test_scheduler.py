@@ -1,3 +1,4 @@
+import copy
 import mock
 import time
 
@@ -32,7 +33,8 @@ class FakeDB(object):
 
     def set_node_metrics_same(self, metrics):
         for n in self.nodes:
-            self.metrics[n] = metrics
+            self.metrics[n] = copy.copy(metrics)
+            self.metrics[n]['is_hypervisor'] = not n.endswith('_net')
 
     def get_metrics(self, node_name):
         if node_name not in self.metrics:
@@ -384,31 +386,6 @@ class ForcedCandidatesTestCase(SchedulerTestCase):
         self.mock_get_instances = mock.patch('shakenfist.instance.Instances')
         self.mock_get_instances.start()
         self.addCleanup(self.mock_get_instances.stop)
-
-    @mock.patch('shakenfist.artifact.Artifacts', return_value=[])
-    def test_only_network_node(self, mock_get_artifacts):
-        self.fake_db.set_node_metrics_same({
-            'cpu_max_per_instance': 16,
-            'cpu_max': 4,
-            'memory_available': 22000,
-            'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024,
-            'cpu_total_instance_vcpus': 4,
-            'cpu_available': 12
-        })
-
-        fake_inst = FakeInstance({
-            'uuid': 'fakeuuid',
-            'cpus': 1,
-            'memory': 1024,
-            'disk_spec': [{
-                'base': 'cirros',
-                        'size': 8
-            }]})
-
-        nodes = scheduler.Scheduler().place_instance(
-            fake_inst, [], candidates=['node1_net'])
-        self.assertSetEqual({'node1_net', }, set(nodes))
 
     @mock.patch('shakenfist.artifact.Artifacts', return_value=[])
     def test_only_two(self, mock_get_artifacts):

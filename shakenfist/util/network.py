@@ -15,10 +15,6 @@ from shakenfist.util import process
 LOG, _ = logutil.setup(__name__)
 
 
-def is_network_node():
-    return config.NODE_MESH_IP == config.NETWORK_NODE_IP
-
-
 def _clean_ip_json(data):
     # For reasons I can't explain, the ip command sometimes returns
     # slightly bogus JSON like this:
@@ -59,16 +55,13 @@ def _clean_ip_json(data):
 
 
 def check_for_interface(name, namespace=None, up=False):
-    in_netns = ''
     if namespace:
         if not os.path.exists('/var/run/netns/%s' % namespace):
             return False
 
-        in_netns = 'ip netns exec %s ' % namespace
-
     stdout, stderr = process.execute(
-        None, '%sip -pretty -json link show %s' % (in_netns, name),
-        check_exit_code=[0, 1])
+        None, 'ip -pretty -json link show %s' % name,
+        check_exit_code=[0, 1], namespace=namespace)
 
     if stderr.rstrip('\n').endswith(' does not exist.'):
         return False
@@ -81,17 +74,9 @@ def check_for_interface(name, namespace=None, up=False):
 
 
 def get_interface_addresses(name, namespace=None):
-    in_namespace = ''
-    if namespace:
-        in_namespace = 'ip netns exec %s ' % namespace
-
-    stdout, _ = process.execute(None,
-                                '%(in_namespace)sip -pretty -json addr show %(name)s'
-                                % {
-                                    'in_namespace': in_namespace,
-                                    'name': name
-                                },
-                                check_exit_code=[0, 1])
+    stdout, _ = process.execute(
+        None, 'ip -pretty -json addr show %s' % name,
+        check_exit_code=[0, 1], namespace=namespace)
 
     for elem in _clean_ip_json(stdout):
         if 'addr_info' in elem:
@@ -102,17 +87,9 @@ def get_interface_addresses(name, namespace=None):
 
 
 def get_interface_statistics(name, namespace=None):
-    in_namespace = ''
-    if namespace:
-        in_namespace = 'ip netns exec %s ' % namespace
-
-    stdout, _ = process.execute(None,
-                                '%(in_namespace)sip -s -pretty -json link show %(name)s'
-                                % {
-                                    'in_namespace': in_namespace,
-                                    'name': name
-                                },
-                                check_exit_code=[0, 1])
+    stdout, _ = process.execute(
+        None, 'ip -s -pretty -json link show %s' % name,
+        check_exit_code=[0, 1], namespace=namespace)
 
     if not stdout:
         raise exceptions.NoInterfaceStatistics(
@@ -123,49 +100,27 @@ def get_interface_statistics(name, namespace=None):
 
 
 def get_interface_mtus(namespace=None):
-    in_namespace = ''
-    if namespace:
-        in_namespace = 'ip netns exec %s ' % namespace
-
-    stdout, _ = process.execute(None,
-                                '%(in_namespace)sip -pretty -json link show'
-                                % {
-                                    'in_namespace': in_namespace
-                                },
-                                check_exit_code=[0, 1])
+    stdout, _ = process.execute(
+        None, 'ip -pretty -json link show',
+        check_exit_code=[0, 1], namespace=namespace)
 
     for elem in _clean_ip_json(stdout):
         yield elem['ifname'], elem['mtu']
 
 
 def get_interface_mtu(interface, namespace=None):
-    in_namespace = ''
-    if namespace:
-        in_namespace = 'ip netns exec %s ' % namespace
-
-    stdout, _ = process.execute(None,
-                                '%(in_namespace)sip -pretty -json link show '
-                                '%(interface)s'
-                                % {
-                                    'in_namespace': in_namespace,
-                                    'interface': interface
-                                },
-                                check_exit_code=[0, 1])
+    stdout, _ = process.execute(
+        None, 'ip -pretty -json link show %s' % interface,
+        check_exit_code=[0, 1], namespace=namespace)
 
     for elem in _clean_ip_json(stdout):
         return elem['mtu']
 
 
 def get_default_routes(namespace):
-    in_namespace = ''
-    if namespace:
-        in_namespace = 'ip netns exec %s ' % namespace
+    stdout, _ = process.execute(
+        None,  'ip route list default', namespace=namespace)
 
-    stdout, _ = process.execute(None,
-                                '%(in_namespace)sip route list default'
-                                % {
-                                    'in_namespace': in_namespace
-                                })
     if not stdout:
         return []
 

@@ -6,12 +6,14 @@ import re
 import uuid
 
 from shakenfist.artifact import (
-    Artifact, BLOB_URL, LABEL_URL, SNAPSHOT_URL)
+    Artifact, BLOB_URL, LABEL_URL, SNAPSHOT_URL, UPLOAD_URL)
 from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
+from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist.external_api import (
     base as api_base,
@@ -50,6 +52,7 @@ class InstanceEndpoint(api_base.Resource):
     @jwt_required
     @api_base.arg_is_instance_uuid
     @api_base.requires_instance_ownership
+    @api_base.requires_namespace_exist
     def delete(self, instance_uuid=None, instance_from_db=None, namespace=None):
         # Check if instance has already been deleted
         if instance_from_db.state.value == dbo.STATE_DELETED:
@@ -84,16 +87,26 @@ class InstancesEndpoint(api_base.Resource):
         return retval
 
     @jwt_required
+    @api_base.requires_namespace_exist
     def post(self, name=None, cpus=None, memory=None, network=None, disk=None,
              ssh_key=None, user_data=None, placed_on=None, namespace=None,
              video=None, uefi=False):
         global SCHEDULER
 
+        if not namespace:
+            namespace = get_jwt_identity()
+
+        # If accessing a foreign namespace, we need to be an admin
+        if get_jwt_identity() not in [namespace, 'system']:
+            return api_base.error(
+                401, 'only admins can create resources in a different namespace')
+
         # Check that the instance name is safe for use as a DNS host name
         if name != re.sub(r'([^a-zA-Z0-9\-])', '', name) or len(name) > 63:
-            return api_base.error(400, ('instance name %s is not useable as a DNS and Linux host name. '
-                                        'That is, less than 63 characters and in the character set: '
-                                        'a-z, A-Z, 0-9, or hyphen (-).' % name))
+            return api_base.error(
+                400, ('instance name %s is not useable as a DNS and Linux host name. '
+                      'That is, less than 63 characters and in the character set: '
+                      'a-z, A-Z, 0-9, or hyphen (-).' % name))
 
         # If we are placed, make sure that node exists
         if placed_on:
@@ -123,16 +136,56 @@ class InstancesEndpoint(api_base.Resource):
                     Artifact.TYPE_LABEL, '%s%s/%s' % (LABEL_URL, get_jwt_identity(), label))
                 if not a:
                     return api_base.error(404, 'label %s not found' % label)
+                if a.state.value != Artifact.STATE_CREATED:
+                    return api_base.error(404, 'label %s is not ready (state=%s)'
+                                          % (label, a.state.value))
                 blob_uuid = a.most_recent_index.get('blob_uuid')
                 if not blob_uuid:
                     return api_base.error(404, 'label %s not found (no versions)' % label)
+                b = Blob.from_db(blob_uuid)
+                if not b:
+                    return api_base.error(404, 'artifact references non-existent blob (%s)' % blob_uuid)
+                if b.state == Blob.STATE_DELETED:
+                    return api_base.error(404, 'artifact references deleted blob (%s)' % blob_uuid)
                 d['blob_uuid'] = blob_uuid
 
             elif disk_base.startswith(SNAPSHOT_URL):
                 a = Artifact.from_db(disk_base[len(SNAPSHOT_URL):])
+                if not a:
+                    return api_base.error(
+                        404, 'snapshot %s not found' % disk_base[len(SNAPSHOT_URL):])
+                if a.state.value != Artifact.STATE_CREATED:
+                    return api_base.error(404, 'label %s is not ready (state=%s)'
+                                          % (label, a.state.value))
                 blob_uuid = a.most_recent_index.get('blob_uuid')
                 if not blob_uuid:
                     return api_base.error(404, 'snapshot not found (no versions)')
+                b = Blob.from_db(blob_uuid)
+                if not b:
+                    return api_base.error(404, 'artifact references non-existent blob (%s)' % blob_uuid)
+                if b.state == Blob.STATE_DELETED:
+                    return api_base.error(404, 'artifact references deleted blob (%s)' % blob_uuid)
+                d['blob_uuid'] = blob_uuid
+
+            elif disk_base.startswith(UPLOAD_URL) or disk_base.startswith(LABEL_URL):
+                if disk_base.startswith(UPLOAD_URL):
+                    a = Artifact.from_url(Artifact.TYPE_IMAGE, disk_base)
+                else:
+                    a = Artifact.from_url(Artifact.TYPE_LABEL, disk_base)
+                if not a:
+                    return api_base.error(404, 'artifact %s not found' % disk_base)
+                if a.state.value != Artifact.STATE_CREATED:
+                    return api_base.error(404, 'label %s is not ready (state=%s)'
+                                          % (label, a.state.value))
+
+                blob_uuid = a.most_recent_index.get('blob_uuid')
+                if not blob_uuid:
+                    return api_base.error(404, 'artifact not found (no versions)')
+                b = Blob.from_db(blob_uuid)
+                if not b:
+                    return api_base.error(404, 'artifact references non-existent blob (%s)' % blob_uuid)
+                if b.state == Blob.STATE_DELETED:
+                    return api_base.error(404, 'artifact references deleted blob (%s)' % blob_uuid)
                 d['blob_uuid'] = blob_uuid
 
             elif disk_base.startswith(BLOB_URL):
@@ -172,6 +225,8 @@ class InstancesEndpoint(api_base.Resource):
                     return api_base.error(404, 'network %s does not exist' % net_uuid)
                 if n.state.value != net.Network.STATE_CREATED:
                     return api_base.error(406, 'network %s is not ready (%s)' % (n.uuid, n.state.value))
+                if n.namespace != namespace:
+                    return api_base.error(404, 'network %s does not exist' % net_uuid)
 
         if not video:
             video = {'model': 'cirrus', 'memory': 16384}
@@ -180,14 +235,6 @@ class InstancesEndpoint(api_base.Resource):
                 return api_base.error(400, 'video specification requires "model"')
             if 'memory' not in video:
                 return api_base.error(400, 'video specification requires "memory"')
-
-        if not namespace:
-            namespace = get_jwt_identity()
-
-        # If accessing a foreign namespace, we need to be an admin
-        if get_jwt_identity() not in [namespace, 'system']:
-            return api_base.error(401,
-                                  'only admins can create resources in a different namespace')
 
         # Create instance object
         inst = instance.Instance.new(
@@ -315,10 +362,11 @@ class InstancesEndpoint(api_base.Resource):
         tasks.extend(float_tasks)
 
         # Enqueue creation tasks on desired node task queue
-        db.enqueue(placement, {'tasks': tasks})
+        etcd.enqueue(placement, {'tasks': tasks})
         return inst.external_view()
 
     @jwt_required
+    @api_base.requires_namespace_exist
     def delete(self, confirm=False, namespace=None):
         """Delete all instances in the namespace."""
 
@@ -353,7 +401,7 @@ class InstancesEndpoint(api_base.Resource):
             waiting_for.append(inst.uuid)
 
         for node in tasks_by_node:
-            db.enqueue(node, {'tasks': tasks_by_node[node]})
+            etcd.enqueue(node, {'tasks': tasks_by_node[node]})
 
         return waiting_for
 

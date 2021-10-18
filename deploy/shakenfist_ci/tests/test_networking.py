@@ -20,10 +20,10 @@ class TestNetworking(base.BaseNamespacedTestCase):
             '192.168.242.0/24', True, True, '%s-net-three' % self.namespace)
         self.net_four = self.test_client.allocate_network(
             '192.168.10.0/24', True, True, '%s-net-four' % self.namespace)
-        self._await_network_ready(self.net_one['uuid'])
-        self._await_network_ready(self.net_two['uuid'])
-        self._await_network_ready(self.net_three['uuid'])
-        self._await_network_ready(self.net_four['uuid'])
+        self._await_networks_ready([self.net_one['uuid'],
+                                    self.net_two['uuid'],
+                                    self.net_three['uuid'],
+                                    self.net_four['uuid']])
 
     def test_network_validity(self):
         self.assertRaises(apiclient.APIException, self.test_client.allocate_network,
@@ -73,18 +73,13 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self._await_login_prompt(inst1['uuid'])
         self._await_login_prompt(inst2['uuid'])
 
-        # We need to refresh our view of the instances, as it might have
-        # changed as they started up
-        inst1 = self.test_client.get_instance(inst1['uuid'])
-        inst2 = self.test_client.get_instance(inst2['uuid'])
-
         nics = self.test_client.get_instance_interfaces(inst2['uuid'])
         self.assertEqual(1, len(nics))
         for iface in nics:
             self.assertEqual('created', iface['state'],
                              'Interface %s is not in correct state' % iface['uuid'])
 
-        console = base.LoggingSocket(inst1['node'], inst1['console_port'])
+        console = base.LoggingSocket(self.test_client, inst1)
         out = console.execute('ping -c 3 %s' % nics[0]['ipv4'])
         if not out.find('100% packet'):
             self.fail('Ping should have failed!\n\n%s' % out)
@@ -126,18 +121,13 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self._await_login_prompt(inst1['uuid'])
         self._await_login_prompt(inst2['uuid'])
 
-        # We need to refresh our view of the instances, as it might have
-        # changed as they started up
-        inst1 = self.test_client.get_instance(inst1['uuid'])
-        inst2 = self.test_client.get_instance(inst2['uuid'])
-
         nics = self.test_client.get_instance_interfaces(inst2['uuid'])
         self.assertEqual(1, len(nics))
         for iface in nics:
             self.assertEqual('created', iface['state'],
                              'Interface %s is not in correct state' % iface['uuid'])
 
-        console = base.LoggingSocket(inst1['node'], inst1['console_port'])
+        console = base.LoggingSocket(self.test_client, inst1)
         out = console.execute('ping -c 3 %s' % nics[0]['ipv4'])
         if not out.find('100% packet'):
             self.fail('Ping should have failed!\n\n%s' % out)
@@ -179,11 +169,6 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self._await_login_prompt(inst1['uuid'])
         self._await_login_prompt(inst2['uuid'])
 
-        # We need to refresh our view of the instances, as it might have
-        # changed as they started up
-        inst1 = self.test_client.get_instance(inst1['uuid'])
-        inst2 = self.test_client.get_instance(inst2['uuid'])
-
         nics = self.test_client.get_instance_interfaces(inst2['uuid'])
         self.assertEqual(1, len(nics))
         for iface in nics:
@@ -191,7 +176,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                              'Interface %s is not in correct state' % iface['uuid'])
 
         # Ping the other instance on this network
-        console = base.LoggingSocket(inst1['node'], inst1['console_port'])
+        console = base.LoggingSocket(self.test_client, inst1)
         out = console.execute('ping -c 3 %s' % nics[0]['ipv4'])
         if not out.find(' 0% packet'):
             self.fail('Ping should have worked!\n\n%s' % out)
@@ -218,12 +203,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                 }
             ], None, None)
 
-        while inst['state'] not in ['created', 'error']:
-            time.sleep(1)
-            inst = self.test_client.get_instance(inst['uuid'])
-
-        if inst['state'] != 'created':
-            self.fail('Instance is not in created state: %s' % inst)
+        self._await_instances_ready([inst['uuid']])
 
         nics = self.test_client.get_instance_interfaces(inst['uuid'])
         self.assertEqual(1, len(nics))
@@ -273,16 +253,9 @@ class TestNetworking(base.BaseNamespacedTestCase):
                 }
             ], None, None)
 
-        while inst['state'] not in ['created', 'error']:
-            time.sleep(1)
-            inst = self.test_client.get_instance(inst['uuid'])
+        self._await_instances_ready([inst['uuid']])
 
-        # Sometimes the console port is missing. Explicitly check for
-        # that.
-        if 'console_port' not in inst:
-            self.fail('Missing console port: %s' % inst)
-
-        console = base.LoggingSocket(inst['node'], inst['console_port'])
+        console = base.LoggingSocket(self.test_client, inst)
         out = console.execute('ip link')
         if not out.find('04:ed:33:c0:2e:6c'):
             self.fail('Requested macaddress not used!\n\n%s' % out)
@@ -326,3 +299,70 @@ class TestNetworking(base.BaseNamespacedTestCase):
         for iface in nics:
             self.assertEqual(
                 'deleted', self.test_client.get_interface(iface['uuid'])['state'])
+
+    def test_extraneous_network_duplicates(self):
+        dupnet = self.test_client.allocate_network(
+            '10.0.0.0/24', True, True, '%s-dups' % self.namespace)
+        self._await_networks_ready([dupnet['uuid']])
+
+        try:
+            inst_hyp1_vm1 = self.test_client.create_instance(
+                'dup1', 1, 1024,
+                [
+                    {
+                        'network_uuid': dupnet['uuid']
+                    }
+                ],
+                [
+                    {
+                        'size': 8,
+                        'base': 'cirros',
+                        'type': 'disk'
+                    }
+                ], None, None, force_placement='sf-2')
+
+            inst_hyp1_vm2 = self.test_client.create_instance(
+                'dup2', 1, 1024,
+                [
+                    {
+                        'network_uuid': dupnet['uuid']
+                    }
+                ],
+                [
+                    {
+                        'size': 8,
+                        'base': 'ubuntu:20.04',
+                        'type': 'disk'
+                    }
+                ], None, None, force_placement='sf-2')
+
+            inst_hyp2_vm1 = self.test_client.create_instance(
+                'dup3', 1, 1024,
+                [
+                    {
+                        'network_uuid': dupnet['uuid']
+                    }
+                ],
+                [
+                    {
+                        'size': 8,
+                        'base': 'ubuntu:20.04',
+                        'type': 'disk'
+                    }
+                ], None, None, force_placement='sf-3')
+
+        except apiclient.ResourceNotFoundException as e:
+            self.skip('Target node does not exist. %s' % e)
+            return
+
+        self.assertIsNotNone(inst_hyp1_vm1['uuid'])
+        self._await_login_prompt(inst_hyp1_vm1['uuid'])
+        self.assertIsNotNone(inst_hyp1_vm2['uuid'])
+        self._await_login_prompt(inst_hyp1_vm2['uuid'])
+        self.assertIsNotNone(inst_hyp2_vm1['uuid'])
+        self._await_login_prompt(inst_hyp2_vm1['uuid'])
+
+        nics = self.test_client.get_instance_interfaces(inst_hyp1_vm2['uuid'])
+        console = base.LoggingSocket(self.test_client, inst_hyp1_vm1)
+        out = console.execute('ping -c 3 %s' % nics[0]['ipv4'])
+        self.assertFalse('DUP' in out)

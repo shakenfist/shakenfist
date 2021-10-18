@@ -12,7 +12,7 @@ class TestCirros(base.BaseNamespacedTestCase):
         super(TestCirros, self).setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net' % self.namespace)
-        self._await_network_ready(self.net['uuid'])
+        self._await_networks_ready([self.net['uuid']])
 
     def test_cirros_boot_no_network(self):
         """Check that instances without a network still boot.

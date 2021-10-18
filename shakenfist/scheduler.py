@@ -38,7 +38,7 @@ def get_network_node():
             CACHED_NETWORK_NODE = n
             return CACHED_NETWORK_NODE
 
-    return None
+    raise exceptions.NoNetworkNode('Cannot find network node')
 
 
 class Scheduler(object):
@@ -223,6 +223,19 @@ class Scheduler(object):
                     candidates.append(n)
             log_ctx.with_field('candidates', candidates).info(
                 'Scheduling: Initial candidates')
+
+            # Ensure all specified nodes are hypervisors
+            for n in copy.copy(candidates):
+                instance.add_event(
+                    'schedule',
+                    'Is hypervisor: %s' % self.metrics[n].get(
+                        'is_hypervisor', False),
+                    None, str(n))
+                if not self.metrics[n].get('is_hypervisor', False):
+                    candidates.remove(n)
+            log_ctx.with_field('candidates', candidates).info(
+                'Scheduling: Are hypervisors')
+
             instance.add_event('schedule',
                                'Initial candidates', None, str(candidates))
             if not candidates:
@@ -276,15 +289,6 @@ class Scheduler(object):
             if not candidates:
                 raise exceptions.LowResourceException(
                     'No nodes with enough disk space')
-
-            # Avoid allocating to network node if possible
-            net_node = get_network_node()
-            if len(candidates) > 1 and net_node.uuid in candidates:
-                candidates.remove(net_node.uuid)
-                log_ctx.with_field('candidates', candidates).info(
-                    'Scheduling: Are non-network nodes')
-                instance.add_event('schedule', 'Are non-network nodes',
-                                   None, str(candidates))
 
             # Order candidates by current CPU load
             by_load = {}
