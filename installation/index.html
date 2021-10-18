@@ -14,7 +14,7 @@
         <link rel="canonical" href="https://shakenfist.com/installation/">
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.2.2, mkdocs-material-7.3.0">
+      <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-7.3.4">
     
     
       
@@ -22,7 +22,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.8b42a75e.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.db9e7362.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.3f5d1f46.min.css">
@@ -482,7 +482,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/ci_images/" class="md-nav__link">
+      <a href="../development/ci_images.md" class="md-nav__link">
         CI images
       </a>
     </li>
@@ -885,17 +885,14 @@
                 
                 <h1 id="installing-shaken-fist">Installing Shaken Fist</h1>
 <p>This guide will assume that you want to install Shaken Fist on a single local machine (that is, the one you're going to run ansible on). This is by no means the only installation option, but is the most simple to get people started.</p>
-<p>Shaken Fist only supports Ubuntu 18.04 or later but we strongly recommend 20.04 or higher, so if you're running on localhost that implies that you must be running a recent Ubuntu on your development machine. Note as well that the deployer installs software and changes the configuration of your networking, so be careful when running it on machines you are fond of.</p>
-<p>Note that we used to recommend deployers run the installer from git, but we've outgrown that approach. If you
-see that mentioned in the documentation, you are likely reading outdated guides.</p>
+<p>Shaken Fist only supports Ubuntu 20.04, Debian 10, and Debian 11, so if you're running on localhost that implies that you must be running a recent Ubuntu or Debian on your development machine. Note as well that the deployer installs software and changes the configuration of your networking, so be careful when running it on machines you are fond of.</p>
+<p>Note that we used to recommend deployers run the installer from git, but we've outgrown that approach. If you see that mentioned in the documentation, you are likely reading outdated guides.</p>
 <p>First install some dependencies:</p>
 <pre><code class="language-bash">sudo apt-get update
 sudo apt-get -y dist-upgrade
 sudo apt-get -y install ansible tox pwgen build-essential python3-dev python3-wheel \
     python3-pip python3-venv curl ansible vim git pwgen
     python3-pip curl ansible vim git pwgen
-sudo ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform \
-    andrewrothstein.go
 </code></pre>
 <p>And then manually upgrade pip:</p>
 <pre><code>sudo pip3 install -U pip
@@ -911,6 +908,9 @@ python3 -mvenv --system-site-packages /srv/shakenfist/venv
 </code></pre>
 <p>Because we're fancy, we should also create a symlink to the <code>sf-client</code> command so its easy to use without arguing with the virtual environment:</p>
 <pre><code>sudo ln -s /srv/shakenfist/venv/bin/sf-client /usr/local/bin/sf-client
+</code></pre>
+<p>We need to install required ansible-galaxy roles, which are described by a requirements file packaged with the server package. Do that like this:</p>
+<pre><code>ansible-galaxy install -r /srv/shakenfist/venv/share/installer/requirements.yml
 </code></pre>
 <p>And then run the installer. We describe the correct invocation for a local development environment in the section below.</p>
 <h2 id="local-development">Local development</h2>
@@ -1263,10 +1263,10 @@ with real users.</p>
     <div class="md-dialog" data-md-component="dialog">
       <div class="md-dialog__inner md-typeset"></div>
     </div>
-    <script id="__config" type="application/json">{"base": "..", "features": [], "translations": {"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing", "select.version.title": "Select version"}, "search": "../assets/javascripts/workers/search.f8263e09.min.js", "version": null}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": [], "translations": {"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing", "select.version.title": "Select version"}, "search": "../assets/javascripts/workers/search.8397ff9e.min.js", "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.4fc53ad4.min.js"></script>
+      <script src="../assets/javascripts/bundle.1e84347e.min.js"></script>
       
     
   </body>
