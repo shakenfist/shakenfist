@@ -606,24 +606,6 @@
       shell: virsh net-destroy default
       ignore_errors: True
 
-    - name: Copy dhcp config template
-      copy:
-        src: "{{hostvars['localhost']['template_path']}}/dhcp.tmpl"
-        remote_src: yes
-        dest: /srv/shakenfist/dhcp.tmpl
-        owner: root
-        group: root
-        mode: "0644"
-
-    - name: Copy dhcp hosts template
-      copy:
-        src: "{{hostvars['localhost']['template_path']}}/dhcphosts.tmpl"
-        remote_src: yes
-        dest: /srv/shakenfist/dhcphosts.tmpl
-        owner: root
-        group: root
-        mode: "0644"
-
     - name: Check that the /etc/apparmor.d/local/abstractions/libvirt-qemu exists
       stat:
         path: /etc/apparmor.d/local/abstractions/libvirt-qemu
@@ -651,6 +633,32 @@
         name: apparmor
         enabled: yes
         state: restarted
+
+- hosts: network_node
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - name: Copy dhcp config template
+      copy:
+        src: "{{hostvars['localhost']['template_path']}}/dhcp.tmpl"
+        remote_src: yes
+        dest: /srv/shakenfist/dhcp.tmpl
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Copy dhcp hosts template
+      copy:
+        src: "{{hostvars['localhost']['template_path']}}/dhcphosts.tmpl"
+        remote_src: yes
+        dest: /srv/shakenfist/dhcphosts.tmpl
+        owner: root
+        group: root
+        mode: "0644"
 
 - hosts: hypervisors, network_node
   any_errors_fatal: true
