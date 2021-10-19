@@ -41,7 +41,7 @@
           ff02::2 ip6-allrouters
           ff02::3 ip6-allhosts
 
-          {% for svr in groups.hypervisors %}
+          {% for svr in groups.allsf %}
           {{hostvars[svr]['node_egress_ip']}}  {{svr}}
           {% endfor %}
         dest: /etc/hosts
@@ -389,6 +389,12 @@
     - name: Stop the SF daemon
       shell: systemctl stop sf || true
 
+    - name: Create storage directory
+      file:
+        path: /srv/shakenfist
+        state: directory
+        mode: "0755"
+
 - hosts: primary_node
   any_errors_fatal: true
   become: yes
@@ -479,7 +485,7 @@
             - job_name: 'shakenfist'
               static_configs:
                 - targets: [
-                      {% for svr in groups.hypervisors %}
+                      {% for svr in groups.sf_promethus_exporters %}
                         '{{hostvars[svr]['node_mesh_ip']}}:13001',
                       {% endfor %}
                     ]
@@ -585,12 +591,6 @@
   connection: ssh
 
   tasks:
-    - name: Create storage directory
-      file:
-        path: /srv/shakenfist
-        state: directory
-        mode: "0755"
-
     - name: Copy libvirt template
       copy:
         src: "{{hostvars['localhost']['template_path']}}/libvirt.tmpl"
