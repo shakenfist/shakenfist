@@ -289,11 +289,16 @@ class BaseNamespacedTestCase(BaseTestCase):
             self.fail('Failed to delete instances: %s'
                       % remaining_instances)
 
-        for net in non_blocking_client.get_networks():
-            non_blocking_client.delete_network(net['uuid'])
-
         start_time = time.time()
         while time.time() - start_time < 5 * 60:
+            for net in non_blocking_client.get_networks():
+                try:
+                    non_blocking_client.delete_network(net['uuid'])
+                except apiclient.ResourceCannotBeDeletedException:
+                    pass
+
+            time.sleep(5)
+
             if not list(non_blocking_client.get_networks()):
                 break
             time.sleep(5)
