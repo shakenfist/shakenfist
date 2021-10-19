@@ -42,11 +42,6 @@
       ]
     state: latest
 
-- name: Create a RAM disk for etcd to make it more reliable in CI
-  shell: |
-    mkdir -p /var/lib/etcd
-    mount -t tmpfs -o rw,size=2G tmpfs /var/lib/etcd
-
 - name: Copy server wheel file
   copy:
     src: "{{source_path}}/shakenfist/dist/{{hostvars['localhost']['server_wheel_file']}}"
