@@ -11,7 +11,7 @@
       ff02::2 ip6-allrouters
       ff02::3 ip6-allhosts
 
-      {% for svr in groups.hypervisors %}
+      {% for svr in groups.allsf %}
       {{hostvars[svr]['node_mesh_ip']}}  {{svr}}
       {% endfor %}
       {{hostvars[groups['primary_node'][0]]['node_mesh_ip']}}  sf-primary
