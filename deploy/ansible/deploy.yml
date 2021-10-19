@@ -660,7 +660,7 @@
         group: root
         mode: "0644"
 
-- hosts: hypervisors, network_node
+- hosts: hypervisors, network_node, etcd_master
   any_errors_fatal: true
   become: yes
   become_method: sudo
