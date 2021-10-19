@@ -16,7 +16,6 @@ sudo apt-get update
 sudo apt-get -y dist-upgrade
 sudo apt-get -y install ansible tox pwgen build-essential python3-dev python3-wheel \
     python3-pip python3-venv curl ansible vim git pwgen
-    python3-pip curl ansible vim git pwgen
 ```
 
 And then manually upgrade pip:
@@ -80,7 +79,6 @@ Now create a file called sf-deploy.sh, which contains the details of your instal
 export CLOUD=metal
 export ADMIN_PASSWORD=...a...password...
 export FLOATING_IP_BLOCK="192.168.10.0/24"
-export BOOTDELAY=0
 export DEPLOY_NAME="bonkerslab"
 export METAL_SSH_USER="cloudadmin"
 export METAL_SSH_KEY_FILENAME="/root/.ssh/id_rsa"
