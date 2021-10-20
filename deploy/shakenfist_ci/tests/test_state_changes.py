@@ -72,6 +72,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
 
         # Soft reboot
         LOG.info('Instance Soft reboot')
+        self.test_client.delete_console_data(inst['uuid'])
         self.test_client.reboot_instance(inst['uuid'])
         self._await_login_prompt(inst['uuid'], after=time.time())
         LOG.info('  ping test...')
@@ -79,6 +80,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
 
         # Hard reboot
         LOG.info('Instance Hard reboot')
+        self.test_client.delete_console_data(inst['uuid'])
         self.test_client.reboot_instance(inst['uuid'], hard=True)
         self._await_login_prompt(inst['uuid'], after=time.time())
         LOG.info('  ping test...')
@@ -94,6 +96,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
 
         # Power on
         LOG.info('Instance Power on')
+        self.test_client.delete_console_data(inst['uuid'])
         self.test_client.power_on_instance(inst['uuid'])
         self._await_login_prompt(inst['uuid'], after=time.time())
         LOG.info('  ping test...')

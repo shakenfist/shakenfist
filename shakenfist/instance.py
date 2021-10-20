@@ -955,6 +955,14 @@ class Instance(dbo):
             length, len(d))
         return d
 
+    def delete_console_data(self):
+        console_path = os.path.join(self.instance_path, 'console.log')
+        if not os.path.exists(console_path):
+            return
+        os.truncate(console_path, 0)
+        self.add_event('console log cleared', None)
+        self.log.info('Console log cleared')
+
     def enqueue_delete_remote(self, node):
         etcd.enqueue(node, {
             'tasks': [DeleteInstanceTask(self.uuid)]
