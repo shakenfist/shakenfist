@@ -100,6 +100,16 @@
           ]
         state: latest
 
+    - name: Try and avoid the disk being corrupt when snapshot
+      shell: |
+        sleep 5
+        sync
+        sleep 1
+        sync
+        sleep 1
+        sync
+        sleep 1
+
 - hosts: localhost
   gather_facts: no
   connection: ssh
