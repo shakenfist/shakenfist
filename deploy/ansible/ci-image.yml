@@ -200,7 +200,6 @@
     - name: Delete the snapshot (its a label now if it passed)
       sf_snapshot:
         uuid: "{{cisnapshot['meta']['vda']['artifact_uuid']}}"
-        namespace: ci
         state: absent
 
     - name: Delete test instance
