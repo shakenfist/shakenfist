@@ -39,8 +39,22 @@ def observe(path, instance_uuid):
     # noisy after the login prompt.)
     os.lseek(fd, max(0, os.fstat(fd).st_size - 4096), os.SEEK_SET)
 
+    # Record how long the file is, because we need to detect truncations and
+    # re-open.
+    previous_size = os.stat(path).st_size
+
     buffer = ''
     while True:
+        # Detect file trunctations, and die if we see one. We will be restarted
+        # by the monitor process.
+        if not os.path.exists(path):
+            return
+        size = os.stat(path).st_size
+        if size < previous_size:
+            return
+        previous_size = size
+
+        # Read data, os.read() is non-blocking by the way.
         d = os.read(fd, 1024).decode('utf-8', errors='ignore')
         if d:
             buffer += d
@@ -58,7 +72,7 @@ def observe(path, instance_uuid):
                                          None, None, trigger)
         else:
             # Only pause if there was no data to read
-            time.sleep(1)
+            time.sleep(0.2)
 
 
 class Monitor(daemon.Daemon):

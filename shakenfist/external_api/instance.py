@@ -560,7 +560,7 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
         parsed_length = None
 
         if not length:
-            parsed_length = -1
+            parsed_length = 10240
         else:
             try:
                 parsed_length = int(length)
@@ -577,3 +577,10 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
             mimetype='text/plain')
         resp.status_code = 200
         return resp
+
+    @jwt_required
+    @api_base.arg_is_instance_uuid
+    @api_base.requires_instance_ownership
+    @api_base.redirect_instance_request
+    def delete(self, instance_uuid=None, instance_from_db=None):
+        instance_from_db.delete_console_data()

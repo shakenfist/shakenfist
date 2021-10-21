@@ -105,8 +105,7 @@ api.add_resource(api_instance.InstanceMetadatasEndpoint,
 api.add_resource(api_instance.InstanceMetadataEndpoint,
                  '/instances/<instance_uuid>/metadata/<key>')
 api.add_resource(api_instance.InstanceConsoleDataEndpoint,
-                 '/instances/<instance_uuid>/consoledata',
-                 defaults={'length': 10240})
+                 '/instances/<instance_uuid>/consoledata')
 
 api.add_resource(api_interface.InterfaceEndpoint,
                  '/interfaces/<interface_uuid>')

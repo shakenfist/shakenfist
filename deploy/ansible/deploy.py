@@ -51,7 +51,6 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
         variables['admin_password'] = 'Ukoh5vie'
 
     variables['cloud'] = os.environ.get('CLOUD', 'metal')
-    variables['bootdelay'] = os.environ.get('BOOTDELAY', 2)
     variables['floating_network_ipblock'] = os.environ.get(
         'FLOATING_IP_BLOCK', '10.10.0.0/24')
     variables['ksm_enabled'] = os.environ.get('KSM_ENABLED', 1)
