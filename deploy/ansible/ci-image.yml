@@ -197,6 +197,12 @@
       shell: |
         sf-client label update "{{label}}" "{{hostvars['localhost']['snapshot_uuid']}}"
 
+    - name: Delete the snapshot (its a label now if it passed)
+      sf_snapshot:
+        uuid: "{{cisnapshot['meta']['vda']['uuid']}}"
+        namespace: ci
+        state: absent
+
     - name: Delete test instance
       sf_instance:
         uuid: "{{hostvars['imagetest']['sf_instance_uuid']}}"
