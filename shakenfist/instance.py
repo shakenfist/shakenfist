@@ -70,77 +70,9 @@ def _safe_int_cast(i):
     return i
 
 
-def _initialize_block_devices(instance_path, disk_spec):
-    bus = _get_defaulted_disk_bus(disk_spec[0])
-    root_device = _get_disk_device(bus, 0)
-    config_device = _get_disk_device(bus, 1)
-
-    disk_type = 'qcow2'
-
-    block_devices = {
-        'devices': [
-            {
-                'type': disk_type,
-                'size': _safe_int_cast(disk_spec[0].get('size')),
-                'device': root_device,
-                'bus': bus,
-                'path': os.path.join(instance_path, root_device),
-                'base': disk_spec[0].get('base'),
-                'blob_uuid': disk_spec[0].get('blob_uuid'),
-                'present_as': _get_defaulted_disk_type(disk_spec[0]),
-                'snapshot_ignores': False
-            },
-            {
-                'type': 'raw',
-                'device': config_device,
-                'bus': bus,
-                'path': os.path.join(instance_path, config_device),
-                'present_as': 'disk',
-                'snapshot_ignores': True
-            }
-        ],
-        'extracommands': []
-    }
-
-    i = 2
-    for d in disk_spec[1:]:
-        bus = _get_defaulted_disk_bus(d)
-        device = _get_disk_device(bus, i)
-        disk_path = os.path.join(instance_path, device)
-
-        block_devices['devices'].append({
-            'type': disk_type,
-            'size': _safe_int_cast(d.get('size')),
-            'device': device,
-            'bus': bus,
-            'path': disk_path,
-            'base': d.get('base'),
-            'blob_uuid': d.get('blob_uuid'),
-            'present_as': _get_defaulted_disk_type(d),
-            'snapshot_ignores': False
-        })
-        i += 1
-
-    # NVME disks require a different treatment because libvirt doesn't natively
-    # support them yet.
-    nvme_counter = 0
-    for d in block_devices['devices']:
-        if d['bus'] == 'nvme':
-            nvme_counter += 1
-            block_devices['extracommands'].extend([
-                '-drive', ('file=%s,format=%s,if=none,id=NVME%d'
-                           % (d['path'], d['type'], nvme_counter)),
-                '-device', ('nvme,drive=NVME%d,serial=nvme-%d'
-                            % (nvme_counter, nvme_counter))
-            ])
-
-    block_devices['finalized'] = False
-    return block_devices
-
-
 class Instance(dbo):
     object_type = 'instance'
-    current_version = 3
+    current_version = 4
 
     # docs/development/state_machine.md has a description of these states.
     STATE_INITIAL_ERROR = 'initial-error'
@@ -185,6 +117,8 @@ class Instance(dbo):
         self.__user_data = static_values.get('user_data')
         self.__video = static_values.get('video')
         self.__uefi = static_values.get('uefi', False)
+        self.__configdrive = static_values.get(
+            'configdrive', 'openstack-disk')
 
         if not self.__disk_spec:
             # This should not occur since the API will filter for zero disks.
@@ -194,11 +128,14 @@ class Instance(dbo):
     @classmethod
     def new(cls, name, cpus, memory, namespace, ssh_key=None, disk_spec=None,
             user_data=None, video=None, requested_placement=None, uuid=None,
-            uefi=False):
+            uefi=False, configdrive=None):
 
         if not uuid:
             # uuid should only be specified in testing
             uuid = str(uuid4())
+
+        if not configdrive:
+            configdrive = 'openstack-disk'
 
         Instance._db_create(
             uuid,
@@ -213,6 +150,7 @@ class Instance(dbo):
                 'user_data': user_data,
                 'video': video,
                 'uefi': uefi,
+                'configdrive': configdrive,
 
                 'version': cls.current_version
             })
@@ -248,6 +186,7 @@ class Instance(dbo):
             'user_data': self.user_data,
             'video': self.video,
             'uefi': self.uefi,
+            'configdrive': self.configdrive,
             'version': self.version,
             'error_message': self.error,
         }
@@ -333,6 +272,10 @@ class Instance(dbo):
         return self.__uefi
 
     @property
+    def configdrive(self):
+        return self.__configdrive
+
+    @property
     def instance_path(self):
         return os.path.join(config.STORAGE_PATH, 'instances', self.uuid)
 
@@ -370,6 +313,78 @@ class Instance(dbo):
         self._db_set_attribute('interfaces', interfaces)
 
     # Implementation
+    def _initialize_block_devices(self):
+        bus = _get_defaulted_disk_bus(self.disk_spec[0])
+        root_device = _get_disk_device(bus, 0)
+        config_device = _get_disk_device(bus, 1)
+
+        disk_type = 'qcow2'
+
+        block_devices = {
+            'devices': [
+                {
+                    'type': disk_type,
+                    'size': _safe_int_cast(self.disk_spec[0].get('size')),
+                    'device': root_device,
+                    'bus': bus,
+                    'path': os.path.join(self.instance_path, root_device),
+                    'base': self.disk_spec[0].get('base'),
+                    'blob_uuid': self.disk_spec[0].get('blob_uuid'),
+                    'present_as': _get_defaulted_disk_type(self.disk_spec[0]),
+                    'snapshot_ignores': False
+                }
+            ],
+            'extracommands': []
+        }
+
+        i = 1
+        if self.configdrive == 'openstack-disk':
+            block_devices['devices'].append(
+                {
+                    'type': 'raw',
+                    'device': config_device,
+                    'bus': bus,
+                    'path': os.path.join(self.instance_path, config_device),
+                    'present_as': 'disk',
+                    'snapshot_ignores': True
+                }
+            )
+            i += 1
+
+        for d in self.disk_spec[1:]:
+            bus = _get_defaulted_disk_bus(d)
+            device = _get_disk_device(bus, i)
+            disk_path = os.path.join(self.instance_path, device)
+
+            block_devices['devices'].append({
+                'type': disk_type,
+                'size': _safe_int_cast(d.get('size')),
+                'device': device,
+                'bus': bus,
+                'path': disk_path,
+                'base': d.get('base'),
+                'blob_uuid': d.get('blob_uuid'),
+                'present_as': _get_defaulted_disk_type(d),
+                'snapshot_ignores': False
+            })
+            i += 1
+
+        # NVME disks require a different treatment because libvirt doesn't natively
+        # support them yet.
+        nvme_counter = 0
+        for d in block_devices['devices']:
+            if d['bus'] == 'nvme':
+                nvme_counter += 1
+                block_devices['extracommands'].extend([
+                    '-drive', ('file=%s,format=%s,if=none,id=NVME%d'
+                               % (d['path'], d['type'], nvme_counter)),
+                    '-device', ('nvme,drive=NVME%d,serial=nvme-%d'
+                                % (nvme_counter, nvme_counter))
+                ])
+
+        block_devices['finalized'] = False
+        return block_devices
+
     def place_instance(self, location):
         with self.get_lock_attr('placement', 'Instance placement'):
             # We don't write unchanged things to the database
@@ -540,14 +555,14 @@ class Instance(dbo):
             # Create block devices if required
             block_devices = self.block_devices
             if not block_devices:
-                block_devices = _initialize_block_devices(self.instance_path,
-                                                          self.disk_spec)
+                block_devices = self._initialize_block_devices()
 
             # Generate a config drive
-            with util_general.RecordedOperation('make config drive', self):
-                self._make_config_drive(
-                    os.path.join(self.instance_path,
-                                 block_devices['devices'][1]['path']))
+            if self.configdrive == 'openstack-disk':
+                with util_general.RecordedOperation('make config drive', self):
+                    self._make_config_drive_openstack_disk(
+                        os.path.join(self.instance_path,
+                                     block_devices['devices'][1]['path']))
 
             # Prepare disks. A this point we have a file for each blob in the image
             # cache at a well known location (the blob uuid with .qcow2 appended).
@@ -640,7 +655,7 @@ class Instance(dbo):
                 block_devices['finalized'] = True
                 self._db_set_attribute('block_devices', block_devices)
 
-    def _make_config_drive(self, disk_path):
+    def _make_config_drive_openstack_disk(self, disk_path):
         """Create a config drive"""
 
         # NOTE(mikal): with a big nod at https://gist.github.com/pshchelo/378f3c4e7d18441878b9652e9478233f

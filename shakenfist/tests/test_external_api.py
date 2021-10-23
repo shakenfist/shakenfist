@@ -540,9 +540,10 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
                     'ssh_key': 'sshkey',
                     'user_data': 'userdata',
                     'uuid': 'uuid42',
-                    'version': 3,
+                    'version': 4,
                     'video': {'memory': 16384, 'model': 'cirrus'},
-                    'uefi': False
+                    'uefi': False,
+                    'configdrive': 'openstack-disk'
                 })
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 return_value={})
@@ -564,10 +565,11 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
             'ssh_key': 'sshkey',
             'state': None,
             'uefi': False,
+            'configdrive': 'openstack-disk',
             'user_data': 'userdata',
             'uuid': 'uuid42',
             'vdi_port': None,
-            'version': 3,
+            'version': 4,
             'video': {'memory': 16384, 'model': 'cirrus'}
         }, resp.get_json())
         self.assertEqual(200, resp.status_code)
