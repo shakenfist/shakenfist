@@ -45,22 +45,17 @@ def main():
     etcd_client = etcd.WrappedEtcdClient()
 
     releases = {}
-    old_style_nodes = []
 
     for data, _ in etcd_client.get_prefix('/sf/node/'):
         n = json.loads(data.decode('utf-8'))
 
         observed = etcd_client.get(
             '/sf/attribute/node/%s/observed' % n['fqdn'])
-        if observed:
-            # New style node
-            observed = json.loads(observed[0].decode('utf-8'))
-            release = observed['release']
-        else:
-            # Old style node
-            release = n.get('version', 'unknown')
-            old_style_nodes.append(n['fqdn'])
+        if not observed:
+            continue
 
+        observed = json.loads(observed[0].decode('utf-8'))
+        release = observed['release']
         releases.setdefault(release, 0)
         releases[release] += 1
 
@@ -85,6 +80,15 @@ def main():
     if major == 0:
         if minor <= 4:
             clean_events_mesh_operations(etcd_client)
+
+            # Find version 3 instances and migrate them to version 4
+            for data, metadata in etcd_client.get_prefix('/sf/instance/'):
+                i = json.loads(data.decode('utf-8'))
+                if i.get('version') == 3:
+                    i['configdrive'] = 'openstack-disk'
+                    i['version'] = 4
+                    etcd_client.put(metadata['key'],
+                                    json.dumps(i, indent=4, sort_keys=True))
 
 
 if __name__ == '__main__':

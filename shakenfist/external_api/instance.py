@@ -90,7 +90,7 @@ class InstancesEndpoint(api_base.Resource):
     @api_base.requires_namespace_exist
     def post(self, name=None, cpus=None, memory=None, network=None, disk=None,
              ssh_key=None, user_data=None, placed_on=None, namespace=None,
-             video=None, uefi=False):
+             video=None, uefi=False, configdrive=None):
         global SCHEDULER
 
         if not namespace:
@@ -115,6 +115,12 @@ class InstancesEndpoint(api_base.Resource):
                 return api_base.error(404, 'Specified node does not exist')
             if n.state.value != Node.STATE_CREATED:
                 return api_base.error(404, 'Specified node not ready')
+
+        # Make sure we've been given a valid configdrive option
+        if not configdrive:
+            configdrive = 'openstack-disk'
+        elif configdrive not in ['openstack-disk', 'none']:
+            return api_base.error(400, 'invalid config drive type: "%s"' % configdrive)
 
         # Sanity check and lookup blobs for disks where relevant
         if not disk:
@@ -247,6 +253,7 @@ class InstancesEndpoint(api_base.Resource):
             namespace=namespace,
             video=video,
             uefi=uefi,
+            configdrive=configdrive,
             requested_placement=placed_on
         )
 
