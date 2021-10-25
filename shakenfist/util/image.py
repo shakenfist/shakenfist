@@ -121,6 +121,6 @@ def snapshot(locks, source, destination):
 
     util_process.execute(
         locks,
-        ('qemu-img convert --force-share -O qcow2 %s %s'
+        ('qemu-img convert --force-share -O qcow2 -c %s %s'
          % (source, destination)),
         iopriority=util_process.PRIORITY_LOW)
