@@ -56,8 +56,8 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         snapshot_uuid = snapshots[-1]['uuid']
         snap1_info = self.test_client.get_artifact(snapshot_uuid)
         self.assertEqual(1, len(snap1_info.get('blobs', [])))
-        self.assertEqual(1, snap1_info['blobs']['1']['reference_count'])
-        self.assertEqual(None, snap1_info['blobs']['1']['depends_on'])
+        self.assertEqual(1, snap1_info['blobs'][1]['reference_count'])
+        self.assertEqual(None, snap1_info['blobs'][1]['depends_on'])
 
         # Take another snapshot, we only get the new snapshot returned
         snap2 = self.test_client.snapshot_instance(inst1['uuid'])
@@ -413,8 +413,8 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         snapshot_uuid = snapshots[-1]['uuid']
         snap1_info = self.test_client.get_artifact(snapshot_uuid)
         self.assertEqual(1, len(snap1_info.get('blobs', [])))
-        self.assertEqual(1, snap1_info['blobs']['1']['reference_count'])
-        self.assertNotEqual(None, snap1_info['blobs']['1']['depends_on'])
+        self.assertEqual(1, snap1_info['blobs'][1]['reference_count'])
+        self.assertNotEqual(None, snap1_info['blobs'][1]['depends_on'])
 
         # Refresh our view of the instance
         inst1 = self.test_client.get_instance(inst1['uuid'])
@@ -424,7 +424,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         # is a lot smaller than the base image.
         b = self.test_client.get_blob(inst1['disks'][0]['blob_uuid'])
         self.assertNotEqual(None, b['size'])
-        self.assertLess(snap1_info['blobs']['1']['size'], b['size'])
+        self.assertLess(snap1_info['blobs'][1]['size'], b['size'])
 
         # Try booting an instance with the thin snapshot
         inst2 = self.test_client.create_instance(
