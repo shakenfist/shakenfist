@@ -106,6 +106,9 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
                   % len(versions))
 
     def test_artifact_show(self):
+        # NOTE(mikal): blobs use strings as indexes in this test as the
+        # output from the command line client is JSON not a python dict.
+
         # Create an instance
         inst1 = self.test_client.create_instance(
             'test-cirros-boot-no-network', 1, 1024, None,
