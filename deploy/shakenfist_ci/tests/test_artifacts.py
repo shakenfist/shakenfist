@@ -102,9 +102,9 @@ class TestImages(base.BaseNamespacedTestCase):
 
         self.assertIn('blobs', img)
         self.assertEqual(1, len(img['blobs']))
-        self.assertIn('1', img['blobs'])
-        self.assertIn('reference_count', img['blobs']['1'])
-        self.assertEqual(1, img['blobs']['1']['reference_count'])
+        self.assertIn(1, img['blobs'])
+        self.assertIn('reference_count', img['blobs'][1])
+        self.assertEqual(1, img['blobs'][1]['reference_count'])
 
         self.assertIn('blob_uuid', img)
         blob_uuid = img['blob_uuid']
@@ -114,40 +114,40 @@ class TestImages(base.BaseNamespacedTestCase):
         lbl = self.test_client.update_label(label_name1, blob_uuid)
         self.assertIn('blobs', lbl)
         self.assertEqual(1, len(lbl['blobs']))
-        self.assertIn('1', lbl['blobs'])
-        self.assertIn('reference_count', lbl['blobs']['1'])
-        self.assertEqual(2, lbl['blobs']['1']['reference_count'])
+        self.assertIn(1, lbl['blobs'])
+        self.assertIn('reference_count', lbl['blobs'][1])
+        self.assertEqual(2, lbl['blobs'][1]['reference_count'])
 
         # Create second label also pointing at the blob
         label_name2 = 'test_label_02'
         lbl2 = self.test_client.update_label(label_name2, blob_uuid)
         self.assertIn('blobs', lbl2)
-        self.assertEqual(3, lbl2['blobs']['1']['reference_count'])
+        self.assertEqual(3, lbl2['blobs'][1]['reference_count'])
 
         # Delete the first label
         self.assertIn('uuid', lbl)
         self.test_client.delete_artifact(lbl['uuid'])
         lbl_del = self.test_client.get_artifact(img['uuid'])
-        self.assertEqual(2, lbl_del['blobs']['1']['reference_count'])
+        self.assertEqual(2, lbl_del['blobs'][1]['reference_count'])
 
         # Delete the second label
         self.assertIn('uuid', lbl2)
         self.test_client.delete_artifact(lbl2['uuid'])
         lbl_del = self.test_client.get_artifact(img['uuid'])
-        self.assertEqual(1, lbl_del['blobs']['1']['reference_count'])
+        self.assertEqual(1, lbl_del['blobs'][1]['reference_count'])
 
         # Delete image artifact
         self.test_client.delete_artifact(img['uuid'])
 
         # Check reference count is now zero
         img_del = self.test_client.get_artifact(img['uuid'])
-        self.assertEqual(0, img_del['blobs']['1']['reference_count'])
+        self.assertEqual(0, img_del['blobs'][1]['reference_count'])
         self.assertEqual('deleted', img_del['state'])
 
         # Delete image artifact again (this is idempotent)
         self.test_client.delete_artifact(img['uuid'])
         img_del = self.test_client.get_artifact(img['uuid'])
-        self.assertEqual(0, img_del['blobs']['1']['reference_count'])
+        self.assertEqual(0, img_del['blobs'][1]['reference_count'])
 
     def test_artifact_max_versions(self):
         url = ('https://sfcbr.shakenfist.com/gw-basic/gwbasic.qcow2')
@@ -171,22 +171,22 @@ class TestImages(base.BaseNamespacedTestCase):
 
         self.assertEqual(expected_versions, len(lbl.get('blobs')))
         for i in range(expected_versions):
-            self.assertIn(str(i + 1), lbl['blobs'])
+            self.assertIn(i + 1, lbl['blobs'])
 
         # Check that the blob count remains static
         lbl = self.test_client.update_label(label_name, blob_uuid)
         self.assertEqual(expected_versions, len(lbl.get('blobs')))
         for i in range(expected_versions):
-            self.assertIn(str(i + 2), lbl['blobs'])
-        self.assertNotIn('1', lbl['blobs'])
+            self.assertIn(i + 2, lbl['blobs'])
+        self.assertNotIn(1, lbl['blobs'])
 
         # Again, check that the blob count remains static
         lbl = self.test_client.update_label(label_name, blob_uuid)
         self.assertEqual(expected_versions, len(lbl.get('blobs')))
         for i in range(expected_versions):
-            self.assertIn(str(i + 3), lbl['blobs'])
-        self.assertNotIn('1', lbl['blobs'])
-        self.assertNotIn('2', lbl['blobs'])
+            self.assertIn(i + 3, lbl['blobs'])
+        self.assertNotIn(1, lbl['blobs'])
+        self.assertNotIn(2, lbl['blobs'])
 
         # Delete a version in middle of the list
         if expected_versions > 2:
@@ -198,4 +198,4 @@ class TestImages(base.BaseNamespacedTestCase):
             # Add extra version
             lbl = self.test_client.update_label(label_name, blob_uuid)
             self.assertEqual(expected_versions, len(lbl.get('blobs')))
-            self.assertIn('3', lbl['blobs'])
+            self.assertIn(3, lbl['blobs'])
