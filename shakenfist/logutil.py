@@ -1,4 +1,5 @@
 import copy
+import flask
 import logging
 from logging import handlers as logging_handlers
 import os
@@ -84,6 +85,13 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
         :type prefix: str | None
         """
         self._logger = logger
+
+        # Attempt to lookup a request id for a flask request
+        try:
+            extra['request-id'] = flask.request.environ.get('FLASK_REQUEST_ID')
+        except RuntimeError:
+            pass
+
         self._extra = self._normalize(extra)
         self._prefix = prefix
         super(SFCustomAdapter, self).__init__(

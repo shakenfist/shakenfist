@@ -1,5 +1,4 @@
 import flask
-from flask_jwt_extended import get_jwt_identity
 from flask_jwt_extended import jwt_required
 import json
 import os
@@ -119,7 +118,8 @@ class ArtifactsEndpoint(api_base.Resource):
 class ArtifactUploadEndpoint(api_base.Resource):
     @jwt_required
     def post(self, artifact_name=None, upload_uuid=None):
-        url = '%s%s/%s' % (UPLOAD_URL, get_jwt_identity(), artifact_name)
+        url = '%s%s/%s' % (UPLOAD_URL,
+                           api_base.safe_get_jwt_identity()[0], artifact_name)
         a = Artifact.from_url(Artifact.TYPE_IMAGE, url)
         u = Upload.from_db(upload_uuid)
         if not u:
@@ -130,7 +130,7 @@ class ArtifactUploadEndpoint(api_base.Resource):
                                       flask.request.environ['PATH_INFO'])
             api_token = util_general.get_api_token(
                 'http://%s:%d' % (u.node, config.API_PORT),
-                namespace=get_jwt_identity())
+                namespace=api_base.safe_get_jwt_identity()[0])
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'], url,
                 data=json.dumps(api_base.flask_get_post_body()),
