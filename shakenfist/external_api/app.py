@@ -52,6 +52,15 @@ def log_request_info():
         'API request body: %s' % flask.request.get_data())
 
 
+@app.after_request
+def log_response_info(response):
+    LOG.debug(
+        'API response headers:\n' +
+        ''.join(['    %s: %s\n' % (h, v) for h, v in response.headers]) +
+        'API response body: %s' % response.get_data())
+    return response
+
+
 class Root(api_base.Resource):
     def get(self):
         resp = flask.Response(
