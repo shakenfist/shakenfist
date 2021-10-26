@@ -1,0 +1,10 @@
+#cloud-config
+
+runcmd:
+  - |
+    while :
+    do
+      echo "" > /dev/console
+      echo "System booted ok" > /dev/console
+      sleep 5
+    done
