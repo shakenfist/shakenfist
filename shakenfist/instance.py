@@ -314,60 +314,76 @@ class Instance(dbo):
 
     # Implementation
     def _initialize_block_devices(self):
-        bus = _get_defaulted_disk_bus(self.disk_spec[0])
-        root_device = _get_disk_device(bus, 0)
-        config_device = _get_disk_device(bus, 1)
-
-        disk_type = 'qcow2'
+        disk_index = 0
+        floppy_index = 1
 
         block_devices = {
-            'devices': [
-                {
-                    'type': disk_type,
-                    'size': _safe_int_cast(self.disk_spec[0].get('size')),
-                    'device': root_device,
-                    'bus': bus,
-                    'path': os.path.join(self.instance_path, root_device),
-                    'base': self.disk_spec[0].get('base'),
-                    'blob_uuid': self.disk_spec[0].get('blob_uuid'),
-                    'present_as': _get_defaulted_disk_type(self.disk_spec[0]),
-                    'snapshot_ignores': False
-                }
-            ],
+            'devices': [],
             'extracommands': []
         }
 
-        i = 1
+        if self.disk_spec[0]:
+            present_as = _get_defaulted_disk_type(self.disk_spec[0])
+            bus = _get_defaulted_disk_bus(self.disk_spec[0])
+            if present_as == 'floppy':
+                device = 'fd%s' % LETTERS[floppy_index]
+                floppy_index += 1
+            else:
+                device = _get_disk_device(bus, disk_index)
+                disk_index += 1
+
+            block_devices['devices'].append(
+                {
+                    'type': 'qcow2',
+                    'size': _safe_int_cast(self.disk_spec[0].get('size')),
+                    'device': device,
+                    'bus': bus,
+                    'path': os.path.join(self.instance_path, device),
+                    'base': self.disk_spec[0].get('base'),
+                    'blob_uuid': self.disk_spec[0].get('blob_uuid'),
+                    'present_as': present_as,
+                    'snapshot_ignores': False
+                }
+            )
+
         if self.configdrive == 'openstack-disk':
+            # Config drives cannot be floppies as they're iso9660
+            bus = _get_defaulted_disk_bus(self.disk_spec[0])
+            device = _get_disk_device(bus, disk_index)
             block_devices['devices'].append(
                 {
                     'type': 'raw',
-                    'device': config_device,
+                    'device': device,
                     'bus': bus,
-                    'path': os.path.join(self.instance_path, config_device),
+                    'path': os.path.join(self.instance_path, device),
                     'present_as': 'disk',
                     'snapshot_ignores': True
                 }
             )
-            i += 1
+            disk_index += 1
 
         for d in self.disk_spec[1:]:
+            present_as = _get_defaulted_disk_type(d)
             bus = _get_defaulted_disk_bus(d)
-            device = _get_disk_device(bus, i)
-            disk_path = os.path.join(self.instance_path, device)
+            if present_as == 'floppy':
+                device = 'fd%s' % LETTERS[floppy_index]
+                floppy_index += 1
+            else:
+                device = _get_disk_device(bus, disk_index)
+                disk_index += 1
 
             block_devices['devices'].append({
-                'type': disk_type,
+                'type': 'qcow2',
                 'size': _safe_int_cast(d.get('size')),
                 'device': device,
                 'bus': bus,
-                'path': disk_path,
+                'path': os.path.join(self.instance_path, device),
                 'base': d.get('base'),
                 'blob_uuid': d.get('blob_uuid'),
                 'present_as': _get_defaulted_disk_type(d),
                 'snapshot_ignores': False
             })
-            i += 1
+            disk_index += 1
 
         # NVME disks require a different treatment because libvirt doesn't natively
         # support them yet.
