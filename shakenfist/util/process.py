@@ -1,4 +1,5 @@
 import multiprocessing
+import os
 from oslo_concurrency import processutils
 import psutil
 import time
@@ -47,11 +48,15 @@ def execute(locks, command, check_exit_code=[0], env_variables=None,
         p = multiprocessing.Process(
             target=_lock_refresher, args=(locks,))
         p.start()
+        LOG.debug('Started pid %d as lock refresher for pid %d' %
+                  (p.pid, os.getpid()))
 
         try:
             return processutils.execute(
                 command, check_exit_code=check_exit_code,
                 env_variables=env_variables, shell=True)
         finally:
-            p.terminate()
+            LOG.debug('Ending pid %d as lock refresher for pid %d' %
+                      (p.pid, os.getpid()))
+            p.kill()
             p.join()
