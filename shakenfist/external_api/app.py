@@ -11,6 +11,7 @@
 
 import flask
 from flask_jwt_extended import JWTManager
+from flask_request_id import RequestID
 import flask_restful
 
 from shakenfist.config import config
@@ -36,6 +37,7 @@ daemon.set_log_level(LOG, 'api')
 
 
 app = flask.Flask(__name__)
+RequestID(app)
 api = flask_restful.Api(app, catch_all_404s=False)
 app.config['JWT_SECRET_KEY'] = config.AUTH_SECRET_SEED.get_secret_value()
 jwt = JWTManager(app)
@@ -46,10 +48,23 @@ app.logger.handlers = [HANDLER]
 
 @app.before_request
 def log_request_info():
-    LOG.debug(
-        'API request headers:\n' +
-        ''.join(['    %s: %s\n' % (h, v) for h, v in flask.request.headers]) +
-        'API request body: %s' % flask.request.get_data())
+    LOG.with_fields(
+        {
+            'request-id': flask.request.environ.get('FLASK_REQUEST_ID', 'none'),
+            'headers': flask.request.headers,
+            'body': flask.request.get_data()
+        }).debug('API request received')
+
+
+@app.after_request
+def log_response_info(response):
+    LOG.with_fields(
+        {
+            'request-id': flask.request.environ.get('FLASK_REQUEST_ID', 'none'),
+            'headers': response.headers,
+            'body': response.get_data()
+        }).debug('API response sent')
+    return response
 
 
 class Root(api_base.Resource):

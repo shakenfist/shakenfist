@@ -19,16 +19,6 @@ daemon.set_log_level(LOG, 'api')
 
 
 class AuthEndpoint(api_base.Resource):
-    def _get_keys(self, namespace):
-        rec = db.get_namespace(namespace)
-        if not rec:
-            return (None, [])
-
-        keys = []
-        for key_name in rec.get('keys', {}):
-            keys.append(base64.b64decode(rec['keys'][key_name]))
-        return (rec.get('service_key'), keys)
-
     @api_base.requires_namespace_exist
     def post(self, namespace=None, key=None):
         if not namespace:
@@ -39,12 +29,21 @@ class AuthEndpoint(api_base.Resource):
             # Must be a string to encode()
             return api_base.error(400, 'key is not a string')
 
-        service_key, keys = self._get_keys(namespace)
+        ns = db.get_namespace(namespace)
+        if not ns:
+            return api_base.error(401, 'unauthorized')
+        service_key = ns.get('service_key')
         if service_key and key == service_key:
-            return {'access_token': create_access_token(identity=namespace)}
-        for possible_key in keys:
+            return {
+                'access_token': create_access_token(identity=[namespace, '_service_key'])
+            }
+
+        for key_name in ns.get('keys', {}):
+            possible_key = base64.b64decode(ns['keys'][key_name])
             if bcrypt.checkpw(key.encode('utf-8'), possible_key):
-                return {'access_token': create_access_token(identity=namespace)}
+                return {
+                    'access_token': create_access_token(identity=[namespace, key_name])
+                }
 
         return api_base.error(401, 'unauthorized')
 

@@ -1,6 +1,5 @@
 from functools import partial
 import flask
-from flask_jwt_extended import get_jwt_identity
 from flask_jwt_extended import jwt_required
 import re
 import uuid
@@ -76,7 +75,8 @@ class InstanceEndpoint(api_base.Resource):
 class InstancesEndpoint(api_base.Resource):
     @jwt_required
     def get(self, all=False):
-        filters = [partial(baseobject.namespace_filter, get_jwt_identity())]
+        filters = [partial(baseobject.namespace_filter,
+                           api_base.safe_get_jwt_identity()[0])]
         if not all:
             filters.append(instance.active_states_filter)
 
@@ -94,10 +94,10 @@ class InstancesEndpoint(api_base.Resource):
         global SCHEDULER
 
         if not namespace:
-            namespace = get_jwt_identity()
+            namespace = api_base.safe_get_jwt_identity()[0]
 
         # If accessing a foreign namespace, we need to be an admin
-        if get_jwt_identity() not in [namespace, 'system']:
+        if api_base.safe_get_jwt_identity()[0] not in [namespace, 'system']:
             return api_base.error(
                 401, 'only admins can create resources in a different namespace')
 
@@ -139,7 +139,7 @@ class InstancesEndpoint(api_base.Resource):
             if disk_base.startswith('label:'):
                 label = disk_base[len('label:'):]
                 a = Artifact.from_url(
-                    Artifact.TYPE_LABEL, '%s%s/%s' % (LABEL_URL, get_jwt_identity(), label))
+                    Artifact.TYPE_LABEL, '%s%s/%s' % (LABEL_URL, api_base.safe_get_jwt_identity()[0], label))
                 if not a:
                     return api_base.error(404, 'label %s not found' % label)
                 if a.state.value != Artifact.STATE_CREATED:
@@ -380,7 +380,7 @@ class InstancesEndpoint(api_base.Resource):
         if confirm is not True:
             return api_base.error(400, 'parameter confirm is not set true')
 
-        if get_jwt_identity() == 'system':
+        if api_base.safe_get_jwt_identity()[0] == 'system':
             if not isinstance(namespace, str):
                 # A client using a system key must specify the namespace. This
                 # ensures that deleting all instances in the cluster (by
@@ -388,9 +388,9 @@ class InstancesEndpoint(api_base.Resource):
                 return api_base.error(400, 'system user must specify parameter namespace')
 
         else:
-            if namespace and namespace != get_jwt_identity():
+            if namespace and namespace != api_base.safe_get_jwt_identity()[0]:
                 return api_base.error(401, 'you cannot delete other namespaces')
-            namespace = get_jwt_identity()
+            namespace = api_base.safe_get_jwt_identity()[0]
 
         waiting_for = []
         tasks_by_node = {}

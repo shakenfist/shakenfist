@@ -21,6 +21,7 @@ gunicorn                    # mit
 pylogrus                    # mit
 pydantic                    # mit
 python-magic                # mit
+flask-request-id-middleware # mit
 
 # Is difficult to get install working, use system packages instead. On Ubuntu
 # those are: libvirt-daemon-system libvirt-dev python3-libvirt
