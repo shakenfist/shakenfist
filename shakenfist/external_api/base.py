@@ -291,16 +291,16 @@ def generic_wrapper(func):
 
             log = LOG.with_fields({
                 'request-id': flask.request.environ.get('FLASK_REQUEST_ID', 'none'),
-                'identity': safe_get_jwt_identity()[0],
+                'identity': safe_get_jwt_identity(),
                 'method': flask.request.method,
                 'url': flask.request.url,
                 'args': args,
                 'kwargs': kwargs_log
             })
             if re.match(r'http(|s)://0.0.0.0:\d+/$', flask.request.url):
-                log.debug('API request received')
+                log.debug('API request parsed')
             else:
-                log.info('API request received')
+                log.info('API request parsed')
 
             return func(*args, **kwargs)
 
