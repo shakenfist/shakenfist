@@ -212,9 +212,12 @@ class Monitor(daemon.Daemon):
                 if age > config.NODE_CHECKIN_MAXIMUM:
                     n.state = Node.STATE_MISSING
 
-            # Find orphaned blobs
+            # Find orphaned and deleted blobs still on disk
             blob_path = os.path.join(config.STORAGE_PATH, 'blobs')
             os.makedirs(blob_path, exist_ok=True)
+            cache_path = os.path.join(config.STORAGE_PATH, 'image_cache')
+            os.makedirs(cache_path, exist_ok=True)
+
             for ent in os.listdir(blob_path):
                 entpath = os.path.join(blob_path, ent)
                 st = os.stat(entpath)
@@ -234,6 +237,51 @@ class Monitor(daemon.Daemon):
                             LOG.with_fields({
                                 'blob': ent}).warning('Deleting orphaned blob')
                             os.unlink(entpath)
+                            cached = util_general.file_permutation_exists(
+                                os.path.join(cache_path, ent),
+                                ['iso', 'qcow2'])
+                            if cached:
+                                os.unlink(cached)
+
+            # Find transcoded blobs in the image cache which are no longer in use
+            for ent in os.listdir(cache_path):
+                entpath = os.path.join(cache_path, ent)
+                st = os.stat(entpath)
+
+                # If we've had this file for more than two cleaner delays...
+                if time.time() - st.st_mtime > config.CLEANER_DELAY * 2:
+                    blob_uuid = ent.split('.')[0]
+                    b = Blob.from_db(blob_uuid)
+                    if not b:
+                        LOG.with_fields({
+                            'blob': ent}).warning('Deleting orphaned image cache entry')
+                        os.unlink(entpath)
+                        continue
+
+                    if b.ref_count == 0:
+                        LOG.with_fields({
+                            'blob': ent}).warning('Deleting unused image cache entry')
+                        os.unlink(entpath)
+                        continue
+
+                    this_node = 0
+                    for instance_uuid in b.instances:
+                        i = instance.Instance.from_db(instance_uuid)
+                        if i:
+                            if i.placement.get('node') == config.NODE_NAME:
+                                this_node += 1
+
+                    LOG.with_fields(
+                        {
+                            'blob': blob_uuid,
+                            'this_node': this_node
+                        }).info('Blob users on this node')
+                    if this_node == 0:
+                        LOG.with_fields(
+                            {
+                                'blob': blob_uuid
+                            }).warning('Deleting unused image cache entry')
+                        os.unlink(entpath)
 
             # Perform etcd maintenance, if we are an etcd master
             if config.NODE_IS_ETCD_MASTER:
