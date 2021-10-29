@@ -10,6 +10,7 @@ from shakenfist.baseobject import (
 from shakenfist import blob
 from shakenfist import etcd
 from shakenfist import exceptions
+from shakenfist import instance
 from shakenfist import logutil
 
 
@@ -143,11 +144,24 @@ class Artifact(dbo):
         # expect
         a = self.external_view_without_index()
         a.update(self.most_recent_index)
+
+        # Build list of instances for each blob
+        blob_usage = {}
+        for inst in instance.Instances([instance.healthy_states_filter]):
+            # inst.block_devices isn't populated until the instance is created,
+            # so it may not be ready yet. This means we will miss instances
+            # which have been requested but not yet started.
+            for d in inst.block_devices.get('devices', []):
+                blob_usage.setdefault(d.get('blob_uuid'), []).append(inst.uuid)
+
+        # Insert blob information
         blobs = {}
         for blob_index in self.get_all_indexes():
-            b = blob.Blob.from_db(blob_index['blob_uuid'])
+            blob_uuid = blob_index['blob_uuid']
+            b = blob.Blob.from_db(blob_uuid)
             blobs[blob_index['index']] = {
-                'instances': b.instances,
+                'uuid': blob_uuid,
+                'instances': blob_usage.get(blob_uuid, []),
                 'size': b.size,
                 'reference_count': b.ref_count,
             }
