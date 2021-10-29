@@ -85,7 +85,8 @@ class TestImages(base.BaseNamespacedTestCase):
         self.assertTrue(inst['state'] in ['creating-error', 'error'])
 
     def test_artifact_ref_count_label(self):
-        url = ('https://sfcbr.shakenfist.com/gw-basic/gwbasic.qcow2')
+        # Use a URL not used by other tests in order to control the ref count
+        url = ('https://sfcbr.shakenfist.com/gw-basic-again.qcow2')
 
         img = self.system_client.cache_artifact(url)
 
@@ -95,18 +96,9 @@ class TestImages(base.BaseNamespacedTestCase):
             image_urls.append(image['source_url'])
         self.assertIn(url, image_urls)
 
-        # And then just lookup the single artifact
-        start_time = time.time()
-        found = False
-        while time.time() - start_time < 7 * 60:
-            img = self.system_client.get_artifact(img['uuid'])
-            if img['state'] == 'created':
-                found = True
-            time.sleep(5)
-
-        if not found:
-            self.fail('Image was not downloaded after seven minutes: %s'
-                      % (img['uuid']))
+        # Ensure the artifact is ready
+        results = self._await_artifact_ready([img['uuid']])
+        img = results[0]
 
         self.assertIn('blobs', img)
         self.assertEqual(1, len(img['blobs']))
@@ -156,3 +148,54 @@ class TestImages(base.BaseNamespacedTestCase):
         self.test_client.delete_artifact(img['uuid'])
         img_del = self.test_client.get_artifact(img['uuid'])
         self.assertEqual(0, img_del['blobs']['1']['reference_count'])
+
+    def test_artifact_max_versions(self):
+        url = ('https://sfcbr.shakenfist.com/gw-basic/gwbasic.qcow2')
+
+        img = self.system_client.cache_artifact(url)
+        results = self._await_artifact_ready([img['uuid']])
+        self.assertEqual('created', results[0].get('state'))
+
+        self.assertIn('blob_uuid', results[0])
+        blob_uuid = results[0]['blob_uuid']
+
+        # Create a label artifact pointing at the blob
+        label_name = 'test_label_max_versions'
+        lbl = self.test_client.update_label(label_name, blob_uuid)
+        self.assertIsNot(0, lbl.get('max_versions'))
+
+        expected_versions = lbl.get('max_versions')
+        for i in range(expected_versions-1):
+            lbl = self.test_client.update_label(label_name, blob_uuid)
+            self.assertEqual(i + 2, len(lbl.get('blobs')))
+
+        self.assertEqual(expected_versions, len(lbl.get('blobs')))
+        for i in range(expected_versions):
+            self.assertIn(str(i + 1), lbl['blobs'])
+
+        # Check that the blob count remains static
+        lbl = self.test_client.update_label(label_name, blob_uuid)
+        self.assertEqual(expected_versions, len(lbl.get('blobs')))
+        for i in range(expected_versions):
+            self.assertIn(str(i + 2), lbl['blobs'])
+        self.assertNotIn('1', lbl['blobs'])
+
+        # Again, check that the blob count remains static
+        lbl = self.test_client.update_label(label_name, blob_uuid)
+        self.assertEqual(expected_versions, len(lbl.get('blobs')))
+        for i in range(expected_versions):
+            self.assertIn(str(i + 3), lbl['blobs'])
+        self.assertNotIn('1', lbl['blobs'])
+        self.assertNotIn('2', lbl['blobs'])
+
+        # Delete a version in middle of the list
+        if expected_versions > 2:
+            self.test_client.delete_artifact_version(lbl['uuid'], '4')
+
+            img = self.system_client.get_artifact(lbl['uuid'])
+            self.assertEqual(expected_versions-1, len(img['blobs']))
+
+            # Add extra version
+            lbl = self.test_client.update_label(label_name, blob_uuid)
+            self.assertEqual(expected_versions, len(lbl.get('blobs')))
+            self.assertIn('3', lbl['blobs'])

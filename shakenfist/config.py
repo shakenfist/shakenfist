@@ -163,6 +163,11 @@ class SFConfig(BaseSettings):
         1800, description='How long to wait for an image transfer to occur before giving up'
     )
 
+    # Artifact options
+    ARTIFACT_MAX_VERSIONS_DEFAULT: int = Field(
+        3, description='Default number of versions to keep within an artifact'
+    )
+
     # Other options
     BLOB_REPLICATION_FACTOR: int = Field(
         2, description='How many copies of each blob we like to have.'

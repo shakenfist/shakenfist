@@ -200,14 +200,16 @@ class BaseTestCase(testtools.TestCase):
             % (after, image_uuid, operation))
 
     def _await_objects_ready(self, callback, items):
-        waiting_for = copy.copy(items)
+        waiting_for = list(enumerate(items))
         start_time = time.time()
+        results = [None] * len(items)
 
         while waiting_for:
-            for item in copy.copy(waiting_for):
+            for idx, item in copy.copy(waiting_for):
                 n = callback(item)
                 if n.get('state') in ['created', 'deleted', 'error']:
-                    waiting_for.remove(item)
+                    waiting_for.remove((idx, item))
+                    results[idx] = n
 
             if waiting_for:
                 time.sleep(5)
@@ -216,16 +218,24 @@ class BaseTestCase(testtools.TestCase):
                 raise TimeoutException(
                     'Items %s never became ready (waited 5 mins)' % ', '.join(waiting_for))
 
+        return results
+
     def _await_networks_ready(self, network_uuids):
-        self._await_objects_ready(
+        return self._await_objects_ready(
             self.system_client.get_network, network_uuids)
 
     def _await_instances_ready(self, instance_uuids):
-        self._await_objects_ready(
+        res = self._await_objects_ready(
             self.system_client.get_instance, instance_uuids)
 
         for instance_uuid in instance_uuids:
             self.assertInstanceOk(instance_uuid)
+
+        return res
+
+    def _await_artifact_ready(self, img_uuids):
+        return self._await_objects_ready(
+            self.system_client.get_artifact, img_uuids)
 
     def _test_ping(self, instance_uuid, network_uuid, ip, expected, attempts=1):
         while attempts:

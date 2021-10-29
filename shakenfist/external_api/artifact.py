@@ -204,8 +204,6 @@ class ArtifactVersionEndpoint(api_base.Resource):
         for idx in indexes:
             if idx['index'] == ver_index:
                 artifact_from_db.del_index(idx['index'])
-                b = Blob.from_db(idx['blob_uuid'])
-                b.ref_count_dec()
                 if len(indexes) == 1:
                     artifact_from_db.state = Artifact.STATE_DELETED
                 return

@@ -24,7 +24,7 @@ class InstanceSnapshotEndpoint(api_base.Resource):
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
     def post(self, instance_uuid=None, instance_from_db=None, all=None,
-             device=None):
+             device=None, max_versions=0):
         disks = instance_from_db.block_devices['devices']
 
         # Filter if requested
@@ -47,7 +47,8 @@ class InstanceSnapshotEndpoint(api_base.Resource):
 
             a = Artifact.from_url(
                 Artifact.TYPE_SNAPSHOT,
-                '%s%s/%s' % (artifact.INSTANCE_URL, instance_uuid, disk['device']))
+                '%s%s/%s' % (artifact.INSTANCE_URL, instance_uuid, disk['device']),
+                max_versions)
 
             blob_uuid = str(uuid.uuid4())
             entry = a.add_index(blob_uuid)
