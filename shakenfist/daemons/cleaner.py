@@ -1,3 +1,4 @@
+import errno
 import etcd3
 import json
 import os
@@ -246,7 +247,18 @@ class Monitor(daemon.Daemon):
             # Find transcoded blobs in the image cache which are no longer in use
             for ent in os.listdir(cache_path):
                 entpath = os.path.join(cache_path, ent)
-                st = os.stat(entpath)
+
+                # Broken symlinks will report an error here that we have to catch
+                try:
+                    st = os.stat(entpath)
+                except OSError as e:
+                    if e.errno == errno.ENOENT:
+                        LOG.with_fields({
+                            'blob': ent}).warning('Deleting broken symlinked image cache entry')
+                        os.unlink(entpath)
+                        continue
+                    else:
+                        raise e
 
                 # If we've had this file for more than two cleaner delays...
                 if time.time() - st.st_mtime > config.CLEANER_DELAY * 2:
