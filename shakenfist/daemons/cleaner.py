@@ -141,7 +141,7 @@ class Monitor(daemon.Daemon):
                         inst.add_event('detected poweroff', 'complete')
 
         except libvirt.libvirtError as e:
-            LOG.error('Failed to lookup all domains: %s' % e)
+            LOG.debug('Failed to lookup all domains: %s' % e)
 
     def _compact_etcd(self):
         try:
