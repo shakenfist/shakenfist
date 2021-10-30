@@ -29,9 +29,9 @@ class TestDisks(base.BaseNamespacedTestCase):
                     'type': 'disk',
                     'bus': 'nvme'
                 }
-            ], None, None)
+            ], None, base.load_userdata('bootok'))
 
-        self._await_login_prompt(inst['uuid'])
+        self.assertInstanceConsoleAfterBoot(inst['uuid'], 'System booted ok')
 
         self.test_client.delete_instance(inst['uuid'])
         inst_uuids = []
