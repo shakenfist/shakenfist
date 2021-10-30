@@ -1,5 +1,5 @@
 import flask
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, get_jwt_identity
 import os
 import random
 import requests
@@ -40,7 +40,7 @@ class BlobEndpoint(api_base.Resource):
         def read_remote(target, blob_uuid, blob_path=None):
             api_token = util_general.get_api_token(
                 'http://%s:%d' % (target, config.API_PORT),
-                namespace=api_base.safe_get_jwt_identity()[0])
+                namespace=get_jwt_identity()[0])
             url = 'http://%s:%d/blob/%s' % (target, config.API_PORT, blob_uuid)
 
             if blob_path:

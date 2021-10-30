@@ -1,5 +1,5 @@
 import flask
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, get_jwt_identity
 import os
 import requests
 import uuid
@@ -34,7 +34,7 @@ class UploadDataEndpoint(api_base.Resource):
                                       flask.request.environ['PATH_INFO'])
             api_token = util_general.get_api_token(
                 'http://%s:%d' % (u.node, config.API_PORT),
-                namespace=api_base.safe_get_jwt_identity()[0])
+                namespace=get_jwt_identity()[0])
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'], url,
                 data=flask.request.get_data(cache=False, as_text=False,
