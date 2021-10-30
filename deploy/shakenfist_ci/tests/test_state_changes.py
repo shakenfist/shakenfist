@@ -1,5 +1,4 @@
 import logging
-import time
 
 from shakenfist_ci import base
 
@@ -22,7 +21,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
     def test_lifecycle_events(self):
         # Start our test instance
         inst = self.test_client.create_instance(
-            'cirros', 1, 1024,
+            'test-statechanges', 1, 1024,
             [
                 {
                     'network_uuid': self.net['uuid']
@@ -31,16 +30,16 @@ class TestStateChanges(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'cirros',
+                    'base': 'ubuntu:20.04',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, base.load_userdata('bootok'))
         LOG.info('Started test instance %s', inst['uuid'])
 
         # We need to start a second instance on the same node / network so that
         # the network doesn't get torn down during any of the tests.
         self.test_client.create_instance(
-            'cirros', 1, 1024,
+            'keepalive-statechanges', 1, 1024,
             [
                 {
                     'network_uuid': self.net['uuid']
@@ -57,7 +56,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
 
         # Wait for our test instance to boot
         self.assertIsNotNone(inst['uuid'])
-        self._await_login_prompt(inst['uuid'])
+        self.assertInstanceConsoleAfterBoot(inst['uuid'], 'System booted ok')
 
         # We need to refetch the instance to get a complete view of its state.
         # It is also now safe to fetch the instance IP.
@@ -74,7 +73,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         LOG.info('Instance Soft reboot')
         self.test_client.delete_console_data(inst['uuid'])
         self.test_client.reboot_instance(inst['uuid'])
-        self._await_login_prompt(inst['uuid'], after=time.time())
+        self.assertInstanceConsoleAfterBoot(inst['uuid'], 'System booted ok')
         LOG.info('  ping test...')
         self._test_ping(inst['uuid'], self.net['uuid'], ip, True, 10)
 
@@ -82,7 +81,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         LOG.info('Instance Hard reboot')
         self.test_client.delete_console_data(inst['uuid'])
         self.test_client.reboot_instance(inst['uuid'], hard=True)
-        self._await_login_prompt(inst['uuid'], after=time.time())
+        self.assertInstanceConsoleAfterBoot(inst['uuid'], 'System booted ok')
         LOG.info('  ping test...')
         self._test_ping(inst['uuid'], self.net['uuid'], ip, True, 10)
 
@@ -98,7 +97,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         LOG.info('Instance Power on')
         self.test_client.delete_console_data(inst['uuid'])
         self.test_client.power_on_instance(inst['uuid'])
-        self._await_login_prompt(inst['uuid'], after=time.time())
+        self.assertInstanceConsoleAfterBoot(inst['uuid'], 'System booted ok')
         LOG.info('  ping test...')
         self._test_ping(inst['uuid'], self.net['uuid'], ip, True, 10)
 

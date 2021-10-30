@@ -1,6 +1,7 @@
 import base64
 import copy
 import datetime
+import logging
 import os
 import random
 from socket import error as socket_error
@@ -13,6 +14,10 @@ import time
 from oslo_concurrency import processutils
 from prettytable import PrettyTable
 from shakenfist_client import apiclient
+
+
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+LOG = logging.getLogger()
 
 
 class TimeoutException(Exception):
@@ -272,18 +277,22 @@ class BaseTestCase(testtools.TestCase):
 
     def assertInstanceConsoleAfterBoot(self, instance_uuid, contains):
         self.assertIsNotNone(instance_uuid)
+        LOG.info('Waiting for %s to be ready' % instance_uuid)
         self._await_instances_ready([instance_uuid])
 
         start_time = time.time()
         while True:
-            time.sleep(30)
-            console = self.test_client.get_console_data(instance_uuid, 1000000)
+            LOG.info('Verifying console log of %s' % instance_uuid)
+            console = self.test_client.get_console_data(instance_uuid, 100000)
             if console.find(contains) != -1:
                 return
+            LOG.info('Console of %s did not match... %s'
+                     % (instance_uuid, console[-200:]))
 
             if time.time() - start_time > 300:
                 raise TimeoutException(
                     'Instance %s never became ready' % instance_uuid)
+            time.sleep(30)
 
 
 class BaseNamespacedTestCase(BaseTestCase):
