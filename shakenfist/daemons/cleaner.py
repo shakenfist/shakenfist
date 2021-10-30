@@ -2,6 +2,7 @@ import errno
 import etcd3
 import json
 import os
+import pathlib
 import random
 import time
 
@@ -260,7 +261,7 @@ class Monitor(daemon.Daemon):
                     else:
                         raise e
 
-                # If we've had this file for more than two cleaner delays...
+                # If we haven't seen this file in use for more than two cleaner delays...
                 if time.time() - st.st_mtime > config.CLEANER_DELAY * 2:
                     blob_uuid = ent.split('.')[0]
                     b = Blob.from_db(blob_uuid)
@@ -294,6 +295,10 @@ class Monitor(daemon.Daemon):
                                 'blob': blob_uuid
                             }).warning('Deleting unused image cache entry')
                         os.unlink(entpath)
+                    else:
+                        # Record that this file is in use for the benefit of
+                        # the above time check.
+                        pathlib.Path(entpath).touch(exist_ok=True)
 
             # Perform etcd maintenance, if we are an etcd master
             if config.NODE_IS_ETCD_MASTER:
