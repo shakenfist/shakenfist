@@ -8,7 +8,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist import constants
 from shakenfist import db
-from shakenfist.exceptions import BlobRefCountDecrementBelowZero, BlobDeleted
+from shakenfist.exceptions import BlobDeleted
 from shakenfist import instance
 from shakenfist import logutil
 from shakenfist.util import general as util_general
@@ -181,7 +181,8 @@ class Blob(dbo):
         with self.get_lock_attr('ref_count', 'Increase ref count'):
             new_count = self.ref_count - 1
             if new_count < 0:
-                raise BlobRefCountDecrementBelowZero
+                new_count = 0
+                self.log.warning('Reference count decremented below zero')
 
             self._db_set_attribute('ref_count', {'ref_count': new_count})
 

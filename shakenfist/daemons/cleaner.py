@@ -6,6 +6,7 @@ import pathlib
 import random
 import time
 
+from shakenfist import artifact
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
 from shakenfist.config import config
@@ -186,6 +187,10 @@ class Monitor(daemon.Daemon):
                 LOG.with_networkinterface(
                     ni).info('Hard deleting network interface')
                 ni.hard_delete()
+
+            # Prune artifacts which might have too many versions
+            for a in artifact.Artifacts([]):
+                a.delete_old_versions()
 
             for n in Nodes([node_inactive_states_filter]):
                 age = time.time() - n.last_seen
