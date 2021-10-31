@@ -96,7 +96,8 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         while time.time() - start_time < 5 * 60 * base.NETWORK_PATIENCE_FACTOR:
             versions = json.loads(self._exec_client(
                 'artifact versions %s' % artifact_uuid))
-            if len(versions) == 5:
+            # Number of versions will be limited to the max_versions setting
+            if len(versions) == 3:
                 return
             time.sleep(30)
 

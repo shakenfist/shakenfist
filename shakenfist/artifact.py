@@ -12,6 +12,7 @@ from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import logutil
+from shakenfist.config import config
 
 
 LOG, _ = logutil.setup(__name__)
@@ -45,10 +46,14 @@ class Artifact(dbo):
 
         self.__artifact_type = static_values['artifact_type']
         self.__source_url = static_values['source_url']
+        self.__max_versions = static_values.get(
+            'max_versions', config.ARTIFACT_MAX_VERSIONS_DEFAULT)
 
     @classmethod
-    def new(cls, artifact_type, source_url):
+    def new(cls, artifact_type, source_url, max_versions=0):
         artifact_uuid = str(uuid4())
+        if not max_versions:
+            max_versions = config.ARTIFACT_MAX_VERSIONS_DEFAULT
 
         Artifact._db_create(
             artifact_uuid,
@@ -69,6 +74,7 @@ class Artifact(dbo):
 
         a = Artifact.from_db(artifact_uuid)
         a.state = Artifact.STATE_INITIAL
+        a.max_versions = max_versions
 
         return a
 
@@ -84,15 +90,27 @@ class Artifact(dbo):
         return Artifact(static_values)
 
     @staticmethod
-    def from_url(artifact_type, url):
+    def from_url(artifact_type, url, max_versions=0):
         artifacts = list(Artifacts([partial(url_filter, url),
                                     partial(type_filter, artifact_type),
                                     not_dead_states_filter]))
         if len(artifacts) == 0:
-            return Artifact.new(artifact_type, url)
+            return Artifact.new(artifact_type, url, max_versions)
         if len(artifacts) == 1:
             return artifacts[0]
         raise exceptions.TooManyMatches()
+
+    @property
+    def max_versions(self):
+        db_data = self._db_get_attribute('max_versions')
+        if not db_data:
+            return config.ARTIFACT_MAX_VERSIONS_DEFAULT
+        return db_data.get('max_versions', config.ARTIFACT_MAX_VERSIONS_DEFAULT)
+
+    @max_versions.setter
+    def max_versions(self, value):
+        self._db_set_attribute('max_versions', {'max_versions': value})
+        self._delete_old_versions()
 
     @property
     def most_recent_index(self):
@@ -125,10 +143,27 @@ class Artifact(dbo):
             }
             self._db_set_attribute('index_%012d' % index, entry)
             self.log.with_fields(entry).info('Added index to artifact')
+            self._delete_old_versions()
             return entry
 
+    def _delete_old_versions(self):
+        """Count versions and if necessary remove oldest versions."""
+        indexes = [i['index'] for i in self.get_all_indexes()]
+        max = self.max_versions
+        if len(indexes) > max:
+            for i in sorted(indexes)[:-max]:
+                self.log.with_field(
+                    'index', i).info('Deleting artifact version')
+                self.del_index(i)
+
     def del_index(self, index):
+        index_data = self._db_get_attribute('index_%012d' % index)
+        if not index_data:
+            self.log.withField('index', index).warn('Cannot find index in DB')
+            return
         self._db_delete_attribute('index_%012d' % index)
+        b = blob.Blob.from_db(index_data['blob_uuid'])
+        b.ref_count_dec()
 
     def external_view_without_index(self):
         return {
@@ -136,7 +171,8 @@ class Artifact(dbo):
             'artifact_type': self.artifact_type,
             'state': self.state.value,
             'source_url': self.source_url,
-            'version': self.version
+            'version': self.version,
+            'max_versions': self.max_versions,
         }
 
     def external_view(self):
