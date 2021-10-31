@@ -228,8 +228,12 @@ class BaseTestCase(testtools.TestCase):
                 time.sleep(5)
 
             if waiting_for and time.time() - start_time > 300:
+                remaining = []
+                for _, item in waiting_for:
+                    remaining.append(item)
+
                 raise TimeoutException(
-                    'Items %s never became ready (waited 5 mins)' % ', '.join(waiting_for))
+                    'Items %s never became ready (waited 5 mins)' % ', '.join(remaining))
 
         return results
 
