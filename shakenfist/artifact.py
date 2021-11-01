@@ -195,12 +195,15 @@ class Artifact(dbo):
         for blob_index in self.get_all_indexes():
             blob_uuid = blob_index['blob_uuid']
             b = blob.Blob.from_db(blob_uuid)
-            blobs[blob_index['index']] = {
-                'uuid': blob_uuid,
-                'instances': blob_usage.get(blob_uuid, []),
-                'size': b.size,
-                'reference_count': b.ref_count,
-            }
+            if b:
+                # Blobs might have a UUID listed but not yet be instantiated.
+                # TODO(andy): Artifacts should not reference non-existent blobs
+                blobs[blob_index['index']] = {
+                    'uuid': blob_uuid,
+                    'instances': blob_usage.get(blob_uuid, []),
+                    'size': b.size,
+                    'reference_count': b.ref_count,
+                }
         a['blobs'] = blobs
         return a
 
