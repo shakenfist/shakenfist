@@ -97,7 +97,7 @@ class TestImages(base.BaseNamespacedTestCase):
         self.assertIn(url, image_urls)
 
         # Ensure the artifact is ready
-        results = self._await_artifact_ready([img['uuid']])
+        results = self._await_artifacts_ready([img['uuid']])
         img = results[0]
 
         self.assertIn('blobs', img)
@@ -153,7 +153,7 @@ class TestImages(base.BaseNamespacedTestCase):
         url = ('https://sfcbr.shakenfist.com/gw-basic/gwbasic.qcow2')
 
         img = self.system_client.cache_artifact(url)
-        results = self._await_artifact_ready([img['uuid']])
+        results = self._await_artifacts_ready([img['uuid']])
         self.assertEqual('created', results[0].get('state'))
 
         self.assertIn('blob_uuid', results[0])

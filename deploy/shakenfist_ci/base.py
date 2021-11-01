@@ -250,9 +250,9 @@ class BaseTestCase(testtools.TestCase):
 
         return res
 
-    def _await_artifact_ready(self, img_uuids):
+    def _await_artifacts_ready(self, artifact_uuids):
         return self._await_objects_ready(
-            self.system_client.get_artifact, img_uuids)
+            self.system_client.get_artifact, artifact_uuids)
 
     def _test_ping(self, instance_uuid, network_uuid, ip, expected, attempts=1):
         while attempts:
