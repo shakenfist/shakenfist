@@ -97,6 +97,10 @@ class ImagesCannotShrinkException(Exception):
     pass
 
 
+class ImageMissingFromCache(Exception):
+    pass
+
+
 # Tasks
 class TaskException(Exception):
     pass

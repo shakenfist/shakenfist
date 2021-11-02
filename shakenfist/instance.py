@@ -597,6 +597,9 @@ class Instance(dbo):
                             os.path.join(config.STORAGE_PATH,
                                          'image_cache', disk['blob_uuid']),
                             ['iso', 'qcow2'])
+                        if not cached_image_path:
+                            raise exceptions.ImageMissingFromCache(
+                                'Image %s is missing' % disk['blob_uuid'])
 
                         with util_general.RecordedOperation('detect cdrom images', self):
                             try:
