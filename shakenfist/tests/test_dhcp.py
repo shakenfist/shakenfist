@@ -180,7 +180,9 @@ class DHCPTestCase(testtools.TestCase):
     @mock.patch('os.path.exists', return_value=True)
     @mock.patch('psutil.pid_exists', return_value=True)
     @mock.patch('os.kill')
-    def test_send_signal(self, mock_kill, mock_pid_exists, mock_path_exists):
+    @mock.patch('os.waitpid')
+    def test_send_signal(self, mock_waitpid, mock_kill, mock_pid_exists,
+                         mock_path_exists):
         d = dhcp.DHCP(FakeNetwork(), 'eth0')
 
         mock_open = mock.mock_open(read_data='424242')

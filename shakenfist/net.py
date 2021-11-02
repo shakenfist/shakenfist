@@ -483,34 +483,36 @@ class Network(dbo):
                     util_process.execute(
                         None, 'ip link delete %(vx_interface)s' % subst)
 
+    # This method should only ever be called when you already know you're on
+    # the network node. Specifically it is called by a queue task that the
+    # network node listens for.
     def delete_on_network_node(self):
         with self.get_lock(op='Network delete'):
             subst = self.subst_dict()
 
-            if config.NODE_IS_NETWORK_NODE:
-                if util_network.check_for_interface(subst['vx_veth_outer']):
-                    with util_general.RecordedOperation('delete router veth', self):
-                        util_process.execute(
-                            None, 'ip link delete %(vx_veth_outer)s' % subst)
+            if util_network.check_for_interface(subst['vx_veth_outer']):
+                with util_general.RecordedOperation('delete router veth', self):
+                    util_process.execute(
+                        None, 'ip link delete %(vx_veth_outer)s' % subst)
 
-                if util_network.check_for_interface(subst['egress_veth_outer']):
-                    with util_general.RecordedOperation('delete egress veth', self):
-                        util_process.execute(
-                            None,
-                            'ip link delete %(egress_veth_outer)s' % subst)
+            if util_network.check_for_interface(subst['egress_veth_outer']):
+                with util_general.RecordedOperation('delete egress veth', self):
+                    util_process.execute(
+                        None,
+                        'ip link delete %(egress_veth_outer)s' % subst)
 
-                if os.path.exists('/var/run/netns/%s' % self.uuid):
-                    with util_general.RecordedOperation('delete netns', self):
-                        util_process.execute(
-                            None, 'ip netns del %s' % self.uuid)
+            if os.path.exists('/var/run/netns/%s' % self.uuid):
+                with util_general.RecordedOperation('delete netns', self):
+                    util_process.execute(
+                        None, 'ip netns del %s' % self.uuid)
 
-                if self.floating_gateway:
-                    with db.get_lock('ipmanager', None, 'floating', ttl=120,
-                                     op='Network delete'):
-                        ipm = IPManager.from_db('floating')
-                        ipm.release(self.floating_gateway)
-                        ipm.persist()
-                        self.update_floating_gateway(None)
+            if self.floating_gateway:
+                with db.get_lock('ipmanager', None, 'floating', ttl=120,
+                                 op='Network delete'):
+                    ipm = IPManager.from_db('floating')
+                    ipm.release(self.floating_gateway)
+                    ipm.persist()
+                    self.update_floating_gateway(None)
 
             self.state = self.STATE_DELETED
 
