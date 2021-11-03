@@ -181,9 +181,5 @@ class BlobMissing(ArtifactException):
     pass
 
 
-class BlobRefCountDecrementBelowZero(ArtifactException):
-    pass
-
-
 class BlobDeleted(ArtifactException):
     pass
