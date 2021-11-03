@@ -1,5 +1,6 @@
 import hashlib
 import os
+import pathlib
 import random
 import requests
 import shutil
@@ -109,7 +110,11 @@ class ImageFetchHelper(object):
         cached = util_general.file_permutation_exists(
             os.path.join(config.STORAGE_PATH, 'image_cache', b.uuid),
             ['iso', 'qcow2'])
-        if not cached:
+        if cached:
+            # We touch the file here, because we want to know when it was last used.
+            pathlib.Path(cached).touch(exist_ok=True)
+
+        else:
             blob_path = os.path.join(config.STORAGE_PATH, 'blobs', b.uuid)
             mimetype = b.info.get('mime-type', '')
 
