@@ -5,10 +5,9 @@ from flask_jwt_extended.exceptions import (
     JWTDecodeError, NoAuthorizationError, InvalidHeaderError, WrongTokenError,
     RevokedTokenError, FreshTokenRequired, CSRFError
 )
-from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import decode_token, get_jwt_identity
 import json
 from jwt.exceptions import DecodeError, PyJWTError
-import re
 import requests
 import sys
 import traceback
@@ -59,17 +58,10 @@ def error(status_code, message, suppress_traceback=False):
     return resp
 
 
-def safe_get_jwt_identity():
-    ident = get_jwt_identity()
-    if not ident:
-        return None, None
-    return ident
-
-
 def caller_is_admin(func):
     # Ensure only users in the 'system' namespace can call this method
     def wrapper(*args, **kwargs):
-        if safe_get_jwt_identity()[0] != 'system':
+        if get_jwt_identity()[0] != 'system':
             return error(401, 'unauthorized')
 
         return func(*args, **kwargs)
@@ -109,7 +101,7 @@ def redirect_instance_request(func):
                                       flask.request.environ['PATH_INFO'])
             api_token = util_general.get_api_token(
                 'http://%s:%d' % (placement['node'], config.API_PORT),
-                namespace=safe_get_jwt_identity()[0])
+                namespace=get_jwt_identity()[0])
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'], url,
                 data=json.dumps(flask_get_post_body()),
@@ -137,7 +129,7 @@ def requires_instance_ownership(func):
             return error(404, 'instance not found')
 
         i = kwargs['instance_from_db']
-        if safe_get_jwt_identity()[0] not in [i.namespace, 'system']:
+        if get_jwt_identity()[0] not in [i.namespace, 'system']:
             LOG.with_instance(i).info(
                 'Instance not found, ownership test in decorator')
             return error(404, 'instance not found')
@@ -214,7 +206,7 @@ def requires_network_ownership(func):
             log.info('Network not found, kwarg missing')
             return error(404, 'network not found')
 
-        if safe_get_jwt_identity()[0] not in [kwargs['network_from_db'].namespace, 'system']:
+        if get_jwt_identity()[0] not in [kwargs['network_from_db'].namespace, 'system']:
             log.info('Network not found, ownership test in decorator')
             return error(404, 'network not found')
 
@@ -289,15 +281,38 @@ def generic_wrapper(func):
             if 'key' in kwargs_log:
                 kwargs_log['key'] = '*****'
 
+            # Redact the JWT auth token in headers as well
+            headers_log = dict(flask.request.headers)
+            if 'Authorization' in headers_log:
+                headers_log = 'Bearer *****'
+
+            # Attempt to lookup the identity from JWT token. This doesn't use
+            # the ususal get_jwt_identity() because that requires that the
+            # require_jwt() decorator has been run, and that is not the case
+            # for all paths this wrapper covers. Its ok for there to be no
+            # identity here, for example unprotected paths.
+            identity = None
+            try:
+                auth = flask.request.headers.get('Authorization')
+                if auth:
+                    token = auth.split(' ')[1]
+                    dt = decode_token(token)
+                    identity = dt.get('identity')
+            except Exception as e:
+                print(e)
+
             log = LOG.with_fields({
                 'request-id': flask.request.environ.get('FLASK_REQUEST_ID', 'none'),
-                'identity': safe_get_jwt_identity(),
+                'identity': identity,
                 'method': flask.request.method,
                 'url': flask.request.url,
+                'path': flask.request.path,
                 'args': args,
-                'kwargs': kwargs_log
+                'kwargs': kwargs_log,
+                'headers': headers_log
             })
-            if re.match(r'http(|s)://0.0.0.0:\d+/$', flask.request.url):
+            if flask.request.path == '/':
+                # This is likely a load balancer health check
                 log.debug('API request parsed')
             else:
                 log.info('API request parsed')

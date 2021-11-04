@@ -110,7 +110,7 @@ class Artifact(dbo):
     @max_versions.setter
     def max_versions(self, value):
         self._db_set_attribute('max_versions', {'max_versions': value})
-        self._delete_old_versions()
+        self.delete_old_versions()
 
     @property
     def most_recent_index(self):
@@ -128,7 +128,6 @@ class Artifact(dbo):
             indices[key] = data
 
         for key in sorted(indices):
-            self.log.info('Yielding index %s' % indices[key])
             yield indices[key]
 
     def add_index(self, blob_uuid):
@@ -143,10 +142,10 @@ class Artifact(dbo):
             }
             self._db_set_attribute('index_%012d' % index, entry)
             self.log.with_fields(entry).info('Added index to artifact')
-            self._delete_old_versions()
+            self.delete_old_versions()
             return entry
 
-    def _delete_old_versions(self):
+    def delete_old_versions(self):
         """Count versions and if necessary remove oldest versions."""
         indexes = [i['index'] for i in self.get_all_indexes()]
         max = self.max_versions
@@ -248,4 +247,4 @@ not_dead_states_filter = partial(
         Artifact.STATE_INITIAL,
         Artifact.STATE_CREATING,
         Artifact.STATE_CREATED,
-        ])
+    ])

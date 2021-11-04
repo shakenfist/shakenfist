@@ -2,9 +2,11 @@ import errno
 import etcd3
 import json
 import os
+import pathlib
 import random
 import time
 
+from shakenfist import artifact
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
 from shakenfist.config import config
@@ -140,7 +142,7 @@ class Monitor(daemon.Daemon):
                         inst.add_event('detected poweroff', 'complete')
 
         except libvirt.libvirtError as e:
-            LOG.error('Failed to lookup all domains: %s' % e)
+            LOG.debug('Failed to lookup all domains: %s' % e)
 
     def _compact_etcd(self):
         try:
@@ -185,6 +187,10 @@ class Monitor(daemon.Daemon):
                 LOG.with_networkinterface(
                     ni).info('Hard deleting network interface')
                 ni.hard_delete()
+
+            # Prune artifacts which might have too many versions
+            for a in artifact.Artifacts([]):
+                a.delete_old_versions()
 
             for n in Nodes([node_inactive_states_filter]):
                 age = time.time() - n.last_seen
@@ -260,7 +266,7 @@ class Monitor(daemon.Daemon):
                     else:
                         raise e
 
-                # If we've had this file for more than two cleaner delays...
+                # If we haven't seen this file in use for more than two cleaner delays...
                 if time.time() - st.st_mtime > config.CLEANER_DELAY * 2:
                     blob_uuid = ent.split('.')[0]
                     b = Blob.from_db(blob_uuid)
@@ -294,6 +300,10 @@ class Monitor(daemon.Daemon):
                                 'blob': blob_uuid
                             }).warning('Deleting unused image cache entry')
                         os.unlink(entpath)
+                    else:
+                        # Record that this file is in use for the benefit of
+                        # the above time check.
+                        pathlib.Path(entpath).touch(exist_ok=True)
 
             # Perform etcd maintenance, if we are an etcd master
             if config.NODE_IS_ETCD_MASTER:

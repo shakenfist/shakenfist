@@ -97,6 +97,10 @@ class ImagesCannotShrinkException(Exception):
     pass
 
 
+class ImageMissingFromCache(Exception):
+    pass
+
+
 # Tasks
 class TaskException(Exception):
     pass
@@ -174,10 +178,6 @@ class ArtifactHasNoBlobs(ArtifactException):
 
 
 class BlobMissing(ArtifactException):
-    pass
-
-
-class BlobRefCountDecrementBelowZero(ArtifactException):
     pass
 
 

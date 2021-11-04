@@ -13,7 +13,7 @@ import socket
 import time
 from uuid import uuid4
 
-from shakenfist.artifact import Artifact, BLOB_URL
+from shakenfist import artifact
 from shakenfist import baseobject
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
@@ -576,10 +576,11 @@ class Instance(dbo):
                     # if an image had to be fetched from outside the cluster.
                     disk_base = None
                     if disk.get('blob_uuid'):
-                        disk_base = '%s%s' % (BLOB_URL, disk['blob_uuid'])
+                        disk_base = '%s%s' % (
+                            artifact.BLOB_URL, disk['blob_uuid'])
                     elif disk.get('base'):
-                        a = Artifact.from_url(
-                            Artifact.TYPE_IMAGE, disk['base'])
+                        a = artifact.Artifact.from_url(
+                            artifact.Artifact.TYPE_IMAGE, disk['base'])
                         mri = a.most_recent_index
 
                         if 'blob_uuid' not in mri:
@@ -588,13 +589,17 @@ class Instance(dbo):
                                 % (a.uuid, a.artifact_type))
 
                         disk['blob_uuid'] = mri['blob_uuid']
-                        disk_base = '%s%s' % (BLOB_URL, disk['blob_uuid'])
+                        disk_base = '%s%s' % (
+                            artifact.BLOB_URL, disk['blob_uuid'])
 
                     if disk_base:
                         cached_image_path = util_general.file_permutation_exists(
                             os.path.join(config.STORAGE_PATH,
                                          'image_cache', disk['blob_uuid']),
                             ['iso', 'qcow2'])
+                        if not cached_image_path:
+                            raise exceptions.ImageMissingFromCache(
+                                'Image %s is missing' % disk['blob_uuid'])
 
                         with util_general.RecordedOperation('detect cdrom images', self):
                             try:
