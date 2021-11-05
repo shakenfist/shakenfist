@@ -1,6 +1,7 @@
 import base64
 import copy
 import datetime
+import json
 import logging
 import os
 import random
@@ -290,12 +291,19 @@ class BaseTestCase(testtools.TestCase):
             console = self.test_client.get_console_data(instance_uuid, 100000)
             if console.find(contains) != -1:
                 return
-            LOG.info('Console of %s did not match... %s'
-                     % (instance_uuid, console[-200:]))
+            LOG.info('Console of %s did not match. We searched for %s in:'
+                     '\n\n-----\n%s\n-----\n'
+                     % (instance_uuid, contains, console))
 
             if time.time() - start_time > 300:
+                LOG.info('Instance %s: \n%s'
+                         % (instance_uuid,
+                            json.dumps(self.test_client.get_instance(instance_uuid),
+                                       indent=4, sort_keys=True)))
                 raise TimeoutException(
-                    'Instance %s never became ready' % instance_uuid)
+                    'Instance %s never became ready. We searched for %s in:'
+                    '\n\n-----\n%s\n-----\n'
+                    % (instance_uuid, contains, console))
             time.sleep(30)
 
 
