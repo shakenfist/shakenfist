@@ -17,6 +17,7 @@ from shakenfist.config import config
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist import images
+from shakenfist import instance
 from shakenfist import logutil
 from shakenfist.tasks import FetchImageTask
 from shakenfist.upload import Upload
@@ -89,15 +90,20 @@ class ArtifactsEndpoint(api_base.Resource):
     @jwt_required
     def get(self, node=None):
         retval = []
+        cached_instances = list(instance.Instances(
+            [instance.healthy_states_filter]))
+
         for a in Artifacts(filters=[baseobject.active_states_filter]):
             if node:
                 idx = a.most_recent_index
                 if 'blob_uuid' in idx:
                     b = Blob.from_db(idx['blob_uuid'])
                     if b and node in b.locations:
-                        retval.append(a.external_view())
+                        retval.append(a.external_view(
+                            cached_instances=cached_instances))
             else:
-                retval.append(a.external_view())
+                retval.append(a.external_view(
+                    cached_instances=cached_instances))
 
         return retval
 

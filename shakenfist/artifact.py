@@ -174,15 +174,19 @@ class Artifact(dbo):
             'max_versions': self.max_versions,
         }
 
-    def external_view(self):
+    def external_view(self, cached_instances=None):
         # If this is an external view, then mix back in attributes that users
         # expect
         a = self.external_view_without_index()
         a.update(self.most_recent_index)
 
         # Build list of instances for each blob
+        if not cached_instances:
+            cached_instances = list(instance.Instances(
+                [instance.healthy_states_filter]))
+
         blob_usage = {}
-        for inst in instance.Instances([instance.healthy_states_filter]):
+        for inst in cached_instances:
             # inst.block_devices isn't populated until the instance is created,
             # so it may not be ready yet. This means we will miss instances
             # which have been requested but not yet started.
