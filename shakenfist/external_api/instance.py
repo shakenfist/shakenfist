@@ -133,7 +133,7 @@ class InstancesEndpoint(api_base.Resource):
 
             # Convert internal shorthand forms into specific blobs
             disk_base = d.get('base')
-            if not disk_base:
+            if util_general.noneish(disk_base):
                 disk_base = ''
 
             if disk_base.startswith('label:'):
