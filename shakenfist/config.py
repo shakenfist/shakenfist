@@ -223,6 +223,11 @@ class SFConfig(BaseSettings):
         'libvirt-qemu', description='Name of the libvirt group'
     )
 
+    ENABLE_EVENTS: bool = Field(
+        True, description='Record events about objects in the database. '
+                          'Consider disabling if you have etcd performance issues.'
+    )
+
     # Logging
     SLOW_LOCK_THRESHOLD: float = 5.0
     LOGLEVEL_API: str = 'info'
