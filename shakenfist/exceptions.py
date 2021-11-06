@@ -25,8 +25,6 @@ class NoStateTransitionsDefined(ObjectException):
 
 
 # Instance
-
-
 class InstanceException(Exception):
     pass
 
@@ -76,6 +74,19 @@ class BadObjectVersion(DatabaseException):
     pass
 
 
+class PreExistingReadOnlyCache(DatabaseException):
+    pass
+
+
+class ForbiddenWhileUsingReadOnlyCache(DatabaseException):
+    pass
+
+
+class PrefixNotInCache(DatabaseException):
+    pass
+
+
+# Virt
 class VirtException(Exception):
     pass
 
@@ -84,6 +95,7 @@ class NoDomainException(VirtException):
     pass
 
 
+# Config
 class FlagException(Exception):
     pass
 
