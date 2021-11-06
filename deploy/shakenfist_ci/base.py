@@ -285,6 +285,20 @@ class BaseTestCase(testtools.TestCase):
         LOG.info('Waiting for %s to be ready' % instance_uuid)
         self._await_instances_ready([instance_uuid])
 
+        # Wait for the console log to have any data (i.e. boot commenced)
+        start_time = time.time()
+        while True:
+            LOG.info('Waiting for console of %s' % instance_uuid)
+            console = self.test_client.get_console_data(instance_uuid, 100)
+            if len(console) > 0:
+                break
+
+            if time.time() - start_time > 300:
+                raise TimeoutException(
+                    'Instance %s console never became ready' % instance_uuid)
+            time.sleep(30)
+
+        # And then ensure that what we're expecting is in the console log
         start_time = time.time()
         while True:
             LOG.info('Verifying console log of %s' % instance_uuid)
