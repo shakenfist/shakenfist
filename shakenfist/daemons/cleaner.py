@@ -278,7 +278,7 @@ class Monitor(daemon.Daemon):
 
                     if b.ref_count == 0:
                         LOG.with_fields({
-                            'blob': ent}).warning('Deleting unused image cache entry')
+                            'blob': ent}).warning('Deleting globally unused image cache entry')
                         os.unlink(entpath)
                         continue
 
