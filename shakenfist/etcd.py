@@ -328,7 +328,7 @@ def _construct_key(objecttype, subtype, name):
     return '/sf/%s/' % objecttype
 
 
-class JSONEncoderTasks(json.JSONEncoder):
+class JSONEncoderCustomTypes(json.JSONEncoder):
     def default(self, obj):
         if QueueTask.__subclasscheck__(type(obj)):
             return obj.obj_dict()
@@ -345,7 +345,7 @@ def put(objecttype, subtype, name, data, ttl=None):
 
     path = _construct_key(objecttype, subtype, name)
     encoded = json.dumps(data, indent=4, sort_keys=True,
-                         cls=JSONEncoderTasks)
+                         cls=JSONEncoderCustomTypes)
     WrappedEtcdClient().put(path, encoded, lease=None)
 
 
@@ -357,7 +357,7 @@ def create(objecttype, subtype, name, data, ttle=None):
 
     path = _construct_key(objecttype, subtype, name)
     encoded = json.dumps(data, indent=4, sort_keys=True,
-                         cls=JSONEncoderTasks)
+                         cls=JSONEncoderCustomTypes)
     return WrappedEtcdClient().create(path, encoded, lease=None)
 
 
