@@ -1,3 +1,4 @@
+from functools import partial
 import multiprocessing
 import os
 import re
@@ -5,9 +6,11 @@ import setproctitle
 import signal
 import time
 
+from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
+from shakenfist import etcd
 from shakenfist import logutil
 from shakenfist import instance
 
@@ -93,27 +96,36 @@ class Monitor(daemon.Daemon):
                         'instance', instance_uuid, 'trigger monitor', 'crashed', None, None)
                     del observers[instance_uuid]
 
-            # Start missing observers
+            # Audit desired observers
             extra_instances = list(observers.keys())
+            missing_instances = []
 
-            for inst in instance.created_instances_on_node():
-                if inst.uuid in extra_instances:
-                    extra_instances.remove(inst.uuid)
+            with etcd.ThreadLocalReadOnlyCache(
+                    ['/sf/instance', '/sf/attribute/instance']):
+                for inst in instance.Instances([
+                        instance.this_node_filter,
+                        partial(baseobject.state_filter, [instance.Instance.STATE_CREATED])]):
+                    if inst.uuid in extra_instances:
+                        extra_instances.remove(inst.uuid)
 
-                if inst.uuid not in observers:
-                    console_path = os.path.join(
-                        config.STORAGE_PATH, 'instances', inst.uuid, 'console.log')
-                    p = multiprocessing.Process(
-                        target=observe, args=(console_path, inst.uuid),
-                        name='%s-%s' % (daemon.process_name('triggers'),
-                                        inst.uuid))
-                    p.start()
+                    if inst.uuid not in observers:
+                        missing_instances.append(inst.uuid)
 
-                    observers[inst.uuid] = p
-                    LOG.with_instance(inst.uuid).info(
-                        'Started trigger observer')
-                    db.add_event(
-                        'instance', inst.uuid, 'trigger monitor', 'started', None, None)
+            # Start missing observers
+            for instance_uuid in missing_instances:
+                console_path = os.path.join(
+                    config.STORAGE_PATH, 'instances', instance_uuid, 'console.log')
+                p = multiprocessing.Process(
+                    target=observe, args=(console_path, instance_uuid),
+                    name='%s-%s' % (daemon.process_name('triggers'),
+                                    instance_uuid))
+                p.start()
+
+                observers[instance_uuid] = p
+                LOG.with_instance(instance_uuid).info(
+                    'Started trigger observer')
+                db.add_event(
+                    'instance', instance_uuid, 'trigger monitor', 'started', None, None)
 
             # Cleanup extra observers
             for instance_uuid in extra_instances:

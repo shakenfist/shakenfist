@@ -1050,9 +1050,5 @@ def healthy_instances_on_node(n):
     return Instances([healthy_states_filter, partial(placement_filter, n.uuid)])
 
 
-def created_instances_on_node():
-    return Instances([this_node_filter, partial(baseobject.state_filter, [dbo.STATE_CREATED])])
-
-
 def instances_in_namespace(namespace):
     return Instances([partial(baseobject.namespace_filter, namespace)])
