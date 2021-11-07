@@ -5,6 +5,7 @@ import re
 # To avoid circular imports, util modules should only import a limited
 # set of shakenfist modules, mainly exceptions, logutils, and specific
 # other util modules.
+from shakenfist import constants
 from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist.util import process as util_process
@@ -79,13 +80,15 @@ def create_cow(locks, cache_file, disk_file, disk_size):
     if disk_size:
         util_process.execute(
             locks,
-            ('qemu-img create -b %s -f qcow2 %s %dG'
-             % (cache_file, disk_file, int(disk_size))),
+            ('qemu-img create -b %s -o cluster_size=%s -f qcow2 %s %dG'
+             % (cache_file, constants.qcow2_cluster_size, disk_file,
+                int(disk_size))),
             iopriority=util_process.PRIORITY_LOW)
     else:
         util_process.execute(
             locks,
-            'qemu-img create -b %s -f qcow2 %s' % (cache_file, disk_file),
+            'qemu-img create -b %s -o cluster_size=%s -f qcow2 %s'
+            % (cache_file, constants.qcow2_cluster_size, disk_file),
             iopriority=util_process.PRIORITY_LOW)
 
 
@@ -97,7 +100,8 @@ def create_qcow2(locks, cache_file, disk_file, disk_size=None):
 
     util_process.execute(
         locks,
-        'qemu-img convert -t none -O qcow2 %s %s' % (cache_file, disk_file),
+        'qemu-img convert -t none -o cluster_size=%s -O qcow2 %s %s'
+        % (constants.qcow2_cluster_size, cache_file, disk_file),
         iopriority=util_process.PRIORITY_LOW)
     if disk_size:
         util_process.execute(
@@ -112,7 +116,8 @@ def create_blank(locks, disk_file, disk_size):
         return
 
     util_process.execute(
-        locks, 'qemu-img create -f qcow2 %s %sG' % (disk_file, disk_size),
+        locks, 'qemu-img create -o cluster_size=%s -f qcow2 %s %sG'
+        % (constants.qcow2_cluster_size, disk_file, disk_size),
         iopriority=util_process.PRIORITY_LOW)
 
 
@@ -121,6 +126,6 @@ def snapshot(locks, source, destination):
 
     util_process.execute(
         locks,
-        ('qemu-img convert --force-share -O qcow2 -c %s %s'
-         % (source, destination)),
+        ('qemu-img convert --force-share -o cluster_size=%s -O qcow2 -c %s %s'
+         % (constants.qcow2_cluster_size, source, destination)),
         iopriority=util_process.PRIORITY_LOW)

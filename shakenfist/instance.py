@@ -19,6 +19,7 @@ from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist.config import config
+from shakenfist import constants
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
@@ -331,7 +332,8 @@ class Instance(dbo):
                     'base': self.disk_spec[0].get('base'),
                     'blob_uuid': self.disk_spec[0].get('blob_uuid'),
                     'present_as': _get_defaulted_disk_type(self.disk_spec[0]),
-                    'snapshot_ignores': False
+                    'snapshot_ignores': False,
+                    'cache_mode': constants.disk_cache_mode
                 }
             ],
             'extracommands': []
@@ -346,7 +348,8 @@ class Instance(dbo):
                     'bus': bus,
                     'path': os.path.join(self.instance_path, config_device),
                     'present_as': 'disk',
-                    'snapshot_ignores': True
+                    'snapshot_ignores': True,
+                    'cache_mode': constants.disk_cache_mode
                 }
             )
             i += 1
@@ -365,7 +368,8 @@ class Instance(dbo):
                 'base': d.get('base'),
                 'blob_uuid': d.get('blob_uuid'),
                 'present_as': _get_defaulted_disk_type(d),
-                'snapshot_ignores': False
+                'snapshot_ignores': False,
+                'cache_mode': constants.disk_cache_mode
             })
             i += 1
 
