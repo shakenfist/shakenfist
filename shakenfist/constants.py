@@ -5,3 +5,25 @@ LOCK_REFRESH_SECONDS = 5
 
 # How long we wait to acquire an etcd lock by default.
 ETCD_ATTEMPT_TIMEOUT = 60
+
+
+# Disk caching mode. Refer to docs/development/io_performance_tuning.md for
+# more details than you really want.
+#
+# Options are:
+#  - "default", which is the libvirt default of writeback
+#  - "none", which is our recommendation
+#  - "writethrough"
+#  - "writeback"
+#  - "directsync"
+#  - "unsafe"
+disk_cache_mode = 'none'
+
+
+# qcow2 cluster size. Refer to docs/development/io_performance_tuning.md for
+# more details than you really want. The value must be a power of 2 and less
+# than 2MB. qemu defaults to 64K and we recommend 2048K to improve IO performance
+# on larger disks. Note for a change in this setting to fully take effect you
+# need to re-transcode the images into the image cache. There is no automation
+# to support doing at at this time.
+qcow2_cluster_size = '2048K'

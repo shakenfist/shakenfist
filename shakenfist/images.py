@@ -134,7 +134,20 @@ class ImageFetchHelper(object):
 
                 cache_path = os.path.join(
                     config.STORAGE_PATH, 'image_cache', b.uuid + '.qcow2')
-                if util_image.identify(blob_path).get('file format', '') == 'qcow2':
+                cache_info = util_image.identify(blob_path)
+
+                # Convert the cluster size from qemu format to an int
+                cluster_size_as_int = constants.qcow2_cluster_size
+                if cluster_size_as_int.endswith('M'):
+                    cluster_size_as_int = int(
+                        cluster_size_as_int[:-1]) * 1024 * 1024
+                elif cluster_size_as_int.endswith('K'):
+                    cluster_size_as_int = int(cluster_size_as_int[:-1]) * 1024
+                else:
+                    cluster_size_as_int = int(cluster_size_as_int)
+
+                if (cache_info.get('file format', '') == 'qcow2' and
+                        cache_info.get('cluster_size', 0) == cluster_size_as_int):
                     util_general.link(blob_path, cache_path)
                 else:
                     with util_general.RecordedOperation('transcode image', self.instance):
