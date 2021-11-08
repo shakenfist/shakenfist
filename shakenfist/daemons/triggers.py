@@ -100,8 +100,7 @@ class Monitor(daemon.Daemon):
             extra_instances = list(observers.keys())
             missing_instances = []
 
-            with etcd.ThreadLocalReadOnlyCache(
-                    ['/sf/instance', '/sf/attribute/instance']):
+            with etcd.ThreadLocalReadOnlyCache():
                 for inst in instance.Instances([
                         instance.this_node_filter,
                         partial(baseobject.state_filter, [instance.Instance.STATE_CREATED])]):

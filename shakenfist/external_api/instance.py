@@ -75,16 +75,17 @@ class InstanceEndpoint(api_base.Resource):
 class InstancesEndpoint(api_base.Resource):
     @jwt_required
     def get(self, all=False):
-        filters = [partial(baseobject.namespace_filter,
-                           get_jwt_identity()[0])]
-        if not all:
-            filters.append(instance.active_states_filter)
+        with etcd.ThreadLocalReadOnlyCache():
+            filters = [partial(baseobject.namespace_filter,
+                               get_jwt_identity()[0])]
+            if not all:
+                filters.append(instance.active_states_filter)
 
-        retval = []
-        for i in instance.Instances(filters):
-            # This forces the instance through the external view rehydration
-            retval.append(i.external_view())
-        return retval
+            retval = []
+            for i in instance.Instances(filters):
+                # This forces the instance through the external view rehydration
+                retval.append(i.external_view())
+            return retval
 
     @jwt_required
     @api_base.requires_namespace_exist

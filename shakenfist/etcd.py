@@ -1,6 +1,7 @@
 import json
 import os
 import psutil
+import re
 import threading
 import time
 
@@ -64,54 +65,53 @@ def read_only_cache():
 
 
 class ThreadLocalReadOnlyCache():
-    def __init__(self, prefixes):
-        self.prefixes = prefixes
-
+    def __init__(self):
         if read_only_cache():
             raise exceptions.PreExistingReadOnlyCache('Cache already setup')
+        self.prefixes = []
 
     def __enter__(self):
         self.cache = {}
-
-        client = WrappedEtcdClient()
-        start_time = time.time()
-        for prefix in self.prefixes:
-            for data, metadata in client.get_prefix(prefix):
-                self.cache[metadata['key'].decode('utf-8')] = json.loads(data)
-        LOG.info('Populating thread local etcd cache took %.02f seconds '
-                 'and cached %d keys' % (time.time() - start_time, len(self.cache)))
-
         local.read_only_etcd_cache = self
         return self
 
     def __exit__(self, *args):
         local.read_only_etcd_cache = None
 
-    def get(self, key):
-        whitelisted = False
+    def _cached(self, key):
         for p in self.prefixes:
             if key.startswith(p):
-                whitelisted = True
-                break
+                return True
+        return False
 
-        if not whitelisted:
-            raise exceptions.PrefixNotInCache(
-                'The prefix %s is not in the cache' % key)
+    def _find_prefix(self, key):
+        uuid_regex = re.compile('.{8}-.{4}-.{4}-.{4}-.{12}')
 
+        keys = key.split('/')
+        while keys:
+            if uuid_regex.match(keys.pop()):
+                return '/'.join(keys)
+        raise ValueError('Attempt to cache etcd key without a UUID: %s' % key)
+
+    def _cache_prefix(self, prefix):
+        client = WrappedEtcdClient()
+        start_time = time.time()
+        for data, metadata in client.get_prefix(prefix):
+            self.cache[metadata['key'].decode('utf-8')] = json.loads(data)
+        LOG.info('Populating thread local etcd cache took %.02f seconds '
+                 'and cached %d keys from %s' % (
+                     time.time() - start_time, len(self.cache), prefix))
+        self.prefixes.append(prefix)
+
+    def get(self, key):
+        if not self._cached(key):
+            self._cache_prefix(self._find_prefix(key))
         return self.cache.get(key)
 
     def get_prefix(self, prefix):
-        whitelisted = False
-        for p in self.prefixes:
-            if prefix.startswith(p):
-                whitelisted = True
-                break
-
-        if not whitelisted:
-            raise exceptions.PrefixNotInCache(
-                'The prefix %s is not in the cache' % prefix)
-
-        for key in self.cache.keys():
+        if not self._cached(prefix):
+            self._cache_prefix(prefix)
+        for key in self.cache.copy().keys():
             if key.startswith(prefix):
                 yield(key, self.cache[key])
 
