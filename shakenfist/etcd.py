@@ -1,6 +1,7 @@
 import json
 import os
 import psutil
+import threading
 import time
 
 from etcd3gw.client import Etcd3Client
@@ -42,6 +43,79 @@ class WrappedEtcdClient(Etcd3Client):
             api_path=api_path)
 
 
+# This read only cache is thread local, a bit like Flask's request object.
+# The basic idea is that you can use this cache a bit like playing billiards --
+# you declare what data you need, it gets cached, and then you can refer to it
+# as much as you like. If you request data that is not in the cache then that's
+# a foul and an exception is raised. Given this is a read only cache, once
+# you have set one of these up any attempt to change or lock data will also
+# result in an exception being raised. This is solely about reducing the load
+# on etcd for read only operations.
+#
+# There is one exception here. I think it is safe to enqueue work items while
+# using one of these caches, so it is possible to write a loop which does the
+# expensive analysis of state while using one of these caches, and then
+# enqueues work to change the database while a cache is not being used.
+local = threading.local()
+
+
+def read_only_cache():
+    return getattr(local, 'read_only_etcd_cache', None)
+
+
+class ThreadLocalReadOnlyCache():
+    def __init__(self, prefixes):
+        self.prefixes = prefixes
+
+        if read_only_cache():
+            raise exceptions.PreExistingReadOnlyCache('Cache already setup')
+
+    def __enter__(self):
+        self.cache = {}
+
+        client = WrappedEtcdClient()
+        start_time = time.time()
+        for prefix in self.prefixes:
+            for data, metadata in client.get_prefix(prefix):
+                self.cache[metadata['key'].decode('utf-8')] = json.loads(data)
+        LOG.info('Populating thread local etcd cache took %.02f seconds '
+                 'and cached %d keys' % (time.time() - start_time, len(self.cache)))
+
+        local.read_only_etcd_cache = self
+        return self
+
+    def __exit__(self, *args):
+        local.read_only_etcd_cache = None
+
+    def get(self, key):
+        whitelisted = False
+        for p in self.prefixes:
+            if key.startswith(p):
+                whitelisted = True
+                break
+
+        if not whitelisted:
+            raise exceptions.PrefixNotInCache(
+                'The prefix %s is not in the cache' % key)
+
+        return self.cache.get(key)
+
+    def get_prefix(self, prefix):
+        whitelisted = False
+        for p in self.prefixes:
+            if prefix.startswith(p):
+                whitelisted = True
+                break
+
+        if not whitelisted:
+            raise exceptions.PrefixNotInCache(
+                'The prefix %s is not in the cache' % prefix)
+
+        for key in self.cache.keys():
+            if key.startswith(prefix):
+                yield(key, self.cache[key])
+
+
 def retry_etcd_forever(func):
     """Retry the Etcd server forever.
 
@@ -69,6 +143,9 @@ class ActualLock(Lock):
     def __init__(self, objecttype, subtype, name, ttl=120,
                  client=None, timeout=1000000000, log_ctx=LOG,
                  op=None):
+        if read_only_cache():
+            raise exceptions.ForbiddenWhileUsingReadOnlyCache(
+                'You cannot lock while using a read only cache')
 
         self.path = _construct_key(objecttype, subtype, name)
         super(ActualLock, self).__init__(self.path, ttl=ttl, client=client)
@@ -176,6 +253,10 @@ def get_lock(objecttype, subtype, name, ttl=60, timeout=10, log_ctx=LOG,
 
 
 def refresh_lock(lock, log_ctx=LOG):
+    if read_only_cache():
+        raise exceptions.ForbiddenWhileUsingReadOnlyCache(
+            'You cannot hold locks while using a read only cache')
+
     if not lock.is_acquired():
         log_ctx.with_field('lock', lock.name).info(
             'Attempt to refresh an expired lock')
@@ -191,6 +272,10 @@ def clear_stale_locks():
     # Remove all locks held by former processes on this node. This is required
     # after an unclean restart, otherwise we need to wait for these locks to
     # timeout and that can take a long time.
+    if read_only_cache():
+        raise exceptions.ForbiddenWhileUsingReadOnlyCache(
+            'You cannot clear locks while using a read only cache')
+
     client = WrappedEtcdClient()
 
     for data, metadata in client.get_prefix(
@@ -237,6 +322,10 @@ class JSONEncoderTasks(json.JSONEncoder):
 
 @retry_etcd_forever
 def put(objecttype, subtype, name, data, ttl=None):
+    if read_only_cache():
+        raise exceptions.ForbiddenWhileUsingReadOnlyCache(
+            'You cannot change data while using a read only cache')
+
     path = _construct_key(objecttype, subtype, name)
     encoded = json.dumps(data, indent=4, sort_keys=True,
                          cls=JSONEncoderTasks)
@@ -245,6 +334,10 @@ def put(objecttype, subtype, name, data, ttl=None):
 
 @retry_etcd_forever
 def create(objecttype, subtype, name, data, ttle=None):
+    if read_only_cache():
+        raise exceptions.ForbiddenWhileUsingReadOnlyCache(
+            'You cannot change data while using a read only cache')
+
     path = _construct_key(objecttype, subtype, name)
     encoded = json.dumps(data, indent=4, sort_keys=True,
                          cls=JSONEncoderTasks)
@@ -254,6 +347,11 @@ def create(objecttype, subtype, name, data, ttle=None):
 @retry_etcd_forever
 def get(objecttype, subtype, name):
     path = _construct_key(objecttype, subtype, name)
+
+    cache = read_only_cache()
+    if cache:
+        return cache.get(path)
+
     value = WrappedEtcdClient().get(path, metadata=True)
     if value is None or len(value) == 0:
         return None
@@ -263,27 +361,50 @@ def get(objecttype, subtype, name):
 @retry_etcd_forever
 def get_all(objecttype, subtype, prefix=None, sort_order=None):
     path = _construct_key(objecttype, subtype, prefix)
-    for data, metadata in WrappedEtcdClient().get_prefix(path, sort_order=sort_order, sort_target='key'):
-        yield str(metadata['key'].decode('utf-8')), json.loads(data)
+
+    cache = read_only_cache()
+    if cache:
+        for key, value in cache.get_prefix(path):
+            yield key, value
+    else:
+        for data, metadata in WrappedEtcdClient().get_prefix(
+                path, sort_order=sort_order, sort_target='key'):
+            yield str(metadata['key'].decode('utf-8')), json.loads(data)
 
 
 @retry_etcd_forever
 def get_all_dict(objecttype, subtype=None, sort_order=None):
     path = _construct_key(objecttype, subtype, None)
     key_val = {}
-    for value in WrappedEtcdClient().get_prefix(path, sort_order=sort_order, sort_target='key'):
-        key_val[value[1]['key'].decode('utf-8')] = json.loads(value[0])
+
+    cache = read_only_cache()
+    if cache:
+        for key, value in cache.get_prefix(path):
+            key_val[key] = value
+    else:
+        for value in WrappedEtcdClient().get_prefix(
+                path, sort_order=sort_order, sort_target='key'):
+            key_val[value[1]['key'].decode('utf-8')] = json.loads(value[0])
+
     return key_val
 
 
 @retry_etcd_forever
 def delete(objecttype, subtype, name):
+    if read_only_cache():
+        raise exceptions.ForbiddenWhileUsingReadOnlyCache(
+            'You cannot change data while using a read only cache')
+
     path = _construct_key(objecttype, subtype, name)
     WrappedEtcdClient().delete(path)
 
 
 @retry_etcd_forever
 def delete_all(objecttype, subtype):
+    if read_only_cache():
+        raise exceptions.ForbiddenWhileUsingReadOnlyCache(
+            'You cannot change data while using a read only cache')
+
     path = _construct_key(objecttype, subtype, None)
     WrappedEtcdClient().delete_prefix(path)
 
@@ -340,6 +461,10 @@ def decodeTasks(obj):
 
 @retry_etcd_forever
 def dequeue(queuename):
+    if read_only_cache():
+        raise exceptions.ForbiddenWhileUsingReadOnlyCache(
+            'You cannot consume queue work items while using a read only cache')
+
     try:
         queue_path = _construct_key('queue', queuename, None)
         client = WrappedEtcdClient()
@@ -375,6 +500,10 @@ def dequeue(queuename):
 
 
 def resolve(queuename, jobname):
+    if read_only_cache():
+        raise exceptions.ForbiddenWhileUsingReadOnlyCache(
+            'You cannot resolve queue work items while using a read only cache')
+
     with get_lock('queue', None, queuename, op='Resolve'):
         delete('processing', queuename, jobname)
         LOG.with_fields({'jobname': jobname,

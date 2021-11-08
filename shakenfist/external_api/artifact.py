@@ -89,15 +89,23 @@ class ArtifactsEndpoint(api_base.Resource):
     @jwt_required
     def get(self, node=None):
         retval = []
-        for a in Artifacts(filters=[baseobject.active_states_filter]):
-            if node:
-                idx = a.most_recent_index
-                if 'blob_uuid' in idx:
-                    b = Blob.from_db(idx['blob_uuid'])
-                    if b and node in b.locations:
-                        retval.append(a.external_view())
-            else:
-                retval.append(a.external_view())
+
+        # I feel like maybe we need a further abstraction here where I don't need
+        # to self compute the prefixes, and instead specify which object types
+        # I want cached?
+        with etcd.ThreadLocalReadOnlyCache(
+                ['/sf/artifact', '/sf/attribute/artifact',
+                 '/sf/blob', '/sf/attribute/blob',
+                 '/sf/instance', '/sf/attribute/instance']):
+            for a in Artifacts(filters=[baseobject.active_states_filter]):
+                if node:
+                    idx = a.most_recent_index
+                    if 'blob_uuid' in idx:
+                        b = Blob.from_db(idx['blob_uuid'])
+                        if b and node in b.locations:
+                            retval.append(a.external_view())
+                else:
+                    retval.append(a.external_view())
 
         return retval
 
