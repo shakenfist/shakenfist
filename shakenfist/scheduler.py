@@ -131,11 +131,14 @@ class Scheduler(object):
                 if not disk['size'] is None:
                     requested_disk += int(disk['size'])
 
-        if requested_disk > (int(self.metrics[node].get('disk_free', '0')) / 1024 / 1024 / 1024):
+        disk_free = int(self.metrics[node].get(
+            'disk_free', '0')) / 1024 / 1024 / 1024
+
+        if requested_disk > disk_free:
             log_ctx.with_fields({
                 'node': node,
-                'requested_disk': requested_disk,
-                'disk_free': self.metrics[node].get('disk_free', 0),
+                'requested_disk_gb': requested_disk,
+                'disk_free_gb': disk_free,
             }).debug('Node has insufficient disk')
             return False
         return True
