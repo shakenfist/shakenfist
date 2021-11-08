@@ -15,6 +15,7 @@ from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist.tasks import QueueTask
+from shakenfist.util import callstack as util_callstack
 from shakenfist.util import random as util_random
 
 
@@ -25,7 +26,6 @@ from shakenfist.util import random as util_random
 
 
 LOG, _ = logutil.setup(__name__)
-
 LOCK_PREFIX = '/sflocks'
 
 
@@ -58,10 +58,26 @@ class WrappedEtcdClient(Etcd3Client):
 # expensive analysis of state while using one of these caches, and then
 # enqueues work to change the database while a cache is not being used.
 local = threading.local()
+local.sf_etcd_statistics = {}
 
 
 def read_only_cache():
-    return getattr(local, 'read_only_etcd_cache', None)
+    return getattr(local, 'sf_read_only_etcd_cache', None)
+
+
+def get_statistics():
+    return local.sf_etcd_statistics
+
+
+def reset_statistics():
+    local.sf_etcd_statistics = {}
+
+
+def _record_uncached_read(path):
+    caller = util_callstack.get_caller(-3)
+    caller_path = '%s %s' % (caller, path)
+    local.sf_etcd_statistics.setdefault(caller_path,  0)
+    local.sf_etcd_statistics[caller_path] += 1
 
 
 class ThreadLocalReadOnlyCache():
@@ -72,11 +88,11 @@ class ThreadLocalReadOnlyCache():
 
     def __enter__(self):
         self.cache = {}
-        local.read_only_etcd_cache = self
+        local.sf_read_only_etcd_cache = self
         return self
 
     def __exit__(self, *args):
-        local.read_only_etcd_cache = None
+        local.sf_read_only_etcd_cache = None
 
     def _cached(self, key):
         for p in self.prefixes:
@@ -98,9 +114,10 @@ class ThreadLocalReadOnlyCache():
         start_time = time.time()
         for data, metadata in client.get_prefix(prefix):
             self.cache[metadata['key'].decode('utf-8')] = json.loads(data)
-        LOG.info('Populating thread local etcd cache took %.02f seconds '
-                 'and cached %d keys from %s' % (
-                     time.time() - start_time, len(self.cache), prefix))
+        if config.EXCESSIVE_ETCD_CACHE_LOGGING:
+            LOG.info('Populating thread local etcd cache took %.02f seconds '
+                     'and cached %d keys from %s' % (
+                         time.time() - start_time, len(self.cache), prefix))
         self.prefixes.append(prefix)
 
     def get(self, key):
@@ -351,6 +368,7 @@ def get(objecttype, subtype, name):
     cache = read_only_cache()
     if cache:
         return cache.get(path)
+    _record_uncached_read(path)
 
     value = WrappedEtcdClient().get(path, metadata=True)
     if value is None or len(value) == 0:
@@ -367,6 +385,7 @@ def get_all(objecttype, subtype, prefix=None, sort_order=None):
         for key, value in cache.get_prefix(path):
             yield key, value
     else:
+        _record_uncached_read(path)
         for data, metadata in WrappedEtcdClient().get_prefix(
                 path, sort_order=sort_order, sort_target='key'):
             yield str(metadata['key'].decode('utf-8')), json.loads(data)
@@ -382,6 +401,7 @@ def get_all_dict(objecttype, subtype=None, sort_order=None):
         for key, value in cache.get_prefix(path):
             key_val[key] = value
     else:
+        _record_uncached_read(path)
         for value in WrappedEtcdClient().get_prefix(
                 path, sort_order=sort_order, sort_target='key'):
             key_val[value[1]['key'].decode('utf-8')] = json.loads(value[0])

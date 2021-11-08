@@ -241,6 +241,10 @@ class SFConfig(BaseSettings):
         False, description='Add method name and module line number to log messages'
     )
 
+    EXCESSIVE_ETCD_CACHE_LOGGING: bool = Field(
+        False, description='Record detailed information about etcd cache performance.'
+    )
+
     class Config:
         env_prefix = 'SHAKENFIST_'
 
