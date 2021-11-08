@@ -25,7 +25,6 @@ from shakenfist.util import random as util_random
 
 
 LOG, _ = logutil.setup(__name__)
-
 LOCK_PREFIX = '/sflocks'
 
 
@@ -98,9 +97,10 @@ class ThreadLocalReadOnlyCache():
         start_time = time.time()
         for data, metadata in client.get_prefix(prefix):
             self.cache[metadata['key'].decode('utf-8')] = json.loads(data)
-        LOG.info('Populating thread local etcd cache took %.02f seconds '
-                 'and cached %d keys from %s' % (
-                     time.time() - start_time, len(self.cache), prefix))
+        if config.EXCESSIVE_ETCD_CACHE_LOGGING:
+            LOG.info('Populating thread local etcd cache took %.02f seconds '
+                     'and cached %d keys from %s' % (
+                         time.time() - start_time, len(self.cache), prefix))
         self.prefixes.append(prefix)
 
     def get(self, key):
