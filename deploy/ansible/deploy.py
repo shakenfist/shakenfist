@@ -18,18 +18,7 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
         logfile.write('%s %s\n' % (timestamp, s))
 
     variables = {}
-
-    # Cloud type localhost is really an alias for some simple metal
-    # deployment defaults.
-    if os.environ.get('CLOUD') == 'localhost':
-        variables['ram_system_reservation'] = 1.0
-        variables['ignore_mtu'] = True
-        variables['topology'] = {
-
-        }
-
-    if os.environ.get('CLOUD') == 'metal':
-        variables['topology'] = os.environ.get('TOPOLOGY')
+    variables['topology'] = os.environ.get('TOPOLOGY')
 
     if os.environ.get('METAL_SSH_KEY_FILENAME'):
         variables['ssh_key_filename'] = os.environ.get(

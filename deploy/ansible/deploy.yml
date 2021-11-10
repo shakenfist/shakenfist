@@ -30,36 +30,17 @@
       include: includes/topology_add_node.yml
       loop: "{{topology}}"
 
-    # If we are installing to localhost, and are not using a packaged version
-    # we need to special case where configuration files come from.
     - name: Set configuration file location
       set_fact:
         "template_path": "/srv/shakenfist/venv/share/shakenfist/templates"
         "utility_path": "/srv/shakenfist/venv/bin"
       delegate_to: localhost
       delegate_facts: true
-      when: cloud != "localhost"
 
     - name: Check if we have a venv on localhost already
       stat:
         path: /srv/shakenfist/venv/share/shakenfist/templates
       register: localhost_venv
-
-    - name: Templates from git if no localhost venv
-      set_fact:
-        "template_path": "files"
-        "utility_path": "/usr/local/bin"
-      delegate_to: localhost
-      delegate_facts: true
-      when: not localhost_venv.stat.exists and cloud == "localhost"
-
-    - name: Templates from localhost venv
-      set_fact:
-        "template_path": "/srv/shakenfist/venv/share/shakenfist/templates"
-        "utility_path": "/srv/shakenfist/venv/bin"
-      delegate_to: localhost
-      delegate_facts: true
-      when: localhost_venv.stat.exists and cloud == "localhost"
 
 - hosts: allsf
   any_errors_fatal: true
@@ -359,7 +340,6 @@
 - hosts: etcd
   roles:
     - role: andrewrothstein.etcd-cluster
-      when: cloud != "localhost"
       vars:
         etcd_secure: False
         etcd_cluster_name: shakenfist
@@ -367,21 +347,6 @@
         etcd_master_group_name: etcd_master
         etcd_iface_public: "{{node_mesh_nic}}"
         etcd_iface_cluster: "{{node_mesh_nic}}"
-
-# NOTE(mikal): I am not happy with binding to 0.0.0.0 here for
-# etcd, but I can't bind to lo because of how the ansible role
-# is written. So here we are.
-- hosts: etcd
-  roles:
-    - role: andrewrothstein.etcd-cluster
-      when: cloud == "localhost"
-      vars:
-        etcd_secure: False
-        etcd_cluster_name: shakenfist
-        etcd_enable_v2: False
-        etcd_master_group_name: etcd_master
-        etcd_iface_public: "all"
-        etcd_iface_cluster: "all"
 
 - hosts: allsf
   any_errors_fatal: true
