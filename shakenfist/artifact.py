@@ -42,7 +42,8 @@ class Artifact(dbo):
 
     def __init__(self, static_values):
         super(Artifact, self).__init__(static_values.get('uuid'),
-                                       static_values.get('version'))
+                                       static_values.get('version'),
+                                       static_values.get('in_memory_only', False))
 
         self.__artifact_type = static_values['artifact_type']
         self.__source_url = static_values['source_url']
@@ -55,27 +56,31 @@ class Artifact(dbo):
         if not max_versions:
             max_versions = config.ARTIFACT_MAX_VERSIONS_DEFAULT
 
-        Artifact._db_create(
-            artifact_uuid,
-            {
-                'uuid': artifact_uuid,
-                'artifact_type': artifact_type,
-                'source_url': source_url,
-
-                'version': cls.current_version
-            }
-        )
-
-        LOG.with_fields({
+        static_values = {
             'uuid': artifact_uuid,
             'artifact_type': artifact_type,
-            'source_url': source_url
-        }).debug('Artifact created')
+            'source_url': source_url,
 
-        a = Artifact.from_db(artifact_uuid)
+            'version': cls.current_version
+        }
+
+        # Artifacts of type IMAGE which are references to blobs are not
+        # persisted to the database, as they are an ephemeral convenience
+        # abstraction. We track blobs elsewhere.
+        if artifact_type == cls.TYPE_IMAGE and source_url.startswith(BLOB_URL):
+            static_values['in_memory_only'] = True
+            a = Artifact(static_values)
+        else:
+            Artifact._db_create(artifact_uuid, static_values)
+            LOG.with_fields({
+                'uuid': artifact_uuid,
+                'artifact_type': artifact_type,
+                'source_url': source_url
+            }).debug('Artifact created')
+            a = Artifact.from_db(artifact_uuid)
+
         a.state = Artifact.STATE_INITIAL
         a.max_versions = max_versions
-
         return a
 
     @staticmethod

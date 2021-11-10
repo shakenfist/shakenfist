@@ -1,5 +1,6 @@
 
 from functools import partial
+import json
 import time
 
 from shakenfist import constants
@@ -24,9 +25,13 @@ class DatabaseBackedObject(object):
     STATE_DELETE_WAIT = 'delete_wait'
     STATE_ERROR = 'error'
 
-    def __init__(self, object_uuid, version=None):
+    def __init__(self, object_uuid, version=None, in_memory_only=False):
         self.__uuid = object_uuid
         self.__version = version
+
+        self.__in_memory_only = in_memory_only
+        if self.__in_memory_only:
+            self.__in_memory_values = {}
 
         self.log = LOG.with_object(self)
 
@@ -45,8 +50,9 @@ class DatabaseBackedObject(object):
         return (self.object_type, self.__uuid)
 
     def add_event(self, operation, phase, duration=None, msg=None):
-        db.add_event(
-            self.object_type, self.__uuid, operation, phase, duration, msg)
+        if not self.__in_memory_only:
+            db.add_event(
+                self.object_type, self.__uuid, operation, phase, duration, msg)
 
     @classmethod
     def _db_create(cls, object_uuid, metadata):
@@ -71,24 +77,42 @@ class DatabaseBackedObject(object):
                 'Unknown version - %s: %s' % (cls.object_type, o))
         return o
 
+    # We need to force in memory values through JSON because some values require
+    # a serializer to run to work when we read them.
     def _db_get_attribute(self, attribute):
-        retval = etcd.get('attribute/%s' % self.object_type,
-                          self.__uuid, attribute)
+        if self.__in_memory_only:
+            retval = json.loads(self.__in_memory_values.get(attribute, 'null'))
+        else:
+            retval = etcd.get('attribute/%s' % self.object_type,
+                              self.__uuid, attribute)
         if not retval:
             return {}
         return retval
 
     def _db_get_attributes(self, attribute_prefix):
-        for key, data in etcd.get_all('attribute/%s' % self.object_type,
-                                      self.__uuid, prefix=attribute_prefix):
-            yield key, data
+        if self.__in_memory_only:
+            for key in self.__in_memory_values.keys():
+                if key.startswith(attribute_prefix):
+                    yield key, json.loads(self.__in_memory_values[key])
+        else:
+            for key, data in etcd.get_all('attribute/%s' % self.object_type,
+                                          self.__uuid, prefix=attribute_prefix):
+                yield key, data
 
     def _db_set_attribute(self, attribute, value):
-        etcd.put('attribute/%s' % self.object_type,
-                 self.__uuid, attribute, value)
+        if self.__in_memory_only:
+            self.__in_memory_values[attribute] = json.dumps(
+                value, indent=4, sort_keys=True, cls=etcd.JSONEncoderCustomTypes)
+        else:
+            etcd.put('attribute/%s' % self.object_type,
+                     self.__uuid, attribute, value)
 
     def _db_delete_attribute(self, attribute):
-        etcd.delete('attribute/%s' % self.object_type, self.__uuid, attribute)
+        if self.__in_memory_only and attribute in self.__in_memory_values:
+            del self.__in_memory_values[attribute]
+        else:
+            etcd.delete('attribute/%s' %
+                        self.object_type, self.__uuid, attribute)
 
     def get_lock(self, subtype=None, ttl=60, relatedobjects=None, log_ctx=None,
                  op=None, timeout=constants.ETCD_ATTEMPT_TIMEOUT):
