@@ -6,6 +6,7 @@ import jinja2
 import io
 import json
 import os
+import pathlib
 import pycdlib
 import random
 import shutil
@@ -467,6 +468,17 @@ class Instance(dbo):
             self.enqueue_delete_due_error('Instance failed to power on')
 
     def delete(self):
+        # Mark files we used in the image cache as recently used so that they
+        # linger a little for possible future users.
+        for disk in self.block_devices.get('devices', []):
+            if 'blob_uuid' in disk and disk['blob_uuid']:
+                cached_image_path = util_general.file_permutation_exists(
+                    os.path.join(config.STORAGE_PATH,
+                                 'image_cache', disk['blob_uuid']),
+                    ['iso', 'qcow2'])
+                if cached_image_path:
+                    pathlib.Path(cached_image_path).touch(exist_ok=True)
+
         with util_general.RecordedOperation('delete domain', self):
             try:
                 self.power_off()
