@@ -103,6 +103,15 @@ class Artifact(dbo):
             return artifacts[0]
         raise exceptions.TooManyMatches()
 
+    # Static values
+    @property
+    def artifact_type(self):
+        return self.__artifact_type
+
+    @property
+    def source_url(self):
+        return self.__source_url
+
     @property
     def max_versions(self):
         db_data = self._db_get_attribute('max_versions')
@@ -124,48 +133,6 @@ class Artifact(dbo):
         if not indices:
             return {'index': 0}
         return indices[sorted(indices)[-1]]
-
-    def get_all_indexes(self):
-        indices = {}
-        for key, data in self._db_get_attributes('index_'):
-            indices[key] = data
-
-        for key in sorted(indices):
-            yield indices[key]
-
-    def add_index(self, blob_uuid):
-        with self.get_lock_attr('index', 'Artifact index creation'):
-            highest_index = self._db_get_attribute('highest_index')
-            index = highest_index.get('index', 0) + 1
-            self._db_set_attribute('highest_index', {'index': index})
-
-            entry = {
-                'index': index,
-                'blob_uuid': blob_uuid
-            }
-            self._db_set_attribute('index_%012d' % index, entry)
-            self.log.with_fields(entry).info('Added index to artifact')
-            self.delete_old_versions()
-            return entry
-
-    def delete_old_versions(self):
-        """Count versions and if necessary remove oldest versions."""
-        indexes = [i['index'] for i in self.get_all_indexes()]
-        max = self.max_versions
-        if len(indexes) > max:
-            for i in sorted(indexes)[:-max]:
-                self.log.with_field(
-                    'index', i).info('Deleting artifact version')
-                self.del_index(i)
-
-    def del_index(self, index):
-        index_data = self._db_get_attribute('index_%012d' % index)
-        if not index_data:
-            self.log.withField('index', index).warn('Cannot find index in DB')
-            return
-        self._db_delete_attribute('index_%012d' % index)
-        b = blob.Blob.from_db(index_data['blob_uuid'])
-        b.ref_count_dec()
 
     def external_view_without_index(self):
         return {
@@ -209,14 +176,55 @@ class Artifact(dbo):
         a['blobs'] = blobs
         return a
 
-    # Static values
-    @property
-    def artifact_type(self):
-        return self.__artifact_type
+    def get_all_indexes(self):
+        indices = {}
+        for key, data in self._db_get_attributes('index_'):
+            indices[key] = data
 
-    @property
-    def source_url(self):
-        return self.__source_url
+        for key in sorted(indices):
+            yield indices[key]
+
+    def add_index(self, blob_uuid):
+        with self.get_lock_attr('index', 'Artifact index creation'):
+            highest_index = self._db_get_attribute('highest_index')
+            index = highest_index.get('index', 0) + 1
+            self._db_set_attribute('highest_index', {'index': index})
+
+            entry = {
+                'index': index,
+                'blob_uuid': blob_uuid
+            }
+            self._db_set_attribute('index_%012d' % index, entry)
+            self.log.with_fields(entry).info('Added index to artifact')
+            self.delete_old_versions()
+            return entry
+
+    def delete_old_versions(self):
+        """Count versions and if necessary remove oldest versions."""
+        indexes = [i['index'] for i in self.get_all_indexes()]
+        max = self.max_versions
+        if len(indexes) > max:
+            for i in sorted(indexes)[:-max]:
+                self.log.with_field(
+                    'index', i).info('Deleting artifact version')
+                self.del_index(i)
+
+    def del_index(self, index):
+        index_data = self._db_get_attribute('index_%012d' % index)
+        if not index_data:
+            self.log.withField('index', index).warn('Cannot find index in DB')
+            return
+        self._db_delete_attribute('index_%012d' % index)
+        b = blob.Blob.from_db(index_data['blob_uuid'])
+        b.ref_count_dec()
+
+    def delete(self):
+        self.state = self.STATE_DELETED
+
+    def hard_delete(self):
+        etcd.delete('artifact', None, self.uuid)
+        etcd.delete_all('attribute/artifact', self.uuid)
+        etcd.delete_all('event/artifact', self.uuid)
 
 
 class Artifacts(dbo_iter):

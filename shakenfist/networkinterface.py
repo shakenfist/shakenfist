@@ -7,7 +7,6 @@ from shakenfist import baseobject
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
-from shakenfist.config import config
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
@@ -205,9 +204,3 @@ def interfaces_for_instance(instance):
 def interfaces_for_network(network):
     return NetworkInterfaces([baseobject.active_states_filter,
                               partial(network_filter, network)])
-
-
-def inactive_network_interfaces():
-    return NetworkInterfaces([
-        partial(baseobject.state_filter, [dbo.STATE_DELETED, dbo.STATE_ERROR]),
-        partial(baseobject.state_age_filter, config.CLEANER_DELAY)])

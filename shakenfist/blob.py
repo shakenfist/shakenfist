@@ -8,6 +8,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist import constants
 from shakenfist import db
+from shakenfist import etcd
 from shakenfist.exceptions import BlobDeleted
 from shakenfist import instance
 from shakenfist import logutil
@@ -191,6 +192,11 @@ class Blob(dbo):
                 self.state = self.STATE_DELETED
 
             return new_count
+
+    def hard_delete(self):
+        etcd.delete('blob', None, self.uuid)
+        etcd.delete_all('attribute/blob', self.uuid)
+        etcd.delete_all('event/blob', self.uuid)
 
     @staticmethod
     def filepath(blob_uuid):
