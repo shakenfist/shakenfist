@@ -59,15 +59,18 @@ def log_request_info():
 
 @app.after_request
 def log_response_info(response):
+    # Unfortunately the response body is too long to log here, but may be
+    # obtained with flask.response.get_data() if we ever want to grow a more
+    # complete tracing system.
     log = LOG.with_fields(
         {
             'request-id': flask.request.environ.get('FLASK_REQUEST_ID', 'none'),
-            'headers': response.headers,
-            'body': response.get_data()
+            'headers': response.headers
         })
     if config.EXCESSIVE_ETCD_CACHE_LOGGING:
-        log.with_fields(etcd.get_statistics())
-    log.debug('API response sent')
+        log.with_fields(etcd.get_statistics()).info('API response sent')
+    else:
+        log.debug('API response sent')
     etcd.reset_statistics()
     return response
 
