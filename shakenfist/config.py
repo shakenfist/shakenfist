@@ -22,11 +22,11 @@ class SFConfig(BaseSettings):
     # API Options
     API_PORT: int = Field(13000, description='Port for the REST API')
     API_TIMEOUT: int = Field(
-        900,
+        30,
         description='How long gunicorn processes can use for a single request'
     )
     API_ASYNC_WAIT: int = Field(
-        30,
+        15,
         description='How long we wait for an async operation to complete '
                     'before returning to the user'
     )
