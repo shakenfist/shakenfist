@@ -193,6 +193,16 @@ class ArtifactVersionsEndpoint(api_base.Resource):
             retval.append(bout)
         return retval
 
+    @jwt_required
+    @arg_is_artifact_uuid
+    def post(self, artifact_uuid=None, artifact_from_db=None,
+             max_versions=config.ARTIFACT_MAX_VERSIONS_DEFAULT):
+        try:
+            mv = int(max_versions)
+        except ValueError:
+            return api_base.error(400, 'max version is not an integer')
+        artifact_from_db.max_versions = mv
+
 
 class ArtifactVersionEndpoint(api_base.Resource):
     @jwt_required
