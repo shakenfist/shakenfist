@@ -7,6 +7,11 @@ LOCK_REFRESH_SECONDS = 5
 ETCD_ATTEMPT_TIMEOUT = 60
 
 
+# A list of object names which deserve hard delete and event tracking
+OBJECT_NAMES = ['artifact', 'blob', 'instance', 'network', 'networkinterface',
+                'node']
+
+
 # Disk caching mode. Refer to docs/development/io_performance_tuning.md for
 # more details than you really want.
 #

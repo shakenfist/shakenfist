@@ -47,8 +47,6 @@ class Artifact(dbo):
 
         self.__artifact_type = static_values['artifact_type']
         self.__source_url = static_values['source_url']
-        self.__max_versions = static_values.get(
-            'max_versions', config.ARTIFACT_MAX_VERSIONS_DEFAULT)
 
     @classmethod
     def new(cls, artifact_type, source_url, max_versions=0):

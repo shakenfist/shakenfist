@@ -12,6 +12,7 @@ from shakenfist.util import libvirt as util_libvirt
 DAEMON_NAMES = {
     'api': 'sf-api',
     'cleaner': 'sf-cleaner',
+    'cluster': 'sf-cluster',
     'main': 'sf-main',
     'net': 'sf-net',
     'queues': 'sf-queues',
