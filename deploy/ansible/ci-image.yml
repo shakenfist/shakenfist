@@ -3,11 +3,11 @@
   connection: ssh
   vars:
     identifier: unknown
-    source_path: "/home/jenkins/src/shakenfist/"
+    source_path: "~/src/shakenfist/"
     base_image: "ubuntu:20.04"
     base_image_user: "ubuntu"
-    keyfile_private: "/home/jenkins/id_ci"
-    keyfile_public: "/home/jenkins/id_ci.pub"
+    keyfile_private: "~/id_ci"
+    keyfile_public: "~/id_ci.pub"
 
   tasks:
     - name: Create a network
@@ -61,7 +61,7 @@
   gather_facts: yes
   become: true
   vars:
-    source_path: "/home/jenkins/src/shakenfist/"
+    source_path: "~/src/shakenfist/"
 
   tasks:
     - name: Use CI package cache to speed things up
@@ -101,17 +101,17 @@
           ]
         state: latest
 
-    - name: Copy ansible config
-      copy:
-        src: /etc/ansible/ansible.cfg
-        dest: /etc/ansible/ansible.cfg
-        owner: root
-        group: root
-        mode: u=r,g=r,o=r
+    # - name: Copy ansible config
+    #   copy:
+    #     src: /etc/ansible/ansible.cfg
+    #     dest: /etc/ansible/ansible.cfg
+    #     owner: root
+    #     group: root
+    #     mode: u=r,g=r,o=r
 
     - name: Copy SF installer ansible requirements
       copy:
-        src: deploy/requirements.yml
+        src: ../../requirements.yml
         dest: /tmp/ansible-requirements.yml
         owner: root
         group: root
@@ -122,7 +122,7 @@
 
     - name: Copy SF requirements.txt
       copy:
-        src: requirements.txt
+        src: ../../../requirements.txt
         dest: /tmp/sf-requirements.txt
         owner: root
         group: root
@@ -130,8 +130,8 @@
 
     - name: Copy SF client requirements.txt
       copy:
-        src: ../client-python/client-requirements.txt
-        dest: /tmp/sf-requirements.txt
+        src: ../../../../client-python/requirements.txt
+        dest: /tmp/client-requirements.txt
         owner: root
         group: root
         mode: u=r,g=r,o=r
@@ -140,8 +140,8 @@
       shell: |
         python3 -m venv --system-site-packages /srv/shakenfist/venv
         /srv/shakenfist/venv/bin/pip install -U pip
-        /srv/shakenfist/venv/bin/pip install -U -i /tmp/sf-requirements.txt
-        /srv/shakenfist/venv/bin/pip install -U -i /tmp/client-requirements.txt
+        /srv/shakenfist/venv/bin/pip install -U -r /tmp/sf-requirements.txt
+        /srv/shakenfist/venv/bin/pip install -U -r /tmp/client-requirements.txt
 
     - name: Try and avoid the disk being corrupt when snapshot
       shell: |
@@ -159,8 +159,8 @@
   vars:
     identifier: cron
     base_image_user: "ubuntu"
-    keyfile_private: "/home/jenkins/id_ci"
-    keyfile_public: "/home/jenkins/id_ci.pub"
+    keyfile_private: "~/id_ci"
+    keyfile_public: "~/id_ci.pub"
     label: "sfci-image"
 
   tasks:
