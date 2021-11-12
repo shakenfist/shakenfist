@@ -49,6 +49,8 @@
 
 - name: Make venv and install server wheel
   shell: |
-    python3 -m venv --system-site-packages /srv/shakenfist/venv
+    if [ ! -e /srv/shakenfist/venv ]; then
+      python3 -m venv --system-site-packages /srv/shakenfist/venv
+    fi
     /srv/shakenfist/venv/bin/pip install -U pip
     /srv/shakenfist/venv/bin/pip install /tmp/shakenfist*whl
