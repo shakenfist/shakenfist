@@ -3,11 +3,11 @@
   connection: ssh
   vars:
     identifier: unknown
-    source_path: "~/src/shakenfist/"
+    source_path: "/home/jenkins/src/shakenfist/"
     base_image: "ubuntu:20.04"
     base_image_user: "ubuntu"
-    keyfile_private: "~/id_ci"
-    keyfile_public: "~/id_ci.pub"
+    keyfile_private: "/home/jenkins/id_ci"
+    keyfile_public: "/home/jenkins/id_ci.pub"
 
   tasks:
     - name: Create a network
@@ -61,7 +61,7 @@
   gather_facts: yes
   become: true
   vars:
-    source_path: "~/src/shakenfist/"
+    source_path: "/home/jenkins/src/shakenfist/"
 
   tasks:
     - name: Use CI package cache to speed things up
@@ -101,13 +101,13 @@
           ]
         state: latest
 
-    # - name: Copy ansible config
-    #   copy:
-    #     src: /etc/ansible/ansible.cfg
-    #     dest: /etc/ansible/ansible.cfg
-    #     owner: root
-    #     group: root
-    #     mode: u=r,g=r,o=r
+    - name: Copy ansible config
+      copy:
+        src: /etc/ansible/ansible.cfg
+        dest: /etc/ansible/ansible.cfg
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
 
     - name: Copy SF installer ansible requirements
       copy:
@@ -159,8 +159,8 @@
   vars:
     identifier: cron
     base_image_user: "ubuntu"
-    keyfile_private: "~/id_ci"
-    keyfile_public: "~/id_ci.pub"
+    keyfile_private: "/home/jenkins/id_ci"
+    keyfile_public: "/home/jenkins/id_ci.pub"
     label: "sfci-image"
 
   tasks:
