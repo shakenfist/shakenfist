@@ -16,7 +16,6 @@ from shakenfist.external_api import base as api_base
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import etcd
-from shakenfist import images
 from shakenfist import logutil
 from shakenfist.tasks import FetchImageTask
 from shakenfist.upload import Upload
@@ -149,9 +148,7 @@ class ArtifactUploadEndpoint(api_base.Resource):
             return resp
 
         with a.get_lock(ttl=(12 * constants.LOCK_REFRESH_SECONDS),
-                        timeout=config.MAX_IMAGE_TRANSFER_SECONDS) as lock:
-            helper = images.ImageFetchHelper(None, url)
-
+                        timeout=config.MAX_IMAGE_TRANSFER_SECONDS):
             blob_uuid = str(uuid.uuid4())
             blob_dir = os.path.join(config.STORAGE_PATH, 'blobs')
             blob_path = os.path.join(blob_dir, blob_uuid)
@@ -167,11 +164,14 @@ class ArtifactUploadEndpoint(api_base.Resource):
                 blob_uuid, st.st_size,
                 time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime()),
                 time.time())
+            b.state = Blob.STATE_CREATED
             b.ref_count_inc()
             b.observe()
-            helper.transcode_image(lock, b)
+            b.request_replication()
 
             a.add_event('upload', None, None, 'success')
+            a.add_index(b.uuid)
+            a.state = Artifact.STATE_CREATED
             return a.external_view()
 
 

@@ -26,7 +26,7 @@ OBJECT_NAMES = ['artifact', 'blob', 'instance', 'network', 'networkinterface']
 #  - "writeback"
 #  - "directsync"
 #  - "unsafe"
-disk_cache_mode = 'none'
+DISK_CACHE_MODE = 'none'
 
 
 # qcow2 cluster size. Refer to docs/development/io_performance_tuning.md for
@@ -35,4 +35,4 @@ disk_cache_mode = 'none'
 # on larger disks. Note for a change in this setting to fully take effect you
 # need to re-transcode the images into the image cache. There is no automation
 # to support doing at at this time.
-qcow2_cluster_size = '2048K'
+QCOW2_CLUSTER_SIZE = '2048K'

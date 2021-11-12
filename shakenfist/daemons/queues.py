@@ -23,7 +23,8 @@ from shakenfist.tasks import (QueueTask,
                               DestroyNetworkTask,
                               DeleteNetworkWhenClean,
                               FloatNetworkInterfaceTask,
-                              SnapshotTask)
+                              SnapshotTask,
+                              FetchBlobTask)
 from shakenfist import net
 from shakenfist import networkinterface
 from shakenfist import scheduler
@@ -160,6 +161,11 @@ def handle(jobname, workitem):
             elif isinstance(task, HypervisorDestroyNetworkTask):
                 n = net.Network.from_db(task.network_uuid())
                 n.delete_on_hypervisor()
+
+            elif isinstance(task, FetchBlobTask):
+                b = blob.Blob.from_db(task.blob_uuid())
+                if b:
+                    b.ensure_local([])
 
             else:
                 log_i.with_field('task', task).error(
