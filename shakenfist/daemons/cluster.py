@@ -7,7 +7,10 @@ import setproctitle
 import time
 
 from shakenfist import artifact
+from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist import blob
 from shakenfist.config import config
+from shakenfist import constants
 from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import instance
@@ -21,6 +24,13 @@ from shakenfist.node import (
 
 
 LOG, _ = logutil.setup(__name__)
+OBJECT_NAMES_TO_CLASSES = {
+    'artifact': artifact.Artifact,
+    'blob': blob.Blob,
+    'instance': instance.Instance,
+    'network': net.Network,
+    'networkinterface': networkinterface.NetworkInterface
+}
 
 
 class Monitor(daemon.Daemon):
@@ -43,19 +53,16 @@ class Monitor(daemon.Daemon):
             time.sleep(300)
 
     def _cluster_wide_cleanup(self, last_loop_run):
-        # Cleanup soft deleted instances and networks
-        for i in instance.inactive_instances():
-            LOG.with_object(i).info('Hard deleting instance')
-            i.hard_delete()
-
-        for n in net.inactive_networks():
-            LOG.with_network(n).info('Hard deleting network')
-            n.hard_delete()
-
-        for ni in networkinterface.inactive_network_interfaces():
-            LOG.with_networkinterface(
-                ni).info('Hard deleting network interface')
-            ni.hard_delete()
+        # Cleanup soft deleted objects
+        for objtype in constants.OBJECT_NAMES:
+            for _, objdata in etcd.get_all(objtype, None):
+                obj = OBJECT_NAMES_TO_CLASSES[objtype].from_db(objdata['uuid'])
+                if (obj.state.value == dbo.STATE_DELETED and
+                        time.time() - obj.state.update_time > config.CLEANER_DELAY):
+                    LOG.with_fields({
+                        objtype: obj.uuid
+                    }).info('Hard deleting')
+                    obj.hard_delete()
 
         # Prune artifacts which might have too many versions
         for a in artifact.Artifacts([]):

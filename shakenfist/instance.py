@@ -1046,18 +1046,8 @@ healthy_states_filter = partial(
     baseobject.state_filter, [Instance.STATE_INITIAL, Instance.STATE_PREFLIGHT,
                               Instance.STATE_CREATING, Instance.STATE_CREATED])
 
-inactive_states_filter = partial(
-    baseobject.state_filter, [Instance.STATE_DELETED])
-
 
 # Convenience helpers
-
-def inactive_instances():
-    return Instances([
-        inactive_states_filter,
-        partial(baseobject.state_age_filter, config.CLEANER_DELAY)])
-
-
 def healthy_instances_on_node(n):
     return Instances([healthy_states_filter, partial(placement_filter, n.uuid)])
 

@@ -359,7 +359,7 @@ def instance_delete(inst):
             if not i.uuid == inst.uuid:
                 for iface_uuid in inst.interfaces:
                     ni = networkinterface.NetworkInterface.from_db(iface_uuid)
-                    if ni.network_uuid not in host_networks:
+                    if ni and ni.network_uuid not in host_networks:
                         host_networks.append(ni.network_uuid)
 
         inst.delete()

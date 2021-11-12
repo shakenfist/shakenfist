@@ -63,6 +63,7 @@ class ArtifactEndpoint(api_base.Resource):
         the user does not do that.
         """
         # TODO(andy): Enforce namespace permissions when snapshots have namespaces
+        # TODO(mikal): this should all be refactored to be in the object
 
         if artifact_from_db.state.value == Artifact.STATE_DELETED:
             # Already deleted, nothing to do.
@@ -81,7 +82,7 @@ class ArtifactEndpoint(api_base.Resource):
                 400, 'Cannot delete last reference to blob in use by instance (%s)' % (
                     ', '.join(sole_ref_in_use), ))
 
-        artifact_from_db.state = Artifact.STATE_DELETED
+        artifact_from_db.delete()
         for b in blobs:
             b.ref_count_dec()
 

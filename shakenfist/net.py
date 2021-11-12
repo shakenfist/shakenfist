@@ -760,12 +760,5 @@ class Networks(dbo_iter):
 
 
 # Convenience helpers
-
-def inactive_networks():
-    return Networks([
-                    baseobject.inactive_states_filter,
-                    partial(baseobject.state_age_filter, config.CLEANER_DELAY)])
-
-
 def networks_in_namespace(namespace):
     return Networks([partial(baseobject.namespace_filter, namespace)])

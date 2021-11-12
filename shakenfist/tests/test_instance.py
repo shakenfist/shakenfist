@@ -651,55 +651,6 @@ class InstancesTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(['a7c5ecec-c3a9-4774-ad1b-249d9e90e806'], uuids)
 
-    @mock.patch('shakenfist.instance.Instance._db_get_attribute',
-                side_effect=[{'value': instance.Instance.STATE_DELETED, 'update_time': 1},
-                             {'value': instance.Instance.STATE_INITIAL,
-                                 'update_time': 1},
-                             {'value': instance.Instance.STATE_INITIAL, 'update_time': 1}])
-    @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
-    def test_state_filter_inactive(self, mock_get_all, mock_attr):
-        uuids = []
-        for i in instance.Instances([instance.inactive_states_filter]):
-            uuids.append(i.uuid)
-
-        self.assertEqual(['373a165e-9720-4e14-bd0e-9612de79ff15'], uuids)
-
-    @mock.patch('shakenfist.instance.Instance._db_get_attribute',
-                side_effect=[{'value': instance.Instance.STATE_DELETED, 'update_time': 'not_used'},
-                             {'value': 'not_used', 'update_time': time.time()},
-                             {'value': instance.Instance.STATE_DELETED,
-                                 'update_time': 'not_used'},
-                             {'value': 'not_used', 'update_time': time.time()},
-                             {'value': instance.Instance.STATE_INITIAL, 'update_time': 'not_used'}])
-    @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
-    def test_state_hard_delete_later(self, mock_get_all, mock_attr):
-        uuids = []
-        for i in instance.Instances([instance.inactive_states_filter,
-                                     partial(baseobject.state_age_filter, 500)]):
-            uuids.append(i.uuid)
-
-        self.assertEqual([], uuids)
-
-    @mock.patch('shakenfist.instance.Instance._db_get_attribute',
-                side_effect=[
-                    {'value': instance.Instance.STATE_DELETED,
-                        'update_time': time.time() - 1000},
-                    {'value': instance.Instance.STATE_DELETED,
-                        'update_time': time.time() - 1000},
-                    {'value': instance.Instance.STATE_DELETED,
-                        'update_time': time.time()},
-                    {'value': instance.Instance.STATE_DELETED,
-                        'update_time': time.time()},
-                    {'value': instance.Instance.STATE_INITIAL, 'update_time': 1}])
-    @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
-    def test_state_hard_delete_now(self, mock_get_all, mock_attr):
-        uuids = []
-        for i in instance.Instances([instance.inactive_states_filter,
-                                     partial(baseobject.state_age_filter, 500)]):
-            uuids.append(i.uuid)
-
-        self.assertEqual(['373a165e-9720-4e14-bd0e-9612de79ff15'], uuids)
-
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
     def test_namespace_filter(self, mock_get_all):
         uuids = []
