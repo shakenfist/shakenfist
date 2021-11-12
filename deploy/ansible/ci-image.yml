@@ -111,7 +111,7 @@
 
     - name: Copy SF installer ansible requirements
       copy:
-        src: ansible/requirements.yml
+        src: deploy/requirements.yml
         dest: /tmp/ansible-requirements.yml
         owner: root
         group: root
