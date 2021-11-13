@@ -68,6 +68,17 @@
       copy:
         content: |
           Acquire::http::Proxy "http://192.168.1.50:8000";
+        dest: /etc/apt/sources.list.d/ansible.list
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
+
+    # Setup ansible PPA so we get never versions for Ubuntu to work around
+    # https://github.com/ansible/ansible/issues/69401
+    - name: Setup Ansible PPA
+      copy:
+        content: |
+          deb http://ppa.launchpad.net/ansible/ansible/ubuntu focal main
         dest: /etc/apt/apt.conf.d/00proxy
         owner: root
         group: root
@@ -75,7 +86,9 @@
 
     # I am unsure why I need to manually force this, but I do need to.
     - name: Force an apt-get update
-      shell: apt-get update
+      shell: |
+        apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367
+        apt-get update
 
     - name: apt-get dist-upgrade
       apt:
