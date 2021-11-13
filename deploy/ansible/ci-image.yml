@@ -79,7 +79,7 @@
       copy:
         content: |
           deb http://ppa.launchpad.net/ansible/ansible/ubuntu focal main
-        dest: /etc/apt/apt.conf.d/00proxy
+        dest: /etc/apt/sources.list.d/ansible.list
         owner: root
         group: root
         mode: u=r,g=r,o=r
