@@ -27,6 +27,8 @@ sudo apt-get -y install ansible git tox build-essential python3-dev python3-whee
     python3-pip python3-venv
 ```
 
+On Ubuntu 20.04, you need a more modern version of Ansible than what is packaged. Refer to https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html#installing-ansible-on-ubuntu for instructions on how to setup the Ansible PPA.
+
 We require that Shaken Fist be installed into a venv at /srv/shakenfist/venv on each Shaken Fist machine. This is done outside of the installer process. Create that venv now:
 
 ```
