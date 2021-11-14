@@ -83,14 +83,18 @@
         owner: root
         group: root
         mode: u=r,g=r,o=r
+      when: ansible_distribution == 'Ubuntu'
 
-    # I am unsure why I need to manually force this, but I do need to.
+    # Add GPG key for Ansible PPA
     - name: Force an apt-get update
       shell: |
         apt-get update
         apt-get install gnupg
         apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367
-        apt-get update
+
+    # I am unsure why I need to manually force this, but I do need to.
+    - name: Force an apt-get update
+      shell: apt-get update
 
     - name: apt-get dist-upgrade
       apt:
