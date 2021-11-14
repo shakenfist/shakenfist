@@ -86,11 +86,12 @@
       when: ansible_distribution == 'Ubuntu'
 
     # Add GPG key for Ansible PPA
-    - name: Force an apt-get update
+    - name: Force an apt-get update with Ansible PPA
       shell: |
         apt-get update
         apt-get install gnupg
         apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367
+      when: ansible_distribution == 'Ubuntu'
 
     # I am unsure why I need to manually force this, but I do need to.
     - name: Force an apt-get update
