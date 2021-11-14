@@ -4,8 +4,10 @@ import os
 import random
 import requests
 
-from shakenfist.blob import Blob
+from shakenfist import baseobject
+from shakenfist.blob import Blob, Blobs
 from shakenfist.config import config
+from shakenfist import etcd
 from shakenfist.external_api import base as api_base
 from shakenfist.util import general as util_general
 
@@ -65,3 +67,19 @@ class BlobEndpoint(api_base.Resource):
         return flask.Response(flask.stream_with_context(
             read_remote(locations[0], blob_uuid, blob_path=blob_path)),
             mimetype='text/plain', status=200)
+
+
+class BlobsEndpoint(api_base.Resource):
+    @jwt_required
+    @api_base.caller_is_admin
+    def get(self, node=None):
+        retval = []
+
+        with etcd.ThreadLocalReadOnlyCache():
+            for b in Blobs(filters=[baseobject.active_states_filter]):
+                if node and node in b.locations:
+                    retval.append(b.external_view())
+                else:
+                    retval.append(b.external_view())
+
+        return retval

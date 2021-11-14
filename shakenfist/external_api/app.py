@@ -81,6 +81,9 @@ class Root(api_base.Resource):
         return resp
 
 
+# TODO(mikal): we are inconsistent in this interface. Elsewhere the object type
+# is always signular, here its a mix. We should move all of these to the
+# singular form for consistency.
 api.add_resource(Root, '/')
 
 api.add_resource(api_admin.AdminLocksEndpoint, '/admin/locks')
@@ -98,6 +101,7 @@ api.add_resource(api_auth.AuthMetadatasEndpoint,
 api.add_resource(api_auth.AuthMetadataEndpoint,
                  '/auth/namespaces/<namespace>/metadata/<key>')
 
+api.add_resource(api_blob.BlobsEndpoint, '/blob')
 api.add_resource(api_blob.BlobEndpoint, '/blob/<blob_uuid>')
 
 api.add_resource(api_instance.InstancesEndpoint, '/instances')
