@@ -1,3 +1,4 @@
+from collections import defaultdict
 from functools import partial
 import time
 
@@ -6,6 +7,8 @@ from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist.config import config
+from shakenfist.constants import GiB
+from shakenfist import db
 from shakenfist import etcd
 from shakenfist import logutil
 from shakenfist.util import general as util_general
@@ -130,3 +133,26 @@ active_states_filter = partial(
     baseobject.state_filter, [dbo.STATE_CREATED])
 inactive_states_filter = partial(
     baseobject.state_filter, [dbo.STATE_DELETED, dbo.STATE_ERROR, 'missing'])
+
+
+def _sort_by_key(d):
+    for k in sorted(d):
+        for v in d[k]:
+            yield v
+
+
+def nodes_by_free_disk_descending(minimum=0, maximum=-1):
+    by_disk = defaultdict(list)
+
+    for n in Nodes([active_states_filter]):
+        metrics = db.get_metrics(n.fqdn)
+        disk_free_gb = int(int(metrics.get('disk_free', '0')) / GiB)
+
+        if disk_free_gb < minimum:
+            continue
+        if maximum != -1 and disk_free_gb > maximum:
+            continue
+
+        by_disk[disk_free_gb].append(n.fqdn)
+
+    return list(_sort_by_key(by_disk))

@@ -163,9 +163,11 @@ def handle(jobname, workitem):
                 n.delete_on_hypervisor()
 
             elif isinstance(task, FetchBlobTask):
+                log.with_fields({
+                    'blob': task.blob_uuid()
+                }).info('Replicating blob')
                 b = blob.Blob.from_db(task.blob_uuid())
-                if b:
-                    b.ensure_local([])
+                b.ensure_local([])
 
             else:
                 log_i.with_field('task', task).error(

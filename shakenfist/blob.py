@@ -17,7 +17,7 @@ from shakenfist import etcd
 from shakenfist.exceptions import BlobDeleted
 from shakenfist import instance
 from shakenfist import logutil
-from shakenfist.node import Nodes, active_states_filter as node_active_states_filter
+from shakenfist.node import nodes_by_free_disk_descending
 from shakenfist.tasks import FetchBlobTask
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
@@ -26,18 +26,14 @@ from shakenfist.util import image as util_image
 LOG, _ = logutil.setup(__name__)
 
 
-def _sort_by_key(d):
-    for k in sorted(d):
-        for v in d[k]:
-            yield v
-
-
 class Blob(dbo):
     object_type = 'blob'
     current_version = 2
     state_targets = {
-        None: (dbo.STATE_CREATED),
-        dbo.STATE_CREATED: (dbo.STATE_DELETED),
+        None: (dbo.STATE_INITIAL),
+        dbo.STATE_INITIAL: (dbo.STATE_CREATED, dbo.STATE_ERROR, dbo.STATE_DELETED),
+        dbo.STATE_CREATED: (dbo.STATE_ERROR, dbo.STATE_DELETED),
+        dbo.STATE_ERROR: (dbo.STATE_DELETED),
         dbo.STATE_DELETED: (),
     }
 
@@ -64,6 +60,7 @@ class Blob(dbo):
         )
 
         b = Blob.from_db(blob_uuid)
+        b.state = Blob.STATE_INITIAL
         return b
 
     @staticmethod
@@ -265,30 +262,24 @@ class Blob(dbo):
         os.rename(blob_path + '.partial', blob_path)
         self.observe()
 
-    def request_replication(self):
-        targets = config.BLOB_REPLICATION_FACTOR - len(self.locations)
+    def request_replication(self, allow_excess=0):
+        replica_count = len(self.locations)
+        targets = config.BLOB_REPLICATION_FACTOR + allow_excess - replica_count
+        self.log.info('Desired replica count is %d, we have %d, excess of %d requested'
+                      % (config.BLOB_REPLICATION_FACTOR, replica_count, allow_excess))
         if targets > 0:
             blob_size_gb = int(int(self.size) / GiB)
-            by_disk = {}
-            for n in Nodes([node_active_states_filter]):
-                metrics = db.get_metrics(n.fqdn)
+            nodes = nodes_by_free_disk_descending(
+                minimum=blob_size_gb + config.MINIMUM_FREE_DISK)
+            if config.NODE_NAME in nodes:
+                nodes.remove(config.NODE_NAME)
 
-                # If replicating a blob to a given node would make the target node
-                # have less than the minimum free disk, then don't do it.
-                disk_free_gb = int(metrics.get('disk_free', '0') / GiB)
-                if disk_free_gb - blob_size_gb < config.MINIMUM_FREE_DISK:
-                    continue
-
-                by_disk.setdefault(disk_free_gb, [])
-                by_disk[disk_free_gb].append(n.fqdn)
-
-            for node in list(_sort_by_key(by_disk))[:targets]:
-                etcd.enqueue(node, {
+            for n in nodes[:targets]:
+                etcd.enqueue(n, {
                     'tasks': [FetchBlobTask(self.uuid)]
                 })
-                LOG.with_fields({
-                    'blob': self.uuid,
-                    'node': node
+                self.log.with_fields({
+                    'node': n
                 }).info('Instructed to replicate blob')
 
     def hard_delete(self):
@@ -319,6 +310,7 @@ def snapshot_disk(disk, blob_uuid, related_object=None):
 
     # And make the associated blob
     b = Blob.new(blob_uuid, st.st_size, time.time(), time.time())
+    b.state = Blob.STATE_CREATED
     b.observe()
     b.request_replication()
     return b
@@ -363,7 +355,9 @@ def http_fetch(resp, blob_uuid, locks, logs):
                  resp.headers.get('Content-Length'),
                  resp.headers.get('Last-Modified'),
                  time.time())
+    b.state = Blob.STATE_CREATED
     b.observe()
+    b.request_replication()
     return b
 
 
