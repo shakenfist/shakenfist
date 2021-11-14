@@ -4,7 +4,9 @@ import magic
 import os
 import time
 
-from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.baseobject import (
+    DatabaseBackedObject as dbo,
+    DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist.config import config
 from shakenfist import constants
 from shakenfist import db
@@ -72,7 +74,10 @@ class Blob(dbo):
             'uuid': self.uuid,
             'size': self.size,
             'modified': self.modified,
-            'fetched_at': self.fetched_at
+            'fetched_at': self.fetched_at,
+            'locations': self.locations,
+            'reference_count': self.ref_count,
+            'instances': self.instances
         }
 
         out.update(self.info)
@@ -261,3 +266,15 @@ def http_fetch(resp, blob_uuid, locks, logs):
                  time.time())
     b.observe()
     return b
+
+
+class Blobs(dbo_iter):
+    def __iter__(self):
+        for _, b in etcd.get_all('blob', None):
+            b = Blob.from_db(b['uuid'])
+            if not b:
+                continue
+
+            out = self.apply_filters(b)
+            if out:
+                yield out
