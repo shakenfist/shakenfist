@@ -383,9 +383,14 @@ def instance_delete(inst):
 
 def snapshot(inst, disk, artifact_uuid, blob_uuid):
     b = blob.snapshot_disk(disk, blob_uuid)
-    b.ref_count_inc()
     a = Artifact.from_db(artifact_uuid)
-    a.state = dbo.STATE_CREATED
+
+    if b.state.value == blob.Blob.STATE_DELETED:
+        # The blob was deleted while it was being created
+        a.state = Artifact.STATE_ERROR
+    else:
+        b.ref_count_inc()
+        a.state = Artifact.STATE_CREATED
 
 
 class Monitor(daemon.WorkerPoolDaemon):
