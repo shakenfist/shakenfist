@@ -85,6 +85,15 @@
         mode: u=r,g=r,o=r
       when: ansible_distribution == 'Ubuntu'
 
+    # As recommended on the ansible apt module documentation...
+    - name: Install packages only when the apt process is not locked
+      apt:
+        name: gnupg
+        state: present
+      register: apt_action
+      retries: 100
+      until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
+
     # Add GPG key for Ansible PPA
     - name: Force an apt-get update with Ansible PPA
       shell: |
