@@ -594,7 +594,7 @@ class Instance(dbo):
                     if disk.get('blob_uuid'):
                         disk_base = '%s%s' % (
                             artifact.BLOB_URL, disk['blob_uuid'])
-                    elif disk.get('base'):
+                    elif disk.get('base') and not util_general.noneish(disk.get('base')):
                         a = artifact.Artifact.from_url(
                             artifact.Artifact.TYPE_IMAGE, disk['base'])
                         mri = a.most_recent_index

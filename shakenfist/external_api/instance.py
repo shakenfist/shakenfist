@@ -135,9 +135,9 @@ class InstancesEndpoint(api_base.Resource):
             # Convert internal shorthand forms into specific blobs
             disk_base = d.get('base')
             if util_general.noneish(disk_base):
-                disk_base = ''
+                d['disk_base'] = None
 
-            if disk_base.startswith('label:'):
+            elif disk_base.startswith('label:'):
                 label = disk_base[len('label:'):]
                 a = Artifact.from_url(
                     Artifact.TYPE_LABEL, '%s%s/%s' % (LABEL_URL, get_jwt_identity()[0], label))
@@ -361,10 +361,11 @@ class InstancesEndpoint(api_base.Resource):
         # Create a queue entry for the instance start
         tasks = [PreflightInstanceTask(inst.uuid, network)]
         for disk in inst.disk_spec:
+            disk_base = disk.get('base')
             if disk.get('blob_uuid'):
                 tasks.append(FetchImageTask(
                     '%s%s' % (BLOB_URL, disk['blob_uuid']), inst.uuid))
-            elif disk.get('base'):
+            elif not util_general.noneish(disk_base):
                 tasks.append(FetchImageTask(disk['base'], inst.uuid))
         tasks.append(StartInstanceTask(inst.uuid, network))
         tasks.extend(float_tasks)
