@@ -216,7 +216,8 @@ class Artifact(dbo):
             return
         self._db_delete_attribute('index_%012d' % index)
         b = blob.Blob.from_db(index_data['blob_uuid'])
-        b.ref_count_dec()
+        if b:
+            b.ref_count_dec()
 
     def delete(self):
         self.state = self.STATE_DELETED
