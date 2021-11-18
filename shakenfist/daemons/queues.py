@@ -164,8 +164,11 @@ def handle(jobname, workitem):
 
             elif isinstance(task, FetchBlobTask):
                 b = blob.Blob.from_db(task.blob_uuid())
-                log.with_object(b).info('Replicating blob')
-                b.ensure_local([])
+                size = b.ensure_local([])
+                log.with_object(b).with_fields({
+                    'transferred': size,
+                    'expected': b.size
+                }).info('Replicating blob complete')
 
             else:
                 log_i.with_field('task', task).error(

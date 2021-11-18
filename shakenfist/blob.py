@@ -261,6 +261,7 @@ class Blob(dbo):
 
         os.rename(blob_path + '.partial', blob_path)
         self.observe()
+        return total_bytes_received
 
     def request_replication(self, allow_excess=0):
         replica_count = len(self.locations)
