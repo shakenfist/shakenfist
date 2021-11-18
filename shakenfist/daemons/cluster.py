@@ -24,6 +24,7 @@ from shakenfist.node import (
     active_states_filter as node_active_states_filter,
     inactive_states_filter as node_inactive_states_filter,
     nodes_by_free_disk_descending)
+from shakenfist.tasks import FetchBlobTask
 
 
 LOG, _ = logutil.setup(__name__)
@@ -77,15 +78,49 @@ class Monitor(daemon.Daemon):
         for a in artifact.Artifacts([]):
             a.delete_old_versions()
 
-        # Prune over replicated blobs
+        # Inspect current state of blobs, the actual changes are done below outside
+        # the read only cache.
         overreplicated = {}
         underreplicated = []
         low_disk_nodes = nodes_by_free_disk_descending(
             maximum=config.MINIMUM_FREE_DISK)
         absent_nodes = [n.fqdn for n in Nodes([node_inactive_states_filter])]
 
+        current_fetches = {}
+        for workname, workitem in etcd.get_outstanding_jobs():
+            # A workname looks like: /sf/queue/sf-3/jobname
+            _, _, phase, node, _ = workname.split('/')
+            if node == 'networknode':
+                continue
+
+            for task in workitem:
+                if isinstance(task, FetchBlobTask):
+                    LOG.with_fields({
+                        'blob': task.blob_uuid,
+                        'node': node,
+                        'phase': phase
+                    }).info('Node is fetching blob')
+
+                    if node in absent_nodes:
+                        LOG.with_fields({
+                            'blob': task.blob_uuid,
+                            'node': node,
+                            'phase': phase
+                        }).warning('Node is absent, ignoring fetch')
+                    else:
+                        current_fetches.setdefault(task.blob_uuid, [])
+                        current_fetches[task.blob_uuid].append(node)
+
         with etcd.ThreadLocalReadOnlyCache():
             for b in blob.Blobs([active_states_filter]):
+                # If there is current work for a blob, we ignore it until that
+                # work completes
+                if b.uuid in current_fetches:
+                    LOG.with_fields({
+                        'blob': task.blob_uuid
+                    }).info('Blob has current fetches, ignoring')
+                    continue
+
                 locations = b.locations
                 ignored_locations = []
                 for n in absent_nodes:
@@ -147,6 +182,7 @@ class Monitor(daemon.Daemon):
                             underreplicated.append((b.uuid, 1))
                             break
 
+        # Prune over replicated blobs
         for blob_uuid in overreplicated:
             b = blob.Blob.from_db(blob_uuid)
             for node in overreplicated[blob_uuid]:
