@@ -271,8 +271,11 @@ class Blob(dbo):
             blob_size_gb = int(int(self.size) / GiB)
             nodes = nodes_by_free_disk_descending(
                 minimum=blob_size_gb + config.MINIMUM_FREE_DISK)
-            if config.NODE_NAME in nodes:
-                nodes.remove(config.NODE_NAME)
+
+            # Don't copy to locations which already have the blob
+            for n in self.locations:
+                if n in nodes:
+                    nodes.remove(n)
 
             for n in nodes[:targets]:
                 etcd.enqueue(n, {
