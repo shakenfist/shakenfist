@@ -109,6 +109,7 @@ class Instance(dbo):
         super(Instance, self).__init__(static_values.get('uuid'),
                                        static_values.get('version'))
 
+        self.__affinity = static_values.get('affinity')
         self.__cpus = static_values.get('cpus')
         self.__disk_spec = static_values.get('disk_spec')
         self.__memory = static_values.get('memory')
@@ -116,6 +117,7 @@ class Instance(dbo):
         self.__namespace = static_values.get('namespace')
         self.__requested_placement = static_values.get('requested_placement')
         self.__ssh_key = static_values.get('ssh_key')
+        self.__tags = static_values.get('tags')
         self.__user_data = static_values.get('user_data')
         self.__video = static_values.get('video')
         self.__uefi = static_values.get('uefi', False)
@@ -130,7 +132,7 @@ class Instance(dbo):
     @classmethod
     def new(cls, name, cpus, memory, namespace, ssh_key=None, disk_spec=None,
             user_data=None, video=None, requested_placement=None, uuid=None,
-            uefi=False, configdrive=None):
+            uefi=False, configdrive=None, affinity=None, tags=None):
 
         if not uuid:
             # uuid should only be specified in testing
@@ -142,6 +144,7 @@ class Instance(dbo):
         Instance._db_create(
             uuid,
             {
+                'affinity': affinity,
                 'cpus': cpus,
                 'disk_spec': disk_spec,
                 'memory': memory,
@@ -149,6 +152,7 @@ class Instance(dbo):
                 'namespace': namespace,
                 'requested_placement': requested_placement,
                 'ssh_key': ssh_key,
+                'tags': tags,
                 'user_data': user_data,
                 'video': video,
                 'uefi': uefi,
@@ -178,6 +182,7 @@ class Instance(dbo):
         # expect
         i = {
             'uuid': self.uuid,
+            'affinity': self.affinity,
             'cpus': self.cpus,
             'disk_spec': self.disk_spec,
             'memory': self.memory,
@@ -185,6 +190,7 @@ class Instance(dbo):
             'namespace': self.namespace,
             'ssh_key': self.ssh_key,
             'state': self.state.value,
+            'tags': self.tags,
             'user_data': self.user_data,
             'video': self.video,
             'uefi': self.uefi,
@@ -234,6 +240,12 @@ class Instance(dbo):
 
     # Static values
     @property
+    def affinity(self):
+        if not self.__affinity:
+            return {}
+        return self.__affinity
+
+    @property
     def cpus(self):
         return self.__cpus
 
@@ -260,6 +272,10 @@ class Instance(dbo):
     @property
     def ssh_key(self):
         return self.__ssh_key
+
+    @property
+    def tags(self):
+        return self.__tags
 
     @property
     def user_data(self):

@@ -92,7 +92,8 @@ class InstancesEndpoint(api_base.Resource):
     @api_base.requires_namespace_exist
     def post(self, name=None, cpus=None, memory=None, network=None, disk=None,
              ssh_key=None, user_data=None, placed_on=None, namespace=None,
-             video=None, uefi=False, configdrive=None):
+             video=None, uefi=False, configdrive=None, affinity=None,
+             tags=None):
         global SCHEDULER
 
         if not namespace:
@@ -244,8 +245,38 @@ class InstancesEndpoint(api_base.Resource):
             if 'memory' not in video:
                 return api_base.error(400, 'video specification requires "memory"')
 
+        # Verify tags
+        if tags:
+            if not isinstance(tags, list):
+                return api_base.error(400, 'tags should be a list of strings')
+            for t in tags:
+                if not isinstance(t, str):
+                    return api_base.error(400, 'tag (%s) is not a string' % t)
+
+        # Verify affinity settings
+        if affinity:
+            if not isinstance(affinity, dict):
+                return api_base.error(400, 'affinity should be a dictionary')
+
+            for key_type, aff in affinity.items():
+                # Check the validity of each affinity setting
+                if key_type not in ('cpu', 'disk', 'instance'):
+                    return api_base.error(
+                        400, 'can only set affinity for cpu, disk or instance')
+                if not isinstance(aff, dict):
+                    return api_base.error(
+                        400, 'an affinity must be a dictionary (%s)' % aff)
+                for tag, val in aff.items():
+                    try:
+                        affinity[key_type][tag] = int(val)
+                    except ValueError:
+                        return api_base.error(
+                            400, 'affinity (%s) contains non integer value (%s)' % (
+                                key_type, val))
+
         # Create instance object
         inst = instance.Instance.new(
+            affinity=affinity,
             name=name,
             disk_spec=disk,
             memory=memory,
@@ -256,7 +287,8 @@ class InstancesEndpoint(api_base.Resource):
             video=video,
             uefi=uefi,
             configdrive=configdrive,
-            requested_placement=placed_on
+            requested_placement=placed_on,
+            tags=tags,
         )
 
         # Initialise metadata

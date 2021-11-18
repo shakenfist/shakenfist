@@ -558,7 +558,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
                     'version': 4,
                     'video': {'memory': 16384, 'model': 'cirrus'},
                     'uefi': False,
-                    'configdrive': 'openstack-disk'
+                    'configdrive': 'openstack-disk',
                 })
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 return_value={})
@@ -567,6 +567,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         resp = self.client.get(
             '/instances/foo', headers={'Authorization': self.auth_header})
         self.assertEqual({
+            'affinity': {},
             'console_port': None,
             'cpus': 1,
             'disk_spec': [{}],
@@ -579,6 +580,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
             'power_state': None,
             'ssh_key': 'sshkey',
             'state': None,
+            'tags': None,
             'uefi': False,
             'configdrive': 'openstack-disk',
             'user_data': 'userdata',
