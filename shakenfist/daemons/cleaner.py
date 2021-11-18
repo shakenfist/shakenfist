@@ -6,10 +6,13 @@ import pathlib
 import random
 import time
 
-from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.blob import Blob
+from shakenfist.baseobject import (
+    DatabaseBackedObject as dbo,
+    active_states_filter)
+from shakenfist.blob import Blob, Blobs
 from shakenfist.config import config
 from shakenfist.daemons import daemon
+from shakenfist import etcd
 from shakenfist import logutil
 from shakenfist import instance
 from shakenfist.util import general as util_general
@@ -141,6 +144,110 @@ class Monitor(daemon.Daemon):
         except libvirt.libvirtError as e:
             LOG.debug('Failed to lookup all domains: %s' % e)
 
+    def _maintain_blobs(self):
+        # Find orphaned and deleted blobs still on disk
+        blob_path = os.path.join(config.STORAGE_PATH, 'blobs')
+        os.makedirs(blob_path, exist_ok=True)
+        cache_path = os.path.join(config.STORAGE_PATH, 'image_cache')
+        os.makedirs(cache_path, exist_ok=True)
+
+        for ent in os.listdir(blob_path):
+            entpath = os.path.join(blob_path, ent)
+            st = os.stat(entpath)
+
+            # If we've had this file for more than two cleaner delays...
+            if time.time() - st.st_mtime > config.CLEANER_DELAY * 2:
+                if ent.endswith('.partial'):
+                    # ... and its a stale partial transfer
+                    LOG.with_fields({
+                        'blob': ent}).warning(
+                            'Deleting stale partial transfer')
+                    os.unlink(entpath)
+
+                else:
+                    b = Blob.from_db(ent)
+                    if (not b or b.state.value == Blob.STATE_DELETED
+                            or config.NODE_NAME not in b.locations):
+                        LOG.with_fields({
+                            'blob': ent}).warning('Deleting orphaned blob')
+                        os.unlink(entpath)
+                        cached = util_general.file_permutation_exists(
+                            os.path.join(cache_path, ent),
+                            ['iso', 'qcow2'])
+                        if cached:
+                            os.unlink(cached)
+
+        # Find transcoded blobs in the image cache which are no longer in use
+        for ent in os.listdir(cache_path):
+            entpath = os.path.join(cache_path, ent)
+
+            # Broken symlinks will report an error here that we have to catch
+            try:
+                st = os.stat(entpath)
+            except OSError as e:
+                if e.errno == errno.ENOENT:
+                    LOG.with_fields({
+                        'blob': ent}).warning('Deleting broken symlinked image cache entry')
+                    os.unlink(entpath)
+                    continue
+                else:
+                    raise e
+
+            # If we haven't seen this file in use for more than two cleaner delays...
+            if time.time() - st.st_mtime > config.CLEANER_DELAY * 2:
+                blob_uuid = ent.split('.')[0]
+                b = Blob.from_db(blob_uuid)
+                if not b:
+                    LOG.with_fields({
+                        'blob': ent}).warning('Deleting orphaned image cache entry')
+                    os.unlink(entpath)
+                    continue
+
+                if b.ref_count == 0:
+                    LOG.with_fields({
+                        'blob': ent}).warning('Deleting globally unused image cache entry')
+                    os.unlink(entpath)
+                    continue
+
+                this_node = 0
+                for instance_uuid in b.instances:
+                    i = instance.Instance.from_db(instance_uuid)
+                    if i:
+                        if i.placement.get('node') == config.NODE_NAME:
+                            this_node += 1
+
+                LOG.with_fields(
+                    {
+                        'blob': blob_uuid,
+                        'this_node': this_node
+                    }).info('Blob users on this node')
+                if this_node == 0:
+                    LOG.with_fields(
+                        {
+                            'blob': blob_uuid
+                        }).warning('Deleting unused image cache entry')
+                    os.unlink(entpath)
+                else:
+                    # Record that this file is in use for the benefit of
+                    # the above time check.
+                    pathlib.Path(entpath).touch(exist_ok=True)
+
+        # Find blobs which should be on this node but are not.
+        missing = []
+        with etcd.ThreadLocalReadOnlyCache():
+            for b in Blobs([active_states_filter]):
+                if config.NODE_NAME in b.locations:
+                    if not os.path.exists(os.path.join(
+                            config.STORAGE_PATH, 'blobs', b.uuid)):
+                        missing.append(b.uuid)
+
+        for blob_uuid in missing:
+            b = Blob.from_db(blob_uuid)
+            if b:
+                LOG.with_fields({
+                    'blob': blob_uuid}).warning('Blob missing from node')
+                b.drop_node_location(config.NODE_NAME)
+
     def _compact_etcd(self):
         try:
             # We need to determine what revision to compact to, so we keep a
@@ -170,92 +277,8 @@ class Monitor(daemon.Daemon):
             LOG.info('Updating power states')
             self._update_power_states()
 
-            # Find orphaned and deleted blobs still on disk
-            blob_path = os.path.join(config.STORAGE_PATH, 'blobs')
-            os.makedirs(blob_path, exist_ok=True)
-            cache_path = os.path.join(config.STORAGE_PATH, 'image_cache')
-            os.makedirs(cache_path, exist_ok=True)
-
-            for ent in os.listdir(blob_path):
-                entpath = os.path.join(blob_path, ent)
-                st = os.stat(entpath)
-
-                # If we've had this file for more than two cleaner delays...
-                if time.time() - st.st_mtime > config.CLEANER_DELAY * 2:
-                    if ent.endswith('.partial'):
-                        # ... and its a stale partial transfer
-                        LOG.with_fields({
-                            'blob': ent}).warning(
-                                'Deleting stale partial transfer')
-                        os.unlink(entpath)
-
-                    else:
-                        b = Blob.from_db(ent)
-                        if (not b or b.state.value == Blob.STATE_DELETED
-                                or config.NODE_NAME not in b.locations):
-                            LOG.with_fields({
-                                'blob': ent}).warning('Deleting orphaned blob')
-                            os.unlink(entpath)
-                            cached = util_general.file_permutation_exists(
-                                os.path.join(cache_path, ent),
-                                ['iso', 'qcow2'])
-                            if cached:
-                                os.unlink(cached)
-
-            # Find transcoded blobs in the image cache which are no longer in use
-            for ent in os.listdir(cache_path):
-                entpath = os.path.join(cache_path, ent)
-
-                # Broken symlinks will report an error here that we have to catch
-                try:
-                    st = os.stat(entpath)
-                except OSError as e:
-                    if e.errno == errno.ENOENT:
-                        LOG.with_fields({
-                            'blob': ent}).warning('Deleting broken symlinked image cache entry')
-                        os.unlink(entpath)
-                        continue
-                    else:
-                        raise e
-
-                # If we haven't seen this file in use for more than two cleaner delays...
-                if time.time() - st.st_mtime > config.CLEANER_DELAY * 2:
-                    blob_uuid = ent.split('.')[0]
-                    b = Blob.from_db(blob_uuid)
-                    if not b:
-                        LOG.with_fields({
-                            'blob': ent}).warning('Deleting orphaned image cache entry')
-                        os.unlink(entpath)
-                        continue
-
-                    if b.ref_count == 0:
-                        LOG.with_fields({
-                            'blob': ent}).warning('Deleting globally unused image cache entry')
-                        os.unlink(entpath)
-                        continue
-
-                    this_node = 0
-                    for instance_uuid in b.instances:
-                        i = instance.Instance.from_db(instance_uuid)
-                        if i:
-                            if i.placement.get('node') == config.NODE_NAME:
-                                this_node += 1
-
-                    LOG.with_fields(
-                        {
-                            'blob': blob_uuid,
-                            'this_node': this_node
-                        }).info('Blob users on this node')
-                    if this_node == 0:
-                        LOG.with_fields(
-                            {
-                                'blob': blob_uuid
-                            }).warning('Deleting unused image cache entry')
-                        os.unlink(entpath)
-                    else:
-                        # Record that this file is in use for the benefit of
-                        # the above time check.
-                        pathlib.Path(entpath).touch(exist_ok=True)
+            LOG.info('Maintaining blobs')
+            self._maintain_blobs()
 
             # Perform etcd maintenance, if we are an etcd master
             if config.NODE_IS_ETCD_MASTER:
