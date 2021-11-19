@@ -73,9 +73,10 @@ class ArtifactEndpoint(api_base.Resource):
         sole_ref_in_use = []
         for blob_index in artifact_from_db.get_all_indexes():
             b = Blob.from_db(blob_index['blob_uuid'])
-            blobs.append(b)
-            if b.ref_count == 1:
-                sole_ref_in_use += b.instances
+            if b:
+                blobs.append(b)
+                if b.ref_count == 1:
+                    sole_ref_in_use += b.instances
         if sole_ref_in_use:
             return api_base.error(
                 400, 'Cannot delete last reference to blob in use by instance (%s)' % (
