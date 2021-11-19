@@ -12,7 +12,7 @@ from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist.config import config
-from shakenfist.constants import ETCD_ATTEMPT_TIMEOUT, LOCK_REFRESH_SECONDS, GiB
+from shakenfist.constants import LOCK_REFRESH_SECONDS, GiB
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist.exceptions import BlobDeleted, BlobFetchFailed
@@ -303,7 +303,8 @@ class Blob(dbo):
             if targets > 0:
                 blob_size_gb = int(int(self.size) / GiB)
                 nodes = nodes_by_free_disk_descending(
-                    minimum=blob_size_gb + config.MINIMUM_FREE_DISK)
+                    minimum=blob_size_gb + config.MINIMUM_FREE_DISK,
+                    intention='blobs')
 
                 # Don't copy to locations which already have the blob
                 for n in self.locations:

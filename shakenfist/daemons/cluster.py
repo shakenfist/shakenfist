@@ -83,7 +83,8 @@ class Monitor(daemon.Daemon):
         overreplicated = {}
         underreplicated = []
         low_disk_nodes = nodes_by_free_disk_descending(
-            maximum=config.MINIMUM_FREE_DISK)
+            minimum=0, maximum=config.MINIMUM_FREE_DISK,
+            intention='blobs')
         absent_nodes = [n.fqdn for n in Nodes([node_inactive_states_filter])]
 
         current_fetches = {}
