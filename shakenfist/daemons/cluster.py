@@ -3,6 +3,7 @@
 # obtaining the lock to do work et cetera. There is only one active cluster
 # maintenance daemon per cluster.
 
+from collections import defaultdict
 import setproctitle
 import time
 
@@ -87,7 +88,7 @@ class Monitor(daemon.Daemon):
             intention='blobs')
         absent_nodes = [n.fqdn for n in Nodes([node_inactive_states_filter])]
 
-        current_fetches = {}
+        current_fetches = defaultdict(list)
         for workname, workitem in etcd.get_outstanding_jobs():
             # A workname looks like: /sf/queue/sf-3/jobname
             _, _, phase, node, _ = workname.split('/')
@@ -109,7 +110,6 @@ class Monitor(daemon.Daemon):
                             'phase': phase
                         }).warning('Node is absent, ignoring fetch')
                     else:
-                        current_fetches.setdefault(task.blob_uuid, [])
                         current_fetches[task.blob_uuid].append(node)
 
         with etcd.ThreadLocalReadOnlyCache():

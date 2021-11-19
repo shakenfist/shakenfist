@@ -142,7 +142,7 @@ def _sort_by_key(d):
 
 
 def nodes_by_free_disk_descending(minimum=0, maximum=-1, intention=None):
-    by_disk = {}
+    by_disk = defaultdict(list)
     if not intention:
         intention = ''
     else:
