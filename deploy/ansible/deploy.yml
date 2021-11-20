@@ -426,13 +426,6 @@
         group: sudo
         mode: u=r,g=r,o=
 
-    - name: Install modern ansible
-      apt:
-        name: ansible
-        state: latest
-        update_cache: yes
-        autoremove: yes
-
     - name: Install prometheus
       apt:
         name: prometheus
@@ -488,21 +481,31 @@
 
     - name: Install Grafana prerequisites
       apt:
-        name: ["apt-transport-https", "software-properties-common"]
+        name:
+          - apt-transport-https
+          - software-properties-common
         update_cache: yes
         state: latest
 
+    - name: Check if grafana packages are already setup
+      stat:
+        path: /etc/apt/sources.list.d/packages_grafana_com_oss_deb.list
+      register: stat_result
+
     - name: Add Grafana GPG key
       apt_key: url=https://packages.grafana.com/gpg.key
+      when: not stat_result.stat.exists
 
     - name: Add Grafana APT repository
       apt_repository:
         repo: deb [arch=amd64] http://packages.grafana.com/oss/deb stable main
+      when: not stat_result.stat.exists
 
     - name: Install Grafana
       apt:
-        name: ["grafana"]
+        name: grafana
         update_cache: yes
+        state: latest
 
     - name: Write grafana config
       template:
