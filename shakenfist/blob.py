@@ -18,7 +18,7 @@ from shakenfist import etcd
 from shakenfist.exceptions import BlobDeleted, BlobFetchFailed
 from shakenfist import instance
 from shakenfist import logutil
-from shakenfist.node import nodes_by_free_disk_descending
+from shakenfist.node import Node, nodes_by_free_disk_descending
 from shakenfist.tasks import FetchBlobTask
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
@@ -296,7 +296,15 @@ class Blob(dbo):
 
     def request_replication(self, allow_excess=0):
         with self.get_lock_attr('locations', 'Request replication'):
-            replica_count = len(self.locations)
+            locations = self.locations
+
+            # Filter out absent locations
+            for node_name in self.locations:
+                n = Node.from_db(node_name)
+                if n.state.value != Node.STATE_CREATED:
+                    locations.remove(node_name)
+
+            replica_count = len(locations)
             targets = config.BLOB_REPLICATION_FACTOR + allow_excess - replica_count
             self.log.info('Desired replica count is %d, we have %d, excess of %d requested'
                           % (config.BLOB_REPLICATION_FACTOR, replica_count, allow_excess))

@@ -86,7 +86,13 @@ class Monitor(daemon.Daemon):
         low_disk_nodes = nodes_by_free_disk_descending(
             minimum=0, maximum=config.MINIMUM_FREE_DISK,
             intention='blobs')
-        absent_nodes = [n.fqdn for n in Nodes([node_inactive_states_filter])]
+
+        absent_nodes = []
+        for n in Nodes([node_inactive_states_filter]):
+            LOG.with_fields({
+                'node': n.fqdn}).info('Node is absent for blob replication')
+            absent_nodes.append(n.fqdn)
+        LOG.info('Found %d inactive nodes' % len(absent_nodes))
 
         current_fetches = defaultdict(list)
         for workname, workitem in etcd.get_outstanding_jobs():
@@ -97,12 +103,6 @@ class Monitor(daemon.Daemon):
 
             for task in workitem:
                 if isinstance(task, FetchBlobTask):
-                    LOG.with_fields({
-                        'blob': task.blob_uuid,
-                        'node': node,
-                        'phase': phase
-                    }).info('Node is fetching blob')
-
                     if node in absent_nodes:
                         LOG.with_fields({
                             'blob': task.blob_uuid,
@@ -110,6 +110,11 @@ class Monitor(daemon.Daemon):
                             'phase': phase
                         }).warning('Node is absent, ignoring fetch')
                     else:
+                        LOG.with_fields({
+                            'blob': task.blob_uuid,
+                            'node': node,
+                            'phase': phase
+                        }).info('Node is fetching blob')
                         current_fetches[task.blob_uuid].append(node)
 
         with etcd.ThreadLocalReadOnlyCache():
@@ -228,6 +233,9 @@ class Monitor(daemon.Daemon):
             age = time.time() - n.last_seen
             if age > config.NODE_CHECKIN_MAXIMUM:
                 n.state = Node.STATE_MISSING
+
+        # And we're done
+        LOG.info('Cluster maintenance loop complete')
 
     def run(self):
         LOG.info('Starting')

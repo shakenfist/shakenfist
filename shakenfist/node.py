@@ -132,7 +132,7 @@ class Nodes(dbo_iter):
 active_states_filter = partial(
     baseobject.state_filter, [dbo.STATE_CREATED])
 inactive_states_filter = partial(
-    baseobject.state_filter, [dbo.STATE_DELETED, dbo.STATE_ERROR, 'missing'])
+    baseobject.state_filter, [dbo.STATE_DELETED, dbo.STATE_ERROR, Node.STATE_MISSING])
 
 
 def _sort_by_key(d):
