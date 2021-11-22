@@ -106,7 +106,6 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             ('instance', None, 'uuid42',
              {
-                 'affinity': None,
                  'cpus': 1,
                  'disk_spec': [{}],
                  'memory': 2048,
@@ -114,7 +113,6 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
                  'namespace': 'namespace',
                  'requested_placement': None,
                  'ssh_key': 'sshkey',
-                 'tags': None,
                  'user_data': 'userdata',
                  'uuid': 'uuid42',
                  'version': 4,

@@ -298,15 +298,17 @@ class Scheduler(object):
             cpu_affinity = inst.affinity.get('cpu')
             if cpu_affinity:
                 for i in instance.Instances([instance.healthy_states_filter]):
-                    if not i.tags:
+                    if i.uuid == inst.uuid or not i.tags:
                         continue
                     for tag, val in cpu_affinity.items():
                         if tag in i.tags:
-                            # Use get() to allow for unplaced healthy instances
-                            pseudo_load[i.placement.get('node')] += val
+                            # Allow for unplaced healthy instances
+                            n = i.placement.get('node')
+                            if n:
+                                pseudo_load[n] += int(val)
 
-            inst.add_event('schedule', 'Pseudo load due inst affinity',
-                           None, str(dict(pseudo_load)))
+                inst.add_event('schedule', 'CPU load with affinity',
+                               None, str(dict(pseudo_load)))
 
             # Order candidates by current CPU load
             by_load = defaultdict(list)

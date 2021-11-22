@@ -567,7 +567,6 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         resp = self.client.get(
             '/instances/foo', headers={'Authorization': self.auth_header})
         self.assertEqual({
-            'affinity': {},
             'console_port': None,
             'cpus': 1,
             'disk_spec': [{}],
@@ -580,7 +579,6 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
             'power_state': None,
             'ssh_key': 'sshkey',
             'state': None,
-            'tags': None,
             'uefi': False,
             'configdrive': 'openstack-disk',
             'user_data': 'userdata',

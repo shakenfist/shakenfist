@@ -80,6 +80,11 @@ class SchedulerTestCase(base.ShakenFistTestCase):
         self.mock_add_event.start()
         self.addCleanup(self.mock_add_event.stop)
 
+        self.mock_instance_affinity = mock.patch(
+            'shakenfist.instance.Instance.affinity', return_value={})
+        self.mock_instance_affinity.start()
+        self.addCleanup(self.mock_instance_affinity.stop)
+
 
 class LowResourceTestCase(SchedulerTestCase):
     """Test low resource exceptions."""
@@ -309,7 +314,11 @@ class CorrectAllocationTestCase(SchedulerTestCase):
         mock_get_nodes.start()
         self.addCleanup(mock_get_nodes.stop)
 
-    @mock.patch('shakenfist.instance.Instance._db_get_attribute')
+    @mock.patch('shakenfist.db.get_metadata', return_value={})
+    @mock.patch('shakenfist.instance.Instance._db_get_attribute',
+                side_effect=[
+                    {'value': Instance.STATE_CREATED, 'update_time': '1'},
+                ])
     @mock.patch('shakenfist.instance.Instance._db_get',
                 return_value={
                     'uuid': 'inst-1',
@@ -329,7 +338,7 @@ class CorrectAllocationTestCase(SchedulerTestCase):
     @mock.patch('shakenfist.artifact.Artifacts', return_value=[])
     def test_any_node_but_not_network_node(
             self, mock_get_artifacts, mock_get_instances,
-            mock_get_instance, mock_instance_attribute):
+            mock_get_instance, mock_instance_attribute, mock_metadata):
         self.fake_db.set_node_metrics_same({
             'cpu_max_per_instance': 16,
             'cpu_max': 4,
