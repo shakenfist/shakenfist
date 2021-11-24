@@ -1,5 +1,4 @@
-# Make scheduling decisions
-
+from collections import defaultdict
 import copy
 import math
 import random
@@ -7,6 +6,7 @@ import time
 import uuid
 
 from shakenfist.config import config
+from shakenfist.constants import GiB
 from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import instance
@@ -132,8 +132,8 @@ class Scheduler(object):
                     requested_disk += int(disk['size'])
 
         disk_free = int(self.metrics[node].get(
-            'disk_free', '0')) / 1024 / 1024 / 1024
-
+            'disk_free_instances', '0')) / GiB
+        disk_free -= config.MINIMUM_FREE_DISK
         if requested_disk > disk_free:
             log_ctx.with_fields({
                 'node': node,
@@ -149,11 +149,10 @@ class Scheduler(object):
 
         # Find number of matching networks on each node. We need to be careful
         # how we do this to avoid repeatedly scanning the etcd repository.
-        per_node = {}
+        per_node = defaultdict(list)
         for inst in instance.Instances([]):
             n = inst.placement
             if n.get('node'):
-                per_node.setdefault(n['node'], [])
                 per_node[n['node']].append(inst)
 
         candidates_network_matches = {}
@@ -179,10 +178,10 @@ class Scheduler(object):
                     candidates_network_matches[n] += 1
 
         # Store candidate nodes keyed by number of matches
-        candidates_by_network_matches = {}
+        candidates_by_network_matches = defaultdict(list)
         for n in candidates:
             matches = candidates_network_matches[n]
-            candidates_by_network_matches.setdefault(matches, []).append(n)
+            candidates_by_network_matches[matches].append(n)
 
         # Find maximum matches of networks on a node
         max_matches = max(candidates_by_network_matches.keys())
@@ -294,10 +293,9 @@ class Scheduler(object):
                     'No nodes with enough disk space')
 
             # Order candidates by current CPU load
-            by_load = {}
+            by_load = defaultdict(list)
             for n in copy.copy(candidates):
                 load = math.floor(self.metrics[n].get('cpu_load_1', 0))
-                by_load.setdefault(load, [])
                 by_load[load].append(n)
             lowest_load = sorted(by_load.keys())[0]
             candidates = by_load[lowest_load]
