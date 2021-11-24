@@ -1,3 +1,4 @@
+from collections import defaultdict
 import copy
 import itertools
 import time
@@ -387,9 +388,8 @@ class Monitor(daemon.WorkerPoolDaemon):
             floating_ipm.persist()
 
     def _validate_mtus(self):
-        by_mtu = {}
+        by_mtu = defaultdict(list)
         for iface, mtu in util_network.get_interface_mtus():
-            by_mtu.setdefault(mtu, [])
             by_mtu[mtu].append(iface)
 
         for mtu in sorted(by_mtu):

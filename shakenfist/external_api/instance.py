@@ -1,3 +1,4 @@
+from collections import defaultdict
 from functools import partial
 import flask
 from flask_jwt_extended import jwt_required, get_jwt_identity
@@ -395,7 +396,7 @@ class InstancesEndpoint(api_base.Resource):
             namespace = get_jwt_identity()[0]
 
         waiting_for = []
-        tasks_by_node = {}
+        tasks_by_node = defaultdict(list)
         for inst in instance.Instances([partial(baseobject.namespace_filter, namespace),
                                         instance.active_states_filter]):
             # If this instance is not on a node, just do the DB cleanup locally
@@ -405,7 +406,6 @@ class InstancesEndpoint(api_base.Resource):
             else:
                 node = dbplacement['node']
 
-            tasks_by_node.setdefault(node, [])
             tasks_by_node[node].append(DeleteInstanceTask(inst.uuid))
             waiting_for.append(inst.uuid)
 

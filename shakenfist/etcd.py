@@ -1,3 +1,4 @@
+from collections import defaultdict
 import json
 import os
 import psutil
@@ -58,7 +59,7 @@ class WrappedEtcdClient(Etcd3Client):
 # expensive analysis of state while using one of these caches, and then
 # enqueues work to change the database while a cache is not being used.
 local = threading.local()
-local.sf_etcd_statistics = {}
+local.sf_etcd_statistics = defaultdict(int)
 
 
 def read_only_cache():
@@ -66,17 +67,16 @@ def read_only_cache():
 
 
 def get_statistics():
-    return local.sf_etcd_statistics
+    return dict(local.sf_etcd_statistics)
 
 
 def reset_statistics():
-    local.sf_etcd_statistics = {}
+    local.sf_etcd_statistics = defaultdict(int)
 
 
 def _record_uncached_read(path):
     caller = util_callstack.get_caller(-3)
     caller_path = '%s %s' % (caller, path)
-    local.sf_etcd_statistics.setdefault(caller_path,  0)
     local.sf_etcd_statistics[caller_path] += 1
 
 

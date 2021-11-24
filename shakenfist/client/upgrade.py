@@ -1,5 +1,6 @@
 # Copyright 2020 Michael Still
 
+from collections import defaultdict
 import json
 
 from shakenfist import etcd
@@ -24,12 +25,12 @@ def clean_events_mesh_operations(etcd_client):
         return
 
     # Split network events into networks
-    network_events = {}
+    network_events = defaultdict(list)
     for key in net_keys.split('\n'):
         if not key:
             continue
         _blank, _sf, _event, _network, uuid, _time = key.split('/')
-        network_events.setdefault(uuid, []).append(key)
+        network_events[uuid].append(key)
 
     # Delete all but last 50 events
     count = 0
@@ -44,8 +45,7 @@ def clean_events_mesh_operations(etcd_client):
 def main():
     etcd_client = etcd.WrappedEtcdClient()
 
-    releases = {}
-
+    releases = defaultdict(list)
     for data, _ in etcd_client.get_prefix('/sf/node/'):
         n = json.loads(data.decode('utf-8'))
 
@@ -56,7 +56,6 @@ def main():
 
         observed = json.loads(observed[0].decode('utf-8'))
         release = observed['release']
-        releases.setdefault(release, 0)
         releases[release] += 1
 
     print('Deployed releases:')
