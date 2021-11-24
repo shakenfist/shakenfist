@@ -158,7 +158,7 @@ class LowResourceTestCase(SchedulerTestCase):
             'cpu_total_instance_vcpus': 4*16,
             'memory_available': 5*1024+1024-1,
             'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024,
+            'disk_free_instances': 2000*1024*1024*1024,
             'cpu_available': 4
         })
 
@@ -183,7 +183,7 @@ class LowResourceTestCase(SchedulerTestCase):
             'cpu_max': 4,
             'memory_available': 5*1024+1024-1,
             'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024,
+            'disk_free_instances': 2000*1024*1024*1024,
             'cpu_total_instance_vcpus': 4,
             'cpu_available': 12
         })
@@ -210,7 +210,7 @@ class LowResourceTestCase(SchedulerTestCase):
             'memory_available': 10000,
             'memory_max': 10000,
             'memory_total_instance_actual': 15001,
-            'disk_free': 2000*1024*1024*1024,
+            'disk_free_instances': 2000*1024*1024*1024,
             'cpu_total_instance_vcpus': 4,
             'cpu_available': 12
         })
@@ -237,7 +237,7 @@ class LowResourceTestCase(SchedulerTestCase):
             'cpu_max': 4,
             'memory_available': 22000,
             'memory_max': 24000,
-            'disk_free': 20*1024*1024*1024,
+            'disk_free_instances': 20*1024*1024*1024,
             'cpu_total_instance_vcpus': 4,
             'cpu_available': 12
         })
@@ -264,7 +264,7 @@ class LowResourceTestCase(SchedulerTestCase):
             'cpu_max': 4,
             'memory_available': 22000,
             'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024,
+            'disk_free_instances': 2000*1024*1024*1024,
             'cpu_total_instance_vcpus': 4,
             'cpu_available': 12
         })
@@ -336,7 +336,7 @@ class CorrectAllocationTestCase(SchedulerTestCase):
             'cpu_max': 4,
             'memory_available': 22000,
             'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024,
+            'disk_free_instances': 2000*1024*1024*1024,
             'cpu_total_instance_vcpus': 4,
             'cpu_available': 12
         })
@@ -394,7 +394,7 @@ class ForcedCandidatesTestCase(SchedulerTestCase):
             'cpu_max': 4,
             'memory_available': 22000,
             'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024,
+            'disk_free_instances': 2000*1024*1024*1024,
             'cpu_total_instance_vcpus': 4,
             'cpu_available': 12
         })
@@ -419,7 +419,7 @@ class ForcedCandidatesTestCase(SchedulerTestCase):
             'cpu_max': 4,
             'memory_available': 22000,
             'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024
+            'disk_free_instances': 2000*1024*1024*1024
         })
 
         fake_inst = FakeInstance({
@@ -484,7 +484,7 @@ class MetricsRefreshTestCase(SchedulerTestCase):
             'cpu_max': 4,
             'memory_available': 22000,
             'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024,
+            'disk_free_instances': 2000*1024*1024*1024,
             'cpu_total_instance_vcpus': 4,
             'cpu_available': 12
         })
@@ -498,7 +498,7 @@ class MetricsRefreshTestCase(SchedulerTestCase):
             'cpu_max': 4,
             'memory_available': 11000,
             'memory_max': 24000,
-            'disk_free': 2000*1024*1024*1024,
+            'disk_free_instances': 2000*1024*1024*1024,
             'cpu_total_instance_vcpus': 4,
             'cpu_available': 12
         })
