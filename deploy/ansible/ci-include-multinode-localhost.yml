@@ -28,7 +28,7 @@
     cpu: 4
     ram: 4096
     disks:
-      - "30@{{base_image}}"
+      - "100@{{base_image}}"
     networkspecs:
       - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
       - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
@@ -55,7 +55,7 @@
     cpu: 4
     ram: 12288
     disks:
-      - "50@{{base_image}}"
+      - "100@{{base_image}}"
     networkspecs:
       - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
       - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
@@ -82,7 +82,7 @@
     cpu: 4
     ram: 12288
     disks:
-      - "50@{{base_image}}"
+      - "100@{{base_image}}"
     networkspecs:
       - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
       - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
@@ -109,7 +109,7 @@
     cpu: 4
     ram: 12288
     disks:
-      - "50@{{base_image}}"
+      - "100@{{base_image}}"
     networkspecs:
       - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
       - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
@@ -136,7 +136,7 @@
     cpu: 4
     ram: 12288
     disks:
-      - "50@{{base_image}}"
+      - "100@{{base_image}}"
     networkspecs:
       - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
       - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
@@ -163,7 +163,7 @@
     cpu: 4
     ram: 12288
     disks:
-      - "50@{{base_image}}"
+      - "100@{{base_image}}"
     networkspecs:
       - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
       - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"

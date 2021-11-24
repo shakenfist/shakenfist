@@ -19,7 +19,7 @@
     cpu: 12
     ram: 32768
     disks:
-      - "50@{{base_image}}"
+      - "100@{{base_image}}"
     networkspecs:
       - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
     ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
