@@ -214,6 +214,12 @@
         /srv/shakenfist/venv/bin/pip install -U -r /tmp/sf-requirements.txt
         /srv/shakenfist/venv/bin/pip install -U -r /tmp/client-requirements.txt
 
+    - name: Make a directory for cached images
+      file:
+        path: /srv/ci
+        state: directory
+        mode: "0755"
+
     - name: Cache most images used during CI to reduce network traffic
       get_url:
         url: "{{item.url}}"
