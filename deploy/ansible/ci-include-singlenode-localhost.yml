@@ -21,7 +21,7 @@
       chpasswd: { expire: False }
 
       users:
-        - name: guefi
+        - name: ciuser
           lock-passwd: False
           sudo: [ "ALL=(ALL) NOPASSWD:ALL" ]
           shell: /bin/bash
