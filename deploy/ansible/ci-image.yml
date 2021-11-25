@@ -214,6 +214,25 @@
         /srv/shakenfist/venv/bin/pip install -U -r /tmp/sf-requirements.txt
         /srv/shakenfist/venv/bin/pip install -U -r /tmp/client-requirements.txt
 
+    - name: Cache most images used during CI to reduce network traffic
+      get_url:
+        url: "{{item.url}}"
+        dest: "/srv/ci/{{item.name}}"
+        mode: u+r
+      loop:
+        - {
+            url: "https://cloud-images.ubuntu.com/releases/bionic/release/ubuntu-18.04-server-cloudimg-amd64.img",
+            name: "ubuntu:18.04",
+          }
+        - {
+            url: "https://cloud-images.ubuntu.com/releases/focal/release/ubuntu-20.04-server-cloudimg-amd64.img",
+            name: "ubuntu:20.04",
+          }
+        - {
+            url: "https://download.cirros-cloud.net/0.5.2/cirros-0.5.2-x86_64-disk.img",
+            name: "cirros",
+          }
+
     - name: Try and avoid the disk being corrupt when snapshot
       shell: |
         sleep 5
