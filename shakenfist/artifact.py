@@ -1,5 +1,6 @@
 # Copyright 2021 Michael Still
 
+from collections import defaultdict
 from functools import partial
 from uuid import uuid4
 
@@ -151,13 +152,13 @@ class Artifact(dbo):
         a.update(self.most_recent_index)
 
         # Build list of instances for each blob
-        blob_usage = {}
+        blob_usage = defaultdict(list)
         for inst in instance.Instances([instance.healthy_states_filter]):
             # inst.block_devices isn't populated until the instance is created,
             # so it may not be ready yet. This means we will miss instances
             # which have been requested but not yet started.
             for d in inst.block_devices.get('devices', []):
-                blob_usage.setdefault(d.get('blob_uuid'), []).append(inst.uuid)
+                blob_usage[d.get('blob_uuid')].append(inst.uuid)
 
         # Insert blob information
         blobs = {}
