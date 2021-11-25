@@ -234,7 +234,7 @@ def http_fetch(resp, blob_uuid, locks, logs):
     _ensure_blob_path()
 
     fetched = 0
-    total_size = int(resp.headers.get('Content-Length'))
+    total_size = int(resp.headers.get('Content-Length'), 0)
     previous_percentage = 0.0
     last_refresh = 0
     dest_path = Blob.filepath(blob_uuid)
