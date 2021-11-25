@@ -128,6 +128,10 @@ class Monitor(daemon.Daemon):
                         # we have a problem.
                         log_ctx.info('Detected error state for instance')
                         inst.state = inst.state.value + '-error'
+                        if inst.state.value in [dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED]:
+                            inst.state.value = dbo.STATE_DELETED
+                        else:
+                            inst.state = inst.state.value + '-error'
 
                     elif not db_power or db_power['power_state'] != 'off':
                         log_ctx.info('Detected power off for instance')

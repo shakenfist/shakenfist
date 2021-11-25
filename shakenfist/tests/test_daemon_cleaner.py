@@ -116,6 +116,8 @@ class CleanerTestCase(base.ShakenFistTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
+    @mock.patch('shakenfist.instance.Instance.state',
+                new_callable=mock.PropertyMock)
     @mock.patch('shakenfist.baseobject.State.value',
                 new_callable=mock.PropertyMock)
     @mock.patch('shakenfist.instance.Instance.error',
@@ -131,7 +133,7 @@ class CleanerTestCase(base.ShakenFistTestCase):
     def test_update_power_states(self, mock_time, mock_exists, mock_put,
                                  mock_get_instance, mock_event, mock_see,
                                  mock_lock, mock_etcd_get, mock_error,
-                                 mock_state_value):
+                                 mock_state_value, mock_state):
         mock_state_value.return_value = 'created'
 
         m = cleaner.Monitor('cleaner')
@@ -155,8 +157,6 @@ class CleanerTestCase(base.ShakenFistTestCase):
                  'power_state', {'power_state': 'off'}),
                 ('attribute/instance', 'crashed',
                  'power_state', {'power_state': 'crashed'}),
-                ('attribute/instance', 'crashed',
-                 'state', State('created-error', 7)),
                 ('attribute/instance', 'paused',
                  'power_state', {'power_state': 'paused'}),
                 ('attribute/instance', 'suspended',
@@ -164,7 +164,5 @@ class CleanerTestCase(base.ShakenFistTestCase):
                 ('attribute/instance', 'foo',
                  'power_state', {'power_state': 'off'}),
                 ('attribute/instance', 'bar',
-                 'power_state', {'power_state': 'off'}),
-                ('attribute/instance', 'nofiles',
-                 'state', State('created-error', 7))
+                 'power_state', {'power_state': 'off'})
             ], result)
