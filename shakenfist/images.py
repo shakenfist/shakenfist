@@ -1,10 +1,8 @@
 import hashlib
 import os
 import pathlib
-import random
 import requests
 import shutil
-import time
 import uuid
 
 from shakenfist.artifact import Artifact, BLOB_URL
@@ -12,7 +10,6 @@ from shakenfist import blob
 from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist import constants
-from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import image_resolver
 from shakenfist import logutil
@@ -167,41 +164,12 @@ class ImageFetchHelper(object):
         """Fetch a blob from the cluster."""
 
         blob_uuid = url[len(BLOB_URL):]
-        blob_dir = os.path.join(config.STORAGE_PATH, 'blobs')
-        blob_path = os.path.join(blob_dir, blob_uuid)
-        os.makedirs(blob_dir, exist_ok=True)
 
         b = Blob.from_db(blob_uuid)
         if not b:
             raise exceptions.BlobMissing(blob_uuid)
 
-        locations = b.locations
-        random.shuffle(locations)
-        blob_source = locations[0]
-
-        if not os.path.exists(blob_path):
-            with util_general.RecordedOperation('fetch blob', self.instance):
-                url = 'http://%s:%d/blob/%s' % (blob_source, config.API_PORT,
-                                                blob_uuid)
-                admin_token = util_general.get_api_token(
-                    'http://%s:%d' % (blob_source, config.API_PORT))
-                r = requests.request('GET', url, stream=True,
-                                     headers={'Authorization': admin_token,
-                                              'User-Agent': util_general.get_user_agent()})
-
-                with open(blob_path + '.partial', 'wb') as f:
-                    last_refresh = 0
-
-                    for chunk in r.iter_content(chunk_size=8192):
-                        f.write(chunk)
-
-                        if time.time() - last_refresh > constants.LOCK_REFRESH_SECONDS:
-                            db.refresh_locks([lock])
-                            last_refresh = time.time()
-
-                os.rename(blob_path + '.partial', blob_path)
-                b.observe()
-
+        b.ensure_local([lock])
         return b
 
     def _http_get_inner(self, lock, url, checksum, checksum_type):

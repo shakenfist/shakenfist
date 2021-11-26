@@ -2,6 +2,8 @@
 
 import magic
 import os
+import random
+import requests
 import time
 
 from shakenfist.baseobject import (
@@ -197,6 +199,39 @@ class Blob(dbo):
                 self.state = self.STATE_DELETED
 
             return new_count
+
+    def ensure_local(self, locks):
+        blob_dir = os.path.join(config.STORAGE_PATH, 'blobs')
+        blob_path = os.path.join(blob_dir, self.uuid)
+        os.makedirs(blob_dir, exist_ok=True)
+
+        if os.path.exists(blob_path):
+            return
+
+        locations = self.locations
+        random.shuffle(locations)
+        blob_source = locations[0]
+
+        url = 'http://%s:%d/blob/%s' % (blob_source, config.API_PORT,
+                                        self.uuid)
+        admin_token = util_general.get_api_token(
+            'http://%s:%d' % (blob_source, config.API_PORT))
+        r = requests.request('GET', url, stream=True,
+                             headers={'Authorization': admin_token,
+                                      'User-Agent': util_general.get_user_agent()})
+
+        with open(blob_path + '.partial', 'wb') as f:
+            last_refresh = 0
+
+            for chunk in r.iter_content(chunk_size=8192):
+                f.write(chunk)
+
+                if time.time() - last_refresh > constants.LOCK_REFRESH_SECONDS:
+                    db.refresh_locks(locks)
+                    last_refresh = time.time()
+
+        os.rename(blob_path + '.partial', blob_path)
+        self.observe()
 
     def hard_delete(self):
         etcd.delete('blob', None, self.uuid)
