@@ -269,7 +269,11 @@ def http_fetch(resp, blob_uuid, locks, logs):
     _ensure_blob_path()
 
     fetched = 0
-    total_size = int(resp.headers.get('Content-Length'), 0)
+    if resp.headers.get('Content-Length'):
+        total_size = int(resp.headers.get('Content-Length'))
+    else:
+        total_size = None
+
     previous_percentage = 0.0
     last_refresh = 0
     dest_path = Blob.filepath(blob_uuid)
@@ -279,7 +283,8 @@ def http_fetch(resp, blob_uuid, locks, logs):
             fetched += len(chunk)
             f.write(chunk)
 
-            percentage = fetched / total_size * 100.0
+            if total_size:
+                percentage = fetched / total_size * 100.0
             if (percentage - previous_percentage) > 10.0:
                 logs.with_field('bytes_fetched', fetched).info(
                     'Fetch %.02f percent complete' % percentage)
