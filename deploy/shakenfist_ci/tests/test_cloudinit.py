@@ -35,7 +35,7 @@ sudo echo 'banana' >  /tmp/output"""
             [
                 {
                     'size': 8,
-                    'base': 'cirros',
+                    'base': 'sf://upload/system/cirros',
                     'type': 'disk'
                 }
             ],
@@ -78,7 +78,7 @@ sudo echo 'banana' >  /tmp/output"""
             [
                 {
                     'size': 8,
-                    'base': 'ubuntu:20.04',
+                    'base': 'sf://upload/system/ubuntu-2004',
                     'type': 'disk'
                 }
             ], None, None)

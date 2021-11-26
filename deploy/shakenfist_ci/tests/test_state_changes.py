@@ -30,7 +30,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'ubuntu:20.04',
+                    'base': 'sf://upload/system/ubuntu-2004',
                     'type': 'disk'
                 }
             ], None, base.load_userdata('bootok'))
@@ -48,7 +48,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'cirros',
+                    'base': 'sf://upload/system/cirros',
                     'type': 'disk'
                 }
             ], None, None, force_placement=inst['node'])

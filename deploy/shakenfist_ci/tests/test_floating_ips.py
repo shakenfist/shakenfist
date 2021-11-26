@@ -37,7 +37,7 @@ echo 'Floating IPs work!' > /var/www/html/index.html
             [
                 {
                     'size': 20,
-                    'base': 'ubuntu',
+                    'base': 'sf://upload/system/ubuntu-2004',
                     'type': 'disk'
                 }
             ],

@@ -71,7 +71,7 @@ class TestImages(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 1,
-                    'base': 'ubuntu:20.04',
+                    'base': 'sf://upload/system/ubuntu-2004',
                     'type': 'disk'
                 }
             ], None, None)

@@ -113,6 +113,25 @@ pipeline {
         }
       }
     }
+    stage('Import cached images') {
+      steps {
+        script {
+          timeout(time: 2, unit: 'MINUTES', activity: true) {
+            sh '''  . $WORKSPACE/$BUILD_TAG/ci-environment.sh
+                    ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                        ubuntu@$primary \
+                        '. /etc/sf/sfrc; sf-client artifact upload ubuntu-1804 /srv/ci/ubuntu:18.04'
+                    ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                        ubuntu@$primary \
+                        '. /etc/sf/sfrc; sf-client artifact upload ubuntu-2004 /srv/ci/ubuntu:20.04'
+                    ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                        ubuntu@$primary \
+                        '. /etc/sf/sfrc; sf-client artifact upload cirros /srv/ci/cirros'
+              '''
+          }
+        }
+      }
+    }
     stage('Create a base level of activity in the cluster') {
       steps {
         script {
