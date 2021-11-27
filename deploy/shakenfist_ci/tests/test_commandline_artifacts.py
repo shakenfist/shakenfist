@@ -54,10 +54,11 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         a = json.loads(self._exec_client(
             '--json artifact show %s' % cirros_uuid))
         while time.time() - start_time < 5 * 60 * base.NETWORK_PATIENCE_FACTOR:
-            while not a.get('blob_uuid', None):
-                time.sleep(5)
-                a = json.loads(self._exec_client('--json artifact show %s'
-                                                 % cirros_uuid))
+            if a.get('blob_uuid'):
+                break
+            time.sleep(5)
+            a = json.loads(self._exec_client('--json artifact show %s'
+                                             % cirros_uuid))
 
         self.assertIn('blob_uuid', a)
 
