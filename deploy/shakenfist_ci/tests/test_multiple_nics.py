@@ -39,7 +39,7 @@ sudo /etc/init.d/S40network restart"""
             [
                 {
                     'size': 8,
-                    'base': 'cirros',
+                    'base': 'sf://upload/system/cirros',
                     'type': 'disk'
                 }
             ], None, str(base64.b64encode(ud.encode('utf-8')), 'utf-8'))

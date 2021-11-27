@@ -26,7 +26,7 @@ class TestDisks(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'ubuntu:20.04',
+                    'base': 'sf://upload/system/ubuntu-2004',
                     'type': 'disk',
                     'bus': 'nvme'
                 }

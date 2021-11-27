@@ -30,7 +30,7 @@ class TestPlacement(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'ubuntu:18.04',
+                    'base': 'sf://upload/system/ubuntu-1804',
                     'type': 'disk'
                 }
             ], None, None, force_placement='sf-nosuchnode')
@@ -48,7 +48,7 @@ class TestPlacement(base.BaseNamespacedTestCase):
                 [
                     {
                         'size': 8,
-                        'base': 'ubuntu:18.04',
+                        'base': 'sf://upload/system/ubuntu-1804',
                         'type': 'disk'
                     }
                 ], None, None, force_placement=socket.getfqdn())
@@ -84,7 +84,7 @@ class TestPlacement(base.BaseNamespacedTestCase):
                 [
                     {
                         'size': 8,
-                        'base': 'ubuntu:18.04',
+                        'base': 'sf://upload/system/ubuntu-1804',
                         'type': 'disk'
                     }
                 ], None, None, force_placement='sf-2')
