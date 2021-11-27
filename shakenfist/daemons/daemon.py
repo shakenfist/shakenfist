@@ -2,6 +2,7 @@ import copy
 import logging
 import multiprocessing
 import setproctitle
+import signal
 
 from shakenfist.config import config
 from shakenfist import etcd
@@ -46,8 +47,16 @@ def set_log_level(log, name):
 class Daemon(object):
     def __init__(self, name):
         setproctitle.setproctitle(process_name(name))
-        log, _ = logutil.setup(name)
-        set_log_level(log, name)
+        self.log, _ = logutil.setup(name)
+        set_log_level(self.log, name)
+
+        self.running = True
+        signal.signal(signal.SIGTERM, self.exit_gracefully)
+
+    def exit_gracefully(self, sig, _frame):
+        if sig == signal.SIGTERM:
+            self.running = False
+            self.log.info('Caught SIGTERM, commencing shutdown')
 
 
 class WorkerPoolDaemon(Daemon):

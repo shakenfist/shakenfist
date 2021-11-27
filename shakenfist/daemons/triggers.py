@@ -81,9 +81,13 @@ def observe(path, instance_uuid):
 class Monitor(daemon.Daemon):
     def run(self):
         LOG.info('Starting Monitor Daemon')
+        self.running = True
         observers = {}
 
         while True:
+            if not self.running:
+                return
+
             # Cleanup terminated observers
             all_observers = list(observers.keys())
             for instance_uuid in all_observers:

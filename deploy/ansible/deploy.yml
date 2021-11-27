@@ -725,7 +725,7 @@
         daemon_reload: yes
 
     - name: Create an admin namespace called "system" with one key configured
-      shell: "{{hostvars['localhost']['utility_path']}}/sf-passwd deploy {{hostvars[groups['primary_node'][0]]['system_key']}}"
+      shell: "{{hostvars['localhost']['utility_path']}}/sf-ctl bootstrap-system-key deploy {{hostvars[groups['primary_node'][0]]['system_key']}}"
       run_once: true
 
 - hosts: primary_node

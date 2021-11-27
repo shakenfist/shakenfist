@@ -179,9 +179,11 @@ class Monitor(daemon.Daemon):
 
     def run(self):
         LOG.info('Starting')
-        gauges = {'updated_at': Gauge('updated_at',
-                                      'The last time metrics were updated')
-                  }
+        self.running = True
+        gauges = {
+            'updated_at': Gauge('updated_at',
+                                'The last time metrics were updated')
+        }
 
         last_metrics = 0
 
@@ -198,6 +200,9 @@ class Monitor(daemon.Daemon):
             gauges['updated_at'].set_to_current_time()
 
         while True:
+            if not self.running:
+                return
+
             try:
                 jobname, _ = etcd.dequeue('%s-metrics' % config.NODE_NAME)
                 if jobname:
