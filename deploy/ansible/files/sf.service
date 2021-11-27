@@ -7,45 +7,9 @@ Type=simple
 User=root
 Group=root
 
-Environment=SHAKENFIST_NODE_EGRESS_IP="{{node_egress_ip}}"
-Environment=SHAKENFIST_NODE_EGRESS_NIC="{{node_egress_nic}}"
-Environment=SHAKENFIST_NODE_MESH_IP="{{node_mesh_ip}}"
-Environment=SHAKENFIST_NODE_MESH_NIC="{{node_mesh_nic}}"
-Environment=SHAKENFIST_NODE_NAME="{{node_name}}"
-
-{% if inventory_hostname in groups['etcd_master'] %}
-Environment=SHAKENFIST_NODE_IS_ETCD_MASTER=True
-{% else %}
-Environment=SHAKENFIST_NODE_IS_ETCD_MASTER=False
-{% endif %}
-
-{% if inventory_hostname in groups['hypervisors'] %}
-Environment=SHAKENFIST_NODE_IS_HYPERVISOR=True
-{% else %}
-Environment=SHAKENFIST_NODE_IS_HYPERVISOR=False
-{% endif %}
-
-{% if inventory_hostname in groups['network_node'] %}
-Environment=SHAKENFIST_NODE_IS_NETWORK_NODE=True
-{% else %}
-Environment=SHAKENFIST_NODE_IS_NETWORK_NODE=False
-{% endif %}
-
-Environment=SHAKENFIST_FLOATING_NETWORK="{{floating_network_ipblock}}"
-Environment=SHAKENFIST_NETWORK_NODE_IP="{{hostvars[groups['network_node'][0]]['node_mesh_ip']}}"
-Environment=SHAKENFIST_AUTH_SECRET_SEED="{{hostvars['localhost']['auth_secret']}}"
-Environment=SHAKENFIST_INCLUDE_TRACEBACKS="{{hostvars['localhost']['include_tracebacks']}}"
-
-# Cluster tuning.
-Environment=SHAKENFIST_RAM_SYSTEM_RESERVATION={{hostvars['localhost']['ram_system_reservation']}}
-Environment=SHAKENFIST_MAX_HYPERVISOR_MTU={{hostvars[groups['primary_node'][0]]['lowest_mtu']}}
-Environment=SHAKENFIST_DNS_SERVER="{{dns_server}}"
-
-{% if http_proxy != '' %}
-Environment=SHAKENFIST_HTTP_PROXY_SERVER="{{http_proxy}}"
-{% endif %}
-
+EnvironmentFile=/etc/sf/config
 ExecStart=/bin/sh -c '/srv/shakenfist/venv/bin/sf-daemon'
+ExecStop=/bin/sh -c '/srv/shakenfist/venv/bin/sf-ctl stop'
 
 Restart=on-failure
 RestartSec=5
