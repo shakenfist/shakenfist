@@ -1,5 +1,6 @@
 # Copyright 2021 Michael Still
 
+import http
 import magic
 import os
 import random
@@ -214,21 +215,43 @@ class Blob(dbo):
 
         url = 'http://%s:%d/blob/%s' % (blob_source, config.API_PORT,
                                         self.uuid)
-        admin_token = util_general.get_api_token(
-            'http://%s:%d' % (blob_source, config.API_PORT))
-        r = requests.request('GET', url, stream=True,
-                             headers={'Authorization': admin_token,
-                                      'User-Agent': util_general.get_user_agent()})
 
         with open(blob_path + '.partial', 'wb') as f:
+            done = False
             last_refresh = 0
+            total_bytes_received = 0
 
-            for chunk in r.iter_content(chunk_size=8192):
-                f.write(chunk)
+            while not done:
+                bytes_in_attempt = 0
 
-                if time.time() - last_refresh > constants.LOCK_REFRESH_SECONDS:
-                    db.refresh_locks(locks)
-                    last_refresh = time.time()
+                try:
+                    admin_token = util_general.get_api_token(
+                        'http://%s:%d' % (blob_source, config.API_PORT))
+                    r = requests.request(
+                        'GET', url, stream=True,
+                        headers={'Authorization': admin_token,
+                                 'User-Agent': util_general.get_user_agent()},
+                        data={'offset': total_bytes_received})
+
+                    for chunk in r.iter_content(chunk_size=8192):
+                        f.write(chunk)
+                        total_bytes_received += len(chunk)
+                        bytes_in_attempt += len(chunk)
+
+                        if time.time() - last_refresh > constants.LOCK_REFRESH_SECONDS:
+                            db.refresh_locks(locks)
+                            last_refresh = time.time()
+
+                    done = True
+
+                except http.client.IncompleteRead as e:
+                    # An API error (or timeout) occured. Retry unless we got nothing.
+                    if bytes_in_attempt > 0:
+                        self.log.info('HTTP connection dropped, retrying')
+                    else:
+                        self.log.error('HTTP connection dropped without '
+                                       'transferring data: %s' % e)
+                        raise e
 
         os.rename(blob_path + '.partial', blob_path)
         self.observe()
