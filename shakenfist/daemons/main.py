@@ -1,6 +1,5 @@
 # Copyright 2019 Michael Still
 
-import copy
 import setproctitle
 import time
 import os
@@ -210,7 +209,7 @@ def main():
             if d not in running_daemons:
                 _start_daemon(d)
 
-        for d in copy.copy(DAEMON_PIDS):
+        for d in list(DAEMON_PIDS):
             if not psutil.pid_exists(d):
                 LOG.warning('%s pid is missing, restarting' % DAEMON_PIDS[d])
                 _start_daemon(DAEMON_PIDS[d])

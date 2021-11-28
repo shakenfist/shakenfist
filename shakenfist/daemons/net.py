@@ -1,5 +1,4 @@
 from collections import defaultdict
-import copy
 import itertools
 import time
 
@@ -160,7 +159,7 @@ class Monitor(daemon.WorkerPoolDaemon):
         # We keep a global cache of extra vxlans we've seen before, so that
         # we only warn about them when they've been stray for five minutes.
         global EXTRA_VLANS_HISTORY
-        for vxid in copy.copy(EXTRA_VLANS_HISTORY):
+        for vxid in EXTRA_VLANS_HISTORY.copy():
             if vxid not in extra_vxids:
                 del EXTRA_VLANS_HISTORY[vxid]
         for vxid in extra_vxids:

@@ -1,4 +1,3 @@
-import copy
 import mock
 import time
 
@@ -33,7 +32,7 @@ class FakeDB(object):
 
     def set_node_metrics_same(self, metrics):
         for n in self.nodes:
-            self.metrics[n] = copy.copy(metrics)
+            self.metrics[n] = metrics.copy()
             self.metrics[n]['is_hypervisor'] = not n.endswith('_net')
 
     def get_metrics(self, node_name):

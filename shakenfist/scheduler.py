@@ -1,5 +1,4 @@
 from collections import defaultdict
-import copy
 import math
 import random
 import time
@@ -227,7 +226,7 @@ class Scheduler(object):
                 'Scheduling: Initial candidates')
 
             # Ensure all specified nodes are hypervisors
-            for n in copy.copy(candidates):
+            for n in list(candidates):
                 instance.add_event(
                     'schedule',
                     'Is hypervisor: %s' % self.metrics[n].get(
@@ -244,7 +243,7 @@ class Scheduler(object):
                 raise exceptions.LowResourceException('No nodes with metrics')
 
             # Can we host that many vCPUs?
-            for n in copy.copy(candidates):
+            for n in list(candidates):
                 max_cpu = self.metrics[n].get('cpu_max_per_instance', 0)
                 if instance.cpus > max_cpu:
                     candidates.remove(n)
@@ -257,7 +256,7 @@ class Scheduler(object):
                     'Requested vCPUs exceeds vCPU limit')
 
             # Do we have enough idle CPU?
-            for n in copy.copy(candidates):
+            for n in list(candidates):
                 if not self._has_sufficient_cpu(log_ctx, instance.cpus, n):
                     candidates.remove(n)
             log_ctx.with_field('candidates', candidates).info(
@@ -269,7 +268,7 @@ class Scheduler(object):
                     'No nodes with enough idle CPU')
 
             # Do we have enough idle RAM?
-            for n in copy.copy(candidates):
+            for n in list(candidates):
                 if not self._has_sufficient_ram(log_ctx, instance.memory, n):
                     candidates.remove(n)
             log_ctx.with_field('candidates', candidates).info(
@@ -281,7 +280,7 @@ class Scheduler(object):
                     'No nodes with enough idle RAM')
 
             # Do we have enough idle disk?
-            for n in copy.copy(candidates):
+            for n in list(candidates):
                 if not self._has_sufficient_disk(log_ctx, instance, n):
                     candidates.remove(n)
             log_ctx.with_field('candidates', candidates).info(
@@ -294,7 +293,7 @@ class Scheduler(object):
 
             # Order candidates by current CPU load
             by_load = defaultdict(list)
-            for n in copy.copy(candidates):
+            for n in list(candidates):
                 load = math.floor(self.metrics[n].get('cpu_load_1', 0))
                 by_load[load].append(n)
             lowest_load = sorted(by_load.keys())[0]

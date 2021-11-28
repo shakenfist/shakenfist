@@ -1,4 +1,3 @@
-import copy
 import logging
 import multiprocessing
 import setproctitle
@@ -69,7 +68,7 @@ class WorkerPoolDaemon(Daemon):
         self.present_cpus, _, _ = conn.getCPUMap()
 
     def reap_workers(self):
-        for w in copy.copy(self.workers):
+        for w in list(self.workers):
             if not w.is_alive():
                 w.join(1)
                 self.workers.remove(w)
