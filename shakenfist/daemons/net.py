@@ -452,4 +452,4 @@ class Monitor(daemon.WorkerPoolDaemon):
                 time.sleep(1)
 
             except Exception as e:
-                util_general.ignore_exception(daemon.process_name('queues'), e)
+                util_general.ignore_exception('network worker', e)

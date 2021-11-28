@@ -493,14 +493,16 @@ class Instance(dbo):
                 if inst:
                     inst.undefine()
             except Exception as e:
-                util_general.ignore_exception('instance delete', e)
+                util_general.ignore_exception(
+                    'instance delete domain %s' % self, e)
 
         with util_general.RecordedOperation('delete disks', self):
             try:
                 if os.path.exists(self.instance_path):
                     shutil.rmtree(self.instance_path)
             except Exception as e:
-                util_general.ignore_exception('instance delete', e)
+                util_general.ignore_exception(
+                    'instance delete disks %s' % self, e)
 
         self.deallocate_instance_ports()
 

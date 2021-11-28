@@ -100,7 +100,7 @@ def restore_instances():
                     inst.create_on_hypervisor()
             except Exception as e:
                 util_general.ignore_exception(
-                    'restore instance %s' % inst.uuid, e)
+                    'restore instance %s' % inst, e)
                 inst.etcd.enqueue_delete_due_error(
                     'exception while restoring instance on daemon restart')
 

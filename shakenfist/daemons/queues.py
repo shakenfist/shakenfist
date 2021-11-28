@@ -117,7 +117,7 @@ def handle(jobname, workitem):
                     etcd.enqueue('%s-metrics' % config.NODE_NAME, {})
                 except Exception as e:
                     util_general.ignore_exception(
-                        daemon.process_name('queues'), e)
+                        'instance delete task' % inst, e)
 
             elif isinstance(task, FloatNetworkInterfaceTask):
                 # Just punt it to the network node now that the interface is ready
@@ -190,7 +190,7 @@ def handle(jobname, workitem):
 
     except Exception as e:
         # Logging ignored exception - this should be investigated
-        util_general.ignore_exception(daemon.process_name('queues'), e)
+        util_general.ignore_exception('queue worker', e)
         if inst:
             inst.enqueue_delete_due_error('Failed queue task: %s' % e)
 
@@ -404,4 +404,4 @@ class Monitor(daemon.WorkerPoolDaemon):
                     time.sleep(0.2)
 
             except Exception as e:
-                util_general.ignore_exception(daemon.process_name('queues'), e)
+                util_general.ignore_exception('queue worker', e)
