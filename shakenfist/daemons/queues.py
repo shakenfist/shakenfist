@@ -396,12 +396,21 @@ def snapshot(inst, disk, artifact_uuid, blob_uuid):
 class Monitor(daemon.WorkerPoolDaemon):
     def run(self):
         LOG.info('Starting')
+        self.running = True
 
         while True:
             try:
                 self.reap_workers()
-                if not self.dequeue_work_item(config.NODE_NAME, handle):
+
+                if self.running:
+                    if not self.dequeue_work_item(config.NODE_NAME, handle):
+                        time.sleep(0.2)
+                elif len(self.workers) > 0:
+                    LOG.info('Waiting for %d workers to finish'
+                             % len(self.workers))
                     time.sleep(0.2)
+                else:
+                    return
 
             except Exception as e:
                 util_general.ignore_exception('queue worker', e)

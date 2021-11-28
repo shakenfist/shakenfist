@@ -4,6 +4,7 @@ import setproctitle
 import time
 import os
 import psutil
+import signal
 
 from shakenfist.config import config
 from shakenfist.daemons import daemon
@@ -208,7 +209,7 @@ def main():
             if d not in running_daemons:
                 _start_daemon(d)
 
-        for d in DAEMON_PIDS:
+        for d in list(DAEMON_PIDS):
             if not psutil.pid_exists(d):
                 LOG.warning('%s pid is missing, restarting' % DAEMON_PIDS[d])
                 _start_daemon(DAEMON_PIDS[d])
@@ -219,12 +220,31 @@ def main():
     while True:
         time.sleep(10)
 
-        wpid, _ = os.waitpid(-1, os.WNOHANG)
-        while wpid != 0:
-            LOG.warning('%s died (pid %d)'
-                        % (DAEMON_PIDS.get(wpid, 'unknown'), wpid))
-            del DAEMON_PIDS[wpid]
+        try:
             wpid, _ = os.waitpid(-1, os.WNOHANG)
+            while wpid != 0:
+                LOG.warning('%s died (pid %d)'
+                            % (DAEMON_PIDS.get(wpid, 'unknown'), wpid))
+                del DAEMON_PIDS[wpid]
+                wpid, _ = os.waitpid(-1, os.WNOHANG)
 
-        _audit_daemons()
-        Node.observe_this_node()
+        except ChildProcessError:
+            # We get this if there are no child processes
+            pass
+
+        n = Node.from_db(config.NODE_NAME)
+        if n.state.value not in [Node.STATE_STOPPING, Node.STATE_STOPPED]:
+            _audit_daemons()
+            Node.observe_this_node()
+
+        elif len(DAEMON_PIDS) == 0:
+            n.state = Node.STATE_STOPPED
+            return
+
+        else:
+            for pid in DAEMON_PIDS:
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                    LOG.winfoarn('Sent SIGTERM to %s' % pid)
+                except OSError as e:
+                    LOG.warn('Failed to send SIGTERM to %s: %s' % (pid, e))

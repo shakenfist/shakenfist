@@ -1,4 +1,3 @@
-import copy
 from flask_jwt_extended import jwt_required
 from functools import partial
 import uuid
@@ -47,7 +46,8 @@ class InstanceSnapshotEndpoint(api_base.Resource):
 
             a = Artifact.from_url(
                 Artifact.TYPE_SNAPSHOT,
-                '%s%s/%s' % (artifact.INSTANCE_URL, instance_uuid, disk['device']),
+                '%s%s/%s' % (artifact.INSTANCE_URL,
+                             instance_uuid, disk['device']),
                 max_versions)
 
             blob_uuid = str(uuid.uuid4())
@@ -86,7 +86,7 @@ class InstanceSnapshotEndpoint(api_base.Resource):
                 del bout['uuid']
 
                 # Merge it with the parent artifact
-                a = copy.copy(ev)
+                a = ev.copy()
                 a.update(bout)
                 out.append(a)
         return out

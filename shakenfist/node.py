@@ -20,10 +20,16 @@ class Node(dbo):
 
     # docs/development/state_machine.md has a description of these states.
     STATE_MISSING = 'missing'
+    STATE_STOPPING = 'stopping'
+    STATE_STOPPED = 'stopped'
 
     state_targets = {
         None: (dbo.STATE_CREATED, dbo.STATE_ERROR, STATE_MISSING),
-        dbo.STATE_CREATED: (dbo.STATE_DELETED, dbo.STATE_ERROR, STATE_MISSING),
+        dbo.STATE_CREATED: (dbo.STATE_DELETED, dbo.STATE_ERROR, STATE_MISSING,
+                            STATE_STOPPING),
+        STATE_STOPPING: (STATE_STOPPED, dbo.STATE_DELETED, dbo.STATE_ERROR),
+        STATE_STOPPED: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR),
+
         # A node can return from the dead...
         dbo.STATE_ERROR: (dbo.STATE_CREATED, dbo.STATE_DELETED),
         STATE_MISSING: (dbo.STATE_CREATED, dbo.STATE_ERROR)

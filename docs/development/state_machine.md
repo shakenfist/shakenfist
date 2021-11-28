@@ -37,6 +37,8 @@ Nodes
 -----
 
 * `Created`: on first check in, a node is created in the "created" state.
+* `Stopping`: the node is gracefully shutting down.
+* `Stopped`: the node has gracefully shut down.
 * `Deleted`: the node was manually evacuated and removed.
 * `Missing`: the node has not checked in within the NODE_CHECKIN_MAXIMUM deadline.
 * `Error`: the node has not check in for ten times NODE_CHECKIN_MAXIMUM, and all instances on this node have been declared to be in an error state.

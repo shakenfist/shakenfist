@@ -1,4 +1,3 @@
-import copy
 import flask
 import flask_restful
 from flask_jwt_extended.exceptions import (
@@ -277,7 +276,7 @@ def generic_wrapper(func):
                 formatted_headers.append(str(header))
 
             # Ensure key does not appear in logs
-            kwargs_log = copy.copy(kwargs)
+            kwargs_log = kwargs.copy()
             if 'key' in kwargs_log:
                 kwargs_log['key'] = '*****'
 

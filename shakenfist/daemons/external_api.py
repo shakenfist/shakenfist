@@ -12,6 +12,7 @@ LOG, _ = logutil.setup(__name__)
 class Monitor(daemon.Daemon):
     def run(self):
         LOG.info('Starting')
+        self.running = True
         util_process.execute(None, (config.API_COMMAND_LINE
                                     % {
                                         'port': config.API_PORT,
