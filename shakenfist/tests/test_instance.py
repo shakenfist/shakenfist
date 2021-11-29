@@ -76,7 +76,7 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
                     'video': {'model': 'cirrus', 'memory': 16384},
                     'uefi': False,
                     'configdrive': 'openstack-disk',
-                    'version': 5,
+                    'version': 6,
                     'nvram_template': None,
                     'secure_boot': False
                 })
@@ -110,6 +110,7 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
              {
                  'cpus': 1,
                  'disk_spec': [{}],
+                 'machine_type': 'pc',
                  'memory': 2048,
                  'name': 'barry',
                  'namespace': 'namespace',
@@ -117,7 +118,7 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
                  'ssh_key': 'sshkey',
                  'user_data': 'userdata',
                  'uuid': 'uuid42',
-                 'version': 5,
+                 'version': 6,
                  'video': {'memory': 16384, 'model': 'cirrus'},
                  'uefi': False,
                  'configdrive': 'openstack-disk',
@@ -137,7 +138,7 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
                     'ssh_key': 'sshkey',
                     'user_data': 'userdata',
                     'uuid': 'uuid42',
-                    'version': 5,
+                    'version': 6,
                     'video': {'memory': 16384, 'model': 'cirrus'},
                     'uefi': False,
                     'configdrive': 'openstack-disk',
@@ -155,7 +156,7 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
         self.assertEqual('sshkey', inst.ssh_key)
         self.assertEqual('userdata', inst.user_data)
         self.assertEqual('uuid42', inst.uuid)
-        self.assertEqual(5, inst.version)
+        self.assertEqual(6, inst.version)
         self.assertEqual('openstack-disk', inst.configdrive)
         self.assertEqual(None, inst.nvram_template)
         self.assertEqual(False, inst.secure_boot)
@@ -204,7 +205,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
                     'video': {'model': 'cirrus', 'memory': 16384},
                     'uefi': False,
                     'configdrive': 'openstack-disk',
-                    'version': 5,
+                    'version': 6,
                     'nvram_template': None,
                     'secure_boot': False
                 })
@@ -552,7 +553,7 @@ GET_ALL_INSTANCES = [
         'video': {'model': 'cirrus', 'memory': 16384},
         'uefi': False,
         'configdrive': 'openstack-disk',
-        'version': 5,
+        'version': 6,
         'nvram_template': None,
         'secure_boot': False
     }),
@@ -573,7 +574,7 @@ GET_ALL_INSTANCES = [
         'video': {'model': 'cirrus', 'memory': 16384},
         'uefi': False,
         'configdrive': 'openstack-disk',
-        'version': 5,
+        'version': 6,
         'nvram_template': None,
         'secure_boot': False
     }),
@@ -593,7 +594,7 @@ GET_ALL_INSTANCES = [
         'video': {'model': 'cirrus', 'memory': 16384},
         'uefi': False,
         'configdrive': 'openstack-disk',
-        'version': 5,
+        'version': 6,
         'nvram_template': None,
         'secure_boot': False
     })

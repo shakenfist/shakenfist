@@ -548,6 +548,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
                 return_value={
                     'cpus': 1,
                     'disk_spec': [{}],
+                    'machine_type': 'pc',
                     'memory': 2048,
                     'name': 'barry',
                     'namespace': 'namespace',
@@ -555,7 +556,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
                     'ssh_key': 'sshkey',
                     'user_data': 'userdata',
                     'uuid': 'uuid42',
-                    'version': 5,
+                    'version': 6,
                     'video': {'memory': 16384, 'model': 'cirrus'},
                     'uefi': False,
                     'configdrive': 'openstack-disk',
@@ -574,6 +575,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
             'disk_spec': [{}],
             'error_message': None,
             'interfaces': [],
+            'machine_type': 'pc',
             'memory': 2048,
             'name': 'barry',
             'namespace': 'namespace',
@@ -586,7 +588,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
             'user_data': 'userdata',
             'uuid': 'uuid42',
             'vdi_port': None,
-            'version': 5,
+            'version': 6,
             'video': {'memory': 16384, 'model': 'cirrus'},
             'nvram_template': None,
             'secure_boot': False

@@ -51,6 +51,7 @@ NUMBERS = '0123456789'
 def _get_disk_device(bus, index):
     bases = {
         'ide': ('hd', LETTERS),
+        'sata': ('sd', LETTERS),
         'scsi': ('sd', LETTERS),
         'usb': ('sd', LETTERS),
         'virtio': ('vd', LETTERS),
@@ -75,7 +76,7 @@ def _safe_int_cast(i):
 
 class Instance(dbo):
     object_type = 'instance'
-    current_version = 5
+    current_version = 6
 
     # docs/development/state_machine.md has a description of these states.
     STATE_INITIAL_ERROR = 'initial-error'
@@ -128,6 +129,7 @@ class Instance(dbo):
             'configdrive', 'openstack-disk')
         self.__nvram_template = static_values.get('nvram_template')
         self.__secure_boot = static_values.get('secure_boot', False)
+        self.__machine_type = static_values.get('machine_type', 'pc')
 
         if not self.__disk_spec:
             # This should not occur since the API will filter for zero disks.
@@ -137,7 +139,8 @@ class Instance(dbo):
     @classmethod
     def new(cls, name, cpus, memory, namespace, ssh_key=None, disk_spec=None,
             user_data=None, video=None, requested_placement=None, uuid=None,
-            uefi=False, configdrive=None, nvram_template=None, secure_boot=False):
+            uefi=False, configdrive=None, nvram_template=None, secure_boot=False,
+            machine_type='pc'):
 
         if not uuid:
             # uuid should only be specified in testing
@@ -162,6 +165,7 @@ class Instance(dbo):
                 'configdrive': configdrive,
                 'nvram_template': nvram_template,
                 'secure_boot': secure_boot,
+                'machine_type': machine_type,
 
                 'version': cls.current_version
             })
@@ -200,6 +204,8 @@ class Instance(dbo):
             'configdrive': self.configdrive,
             'nvram_template': self.nvram_template,
             'secure_boot': self.secure_boot,
+            'machine_type': self.machine_type,
+
             'version': self.version,
             'error_message': self.error,
         }
@@ -295,6 +301,10 @@ class Instance(dbo):
     @property
     def secure_boot(self):
         return self.__secure_boot
+
+    @property
+    def machine_type(self):
+        return self.__machine_type
 
     @property
     def instance_path(self):
@@ -514,9 +524,7 @@ class Instance(dbo):
             try:
                 self.power_off()
 
-                nvram_path = os.path.join(
-                    config.STORAGE_PATH, 'instances', self.uuid,
-                    'nvram')
+                nvram_path = os.path.join(self.instance_path, 'nvram')
                 if os.path.exists(nvram_path):
                     os.unlink(nvram_path)
 
@@ -908,8 +916,10 @@ class Instance(dbo):
             video_model=self.video['model'],
             video_memory=self.video['memory'],
             uefi=self.uefi,
+            secure_boot=self.secure_boot,
             nvram_template_attribute=nvram_template_attribute,
-            extracommands=block_devices.get('extracommands', [])
+            extracommands=block_devices.get('extracommands', []),
+            machine_type=self.machine_type
         )
 
         # Libvirt re-writes the domain XML once loaded, so we store the XML
@@ -966,8 +976,7 @@ class Instance(dbo):
                 # We need to delete the nvram file before we can undefine
                 # the domain. This will be recreated by libvirt on the next
                 # attempt.
-                nvram_path = os.path.join(
-                    config.STORAGE_PATH, 'instances', self.uuid, 'nvram')
+                nvram_path = os.path.join(self.instance_path, 'nvram')
                 if os.path.exists(nvram_path):
                     os.unlink(nvram_path)
 
