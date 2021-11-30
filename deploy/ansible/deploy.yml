@@ -360,11 +360,6 @@
   connection: ssh
 
   tasks:
-    # We use a shell command here because the service might not exist and
-    # that's ok.
-    - name: Stop the SF daemon
-      shell: systemctl stop sf || true
-
     - name: Create storage directory
       file:
         path: /srv/shakenfist
@@ -717,13 +712,30 @@
         mode: u=rw,g=r,o=r
       when: not config_stat_result.stat.exists
 
-    - name: Start the SF daemon
+- hosts: hypervisors, network_node, etcd_master
+  any_errors_fatal: true
+  serial: 1
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - name: Restart the SF daemon, one node at a time
       service:
         name: sf
         enabled: yes
         state: restarted
         daemon_reload: yes
 
+- hosts: hypervisors
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
     - name: Create an admin namespace called "system" with one key configured
       shell: "{{hostvars['localhost']['utility_path']}}/sf-ctl bootstrap-system-key deploy {{hostvars[groups['primary_node'][0]]['system_key']}}"
       run_once: true

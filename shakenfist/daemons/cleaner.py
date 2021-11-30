@@ -161,15 +161,11 @@ class Monitor(daemon.Daemon):
 
     def run(self):
         LOG.info('Starting')
-        self.running = True
 
         # Delay first compaction until system startup load has reduced
         last_compaction = time.time() - random.randint(1, 20*60)
 
-        while True:
-            if not self.running:
-                return
-
+        while self.running:
             # Update power state of all instances on this hypervisor
             LOG.info('Updating power states')
             self._update_power_states()

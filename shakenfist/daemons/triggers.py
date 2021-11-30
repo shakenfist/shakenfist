@@ -80,14 +80,10 @@ def observe(path, instance_uuid):
 
 class Monitor(daemon.Daemon):
     def run(self):
-        LOG.info('Starting Monitor Daemon')
-        self.running = True
+        LOG.info('Starting')
         observers = {}
 
-        while True:
-            if not self.running:
-                return
-
+        while self.running:
             # Cleanup terminated observers
             all_observers = list(observers.keys())
             for instance_uuid in all_observers:
@@ -146,3 +142,7 @@ class Monitor(daemon.Daemon):
                     'instance', instance_uuid, 'trigger monitor', 'finished', None, None)
 
             time.sleep(1)
+
+        # No longer running, clean up all trigger deaemons
+        for instance_uuid in observers:
+            os.kill(observers[instance_uuid].pid, signal.SIGKILL)

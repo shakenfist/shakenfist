@@ -5,6 +5,7 @@ import time
 import os
 import psutil
 import signal
+import sys
 
 from shakenfist.config import config
 from shakenfist.daemons import daemon
@@ -128,6 +129,10 @@ def main():
     setproctitle.setproctitle(
         daemon.process_name('main') + '-v%s' % util_general.get_version())
 
+    # If you ran this, it means we're not shutting down any more
+    n = Node.new(config.NODE_NAME, config.NODE_MESH_IP)
+    n.state = Node.STATE_CREATED
+
     # Log configuration on startup
     for key, value in config.dict().items():
         LOG.info('Configuration item %s = %s' % (key, value))
@@ -142,7 +147,13 @@ def main():
     def _start_daemon(d):
         pid = os.fork()
         if pid == 0:
-            DAEMON_IMPLEMENTATIONS[d].Monitor(d).run()
+            try:
+                DAEMON_IMPLEMENTATIONS[d].Monitor(d).run()
+                sys.exit(0)
+            except Exception as e:
+                util_general.ignore_exception('daemon creation', e)
+                sys.exit(1)
+
         DAEMON_PIDS[pid] = d
         LOG.with_field('pid', pid).info('Started %s' % d)
 
@@ -217,15 +228,17 @@ def main():
     _audit_daemons()
     restore_instances()
 
+    running = True
     while True:
         time.sleep(10)
 
         try:
             wpid, _ = os.waitpid(-1, os.WNOHANG)
             while wpid != 0:
-                LOG.warning('%s died (pid %d)'
+                LOG.warning('%s exitted (pid %d)'
                             % (DAEMON_PIDS.get(wpid, 'unknown'), wpid))
-                del DAEMON_PIDS[wpid]
+                if wpid in DAEMON_PIDS:
+                    del DAEMON_PIDS[wpid]
                 wpid, _ = os.waitpid(-1, os.WNOHANG)
 
         except ChildProcessError:
@@ -242,9 +255,13 @@ def main():
             return
 
         else:
-            for pid in DAEMON_PIDS:
-                try:
-                    os.kill(pid, signal.SIGTERM)
-                    LOG.winfoarn('Sent SIGTERM to %s' % pid)
-                except OSError as e:
-                    LOG.warn('Failed to send SIGTERM to %s: %s' % (pid, e))
+            if running:
+                for pid in DAEMON_PIDS:
+                    try:
+                        os.kill(pid, signal.SIGTERM)
+                        LOG.info('Sent SIGTERM to %s (pid %s)'
+                                 % (DAEMON_PIDS.get(pid, 'unknown'), pid))
+                    except OSError as e:
+                        LOG.warn('Failed to send SIGTERM to %s: %s' % (pid, e))
+
+            running = False

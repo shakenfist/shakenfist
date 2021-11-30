@@ -43,14 +43,14 @@ class Monitor(daemon.Daemon):
         # Attempt to acquire the cluster maintenance lock forever. We never
         # release the lock, it gets cleared on a crash. This is so that only
         # one node at a time is performing cluster maintenance.
-        while True:
+        while self.running:
             self.lock = etcd.get_lock('cluster', None, None, ttl=900, timeout=10,
                                       op='Cluster maintenance')
             result = self.lock.acquire()
             if result:
                 self.is_elected = True
                 return
-            time.sleep(300)
+            time.sleep(10)
 
     def _cluster_wide_cleanup(self, last_loop_run):
         # Cleanup soft deleted objects
@@ -97,14 +97,17 @@ class Monitor(daemon.Daemon):
 
     def run(self):
         LOG.info('Starting')
-        setproctitle.setproctitle(daemon.process_name('cluster') + ' idle')
-        self._await_election()
-        setproctitle.setproctitle(daemon.process_name('cluster') + ' active')
 
         last_loop_run = 0
-        while True:
-            self.lock.refresh()
-            self._cluster_wide_cleanup(last_loop_run)
-            last_loop_run = time.time()
-            self.lock.refresh()
-            time.sleep(300)
+        while self.running:
+            setproctitle.setproctitle(daemon.process_name('cluster') + ' idle')
+            self._await_election()
+
+            if self.is_elected and self.running:
+                setproctitle.setproctitle(
+                    daemon.process_name('cluster') + ' active')
+                self.lock.refresh()
+                self._cluster_wide_cleanup(last_loop_run)
+                last_loop_run = time.time()
+                self.lock.refresh()
+                time.sleep(10)

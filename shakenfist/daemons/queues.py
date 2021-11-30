@@ -396,7 +396,6 @@ def snapshot(inst, disk, artifact_uuid, blob_uuid):
 class Monitor(daemon.WorkerPoolDaemon):
     def run(self):
         LOG.info('Starting')
-        self.running = True
 
         while True:
             try:

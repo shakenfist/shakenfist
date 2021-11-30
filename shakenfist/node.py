@@ -27,7 +27,8 @@ class Node(dbo):
         None: (dbo.STATE_CREATED, dbo.STATE_ERROR, STATE_MISSING),
         dbo.STATE_CREATED: (dbo.STATE_DELETED, dbo.STATE_ERROR, STATE_MISSING,
                             STATE_STOPPING),
-        STATE_STOPPING: (STATE_STOPPED, dbo.STATE_DELETED, dbo.STATE_ERROR),
+        STATE_STOPPING: (STATE_STOPPED, dbo.STATE_DELETED, dbo.STATE_ERROR,
+                         dbo.STATE_CREATED),
         STATE_STOPPED: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR),
 
         # A node can return from the dead...
