@@ -297,10 +297,10 @@ class Monitor(daemon.WorkerPoolDaemon):
             n.add_floating_ip(ni.floating.get('floating_address'), ni.ipv4)
 
     def _process_network_node_workitems(self):
-        while True:
+        while self.running:
             jobname, workitem = etcd.dequeue('networknode')
             if not workitem:
-                time.sleep(0.2)
+                return
             else:
                 try:
                     log_ctx = LOG.with_field('workitem', workitem)
@@ -403,7 +403,6 @@ class Monitor(daemon.WorkerPoolDaemon):
 
     def run(self):
         LOG.info('Starting')
-        self.running = True
         last_management = 0
 
         network_worker = None
@@ -458,7 +457,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                 else:
                     return
 
-                time.sleep(1)
+                time.sleep(0.2)
 
             except Exception as e:
                 util_general.ignore_exception('network worker', e)
