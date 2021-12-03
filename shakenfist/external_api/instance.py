@@ -200,7 +200,7 @@ class InstancesEndpoint(api_base.Resource):
                 if not a:
                     return api_base.error(404, 'artifact %s not found' % disk_base)
                 if a.state.value != Artifact.STATE_CREATED:
-                    return api_base.error(404, 'artifact %s is not ready (state=%s)'
+                    return api_base.error(404, 'disk base %s is not ready (state=%s)'
                                           % (disk_base, a.state.value))
 
                 blob_uuid = a.most_recent_index.get('blob_uuid')
