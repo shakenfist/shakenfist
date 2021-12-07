@@ -11,17 +11,25 @@ from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist.config import config
-from shakenfist import constants
+from shakenfist.constants import LOCK_REFRESH_SECONDS, GiB
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist.exceptions import BlobDeleted
 from shakenfist import instance
 from shakenfist import logutil
+from shakenfist.node import Nodes, active_states_filter as node_active_states_filter
+from shakenfist.tasks import FetchBlobTask
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
 
 
 LOG, _ = logutil.setup(__name__)
+
+
+def _sort_by_key(d):
+    for k in sorted(d):
+        for v in d[k]:
+            yield v
 
 
 class Blob(dbo):
@@ -56,7 +64,6 @@ class Blob(dbo):
         )
 
         b = Blob.from_db(blob_uuid)
-        b.state = Blob.STATE_CREATED
         return b
 
     @staticmethod
@@ -148,11 +155,11 @@ class Blob(dbo):
                 locs.append(config.NODE_NAME)
             self.locations = locs
 
-    def drop_node_location(self):
+    def drop_node_location(self, node=config.NODE_NAME):
         with self.get_lock_attr('locations', 'Remove node from location'):
             locs = self.locations
             try:
-                locs.remove(config.NODE_NAME)
+                locs.remove(node)
             except ValueError:
                 pass
             else:
@@ -161,6 +168,8 @@ class Blob(dbo):
 
     def observe(self):
         self.add_node_location()
+        if self.state.value != self.STATE_CREATED:
+            self.state = self.STATE_CREATED
 
         with self.get_lock_attr('locations', 'Set blob info'):
             if not self.info:
@@ -238,7 +247,7 @@ class Blob(dbo):
                         total_bytes_received += len(chunk)
                         bytes_in_attempt += len(chunk)
 
-                        if time.time() - last_refresh > constants.LOCK_REFRESH_SECONDS:
+                        if time.time() - last_refresh > LOCK_REFRESH_SECONDS:
                             db.refresh_locks(locks)
                             last_refresh = time.time()
 
@@ -255,6 +264,32 @@ class Blob(dbo):
 
         os.rename(blob_path + '.partial', blob_path)
         self.observe()
+
+    def request_replication(self):
+        targets = config.BLOB_REPLICATION_FACTOR - len(self.locations)
+        if targets > 0:
+            blob_size_gb = int(int(self.size) / GiB)
+            by_disk = {}
+            for n in Nodes([node_active_states_filter]):
+                metrics = db.get_metrics(n.fqdn)
+
+                # If replicating a blob to a given node would make the target node
+                # have less than the minimum free disk, then don't do it.
+                disk_free_gb = int(metrics.get('disk_free', '0') / GiB)
+                if disk_free_gb - blob_size_gb < config.MINIMUM_FREE_DISK:
+                    continue
+
+                by_disk.setdefault(disk_free_gb, [])
+                by_disk[disk_free_gb].append(n.fqdn)
+
+            for node in list(_sort_by_key(by_disk))[:targets]:
+                etcd.enqueue(node, {
+                    'tasks': [FetchBlobTask(self.uuid)]
+                })
+                LOG.with_fields({
+                    'blob': self.uuid,
+                    'node': node
+                }).info('Instructed to replicate blob')
 
     def hard_delete(self):
         etcd.delete('blob', None, self.uuid)
@@ -285,6 +320,7 @@ def snapshot_disk(disk, blob_uuid, related_object=None):
     # And make the associated blob
     b = Blob.new(blob_uuid, st.st_size, time.time(), time.time())
     b.observe()
+    b.request_replication()
     return b
 
 
@@ -313,7 +349,7 @@ def http_fetch(resp, blob_uuid, locks, logs):
                     'Fetch %.02f percent complete' % percentage)
                 previous_percentage = percentage
 
-            if time.time() - last_refresh > constants.LOCK_REFRESH_SECONDS:
+            if time.time() - last_refresh > LOCK_REFRESH_SECONDS:
                 db.refresh_locks(locks)
                 last_refresh = time.time()
 

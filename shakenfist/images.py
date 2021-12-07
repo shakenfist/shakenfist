@@ -9,7 +9,8 @@ from shakenfist.artifact import Artifact, BLOB_URL
 from shakenfist import blob
 from shakenfist.blob import Blob
 from shakenfist.config import config
-from shakenfist import constants
+from shakenfist.constants import (QCOW2_CLUSTER_SIZE, LOCK_REFRESH_SECONDS,
+                                  KiB, MiB)
 from shakenfist import exceptions
 from shakenfist import image_resolver
 from shakenfist import logutil
@@ -31,7 +32,7 @@ class ImageFetchHelper(object):
             {'url': self.url, 'artifact': self.__artifact.uuid})
 
     def get_image(self):
-        with self.__artifact.get_lock(ttl=(12 * constants.LOCK_REFRESH_SECONDS),
+        with self.__artifact.get_lock(ttl=(12 * LOCK_REFRESH_SECONDS),
                                       timeout=config.MAX_IMAGE_TRANSFER_SECONDS) as lock:
             b = self.transfer_image(lock)
             self.transcode_image(lock, b)
@@ -134,12 +135,13 @@ class ImageFetchHelper(object):
                 cache_info = util_image.identify(blob_path)
 
                 # Convert the cluster size from qemu format to an int
-                cluster_size_as_int = constants.qcow2_cluster_size
+                cluster_size_as_int = QCOW2_CLUSTER_SIZE
                 if cluster_size_as_int.endswith('M'):
                     cluster_size_as_int = int(
-                        cluster_size_as_int[:-1]) * 1024 * 1024
+                        cluster_size_as_int[:-1]) * MiB
                 elif cluster_size_as_int.endswith('K'):
-                    cluster_size_as_int = int(cluster_size_as_int[:-1]) * 1024
+                    cluster_size_as_int = int(
+                        cluster_size_as_int[:-1]) * KiB
                 else:
                     cluster_size_as_int = int(cluster_size_as_int)
 
@@ -193,6 +195,7 @@ class ImageFetchHelper(object):
 
             # Only persist values after the file has been verified.
             b.observe()
+            b.request_replication()
             return b
 
     def _open_connection(self, url):

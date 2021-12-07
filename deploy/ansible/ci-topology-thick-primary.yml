@@ -42,7 +42,7 @@
           export METAL_SSH_USER="{{base_image_user}}"
           export METAL_SSH_KEY_FILENAME="/root/.ssh/id_rsa"
           export HTTP_PROXY="http://192.168.1.50:3128"
-          export INCLUDE_TRACEBACKS="True"
+          export INCLUDE_TRACEBACKS=1
 
           export KSM_ENABLED=0
 

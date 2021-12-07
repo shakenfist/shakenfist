@@ -42,6 +42,7 @@ class Node(dbo):
                                    static_values.get('version'))
 
         self.__ip = static_values['ip']
+        self.__fqdn = static_values['fqdn']
 
     @classmethod
     def new(cls, name, ip):
@@ -98,6 +99,10 @@ class Node(dbo):
     @property
     def ip(self):
         return self.__ip
+
+    @property
+    def fqdn(self):
+        return self.__fqdn
 
     # Values routed to attributes, writes are via helper methods.
     @property

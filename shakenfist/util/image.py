@@ -57,7 +57,7 @@ def identify(path):
 def create_cow(locks, cache_file, disk_file, disk_size):
     """Create a COW layer on top of the image cache.
 
-    disk_size is specified in Gigabytes.
+    disk_size is specified in GiBs.
     """
 
     if os.path.exists(disk_file):
@@ -81,14 +81,14 @@ def create_cow(locks, cache_file, disk_file, disk_size):
         util_process.execute(
             locks,
             ('qemu-img create -b %s -o cluster_size=%s -f qcow2 %s %dG'
-             % (cache_file, constants.qcow2_cluster_size, disk_file,
+             % (cache_file, constants.QCOW2_CLUSTER_SIZE, disk_file,
                 int(disk_size))),
             iopriority=util_process.PRIORITY_LOW)
     else:
         util_process.execute(
             locks,
             'qemu-img create -b %s -o cluster_size=%s -f qcow2 %s'
-            % (cache_file, constants.qcow2_cluster_size, disk_file),
+            % (cache_file, constants.QCOW2_CLUSTER_SIZE, disk_file),
             iopriority=util_process.PRIORITY_LOW)
 
 
@@ -101,7 +101,7 @@ def create_qcow2(locks, cache_file, disk_file, disk_size=None):
     util_process.execute(
         locks,
         'qemu-img convert -t none -o cluster_size=%s -O qcow2 %s %s'
-        % (constants.qcow2_cluster_size, cache_file, disk_file),
+        % (constants.QCOW2_CLUSTER_SIZE, cache_file, disk_file),
         iopriority=util_process.PRIORITY_LOW)
     if disk_size:
         util_process.execute(
@@ -117,7 +117,7 @@ def create_blank(locks, disk_file, disk_size):
 
     util_process.execute(
         locks, 'qemu-img create -o cluster_size=%s -f qcow2 %s %sG'
-        % (constants.qcow2_cluster_size, disk_file, disk_size),
+        % (constants.QCOW2_CLUSTER_SIZE, disk_file, disk_size),
         iopriority=util_process.PRIORITY_LOW)
 
 
@@ -127,5 +127,5 @@ def snapshot(locks, source, destination):
     util_process.execute(
         locks,
         ('qemu-img convert --force-share -o cluster_size=%s -O qcow2 -c %s %s'
-         % (constants.qcow2_cluster_size, source, destination)),
+         % (constants.QCOW2_CLUSTER_SIZE, source, destination)),
         iopriority=util_process.PRIORITY_LOW)
