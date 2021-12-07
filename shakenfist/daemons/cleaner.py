@@ -192,7 +192,7 @@ class Monitor(daemon.Daemon):
                     else:
                         b = Blob.from_db(ent)
                         if (not b or b.state.value == Blob.STATE_DELETED
-                                or config.NODE_NAME not in b.location):
+                                or config.NODE_NAME not in b.locations):
                             LOG.with_fields({
                                 'blob': ent}).warning('Deleting orphaned blob')
                             os.unlink(entpath)
