@@ -301,7 +301,7 @@ class Blob(dbo):
         return os.path.join(config.STORAGE_PATH, 'blobs', blob_uuid)
 
 
-def _ensure_blob_path():
+def ensure_blob_path():
     blobs_path = os.path.join(config.STORAGE_PATH, 'blobs')
     os.makedirs(blobs_path, exist_ok=True)
 
@@ -309,7 +309,7 @@ def _ensure_blob_path():
 def snapshot_disk(disk, blob_uuid, related_object=None):
     if not os.path.exists(disk['path']):
         return
-    _ensure_blob_path()
+    ensure_blob_path()
     dest_path = Blob.filepath(blob_uuid)
 
     # Actually make the snapshot
@@ -325,7 +325,7 @@ def snapshot_disk(disk, blob_uuid, related_object=None):
 
 
 def http_fetch(resp, blob_uuid, locks, logs):
-    _ensure_blob_path()
+    ensure_blob_path()
 
     fetched = 0
     if resp.headers.get('Content-Length'):

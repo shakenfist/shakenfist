@@ -19,6 +19,7 @@ from shakenfist import baseobject
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
+from shakenfist import blob
 from shakenfist.config import config
 from shakenfist import constants
 from shakenfist import db
@@ -74,7 +75,7 @@ def _safe_int_cast(i):
 
 class Instance(dbo):
     object_type = 'instance'
-    current_version = 4
+    current_version = 5
 
     # docs/development/state_machine.md has a description of these states.
     STATE_INITIAL_ERROR = 'initial-error'
@@ -125,6 +126,8 @@ class Instance(dbo):
         self.__uefi = static_values.get('uefi', False)
         self.__configdrive = static_values.get(
             'configdrive', 'openstack-disk')
+        self.__nvram_template = static_values.get('nvram_template')
+        self.__secure_boot = static_values.get('secure_boot', False)
 
         if not self.__disk_spec:
             # This should not occur since the API will filter for zero disks.
@@ -134,7 +137,7 @@ class Instance(dbo):
     @classmethod
     def new(cls, name, cpus, memory, namespace, ssh_key=None, disk_spec=None,
             user_data=None, video=None, requested_placement=None, uuid=None,
-            uefi=False, configdrive=None):
+            uefi=False, configdrive=None, nvram_template=None, secure_boot=False):
 
         if not uuid:
             # uuid should only be specified in testing
@@ -157,6 +160,8 @@ class Instance(dbo):
                 'video': video,
                 'uefi': uefi,
                 'configdrive': configdrive,
+                'nvram_template': nvram_template,
+                'secure_boot': secure_boot,
 
                 'version': cls.current_version
             })
@@ -193,6 +198,8 @@ class Instance(dbo):
             'video': self.video,
             'uefi': self.uefi,
             'configdrive': self.configdrive,
+            'nvram_template': self.nvram_template,
+            'secure_boot': self.secure_boot,
             'version': self.version,
             'error_message': self.error,
         }
@@ -280,6 +287,14 @@ class Instance(dbo):
     @property
     def configdrive(self):
         return self.__configdrive
+
+    @property
+    def nvram_template(self):
+        return self.__nvram_template
+
+    @property
+    def secure_boot(self):
+        return self.__secure_boot
 
     @property
     def instance_path(self):
@@ -839,6 +854,7 @@ class Instance(dbo):
     def _create_domain_xml(self):
         """Create the domain XML for the instance."""
 
+        os.makedirs(self.instance_path, exist_ok=True)
         with open(os.path.join(config.STORAGE_PATH, 'libvirt.tmpl')) as f:
             t = jinja2.Template(f.read())
 
@@ -854,6 +870,26 @@ class Instance(dbo):
                     'mtu': config.MAX_HYPERVISOR_MTU - 50
                 }
             )
+
+        # The nvram_template variable is either None (use the default path), or
+        # a UUID of a blob to fetch. The nvram template is only used for UEFI boots.
+        nvram_template_attribute = ''
+        if self.uefi:
+            if not self.nvram_template:
+                if self.secure_boot:
+                    nvram_template_attribute = "template = '/usr/share/OVMF/OVMF_VARS.ms.fd'"
+                else:
+                    nvram_template_attribute = "template = '/usr/share/OVMF/OVMF_VARS.fd'"
+            else:
+                # Fetch the nvram template
+                b = blob.Blob.from_db(self.nvram_template)
+                if not b:
+                    raise exceptions.NVRAMTemplateMissing(
+                        'Blob %s does not exist' % self.nvram_template)
+                b.ensure_local()
+                shutil.copyfile(
+                    b.filepath(), os.path.join(self.instance_path, 'nvram'))
+                nvram_template_attribute = ''
 
         # NOTE(mikal): the database stores memory allocations in MB, but the
         # domain XML takes them in KB. That wouldn't be worth a comment here if
@@ -872,13 +908,13 @@ class Instance(dbo):
             video_model=self.video['model'],
             video_memory=self.video['memory'],
             uefi=self.uefi,
+            nvram_template_attribute=nvram_template_attribute,
             extracommands=block_devices.get('extracommands', [])
         )
 
         # Libvirt re-writes the domain XML once loaded, so we store the XML
         # as generated as well so that we can debug. Note that this is _not_
         # the XML actually used by libvirt.
-        os.makedirs(self.instance_path, exist_ok=True)
         with open(os.path.join(self.instance_path, 'original_domain.xml'), 'w') as f:
             f.write(x)
 

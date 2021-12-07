@@ -92,8 +92,10 @@ class InstancesEndpoint(api_base.Resource):
     @api_base.requires_namespace_exist
     def post(self, name=None, cpus=None, memory=None, network=None, disk=None,
              ssh_key=None, user_data=None, placed_on=None, namespace=None,
-             video=None, uefi=False, configdrive=None, metadata=None):
+             video=None, uefi=False, configdrive=None, metadata=None,
+             nvram_template=None):
         global SCHEDULER
+        secure_boot = False
 
         if not namespace:
             namespace = get_jwt_identity()[0]
@@ -109,6 +111,10 @@ class InstancesEndpoint(api_base.Resource):
                 400, ('instance name %s is not useable as a DNS and Linux host name. '
                       'That is, less than 63 characters and in the character set: '
                       'a-z, A-Z, 0-9, or hyphen (-).' % name))
+
+        # Secure boot requires UEFI
+        if secure_boot and not uefi:
+            return api_base.error(400, 'secure boot requires UEFI be enabled')
 
         # If we are placed, make sure that node exists
         if placed_on:
@@ -257,6 +263,8 @@ class InstancesEndpoint(api_base.Resource):
             uefi=uefi,
             configdrive=configdrive,
             requested_placement=placed_on,
+            nvram_template=nvram_template,
+            secure_boot=secure_boot
         )
 
         # Initialise metadata

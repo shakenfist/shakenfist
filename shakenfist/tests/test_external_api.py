@@ -555,10 +555,12 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
                     'ssh_key': 'sshkey',
                     'user_data': 'userdata',
                     'uuid': 'uuid42',
-                    'version': 4,
+                    'version': 5,
                     'video': {'memory': 16384, 'model': 'cirrus'},
                     'uefi': False,
                     'configdrive': 'openstack-disk',
+                    'nvram_template': None,
+                    'secure_boot': False
                 })
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 return_value={})
@@ -584,8 +586,10 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
             'user_data': 'userdata',
             'uuid': 'uuid42',
             'vdi_port': None,
-            'version': 4,
-            'video': {'memory': 16384, 'model': 'cirrus'}
+            'version': 5,
+            'video': {'memory': 16384, 'model': 'cirrus'},
+            'nvram_template': None,
+            'secure_boot': False
         }, resp.get_json())
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)

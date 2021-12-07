@@ -76,7 +76,9 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
                     'video': {'model': 'cirrus', 'memory': 16384},
                     'uefi': False,
                     'configdrive': 'openstack-disk',
-                    'version': 4
+                    'version': 5,
+                    'nvram_template': None,
+                    'secure_boot': False
                 })
     @mock.patch('shakenfist.etcd.put')
     @mock.patch('shakenfist.etcd.create')
@@ -115,10 +117,12 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
                  'ssh_key': 'sshkey',
                  'user_data': 'userdata',
                  'uuid': 'uuid42',
-                 'version': 4,
+                 'version': 5,
                  'video': {'memory': 16384, 'model': 'cirrus'},
                  'uefi': False,
-                 'configdrive': 'openstack-disk'
+                 'configdrive': 'openstack-disk',
+                 'nvram_template': None,
+                 'secure_boot': False
              }),
             mock_create.mock_calls[0][1])
 
@@ -133,10 +137,12 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
                     'ssh_key': 'sshkey',
                     'user_data': 'userdata',
                     'uuid': 'uuid42',
-                    'version': 4,
+                    'version': 5,
                     'video': {'memory': 16384, 'model': 'cirrus'},
                     'uefi': False,
-                    'configdrive': 'openstack-disk'
+                    'configdrive': 'openstack-disk',
+                    'nvram_template': None,
+                    'secure_boot': False
                 })
     def test_from_db(self, mock_get):
         inst = instance.Instance.from_db('uuid42')
@@ -149,7 +155,10 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
         self.assertEqual('sshkey', inst.ssh_key)
         self.assertEqual('userdata', inst.user_data)
         self.assertEqual('uuid42', inst.uuid)
-        self.assertEqual(4, inst.version)
+        self.assertEqual(5, inst.version)
+        self.assertEqual('openstack-disk', inst.configdrive)
+        self.assertEqual(None, inst.nvram_template)
+        self.assertEqual(False, inst.secure_boot)
         self.assertEqual({'memory': 16384, 'model': 'cirrus'}, inst.video)
         self.assertEqual('/a/b/c/instances/uuid42', inst.instance_path)
 
@@ -195,7 +204,9 @@ class InstanceTestCase(base.ShakenFistTestCase):
                     'video': {'model': 'cirrus', 'memory': 16384},
                     'uefi': False,
                     'configdrive': 'openstack-disk',
-                    'version': 4
+                    'version': 5,
+                    'nvram_template': None,
+                    'secure_boot': False
                 })
     def _make_instance(self, mock_get_instance, mock_create_instance):
         return instance.Instance.new(
@@ -541,7 +552,9 @@ GET_ALL_INSTANCES = [
         'video': {'model': 'cirrus', 'memory': 16384},
         'uefi': False,
         'configdrive': 'openstack-disk',
-        'version': 4
+        'version': 5,
+        'nvram_template': None,
+        'secure_boot': False
     }),
     # Present here, but not in the get (a race?)
     (None, {
@@ -560,7 +573,9 @@ GET_ALL_INSTANCES = [
         'video': {'model': 'cirrus', 'memory': 16384},
         'uefi': False,
         'configdrive': 'openstack-disk',
-        'version': 4
+        'version': 5,
+        'nvram_template': None,
+        'secure_boot': False
     }),
     (None, {
         'uuid': 'a7c5ecec-c3a9-4774-ad1b-249d9e90e806',
@@ -578,7 +593,9 @@ GET_ALL_INSTANCES = [
         'video': {'model': 'cirrus', 'memory': 16384},
         'uefi': False,
         'configdrive': 'openstack-disk',
-        'version': 4
+        'version': 5,
+        'nvram_template': None,
+        'secure_boot': False
     })
 ]
 

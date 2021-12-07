@@ -37,6 +37,11 @@ class InstanceBadDiskSpecification(InstanceException):
     pass
 
 
+class NVRAMTemplateMissing(InstanceException):
+    pass
+
+
+# Scheduler
 class SchedulerException(Exception):
     pass
 
