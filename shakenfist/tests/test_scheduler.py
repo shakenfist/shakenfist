@@ -80,11 +80,6 @@ class SchedulerTestCase(base.ShakenFistTestCase):
         self.mock_add_event.start()
         self.addCleanup(self.mock_add_event.stop)
 
-        self.mock_instance_affinity = mock.patch(
-            'shakenfist.instance.Instance.affinity', return_value={})
-        self.mock_instance_affinity.start()
-        self.addCleanup(self.mock_instance_affinity.stop)
-
 
 class LowResourceTestCase(SchedulerTestCase):
     """Test low resource exceptions."""
@@ -116,6 +111,11 @@ class LowResourceTestCase(SchedulerTestCase):
         self.mock_get_instances = mock.patch('shakenfist.instance.Instances')
         self.mock_get_instances.start()
         self.addCleanup(self.mock_get_instances.stop)
+
+        self.mock_instance_affinity = mock.patch(
+            'shakenfist.instance.Instance.affinity', return_value={})
+        self.mock_instance_affinity.start()
+        self.addCleanup(self.mock_instance_affinity.stop)
 
     def test_no_metrics(self):
         fake_inst = FakeInstance({
@@ -314,6 +314,11 @@ class CorrectAllocationTestCase(SchedulerTestCase):
         mock_get_nodes.start()
         self.addCleanup(mock_get_nodes.stop)
 
+        self.mock_instance_affinity = mock.patch(
+            'shakenfist.instance.Instance.affinity', return_value={})
+        self.mock_instance_affinity.start()
+        self.addCleanup(self.mock_instance_affinity.stop)
+
     @mock.patch('shakenfist.db.get_metadata', return_value={})
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 side_effect=[
@@ -394,6 +399,11 @@ class ForcedCandidatesTestCase(SchedulerTestCase):
         self.mock_get_instances = mock.patch('shakenfist.instance.Instances')
         self.mock_get_instances.start()
         self.addCleanup(self.mock_get_instances.stop)
+
+        self.mock_instance_affinity = mock.patch(
+            'shakenfist.instance.Instance.affinity', return_value={})
+        self.mock_instance_affinity.start()
+        self.addCleanup(self.mock_instance_affinity.stop)
 
     @mock.patch('shakenfist.artifact.Artifacts', return_value=[])
     def test_only_two(self, mock_get_artifacts):
@@ -476,6 +486,11 @@ class MetricsRefreshTestCase(SchedulerTestCase):
         self.mock_get_instances.start()
         self.addCleanup(self.mock_get_instances.stop)
 
+        self.mock_instance_affinity = mock.patch(
+            'shakenfist.instance.Instance.affinity', return_value={})
+        self.mock_instance_affinity.start()
+        self.addCleanup(self.mock_instance_affinity.stop)
+
     @mock.patch('shakenfist.artifact.Artifacts', return_value=[])
     def test_refresh(self, mock_get_artifacts):
         fake_inst = FakeInstance({
@@ -513,3 +528,321 @@ class MetricsRefreshTestCase(SchedulerTestCase):
         s.metrics_updated = time.time() - 400
         s.place_instance(fake_inst, [])
         self.assertEqual(11000, s.metrics['node1_net']['memory_available'])
+
+
+class CPUloadAffinityTestCase(SchedulerTestCase):
+    """Test CPU load affinity."""
+
+    def setUp(self):
+        super().setUp()
+
+        self.fake_db = FakeDB(['node1_net', 'node2', 'node3', 'node4'])
+
+        mock_db_get_metrics = mock.patch('shakenfist.db.get_metrics',
+                                         side_effect=self.fake_db.get_metrics)
+        mock_db_get_metrics.start()
+        self.addCleanup(mock_db_get_metrics.stop)
+
+        self.mock_config = mock.patch(
+            'shakenfist.scheduler.config', fake_config)
+        self.mock_config.start()
+        self.addCleanup(self.mock_config.stop)
+
+        mock_get_nodes = mock.patch(
+            'shakenfist.scheduler.Nodes',
+            return_value=[FakeNode('node1_net', '10.0.0.1'),
+                          FakeNode('node2', '10.0.0.2'),
+                          FakeNode('node3', '10.0.0.3'),
+                          FakeNode('node4', '10.0.0.4')])
+        mock_get_nodes.start()
+        self.addCleanup(mock_get_nodes.stop)
+
+    @mock.patch('shakenfist.db.get_metadata', side_effect=[
+            {  # fakeuuid
+                "affinity": {
+                    "cpu": {
+                        "socialite": 2,
+                        "nerd": -100,
+                    }
+                },
+            },
+            {'tags': ['socialite']},  # inst-1
+            {'tags': ['socialite']},  # inst-1
+            {'tags': ['socialite']},  # inst-1
+        ])
+    @mock.patch('shakenfist.instance.Instance._db_get_attribute',
+                side_effect=[
+                    {'value': Instance.STATE_CREATED, 'update_time': '1'},
+                    {'node': 'node3', 'placement_attempts': 1},  # inst-1
+                ])
+    @mock.patch('shakenfist.instance.Instance._db_get',
+                return_value={
+                    'uuid': 'inst-1',
+                    'cpus': 1,
+                    'memory': 1024,
+                    'node': 'node3',
+                    'disk_spec': [{'base': 'cirros', 'size': 21}]
+                })
+    @mock.patch('shakenfist.etcd.get_all',
+                return_value=[(None, {
+                    'uuid': 'inst-1',
+                    'cpus': 1,
+                    'memory': 1024,
+                    'node': 'node3',
+                    'disk_spec': [{'base': 'cirros', 'size': 21}]
+                })])
+    @mock.patch('shakenfist.artifact.Artifacts', return_value=[])
+    def test_affinity_to_same_node(
+            self, mock_get_artifacts, mock_get_instances,
+            mock_get_instance, mock_instance_attribute, mock_metadata):
+
+        self.fake_db.set_node_metrics_same({
+            'cpu_max_per_instance': 16,
+            'cpu_max': 4,
+            'memory_available': 22000,
+            'memory_max': 24000,
+            'disk_free_instances': 2000*1024*1024*1024,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12
+        })
+
+        fake_inst = FakeInstance({
+            'uuid': 'fakeuuid',
+            'cpus': 1,
+            'memory': 1024,
+            'disk_spec': [{
+                'base': 'cirros',
+                        'size': 8
+            }]})
+
+        nodes = scheduler.Scheduler().place_instance(fake_inst, [])
+        self.assertSetEqual({'node3'}, set(nodes))
+
+    @mock.patch('shakenfist.db.get_metadata', side_effect=[
+            {  # fakeuuid
+                "affinity": {
+                    "cpu": {
+                        "socialite": 2,
+                        "nerd": -100,
+                    }
+                },
+            },
+            {'tags': ['nerd']},  # inst-1
+            {'tags': ['nerd']},  # inst-1
+            {'tags': ['nerd']},  # inst-1
+        ])
+    @mock.patch('shakenfist.instance.Instance._db_get_attribute',
+                side_effect=[
+                    {'value': Instance.STATE_CREATED, 'update_time': '1'},
+                    {'node': 'node3', 'placement_attempts': 1},  # inst-1
+                ])
+    @mock.patch('shakenfist.instance.Instance._db_get',
+                return_value={
+                    'uuid': 'inst-1',
+                    'cpus': 1,
+                    'memory': 1024,
+                    'node': 'node3',
+                    'disk_spec': [{'base': 'cirros', 'size': 21}]
+                })
+    @mock.patch('shakenfist.etcd.get_all',
+                return_value=[(None, {
+                    'uuid': 'inst-1',
+                    'cpus': 1,
+                    'memory': 1024,
+                    'node': 'node3',
+                    'disk_spec': [{'base': 'cirros', 'size': 21}]
+                })])
+    @mock.patch('shakenfist.artifact.Artifacts', return_value=[])
+    def test_anti_affinity_single_inst(
+            self, mock_get_artifacts, mock_get_instances,
+            mock_get_instance, mock_instance_attribute, mock_metadata):
+
+        self.fake_db.set_node_metrics_same({
+            'cpu_max_per_instance': 16,
+            'cpu_max': 4,
+            'memory_available': 22000,
+            'memory_max': 24000,
+            'disk_free_instances': 2000*1024*1024*1024,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12
+        })
+
+        fake_inst = FakeInstance({
+            'uuid': 'fakeuuid',
+            'cpus': 1,
+            'memory': 1024,
+            'disk_spec': [{
+                'base': 'cirros',
+                        'size': 8
+            }]})
+
+        nodes = scheduler.Scheduler().place_instance(fake_inst, [])
+        self.assertSetEqual({'node2', 'node4'}, set(nodes))
+
+    @mock.patch('shakenfist.db.get_metadata', side_effect=[
+            {  # fakeuuid
+                "affinity": {
+                    "cpu": {
+                        "socialite": 2,
+                        "nerd": -100,
+                    }
+                },
+            },
+            {'tags': ['nerd']},  # inst-1
+            {'tags': ['nerd']},  # inst-1
+            {'tags': ['nerd']},  # inst-1
+            {'tags': ['nerd']},  # inst-2
+            {'tags': ['nerd']},  # inst-2
+            {'tags': ['nerd']},  # inst-2
+        ])
+    @mock.patch('shakenfist.instance.Instance._db_get_attribute',
+                side_effect=[
+                    {'value': Instance.STATE_CREATED, 'update_time': '1'},
+                    {'node': 'node3', 'placement_attempts': 1},  # inst-1
+                    {'value': Instance.STATE_CREATED, 'update_time': '1'},
+                    {'node': 'node4', 'placement_attempts': 1},  # inst-2
+                ])
+    @mock.patch('shakenfist.instance.Instance._db_get',
+                side_effect=[
+                    {
+                        'uuid': 'inst-1',
+                        'cpus': 1,
+                        'memory': 1024,
+                        'node': 'node3',
+                        'disk_spec': [{'base': 'cirros', 'size': 21}]
+                    },
+                    {
+                        'uuid': 'inst-2',
+                        'cpus': 1,
+                        'memory': 1024,
+                        'node': 'node4',
+                        'disk_spec': [{'base': 'cirros', 'size': 21}]
+                    },
+                ])
+    @mock.patch('shakenfist.etcd.get_all',
+                return_value=[
+                    (None, {
+                        'uuid': 'inst-1',
+                        'cpus': 1,
+                        'memory': 1024,
+                        'node': 'node3',
+                        'disk_spec': [{'base': 'cirros', 'size': 21}]
+                    }),
+                    (None, {
+                        'uuid': 'inst-2',
+                        'cpus': 1,
+                        'memory': 1024,
+                        'node': 'node4',
+                        'disk_spec': [{'base': 'cirros', 'size': 21}]
+                    }),
+                    ])
+    @mock.patch('shakenfist.artifact.Artifacts', return_value=[])
+    def test_anti_affinity_multiple_inst(
+            self, mock_get_artifacts, mock_get_instances,
+            mock_get_instance, mock_instance_attribute, mock_metadata):
+
+        self.fake_db.set_node_metrics_same({
+            'cpu_max_per_instance': 16,
+            'cpu_max': 4,
+            'memory_available': 22000,
+            'memory_max': 24000,
+            'disk_free_instances': 2000*1024*1024*1024,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12
+        })
+
+        fake_inst = FakeInstance({
+            'uuid': 'fakeuuid',
+            'cpus': 1,
+            'memory': 1024,
+            'disk_spec': [{
+                'base': 'cirros',
+                        'size': 8
+            }]})
+
+        nodes = scheduler.Scheduler().place_instance(fake_inst, [])
+        self.assertSetEqual({'node2'}, set(nodes))
+
+    @mock.patch('shakenfist.db.get_metadata', side_effect=[
+            {  # fakeuuid
+                "affinity": {
+                    "cpu": {
+                        "socialite": 2,
+                        "nerd": -100,
+                    }
+                },
+            },
+            {'tags': ['socialite']},  # inst-1
+            {'tags': ['socialite']},  # inst-1
+            {'tags': ['socialite']},  # inst-1
+            {'tags': ['nerd']},  # inst-2
+            {'tags': ['nerd']},  # inst-2
+            {'tags': ['nerd']},  # inst-2
+        ])
+    @mock.patch('shakenfist.instance.Instance._db_get_attribute',
+                side_effect=[
+                    {'value': Instance.STATE_CREATED, 'update_time': '1'},
+                    {'node': 'node3', 'placement_attempts': 1},  # inst-1
+                    {'value': Instance.STATE_CREATED, 'update_time': '1'},
+                    {'node': 'node4', 'placement_attempts': 1},  # inst-2
+                ])
+    @mock.patch('shakenfist.instance.Instance._db_get',
+                side_effect=[
+                    {
+                        'uuid': 'inst-1',
+                        'cpus': 1,
+                        'memory': 1024,
+                        'node': 'node3',
+                        'disk_spec': [{'base': 'cirros', 'size': 21}]
+                    },
+                    {
+                        'uuid': 'inst-2',
+                        'cpus': 1,
+                        'memory': 1024,
+                        'node': 'node4',
+                        'disk_spec': [{'base': 'cirros', 'size': 21}]
+                    },
+                ])
+    @mock.patch('shakenfist.etcd.get_all',
+                return_value=[
+                    (None, {
+                        'uuid': 'inst-1',
+                        'cpus': 1,
+                        'memory': 1024,
+                        'node': 'node3',
+                        'disk_spec': [{'base': 'cirros', 'size': 21}]
+                    }),
+                    (None, {
+                        'uuid': 'inst-2',
+                        'cpus': 1,
+                        'memory': 1024,
+                        'node': 'node4',
+                        'disk_spec': [{'base': 'cirros', 'size': 21}]
+                    }),
+                    ])
+    @mock.patch('shakenfist.artifact.Artifacts', return_value=[])
+    def test_anti_affinity_multiple_inst_different_tags(
+            self, mock_get_artifacts, mock_get_instances,
+            mock_get_instance, mock_instance_attribute, mock_metadata):
+
+        self.fake_db.set_node_metrics_same({
+            'cpu_max_per_instance': 16,
+            'cpu_max': 4,
+            'memory_available': 22000,
+            'memory_max': 24000,
+            'disk_free_instances': 2000*1024*1024*1024,
+            'cpu_total_instance_vcpus': 4,
+            'cpu_available': 12
+        })
+
+        fake_inst = FakeInstance({
+            'uuid': 'fakeuuid',
+            'cpus': 1,
+            'memory': 1024,
+            'disk_spec': [{
+                'base': 'cirros',
+                        'size': 8
+            }]})
+
+        nodes = scheduler.Scheduler().place_instance(fake_inst, [])
+        self.assertSetEqual({'node3'}, set(nodes))

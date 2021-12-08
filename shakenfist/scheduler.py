@@ -123,9 +123,9 @@ class Scheduler(object):
 
         return True
 
-    def _has_sufficient_disk(self, log_ctx, instance, node):
+    def _has_sufficient_disk(self, log_ctx, inst, node):
         requested_disk = 0
-        for disk in instance.disk_spec:
+        for disk in inst.disk_spec:
             # TODO(mikal): this ignores "sizeless disks", that is ones that
             # are exactly the size of their base image, for example CD ROMs.
             if 'size' in disk:
@@ -229,7 +229,7 @@ class Scheduler(object):
 
             # Ensure all specified nodes are hypervisors
             for n in list(candidates):
-                instance.add_event(
+                inst.add_event(
                     'schedule',
                     'Is hypervisor: %s' % self.metrics[n].get(
                         'is_hypervisor', False),
@@ -259,7 +259,7 @@ class Scheduler(object):
 
             # Do we have enough idle CPU?
             for n in list(candidates):
-                if not self._has_sufficient_cpu(log_ctx, instance.cpus, n):
+                if not self._has_sufficient_cpu(log_ctx, inst.cpus, n):
                     candidates.remove(n)
             log_ctx.with_field('candidates', candidates).info(
                 'Scheduling: have enough idle CPU')
@@ -319,7 +319,7 @@ class Scheduler(object):
             log_ctx.with_field('by_load', by_load).info(
                 'Scheduling: Adjusted CPU load')
 
-            lowest_load = sorted(by_load.keys())[0]
+            lowest_load = sorted(by_load)[0]
             candidates = by_load[lowest_load]
             inst.add_event('schedule', 'Have lowest CPU load', None, str(candidates))
 
