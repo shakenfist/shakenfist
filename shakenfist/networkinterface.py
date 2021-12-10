@@ -68,12 +68,6 @@ class NetworkInterface(dbo):
             }
         )
 
-        LOG.with_fields({
-            'networkinterface': interface_uuid,
-            'instance_uuid': instance_uuid,
-            'network_uuid': netdesc['network_uuid']
-        }).debug('Network interface created')
-
         ni = NetworkInterface.from_db(interface_uuid)
         ni._db_set_attribute('floating', {'floating_address': None})
         ni.state = NetworkInterface.STATE_INITIAL

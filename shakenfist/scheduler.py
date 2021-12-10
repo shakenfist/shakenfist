@@ -321,9 +321,11 @@ class Scheduler(object):
 
             lowest_load = sorted(by_load)[0]
             candidates = by_load[lowest_load]
-            inst.add_event('schedule', 'Have lowest CPU load', None, str(candidates))
+            inst.add_event('schedule', 'Have lowest CPU load',
+                           None, str(candidates))
 
             # Return a shuffled list of options
             random.shuffle(candidates)
-            inst.add_event('schedule', 'Final candidates', None, str(candidates))
+            inst.add_event('schedule', 'Final candidates',
+                           None, str(candidates))
             return candidates

@@ -44,19 +44,15 @@ class Monitor(daemon.WorkerPoolDaemon):
                 inst = instance.Instance.from_db(ni.instance_uuid)
                 if not inst:
                     ni.delete()
-                    LOG.with_fields({
-                        'instance': ni.instance_uuid,
-                        'networkinterface': ni.uuid
-                    }).info('Deleted stray network interface for missing instance')
+                    LOG.with_object(ni).with_field('instance', ni.instance_uuid).info(
+                        'Deleted stray network interface for missing instance')
                 else:
                     s = inst.state
                     if (s.update_time + 30 < t and
                             s.value in [dbo.STATE_DELETED, dbo.STATE_ERROR, 'unknown']):
                         ni.delete()
-                        LOG.with_fields({
-                            'instance': ni.instance_uuid,
-                            'networkinterface': ni.uuid
-                        }).info('Deleted stray network interface')
+                        LOG.with_object(ni).with_field('instance', ni.instance_uuid).info(
+                            'Deleted stray network interface')
 
     def _maintain_networks(self):
         LOG.info('Maintaining networks')

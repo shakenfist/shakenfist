@@ -71,11 +71,6 @@ class Artifact(dbo):
             a = Artifact(static_values)
         else:
             Artifact._db_create(artifact_uuid, static_values)
-            LOG.with_fields({
-                'uuid': artifact_uuid,
-                'artifact_type': artifact_type,
-                'source_url': source_url
-            }).debug('Artifact created')
             a = Artifact.from_db(artifact_uuid)
 
         a.state = Artifact.STATE_INITIAL

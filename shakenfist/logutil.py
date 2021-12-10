@@ -154,6 +154,12 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
             extra.update({label: value})
         return SFCustomAdapter(self._logger, extra, self._prefix)
 
+    def with_objects(self, objs):
+        retval = self
+        for obj in objs:
+            retval = retval.with_object(obj)
+        return retval
+
     #
     # Use labelled convenience methods when ID is a string (not object)
     # Note: the helper method still handles objects

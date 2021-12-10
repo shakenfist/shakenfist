@@ -278,9 +278,8 @@ class Blob(dbo):
                 etcd.enqueue(n, {
                     'tasks': [FetchBlobTask(self.uuid)]
                 })
-                self.log.with_fields({
-                    'node': n
-                }).info('Instructed to replicate blob')
+                self.log.with_field('node', n).info(
+                    'Instructed to replicate blob')
 
     def hard_delete(self):
         etcd.delete('blob', None, self.uuid)
