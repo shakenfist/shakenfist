@@ -92,7 +92,7 @@ class InstancesEndpoint(api_base.Resource):
     @api_base.requires_namespace_exist
     def post(self, name=None, cpus=None, memory=None, network=None, disk=None,
              ssh_key=None, user_data=None, placed_on=None, namespace=None,
-             video=None, uefi=False, configdrive=None):
+             video=None, uefi=False, configdrive=None, metadata=None):
         global SCHEDULER
 
         if not namespace:
@@ -256,11 +256,23 @@ class InstancesEndpoint(api_base.Resource):
             video=video,
             uefi=uefi,
             configdrive=configdrive,
-            requested_placement=placed_on
+            requested_placement=placed_on,
         )
 
         # Initialise metadata
-        db.persist_metadata('instance', inst.uuid, {})
+        if metadata:
+            if not isinstance(metadata, dict):
+                return api_base.error(400, 'metadata must be a dictionary')
+
+            for k, v in metadata.items():
+                err = _validate_instance_metadata(k, v)
+                if err:
+                    return api_base.error(400, err)
+
+            db.persist_metadata('instance', inst.uuid, metadata)
+
+        else:
+            db.persist_metadata('instance', inst.uuid, {})
 
         # Allocate IP addresses
         order = 0
@@ -538,11 +550,45 @@ class InstanceMetadatasEndpoint(api_base.Resource):
         return api_util.metadata_putpost('instance', instance_uuid, key, value)
 
 
+def _validate_instance_metadata(key, value):
+    # Reserved key "tags" should be validated to avoid unexpected failures
+    if key == instance.Instance.METADATA_KEY_TAGS:
+        if not isinstance(value, list):
+            return api_base.error(400, 'value for "tags" key should a list')
+
+    # Reserved key "affinity" should be validated to avoid unexpected
+    # failures during instance creation.
+    elif key == instance.Instance.METADATA_KEY_AFFINITY:
+        if not isinstance(value, dict):
+            return api_base.error(
+                400,
+                'value for "affinity" key should a valid JSON dictionary')
+
+        for key_type, dv in value.items():
+            if key_type not in ('cpu', 'disk', 'instance'):
+                return api_base.error(
+                    400, 'can only set affinity for cpu, disk or instance')
+
+            if not isinstance(dv, dict):
+                return api_base.error(
+                    400,
+                    'value for affinity key should a dictionary')
+            for v in dv.values():
+                try:
+                    int(v)
+                except ValueError:
+                    return api_base.error(
+                        400, 'affinity dictionary values should be integers')
+
+
 class InstanceMetadataEndpoint(api_base.Resource):
     @jwt_required
     @api_base.arg_is_instance_uuid
     @api_base.requires_instance_ownership
     def put(self, instance_uuid=None, key=None, value=None, instance_from_db=None):
+        err = _validate_instance_metadata(key, value)
+        if err:
+            return err
         return api_util.metadata_putpost('instance', instance_uuid, key, value)
 
     @jwt_required

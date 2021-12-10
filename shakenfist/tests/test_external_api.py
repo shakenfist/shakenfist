@@ -558,7 +558,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
                     'version': 4,
                     'video': {'memory': 16384, 'model': 'cirrus'},
                     'uefi': False,
-                    'configdrive': 'openstack-disk'
+                    'configdrive': 'openstack-disk',
                 })
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 return_value={})

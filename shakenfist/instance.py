@@ -105,6 +105,10 @@ class Instance(dbo):
         dbo.STATE_DELETED: None,
     }
 
+    # Metadata - Reserved Keys
+    METADATA_KEY_TAGS = 'tags'
+    METADATA_KEY_AFFINITY = 'affinity'
+
     def __init__(self, static_values):
         super(Instance, self).__init__(static_values.get('uuid'),
                                        static_values.get('version'))
@@ -283,6 +287,12 @@ class Instance(dbo):
 
     # Values routed to attributes, writes are via helper methods.
     @property
+    def affinity(self):
+        # TODO(andy) Move metadata to a new DBO subclass "DBO with metadata"
+        meta = db.get_metadata('instance', self.uuid)
+        return meta.get(self.METADATA_KEY_AFFINITY, {})
+
+    @property
     def placement(self):
         return self._db_get_attribute('placement')
 
@@ -313,6 +323,12 @@ class Instance(dbo):
     @interfaces.setter
     def interfaces(self, interfaces):
         self._db_set_attribute('interfaces', interfaces)
+
+    @property
+    def tags(self):
+        # TODO(andy) Move metadata to a new DBO subclass "DBO with metadata"
+        meta = db.get_metadata('instance', self.uuid)
+        return meta.get(self.METADATA_KEY_TAGS, None)
 
     # Implementation
     def _initialize_block_devices(self):
