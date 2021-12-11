@@ -12,7 +12,7 @@
 
     {%- if uefi -%}
     <loader readonly='yes' type='pflash'>/usr/share/OVMF/OVMF_CODE.fd</loader>
-    <nvram>{{instance_path}}/nvram</nvram>
+    <nvram {{nvram_template_attribute}}>{{instance_path}}/nvram</nvram>
     {%- endif -%}
   </os>
   <features>

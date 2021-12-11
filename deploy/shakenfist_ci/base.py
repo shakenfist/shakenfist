@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import random
+import re
 from socket import error as socket_error
 import string
 import sys
@@ -256,25 +257,36 @@ class BaseTestCase(testtools.TestCase):
             self.system_client.get_artifact, artifact_uuids)
 
     def _test_ping(self, instance_uuid, network_uuid, ip, expected, attempts=1):
+        packet_loss_re = re.compile(r'.* ([0-9\.]+)% packet loss.*')
+
+        packet_loss = None
         while attempts:
             sys.stderr.write('    _test_ping()  attempts=%s\n' % attempts)
             attempts -= 1
-            output = self.system_client.ping(network_uuid, ip)
 
-            actual = output.get('stdout').find(' 0% packet loss') != -1
-            if actual == expected:
-                break
+            output = self.system_client.ping(network_uuid, ip)
+            for line in output.get('stdout', '').split('\n'):
+                m = packet_loss_re.match(line)
+                if m:
+                    packet_loss = int(m.group(1))
+                    break
 
             # Almost unnecessary due to the slowness of execute()
             time.sleep(1)
 
-        if expected != actual:
+        failed = False
+        if expected == 0 and packet_loss > 10:
+            failed = True
+        elif expected == 100 and packet_loss != 100:
+            failed = True
+
+        if failed:
             self._log_console(instance_uuid)
             self._log_instance_events(instance_uuid)
             self._log_netns()
             sys.stderr.write('Current time: '+time.ctime()+'\n')
             self.fail('Ping test failed. Expected %s != actual %s.\nout: %s\nerr: %s\n'
-                      % (expected, actual, output['stdout'], output['stderr']))
+                      % (expected, packet_loss, output['stdout'], output['stderr']))
 
     def assertInstanceOk(self, instance_uuid):
         inst = self.system_client.get_instance(instance_uuid)
@@ -405,7 +417,7 @@ class TestDistroBoots(BaseNamespacedTestCase):
         self._await_login_prompt(inst['uuid'])
 
         ip = self.test_client.get_instance_interfaces(inst['uuid'])[0]['ipv4']
-        self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, 0)
 
         self.test_client.delete_instance(inst['uuid'])
         inst_uuids = []

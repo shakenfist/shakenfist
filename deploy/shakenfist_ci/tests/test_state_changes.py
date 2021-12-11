@@ -67,7 +67,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         # instance "login prompt" event. We are willing to forgive a few fails
         # while the network starts.
         LOG.info('  ping test...')
-        self._test_ping(inst['uuid'], self.net['uuid'], ip, True, 10)
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, 0, 10)
 
         # Soft reboot
         LOG.info('Instance Soft reboot')
@@ -75,7 +75,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         self.test_client.reboot_instance(inst['uuid'])
         self.assertInstanceConsoleAfterBoot(inst['uuid'], 'System booted ok')
         LOG.info('  ping test...')
-        self._test_ping(inst['uuid'], self.net['uuid'], ip, True, 10)
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, 0, 10)
 
         # Hard reboot
         LOG.info('Instance Hard reboot')
@@ -83,7 +83,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         self.test_client.reboot_instance(inst['uuid'], hard=True)
         self.assertInstanceConsoleAfterBoot(inst['uuid'], 'System booted ok')
         LOG.info('  ping test...')
-        self._test_ping(inst['uuid'], self.net['uuid'], ip, True, 10)
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, 0, 10)
 
         # Power off
         LOG.info('Power off')
@@ -91,7 +91,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         # Once the API returns the libvirt has powered off the instance or an
         # error has occurred (which CI will catch).
         LOG.info('  ping test...')
-        self._test_ping(inst['uuid'], self.net['uuid'], ip, False)
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, 100)
 
         # Power on
         LOG.info('Instance Power on')
@@ -99,13 +99,13 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         self.test_client.power_on_instance(inst['uuid'])
         self.assertInstanceConsoleAfterBoot(inst['uuid'], 'System booted ok')
         LOG.info('  ping test...')
-        self._test_ping(inst['uuid'], self.net['uuid'], ip, True, 10)
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, 0, 10)
 
         # Pause
         LOG.info('Instance Pause')
         self.test_client.pause_instance(inst['uuid'])
         LOG.info('  ping test...')
-        self._test_ping(inst['uuid'], self.net['uuid'], ip, False, 10)
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, 100, 10)
 
         # Unpause
         LOG.info('Instance Unpause')
@@ -113,4 +113,4 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         # No new login prompt after unpause, so just forgive a few fails while
         # the instance is un-paused.
         LOG.info('  ping test...')
-        self._test_ping(inst['uuid'], self.net['uuid'], ip, True, 10)
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, 0, 10)

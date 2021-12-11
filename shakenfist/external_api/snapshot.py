@@ -1,10 +1,13 @@
 from flask_jwt_extended import jwt_required
 from functools import partial
+import os
+import shutil
+import time
 import uuid
 
 from shakenfist import artifact
 from shakenfist.artifact import Artifact, Artifacts
-from shakenfist.blob import Blob
+from shakenfist import blob
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
@@ -25,6 +28,13 @@ class InstanceSnapshotEndpoint(api_base.Resource):
     def post(self, instance_uuid=None, instance_from_db=None, all=None,
              device=None, max_versions=0):
         disks = instance_from_db.block_devices['devices']
+        if instance_from_db.uefi:
+            disks.append({
+                'type': 'nvram',
+                'device': 'nvram',
+                'path': os.path.join(instance_from_db.instance_path, 'nvram'),
+                'snapshot_ignores': False
+            })
 
         # Filter if requested
         if device:
@@ -35,13 +45,19 @@ class InstanceSnapshotEndpoint(api_base.Resource):
             disks = new_disks
         elif not all:
             disks = [disks[0]]
+        LOG.with_fields({
+            'instance': instance_uuid,
+            'devices': disks}).info('Devices for snapshot')
 
         out = {}
         for disk in disks:
             if disk['snapshot_ignores']:
                 continue
 
-            if disk['type'] != 'qcow2':
+            if disk['type'] not in ['qcow2', 'nvram']:
+                continue
+
+            if not os.path.exists(disk['path']):
                 continue
 
             a = Artifact.from_url(
@@ -60,9 +76,23 @@ class InstanceSnapshotEndpoint(api_base.Resource):
                 'blob_uuid': blob_uuid
             }
 
-            etcd.enqueue(config.NODE_NAME, {
-                'tasks': [SnapshotTask(instance_uuid, disk, a.uuid, blob_uuid)],
-            })
+            if disk['type'] == 'nvram':
+                # These are small and don't use qemu-img to capture, so just
+                # do them now.
+                blob.ensure_blob_path()
+                dest_path = blob.Blob.filepath(blob_uuid)
+                shutil.copyfile(disk['path'], dest_path)
+
+                st = os.stat(dest_path)
+                b = blob.Blob.new(blob_uuid, st.st_size,
+                                  time.time(), time.time())
+                b.observe()
+                a.state = Artifact.STATE_CREATED
+
+            else:
+                etcd.enqueue(config.NODE_NAME, {
+                    'tasks': [SnapshotTask(instance_uuid, disk, a.uuid, blob_uuid)],
+                })
             instance_from_db.add_event('api', 'snapshot of %s requested' % disk,
                                        None, a.uuid)
 
@@ -77,7 +107,7 @@ class InstanceSnapshotEndpoint(api_base.Resource):
             ev = snap.external_view_without_index()
             for idx in snap.get_all_indexes():
                 # Give the blob uuid a better name
-                b = Blob.from_db(idx['blob_uuid'])
+                b = blob.Blob.from_db(idx['blob_uuid'])
                 if not b:
                     continue
 

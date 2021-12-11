@@ -17,9 +17,10 @@ def clean_events_mesh_operations(etcd_client):
     # can return at one time.
 
     # Save time and use the already available etcdctl client.
-    net_keys, stderr = util_process.execute(None,
-                                            'etcdctl get --prefix /sf/event/network/ | grep sf/event',
-                                            check_exit_code=[0, 1])
+    net_keys, stderr = util_process.execute(
+        None,
+        'etcdctl get --prefix /sf/event/network/ | grep sf/event',
+        check_exit_code=[0, 1])
     if stderr:
         print('ERROR: Unable to retrieve network keys:%s' % stderr)
         return
@@ -45,7 +46,7 @@ def clean_events_mesh_operations(etcd_client):
 def main():
     etcd_client = etcd.WrappedEtcdClient()
 
-    releases = defaultdict(list)
+    releases = defaultdict(int)
     for data, _ in etcd_client.get_prefix('/sf/node/'):
         n = json.loads(data.decode('utf-8'))
 
@@ -65,9 +66,9 @@ def main():
 
     min_release = None
     if not releases:
-        min_release = '0.2'
+        min_release = '0.4'
     elif 'unknown' in releases:
-        min_release = '0.2'
+        min_release = '0.4'
     else:
         min_release = sorted(releases)[0]
     print('Minimum release is %s' % min_release)
@@ -80,12 +81,26 @@ def main():
         if minor <= 4:
             clean_events_mesh_operations(etcd_client)
 
-            # Find version 3 instances and migrate them to version 4
             for data, metadata in etcd_client.get_prefix('/sf/instance/'):
                 i = json.loads(data.decode('utf-8'))
+                changed = False
+
+                # Find version 3 instances and migrate them to version 4
                 if i.get('version') == 3:
                     i['configdrive'] = 'openstack-disk'
                     i['version'] = 4
+                    changed = True
+
+                # Find version 4 instances and migrate them to version 5
+                if i.get('version') == 4:
+                    i['nvram_template'] = None
+                    i['secure_boot'] = False
+                    i['version'] = 5
+                    changed = True
+
+                if changed:
+                    print('--> Upgraded instance %s to version %d'
+                          % (i['uuid'], i['version']))
                     etcd_client.put(metadata['key'],
                                     json.dumps(i, indent=4, sort_keys=True))
 
