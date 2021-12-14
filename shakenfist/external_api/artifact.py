@@ -120,10 +120,7 @@ class ArtifactsEndpoint(api_base.Resource):
 
 class ArtifactUploadEndpoint(api_base.Resource):
     @jwt_required
-    def post(self, artifact_name=None, upload_uuid=None):
-        url = '%s%s/%s' % (UPLOAD_URL,
-                           get_jwt_identity()[0], artifact_name)
-        a = Artifact.from_url(Artifact.TYPE_IMAGE, url)
+    def post(self, artifact_name=None, upload_uuid=None, source_url=None):
         u = Upload.from_db(upload_uuid)
         if not u:
             return api_base.error(404, 'upload not found')
@@ -146,6 +143,11 @@ class ArtifactUploadEndpoint(api_base.Resource):
             resp = flask.Response(r.text,  mimetype='application/json')
             resp.status_code = r.status_code
             return resp
+
+        if not source_url:
+            source_url = ('%s%s/%s'
+                          % (UPLOAD_URL, get_jwt_identity()[0], artifact_name))
+        a = Artifact.from_url(Artifact.TYPE_IMAGE, source_url)
 
         with a.get_lock(ttl=(12 * constants.LOCK_REFRESH_SECONDS),
                         timeout=config.MAX_IMAGE_TRANSFER_SECONDS):
