@@ -45,14 +45,10 @@ class WrappedEtcdClient(Etcd3Client):
             api_path=api_path)
 
 
-# This read only cache is thread local, a bit like Flask's request object.
-# The basic idea is that you can use this cache a bit like playing billiards --
-# you declare what data you need, it gets cached, and then you can refer to it
-# as much as you like. If you request data that is not in the cache then that's
-# a foul and an exception is raised. Given this is a read only cache, once
-# you have set one of these up any attempt to change or lock data will also
-# result in an exception being raised. This is solely about reducing the load
-# on etcd for read only operations.
+# This read only cache is thread local, a bit like Flask's request object. Given
+# this is a read only cache, once you have set one of these up any attempt to
+# change or lock data will also result in an exception being raised. This is
+# solely about reducing the load on etcd for read only operations.
 #
 # There is one exception here. I think it is safe to enqueue work items while
 # using one of these caches, so it is possible to write a loop which does the
@@ -350,7 +346,7 @@ def put(objecttype, subtype, name, data, ttl=None):
 
 
 @retry_etcd_forever
-def create(objecttype, subtype, name, data, ttle=None):
+def create(objecttype, subtype, name, data, ttl=None):
     if read_only_cache():
         raise exceptions.ForbiddenWhileUsingReadOnlyCache(
             'You cannot change data while using a read only cache')
