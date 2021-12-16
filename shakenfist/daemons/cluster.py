@@ -66,9 +66,7 @@ class Monitor(daemon.Daemon):
                         objdata['uuid'])
                     if (obj.state.value == dbo.STATE_DELETED and
                             time.time() - obj.state.update_time > config.CLEANER_DELAY):
-                        LOG.with_fields({
-                            objtype: obj.uuid
-                        }).info('Hard deleting')
+                        LOG.with_object(obj).info('Hard deleting')
                         obj.hard_delete()
                 except exceptions.BadObjectVersion:
                     LOG.with_fields({

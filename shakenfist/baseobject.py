@@ -56,7 +56,10 @@ class DatabaseBackedObject(object):
 
     @classmethod
     def _db_create(cls, object_uuid, metadata):
-        LOG.with_fields(metadata).with_field(
+        # NOTE(mikal): the copy() here is important. The logging framework mucks
+        # with the metadata dictionary it is passed in such a way that object
+        # creation breaks. Only give it a copy!
+        LOG.with_fields(metadata.copy()).with_field(
             cls.object_type, object_uuid).debug('Object created')
         metadata['uuid'] = object_uuid
         etcd.create(cls.object_type, None, object_uuid, metadata)
