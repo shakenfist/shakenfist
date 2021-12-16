@@ -56,14 +56,11 @@ class DatabaseBackedObject(object):
 
     @classmethod
     def _db_create(cls, object_uuid, metadata):
+        LOG.with_fields(metadata).with_field(
+            cls.object_type, object_uuid).debug('Object created')
         metadata['uuid'] = object_uuid
         etcd.create(cls.object_type, None, object_uuid, metadata)
 
-        # Mangle things a little so it matches other log messages for this object
-        log_metadata = metadata.copy()
-        log_metadata[cls.object_type] = log_metadata['uuid']
-        del log_metadata['uuid']
-        LOG.with_fields(metadata).debug('Object created')
         db.add_event(
             cls.object_type, object_uuid, 'db record created', None, None, None)
 
