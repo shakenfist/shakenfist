@@ -98,6 +98,12 @@ def main():
                     i['version'] = 5
                     changed = True
 
+                # Find version 5 instances and migrate them to version 6
+                if i.get('version') == 5:
+                    i['machine_type'] = 'pc'
+                    i['version'] = 6
+                    changed = True
+
                 if changed:
                     print('--> Upgraded instance %s to version %d'
                           % (i['uuid'], i['version']))

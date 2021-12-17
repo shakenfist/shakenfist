@@ -93,9 +93,17 @@ class InstancesEndpoint(api_base.Resource):
     def post(self, name=None, cpus=None, memory=None, network=None, disk=None,
              ssh_key=None, user_data=None, placed_on=None, namespace=None,
              video=None, uefi=False, configdrive=None, metadata=None,
-             nvram_template=None):
+             nvram_template=None, secure_boot=False):
         global SCHEDULER
-        secure_boot = False
+
+        # There is a wart in the qemu machine type naming. 'pc' is shorthand for
+        # "the most recent version of pc-i440fx", whereas 'q35' is shorthand for
+        # "the most recent version of pc-q35" you have. We default to i440fx
+        # unless you specify secure boot. We could infer the machine type from
+        # the use of secure boot in the libvirt template later, but I want to be
+        # more explicit in case we want to add other machine types later (microvm
+        # for example).
+        machine_type = 'pc'
 
         if not namespace:
             namespace = get_jwt_identity()[0]
@@ -115,6 +123,9 @@ class InstancesEndpoint(api_base.Resource):
         # Secure boot requires UEFI
         if secure_boot and not uefi:
             return api_base.error(400, 'secure boot requires UEFI be enabled')
+
+        if secure_boot:
+            machine_type = 'q35'
 
         # If we are placed, make sure that node exists
         if placed_on:
@@ -215,6 +226,13 @@ class InstancesEndpoint(api_base.Resource):
 
         disk = transformed_disk
 
+        # Make sure that we are on a compatible machine type if we specify any
+        # IDE attachments.
+        if machine_type == 'q35':
+            for d in disk:
+                if d.get('bus') == 'ide':
+                    return api_base.error(400, 'secure boot machine type does not support IDE')
+
         if network:
             for netdesc in network:
                 if not isinstance(netdesc, dict):
@@ -264,7 +282,8 @@ class InstancesEndpoint(api_base.Resource):
             configdrive=configdrive,
             requested_placement=placed_on,
             nvram_template=nvram_template,
-            secure_boot=secure_boot
+            secure_boot=secure_boot,
+            machine_type=machine_type
         )
 
         # Initialise metadata
