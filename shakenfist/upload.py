@@ -26,18 +26,15 @@ class Upload(dbo):
 
     @classmethod
     def new(cls, upload_uuid, node):
-        Upload._db_create(
-            upload_uuid,
-            {
-                'uuid': upload_uuid,
-                'node': node,
-                'created_at': time.time(),
+        static_values = {
+            'uuid': upload_uuid,
+            'node': node,
+            'created_at': time.time(),
 
-                'version': cls.current_version
-            }
-        )
-
-        u = Upload.from_db(upload_uuid)
+            'version': cls.current_version
+        }
+        Upload._db_create(upload_uuid, static_values)
+        u = Upload(static_values)
         u.state = Upload.STATE_CREATED
         return u
 
