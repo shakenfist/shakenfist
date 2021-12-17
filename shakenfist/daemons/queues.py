@@ -164,8 +164,8 @@ def handle(jobname, workitem):
 
             elif isinstance(task, FetchBlobTask):
                 b = blob.Blob.from_db(task.blob_uuid())
-                if b:
-                    b.ensure_local([])
+                log.with_object(b).info('Replicating blob')
+                b.ensure_local([])
 
             else:
                 log_i.with_field('task', task).error(

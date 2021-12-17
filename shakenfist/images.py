@@ -150,7 +150,7 @@ class ImageFetchHelper(object):
                     util_general.link(blob_path, cache_path)
                 else:
                     with util_general.RecordedOperation('transcode image', self.instance):
-                        self.log.with_fields({'blob': b}).info(
+                        self.log.with_object(b).info(
                             'Transcoding %s -> %s' % (blob_path, cache_path))
                         util_image.create_qcow2(
                             [lock], blob_path, cache_path)
@@ -180,8 +180,7 @@ class ImageFetchHelper(object):
         with util_general.RecordedOperation('fetch image', self.instance):
             resp = self._open_connection(url)
             blob_uuid = str(uuid.uuid4())
-            self.log.with_fields({
-                'artifact': self.__artifact.uuid,
+            self.log.with_object(self.__artifact).with_fields({
                 'blob': blob_uuid,
                 'url': url}).info('Commencing HTTP fetch to blob')
             b = blob.http_fetch(resp, blob_uuid, [lock], self.log)
