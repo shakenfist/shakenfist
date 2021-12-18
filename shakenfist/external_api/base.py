@@ -18,6 +18,7 @@ from shakenfist import db
 from shakenfist.instance import Instance
 from shakenfist import logutil
 from shakenfist.net import Network
+from shakenfist.upload import Upload
 from shakenfist.util import general as util_general
 
 LOG, HANDLER = logutil.setup(__name__)
@@ -240,6 +241,55 @@ def requires_namespace_exist(func):
                 LOG.with_field('namespace', kwargs['namespace']).warning(
                     'Attempt to use non-existent namespace')
                 return error(404, 'namespace not found')
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
+def arg_is_upload_uuid(func):
+    # Method uses the upload from the db
+    def wrapper(*args, **kwargs):
+        if 'upload_uuid' in kwargs:
+            kwargs['upload_from_db'] = Upload.from_db(
+                kwargs['upload_uuid'])
+        if not kwargs.get('upload_from_db'):
+            LOG.with_field('upload', kwargs['upload_uuid']).info(
+                'Upload not found, genuinely missing')
+            return error(404, 'upload not found')
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
+def redirect_upload_request(func):
+    # Redirect method to the hypervisor hosting the upload
+    def wrapper(*args, **kwargs):
+        u = kwargs.get('upload_from_db')
+        if not u:
+            return
+
+        if not u.node:
+            return
+
+        if u.node != config.NODE_NAME:
+            url = 'http://%s:%d%s' % (u.node, config.API_PORT,
+                                      flask.request.environ['PATH_INFO'])
+            api_token = util_general.get_api_token(
+                'http://%s:%d' % (u.node, config.API_PORT),
+                namespace=get_jwt_identity()[0])
+            r = requests.request(
+                flask.request.environ['REQUEST_METHOD'], url,
+                data=flask.request.get_data(cache=False, as_text=False,
+                                            parse_form_data=False),
+                headers={'Authorization': api_token,
+                         'User-Agent': util_general.get_user_agent()})
+
+            LOG.info('Proxied %s %s returns: %d, %s' % (
+                     flask.request.environ['REQUEST_METHOD'], url,
+                     r.status_code, r.text))
+            resp = flask.Response(r.text,  mimetype='application/json')
+            resp.status_code = r.status_code
+            return resp
 
         return func(*args, **kwargs)
     return wrapper
