@@ -87,4 +87,17 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
 
     logwrite('\nInstall finished with exit code %d' % obj.returncode)
 
+    if obj.returncode != 0:
+        logwrite('***************************************************')
+        logwrite('*                     WARNING                     *')
+        logwrite('*                                                 *')
+        logwrite('* The return code of the deploy script indicates  *')
+        logwrite('* that your install has failed. You will need to  *')
+        logwrite('* inspect /etc/sf/deploy-log to determine why.    *')
+        logwrite('* The failure will likely look like a fatal       *')
+        logwrite('* ansible task. You can also request assistance   *')
+        logwrite('* by filing a github issue at                     *')
+        logwrite('* https://github.com/shakenfist/shakenfist/issues *')
+        logwrite('***************************************************')
+
     sys.exit(obj.returncode)
