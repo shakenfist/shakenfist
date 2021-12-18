@@ -200,3 +200,7 @@ class BlobMissing(ArtifactException):
 
 class BlobDeleted(ArtifactException):
     pass
+
+
+class BlobFetchFailed(Exception):
+    pass

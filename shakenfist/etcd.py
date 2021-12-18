@@ -547,6 +547,13 @@ def _restart_queue(queuename):
                              }).warning('Reset workitem')
 
 
+def get_outstanding_jobs():
+    for data, metadata in WrappedEtcdClient().get_prefix('/sf/processing'):
+        yield metadata['key'].decode('utf-8'), json.loads(data, object_hook=decodeTasks)
+    for data, metadata in WrappedEtcdClient().get_prefix('/sf/queued'):
+        yield metadata['key'].decode('utf-8'), json.loads(data, object_hook=decodeTasks)
+
+
 def restart_queues():
     # Move things which were in processing back to the queue because
     # we didn't complete them before crashing.

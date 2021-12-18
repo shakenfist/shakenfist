@@ -163,9 +163,26 @@ def handle(jobname, workitem):
                 n.delete_on_hypervisor()
 
             elif isinstance(task, FetchBlobTask):
+                metrics = db.get_metrics(config.NODE_NAME)
                 b = blob.Blob.from_db(task.blob_uuid())
-                log.with_object(b).info('Replicating blob')
-                b.ensure_local([])
+                if not b:
+                    log.with_fields({
+                        'blob': task.blob_uuid()
+                    }).info('Cannot replicate blob, not found')
+
+                elif (int(metrics.get('disk_free_blobs', 0)) - int(b.size) <
+                      config.MINIMUM_FREE_DISK):
+                    log.with_fields({
+                        'blob': task.blob_uuid()
+                    }).info('Cannot replicate blob, insufficient space')
+
+                else:
+                    log.with_object(b).info('Replicating blob')
+                    size = b.ensure_local([])
+                    log.with_object(b).with_fields({
+                        'transferred': size,
+                        'expected': b.size
+                    }).info('Replicating blob complete')
 
             else:
                 log_i.with_field('task', task).error(

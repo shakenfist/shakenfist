@@ -3,6 +3,7 @@
 # obtaining the lock to do work et cetera. There is only one active cluster
 # maintenance daemon per cluster.
 
+from collections import defaultdict
 import setproctitle
 import time
 
@@ -24,6 +25,7 @@ from shakenfist.node import (
     active_states_filter as node_active_states_filter,
     inactive_states_filter as node_inactive_states_filter,
     nodes_by_free_disk_descending)
+from shakenfist.tasks import FetchBlobTask
 
 
 LOG, _ = logutil.setup(__name__)
@@ -77,15 +79,54 @@ class Monitor(daemon.Daemon):
         for a in artifact.Artifacts([]):
             a.delete_old_versions()
 
-        # Prune over replicated blobs
+        # Inspect current state of blobs, the actual changes are done below outside
+        # the read only cache.
         overreplicated = {}
         underreplicated = []
         low_disk_nodes = nodes_by_free_disk_descending(
-            maximum=config.MINIMUM_FREE_DISK)
-        absent_nodes = [n.fqdn for n in Nodes([node_inactive_states_filter])]
+            minimum=0, maximum=config.MINIMUM_FREE_DISK,
+            intention='blobs')
+
+        absent_nodes = []
+        for n in Nodes([node_inactive_states_filter]):
+            LOG.with_fields({
+                'node': n.fqdn}).info('Node is absent for blob replication')
+            absent_nodes.append(n.fqdn)
+        LOG.info('Found %d inactive nodes' % len(absent_nodes))
+
+        current_fetches = defaultdict(list)
+        for workname, workitem in etcd.get_outstanding_jobs():
+            # A workname looks like: /sf/queue/sf-3/jobname
+            _, _, phase, node, _ = workname.split('/')
+            if node == 'networknode':
+                continue
+
+            for task in workitem:
+                if isinstance(task, FetchBlobTask):
+                    if node in absent_nodes:
+                        LOG.with_fields({
+                            'blob': task.blob_uuid,
+                            'node': node,
+                            'phase': phase
+                        }).warning('Node is absent, ignoring fetch')
+                    else:
+                        LOG.with_fields({
+                            'blob': task.blob_uuid,
+                            'node': node,
+                            'phase': phase
+                        }).info('Node is fetching blob')
+                        current_fetches[task.blob_uuid].append(node)
 
         with etcd.ThreadLocalReadOnlyCache():
             for b in blob.Blobs([active_states_filter]):
+                # If there is current work for a blob, we ignore it until that
+                # work completes
+                if b.uuid in current_fetches:
+                    LOG.with_fields({
+                        'blob': task.blob_uuid
+                    }).info('Blob has current fetches, ignoring')
+                    continue
+
                 locations = b.locations
                 ignored_locations = []
                 for n in absent_nodes:
@@ -147,6 +188,7 @@ class Monitor(daemon.Daemon):
                             underreplicated.append((b.uuid, 1))
                             break
 
+        # Prune over replicated blobs
         for blob_uuid in overreplicated:
             b = blob.Blob.from_db(blob_uuid)
             for node in overreplicated[blob_uuid]:
@@ -191,6 +233,9 @@ class Monitor(daemon.Daemon):
             age = time.time() - n.last_seen
             if age > config.NODE_CHECKIN_MAXIMUM:
                 n.state = Node.STATE_MISSING
+
+        # And we're done
+        LOG.info('Cluster maintenance loop complete')
 
     def run(self):
         LOG.info('Starting')
