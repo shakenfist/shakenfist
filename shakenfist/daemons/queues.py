@@ -170,7 +170,8 @@ def handle(jobname, workitem):
                         'blob': task.blob_uuid()
                     }).info('Cannot replicate blob, not found')
 
-                elif metrics.get('disk_free_blobs', 0) - b.size < config.MINIMUM_FREE_DISK:
+                elif (int(metrics.get('disk_free_blobs', 0)) - int(b.size) <
+                      config.MINIMUM_FREE_DISK):
                     log.with_fields({
                         'blob': task.blob_uuid()
                     }).info('Cannot replicate blob, insufficient space')
