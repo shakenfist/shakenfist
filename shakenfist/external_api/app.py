@@ -171,3 +171,5 @@ api.add_resource(api_node.NodesEndpoint, '/nodes')
 
 api.add_resource(api_upload.UploadCreateEndpoint, '/upload')
 api.add_resource(api_upload.UploadDataEndpoint, '/upload/<upload_uuid>')
+api.add_resource(api_upload.UploadTruncateEndpoint,
+                 '/upload/<upload_uuid>/truncate/<offset>')
