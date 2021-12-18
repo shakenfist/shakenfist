@@ -15,7 +15,7 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
         s = s.rstrip()
         timestamp = datetime.datetime.now()
         print('%s %s' % (timestamp, s))
-        logfile.write('%s %s\n' % (timestamp, s))
+        logfile.write('%s %s\n' % (timestamp, s.rstrip()))
 
     variables = {}
     variables['topology'] = os.environ.get('TOPOLOGY')
@@ -54,10 +54,9 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
     with open('/etc/sf/deploy-vars.json', 'w') as varsfile:
         varsfile.write(json.dumps(variables, indent=4, sort_keys=True))
 
-    logwrite('%s Install started\n' % datetime.datetime.now())
-    logwrite('%s Install variables:\n    %s'
-             % (datetime.datetime.now(),
-                '\n    '.join(json.dumps(variables, indent=4, sort_keys=True).split('\n'))))
+    logwrite('Install started')
+    logwrite('Install variables:\n    %s'
+             % '\n    '.join(json.dumps(variables, indent=4, sort_keys=True).split('\n')))
 
     env = os.environ.copy()
     env['ANSIBLE_SSH_PIPELINING'] = '0'
@@ -70,8 +69,7 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
         stderr=subprocess.PIPE,
         shell=True,
         env=env)
-    logwrite('%s Installer pid is %d\n\n'
-             % (datetime.datetime.now(), obj.pid))
+    logwrite('Installer pid is %d\n' % obj.pid)
 
     flags = fcntl.fcntl(obj.stdout, fcntl.F_GETFL)
     fcntl.fcntl(obj.stdout, fcntl.F_SETFL, flags | os.O_NONBLOCK)
@@ -85,9 +83,8 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
         for f in readable:
             d = os.read(f.fileno(), 10000)
             for line in d.decode('utf-8').split('\n'):
-                logwrite('%s %s\n' % (datetime.datetime.now(), line))
+                logwrite(line)
 
-    logwrite('\n%s Install finished with exit code %d\n'
-             % (datetime.datetime.now(), obj.returncode))
+    logwrite('\nInstall finished with exit code %d' % obj.returncode)
 
     sys.exit(obj.returncode)
