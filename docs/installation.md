@@ -14,77 +14,35 @@ Each machine in the cluster should match this description:
 * Have at least 1 gigabit connectivity on the "mesh interface". This is a requirement of etcd.
 * Have a cloudadmin account setup with passwordless sudo, and a ssh key in its authorized_keys file. This is an ansible requirement, although the exact username is configurable in the SSH_USER variable.
 
-Note that we used to recommend deployers run the installer from git, but we've outgrown that approach. If you see that mentioned in the documentation, you are likely reading outdated guides.
-
-Finally, Shaken Fist is run as root, so we install it as root as well. Make sure you're installing as the right user as you follow these instructions!
-
-First install some dependencies:
+We now have a fancy helper to help you install your first localhost cluster, so let's give that a go:
 
 ```bash
-sudo apt-get update
-sudo apt-get -y dist-upgrade
-sudo apt-get -y install ansible git tox build-essential python3-dev python3-wheel \
-    python3-pip python3-venv
+curl https://github.com/shakenfist/shakenfist/blob/develop/getsf
+chmod ugo+rx getsf
+sudo ./getsf
 ```
 
-On Ubuntu 20.04, you need a more modern version of Ansible than what is packaged. Refer to https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html#installing-ansible-on-ubuntu for instructions on how to setup the Ansible PPA.
+This script will then walk you through the installation steps, asking questions as you go. The script leaves you with an installer configuration at `/root/sf-deploy`, which is the basis for later upgrades and cluster expansions.
 
-We require that Shaken Fist be installed into a venv at /srv/shakenfist/venv on each Shaken Fist machine. This is done outside of the installer process. Create that venv now:
+You can script the answers to `getsf` by setting environment variables. For example:
 
-```
-sudo mkdir -p /srv/shakenfist/venv
-sudo python3 -mvenv --system-site-packages /srv/shakenfist/venv
-```
-
-Next install your desired Shaken Fist pip package. The default should be the latest release.
-
-```
-/srv/shakenfist/venv/bin/pip install -U shakenfist shakenfist_client
+```bash
+export GETSF_FLOATING_BLOCK=192.168.10.0/24
+export GETSF_DEPLOY_NAME=bonkerslab
+export GETSF_RELEASE=pre-release
+export GETSF_NODES=localhost
+export GETSF_WARNING=yes
+sudo --preserve-env ./getsf
 ```
 
-Because we're fancy, we should also create a symlink to the `sf-client` command so its easy to use without arguing with the virtual environment:
+## Sample configuration for a multi-node deploy
+
+However, if you're performing a multinode deploy, the process is currently much more manual. The intent is to expand `getsf` to handle multiple nodes, but that work is not yet complete.
+
+For now, you'll need to write a configuration file a bit like this on the primary node:
 
 ```
-sudo ln -s /srv/shakenfist/venv/bin/sf-client /usr/local/bin/sf-client
-```
-
-We need to install required ansible-galaxy roles, which are described by a requirements file packaged with the server package. Do that like this:
-
-```
-sudo ansible-galaxy install -r /srv/shakenfist/venv/share/shakenfist/installer/requirements.yml
-```
-
-And then run the installer. Generally I create a small shell script called `sf-deploy.sh`, which contains the details of the installation. For my home cluster, it looks like this:
-
-```
-#!/bin/bash
-
-export ADMIN_PASSWORD=...a...password...
-export FLOATING_IP_BLOCK="192.168.10.0/24"
-export DEPLOY_NAME="bonkerslab"
-export SSH_USER="cloudadmin"
-export SSH_KEY_FILENAME="/root/.ssh/id_rsa"
-
-export KSM_ENABLED=1
-
-# Topology is in JSON
-read -r -d '' TOPOLOGY <<'EOF'
-[
-    {
-        "name": "sf-1",
-        "node_egress_ip": "10.0.0.1",
-        "node_egress_nic": "eth0",
-        "node_mesh_ip": "10.0.1.1",
-        "node_mesh_nic": "eth1",
-        "etcd_master": true,
-        "primary_node": true,
-        "network_node": true,
-        "hypervisor": true,
-        #!/bin/bash
-
-ansible-galaxy install -r /srv/shakenfist/venv/share/shakenfist/installer/requirements.yml
-
-=export ADMIN_PASSWORD=engeeF1o
+export ADMIN_PASSWORD=engeeF1o
 export FLOATING_IP_BLOCK="192.168.10.0/24"
 export DEPLOY_NAME="bonkerslab"
 export SSH_USER="cloudadmin"
@@ -139,6 +97,8 @@ export TOPOLOGY
 /srv/shakenfist/venv/share/shakenfist/installer/install
 ```
 
+## Notes for multi-node installations
+
 Not every node needs to be an etcd_master. I'd select three in most situations. One node must be marked as the primary node, and one must be marked as the network node. It is not currently supported having more than one of each of those node types.
 
 * The primary node runs an apache load balancer across the API servers in the cluster, and therefore needs to be accessable to your users on HTTP and HTTPS.
@@ -146,15 +106,16 @@ Not every node needs to be an etcd_master. I'd select three in most situations. 
 
 Some of the considerations here can be subtle. Please reach out if you need a hand.
 
-For a single machine installation, `sf-deploy.sh` looks like this:
+For a node complicated installation, `sf-deploy` might like this:
 
 ```
 #!/bin/bash
 
 export ADMIN_PASSWORD=engeeF1o
 export FLOATING_IP_BLOCK="192.168.10.0/24"
-export BOOTDELAY=0
 export DEPLOY_NAME="bonkerslab"
+export SSH_USER="cloudadmin"
+export SSH_KEY_FILENAME="/root/.ssh/id_rsa"
 
 export KSM_ENABLED=1
 
@@ -162,16 +123,41 @@ export KSM_ENABLED=1
 read -r -d '' TOPOLOGY <<'EOF'
 [
   {
-    "name": "localhost",
-    "node_egress_ip": "127.0.0.1",
-    "node_egress_nic": "lo",
-    "node_mesh_ip": "127.0.0.1",
-    "node_mesh_nic": "lo",
+    "name": "sf-primary",
+    "node_egress_ip": "192.168.1.50",
+    "node_egress_nic": "enp0s31f6",
+    "node_mesh_ip": "192.168.21.50",
+    "node_mesh_nic": "enp0s31f6:1",
     "primary_node": true,
-    "network_node": true,
+    "api_url": "https://...your...install...here.com/api"
+  },
+  {
+    "name": "sf-1",
+    "node_egress_ip": "192.168.1.51",
+    "node_egress_nic": "enp5s0",
+    "node_mesh_ip": "192.168.21.51",
+    "node_mesh_nic": "eno1",
     "etcd_master": true,
-    "hypervisor": true,
-    "api_url": "http://localhost:13000"
+    "network_node": true,
+    "hypervisor": true
+  },
+  {
+    "name": "sf-2",
+    "node_egress_ip": "192.168.1.52",
+    "node_egress_nic": "enp5s0",
+    "node_mesh_ip": "192.168.21.52",
+    "node_mesh_nic": "eno1",
+    "etcd_master": true,
+    "hypervisor": true
+  },
+  {
+    "name": "sf-3",
+    "node_egress_ip": "192.168.1.53",
+    "node_egress_nic": "enp5s0",
+    "node_mesh_ip": "192.168.21.53",
+    "node_mesh_nic": "eno1",
+    "etcd_master": true,
+    "hypervisor": true
   },
 ]
 EOF
@@ -179,14 +165,6 @@ export TOPOLOGY
 
 /srv/shakenfist/venv/share/shakenfist/installer/install
 ```
-
-And then we can run the installer:
-
-```
-chmod +x sf-deploy.sh
-sudo ./sf-deploy.sh
-```
-
 
 ## Your first instance
 

@@ -393,10 +393,10 @@ def http_fetch(resp, blob_uuid, locks, logs):
 
             if total_size:
                 percentage = fetched / total_size * 100.0
-            if (percentage - previous_percentage) > 10.0:
-                logs.with_field('bytes_fetched', fetched).info(
-                    'Fetch %.02f percent complete' % percentage)
-                previous_percentage = percentage
+                if (percentage - previous_percentage) > 10.0:
+                    logs.with_field('bytes_fetched', fetched).info(
+                        'Fetch %.02f percent complete' % percentage)
+                    previous_percentage = percentage
 
             if time.time() - last_refresh > LOCK_REFRESH_SECONDS:
                 db.refresh_locks(locks)
@@ -408,8 +408,11 @@ def http_fetch(resp, blob_uuid, locks, logs):
     # database.
 
     # And make the associated blob
+    if not total_size:
+        total_size = fetched
+
     b = Blob.new(blob_uuid,
-                 resp.headers.get('Content-Length'),
+                 total_size,
                  resp.headers.get('Last-Modified'),
                  time.time())
     b.state = Blob.STATE_CREATED

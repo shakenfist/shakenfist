@@ -1,0 +1,331 @@
+#!/bin/bash -e
+
+function on_exit {
+    echo
+    echo "*** Installation failed ***"
+    echo
+    }
+trap 'on_exit $?' EXIT
+
+# Color helpers, from https://stackoverflow.com/questions/5947742/
+Color_Off='\033[0m'       # Text Reset
+Red='\033[0;31m'          # Red
+Green='\033[0;32m'        # Green
+Yellow='\033[0;33m'       # Yellow
+Blue='\033[0;34m'         # Blue
+Purple='\033[0;35m'       # Purple
+Cyan='\033[0;36m'         # Cyan
+White='\033[0;37m'        # White
+
+function question_start {
+    echo -e "${Green}"
+    }
+
+function question_end {
+    echo -e "${Color_Off}"
+    }
+
+function error {
+    echo -e "${Red}$1${Color_Off}"
+    exit 1
+    }
+
+function status {
+    echo -e "${Blue}$1${Color_Off}"
+    }
+
+# Log input parameters if any
+printenv | grep GETSF || true
+
+# Warn people
+question_start
+echo "This script will make irreversable changes to this system."
+echo "This includes installing packages, changing your networking,"
+echo "and configuring the kernel. Are you sure you want to"
+echo "proceed?"
+echo ""
+if [ -z ${GETSF_WARNING} ]; then
+    echo -n "(yes or no) >> "
+    read GETSF_WARNING
+else
+    echo "(yes or no) >> ${GETSF_WARNING}"
+fi
+question_end
+if [ ${GETSF_WARNING} != "yes" ]; then
+    error "You did not say yes to the warning."
+fi
+echo
+
+# Ask which release track we should be on
+question_start
+echo "Do you want released, pre-release, or local packages?"
+echo "Generally we recommend released packages unless you have a"
+echo "good reason to need a specific bug fix. Local packages are"
+echo "really there for developers and airgapped environments. If"
+echo "you feel the urge to use local packages, please reach out"
+echo "for assistance at https://github.com/shakenfist/shakenfist/issues."
+echo ""
+if [ -z ${GETSF_RELEASE} ]; then
+    echo -n "(release, pre-release, or local) >> "
+    read GETSF_RELEASE
+else
+    echo "(release, pre-release, or local) >> ${GETSF_RELEASE}"
+fi
+question_end
+pipextra=""
+if [ ${GETSF_RELEASE} == "release" ]; then
+    status "We will use released packages."
+    GETSF_SERVER_PACKAGE="shakenfist"
+    GETSF_CLIENT_PACKAGE="shakenfist-client"
+elif [ ${GETSF_RELEASE} == "pre-release" ]; then
+    status "We will use pre-release packages."
+    pipextra="--pre"
+    GETSF_SERVER_PACKAGE="shakenfist"
+    GETSF_CLIENT_PACKAGE="shakenfist-client"
+elif [ ${GETSF_RELEASE} == "local" ]; then
+    status "We will use local packages."
+
+    question_start
+    echo "What is the path to your server package?"
+    echo ""
+    if [ -z ${GETSF_SERVER_PACKAGE} ]; then
+    echo -n "(a pathname) >> "
+        read GETSF_SERVER_PACKAGE
+    else
+        echo "(a pathname) >> ${GETSF_SERVER_PACKAGE}"
+    fi
+    question_end
+
+    if [ ! -e ${GETSF_SERVER_PACKAGE} ]; then
+        error "Server package file does not exist."
+    fi
+
+    question_start
+    echo "What is the path to your client package?"
+    echo ""
+    if [ -z ${GETSF_SERVER_PACKAGE} ]; then
+    echo -n "(a pathname) >> "
+        read GETSF_CLIENT_PACKAGE
+    else
+        echo "(a pathname) >> ${GETSF_CLIENT_PACKAGE}"
+    fi
+    question_end
+
+    if [ ! -e ${GETSF_CLIENT_PACKAGE} ]; then
+        error "Client package file does not exist."
+    fi
+else
+    error "Could not parse response."
+fi
+echo
+
+# We only support single node localhost installs for now
+question_start
+echo "What are the names of the machines you'd like to install"
+echo "Shaken Fist to? For a single node local install, use "
+echo "'localhost'. The list is separated by spaces."
+echo ""
+if [ -z ${GETSF_NODES} ]; then
+    echo -n "(localhost or list of machine names) >> "
+    read GETSF_NODES
+else
+    echo "(localhost or list of machine names) >> ${GETSF_NODES}"
+fi
+question_end
+if [ ${GETSF_NODES} != "localhost" ]; then
+    error "Sorry, we only support localhost installs right now."
+fi
+echo
+
+# Determine the floating IP block
+question_start
+echo "What floating IP block should we use? I normally use"
+echo "192.168.10.0/24, but it really depends on your network."
+echo "You will need to arrange to route this block to the"
+echo "Shaken Fist network node, unless you're accessing all"
+echo "your instances from the network node itself."
+echo ""
+if [ -z ${GETSF_FLOATING_BLOCK} ]; then
+    echo -n "(a CIDR range like 192.168.10.0/24) >> "
+    read GETSF_FLOATING_BLOCK
+else
+    echo "(a CIDR range like 192.168.10.0/24) >> ${GETSF_FLOATING_BLOCK}"
+fi
+question_end
+echo
+
+# Ask for a deploy name
+question_start
+echo "What should this deployment be called? This name is used"
+echo "for Prometheus metrics labels, as well as being visible to"
+echo "end users via API and DNS."
+echo ""
+if [ -z ${GETSF_DEPLOY_NAME} ]; then
+    echo -n "(a single word name) >> "
+    read GETSF_DEPLOY_NAME
+else
+    echo "(a single word name) >> ${GETSF_DEPLOY_NAME}"
+fi
+question_end
+echo
+
+# We must run as root to do the things we do.
+if [ $(whoami) != "root" ]; then
+    error "You need to run this script as root."
+fi
+
+# Are we on Ubuntu >= 20.04 or Debian >= 10?
+osok=0
+isdebian=0
+isubuntu=0
+if [ -e /etc/os-release ]; then
+    source /etc/os-release
+    if [ ${ID} == "debian" ]; then
+	status "Detected Debian."
+	isdebian=1
+
+	if [ ${VERSION_ID} -gt 9 ]; then
+	    osok=1
+	fi
+    elif [ ${ID} == "ubuntu" ]; then
+	status "Detected Ubuntu."
+	isubuntu=1
+
+	MAJOR_VERSION=$(echo ${VERSION_ID} | cut -f 1 -d ".")
+	if [ ${MAJOR_VERSION} -gt 19 ]; then
+	    osok=1
+	fi
+    else
+        status "Distribution ${ID} is unknown."
+    fi
+fi
+
+if [ ${osok} != 1 ]; then
+    error "Sorry, this does not look like a supported Linux distribution.\nWe currently support Ubuntu 20.04 and onwards, and Debian 10\nonwards."
+fi
+echo
+
+# Install required packages
+APT_GET="DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpkg::Options::=\"--force-confold\" -y"
+status "Updating package list."
+eval ${APT_GET} update
+echo
+
+if [ ${isubuntu} == 1 ]; then
+    status "Adding a PPA to provide a more modern Ansible on Ubuntu."
+    eval ${APT_GET} install software-properties-common
+    add-apt-repository --yes --update ppa:ansible/ansible
+    eval ${APT_GET} update
+    echo
+elif [ ${isdebian} == 1]; then
+    status "Adding a PPA to provide a more modern Ansible on Debian."
+    if [ ${VERSION_ID} -eq 10 ]; then
+        echo "deb http://ppa.launchpad.net/ansible/ansible/ubuntu bionic main" > /etc/apt/sources.list.d/ansible.list
+    else
+        echo "deb http://ppa.launchpad.net/ansible/ansible/ubuntu focal main" > /etc/apt/sources.list.d/ansible.list
+    fi
+    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367
+    eval ${APT_GET} update
+    echo
+fi
+
+status "Upgrading packages."
+eval ${APT_GET} dist-upgrade
+echo
+
+status "Installing required packages."
+eval ${APT_GET} install ansible git tox build-essential  python3-dev python3-wheel \
+    python3-pip python3-venv pwgen cpu-checker
+echo
+
+# Make sure that KVM will work. This check is in the installer, but its
+# such a common mistake we should check early and often.
+status "Checking that KVM will work."
+kvm-ok
+if [ $? -ne 0 ]; then
+    error "It looks like this machine isn't configured to run virtual machines.\nThis might indicate a BIOS configuration error (whatever your chipset\ncalls VT extensions), not having nested virtualization enabled if this\nis a virtual machine, or really ancient hardware. Please correct the\nproblem and re-run."
+fi
+
+status "Creating python venv."
+mkdir -p /srv/shakenfist/venv
+python3 -mvenv --system-site-packages /srv/shakenfist/venv
+echo
+
+status "Installing server and client packages in venv."
+/srv/shakenfist/venv/bin/pip install -U ${pipextra} ${GETSF_SERVER_PACKAGE} ${GETSF_CLIENT_PACKAGE}
+
+# NOTE(mikal): I don't love how we need to do this, but it seems to be required
+# to make sure CI is using the right version and tox isn't installing one of its
+# own.
+status "Install client package in system pip as well on the primary node."
+pip3 install -U ${pipextra} ${GETSF_CLIENT_PACKAGE}
+
+status "Installing ansible-galaxy requirements."
+ansible-galaxy install -r /srv/shakenfist/venv/share/shakenfist/installer/requirements.yml
+echo
+
+status "Creating /root/sf-deploy script"
+password=$(pwgen 16 1)
+cat - > /root/sf-deploy << DEPLOYEOF
+#!/bin/bash
+
+export ADMIN_PASSWORD=${password}
+export FLOATING_IP_BLOCK="${GETSF_FLOATING_BLOCK}"
+export DEPLOY_NAME="${GETSF_DEPLOY_NAME}"
+
+export KSM_ENABLED=1
+
+# You would normally hard code these, but we're looking them up to be
+# helpful.
+default_nic=\$(ip route | grep default | sed -e 's/.* dev //' -e 's/ $//' -e 's/ proto static//')
+default_ip=\$(ip address show dev \${default_nic} | grep inet | head -1 | \
+    sed -e 's/ *inet //' -e 's|/.*||')
+
+# And because this install is localhost only, we can ignore MTU as well
+export IGNORE_MTU=1
+
+# Topology is in JSON
+export TOPOLOGY=\$(cat << EOF
+[
+  {
+    "name": "localhost",
+    "node_egress_ip": "\${default_ip}",
+    "node_egress_nic": "\${default_nic}",
+    "node_mesh_ip": "\${default_ip}",
+    "node_mesh_nic": "\${default_nic}",
+    "primary_node": true,
+    "network_node": true,
+    "etcd_master": true,
+    "hypervisor": true,
+    "api_url": "http://127.0.0.1:13000"
+  }
+]
+EOF
+)
+
+/srv/shakenfist/venv/share/shakenfist/installer/install
+DEPLOYEOF
+chmod u+rx /root/sf-deploy
+
+status "Running the installer."
+/root/sf-deploy
+
+status "Pause briefly to let Shaken Fist settle."
+sleep 5
+
+status "Pre-fetching common images."
+. /etc/sf/sfrc
+sf-client artifact cache ubuntu:20.04
+sf-client artifact cache cirros
+
+question_start
+echo "A default configuration including deployment topology has"
+echo "been written to /root/sf-deploy. There's a lot you can change"
+echo "with this configuration, but your current configuration should"
+echo "be good enough for an initial play."
+echo
+echo "Install completed successfully."
+question_end
+
+# Remove our scary failure message
+trap - EXIT
