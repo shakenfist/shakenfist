@@ -166,7 +166,10 @@ class Blob(dbo):
 
     def observe(self):
         self.add_node_location()
-        if self.state.value != self.STATE_CREATED:
+
+        # Observing a blob can move it from initial to created, but it should not
+        # move it from deleted to created.
+        if self.state.value == self.STATE_INITIAL:
             self.state = self.STATE_CREATED
 
         with self.get_lock_attr('locations', 'Set blob info'):
@@ -210,6 +213,11 @@ class Blob(dbo):
 
     def ensure_local(self, locks):
         with self.get_lock(config.NODE_NAME):
+            if self.state.value != self.STATE_CREATED:
+                self.log.warning(
+                    'Blob not in created state, replication cancelled')
+                return
+
             blob_dir = os.path.join(config.STORAGE_PATH, 'blobs')
             blob_path = os.path.join(blob_dir, self.uuid)
             os.makedirs(blob_dir, exist_ok=True)
@@ -286,7 +294,6 @@ class Blob(dbo):
 
             self.log.info('Completing transfer')
             os.rename(blob_path + '.partial', blob_path)
-            self.observe()
 
             self.log.with_fields({
                 'bytes_fetched': total_bytes_received,
