@@ -326,6 +326,9 @@ class Blob(dbo):
                     if n in nodes:
                         nodes.remove(n)
 
+                self.log.with_field('nodes', nodes).debug(
+                    'Considered for blob replication')
+
                 for n in nodes[:targets]:
                     etcd.enqueue(n, {
                         'tasks': [FetchBlobTask(self.uuid)]
