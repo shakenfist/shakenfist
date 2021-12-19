@@ -20,12 +20,12 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
     variables = {}
     variables['topology'] = os.environ.get('TOPOLOGY')
 
-    if os.environ.get('METAL_SSH_KEY_FILENAME'):
+    if os.environ.get('SSH_KEY_FILENAME'):
         variables['ssh_key_filename'] = os.environ.get(
-            'METAL_SSH_KEY_FILENAME')
+            'SSH_KEY_FILENAME')
         with open(variables['ssh_key_filename']) as f:
             variables['ssh_key'] = f.read()
-        variables['ssh_user'] = os.environ.get('METAL_SSH_USER')
+        variables['ssh_user'] = os.environ.get('SSH_USER')
     else:
         variables['ssh_key_filename'] = ''
         variables['ssh_key'] = ''
@@ -39,7 +39,6 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
     else:
         variables['admin_password'] = 'Ukoh5vie'
 
-    variables['cloud'] = os.environ.get('CLOUD', 'metal')
     variables['floating_network_ipblock'] = os.environ.get(
         'FLOATING_IP_BLOCK', '10.10.0.0/24')
     variables['ksm_enabled'] = os.environ.get('KSM_ENABLED', 1)

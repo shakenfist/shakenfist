@@ -34,12 +34,11 @@
           #!/bin/bash
           ansible-galaxy install -r /srv/shakenfist/venv/share/shakenfist/installer/requirements.yml
 
-          export CLOUD=metal
           export ADMIN_PASSWORD=foobar
           export FLOATING_IP_BLOCK="10.10.10.0/24"
           export DEPLOY_NAME="metalci"
-          export METAL_SSH_USER="{{base_image_user}}"
-          export METAL_SSH_KEY_FILENAME="/root/.ssh/id_rsa"
+          export SSH_USER="{{base_image_user}}"
+          export SSH_KEY_FILENAME="/root/.ssh/id_rsa"
           export HTTP_PROXY="http://192.168.1.50:3128"
           export INCLUDE_TRACEBACKS=1
 

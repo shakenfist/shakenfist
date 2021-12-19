@@ -12,7 +12,7 @@ Each machine in the cluster should match this description:
 * Have virtualization extensions enabled in the BIOS.
 * Have jumbo frames enabled on the switch for the "mesh interface" for installations of more than one machine. Shaken Fist can optionally run internal traffic such as etcd and virtual network meshes on a separate interface to traffic egressing the cluster. Whichever interface you specify as being used for virtual network mesh traffic must have jumbo frames enabled for the virtual networks to function correctly.
 * Have at least 1 gigabit connectivity on the "mesh interface". This is a requirement of etcd.
-* Have a cloudadmin account setup with passwordless sudo, and a ssh key in its authorized_keys file. This is an ansible requirement, although the exact username is configurable in the METAL_SSH_USER variable.
+* Have a cloudadmin account setup with passwordless sudo, and a ssh key in its authorized_keys file. This is an ansible requirement, although the exact username is configurable in the SSH_USER variable.
 
 Note that we used to recommend deployers run the installer from git, but we've outgrown that approach. If you see that mentioned in the documentation, you are likely reading outdated guides.
 
@@ -62,12 +62,12 @@ And then run the installer. Generally I create a small shell script called `sf-d
 export ADMIN_PASSWORD=...a...password...
 export FLOATING_IP_BLOCK="192.168.10.0/24"
 export DEPLOY_NAME="bonkerslab"
-export METAL_SSH_USER="cloudadmin"
-export METAL_SSH_KEY_FILENAME="/root/.ssh/id_rsa"
+export SSH_USER="cloudadmin"
+export SSH_KEY_FILENAME="/root/.ssh/id_rsa"
 
 export KSM_ENABLED=1
 
-# Metal topology is in JSON
+# Topology is in JSON
 read -r -d '' TOPOLOGY <<'EOF'
 [
     {
@@ -84,16 +84,15 @@ read -r -d '' TOPOLOGY <<'EOF'
 
 ansible-galaxy install -r /srv/shakenfist/venv/share/shakenfist/installer/requirements.yml
 
-export CLOUD=metal
-export ADMIN_PASSWORD=engeeF1o
+=export ADMIN_PASSWORD=engeeF1o
 export FLOATING_IP_BLOCK="192.168.10.0/24"
 export DEPLOY_NAME="bonkerslab"
-export METAL_SSH_USER="cloudadmin"
-export METAL_SSH_KEY_FILENAME="/root/.ssh/id_rsa"
+export SSH_USER="cloudadmin"
+export SSH_KEY_FILENAME="/root/.ssh/id_rsa"
 
 export KSM_ENABLED=1
 
-# Metal topology is in JSON
+# Topology is in JSON
 read -r -d '' TOPOLOGY <<'EOF'
 [
   {
@@ -159,7 +158,7 @@ export DEPLOY_NAME="bonkerslab"
 
 export KSM_ENABLED=1
 
-# Metal topology is in JSON
+# Topology is in JSON
 read -r -d '' TOPOLOGY <<'EOF'
 [
   {
@@ -280,15 +279,15 @@ The installer will also enforce the following sanity checks:
 
 ### Deployment variables
 
-| Option | Terraform definition | Description |
-|--------|----------------------|-------------|
-| ADMIN_PASSWORD | All | The admin password for the cloud once installed |
-| DNS_SERVER | All | The DNS server to configure instances with via DHCP. Defaults to 8.8.8.8 |
-| HTTP_PROXY | All | A URL for a HTTP proxy to use for image downloads. For example http://localhost:3128 |
-| INCLUDE_TRACEBACKS | All | Whether to include tracebacks in server 500 errors. Never set this to true in production! |
-| FLOATING_IP_BLOCK | All | The IP range to use for the floating network |
-| KSM_ENABLED | All | Set to 1 to enable KSM, 0 to disable |
-| DEPLOY_NAME | All | The name of the deployment to use as an external label for prometheus |
-| TOPOLOGY | metal | The topology of the metal cluster, as described above |
-| METAL_SSH_KEY_FILENAME | metal | The path to a ssh private key file to use for authentication. It is assumed that the public key is at ```${METAL_SSH_KEY_FILENAME}.pub```. |
-| METAL_SSH_USER | metal | The username to ssh as. |
+| Option | Description |
+|--------|-------------|
+| ADMIN_PASSWORD | The admin password for the cloud once installed |
+| DNS_SERVER | The DNS server to configure instances with via DHCP. Defaults to 8.8.8.8 |
+| HTTP_PROXY | A URL for a HTTP proxy to use for image downloads. For example http://localhost:3128 |
+| INCLUDE_TRACEBACKS | Whether to include tracebacks in server 500 errors. Never set this to true in production! |
+| FLOATING_IP_BLOCK | The IP range to use for the floating network |
+| KSM_ENABLED | Set to 1 to enable KSM, 0 to disable |
+| DEPLOY_NAME | The name of the deployment to use as an external label for prometheus |
+| TOPOLOGY | The topology of the cluster, as described above |
+| SSH_KEY_FILENAME | The path to a ssh private key file to use for authentication. It is assumed that the public key is at ```${SSH_KEY_FILENAME}.pub```. |
+| SSH_USER | The username to ssh as. |
