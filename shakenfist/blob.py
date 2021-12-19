@@ -234,6 +234,9 @@ class Blob(dbo):
             with open(blob_path + '.partial', 'wb') as f:
                 done = False
                 last_refresh = 0
+                refreshable_locks = locks.copy()
+                refreshable_locks.append(blob_lock)
+
                 total_bytes_received = 0
                 previous_percentage = 0
 
@@ -257,7 +260,7 @@ class Blob(dbo):
                             bytes_in_attempt += len(chunk)
 
                             if time.time() - last_refresh > LOCK_REFRESH_SECONDS:
-                                db.refresh_locks(locks)
+                                db.refresh_locks(refreshable_locks)
                                 last_refresh = time.time()
 
                             percentage = (total_bytes_received /
