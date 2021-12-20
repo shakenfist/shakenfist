@@ -4,6 +4,7 @@ import json
 import os
 import pathlib
 import random
+import shutil
 import time
 
 from shakenfist.baseobject import (
@@ -24,6 +25,12 @@ LOG, _ = logutil.setup(__name__)
 
 
 class Monitor(daemon.Daemon):
+    def _delete_instance_files(self, instance_uuid):
+        instance_path = os.path.join(
+            config.STORAGE_PATH, 'instances', instance_uuid)
+        if os.path.exists(instance_path):
+            shutil.rmtree(instance_path)
+
     def _update_power_states(self):
         libvirt = util_libvirt.get_libvirt()
         conn = libvirt.open('qemu:///system')
@@ -44,6 +51,7 @@ class Monitor(daemon.Daemon):
                 if not inst:
                     # Instance is SF but not in database. Kill to reduce load.
                     log_ctx.warning('Destroying unknown instance')
+                    self._delete_instance_files(instance_uuid)
                     util_process.execute(None,
                                          'virsh destroy "sf:%s"' % instance_uuid)
                     continue
@@ -68,16 +76,15 @@ class Monitor(daemon.Daemon):
                         # hammer instead.
                         log_ctx.warning(
                             'Attempting alternate delete method for instance')
+                        self._delete_instance_files(instance_uuid)
                         util_process.execute(
                             None, 'virsh destroy "sf:%s"' % instance_uuid)
-
                         inst.add_event('enforced delete', 'complete')
                     else:
                         inst.delete()
 
                     log_ctx.with_field('attempt', attempts).warning(
                         'Deleting stray instance')
-
                     continue
 
                 state = util_libvirt.extract_power_state(libvirt, domain)
@@ -105,8 +112,13 @@ class Monitor(daemon.Daemon):
                         # Instance is SF but not in database. Kill because
                         # unknown.
                         log_ctx.warning('Removing unknown inactive instance')
-                        domain = conn.lookupByName(domain_name)
-                        domain.undefine()
+                        self._delete_instance_files(instance_uuid)
+                        try:
+                            domain = conn.lookupByName(domain_name)
+                            domain.undefine()
+                        except libvirt.libvirtError:
+                            util_process.execute(
+                                None, 'virsh destroy "sf:%s"' % instance_uuid)
                         continue
 
                     db_state = inst.state
@@ -117,9 +129,14 @@ class Monitor(daemon.Daemon):
                         if time.time() - db_state.update_time < 300:
                             continue
 
-                        domain = conn.lookupByName(domain_name)
-                        domain.undefine()
                         log_ctx.info('Detected stray instance')
+                        self._delete_instance_files(instance_uuid)
+                        try:
+                            domain = conn.lookupByName(domain_name)
+                            domain.undefine()
+                        except libvirt.libvirtError:
+                            util_process.execute(
+                                None, 'virsh destroy "sf:%s"' % instance_uuid)
                         inst.add_event('deleted stray', 'complete')
                         continue
 

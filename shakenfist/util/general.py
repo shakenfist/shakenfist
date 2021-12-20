@@ -1,5 +1,6 @@
 import json
 import os
+import pathlib
 from pbr.version import VersionInfo
 import requests
 import secrets
@@ -141,3 +142,5 @@ def link(source, destination):
         os.link(source, destination)
     except OSError:
         os.symlink(source, destination)
+
+    pathlib.Path(destination).touch(exist_ok=True)

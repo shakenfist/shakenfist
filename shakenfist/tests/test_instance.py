@@ -91,7 +91,7 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
         instance.Instance.new('barry', 1, 2048, 'namespace', 'sshkey',
                               [{}], 'userdata', {
                                   'memory': 16384, 'model': 'cirrus'},
-                              uuid='uuid42',)
+                              instance_uuid='uuid42',)
 
         self.assertEqual(
             ('attribute/instance', 'uuid42', 'state',
@@ -212,7 +212,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
     def _make_instance(self, mock_get_instance, mock_create_instance):
         return instance.Instance.new(
             'cirros', 1, 1024,  'namespace',
-            uuid='fakeuuid',
+            instance_uuid='fakeuuid',
             disk_spec=[{
                 'base': 'cirros',
                 'size': 8

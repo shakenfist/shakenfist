@@ -212,7 +212,7 @@ class Blob(dbo):
             return new_count
 
     def ensure_local(self, locks):
-        with self.get_lock(config.NODE_NAME):
+        with self.get_lock(config.NODE_NAME) as blob_lock:
             if self.state.value != self.STATE_CREATED:
                 self.log.warning(
                     'Blob not in created state, replication cancelled')

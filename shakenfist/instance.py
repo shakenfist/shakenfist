@@ -12,7 +12,6 @@ import random
 import shutil
 import socket
 import time
-from uuid import uuid4
 
 from shakenfist import artifact
 from shakenfist import baseobject
@@ -137,50 +136,46 @@ class Instance(dbo):
             raise exceptions.InstanceBadDiskSpecification()
 
     @classmethod
-    def new(cls, name, cpus, memory, namespace, ssh_key=None, disk_spec=None,
-            user_data=None, video=None, requested_placement=None, uuid=None,
-            uefi=False, configdrive=None, nvram_template=None, secure_boot=False,
-            machine_type='pc'):
-
-        if not uuid:
-            # uuid should only be specified in testing
-            uuid = str(uuid4())
-
+    def new(cls, name=None, cpus=None, memory=None, namespace=None, ssh_key=None,
+            disk_spec=None, user_data=None, video=None, requested_placement=None,
+            instance_uuid=None, uefi=False, configdrive=None, nvram_template=None,
+            secure_boot=False, machine_type='pc'):
         if not configdrive:
             configdrive = 'openstack-disk'
 
-        Instance._db_create(
-            uuid,
-            {
-                'cpus': cpus,
-                'disk_spec': disk_spec,
-                'memory': memory,
-                'name': name,
-                'namespace': namespace,
-                'requested_placement': requested_placement,
-                'ssh_key': ssh_key,
-                'user_data': user_data,
-                'video': video,
-                'uefi': uefi,
-                'configdrive': configdrive,
-                'nvram_template': nvram_template,
-                'secure_boot': secure_boot,
-                'machine_type': machine_type,
+        static_values = {
+            'cpus': cpus,
+            'disk_spec': disk_spec,
+            'memory': memory,
+            'name': name,
+            'namespace': namespace,
+            'requested_placement': requested_placement,
+            'ssh_key': ssh_key,
+            'user_data': user_data,
+            'video': video,
+            'uefi': uefi,
+            'configdrive': configdrive,
+            'nvram_template': nvram_template,
+            'secure_boot': secure_boot,
+            'machine_type': machine_type,
 
-                'version': cls.current_version
-            })
-        i = Instance.from_db(uuid)
+            'version': cls.current_version
+        }
+
+        Instance._db_create(instance_uuid, static_values)
+        static_values['uuid'] = instance_uuid
+        i = Instance(static_values)
         i.state = cls.STATE_INITIAL
         i._db_set_attribute(
             'power_state', {'power_state': cls.STATE_INITIAL})
         return i
 
     @staticmethod
-    def from_db(uuid):
-        if not uuid:
+    def from_db(instance_uuid):
+        if not instance_uuid:
             return None
 
-        static_values = Instance._db_get(uuid)
+        static_values = Instance._db_get(instance_uuid)
         if not static_values:
             return None
 
@@ -527,6 +522,9 @@ class Instance(dbo):
                 nvram_path = os.path.join(self.instance_path, 'nvram')
                 if os.path.exists(nvram_path):
                     os.unlink(nvram_path)
+                if self.nvram_template:
+                    b = blob.Blob.from_db(self.nvram_template)
+                    b.ref_count_dec()
 
                 inst = self._get_domain()
                 if inst:
@@ -885,18 +883,19 @@ class Instance(dbo):
         if self.uefi:
             if not self.nvram_template:
                 if self.secure_boot:
-                    nvram_template_attribute = "template = '/usr/share/OVMF/OVMF_VARS.ms.fd'"
+                    nvram_template_attribute = "template='/usr/share/OVMF/OVMF_VARS.ms.fd'"
                 else:
-                    nvram_template_attribute = "template = '/usr/share/OVMF/OVMF_VARS.fd'"
+                    nvram_template_attribute = "template='/usr/share/OVMF/OVMF_VARS.fd'"
             else:
                 # Fetch the nvram template
                 b = blob.Blob.from_db(self.nvram_template)
                 if not b:
                     raise exceptions.NVRAMTemplateMissing(
                         'Blob %s does not exist' % self.nvram_template)
-                b.ensure_local()
+                b.ensure_local([])
+                b.ref_count_inc()
                 shutil.copyfile(
-                    b.filepath(), os.path.join(self.instance_path, 'nvram'))
+                    blob.Blob.filepath(b.uuid), os.path.join(self.instance_path, 'nvram'))
                 nvram_template_attribute = ''
 
         # NOTE(mikal): the database stores memory allocations in MB, but the

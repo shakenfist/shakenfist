@@ -223,6 +223,17 @@ class Artifact(dbo):
         etcd.delete_all('attribute/artifact', self.uuid)
         etcd.delete_all('event/artifact', self.uuid)
 
+    def resolve_to_blob(self):
+        blob_uuid = self.most_recent_index.get('blob_uuid')
+        if not blob_uuid:
+            return
+        b = blob.Blob.from_db(blob_uuid)
+        if not b:
+            return
+        if b.state == blob.Blob.STATE_DELETED:
+            return
+        return blob_uuid
+
 
 class Artifacts(dbo_iter):
     def __iter__(self):

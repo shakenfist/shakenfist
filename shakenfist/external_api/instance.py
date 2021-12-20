@@ -9,7 +9,6 @@ from shakenfist.artifact import (
     Artifact, BLOB_URL, LABEL_URL, SNAPSHOT_URL, UPLOAD_URL)
 from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
@@ -73,6 +72,15 @@ class InstanceEndpoint(api_base.Resource):
         instance_from_db.enqueue_delete_remote(node)
 
 
+def _artifact_safety_checks(a):
+    if not a:
+        return api_base.error(404, 'artifact not found')
+    if a.state.value != Artifact.STATE_CREATED:
+        return api_base.error(
+            404, 'artifact not ready (state=%s)' % a.state.value)
+    return
+
+
 class InstancesEndpoint(api_base.Resource):
     @jwt_required
     def get(self, all=False):
@@ -95,6 +103,8 @@ class InstancesEndpoint(api_base.Resource):
              video=None, uefi=False, configdrive=None, metadata=None,
              nvram_template=None, secure_boot=False):
         global SCHEDULER
+
+        instance_uuid = str(uuid.uuid4())
 
         # There is a wart in the qemu machine type naming. 'pc' is shorthand for
         # "the most recent version of pc-i440fx", whereas 'q35' is shorthand for
@@ -159,37 +169,24 @@ class InstancesEndpoint(api_base.Resource):
                 label = disk_base[len('label:'):]
                 a = Artifact.from_url(
                     Artifact.TYPE_LABEL, '%s%s/%s' % (LABEL_URL, get_jwt_identity()[0], label))
-                if not a:
-                    return api_base.error(404, 'label %s not found' % label)
-                if a.state.value != Artifact.STATE_CREATED:
-                    return api_base.error(404, 'label %s is not ready (state=%s)'
-                                          % (label, a.state.value))
-                blob_uuid = a.most_recent_index.get('blob_uuid')
+                err = _artifact_safety_checks(a)
+                if err:
+                    return err
+
+                blob_uuid = a.resolve_to_blob()
                 if not blob_uuid:
-                    return api_base.error(404, 'label %s not found (no versions)' % label)
-                b = Blob.from_db(blob_uuid)
-                if not b:
-                    return api_base.error(404, 'artifact references non-existent blob (%s)' % blob_uuid)
-                if b.state == Blob.STATE_DELETED:
-                    return api_base.error(404, 'artifact references deleted blob (%s)' % blob_uuid)
+                    return api_base.error(404, 'Could not resolve label %s to a blob' % label)
                 d['blob_uuid'] = blob_uuid
 
             elif disk_base.startswith(SNAPSHOT_URL):
                 a = Artifact.from_db(disk_base[len(SNAPSHOT_URL):])
-                if not a:
-                    return api_base.error(
-                        404, 'snapshot %s not found' % disk_base[len(SNAPSHOT_URL):])
-                if a.state.value != Artifact.STATE_CREATED:
-                    return api_base.error(404, 'label %s is not ready (state=%s)'
-                                          % (label, a.state.value))
-                blob_uuid = a.most_recent_index.get('blob_uuid')
+                err = _artifact_safety_checks(a)
+                if err:
+                    return err
+
+                blob_uuid = a.resolve_to_blob()
                 if not blob_uuid:
-                    return api_base.error(404, 'snapshot not found (no versions)')
-                b = Blob.from_db(blob_uuid)
-                if not b:
-                    return api_base.error(404, 'artifact references non-existent blob (%s)' % blob_uuid)
-                if b.state == Blob.STATE_DELETED:
-                    return api_base.error(404, 'artifact references deleted blob (%s)' % blob_uuid)
+                    return api_base.error(404, 'Could not resolve snapshot to a blob')
                 d['blob_uuid'] = blob_uuid
 
             elif disk_base.startswith(UPLOAD_URL) or disk_base.startswith(LABEL_URL):
@@ -197,20 +194,13 @@ class InstancesEndpoint(api_base.Resource):
                     a = Artifact.from_url(Artifact.TYPE_IMAGE, disk_base)
                 else:
                     a = Artifact.from_url(Artifact.TYPE_LABEL, disk_base)
-                if not a:
-                    return api_base.error(404, 'artifact %s not found' % disk_base)
-                if a.state.value != Artifact.STATE_CREATED:
-                    return api_base.error(404, 'disk base %s is not ready (state=%s)'
-                                          % (disk_base, a.state.value))
+                err = _artifact_safety_checks(a)
+                if err:
+                    return err
 
-                blob_uuid = a.most_recent_index.get('blob_uuid')
+                blob_uuid = a.resolve_to_blob()
                 if not blob_uuid:
-                    return api_base.error(404, 'artifact not found (no versions)')
-                b = Blob.from_db(blob_uuid)
-                if not b:
-                    return api_base.error(404, 'artifact references non-existent blob (%s)' % blob_uuid)
-                if b.state == Blob.STATE_DELETED:
-                    return api_base.error(404, 'artifact references deleted blob (%s)' % blob_uuid)
+                    return api_base.error(404, 'Could not resolve artifact to a blob')
                 d['blob_uuid'] = blob_uuid
 
             elif disk_base.startswith(BLOB_URL):
@@ -225,6 +215,38 @@ class InstancesEndpoint(api_base.Resource):
             transformed_disk.append(d)
 
         disk = transformed_disk
+
+        # Perform a similar translation for NVRAM templates, turning them into
+        # blob UUIDs.
+        if nvram_template:
+            original_template = nvram_template
+            if nvram_template.startswith('label:'):
+                label = nvram_template[len('label:'):]
+                url = '%s%s/%s' % (LABEL_URL, get_jwt_identity()[0], label)
+                a = Artifact.from_url(Artifact.TYPE_LABEL, url)
+                err = _artifact_safety_checks(a)
+                if err:
+                    return err
+
+                blob_uuid = a.resolve_to_blob()
+                if not blob_uuid:
+                    return api_base.error(404, 'Could not resolve label %s to a blob' % label)
+                LOG.with_field('instance', instance_uuid).with_fields({
+                    'original_template': original_template,
+                    'label': label,
+                    'source_url': url,
+                    'artifact': a.uuid,
+                    'blob': blob_uuid
+                }).info('NVRAM template label resolved')
+                nvram_template = blob_uuid
+
+            elif nvram_template.startswith(BLOB_URL):
+                nvram_template = nvram_template[len(BLOB_URL):]
+                LOG.with_field('instance', instance_uuid).with_fields({
+                    'original_template': original_template,
+                    'blob': nvram_template
+                }).info('NVRAM template URL converted')
+                nvram_template = blob_uuid
 
         # Make sure that we are on a compatible machine type if we specify any
         # IDE attachments.
@@ -270,6 +292,7 @@ class InstancesEndpoint(api_base.Resource):
 
         # Create instance object
         inst = instance.Instance.new(
+            instance_uuid=instance_uuid,
             name=name,
             disk_spec=disk,
             memory=memory,

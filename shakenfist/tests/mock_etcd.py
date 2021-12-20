@@ -35,7 +35,8 @@ class MockEtcd():
             assert node_count > 0, 'Must define at least one node'
             self.nodes = [('node1_net', '10.0.0.1', [])]
             for i in range(2, node_count+1):
-                self.nodes.append(('node%i' % i, '10.0.0.%i' % i, ['hypervisor']))
+                self.nodes.append(('node%i' % i, '10.0.0.%i' %
+                                   i, ['hypervisor']))
 
         self.node_names = [n[0] for n in self.nodes]
 
@@ -134,7 +135,7 @@ class MockEtcd():
     # Database backed objects
     #
 
-    def createInstance(self, name, uuid,
+    def createInstance(self, name, instance_uuid,
                        cpus=1,
                        disk_spec=[{'base': 'cirros', 'size': 21}],
                        memory=1024,
@@ -159,7 +160,7 @@ class MockEtcd():
                             user_data=user_data,
                             video=video,
                             requested_placement=requested_placement,
-                            uuid=uuid,
+                            instance_uuid=instance_uuid,
                             uefi=uefi,
                             configdrive=configdrive,
                             )
