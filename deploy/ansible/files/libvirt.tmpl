@@ -95,11 +95,15 @@
       <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x6'/>
     </controller>
     <controller type='usb' index='0' model='qemu-xhci' ports='15'>
-      <address type='pci' domain='0x0000' bus='0x03' slot='0x02' function='0x0'/>
+      <address type='pci' domain='0x0000' bus='0x03' slot='0x00' function='0x0'/>
     </controller>
     <controller type='sata' index='0'>
       <address type='pci' domain='0x0000' bus='0x00' slot='0x1f' function='0x2'/>
     </controller>
+    <rng model='virtio'>
+      <backend model='random'>/dev/urandom</backend>
+      <address type='pci' domain='0x0000' bus='0x06' slot='0x00' function='0x0'/>
+    </rng>
     {%- else -%}
     <!-- NOTE(mikal): i440fx is pci -->
     <controller type='usb' index='0' model='ich9-ehci1'>
@@ -121,6 +125,10 @@
     <controller type='ide' index='0'>
       <address type='pci' domain='0x0000' bus='0x00' slot='0x01' function='0x1'/>
     </controller>
+    <rng model='virtio'>
+      <backend model='random'>/dev/urandom</backend>
+      <address type='pci' domain='0x0000' bus='0x06' slot='0x01' function='0x0'/>
+    </rng>
     {%- endif -%}
 
     {% for net in networks %}
@@ -161,10 +169,6 @@
     <memballoon model='virtio'>
       <address type='pci' domain='0x0000' bus='0x00' slot='0x06' function='0x0'/>
     </memballoon>
-    <rng model='virtio'>
-      <backend model='random'>/dev/urandom</backend>
-      <address type='pci' domain='0x0000' bus='0x06' slot='0x02' function='0x0'/>
-    </rng>
   </devices>
 
   <!-- NOTE(mikal): this is required to support things like NVME disks. -->
