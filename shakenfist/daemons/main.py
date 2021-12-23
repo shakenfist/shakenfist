@@ -235,7 +235,7 @@ def main():
         try:
             wpid, _ = os.waitpid(-1, os.WNOHANG)
             while wpid != 0:
-                LOG.warning('%s exitted (pid %d)'
+                LOG.warning('%s exited (pid %d)'
                             % (DAEMON_PIDS.get(wpid, 'unknown'), wpid))
                 if wpid in DAEMON_PIDS:
                     del DAEMON_PIDS[wpid]
