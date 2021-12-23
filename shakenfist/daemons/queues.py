@@ -118,7 +118,7 @@ def handle(jobname, workitem):
                     etcd.enqueue('%s-metrics' % config.NODE_NAME, {})
                 except Exception as e:
                     util_general.ignore_exception(
-                        'instance delete task' % inst, e)
+                        'instance %s delete task' % inst, e)
 
             elif isinstance(task, FloatNetworkInterfaceTask):
                 # Just punt it to the network node now that the interface is ready
