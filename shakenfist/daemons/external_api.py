@@ -4,6 +4,7 @@ import signal
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import logutil
+from shakenfist.util import libvirt as util_libvirt
 from shakenfist.util import process as util_process
 
 
@@ -14,12 +15,17 @@ class Monitor(daemon.Daemon):
     def run(self):
         LOG.info('Starting')
 
+        libvirt = util_libvirt.get_libvirt()
+        conn = libvirt.open('qemu:///system')
+        present_cpus, _, _ = conn.getCPUMap()
+
         os.makedirs('/var/run/sf', exist_ok=True)
         util_process.execute(None, (config.API_COMMAND_LINE
                                     % {
                                         'port': config.API_PORT,
                                         'timeout': config.API_TIMEOUT,
-                                        'name': daemon.process_name('api')
+                                        'name': daemon.process_name('api'),
+                                        'workers': present_cpus * 4
                                     }),
                              env_variables=os.environ,
                              check_exit_code=[0, 1, -15])
