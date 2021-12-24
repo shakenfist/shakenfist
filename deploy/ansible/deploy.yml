@@ -728,7 +728,7 @@
         state: restarted
         daemon_reload: yes
 
-- hosts: hypervisors
+- hosts: etc_master
   any_errors_fatal: true
   become: yes
   become_method: sudo
