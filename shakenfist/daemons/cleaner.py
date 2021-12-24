@@ -122,7 +122,7 @@ class Monitor(daemon.Daemon):
                         continue
 
                     db_state = inst.state
-                    if db_state.value == dbo.STATE_DELETED:
+                    if db_state.value in [dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED]:
                         # NOTE(mikal): a delete might be in-flight in the queue.
                         # We only worry about instances which should have gone
                         # away five minutes ago.
@@ -137,7 +137,10 @@ class Monitor(daemon.Daemon):
                         except libvirt.libvirtError:
                             util_process.execute(
                                 None, 'virsh destroy "sf:%s"' % instance_uuid)
+
                         inst.add_event('deleted stray', 'complete')
+                        if db_state.value != dbo.STATE_DELETED:
+                            inst.state.value = dbo.STATE_DELETED
                         continue
 
                     inst.place_instance(config.NODE_NAME)
@@ -147,7 +150,6 @@ class Monitor(daemon.Daemon):
                         # If we're inactive and our files aren't on disk,
                         # we have a problem.
                         log_ctx.info('Detected error state for instance')
-                        inst.state = inst.state.value + '-error'
                         if inst.state.value in [dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED]:
                             inst.state.value = dbo.STATE_DELETED
                         else:
