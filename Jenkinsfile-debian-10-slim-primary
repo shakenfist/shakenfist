@@ -117,7 +117,8 @@ pipeline {
       steps {
         script {
           timeout(time: 2, unit: 'MINUTES', activity: true) {
-            sh '''  . $WORKSPACE/$BUILD_TAG/ci-environment.sh
+            sh '''  sleep 10
+                    . $WORKSPACE/$BUILD_TAG/ci-environment.sh
                     ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
                         debian@$primary \
                         '. /etc/sf/sfrc; sf-client artifact upload ubuntu-1804 /srv/ci/ubuntu:18.04'

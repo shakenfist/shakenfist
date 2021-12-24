@@ -94,14 +94,14 @@ pipeline {
         }
       }
     }
-    stage('Run installer on primary') {
+    stage('Run getsf installer on primary') {
       steps {
         script {
           timeout(time: 20, unit: 'MINUTES', activity: true) {
             sh '''  . $WORKSPACE/$BUILD_TAG/ci-environment.sh
                     ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no \
                         -o UserKnownHostsFile=/dev/null \
-                        ubuntu@$primary sudo /root/sf-deploy.sh
+                        ubuntu@$primary /tmp/getsf-wrapper
                     echo ""
                     echo ""
                     ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no \
@@ -117,7 +117,8 @@ pipeline {
       steps {
         script {
           timeout(time: 2, unit: 'MINUTES', activity: true) {
-            sh '''  . $WORKSPACE/$BUILD_TAG/ci-environment.sh
+            sh '''  sleep 10
+                    . $WORKSPACE/$BUILD_TAG/ci-environment.sh
                     ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
                         ubuntu@$primary \
                         '. /etc/sf/sfrc; sf-client artifact upload ubuntu-1804 /srv/ci/ubuntu:18.04'
@@ -127,24 +128,6 @@ pipeline {
                     ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
                         ubuntu@$primary \
                         '. /etc/sf/sfrc; sf-client artifact upload cirros /srv/ci/cirros'
-              '''
-          }
-        }
-      }
-    }
-    stage('Create a base level of activity in the cluster') {
-      steps {
-        script {
-          timeout(time: 2, unit: 'MINUTES', activity: true) {
-            sh '''  . $WORKSPACE/$BUILD_TAG/ci-environment.sh
-                    ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                        ubuntu@$primary \
-                        'echo "==== sfrc ===="; cat /etc/sf/sfrc; echo "==== end sfrc ===="'
-                    echo ""
-                    echo ""
-                    ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                        ubuntu@$primary \
-                        '. /etc/sf/sfrc; for i in `seq 100`; do sf-client --async=continue network create background-$i 10.$i.0.0/24; done'
               '''
           }
         }
