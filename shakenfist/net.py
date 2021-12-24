@@ -660,7 +660,11 @@ class Network(dbo):
             # as an overlay cloud... Also, we don't include ourselves in the
             # mesh as that would cause duplicate packets to reflect back to us.
             # (see bug #859).
-            node_ips = set([config.NETWORK_NODE_IP])
+            node_ips = set()
+            if config.NETWORK_NODE_IP != config.NODE_MESH_IP:
+                # Always add Network node if it is not this node
+                node_ips.add(config.NETWORK_NODE_IP)
+
             for fqdn in node_fqdns:
                 n = Node.from_db(fqdn)
                 if n and n.ip != config.NODE_MESH_IP:
