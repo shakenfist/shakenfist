@@ -34,6 +34,20 @@ function status {
     echo -e "${Blue}$1${Color_Off}"
     }
 
+function record_answer {
+    varname=$1
+    value=$2
+
+    echo "export ${varname}='${value}'" >> /root/.getsfrc
+}
+
+# Load previous answers
+status "Checking for previous answers"
+if [ -e /root/.getsfrc ]; then
+    status "Loading previous answers"
+    . /root/.getsfrc
+fi
+
 # Log input parameters if any
 printenv | grep GETSF || true
 
@@ -47,6 +61,7 @@ echo ""
 if [ -z ${GETSF_WARNING} ]; then
     echo -n "(yes or no) >> "
     read GETSF_WARNING
+    record_answer GETSF_WARNING "${GETSF_WARNING}"
 else
     echo "(yes or no) >> ${GETSF_WARNING}"
 fi
@@ -68,6 +83,7 @@ echo ""
 if [ -z ${GETSF_RELEASE} ]; then
     echo -n "(release, pre-release, or local) >> "
     read GETSF_RELEASE
+    record_answer GETSF_RELEASE "${GETSF_RELEASE}"
 else
     echo "(release, pre-release, or local) >> ${GETSF_RELEASE}"
 fi
@@ -91,6 +107,7 @@ elif [ ${GETSF_RELEASE} == "local" ]; then
     if [ -z ${GETSF_SERVER_PACKAGE} ]; then
     echo -n "(a pathname) >> "
         read GETSF_SERVER_PACKAGE
+        record_answer GETSF_SERVER_PACKAGE "${GETSF_SERVER_PACKAGE}"
     else
         echo "(a pathname) >> ${GETSF_SERVER_PACKAGE}"
     fi
@@ -106,6 +123,7 @@ elif [ ${GETSF_RELEASE} == "local" ]; then
     if [ -z ${GETSF_SERVER_PACKAGE} ]; then
     echo -n "(a pathname) >> "
         read GETSF_CLIENT_PACKAGE
+        record_answer GETSF_CLIENT_PACKAGE "${GETSF_CLIENT_PACKAGE}"
     else
         echo "(a pathname) >> ${GETSF_CLIENT_PACKAGE}"
     fi
@@ -128,6 +146,7 @@ echo ""
 if [ -z ${GETSF_NODES} ]; then
     echo -n "(localhost or list of machine names) >> "
     read GETSF_NODES
+    record_answer GETSF_NODES "${GETSF_NODES}"
 else
     echo "(localhost or list of machine names) >> ${GETSF_NODES}"
 fi
@@ -148,6 +167,7 @@ echo ""
 if [ -z ${GETSF_FLOATING_BLOCK} ]; then
     echo -n "(a CIDR range like 192.168.10.0/24) >> "
     read GETSF_FLOATING_BLOCK
+    record_answer GETSF_FLOATING_BLOCK "${GETSF_FLOATING_BLOCK}"
 else
     echo "(a CIDR range like 192.168.10.0/24) >> ${GETSF_FLOATING_BLOCK}"
 fi
@@ -163,6 +183,7 @@ echo ""
 if [ -z ${GETSF_DEPLOY_NAME} ]; then
     echo -n "(a single word name) >> "
     read GETSF_DEPLOY_NAME
+    record_answer GETSF_DEPLOY_NAME "${GETSF_DEPLOY_NAME}"
 else
     echo "(a single word name) >> ${GETSF_DEPLOY_NAME}"
 fi
