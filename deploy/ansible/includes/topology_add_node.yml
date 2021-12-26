@@ -5,7 +5,7 @@
     ansible_fqdn: "{{item['name']}}"
     ansible_ssh_host: "{{item['node_egress_ip']}}"
     ansible_ssh_user: "{{ssh_user}}"
-    ansible_ssh_private_key_filename: "{{ssh_key_filename}}"
+    ansible_ssh_private_key_file: "{{ssh_key_filename}}"
 
 - name: Add {{item['name']}} as a hypervisor (if configured)
   add_host:
