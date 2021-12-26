@@ -301,7 +301,24 @@ else
     question_end
 
     question_start
-    echo "Finally, which nodes are your hypervisors? These nodes are wehere"
+    echo "Next, you can have storage only nodes. These are used to store blobs,"
+    echo "which are the underlying storage for artifacts such as disk images and"
+    echo "snapshots. You'd only want storage nodes on large deployments, so most"
+    echo "deployers can leave this list empty."
+    echo
+    echo "Of the nodes you entered above, which are storage nodes?"
+    echo
+    if [ -z "${GETSF_NODE_STORAGE}" ]; then
+        echo -n "(a space separated list of nodes from the previous list) >> "
+        read GETSF_NODE_STORAGE
+        record_answer GETSF_NODE_STORAGE "${GETSF_NODE_STORAGE}"
+    else
+        echo "(a space separated list of nodes from the previous list) >> ${GETSF_NODE_STORAGE}"
+    fi
+    question_end
+
+    question_start
+    echo "Finally, which nodes are your hypervisors? These nodes are where"
     echo "instances actually run."
     echo
     echo "Of the nodes you entered above, which are hypervisors?"
@@ -585,6 +602,7 @@ for node in ${GETSF_NODES[@]}; do
         network_node="true"
         etcd_master_node="true"
         hypervisor_node="true"
+        storage_node="false"
     else
         if [ $(echo "${GETSF_NODE_PRIMARY}" | grep -c ${node}) -gt 0 ]; then
             primary_node="true"
@@ -613,6 +631,12 @@ for node in ${GETSF_NODES[@]}; do
         else
             hypervisor_node="false"
         fi
+
+        if [ $(echo "${GETSF_NODE_STORAGE}" | grep -c ${node}) -gt 0 ]; then
+            storage_node="true"
+        else
+            storage_node="false"
+        fi
     fi
 
     cat - >> /root/sf-deploy << DEPLOYEOF
@@ -625,7 +649,8 @@ for node in ${GETSF_NODES[@]}; do
     "primary_node": ${primary_node},
     "network_node": ${network_node},
     "etcd_master": ${etcd_master_node},
-    "hypervisor": ${hypervisor_node}${api_comma}
+    "hypervisor": ${hypervisor_node},
+    "storage": ${storage_node}${api_comma}
     ${api_stanza}
   },
 DEPLOYEOF
