@@ -136,7 +136,7 @@ inactive_states_filter = partial(
 
 
 def _sort_by_key(d):
-    for k in sorted(d):
+    for k in sorted(d, reverse=True):
         for v in d[k]:
             yield v
 
