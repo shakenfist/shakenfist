@@ -4,6 +4,7 @@ localhost ansible_connection=local
 [primary_node]
 [network_node]
 [hypervisors]
+[storage]
 
 [allsf:children]
   primary_node
@@ -20,5 +21,6 @@ localhost ansible_connection=local
   hypervisors
   network_node
   etcd_master
+  storage
 
 [etcd_master]
