@@ -303,6 +303,7 @@ class Blob(dbo):
                 'bytes_fetched': total_bytes_received,
                 'size': int(self.size)
             }).info('Fetch complete')
+            self.observe()
             return total_bytes_received
 
     def request_replication(self, allow_excess=0):
