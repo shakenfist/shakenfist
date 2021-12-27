@@ -34,7 +34,7 @@
 - name: Add {{item['name']}} as a storage node (if configured, should only be one)
   add_host:
     hostname: "{{item['name']}}"
-    groups: storage
+    groups: storage, sf_promethus_exporters
   when: item.get('storage', False)
 
 - name: Record API URL from primary node
