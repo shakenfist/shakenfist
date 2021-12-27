@@ -52,8 +52,10 @@ class Monitor(daemon.Daemon):
                     # Instance is SF but not in database. Kill to reduce load.
                     log_ctx.warning('Destroying unknown instance')
                     self._delete_instance_files(instance_uuid)
-                    util_process.execute(None,
-                                         'virsh destroy "sf:%s"' % instance_uuid)
+                    util_process.execute(
+                        None, 'virsh destroy "sf:%s"' % instance_uuid)
+                    util_process.execute(
+                        None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
                     continue
 
                 inst.place_instance(config.NODE_NAME)
@@ -78,7 +80,7 @@ class Monitor(daemon.Daemon):
                             'Attempting alternate delete method for instance')
                         self._delete_instance_files(instance_uuid)
                         util_process.execute(
-                            None, 'virsh destroy "sf:%s"' % instance_uuid)
+                            None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
                         inst.add_event('enforced delete', 'complete')
                     else:
                         inst.delete()
@@ -92,7 +94,7 @@ class Monitor(daemon.Daemon):
                 if state == 'crashed':
                     if inst.state.value in [dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED]:
                         util_process.execute(
-                            None, 'virsh destroy "sf:%s"' % instance_uuid)
+                            None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
                         inst.state.value = dbo.STATE_DELETED
                     else:
                         inst.state = inst.state.value + '-error'
@@ -115,10 +117,12 @@ class Monitor(daemon.Daemon):
                         self._delete_instance_files(instance_uuid)
                         try:
                             domain = conn.lookupByName(domain_name)
+                            # TODO(mikal): work out if we can pass
+                            # VIR_DOMAIN_UNDEFINE_NVRAM with virDomainUndefineFlags()
                             domain.undefine()
                         except libvirt.libvirtError:
                             util_process.execute(
-                                None, 'virsh destroy "sf:%s"' % instance_uuid)
+                                None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
                         continue
 
                     db_state = inst.state
@@ -133,10 +137,12 @@ class Monitor(daemon.Daemon):
                         self._delete_instance_files(instance_uuid)
                         try:
                             domain = conn.lookupByName(domain_name)
+                            # TODO(mikal): work out if we can pass
+                            # VIR_DOMAIN_UNDEFINE_NVRAM with virDomainUndefineFlags()
                             domain.undefine()
                         except libvirt.libvirtError:
                             util_process.execute(
-                                None, 'virsh destroy "sf:%s"' % instance_uuid)
+                                None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
 
                         inst.add_event('deleted stray', 'complete')
                         if db_state.value != dbo.STATE_DELETED:
