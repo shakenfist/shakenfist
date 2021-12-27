@@ -200,15 +200,18 @@ class Monitor(daemon.Daemon):
 
         # Replicate under replicated blobs, but only if we don't have heaps of
         # queued replications already
-        if len(current_fetches) > config.MAX_CONCURRENT_BLOB_TRANSFERS:
-            LOG.info('Too many concurrent blob transfers queued, not queueing more')
-        else:
-            for blob_uuid, excess in underreplicated:
-                b = blob.Blob.from_db(blob_uuid)
-                LOG.with_fields({
-                    'blob': b
-                }).info('Blob under replicated, attempting to correct')
-                b.request_replication(allow_excess=excess)
+        for blob_uuid, excess in underreplicated:
+            if len(current_fetches) > config.MAX_CONCURRENT_BLOB_TRANSFERS:
+                LOG.info(
+                    'Too many concurrent blob transfers queued, not queueing more')
+                break
+
+            b = blob.Blob.from_db(blob_uuid)
+            LOG.with_fields({
+                'blob': b
+            }).info('Blob under replicated, attempting to correct')
+            b.request_replication(allow_excess=excess)
+            current_fetches[blob_uuid].append('unknown')
 
         # Node management
         for n in Nodes([node_inactive_states_filter]):
