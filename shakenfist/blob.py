@@ -152,6 +152,8 @@ class Blob(dbo):
             locs = self.locations
             if config.NODE_NAME not in locs:
                 locs.append(config.NODE_NAME)
+                self.log.is_event().with_field('node', config.NODE_NAME).info(
+                    'Now has blob')
             self.locations = locs
 
     def drop_node_location(self, node=config.NODE_NAME):
@@ -159,6 +161,8 @@ class Blob(dbo):
             locs = self.locations
             try:
                 locs.remove(node)
+                self.log.is_event().with_field('node', config.NODE_NAME).info(
+                    'No longer has blob')
             except ValueError:
                 pass
             else:
@@ -187,6 +191,7 @@ class Blob(dbo):
                         del info[key]
 
                 info['mime-type'] = magic.Magic(mime=True).from_file(blob_path)
+                self.log.is_event().with_fields(info).info('Blob metadata')
                 self._db_set_attribute('info', info)
 
     def ref_count_inc(self):

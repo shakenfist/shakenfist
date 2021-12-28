@@ -157,6 +157,8 @@ class BaseTestCase(testtools.TestCase):
         start_time = time.time()
         while time.time() - start_time < 2 * 60:
             for event in self.system_client.get_instance_events(instance_uuid):
+                print('Comparing after=%s operation=%s message=%s to %s'
+                      % (after, operation, message, event))
                 if after and event['timestamp'] <= after:
                     continue
 
