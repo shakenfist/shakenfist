@@ -1,0 +1,122 @@
+- hosts: localhost
+  gather_facts: yes
+  connection: ssh
+  vars:
+    identifier: unknown
+    source_path: "/home/jenkins/src/shakenfist/"
+    base_image: "https://sfcbr.shakenfist.com/static/ubuntu2004-ci-template.qcow2"
+    base_image_user: "ubuntu"
+
+  tasks:
+    - include_tasks: ci-include-multinode-localhost.yml
+    - include_tasks: ci-include-common-localhost.yml
+
+- hosts: sfall
+  gather_facts: yes
+  become: true
+  vars:
+    source_path: "/home/jenkins/src/shakenfist/"
+
+  tasks:
+    - include_tasks: ci-include-common-sfnodes.yml
+    - include_tasks: ci-include-multinode-sfnodes.yml
+
+- hosts: primary
+  gather_facts: yes
+  connection: ssh
+  become: true
+
+  tasks:
+    - include_tasks: ci-include-common-primary.yml
+
+    - name: Copy install configuration to primary node
+      copy:
+        content: |
+          #!/bin/bash
+          ansible-galaxy install -r /srv/shakenfist/venv/share/shakenfist/installer/requirements.yml
+
+          export ADMIN_PASSWORD=foobar
+          export FLOATING_IP_BLOCK="10.10.10.0/24"
+          export DEPLOY_NAME="metalci"
+          export SSH_USER="{{base_image_user}}"
+          export SSH_KEY_FILENAME="/root/.ssh/id_rsa"
+          export HTTP_PROXY="http://192.168.1.50:3128"
+          export INCLUDE_TRACEBACKS=1
+
+          export KSM_ENABLED=0
+
+          # Topology
+          read -r -d '' TOPOLOGY <<'EOF'
+          [
+            {
+              "name": "sf-primary",
+              "node_egress_ip": "{{hostvars['primary']['egress_ip']}}",
+              "node_egress_nic": "eth0",
+              "node_mesh_ip": "{{hostvars['primary']['mesh_ip']}}",
+              "node_mesh_nic": "eth1",
+              "primary_node": true,
+              "network_node": true,
+              "hypervisor": false,
+              "api_url": "http://sf-primary/api"
+            },
+            {
+              "name": "sf-1",
+              "node_egress_ip": "{{hostvars['sf1']['egress_ip']}}",
+              "node_egress_nic": "eth0",
+              "node_mesh_ip": "{{hostvars['sf1']['mesh_ip']}}",
+              "node_mesh_nic": "eth1",
+              "hypervisor": true
+            },
+            {
+              "name": "sf-2",
+              "node_egress_ip": "{{hostvars['sf2']['egress_ip']}}",
+              "node_egress_nic": "eth0",
+              "node_mesh_ip": "{{hostvars['sf2']['mesh_ip']}}",
+              "node_mesh_nic": "eth1",
+              "hypervisor": true
+            },
+            {
+              "name": "sf-3",
+              "node_egress_ip": "{{hostvars['sf3']['egress_ip']}}",
+              "node_egress_nic": "eth0",
+              "node_mesh_ip": "{{hostvars['sf3']['mesh_ip']}}",
+              "node_mesh_nic": "eth1",
+              "hypervisor": true
+            },
+            {
+              "name": "sf-4",
+              "node_egress_ip": "{{hostvars['sf4']['egress_ip']}}",
+              "node_egress_nic": "eth0",
+              "node_mesh_ip": "{{hostvars['sf4']['mesh_ip']}}",
+              "node_mesh_nic": "eth1",
+              "hypervisor": true
+            },
+            {
+              "name": "sf-5",
+              "node_egress_ip": "{{hostvars['sf5']['egress_ip']}}",
+              "node_egress_nic": "eth0",
+              "node_mesh_ip": "{{hostvars['sf5']['mesh_ip']}}",
+              "node_mesh_nic": "eth1",
+              "hypervisor": false,
+              "etcd_master": true
+            },
+          ]
+          EOF
+          export TOPOLOGY
+
+          /srv/shakenfist/venv/share/shakenfist/installer/install
+        dest: "/root/sf-deploy.sh"
+        owner: root
+        group: root
+        mode: u=rx
+
+- hosts: sf-5
+  gather_facts: yes
+  connection: ssh
+  become: true
+
+  tasks:
+    - name: Create a RAM disk for etcd to make it more reliable in CI
+      shell: |
+        mkdir -p /var/lib/etcd
+        mount -t tmpfs -o rw,size=2G tmpfs /var/lib/etcd

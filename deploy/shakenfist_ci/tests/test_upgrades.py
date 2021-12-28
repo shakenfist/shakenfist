@@ -49,20 +49,20 @@ class TestUpgrades(base.BaseTestCase):
             instances['upgrade/fe']['uuid'],
             networks_by_name['upgrade/upgrade-fe']['uuid'],
             addresses['upgrade/fe/upgrade-fe'],
-            True, 10)
+            0, 10)
         self._test_ping(
             instances['upgrade/fe']['uuid'],
             networks_by_name['upgrade/upgrade-be']['uuid'],
             addresses['upgrade/fe/upgrade-be'],
-            True, 10)
+            0, 10)
 
         self._test_ping(
             instances['upgrade/be-1']['uuid'],
             networks_by_name['upgrade/upgrade-be']['uuid'],
             addresses['upgrade/be-1/upgrade-be'],
-            True, 10)
+            0, 10)
         self._test_ping(
             instances['upgrade/be-2']['uuid'],
             networks_by_name['upgrade/upgrade-be']['uuid'],
             addresses['upgrade/be-2/upgrade-be'],
-            True, 10)
+            0, 10)

@@ -1,16 +1,25 @@
 # Copyright 2021 Michael Still
 
+import http
 import magic
 import os
+import random
+import requests
 import time
+import urllib3
 
-from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.baseobject import (
+    DatabaseBackedObject as dbo,
+    DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist.config import config
-from shakenfist import constants
+from shakenfist.constants import LOCK_REFRESH_SECONDS, GiB
 from shakenfist import db
-from shakenfist.exceptions import BlobRefCountDecrementBelowZero, BlobDeleted
+from shakenfist import etcd
+from shakenfist.exceptions import BlobDeleted, BlobFetchFailed
 from shakenfist import instance
 from shakenfist import logutil
+from shakenfist.node import Node, nodes_by_free_disk_descending
+from shakenfist.tasks import FetchBlobTask
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
 
@@ -22,8 +31,10 @@ class Blob(dbo):
     object_type = 'blob'
     current_version = 2
     state_targets = {
-        None: (dbo.STATE_CREATED),
-        dbo.STATE_CREATED: (dbo.STATE_DELETED),
+        None: (dbo.STATE_INITIAL),
+        dbo.STATE_INITIAL: (dbo.STATE_CREATED, dbo.STATE_ERROR, dbo.STATE_DELETED),
+        dbo.STATE_CREATED: (dbo.STATE_ERROR, dbo.STATE_DELETED),
+        dbo.STATE_ERROR: (dbo.STATE_DELETED),
         dbo.STATE_DELETED: (),
     }
 
@@ -50,7 +61,7 @@ class Blob(dbo):
         )
 
         b = Blob.from_db(blob_uuid)
-        b.state = Blob.STATE_CREATED
+        b.state = Blob.STATE_INITIAL
         return b
 
     @staticmethod
@@ -69,9 +80,13 @@ class Blob(dbo):
         # expect
         out = {
             'uuid': self.uuid,
+            'state': self.state.value,
             'size': self.size,
             'modified': self.modified,
-            'fetched_at': self.fetched_at
+            'fetched_at': self.fetched_at,
+            'locations': self.locations,
+            'reference_count': self.ref_count,
+            'instances': self.instances
         }
 
         out.update(self.info)
@@ -139,11 +154,11 @@ class Blob(dbo):
                 locs.append(config.NODE_NAME)
             self.locations = locs
 
-    def drop_node_location(self):
+    def drop_node_location(self, node=config.NODE_NAME):
         with self.get_lock_attr('locations', 'Remove node from location'):
             locs = self.locations
             try:
-                locs.remove(config.NODE_NAME)
+                locs.remove(node)
             except ValueError:
                 pass
             else:
@@ -152,6 +167,11 @@ class Blob(dbo):
 
     def observe(self):
         self.add_node_location()
+
+        # Observing a blob can move it from initial to created, but it should not
+        # move it from deleted to created.
+        if self.state.value == self.STATE_INITIAL:
+            self.state = self.STATE_CREATED
 
         with self.get_lock_attr('locations', 'Set blob info'):
             if not self.info:
@@ -181,7 +201,8 @@ class Blob(dbo):
         with self.get_lock_attr('ref_count', 'Increase ref count'):
             new_count = self.ref_count - 1
             if new_count < 0:
-                raise BlobRefCountDecrementBelowZero
+                new_count = 0
+                self.log.warning('Reference count decremented below zero')
 
             self._db_set_attribute('ref_count', {'ref_count': new_count})
 
@@ -191,12 +212,146 @@ class Blob(dbo):
 
             return new_count
 
+    def ensure_local(self, locks):
+        with self.get_lock(config.NODE_NAME) as blob_lock:
+            if self.state.value != self.STATE_CREATED:
+                self.log.warning(
+                    'Blob not in created state, replication cancelled')
+                return
+
+            blob_dir = os.path.join(config.STORAGE_PATH, 'blobs')
+            blob_path = os.path.join(blob_dir, self.uuid)
+            os.makedirs(blob_dir, exist_ok=True)
+
+            if os.path.exists(blob_path):
+                self.log.info('Blob already exists!')
+                self.observe()
+                return
+
+            locations = self.locations
+            random.shuffle(locations)
+            blob_source = locations[0]
+
+            with open(blob_path + '.partial', 'wb') as f:
+                done = False
+                last_refresh = 0
+                refreshable_locks = locks.copy()
+                refreshable_locks.append(blob_lock)
+
+                total_bytes_received = 0
+                previous_percentage = 0
+
+                while not done:
+                    bytes_in_attempt = 0
+
+                    try:
+                        admin_token = util_general.get_api_token(
+                            'http://%s:%d' % (blob_source, config.API_PORT))
+                        url = ('http://%s:%d/blob/%s?offset=%d'
+                               % (blob_source, config.API_PORT, self.uuid,
+                                  total_bytes_received))
+                        r = requests.request(
+                            'GET', url, stream=True,
+                            headers={'Authorization': admin_token,
+                                     'User-Agent': util_general.get_user_agent()})
+
+                        for chunk in r.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                            total_bytes_received += len(chunk)
+                            bytes_in_attempt += len(chunk)
+
+                            if time.time() - last_refresh > LOCK_REFRESH_SECONDS:
+                                db.refresh_locks(refreshable_locks)
+                                last_refresh = time.time()
+
+                            percentage = (total_bytes_received /
+                                          int(self.size) * 100.0)
+                            if (percentage - previous_percentage) > 10.0:
+                                self.log.with_fields({
+                                    'bytes_fetched': total_bytes_received,
+                                    'size': int(self.size)
+                                }).info('Fetch %.02f percent complete' % percentage)
+                                previous_percentage = percentage
+
+                        done = True
+                        self.log.with_fields({
+                            'bytes_fetched': total_bytes_received,
+                            'size': int(self.size),
+                            'done': done
+                        }).info('HTTP request ran out of chunks')
+
+                    except (http.client.IncompleteRead,
+                            urllib3.exceptions.ProtocolError,
+                            requests.exceptions.ChunkedEncodingError) as e:
+                        # An API error (or timeout) occured. Retry unless we got nothing.
+                        if bytes_in_attempt > 0:
+                            self.log.info('HTTP connection dropped, retrying')
+                        else:
+                            self.log.error('HTTP connection dropped without '
+                                           'transferring data: %s' % e)
+                            raise e
+
+            if total_bytes_received != int(self.size):
+                if os.path.exists(blob_path + '.partial'):
+                    os.unlink(blob_path + '.partial')
+                raise BlobFetchFailed('Did not fetch enough data')
+
+            self.log.info('Completing transfer')
+            os.rename(blob_path + '.partial', blob_path)
+
+            self.log.with_fields({
+                'bytes_fetched': total_bytes_received,
+                'size': int(self.size)
+            }).info('Fetch complete')
+            self.observe()
+            return total_bytes_received
+
+    def request_replication(self, allow_excess=0):
+        with self.get_lock_attr('locations', 'Request replication'):
+            locations = self.locations
+
+            # Filter out absent locations
+            for node_name in self.locations:
+                n = Node.from_db(node_name)
+                if n.state.value != Node.STATE_CREATED:
+                    locations.remove(node_name)
+
+            replica_count = len(locations)
+            targets = config.BLOB_REPLICATION_FACTOR + allow_excess - replica_count
+            self.log.info('Desired replica count is %d, we have %d, excess of %d requested'
+                          % (config.BLOB_REPLICATION_FACTOR, replica_count, allow_excess))
+            if targets > 0:
+                blob_size_gb = int(int(self.size) / GiB)
+                nodes = nodes_by_free_disk_descending(
+                    minimum=blob_size_gb + config.MINIMUM_FREE_DISK,
+                    intention='blobs')
+
+                # Don't copy to locations which already have the blob
+                for n in self.locations:
+                    if n in nodes:
+                        nodes.remove(n)
+
+                self.log.with_field('nodes', nodes).debug(
+                    'Considered for blob replication')
+
+                for n in nodes[:targets]:
+                    etcd.enqueue(n, {
+                        'tasks': [FetchBlobTask(self.uuid)]
+                    })
+                    self.log.with_field('node', n).info(
+                        'Instructed to replicate blob')
+
+    def hard_delete(self):
+        etcd.delete('blob', None, self.uuid)
+        etcd.delete_all('attribute/blob', self.uuid)
+        etcd.delete_all('event/blob', self.uuid)
+
     @staticmethod
     def filepath(blob_uuid):
         return os.path.join(config.STORAGE_PATH, 'blobs', blob_uuid)
 
 
-def _ensure_blob_path():
+def ensure_blob_path():
     blobs_path = os.path.join(config.STORAGE_PATH, 'blobs')
     os.makedirs(blobs_path, exist_ok=True)
 
@@ -204,7 +359,7 @@ def _ensure_blob_path():
 def snapshot_disk(disk, blob_uuid, related_object=None):
     if not os.path.exists(disk['path']):
         return
-    _ensure_blob_path()
+    ensure_blob_path()
     dest_path = Blob.filepath(blob_uuid)
 
     # Actually make the snapshot
@@ -214,15 +369,21 @@ def snapshot_disk(disk, blob_uuid, related_object=None):
 
     # And make the associated blob
     b = Blob.new(blob_uuid, st.st_size, time.time(), time.time())
+    b.state = Blob.STATE_CREATED
     b.observe()
+    b.request_replication()
     return b
 
 
 def http_fetch(resp, blob_uuid, locks, logs):
-    _ensure_blob_path()
+    ensure_blob_path()
 
     fetched = 0
-    total_size = int(resp.headers.get('Content-Length'))
+    if resp.headers.get('Content-Length'):
+        total_size = int(resp.headers.get('Content-Length'))
+    else:
+        total_size = None
+
     previous_percentage = 0.0
     last_refresh = 0
     dest_path = Blob.filepath(blob_uuid)
@@ -232,13 +393,14 @@ def http_fetch(resp, blob_uuid, locks, logs):
             fetched += len(chunk)
             f.write(chunk)
 
-            percentage = fetched / total_size * 100.0
-            if (percentage - previous_percentage) > 10.0:
-                logs.with_field('bytes_fetched', fetched).info(
-                    'Fetch %.02f percent complete' % percentage)
-                previous_percentage = percentage
+            if total_size:
+                percentage = fetched / total_size * 100.0
+                if (percentage - previous_percentage) > 10.0:
+                    logs.with_field('bytes_fetched', fetched).info(
+                        'Fetch %.02f percent complete' % percentage)
+                    previous_percentage = percentage
 
-            if time.time() - last_refresh > constants.LOCK_REFRESH_SECONDS:
+            if time.time() - last_refresh > LOCK_REFRESH_SECONDS:
                 db.refresh_locks(locks)
                 last_refresh = time.time()
 
@@ -248,9 +410,26 @@ def http_fetch(resp, blob_uuid, locks, logs):
     # database.
 
     # And make the associated blob
+    if not total_size:
+        total_size = fetched
+
     b = Blob.new(blob_uuid,
-                 resp.headers.get('Content-Length'),
+                 total_size,
                  resp.headers.get('Last-Modified'),
                  time.time())
+    b.state = Blob.STATE_CREATED
     b.observe()
+    b.request_replication()
     return b
+
+
+class Blobs(dbo_iter):
+    def __iter__(self):
+        for _, b in etcd.get_all('blob', None):
+            b = Blob.from_db(b['uuid'])
+            if not b:
+                continue
+
+            out = self.apply_filters(b)
+            if out:
+                yield out

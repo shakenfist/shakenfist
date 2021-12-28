@@ -19,10 +19,12 @@
       ]
     },
     "editable": true,
+    "fiscalYearStartMonth": 0,
     "gnetId": null,
-    "graphTooltip": 0,
-    "id": 4,
+    "graphTooltip": 1,
+    "id": 3,
     "links": [],
+    "liveNow": false,
     "panels": [
       {
         "aliasColors": {},
@@ -56,7 +58,7 @@
           "alertThreshold": true
         },
         "percentage": false,
-        "pluginVersion": "8.1.2",
+        "pluginVersion": "8.1.5",
         "pointradius": 2,
         "points": false,
         "renderer": "flot",
@@ -126,6 +128,557 @@
         }
       },
       {
+        "alert": {
+          "alertRuleTags": {},
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [
+                  4
+                ],
+                "type": "lt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": [
+                  "A",
+                  "5m",
+                  "now"
+                ]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "for": "5m",
+          "frequency": "1m",
+          "handler": 1,
+          "name": "CPU Idle  (secs per sec) alert",
+          "noDataState": "no_data",
+          "notifications": []
+        },
+        "aliasColors": {},
+        "bars": false,
+        "dashLength": 10,
+        "dashes": false,
+        "datasource": "Prometheus",
+        "description": "",
+        "fill": 1,
+        "fillGradient": 0,
+        "gridPos": {
+          "h": 8,
+          "w": 5,
+          "x": 5,
+          "y": 0
+        },
+        "hiddenSeries": false,
+        "id": 38,
+        "legend": {
+          "alignAsTable": false,
+          "avg": false,
+          "current": false,
+          "max": false,
+          "min": false,
+          "show": true,
+          "total": false,
+          "values": false
+        },
+        "lines": true,
+        "linewidth": 1,
+        "nullPointMode": "null",
+        "options": {
+          "alertThreshold": true
+        },
+        "percentage": false,
+        "pluginVersion": "8.1.5",
+        "pointradius": 2,
+        "points": false,
+        "renderer": "flot",
+        "seriesOverrides": [],
+        "spaceLength": 10,
+        "stack": false,
+        "steppedLine": false,
+        "targets": [
+          {
+            "exemplar": true,
+            "expr": "label_replace(sum by (instance) (rate(node_cpu_seconds_total{mode='idle'}[5m])), \"instance\", \"$1\", \"instance\", \"(.*):9100\")\n",
+            "interval": "",
+            "legendFormat": "{{instance}}",
+            "refId": "A"
+          }
+        ],
+        "thresholds": [
+          {
+            "colorMode": "critical",
+            "fill": true,
+            "line": true,
+            "op": "lt",
+            "value": 4,
+            "visible": true
+          }
+        ],
+        "timeFrom": null,
+        "timeRegions": [],
+        "timeShift": null,
+        "title": "CPU Idle  (secs per sec)",
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "transformations": [],
+        "type": "graph",
+        "xaxis": {
+          "buckets": null,
+          "mode": "time",
+          "name": null,
+          "show": true,
+          "values": []
+        },
+        "yaxes": [
+          {
+            "$$hashKey": "object:411",
+            "format": "short",
+            "label": null,
+            "logBase": 1,
+            "max": null,
+            "min": "0",
+            "show": true
+          },
+          {
+            "$$hashKey": "object:412",
+            "format": "short",
+            "label": null,
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true
+          }
+        ],
+        "yaxis": {
+          "align": false,
+          "alignLevel": null
+        }
+      },
+      {
+        "alert": {
+          "alertRuleTags": {},
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [
+                  0.5
+                ],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": [
+                  "A",
+                  "5m",
+                  "now"
+                ]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "for": "5m",
+          "frequency": "1m",
+          "handler": 1,
+          "name": "CPU IOWait  (secs per sec) alert",
+          "noDataState": "no_data",
+          "notifications": []
+        },
+        "aliasColors": {},
+        "bars": false,
+        "dashLength": 10,
+        "dashes": false,
+        "datasource": "Prometheus",
+        "description": "",
+        "fill": 1,
+        "fillGradient": 0,
+        "gridPos": {
+          "h": 8,
+          "w": 5,
+          "x": 10,
+          "y": 0
+        },
+        "hiddenSeries": false,
+        "id": 32,
+        "legend": {
+          "alignAsTable": false,
+          "avg": false,
+          "current": false,
+          "max": false,
+          "min": false,
+          "show": true,
+          "total": false,
+          "values": false
+        },
+        "lines": true,
+        "linewidth": 1,
+        "nullPointMode": "null",
+        "options": {
+          "alertThreshold": true
+        },
+        "percentage": false,
+        "pluginVersion": "8.1.5",
+        "pointradius": 2,
+        "points": false,
+        "renderer": "flot",
+        "seriesOverrides": [],
+        "spaceLength": 10,
+        "stack": false,
+        "steppedLine": false,
+        "targets": [
+          {
+            "exemplar": true,
+            "expr": "label_replace(sum by (instance) (rate(node_cpu_seconds_total{mode='iowait'}[5m])), \"instance\", \"$1\", \"instance\", \"(.*):9100\")\n",
+            "interval": "",
+            "legendFormat": "{{instance}}",
+            "refId": "A"
+          }
+        ],
+        "thresholds": [
+          {
+            "colorMode": "critical",
+            "fill": true,
+            "line": true,
+            "op": "gt",
+            "value": 0.5,
+            "visible": true
+          }
+        ],
+        "timeFrom": null,
+        "timeRegions": [],
+        "timeShift": null,
+        "title": "CPU IOWait  (secs per sec)",
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "transformations": [],
+        "type": "graph",
+        "xaxis": {
+          "buckets": null,
+          "mode": "time",
+          "name": null,
+          "show": true,
+          "values": []
+        },
+        "yaxes": [
+          {
+            "$$hashKey": "object:411",
+            "format": "short",
+            "label": null,
+            "logBase": 1,
+            "max": null,
+            "min": "0",
+            "show": true
+          },
+          {
+            "$$hashKey": "object:412",
+            "format": "short",
+            "label": null,
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true
+          }
+        ],
+        "yaxis": {
+          "align": false,
+          "alignLevel": null
+        }
+      },
+      {
+        "alert": {
+          "alertRuleTags": {},
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [
+                  50
+                ],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": [
+                  "A",
+                  "5m",
+                  "now"
+                ]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "for": "5m",
+          "frequency": "1m",
+          "handler": 1,
+          "name": "Average Disk Queue Size (iostat avgqu-sz) alert",
+          "noDataState": "no_data",
+          "notifications": []
+        },
+        "aliasColors": {},
+        "bars": false,
+        "dashLength": 10,
+        "dashes": false,
+        "datasource": "Prometheus",
+        "description": "",
+        "fill": 1,
+        "fillGradient": 0,
+        "gridPos": {
+          "h": 8,
+          "w": 5,
+          "x": 15,
+          "y": 0
+        },
+        "hiddenSeries": false,
+        "id": 33,
+        "legend": {
+          "alignAsTable": false,
+          "avg": false,
+          "current": false,
+          "max": false,
+          "min": false,
+          "show": true,
+          "total": false,
+          "values": false
+        },
+        "lines": true,
+        "linewidth": 1,
+        "nullPointMode": "null",
+        "options": {
+          "alertThreshold": true
+        },
+        "percentage": false,
+        "pluginVersion": "8.1.5",
+        "pointradius": 2,
+        "points": false,
+        "renderer": "flot",
+        "seriesOverrides": [],
+        "spaceLength": 10,
+        "stack": false,
+        "steppedLine": false,
+        "targets": [
+          {
+            "exemplar": true,
+            "expr": "label_replace(sum by (instance) (rate(node_disk_io_time_weighted_seconds_total[5m])), \"instance\", \"$1\", \"instance\", \"(.*):9100\")\n",
+            "interval": "",
+            "legendFormat": "{{instance}}",
+            "refId": "A"
+          }
+        ],
+        "thresholds": [
+          {
+            "colorMode": "critical",
+            "fill": true,
+            "line": true,
+            "op": "gt",
+            "value": 50,
+            "visible": true
+          }
+        ],
+        "timeFrom": null,
+        "timeRegions": [],
+        "timeShift": null,
+        "title": "Average Disk Queue Size (iostat avgqu-sz)",
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "transformations": [],
+        "type": "graph",
+        "xaxis": {
+          "buckets": null,
+          "mode": "time",
+          "name": null,
+          "show": true,
+          "values": []
+        },
+        "yaxes": [
+          {
+            "$$hashKey": "object:411",
+            "format": "short",
+            "label": null,
+            "logBase": 1,
+            "max": null,
+            "min": "0",
+            "show": true
+          },
+          {
+            "$$hashKey": "object:412",
+            "format": "short",
+            "label": null,
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true
+          }
+        ],
+        "yaxis": {
+          "align": false,
+          "alignLevel": null
+        }
+      },
+      {
+        "datasource": null,
+        "gridPos": {
+          "h": 24,
+          "w": 4,
+          "x": 20,
+          "y": 0
+        },
+        "id": 37,
+        "options": {
+          "alertName": "",
+          "dashboardAlerts": true,
+          "dashboardTitle": "",
+          "folderId": null,
+          "maxItems": 10,
+          "showOptions": "current",
+          "sortOrder": 1,
+          "stateFilter": {
+            "alerting": false,
+            "execution_error": false,
+            "no_data": false,
+            "ok": false,
+            "paused": false,
+            "pending": false
+          },
+          "tags": []
+        },
+        "pluginVersion": "8.1.5",
+        "timeFrom": null,
+        "timeShift": null,
+        "title": "SF Alerts",
+        "type": "alertlist"
+      },
+      {
+        "aliasColors": {},
+        "bars": false,
+        "dashLength": 10,
+        "dashes": false,
+        "datasource": "Prometheus",
+        "fill": 1,
+        "fillGradient": 0,
+        "gridPos": {
+          "h": 8,
+          "w": 5,
+          "x": 0,
+          "y": 8
+        },
+        "hiddenSeries": false,
+        "id": 31,
+        "legend": {
+          "avg": false,
+          "current": false,
+          "max": false,
+          "min": false,
+          "show": true,
+          "total": false,
+          "values": false
+        },
+        "lines": true,
+        "linewidth": 1,
+        "nullPointMode": "null",
+        "options": {
+          "alertThreshold": true
+        },
+        "percentage": false,
+        "pluginVersion": "8.1.5",
+        "pointradius": 2,
+        "points": false,
+        "renderer": "flot",
+        "seriesOverrides": [],
+        "spaceLength": 10,
+        "stack": false,
+        "steppedLine": false,
+        "targets": [
+          {
+            "exemplar": true,
+            "expr": "cpu_load_1",
+            "interval": "",
+            "legendFormat": "{{instance}}",
+            "refId": "A"
+          }
+        ],
+        "thresholds": [],
+        "timeFrom": null,
+        "timeRegions": [],
+        "timeShift": null,
+        "title": "Load Average (1 min)",
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "transformations": [
+          {
+            "id": "renameByRegex",
+            "options": {
+              "regex": ":13001",
+              "renamePattern": ""
+            }
+          }
+        ],
+        "type": "graph",
+        "xaxis": {
+          "buckets": null,
+          "mode": "time",
+          "name": null,
+          "show": true,
+          "values": []
+        },
+        "yaxes": [
+          {
+            "$$hashKey": "object:411",
+            "format": "short",
+            "label": null,
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true
+          },
+          {
+            "$$hashKey": "object:412",
+            "format": "short",
+            "label": null,
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true
+          }
+        ],
+        "yaxis": {
+          "align": false,
+          "alignLevel": null
+        }
+      },
+      {
         "aliasColors": {},
         "bars": true,
         "dashLength": 10,
@@ -137,7 +690,7 @@
           "h": 8,
           "w": 5,
           "x": 5,
-          "y": 0
+          "y": 8
         },
         "hiddenSeries": false,
         "id": 2,
@@ -157,7 +710,7 @@
           "alertThreshold": true
         },
         "percentage": false,
-        "pluginVersion": "8.1.2",
+        "pluginVersion": "8.1.5",
         "pointradius": 2,
         "points": false,
         "renderer": "flot",
@@ -238,7 +791,7 @@
           "h": 8,
           "w": 5,
           "x": 10,
-          "y": 0
+          "y": 8
         },
         "hiddenSeries": false,
         "id": 4,
@@ -258,7 +811,7 @@
           "alertThreshold": true
         },
         "percentage": false,
-        "pluginVersion": "8.1.2",
+        "pluginVersion": "8.1.5",
         "pointradius": 2,
         "points": false,
         "renderer": "flot",
@@ -338,7 +891,7 @@
           "h": 8,
           "w": 5,
           "x": 15,
-          "y": 0
+          "y": 8
         },
         "hiddenSeries": false,
         "id": 19,
@@ -359,7 +912,7 @@
           "alertThreshold": true
         },
         "percentage": false,
-        "pluginVersion": "8.1.2",
+        "pluginVersion": "8.1.5",
         "pointradius": 2,
         "points": false,
         "renderer": "flot",
@@ -431,39 +984,6 @@
         }
       },
       {
-        "datasource": null,
-        "gridPos": {
-          "h": 15,
-          "w": 4,
-          "x": 20,
-          "y": 0
-        },
-        "id": 27,
-        "options": {
-          "alertName": "",
-          "dashboardAlerts": true,
-          "dashboardTitle": "",
-          "folderId": null,
-          "maxItems": 10,
-          "showOptions": "current",
-          "sortOrder": 1,
-          "stateFilter": {
-            "alerting": false,
-            "execution_error": false,
-            "no_data": false,
-            "ok": false,
-            "paused": false,
-            "pending": false
-          },
-          "tags": []
-        },
-        "pluginVersion": "8.1.2",
-        "timeFrom": null,
-        "timeShift": null,
-        "title": "SF Alerts",
-        "type": "alertlist"
-      },
-      {
         "aliasColors": {},
         "bars": false,
         "dashLength": 10,
@@ -475,7 +995,7 @@
           "h": 7,
           "w": 5,
           "x": 0,
-          "y": 8
+          "y": 16
         },
         "hiddenSeries": false,
         "id": 8,
@@ -495,7 +1015,7 @@
           "alertThreshold": true
         },
         "percentage": false,
-        "pluginVersion": "8.1.2",
+        "pluginVersion": "8.1.5",
         "pointradius": 2,
         "points": false,
         "renderer": "flot",
@@ -611,7 +1131,7 @@
           "h": 7,
           "w": 5,
           "x": 5,
-          "y": 8
+          "y": 16
         },
         "hiddenSeries": false,
         "id": 11,
@@ -631,7 +1151,7 @@
           "alertThreshold": false
         },
         "percentage": false,
-        "pluginVersion": "8.1.2",
+        "pluginVersion": "8.1.5",
         "pointradius": 2,
         "points": false,
         "renderer": "flot",
@@ -729,7 +1249,7 @@
           "h": 7,
           "w": 5,
           "x": 10,
-          "y": 8
+          "y": 16
         },
         "hiddenSeries": false,
         "id": 10,
@@ -749,7 +1269,7 @@
           "alertThreshold": true
         },
         "percentage": false,
-        "pluginVersion": "8.1.2",
+        "pluginVersion": "8.1.5",
         "pointradius": 2,
         "points": false,
         "renderer": "flot",
@@ -862,7 +1382,7 @@
           "h": 7,
           "w": 5,
           "x": 15,
-          "y": 8
+          "y": 16
         },
         "hiddenSeries": false,
         "id": 29,
@@ -882,7 +1402,7 @@
           "alertThreshold": true
         },
         "percentage": false,
-        "pluginVersion": "8.1.2",
+        "pluginVersion": "8.1.5",
         "pointradius": 2,
         "points": false,
         "renderer": "flot",
@@ -1005,7 +1525,7 @@
           "h": 7,
           "w": 5,
           "x": 0,
-          "y": 15
+          "y": 23
         },
         "hiddenSeries": false,
         "id": 13,
@@ -1025,7 +1545,7 @@
           "alertThreshold": false
         },
         "percentage": false,
-        "pluginVersion": "8.1.2",
+        "pluginVersion": "8.1.5",
         "pointradius": 2,
         "points": false,
         "renderer": "flot",
@@ -1116,7 +1636,7 @@
           "h": 7,
           "w": 5,
           "x": 5,
-          "y": 15
+          "y": 23
         },
         "hiddenSeries": false,
         "id": 15,
@@ -1136,7 +1656,7 @@
           "alertThreshold": true
         },
         "percentage": false,
-        "pluginVersion": "8.1.2",
+        "pluginVersion": "8.1.5",
         "pointradius": 2,
         "points": false,
         "renderer": "flot",
@@ -1181,6 +1701,7 @@
         },
         "yaxes": [
           {
+            "$$hashKey": "object:559",
             "format": "bytes",
             "label": null,
             "logBase": 1,
@@ -1189,6 +1710,7 @@
             "show": true
           },
           {
+            "$$hashKey": "object:560",
             "format": "short",
             "label": null,
             "logBase": 1,
@@ -1214,7 +1736,7 @@
           "h": 7,
           "w": 5,
           "x": 10,
-          "y": 15
+          "y": 23
         },
         "hiddenSeries": false,
         "id": 17,
@@ -1234,7 +1756,7 @@
           "alertThreshold": true
         },
         "percentage": false,
-        "pluginVersion": "8.1.2",
+        "pluginVersion": "8.1.5",
         "pointradius": 2,
         "points": false,
         "renderer": "flot",
@@ -1279,6 +1801,7 @@
         },
         "yaxes": [
           {
+            "$$hashKey": "object:117",
             "format": "bytes",
             "label": null,
             "logBase": 1,
@@ -1287,6 +1810,7 @@
             "show": true
           },
           {
+            "$$hashKey": "object:118",
             "format": "short",
             "label": null,
             "logBase": 1,
@@ -1347,7 +1871,7 @@
           "h": 7,
           "w": 5,
           "x": 15,
-          "y": 15
+          "y": 23
         },
         "hiddenSeries": false,
         "id": 30,
@@ -1367,7 +1891,7 @@
           "alertThreshold": true
         },
         "percentage": false,
-        "pluginVersion": "8.1.2",
+        "pluginVersion": "8.1.5",
         "pointradius": 2,
         "points": false,
         "renderer": "flot",
@@ -1450,7 +1974,7 @@
           "h": 7,
           "w": 5,
           "x": 0,
-          "y": 22
+          "y": 30
         },
         "hiddenSeries": false,
         "id": 16,
@@ -1470,7 +1994,7 @@
           "alertThreshold": true
         },
         "percentage": false,
-        "pluginVersion": "8.1.2",
+        "pluginVersion": "8.1.5",
         "pointradius": 2,
         "points": false,
         "renderer": "flot",
@@ -1548,7 +2072,7 @@
           "h": 7,
           "w": 5,
           "x": 5,
-          "y": 22
+          "y": 30
         },
         "hiddenSeries": false,
         "id": 18,
@@ -1568,7 +2092,7 @@
           "alertThreshold": true
         },
         "percentage": false,
-        "pluginVersion": "8.1.2",
+        "pluginVersion": "8.1.5",
         "pointradius": 2,
         "points": false,
         "renderer": "flot",
@@ -1646,7 +2170,7 @@
           "h": 7,
           "w": 5,
           "x": 10,
-          "y": 22
+          "y": 30
         },
         "hiddenSeries": false,
         "id": 24,
@@ -1666,7 +2190,7 @@
           "alertThreshold": true
         },
         "percentage": false,
-        "pluginVersion": "8.1.2",
+        "pluginVersion": "8.1.5",
         "pointradius": 2,
         "points": false,
         "renderer": "flot",
@@ -1768,12 +2292,12 @@
               "type": "query"
             }
           ],
-          "executionErrorState": "keep_state",
+          "executionErrorState": "alerting",
           "for": "5m",
           "frequency": "1m",
           "handler": 1,
           "name": "etcd DB Size alert",
-          "noDataState": "keep_state",
+          "noDataState": "no_data",
           "notifications": []
         },
         "aliasColors": {},
@@ -1787,7 +2311,7 @@
           "h": 7,
           "w": 5,
           "x": 15,
-          "y": 22
+          "y": 30
         },
         "hiddenSeries": false,
         "id": 23,
@@ -1807,7 +2331,7 @@
           "alertThreshold": true
         },
         "percentage": false,
-        "pluginVersion": "8.1.2",
+        "pluginVersion": "8.1.5",
         "pointradius": 2,
         "points": false,
         "renderer": "flot",
@@ -1878,8 +2402,8 @@
         }
       }
     ],
-    "refresh": "10s",
-    "schemaVersion": 30,
+    "refresh": "30s",
+    "schemaVersion": 31,
     "style": "dark",
     "tags": [],
     "templating": {
@@ -1903,7 +2427,7 @@
       ]
     },
     "timezone": "",
-    "title": "Shaken Fist Busy",
-    "uid": "8EQRw7kMz",
-    "version": 3
+    "title": "Shaken Fist",
+    "uid": "CBGJu2v7z",
+    "version": 11
 }

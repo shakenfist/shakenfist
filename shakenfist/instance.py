@@ -6,19 +6,21 @@ import jinja2
 import io
 import json
 import os
+import pathlib
 import pycdlib
 import random
 import shutil
 import socket
 import time
-from uuid import uuid4
 
-from shakenfist.artifact import Artifact, BLOB_URL
+from shakenfist import artifact
 from shakenfist import baseobject
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
+from shakenfist import blob
 from shakenfist.config import config
+from shakenfist import constants
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
@@ -48,6 +50,7 @@ NUMBERS = '0123456789'
 def _get_disk_device(bus, index):
     bases = {
         'ide': ('hd', LETTERS),
+        'sata': ('sd', LETTERS),
         'scsi': ('sd', LETTERS),
         'usb': ('sd', LETTERS),
         'virtio': ('vd', LETTERS),
@@ -70,77 +73,9 @@ def _safe_int_cast(i):
     return i
 
 
-def _initialize_block_devices(instance_path, disk_spec):
-    bus = _get_defaulted_disk_bus(disk_spec[0])
-    root_device = _get_disk_device(bus, 0)
-    config_device = _get_disk_device(bus, 1)
-
-    disk_type = 'qcow2'
-
-    block_devices = {
-        'devices': [
-            {
-                'type': disk_type,
-                'size': _safe_int_cast(disk_spec[0].get('size')),
-                'device': root_device,
-                'bus': bus,
-                'path': os.path.join(instance_path, root_device),
-                'base': disk_spec[0].get('base'),
-                'blob_uuid': disk_spec[0].get('blob_uuid'),
-                'present_as': _get_defaulted_disk_type(disk_spec[0]),
-                'snapshot_ignores': False
-            },
-            {
-                'type': 'raw',
-                'device': config_device,
-                'bus': bus,
-                'path': os.path.join(instance_path, config_device),
-                'present_as': 'disk',
-                'snapshot_ignores': True
-            }
-        ],
-        'extracommands': []
-    }
-
-    i = 2
-    for d in disk_spec[1:]:
-        bus = _get_defaulted_disk_bus(d)
-        device = _get_disk_device(bus, i)
-        disk_path = os.path.join(instance_path, device)
-
-        block_devices['devices'].append({
-            'type': disk_type,
-            'size': _safe_int_cast(d.get('size')),
-            'device': device,
-            'bus': bus,
-            'path': disk_path,
-            'base': d.get('base'),
-            'blob_uuid': d.get('blob_uuid'),
-            'present_as': _get_defaulted_disk_type(d),
-            'snapshot_ignores': False
-        })
-        i += 1
-
-    # NVME disks require a different treatment because libvirt doesn't natively
-    # support them yet.
-    nvme_counter = 0
-    for d in block_devices['devices']:
-        if d['bus'] == 'nvme':
-            nvme_counter += 1
-            block_devices['extracommands'].extend([
-                '-drive', ('file=%s,format=%s,if=none,id=NVME%d'
-                           % (d['path'], d['type'], nvme_counter)),
-                '-device', ('nvme,drive=NVME%d,serial=nvme-%d'
-                            % (nvme_counter, nvme_counter))
-            ])
-
-    block_devices['finalized'] = False
-    return block_devices
-
-
 class Instance(dbo):
     object_type = 'instance'
-    current_version = 3
+    current_version = 6
 
     # docs/development/state_machine.md has a description of these states.
     STATE_INITIAL_ERROR = 'initial-error'
@@ -171,6 +106,10 @@ class Instance(dbo):
         dbo.STATE_DELETED: None,
     }
 
+    # Metadata - Reserved Keys
+    METADATA_KEY_TAGS = 'tags'
+    METADATA_KEY_AFFINITY = 'affinity'
+
     def __init__(self, static_values):
         super(Instance, self).__init__(static_values.get('uuid'),
                                        static_values.get('version'))
@@ -185,6 +124,11 @@ class Instance(dbo):
         self.__user_data = static_values.get('user_data')
         self.__video = static_values.get('video')
         self.__uefi = static_values.get('uefi', False)
+        self.__configdrive = static_values.get(
+            'configdrive', 'openstack-disk')
+        self.__nvram_template = static_values.get('nvram_template')
+        self.__secure_boot = static_values.get('secure_boot', False)
+        self.__machine_type = static_values.get('machine_type', 'pc')
 
         if not self.__disk_spec:
             # This should not occur since the API will filter for zero disks.
@@ -192,42 +136,46 @@ class Instance(dbo):
             raise exceptions.InstanceBadDiskSpecification()
 
     @classmethod
-    def new(cls, name, cpus, memory, namespace, ssh_key=None, disk_spec=None,
-            user_data=None, video=None, requested_placement=None, uuid=None,
-            uefi=False):
+    def new(cls, name=None, cpus=None, memory=None, namespace=None, ssh_key=None,
+            disk_spec=None, user_data=None, video=None, requested_placement=None,
+            instance_uuid=None, uefi=False, configdrive=None, nvram_template=None,
+            secure_boot=False, machine_type='pc'):
+        if not configdrive:
+            configdrive = 'openstack-disk'
 
-        if not uuid:
-            # uuid should only be specified in testing
-            uuid = str(uuid4())
+        static_values = {
+            'cpus': cpus,
+            'disk_spec': disk_spec,
+            'memory': memory,
+            'name': name,
+            'namespace': namespace,
+            'requested_placement': requested_placement,
+            'ssh_key': ssh_key,
+            'user_data': user_data,
+            'video': video,
+            'uefi': uefi,
+            'configdrive': configdrive,
+            'nvram_template': nvram_template,
+            'secure_boot': secure_boot,
+            'machine_type': machine_type,
 
-        Instance._db_create(
-            uuid,
-            {
-                'cpus': cpus,
-                'disk_spec': disk_spec,
-                'memory': memory,
-                'name': name,
-                'namespace': namespace,
-                'requested_placement': requested_placement,
-                'ssh_key': ssh_key,
-                'user_data': user_data,
-                'video': video,
-                'uefi': uefi,
+            'version': cls.current_version
+        }
 
-                'version': cls.current_version
-            })
-        i = Instance.from_db(uuid)
+        Instance._db_create(instance_uuid, static_values)
+        static_values['uuid'] = instance_uuid
+        i = Instance(static_values)
         i.state = cls.STATE_INITIAL
         i._db_set_attribute(
             'power_state', {'power_state': cls.STATE_INITIAL})
         return i
 
     @staticmethod
-    def from_db(uuid):
-        if not uuid:
+    def from_db(instance_uuid):
+        if not instance_uuid:
             return None
 
-        static_values = Instance._db_get(uuid)
+        static_values = Instance._db_get(instance_uuid)
         if not static_values:
             return None
 
@@ -248,6 +196,11 @@ class Instance(dbo):
             'user_data': self.user_data,
             'video': self.video,
             'uefi': self.uefi,
+            'configdrive': self.configdrive,
+            'nvram_template': self.nvram_template,
+            'secure_boot': self.secure_boot,
+            'machine_type': self.machine_type,
+
             'version': self.version,
             'error_message': self.error,
         }
@@ -284,7 +237,7 @@ class Instance(dbo):
         for iface_uuid in self.interfaces:
             ni = networkinterface.NetworkInterface.from_db(iface_uuid)
             if not ni:
-                self.log.with_fields({'networkinterface': iface_uuid}).error(
+                self.log.with_object(ni).error(
                     'Network interface missing')
             else:
                 i['interfaces'].append(ni.external_view())
@@ -333,10 +286,32 @@ class Instance(dbo):
         return self.__uefi
 
     @property
+    def configdrive(self):
+        return self.__configdrive
+
+    @property
+    def nvram_template(self):
+        return self.__nvram_template
+
+    @property
+    def secure_boot(self):
+        return self.__secure_boot
+
+    @property
+    def machine_type(self):
+        return self.__machine_type
+
+    @property
     def instance_path(self):
         return os.path.join(config.STORAGE_PATH, 'instances', self.uuid)
 
     # Values routed to attributes, writes are via helper methods.
+    @property
+    def affinity(self):
+        # TODO(andy) Move metadata to a new DBO subclass "DBO with metadata"
+        meta = db.get_metadata('instance', self.uuid)
+        return meta.get(self.METADATA_KEY_AFFINITY, {})
+
     @property
     def placement(self):
         return self._db_get_attribute('placement')
@@ -369,7 +344,88 @@ class Instance(dbo):
     def interfaces(self, interfaces):
         self._db_set_attribute('interfaces', interfaces)
 
+    @property
+    def tags(self):
+        # TODO(andy) Move metadata to a new DBO subclass "DBO with metadata"
+        meta = db.get_metadata('instance', self.uuid)
+        return meta.get(self.METADATA_KEY_TAGS, None)
+
     # Implementation
+    def _initialize_block_devices(self):
+        bus = _get_defaulted_disk_bus(self.disk_spec[0])
+        root_device = _get_disk_device(bus, 0)
+        config_device = _get_disk_device(bus, 1)
+
+        disk_type = 'qcow2'
+
+        block_devices = {
+            'devices': [
+                {
+                    'type': disk_type,
+                    'size': _safe_int_cast(self.disk_spec[0].get('size')),
+                    'device': root_device,
+                    'bus': bus,
+                    'path': os.path.join(self.instance_path, root_device),
+                    'base': self.disk_spec[0].get('base'),
+                    'blob_uuid': self.disk_spec[0].get('blob_uuid'),
+                    'present_as': _get_defaulted_disk_type(self.disk_spec[0]),
+                    'snapshot_ignores': False,
+                    'cache_mode': constants.DISK_CACHE_MODE
+                }
+            ],
+            'extracommands': []
+        }
+
+        i = 1
+        if self.configdrive == 'openstack-disk':
+            block_devices['devices'].append(
+                {
+                    'type': 'raw',
+                    'device': config_device,
+                    'bus': bus,
+                    'path': os.path.join(self.instance_path, config_device),
+                    'present_as': 'disk',
+                    'snapshot_ignores': True,
+                    'cache_mode': constants.DISK_CACHE_MODE
+                }
+            )
+            i += 1
+
+        for d in self.disk_spec[1:]:
+            bus = _get_defaulted_disk_bus(d)
+            device = _get_disk_device(bus, i)
+            disk_path = os.path.join(self.instance_path, device)
+
+            block_devices['devices'].append({
+                'type': disk_type,
+                'size': _safe_int_cast(d.get('size')),
+                'device': device,
+                'bus': bus,
+                'path': disk_path,
+                'base': d.get('base'),
+                'blob_uuid': d.get('blob_uuid'),
+                'present_as': _get_defaulted_disk_type(d),
+                'snapshot_ignores': False,
+                'cache_mode': constants.DISK_CACHE_MODE
+            })
+            i += 1
+
+        # NVME disks require a different treatment because libvirt doesn't natively
+        # support them yet.
+        nvme_counter = 0
+        for d in block_devices['devices']:
+            if d['bus'] == 'nvme':
+                nvme_counter += 1
+                block_devices['extracommands'].extend([
+                    '-drive', ('file=%s,format=%s,if=none,id=NVME%d'
+                               % (d['path'], d['type'], nvme_counter)),
+                    '-device', ('nvme,drive=NVME%d,serial=nvme-%d'
+                                % (nvme_counter, nvme_counter))
+                ])
+
+        block_devices['finalized'] = False
+        return block_devices
+
     def place_instance(self, location):
         with self.get_lock_attr('placement', 'Instance placement'):
             # We don't write unchanged things to the database
@@ -448,28 +504,42 @@ class Instance(dbo):
             self.enqueue_delete_due_error('Instance failed to power on')
 
     def delete(self):
+        # Mark files we used in the image cache as recently used so that they
+        # linger a little for possible future users.
+        for disk in self.block_devices.get('devices', []):
+            if 'blob_uuid' in disk and disk['blob_uuid']:
+                cached_image_path = util_general.file_permutation_exists(
+                    os.path.join(config.STORAGE_PATH,
+                                 'image_cache', disk['blob_uuid']),
+                    ['iso', 'qcow2'])
+                if cached_image_path:
+                    pathlib.Path(cached_image_path).touch(exist_ok=True)
+
         with util_general.RecordedOperation('delete domain', self):
             try:
                 self.power_off()
 
-                nvram_path = os.path.join(
-                    config.STORAGE_PATH, 'instances', self.uuid,
-                    'nvram')
+                nvram_path = os.path.join(self.instance_path, 'nvram')
                 if os.path.exists(nvram_path):
                     os.unlink(nvram_path)
+                if self.nvram_template:
+                    b = blob.Blob.from_db(self.nvram_template)
+                    b.ref_count_dec()
 
                 inst = self._get_domain()
                 if inst:
                     inst.undefine()
             except Exception as e:
-                util_general.ignore_exception('instance delete', e)
+                util_general.ignore_exception(
+                    'instance delete domain %s' % self, e)
 
         with util_general.RecordedOperation('delete disks', self):
             try:
                 if os.path.exists(self.instance_path):
                     shutil.rmtree(self.instance_path)
             except Exception as e:
-                util_general.ignore_exception('instance delete', e)
+                util_general.ignore_exception(
+                    'instance delete disks %s' % self, e)
 
         self.deallocate_instance_ports()
 
@@ -540,14 +610,14 @@ class Instance(dbo):
             # Create block devices if required
             block_devices = self.block_devices
             if not block_devices:
-                block_devices = _initialize_block_devices(self.instance_path,
-                                                          self.disk_spec)
+                block_devices = self._initialize_block_devices()
 
             # Generate a config drive
-            with util_general.RecordedOperation('make config drive', self):
-                self._make_config_drive(
-                    os.path.join(self.instance_path,
-                                 block_devices['devices'][1]['path']))
+            if self.configdrive == 'openstack-disk':
+                with util_general.RecordedOperation('make config drive', self):
+                    self._make_config_drive_openstack_disk(
+                        os.path.join(self.instance_path,
+                                     block_devices['devices'][1]['path']))
 
             # Prepare disks. A this point we have a file for each blob in the image
             # cache at a well known location (the blob uuid with .qcow2 appended).
@@ -561,10 +631,11 @@ class Instance(dbo):
                     # if an image had to be fetched from outside the cluster.
                     disk_base = None
                     if disk.get('blob_uuid'):
-                        disk_base = '%s%s' % (BLOB_URL, disk['blob_uuid'])
-                    elif disk.get('base'):
-                        a = Artifact.from_url(
-                            Artifact.TYPE_IMAGE, disk['base'])
+                        disk_base = '%s%s' % (
+                            artifact.BLOB_URL, disk['blob_uuid'])
+                    elif disk.get('base') and not util_general.noneish(disk.get('base')):
+                        a = artifact.Artifact.from_url(
+                            artifact.Artifact.TYPE_IMAGE, disk['base'])
                         mri = a.most_recent_index
 
                         if 'blob_uuid' not in mri:
@@ -573,13 +644,17 @@ class Instance(dbo):
                                 % (a.uuid, a.artifact_type))
 
                         disk['blob_uuid'] = mri['blob_uuid']
-                        disk_base = '%s%s' % (BLOB_URL, disk['blob_uuid'])
+                        disk_base = '%s%s' % (
+                            artifact.BLOB_URL, disk['blob_uuid'])
 
                     if disk_base:
                         cached_image_path = util_general.file_permutation_exists(
                             os.path.join(config.STORAGE_PATH,
                                          'image_cache', disk['blob_uuid']),
                             ['iso', 'qcow2'])
+                        if not cached_image_path:
+                            raise exceptions.ImageMissingFromCache(
+                                'Image %s is missing' % disk['blob_uuid'])
 
                         with util_general.RecordedOperation('detect cdrom images', self):
                             try:
@@ -640,7 +715,7 @@ class Instance(dbo):
                 block_devices['finalized'] = True
                 self._db_set_attribute('block_devices', block_devices)
 
-    def _make_config_drive(self, disk_path):
+    def _make_config_drive_openstack_disk(self, disk_path):
         """Create a config drive"""
 
         # NOTE(mikal): with a big nod at https://gist.github.com/pshchelo/378f3c4e7d18441878b9652e9478233f
@@ -785,6 +860,7 @@ class Instance(dbo):
     def _create_domain_xml(self):
         """Create the domain XML for the instance."""
 
+        os.makedirs(self.instance_path, exist_ok=True)
         with open(os.path.join(config.STORAGE_PATH, 'libvirt.tmpl')) as f:
             t = jinja2.Template(f.read())
 
@@ -800,6 +876,27 @@ class Instance(dbo):
                     'mtu': config.MAX_HYPERVISOR_MTU - 50
                 }
             )
+
+        # The nvram_template variable is either None (use the default path), or
+        # a UUID of a blob to fetch. The nvram template is only used for UEFI boots.
+        nvram_template_attribute = ''
+        if self.uefi:
+            if not self.nvram_template:
+                if self.secure_boot:
+                    nvram_template_attribute = "template='/usr/share/OVMF/OVMF_VARS.ms.fd'"
+                else:
+                    nvram_template_attribute = "template='/usr/share/OVMF/OVMF_VARS.fd'"
+            else:
+                # Fetch the nvram template
+                b = blob.Blob.from_db(self.nvram_template)
+                if not b:
+                    raise exceptions.NVRAMTemplateMissing(
+                        'Blob %s does not exist' % self.nvram_template)
+                b.ensure_local([])
+                b.ref_count_inc()
+                shutil.copyfile(
+                    blob.Blob.filepath(b.uuid), os.path.join(self.instance_path, 'nvram'))
+                nvram_template_attribute = ''
 
         # NOTE(mikal): the database stores memory allocations in MB, but the
         # domain XML takes them in KB. That wouldn't be worth a comment here if
@@ -818,13 +915,15 @@ class Instance(dbo):
             video_model=self.video['model'],
             video_memory=self.video['memory'],
             uefi=self.uefi,
-            extracommands=block_devices.get('extracommands', [])
+            secure_boot=self.secure_boot,
+            nvram_template_attribute=nvram_template_attribute,
+            extracommands=block_devices.get('extracommands', []),
+            machine_type=self.machine_type
         )
 
         # Libvirt re-writes the domain XML once loaded, so we store the XML
         # as generated as well so that we can debug. Note that this is _not_
         # the XML actually used by libvirt.
-        os.makedirs(self.instance_path, exist_ok=True)
         with open(os.path.join(self.instance_path, 'original_domain.xml'), 'w') as f:
             f.write(x)
 
@@ -876,8 +975,7 @@ class Instance(dbo):
                 # We need to delete the nvram file before we can undefine
                 # the domain. This will be recreated by libvirt on the next
                 # attempt.
-                nvram_path = os.path.join(
-                    config.STORAGE_PATH, 'instances', self.uuid, 'nvram')
+                nvram_path = os.path.join(self.instance_path, 'nvram')
                 if os.path.exists(nvram_path):
                     os.unlink(nvram_path)
 
@@ -955,6 +1053,14 @@ class Instance(dbo):
             length, len(d))
         return d
 
+    def delete_console_data(self):
+        console_path = os.path.join(self.instance_path, 'console.log')
+        if not os.path.exists(console_path):
+            return
+        os.truncate(console_path, 0)
+        self.add_event('console log cleared', None)
+        self.log.info('Console log cleared')
+
     def enqueue_delete_remote(self, node):
         etcd.enqueue(node, {
             'tasks': [DeleteInstanceTask(self.uuid)]
@@ -1002,24 +1108,10 @@ healthy_states_filter = partial(
     baseobject.state_filter, [Instance.STATE_INITIAL, Instance.STATE_PREFLIGHT,
                               Instance.STATE_CREATING, Instance.STATE_CREATED])
 
-inactive_states_filter = partial(
-    baseobject.state_filter, [Instance.STATE_DELETED])
-
 
 # Convenience helpers
-
-def inactive_instances():
-    return Instances([
-        inactive_states_filter,
-        partial(baseobject.state_age_filter, config.CLEANER_DELAY)])
-
-
 def healthy_instances_on_node(n):
     return Instances([healthy_states_filter, partial(placement_filter, n.uuid)])
-
-
-def created_instances_on_node():
-    return Instances([this_node_filter, partial(baseobject.state_filter, [dbo.STATE_CREATED])])
 
 
 def instances_in_namespace(namespace):

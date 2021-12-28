@@ -1,6 +1,11 @@
+import base64
 import copy
 import datetime
+import json
+import logging
+import os
 import random
+import re
 from socket import error as socket_error
 import string
 import sys
@@ -11,6 +16,10 @@ import time
 from oslo_concurrency import processutils
 from prettytable import PrettyTable
 from shakenfist_client import apiclient
+
+
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+LOG = logging.getLogger()
 
 
 class TimeoutException(Exception):
@@ -29,6 +38,12 @@ class WrongEventException(Exception):
 # downloads can be while my ISP is congested because of COVID. We should
 # turn this back down as things improve.
 NETWORK_PATIENCE_FACTOR = 3
+
+
+def load_userdata(name):
+    test_dir = os.path.dirname(os.path.abspath(__file__))
+    with open('%s/tests/files/%s_userdata' % (test_dir, name)) as f:
+        return base64.b64encode(f.read().encode('utf-8')).decode('utf-8')
 
 
 class BaseTestCase(testtools.TestCase):
@@ -200,57 +215,122 @@ class BaseTestCase(testtools.TestCase):
             % (after, image_uuid, operation))
 
     def _await_objects_ready(self, callback, items):
-        waiting_for = copy.copy(items)
+        waiting_for = list(enumerate(items))
         start_time = time.time()
+        results = [None] * len(items)
 
         while waiting_for:
-            for item in copy.copy(waiting_for):
+            for idx, item in copy.copy(waiting_for):
                 n = callback(item)
                 if n.get('state') in ['created', 'deleted', 'error']:
-                    waiting_for.remove(item)
+                    waiting_for.remove((idx, item))
+                    results[idx] = n
 
             if waiting_for:
                 time.sleep(5)
 
             if waiting_for and time.time() - start_time > 300:
+                remaining = []
+                for _, item in waiting_for:
+                    remaining.append(item)
+
                 raise TimeoutException(
-                    'Items %s never became ready (waited 5 mins)' % ', '.join(waiting_for))
+                    'Items %s never became ready (waited 5 mins)' % ', '.join(remaining))
+
+        return results
 
     def _await_networks_ready(self, network_uuids):
-        self._await_objects_ready(
+        return self._await_objects_ready(
             self.system_client.get_network, network_uuids)
 
     def _await_instances_ready(self, instance_uuids):
-        self._await_objects_ready(
+        res = self._await_objects_ready(
             self.system_client.get_instance, instance_uuids)
 
         for instance_uuid in instance_uuids:
             self.assertInstanceOk(instance_uuid)
 
+        return res
+
+    def _await_artifacts_ready(self, artifact_uuids):
+        return self._await_objects_ready(
+            self.system_client.get_artifact, artifact_uuids)
+
     def _test_ping(self, instance_uuid, network_uuid, ip, expected, attempts=1):
+        packet_loss_re = re.compile(r'.* ([0-9\.]+)% packet loss.*')
+
+        packet_loss = None
         while attempts:
             sys.stderr.write('    _test_ping()  attempts=%s\n' % attempts)
             attempts -= 1
-            output = self.system_client.ping(network_uuid, ip)
 
-            actual = output.get('stdout').find(' 0% packet loss') != -1
-            if actual == expected:
-                break
+            output = self.system_client.ping(network_uuid, ip)
+            for line in output.get('stdout', '').split('\n'):
+                m = packet_loss_re.match(line)
+                if m:
+                    packet_loss = int(m.group(1))
+                    break
 
             # Almost unnecessary due to the slowness of execute()
             time.sleep(1)
 
-        if expected != actual:
+        failed = False
+        if expected == 0 and packet_loss > 10:
+            failed = True
+        elif expected == 100 and packet_loss != 100:
+            failed = True
+
+        if failed:
             self._log_console(instance_uuid)
             self._log_instance_events(instance_uuid)
             self._log_netns()
             sys.stderr.write('Current time: '+time.ctime()+'\n')
             self.fail('Ping test failed. Expected %s != actual %s.\nout: %s\nerr: %s\n'
-                      % (expected, actual, output['stdout'], output['stderr']))
+                      % (expected, packet_loss, output['stdout'], output['stderr']))
 
     def assertInstanceOk(self, instance_uuid):
         inst = self.system_client.get_instance(instance_uuid)
         self.assertTrue(inst['state'] == 'created')
+
+    def assertInstanceConsoleAfterBoot(self, instance_uuid, contains):
+        self.assertIsNotNone(instance_uuid)
+        LOG.info('Waiting for %s to be ready' % instance_uuid)
+        self._await_instances_ready([instance_uuid])
+
+        # Wait for the console log to have any data (i.e. boot commenced)
+        start_time = time.time()
+        while True:
+            LOG.info('Waiting for console of %s' % instance_uuid)
+            console = self.test_client.get_console_data(instance_uuid, 100)
+            if len(console) > 0:
+                break
+
+            if time.time() - start_time > 300:
+                raise TimeoutException(
+                    'Instance %s console never became ready' % instance_uuid)
+            time.sleep(30)
+
+        # And then ensure that what we're expecting is in the console log
+        start_time = time.time()
+        while True:
+            LOG.info('Verifying console log of %s' % instance_uuid)
+            console = self.test_client.get_console_data(instance_uuid, 100000)
+            if console.find(contains) != -1:
+                return
+            LOG.info('Console of %s did not match. We searched for %s in:'
+                     '\n\n-----\n%s\n-----\n'
+                     % (instance_uuid, contains, console))
+
+            if time.time() - start_time > 300:
+                LOG.info('Instance %s: \n%s'
+                         % (instance_uuid,
+                            json.dumps(self.test_client.get_instance(instance_uuid),
+                                       indent=4, sort_keys=True)))
+                raise TimeoutException(
+                    'Instance %s never became ready. We searched for %s in:'
+                    '\n\n-----\n%s\n-----\n'
+                    % (instance_uuid, contains, console))
+            time.sleep(30)
 
 
 class BaseNamespacedTestCase(BaseTestCase):
@@ -289,11 +369,16 @@ class BaseNamespacedTestCase(BaseTestCase):
             self.fail('Failed to delete instances: %s'
                       % remaining_instances)
 
-        for net in non_blocking_client.get_networks():
-            non_blocking_client.delete_network(net['uuid'])
-
         start_time = time.time()
         while time.time() - start_time < 5 * 60:
+            for net in non_blocking_client.get_networks():
+                try:
+                    non_blocking_client.delete_network(net['uuid'])
+                except apiclient.ResourceCannotBeDeletedException:
+                    pass
+
+            time.sleep(5)
+
             if not list(non_blocking_client.get_networks()):
                 break
             time.sleep(5)
@@ -332,7 +417,7 @@ class TestDistroBoots(BaseNamespacedTestCase):
         self._await_login_prompt(inst['uuid'])
 
         ip = self.test_client.get_instance_interfaces(inst['uuid'])[0]['ipv4']
-        self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, 0)
 
         self.test_client.delete_instance(inst['uuid'])
         inst_uuids = []

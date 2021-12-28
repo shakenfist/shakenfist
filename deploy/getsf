@@ -1,0 +1,690 @@
+#!/bin/bash -e
+
+function on_exit {
+    echo
+    echo "*** Installation failed ***"
+    echo
+    }
+trap 'on_exit $?' EXIT
+
+# Color helpers, from https://stackoverflow.com/questions/5947742/
+Color_Off='\033[0m'       # Text Reset
+Red='\033[0;31m'          # Red
+Green='\033[0;32m'        # Green
+Yellow='\033[0;33m'       # Yellow
+Blue='\033[0;34m'         # Blue
+Purple='\033[0;35m'       # Purple
+Cyan='\033[0;36m'         # Cyan
+White='\033[0;37m'        # White
+
+function question_start {
+    echo -e "${Green}"
+    }
+
+function question_end {
+    echo -e "${Color_Off}"
+    }
+
+function error {
+    echo -e "${Red}$1${Color_Off}"
+    exit 1
+    }
+
+function status {
+    echo -e "${Blue}$1${Color_Off}"
+    }
+
+function record_answer {
+    varname=$1
+    value=$2
+
+    echo "export ${varname}='${value}'" >> /root/.getsfrc
+}
+
+# Load previous answers
+status "Checking for previous answers."
+if [ -e /root/.getsfrc ]; then
+    status "Loading previous answers."
+    . /root/.getsfrc
+fi
+
+# Log input parameters if any
+printenv | grep GETSF || true
+
+# Cleanup dangling temporary scripts
+rm -f /tmp/sf-per-node-primary /tmp/sf-per-node
+
+# Warn people
+question_start
+echo "This script will make irreversable changes to this system."
+echo "This includes installing packages, changing your networking,"
+echo "and configuring the kernel. Are you sure you want to"
+echo "proceed?"
+echo
+if [ -z ${GETSF_WARNING} ]; then
+    echo -n "(yes or no) >> "
+    read GETSF_WARNING
+    record_answer GETSF_WARNING "${GETSF_WARNING}"
+else
+    echo "(yes or no) >> ${GETSF_WARNING}"
+fi
+question_end
+if [ ${GETSF_WARNING} != "yes" ]; then
+    error "You did not say yes to the warning."
+fi
+echo
+
+# Ask which release track we should be on
+question_start
+echo "Do you want released, pre-release, or local packages?"
+echo "Generally we recommend released packages unless you have a"
+echo "good reason to need a specific bug fix. Local packages are"
+echo "really there for developers and airgapped environments. If"
+echo "you feel the urge to use local packages, please reach out"
+echo "for assistance at https://github.com/shakenfist/shakenfist/issues."
+echo
+if [ -z ${GETSF_RELEASE} ]; then
+    echo -n "(release, pre-release, or local) >> "
+    read GETSF_RELEASE
+    record_answer GETSF_RELEASE "${GETSF_RELEASE}"
+else
+    echo "(release, pre-release, or local) >> ${GETSF_RELEASE}"
+fi
+question_end
+pipextra=""
+if [ ${GETSF_RELEASE} == "release" ]; then
+    status "We will use released packages."
+    GETSF_SERVER_PACKAGE="shakenfist"
+    GETSF_CLIENT_PACKAGE="shakenfist-client"
+elif [ ${GETSF_RELEASE} == "pre-release" ]; then
+    status "We will use pre-release packages."
+    pipextra="--pre"
+    GETSF_SERVER_PACKAGE="shakenfist"
+    GETSF_CLIENT_PACKAGE="shakenfist-client"
+elif [ ${GETSF_RELEASE} == "local" ]; then
+    status "We will use local packages."
+
+    question_start
+    echo "What is the path to your server package?"
+    echo
+    if [ -z ${GETSF_SERVER_PACKAGE} ]; then
+        echo -n "(a pathname) >> "
+        read GETSF_SERVER_PACKAGE
+        record_answer GETSF_SERVER_PACKAGE "${GETSF_SERVER_PACKAGE}"
+    else
+        echo "(a pathname) >> ${GETSF_SERVER_PACKAGE}"
+    fi
+    question_end
+
+    if [ ! -e ${GETSF_SERVER_PACKAGE} ]; then
+        error "Server package file does not exist."
+    fi
+
+    question_start
+    echo "What is the path to your client package?"
+    echo
+    if [ -z ${GETSF_SERVER_PACKAGE} ]; then
+        echo -n "(a pathname) >> "
+        read GETSF_CLIENT_PACKAGE
+        record_answer GETSF_CLIENT_PACKAGE "${GETSF_CLIENT_PACKAGE}"
+    else
+        echo "(a pathname) >> ${GETSF_CLIENT_PACKAGE}"
+    fi
+    question_end
+
+    if [ ! -e ${GETSF_CLIENT_PACKAGE} ]; then
+        error "Client package file does not exist."
+    fi
+else
+    error "Could not parse response."
+fi
+echo
+
+# Determine the floating IP block
+question_start
+echo "What floating IP block should we use? I normally use"
+echo "192.168.10.0/24, but it really depends on your network."
+echo "You will need to arrange to route this block to the"
+echo "Shaken Fist network node, unless you're accessing all"
+echo "your instances from the network node itself."
+echo
+if [ -z ${GETSF_FLOATING_BLOCK} ]; then
+    echo -n "(a CIDR range like 192.168.10.0/24) >> "
+    read GETSF_FLOATING_BLOCK
+    record_answer GETSF_FLOATING_BLOCK "${GETSF_FLOATING_BLOCK}"
+else
+    echo "(a CIDR range like 192.168.10.0/24) >> ${GETSF_FLOATING_BLOCK}"
+fi
+question_end
+echo
+
+# We only support single node localhost installs for now
+question_start
+echo "What are the names of the machines you'd like to install"
+echo "Shaken Fist to?"
+echo
+echo "For a single node local install, use 'localhost'."
+echo
+echo "For a multi-node install, please don't use the name 'localhost',"
+echo "and instead use unique names for all of the machines. Additionally,"
+echo "this machine needs to have passwordless SSH access to each of these"
+echo "machines, as well as passwordless sudo on those machines."
+echo
+echo "The list is separated by spaces."
+echo
+if [ -z "${GETSF_NODES}" ]; then
+    echo -n "(localhost or list of machine names) >> "
+    read GETSF_NODES
+    record_answer GETSF_NODES "${GETSF_NODES}"
+else
+    echo "(localhost or list of machine names) >> ${GETSF_NODES}"
+fi
+question_end
+
+if [ "${GETSF_NODES}" == "localhost" ]; then
+    default_nic=$(ip route | grep default | sed -e 's/.* dev //' -e 's/ $//' -e 's/ proto static//')
+    default_ip=$(ip address show dev ${default_nic} | grep inet | head -1 | sed -e 's/ *inet //' -e 's|/.*||')
+    status "We will use ${default_nic} and ${default_ip} for network traffic."
+
+    GETSF_NODE_EGRESS_NIC_localhost=${default_nic}
+    GETSF_NODE_EGRESS_ADDRESS_localhost=${default_ip}
+    GETSF_NODE_MESH_NIC_localhost=${default_nic}
+    GETSF_NODE_MESH_ADDRESS_localhost=${default_ip}
+else
+    question_start
+    echo "What is the user to ssh as?"
+    echo
+    if [ -z ${GETSF_SSH_USER} ]; then
+        echo -n "(a username) >> "
+        read GETSF_SSH_USER
+        record_answer GETSF_SSH_USER "${GETSF_SSH_USER}"
+    else
+        echo "(a username) >> ${GETSF_SSH_USER}"
+    fi
+    question_end
+
+    question_start
+    echo "What ssh key should we use for authentication?"
+    echo
+    if [ -z ${GETSF_SSH_KEY_FILENAME} ]; then
+        echo -n "(a path to a ssh private key) >> "
+        read GETSF_SSH_KEY_FILENAME
+        record_answer GETSF_SSH_KEY_FILENAME "${GETSF_SSH_KEY_FILENAME}"
+    else
+        echo "(a path to a ssh private key) >> ${GETSF_SSH_KEY_FILENAME}"
+    fi
+
+    # For expansion of globs like ~
+    GETSF_SSH_KEY_FILENAME=$(ls ${GETSF_SSH_KEY_FILENAME})
+    question_end
+
+    status "Determining node roles."
+    status "Nodes in a Shaken Fist cluster have various roles. We need to determine"
+    status "which roles to apply to each of your nodes. We'll therefore walk you"
+    status "through a series of questions about those now."
+    echo
+
+    question_start
+    echo "The node you are running this script on is called the 'primary node'."
+    echo "The primary node is largely an operations console. It deploys the other"
+    echo "nodes, receives all nodes' logs via syslog, runs prometheus, and a"
+    echo "grafana dashboard. Most importantly, the primary node is where we will"
+    echo "configure the load balancer for API traffic. Therefore, its public address"
+    echo "needs to be the one which is in the API URL. Don't worry about the URL"
+    echo "for now, but please be aware that this node requires both ingress and"
+    echo "egress network connectivity."
+    echo
+    echo "The primary node can also be just a hypervisor node as well, depending"
+    echo "on your needs."
+    echo
+    echo "Of the nodes you entered above, what is the node name of this machine?"
+    echo
+    if [ -z ${GETSF_NODE_PRIMARY} ]; then
+        echo -n "(a node name from the previous list) >> "
+        read GETSF_NODE_PRIMARY
+        record_answer GETSF_NODE_PRIMARY "${GETSF_NODE_PRIMARY}"
+    else
+        echo "(a node name from the previous list) >> ${GETSF_NODE_PRIMARY}"
+    fi
+    question_end
+
+    question_start
+    echo "Each cluster also has exactly one network node. This node is the"
+    echo "ingress and egress point for network traffic from the cluster's"
+    echo "virtual networks. That is, it provides NAT and DHCP to the virtual"
+    echo "networks, as well as being where floating IPs are configured. It"
+    echo "therefore needs to be the route for the IP block you specify for"
+    echo "floating IPs. It is fine for the network node to also be a hypervisor."
+    echo
+    echo "The networking configuration on the network node is managed by"
+    echo "Shaken Fist and is often quite complicated."
+    echo
+    echo "A common choice is to configure the primary node as the network"
+    echo "node as well."
+    echo
+    echo "Of the nodes you entered above, which is the network node?"
+    echo
+    if [ -z ${GETSF_NODE_NETWORK} ]; then
+        echo -n "(a node name from the previous list) >> "
+        read GETSF_NODE_NETWORK
+        record_answer GETSF_NODE_NETWORK "${GETSF_NODE_NETWORK}"
+    else
+        echo "(a node name from the previous list) >> ${GETSF_NODE_NETWORK}"
+    fi
+    question_end
+
+    question_start
+    echo "Each cluster also needs etcd masters. etcd is where we store the"
+    echo "state of the cluster. etcd has very specific latency requirements"
+    echo "from both disk and network. So you shouldn't select nodes with"
+    echo "slow disks (non-SSD) or slow network (less than 1gbit). It is ok"
+    echo "for etcd masters to also be hypervisors, but be aware that if your"
+    echo "instances are thrashing the disk that etcd is hosted on, your may"
+    echo "suffer performance and reliability problems."
+    echo
+    echo "Common choices are three etcd masters for reliable environments, or"
+    echo "a single node for high performance environments which are easy to"
+    echo "rebuild."
+    echo
+    echo "A common choice is to configure the first three hypervisor nodes"
+    echo "as etcd masters."
+    echo
+    echo "Of the nodes you entered above, which are etcd masters?"
+    echo
+    if [ -z "${GETSF_NODE_ETCD_MASTER}" ]; then
+        echo -n "(a space separated list of nodes from the previous list) >> "
+        read GETSF_NODE_ETCD_MASTER
+        record_answer GETSF_NODE_ETCD_MASTER "${GETSF_NODE_ETCD_MASTER}"
+    else
+        echo "(a space separated list of nodes from the previous list) >> ${GETSF_NODE_ETCD_MASTER}"
+    fi
+    question_end
+
+    question_start
+    echo "Next, you can have storage only nodes. These are used to store blobs,"
+    echo "which are the underlying storage for artifacts such as disk images and"
+    echo "snapshots. You'd only want storage nodes on large deployments, so most"
+    echo "deployers can leave this list empty."
+    echo
+    echo "Of the nodes you entered above, which are storage nodes?"
+    echo
+    if [ -z "${GETSF_NODE_STORAGE}" ]; then
+        echo -n "(a space separated list of nodes from the previous list) >> "
+        read GETSF_NODE_STORAGE
+        record_answer GETSF_NODE_STORAGE "${GETSF_NODE_STORAGE}"
+    else
+        echo "(a space separated list of nodes from the previous list) >> ${GETSF_NODE_STORAGE}"
+    fi
+    question_end
+
+    question_start
+    echo "Finally, which nodes are your hypervisors? These nodes are where"
+    echo "instances actually run."
+    echo
+    echo "Of the nodes you entered above, which are hypervisors?"
+    echo
+    if [ -z "${GETSF_NODE_HYPERVISOR}" ]; then
+        echo -n "(a space separated list of nodes from the previous list) >> "
+        read GETSF_NODE_HYPERVISOR
+        record_answer GETSF_NODE_HYPERVISOR "${GETSF_NODE_HYPERVISOR}"
+    else
+        echo "(a space separated list of nodes from the previous list) >> ${GETSF_NODE_HYPERVISOR}"
+    fi
+    question_end
+
+    status "Now we need to collect per node details."
+    question_start
+    echo "Each node has an egress NIC and a mesh NIC. The egress NIC is the one"
+    echo "Shaken Fist uses for fetching images and so forth and would generally"
+    echo "have a route to the internet. The mesh NIC is used for private Shaken"
+    echo "Fist traffic such as etcd and virtual network meshes."
+    echo
+    echo "The egress NIC and mesh NIC can be the same device, but are generally"
+    echo "separate."
+    echo
+    question_end
+
+    for node in ${GETSF_NODES[@]}; do
+        safe_node=$(echo ${node} | tr "-" "_")
+        status "*** ${node} ***"
+        
+        question_start
+        echo "What is the ${node} egress NIC named?"
+        calc_var_name="GETSF_NODE_EGRESS_NIC_${safe_node}"
+        if [ -z "${!calc_var_name}" ]; then
+            echo -n "(an interface name) >> "
+            read ${calc_var_name}
+            record_answer "${calc_var_name}" "${!calc_var_name}"
+        else
+            echo "(an interface name) >> ${!calc_var_name}"
+        fi
+        question_end
+
+        question_start
+        echo "What is the ${node} egress NIC address?"
+        calc_var_name="GETSF_NODE_EGRESS_ADDRESS_${safe_node}"
+        if [ -z "${!calc_var_name}" ]; then
+            echo -n "(an IPv4 address) >> "
+            read ${calc_var_name}
+            record_answer "${calc_var_name}" "${!calc_var_name}"
+        else
+            echo "(an IPv4 address) >> ${!calc_var_name}"
+        fi
+        question_end
+        
+        question_start
+        echo "What is the ${node} mesh NIC named?"
+        calc_var_name="GETSF_NODE_MESH_NIC_${safe_node}"
+        if [ -z "${!calc_var_name}" ]; then
+            echo -n "(an interface name) >> "
+            read ${calc_var_name}
+            record_answer "${calc_var_name}" "${!calc_var_name}"
+        else
+            echo "(an interface name) >> ${!calc_var_name}"
+        fi
+        question_end
+
+        question_start
+        echo "What is the ${node} mesh NIC address?"
+        calc_var_name="GETSF_NODE_MESH_ADDRESS_${safe_node}"
+        if [ -z "${!calc_var_name}" ]; then
+            echo -n "(an IPv4 address) >> "
+            read ${calc_var_name}
+            record_answer "${calc_var_name}" "${!calc_var_name}"
+        else
+            echo "(an IPv4 address) >> ${!calc_var_name}"
+        fi
+        question_end
+    done
+    echo
+
+    status "Testing connectivity to nodes."
+    for node in ${GETSF_NODES[@]}; do
+        safe_node=$(echo ${node} | tr "-" "_")
+        calc_var_name="GETSF_NODE_MESH_ADDRESS_${safe_node}"
+
+        status "    ...${node} as ${GETSF_SSH_USER}@${!calc_var_name}."
+        ssh -i ${GETSF_SSH_KEY_FILENAME} ${GETSF_SSH_USER}@${!calc_var_name} "sudo whoami"
+    done
+    echo
+fi
+echo
+
+# Ask for a deploy name
+question_start
+echo "What should this deployment be called? This name is used"
+echo "for Prometheus metrics labels, as well as being visible to"
+echo "end users via API and DNS."
+echo
+if [ -z ${GETSF_DEPLOY_NAME} ]; then
+    echo -n "(a single word name) >> "
+    read GETSF_DEPLOY_NAME
+    record_answer GETSF_DEPLOY_NAME "${GETSF_DEPLOY_NAME}"
+else
+    echo "(a single word name) >> ${GETSF_DEPLOY_NAME}"
+fi
+question_end
+echo
+
+# Create a script to run on each node
+cat - > /tmp/sf-per-node-primary << PERNODEEOF
+#!/bin/bash
+
+Color_Off='\033[0m'       # Text Reset
+Red='\033[0;31m'          # Red
+Blue='\033[0;34m'         # Blue
+
+function error {
+    echo -e "\${Red}\$1\${Color_Off}"
+    exit 1
+    }
+
+function status {
+    echo -e "\${Blue}\$1\${Color_Off}"
+    }
+
+# We must run as root to do the things we do.
+if [ \$(whoami) != "root" ]; then
+    error "You need to run this script as root."
+fi
+
+# Are we on Ubuntu >= 20.04 or Debian >= 10?
+osok=0
+isdebian=0
+isubuntu=0
+if [ -e /etc/os-release ]; then
+    source /etc/os-release
+    if [ \${ID} == "debian" ]; then
+	status "Detected Debian."
+	isdebian=1
+
+	if [ \${VERSION_ID} -gt 9 ]; then
+	    osok=1
+	fi
+    elif [ \${ID} == "ubuntu" ]; then
+	status "Detected Ubuntu."
+	isubuntu=1
+
+	MAJOR_VERSION=\$(echo \${VERSION_ID} | cut -f 1 -d ".")
+	if [ \${MAJOR_VERSION} -gt 19 ]; then
+	    osok=1
+	fi
+    else
+        status "Distribution \${ID} is unknown."
+    fi
+fi
+
+if [ \${osok} != 1 ]; then
+    error "Sorry, this does not look like a supported Linux distribution.\nWe currently support Ubuntu 20.04 and onwards, and Debian 10\nonwards."
+fi
+echo
+
+# Install required packages
+APT_GET="DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpkg::Options::=\"--force-confold\" -y"
+status "Updating package list."
+eval \${APT_GET} update
+echo
+
+if [ \${isubuntu} == 1 ]; then
+    status "Adding a PPA to provide a more modern Ansible on Ubuntu."
+    eval \${APT_GET} install software-properties-common
+    add-apt-repository --yes --update ppa:ansible/ansible
+    eval \${APT_GET} update
+    echo
+elif [ \${isdebian} == 1]; then
+    status "Adding a PPA to provide a more modern Ansible on Debian."
+    if [ \${VERSION_ID} -eq 10 ]; then
+        echo "deb http://ppa.launchpad.net/ansible/ansible/ubuntu bionic main" > /etc/apt/sources.list.d/ansible.list
+    else
+        echo "deb http://ppa.launchpad.net/ansible/ansible/ubuntu focal main" > /etc/apt/sources.list.d/ansible.list
+    fi
+    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367
+    eval \${APT_GET} update
+    echo
+fi
+
+status "Upgrading packages."
+eval \${APT_GET} dist-upgrade
+echo
+
+status "Installing required packages."
+eval \${APT_GET} install ansible git tox build-essential python3-dev python3-wheel \
+    python3-pip python3-venv pwgen cpu-checker
+echo
+
+# Make sure that KVM will work. This check is in the installer, but its
+# such a common mistake we should check early and often.
+status "Checking that KVM will work."
+kvm-ok
+if [ \$? -ne 0 ]; then
+    error "It looks like this machine isn't configured to run virtual machines.\nThis might indicate a BIOS configuration error (whatever your chipset\ncalls VT extensions), not having nested virtualization enabled if this\nis a virtual machine, or really ancient hardware. Please correct the\nproblem and re-run."
+fi
+echo
+
+status "Creating python venv."
+mkdir -p /srv/shakenfist/venv
+python3 -mvenv --system-site-packages /srv/shakenfist/venv
+echo
+
+status "Installing server and client packages in venv."
+/srv/shakenfist/venv/bin/pip install -U ${pipextra} ${GETSF_SERVER_PACKAGE} ${GETSF_CLIENT_PACKAGE}
+PERNODEEOF
+chmod ugo+rx /tmp/sf-per-node-primary
+
+# Now run that script all over the place
+if [ "${GETSF_NODES}" == "localhost" ]; then
+    /tmp/sf-per-node-primary
+else
+    for node in ${GETSF_NODES[@]}; do
+        status "    ...${node}"
+        scp -i ${GETSF_SSH_KEY_FILENAME} /tmp/sf-per-node-primary ${GETSF_SSH_USER}@${node}:/tmp/sf-per-node
+        ssh -i ${GETSF_SSH_KEY_FILENAME} ${GETSF_SSH_USER}@${node} "sudo /tmp/sf-per-node"
+        echo
+    done
+    echo
+fi
+
+# NOTE(mikal): I don't love how we need to do this, but it seems to be required
+# to make sure CI is using the right version and tox isn't installing one of its
+# own.
+status "Install client package in system pip as well on the primary node."
+pip3 install -U ${pipextra} ${GETSF_CLIENT_PACKAGE}
+echo
+
+status "Installing ansible-galaxy requirements."
+ansible-galaxy install --force -r /srv/shakenfist/venv/share/shakenfist/installer/requirements.yml
+echo
+
+status "Creating /root/sf-deploy script"
+password=$(pwgen 16 1)
+cat - > /root/sf-deploy << DEPLOYEOF
+#!/bin/bash
+
+export ADMIN_PASSWORD=${password}
+export FLOATING_IP_BLOCK="${GETSF_FLOATING_BLOCK}"
+export DEPLOY_NAME="${GETSF_DEPLOY_NAME}"
+DEPLOYEOF
+
+if [ ! -z ${GETSF_SSH_USER} ]; then
+    echo "export SSH_USER=\"${GETSF_SSH_USER}\"" >> /root/sf-deploy
+fi
+
+if [ ! -z ${GETSF_SSH_KEY_FILENAME} ]; then
+    echo "export SSH_KEY_FILENAME=\"${GETSF_SSH_KEY_FILENAME}\"" >> /root/sf-deploy
+fi
+
+echo "export KSM_ENABLED=1" >> /root/sf-deploy
+
+# We ignore MTU for localhost installs
+if [ "${GETSF_NODES}" == "localhost" ]; then
+    echo "export IGNORE_MTU=1" >> /root/sf-deploy
+fi
+
+# Generate topology
+cat - >> /root/sf-deploy << DEPLOYEOF
+
+# Topology is in JSON
+export TOPOLOGY=\$(cat << EOF
+[
+DEPLOYEOF
+
+for node in ${GETSF_NODES[@]}; do
+    safe_node=$(echo ${node} | tr "-" "_")
+    calc_egress_nic="GETSF_NODE_EGRESS_NIC_${safe_node}"
+    calc_egress_address="GETSF_NODE_EGRESS_ADDRESS_${safe_node}"
+    calc_mesh_nic="GETSF_NODE_MESH_NIC_${safe_node}"
+    calc_mesh_address="GETSF_NODE_MESH_ADDRESS_${safe_node}"
+
+    if [ ${node} == "localhost" ]; then
+        primary_node="true"
+        api_stanza='"api_url": "http://127.0.0.1:13000"'
+        api_comma=','
+        network_node="true"
+        etcd_master_node="true"
+        hypervisor_node="true"
+        storage_node="false"
+    else
+        if [ $(echo "${GETSF_NODE_PRIMARY}" | grep -c ${node}) -gt 0 ]; then
+            primary_node="true"
+            api_stanza='"api_url": "http://127.0.0.1:13000"'
+            api_comma=','
+        else
+            primary_node="false"
+            api_stanza=''
+            api_comma=''
+        fi
+
+        if [ $(echo "${GETSF_NODE_NETWORK}" | grep -c ${node}) -gt 0 ]; then
+            network_node="true"
+        else
+            network_node="false"
+        fi
+
+        if [ $(echo "${GETSF_NODE_ETCD_MASTER}" | grep -c ${node}) -gt 0 ]; then
+            etcd_master_node="true"
+        else
+            etcd_master_node="false"
+        fi
+
+        if [ $(echo "${GETSF_NODE_HYPERVISOR}" | grep -c ${node}) -gt 0 ]; then
+            hypervisor_node="true"
+        else
+            hypervisor_node="false"
+        fi
+
+        if [ $(echo "${GETSF_NODE_STORAGE}" | grep -c ${node}) -gt 0 ]; then
+            storage_node="true"
+        else
+            storage_node="false"
+        fi
+    fi
+
+    cat - >> /root/sf-deploy << DEPLOYEOF
+  {
+    "name": "${node}",
+    "node_egress_nic": "${!calc_egress_nic}",
+    "node_egress_ip": "${!calc_egress_address}",
+    "node_mesh_nic": "${!calc_mesh_nic}",
+    "node_mesh_ip": "${!calc_mesh_address}",
+    "primary_node": ${primary_node},
+    "network_node": ${network_node},
+    "etcd_master": ${etcd_master_node},
+    "hypervisor": ${hypervisor_node},
+    "storage": ${storage_node}${api_comma}
+    ${api_stanza}
+  },
+DEPLOYEOF
+done
+
+cat - >> /root/sf-deploy << DEPLOYEOF
+]
+EOF
+)
+
+/srv/shakenfist/venv/share/shakenfist/installer/install
+DEPLOYEOF
+chmod u+rx /root/sf-deploy
+
+status "Running the installer."
+/root/sf-deploy
+echo
+
+status "Pause briefly to let Shaken Fist settle."
+sleep 5
+
+status "Pre-fetching common images."
+. /etc/sf/sfrc
+sf-client artifact cache ubuntu:20.04
+sf-client artifact cache cirros
+
+question_start
+echo "A default configuration including deployment topology has"
+echo "been written to /root/sf-deploy. There's a lot you can change"
+echo "with this configuration, but your current configuration should"
+echo "be good enough for an initial play."
+echo
+echo "Install completed successfully."
+question_end
+
+# Remove our scary failure message
+trap - EXIT

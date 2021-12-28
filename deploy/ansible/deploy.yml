@@ -21,14 +21,36 @@
       set_fact:
         auth_secret: "{{ lookup('password', '/dev/null length=30 chars=ascii_letters') }}"
 
-    - include: terraform/{{cloud}}/terraform.yml
+    - name: Log topology
+      debug:
+        msg: "{{topology}}"
 
-    - name: Wait for instances to boot
-      pause:
-        minutes: "{{bootdelay}}"
-      when: cloud != "localhost"
+    - name: Add nodes from topology
+      # This include is to work around the lack of blocks in loops
+      include: includes/topology_add_node.yml
+      loop: "{{topology}}"
 
-    - name: Setup /etc/hosts for localhost when acting as primary node
+    - name: Set configuration file location
+      set_fact:
+        "template_path": "/srv/shakenfist/venv/share/shakenfist/templates"
+        "utility_path": "/srv/shakenfist/venv/bin"
+      delegate_to: localhost
+      delegate_facts: true
+
+    - name: Check if we have a venv on localhost already
+      stat:
+        path: /srv/shakenfist/venv/share/shakenfist/templates
+      register: localhost_venv
+
+- hosts: allsf
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - name: Setup /etc/hosts
       copy:
         content: |
           127.0.0.1 localhost
@@ -41,61 +63,31 @@
           ff02::2 ip6-allrouters
           ff02::3 ip6-allhosts
 
-          {% for svr in groups.hypervisors %}
-          {{hostvars[svr]['node_egress_ip']}}  {{svr}}
+          {% for svr in groups.allsf %}
+          {{hostvars[svr]['node_mesh_ip']}}  {{svr}}
           {% endfor %}
+          {{hostvars[groups['primary_node'][0]]['node_mesh_ip']}}  sf-primary
         dest: /etc/hosts
         owner: root
         group: root
         mode: u=r,g=r,o=r
-      when: cloud != "localhost"
 
-    # If we are installing to localhost, and are not using a packaged version
-    # we need to special case where configuration files come from.
-    - name: Set configuration file location
-      set_fact:
-        "template_path": "/srv/shakenfist/venv/share/shakenfist/templates"
-        "utility_path": "/srv/shakenfist/venv/bin"
-      delegate_to: localhost
-      delegate_facts: true
-      when: cloud != "localhost"
+    - name: Log network and primary node
+      debug:
+        msg:
+          - "Primary node IP is {{hostvars[groups['primary_node'][0]]['node_mesh_ip']}}"
+          - "Network node is {{hostvars[groups['network_node'][0]]['node_name']}} with mesh IP {{hostvars[groups['network_node'][0]]['node_mesh_ip']}}"
+      run_once: true
 
-    - name: Check if we have a venv on localhost already
-      stat:
-        path: /srv/shakenfist/venv/share/shakenfist/templates
-      register: localhost_venv
-
-    - name: Templates from git if no localhost venv
-      set_fact:
-        "template_path": "files"
-        "utility_path": "/usr/local/bin"
-      delegate_to: localhost
-      delegate_facts: true
-      when: not localhost_venv.stat.exists and cloud == "localhost"
-
-    - name: Templates from localhost venv
-      set_fact:
-        "template_path": "/srv/shakenfist/venv/share/shakenfist/templates"
-        "utility_path": "/srv/shakenfist/venv/bin"
-      delegate_to: localhost
-      delegate_facts: true
-      when: localhost_venv.stat.exists and cloud == "localhost"
-
-- hosts: allsf
-  any_errors_fatal: true
-  become: yes
-  become_method: sudo
-  gather_facts: no
-  connection: ssh
-
-  tasks:
-    - include: terraform/{{cloud}}/postboot.yml
-
-    - name: apt-get dist-upgrade
+    # As recommended on the ansible apt module documentation...
+    - name: Upgrade packages
       apt:
-        update_cache: yes
         upgrade: dist
+        update_cache: yes
         autoremove: yes
+      register: apt_action
+      retries: 100
+      until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
 
     # We install libvirt, even on non-hypervisors, because we use it to track
     # the CPU topology and load of the node.
@@ -352,7 +344,6 @@
 - hosts: etcd
   roles:
     - role: andrewrothstein.etcd-cluster
-      when: cloud != "localhost"
       vars:
         etcd_secure: False
         etcd_cluster_name: shakenfist
@@ -360,21 +351,6 @@
         etcd_master_group_name: etcd_master
         etcd_iface_public: "{{node_mesh_nic}}"
         etcd_iface_cluster: "{{node_mesh_nic}}"
-
-# NOTE(mikal): I am not happy with binding to 0.0.0.0 here for
-# etcd, but I can't bind to lo because of how the ansible role
-# is written. So here we are.
-- hosts: etcd
-  roles:
-    - role: andrewrothstein.etcd-cluster
-      when: cloud == "localhost"
-      vars:
-        etcd_secure: False
-        etcd_cluster_name: shakenfist
-        etcd_enable_v2: False
-        etcd_master_group_name: etcd_master
-        etcd_iface_public: "all"
-        etcd_iface_cluster: "all"
 
 - hosts: allsf
   any_errors_fatal: true
@@ -384,10 +360,11 @@
   connection: ssh
 
   tasks:
-    # We use a shell command here because the service might not exist and
-    # that's ok.
-    - name: Stop the SF daemon
-      shell: systemctl stop sf || true
+    - name: Create storage directory
+      file:
+        path: /srv/shakenfist
+        state: directory
+        mode: "0755"
 
 - hosts: primary_node
   any_errors_fatal: true
@@ -444,21 +421,10 @@
         group: sudo
         mode: u=r,g=r,o=
 
-    - name: Install modern ansible
-      apt:
-        name: ansible
-        state: latest
-        update_cache: yes
-        autoremove: yes
-
     - name: Install prometheus
       apt:
         name: prometheus
         state: latest
-
-    - name: Read local prometheus customizations
-      set_fact:
-        prom_additional: "{{lookup('file', 'terraform/{{cloud}}/prometheus.yml') }}"
 
     - name: Write prometheus configuration file
       copy:
@@ -479,7 +445,7 @@
             - job_name: 'shakenfist'
               static_configs:
                 - targets: [
-                      {% for svr in groups.hypervisors %}
+                      {% for svr in groups.sf_promethus_exporters %}
                         '{{hostvars[svr]['node_mesh_ip']}}:13001',
                       {% endfor %}
                     ]
@@ -498,7 +464,6 @@
                 # - source_labels: [__name__]
                 #   regex: (?i)(etcd_mvcc_db_total_size_in_bytes|etcd_network_client_grpc_received_bytes_total|etcd_network_client_grpc_sent_bytes_total|etcd_disk_wal_fsync_duration_seconds)
                 #   action: keep
-          {{prom_additional}}
         dest: /etc/prometheus/prometheus.yml
         owner: root
         mode: u=rw,g=r,o=r
@@ -509,7 +474,33 @@
         enabled: yes
         state: restarted
 
-    - include: includes/grafana.yml
+    - name: Install Grafana prerequisites
+      apt:
+        name:
+          - apt-transport-https
+          - software-properties-common
+        update_cache: yes
+        state: latest
+
+    - name: Check if grafana packages are already setup
+      stat:
+        path: /etc/apt/sources.list.d/packages_grafana_com_oss_deb.list
+      register: stat_result
+
+    - name: Add Grafana GPG key
+      apt_key: url=https://packages.grafana.com/gpg.key
+      when: not stat_result.stat.exists
+
+    - name: Add Grafana APT repository
+      apt_repository:
+        repo: deb [arch=amd64] http://packages.grafana.com/oss/deb stable main
+      when: not stat_result.stat.exists
+
+    - name: Install Grafana
+      apt:
+        name: grafana
+        update_cache: yes
+        state: latest
 
     - name: Write grafana config
       template:
@@ -585,12 +576,6 @@
   connection: ssh
 
   tasks:
-    - name: Create storage directory
-      file:
-        path: /srv/shakenfist
-        state: directory
-        mode: "0755"
-
     - name: Copy libvirt template
       copy:
         src: "{{hostvars['localhost']['template_path']}}/libvirt.tmpl"
@@ -603,24 +588,6 @@
     - name: Turn off default libvirt networking
       shell: virsh net-destroy default
       ignore_errors: True
-
-    - name: Copy dhcp config template
-      copy:
-        src: "{{hostvars['localhost']['template_path']}}/dhcp.tmpl"
-        remote_src: yes
-        dest: /srv/shakenfist/dhcp.tmpl
-        owner: root
-        group: root
-        mode: "0644"
-
-    - name: Copy dhcp hosts template
-      copy:
-        src: "{{hostvars['localhost']['template_path']}}/dhcphosts.tmpl"
-        remote_src: yes
-        dest: /srv/shakenfist/dhcphosts.tmpl
-        owner: root
-        group: root
-        mode: "0644"
 
     - name: Check that the /etc/apparmor.d/local/abstractions/libvirt-qemu exists
       stat:
@@ -650,7 +617,7 @@
         enabled: yes
         state: restarted
 
-- hosts: hypervisors, network_node
+- hosts: network_node
   any_errors_fatal: true
   become: yes
   become_method: sudo
@@ -658,6 +625,64 @@
   connection: ssh
 
   tasks:
+    - name: Copy dhcp config template
+      copy:
+        src: "{{hostvars['localhost']['template_path']}}/dhcp.tmpl"
+        remote_src: yes
+        dest: /srv/shakenfist/dhcp.tmpl
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Copy dhcp hosts template
+      copy:
+        src: "{{hostvars['localhost']['template_path']}}/dhcphosts.tmpl"
+        remote_src: yes
+        dest: /srv/shakenfist/dhcphosts.tmpl
+        owner: root
+        group: root
+        mode: "0644"
+
+- hosts: hypervisors, network_node, etcd_master, storage
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - name: Check if we have an existing config
+      stat:
+        path: /etc/sf/config
+      register: config_stat_result
+
+    - name: Log stat result for existing config
+      debug:
+        msg: "Existing config: {{config_stat_result}}"
+
+    - name: Fetch config template from remote host
+      fetch:
+        src: "{{hostvars['localhost']['template_path']}}/config"
+        dest: /tmp/{{ansible_host}}_config
+        flat: yes
+        fail_on_missing: yes
+      when: not config_stat_result.stat.exists
+
+    - name: Ensure /etc/sf exists
+      file:
+        path: /etc/sf
+        state: directory
+      when: not config_stat_result.stat.exists
+
+    - name: Write config file on remote host
+      template:
+        src: /tmp/{{ansible_host}}_config
+        dest: /etc/sf/config
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
+      when: not config_stat_result.stat.exists
+
     - name: Fetch systemd unit template from remote host
       fetch:
         src: "{{hostvars['localhost']['template_path']}}/sf.service"
@@ -665,23 +690,54 @@
         flat: yes
         fail_on_missing: yes
 
-    - name: Write systemd unit
+    - name: Write systemd unit on remote host
       template:
         src: /tmp/{{ansible_host}}_sf.service
-        dest: /lib/systemd/system/sf.service
+        dest: /etc/systemd/system/sf.service
         owner: root
         group: root
         mode: u=r,g=r,o=r
 
-    - name: Start the SF daemon
+    - name: Remove old systemd units
+      file:
+        dest: /lib/systemd/system/sf.service
+        state: absent
+
+    - name: Ensure /var/run/sf exists
+      file:
+        path: /var/run/sf
+        state: directory
+        owner: root
+        group: root
+        mode: u=rw,g=r,o=r
+      when: not config_stat_result.stat.exists
+
+- hosts: hypervisors, network_node, etcd_master, storage
+  any_errors_fatal: true
+  serial: 1
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - name: Restart the SF daemon, one node at a time
       service:
         name: sf
         enabled: yes
         state: restarted
         daemon_reload: yes
 
+- hosts: hypervisors
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
     - name: Create an admin namespace called "system" with one key configured
-      shell: "{{hostvars['localhost']['utility_path']}}/sf-passwd deploy {{hostvars[groups['primary_node'][0]]['system_key']}}"
+      shell: "{{hostvars['localhost']['utility_path']}}/sf-ctl bootstrap-system-key deploy {{hostvars[groups['primary_node'][0]]['system_key']}}"
       run_once: true
 
 - hosts: primary_node

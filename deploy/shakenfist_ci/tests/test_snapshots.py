@@ -25,7 +25,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'cirros',
+                    'base': 'sf://upload/system/cirros',
                     'type': 'disk'
                 }
             ], None, None)
@@ -153,7 +153,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'cirros',
+                    'base': 'sf://upload/system/cirros',
                     'type': 'disk'
                 },
                 {
@@ -162,7 +162,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                 },
                 {
                     'size': 8,
-                    'base': 'cirros',
+                    'base': 'sf://upload/system/cirros',
                     'type': 'cdrom'
                 }
             ], None, None)
@@ -217,7 +217,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'cirros',
+                    'base': 'sf://upload/system/cirros',
                     'type': 'disk'
                 }
             ], None, None)
@@ -255,6 +255,54 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self.test_client.delete_instance(inst1['uuid'])
         self.test_client.delete_instance(inst2['uuid'])
 
+    def test_labels_with_deleted_snapshot(self):
+        inst1 = self.test_client.create_instance(
+            'cirros', 1, 1024,
+            [
+                {
+                    'network_uuid': self.net['uuid']
+                }
+            ],
+            [
+                {
+                    'size': 8,
+                    'base': 'sf://upload/system/cirros',
+                    'type': 'disk'
+                }
+            ], None, None)
+
+        self.assertIsNotNone(inst1['uuid'])
+        self.assertIsNotNone(inst1['node'])
+
+        self._await_login_prompt(inst1['uuid'])
+
+        # Take a snapshot
+        snap = self.test_client.snapshot_instance(
+            inst1['uuid'], label_name='anotherlabel', delete_snapshot_after_label=True)
+        self.assertIsNotNone(snap)
+
+        # Wait for the label, we cannot use _await_artifacts_ready here because
+        # we don't know the UUID for the label artifact
+        start_time = time.time()
+        artifact_uuid = None
+        while not artifact_uuid:
+            for a in self.test_client.get_artifacts():
+                if a['source_url'] == 'sf://label/%s/anotherlabel' % self.namespace:
+                    artifact_uuid = a['uuid']
+                    break
+
+            if not artifact_uuid:
+                time.sleep(20)
+                if time.time() - start_time > 300:
+                    raise base.TimeoutException('Label never appeared')
+
+        self._await_artifacts_ready([artifact_uuid])
+
+        # Ensure the snapshot is gone
+        for a in self.test_client.get_artifacts():
+            if a['uuid'] == snap['vda']['artifact_uuid']:
+                self.fail('Snapshot remains')
+
     def test_specific_device_snapshots(self):
         inst = self.test_client.create_instance(
             'cirros', 1, 1024,
@@ -266,7 +314,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'cirros',
+                    'base': 'sf://upload/system/cirros',
                     'type': 'disk'
                 },
                 {
@@ -275,7 +323,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                 },
                 {
                     'size': 8,
-                    'base': 'cirros',
+                    'base': 'sf://upload/system/cirros',
                     'type': 'disk'
                 }
             ], None, None)

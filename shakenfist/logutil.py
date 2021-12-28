@@ -1,14 +1,14 @@
 import copy
+import flask
 import logging
 from logging import handlers as logging_handlers
 import os
 from pylogrus import TextFormatter
 from pylogrus.base import PyLogrusBase
-import re
 import setproctitle
-import traceback
 
 from shakenfist.config import config
+from shakenfist.util import callstack as util_callstack
 
 
 # These classes are extensions of the work in https://github.com/vmig/pylogrus
@@ -84,6 +84,13 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
         :type prefix: str | None
         """
         self._logger = logger
+
+        # Attempt to lookup a request id for a flask request
+        try:
+            extra['request-id'] = flask.request.environ.get('FLASK_REQUEST_ID')
+        except RuntimeError:
+            pass
+
         self._extra = self._normalize(extra)
         self._prefix = prefix
         super(SFCustomAdapter, self).__init__(
@@ -124,22 +131,12 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
     def with_prefix(self, prefix=None):
         return self if prefix is None else SFCustomAdapter(self._logger, self._extra, prefix)
 
-    FILENAME_RE = re.compile('.*/dist-packages/shakenfist/(.*)')
-
     def process(self, msg, kwargs):
         msg = '%s[%s] %s' % (setproctitle.getproctitle(), os.getpid(), msg)
         kwargs["extra"] = self.extra
 
         if config.LOG_METHOD_TRACE:
-            # Determine the name of the calling method
-            filename = traceback.extract_stack()[-4].filename
-            f_match = self.FILENAME_RE.match(filename)
-            if f_match:
-                filename = f_match.group(1)
-            caller = '%s:%s:%s()' % (filename,
-                                     traceback.extract_stack()[-4].lineno,
-                                     traceback.extract_stack()[-4].name)
-            self._extra['method'] = caller
+            self._extra['method'] = util_callstack.get_caller(-5)
 
         return msg, kwargs
 
@@ -156,6 +153,12 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
                     'Bad object - no unique_label() function: %s' % e)
             extra.update({label: value})
         return SFCustomAdapter(self._logger, extra, self._prefix)
+
+    def with_objects(self, objs):
+        retval = self
+        for obj in objs:
+            retval = retval.with_object(obj)
+        return retval
 
     #
     # Use labelled convenience methods when ID is a string (not object)

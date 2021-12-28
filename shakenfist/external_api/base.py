@@ -1,14 +1,12 @@
-import copy
 import flask
 import flask_restful
 from flask_jwt_extended.exceptions import (
     JWTDecodeError, NoAuthorizationError, InvalidHeaderError, WrongTokenError,
     RevokedTokenError, FreshTokenRequired, CSRFError
 )
-from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import decode_token, get_jwt_identity
 import json
 from jwt.exceptions import DecodeError, PyJWTError
-import re
 import requests
 import sys
 import traceback
@@ -20,6 +18,7 @@ from shakenfist import db
 from shakenfist.instance import Instance
 from shakenfist import logutil
 from shakenfist.net import Network
+from shakenfist.upload import Upload
 from shakenfist.util import general as util_general
 
 LOG, HANDLER = logutil.setup(__name__)
@@ -62,7 +61,7 @@ def error(status_code, message, suppress_traceback=False):
 def caller_is_admin(func):
     # Ensure only users in the 'system' namespace can call this method
     def wrapper(*args, **kwargs):
-        if get_jwt_identity() != 'system':
+        if get_jwt_identity()[0] != 'system':
             return error(401, 'unauthorized')
 
         return func(*args, **kwargs)
@@ -102,7 +101,7 @@ def redirect_instance_request(func):
                                       flask.request.environ['PATH_INFO'])
             api_token = util_general.get_api_token(
                 'http://%s:%d' % (placement['node'], config.API_PORT),
-                namespace=get_jwt_identity())
+                namespace=get_jwt_identity()[0])
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'], url,
                 data=json.dumps(flask_get_post_body()),
@@ -130,7 +129,7 @@ def requires_instance_ownership(func):
             return error(404, 'instance not found')
 
         i = kwargs['instance_from_db']
-        if get_jwt_identity() not in [i.namespace, 'system']:
+        if get_jwt_identity()[0] not in [i.namespace, 'system']:
             LOG.with_instance(i).info(
                 'Instance not found, ownership test in decorator')
             return error(404, 'instance not found')
@@ -207,7 +206,7 @@ def requires_network_ownership(func):
             log.info('Network not found, kwarg missing')
             return error(404, 'network not found')
 
-        if get_jwt_identity() not in [kwargs['network_from_db'].namespace, 'system']:
+        if get_jwt_identity()[0] not in [kwargs['network_from_db'].namespace, 'system']:
             log.info('Network not found, ownership test in decorator')
             return error(404, 'network not found')
 
@@ -247,6 +246,55 @@ def requires_namespace_exist(func):
     return wrapper
 
 
+def arg_is_upload_uuid(func):
+    # Method uses the upload from the db
+    def wrapper(*args, **kwargs):
+        if 'upload_uuid' in kwargs:
+            kwargs['upload_from_db'] = Upload.from_db(
+                kwargs['upload_uuid'])
+        if not kwargs.get('upload_from_db'):
+            LOG.with_field('upload', kwargs['upload_uuid']).info(
+                'Upload not found, genuinely missing')
+            return error(404, 'upload not found')
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
+def redirect_upload_request(func):
+    # Redirect method to the hypervisor hosting the upload
+    def wrapper(*args, **kwargs):
+        u = kwargs.get('upload_from_db')
+        if not u:
+            return
+
+        if not u.node:
+            return
+
+        if u.node != config.NODE_NAME:
+            url = 'http://%s:%d%s' % (u.node, config.API_PORT,
+                                      flask.request.environ['PATH_INFO'])
+            api_token = util_general.get_api_token(
+                'http://%s:%d' % (u.node, config.API_PORT),
+                namespace=get_jwt_identity()[0])
+            r = requests.request(
+                flask.request.environ['REQUEST_METHOD'], url,
+                data=flask.request.get_data(cache=False, as_text=False,
+                                            parse_form_data=False),
+                headers={'Authorization': api_token,
+                         'User-Agent': util_general.get_user_agent()})
+
+            LOG.info('Proxied %s %s returns: %d, %s' % (
+                     flask.request.environ['REQUEST_METHOD'], url,
+                     r.status_code, r.text))
+            resp = flask.Response(r.text,  mimetype='application/json')
+            resp.status_code = r.status_code
+            return resp
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
 def flask_get_post_body():
     j = {}
     try:
@@ -278,18 +326,45 @@ def generic_wrapper(func):
                 formatted_headers.append(str(header))
 
             # Ensure key does not appear in logs
-            kwargs_log = copy.copy(kwargs)
+            kwargs_log = kwargs.copy()
             if 'key' in kwargs_log:
                 kwargs_log['key'] = '*****'
 
-            msg = 'API request: %s %s' % (
-                flask.request.method, flask.request.url)
-            msg += '\n    Args: %s\n    KWargs: %s' % (args, kwargs_log)
+            # Redact the JWT auth token in headers as well
+            headers_log = dict(flask.request.headers)
+            if 'Authorization' in headers_log:
+                headers_log = 'Bearer *****'
 
-            if re.match(r'http(|s)://0.0.0.0:\d+/$', flask.request.url):
-                LOG.debug(msg)
+            # Attempt to lookup the identity from JWT token. This doesn't use
+            # the ususal get_jwt_identity() because that requires that the
+            # require_jwt() decorator has been run, and that is not the case
+            # for all paths this wrapper covers. Its ok for there to be no
+            # identity here, for example unprotected paths.
+            identity = None
+            try:
+                auth = flask.request.headers.get('Authorization')
+                if auth:
+                    token = auth.split(' ')[1]
+                    dt = decode_token(token)
+                    identity = dt.get('identity')
+            except Exception as e:
+                print(e)
+
+            log = LOG.with_fields({
+                'request-id': flask.request.environ.get('FLASK_REQUEST_ID', 'none'),
+                'identity': identity,
+                'method': flask.request.method,
+                'url': flask.request.url,
+                'path': flask.request.path,
+                'args': args,
+                'kwargs': kwargs_log,
+                'headers': headers_log
+            })
+            if flask.request.path == '/':
+                # This is likely a load balancer health check
+                log.debug('API request parsed')
             else:
-                LOG.info(msg)
+                log.info('API request parsed')
 
             return func(*args, **kwargs)
 

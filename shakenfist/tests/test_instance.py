@@ -75,7 +75,10 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
                         'thisisuserdata'.encode('utf-8')), 'utf-8'),
                     'video': {'model': 'cirrus', 'memory': 16384},
                     'uefi': False,
-                    'version': 3
+                    'configdrive': 'openstack-disk',
+                    'version': 6,
+                    'nvram_template': None,
+                    'secure_boot': False
                 })
     @mock.patch('shakenfist.etcd.put')
     @mock.patch('shakenfist.etcd.create')
@@ -88,7 +91,7 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
         instance.Instance.new('barry', 1, 2048, 'namespace', 'sshkey',
                               [{}], 'userdata', {
                                   'memory': 16384, 'model': 'cirrus'},
-                              uuid='uuid42',)
+                              instance_uuid='uuid42',)
 
         self.assertEqual(
             ('attribute/instance', 'uuid42', 'state',
@@ -107,6 +110,7 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
              {
                  'cpus': 1,
                  'disk_spec': [{}],
+                 'machine_type': 'pc',
                  'memory': 2048,
                  'name': 'barry',
                  'namespace': 'namespace',
@@ -114,9 +118,12 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
                  'ssh_key': 'sshkey',
                  'user_data': 'userdata',
                  'uuid': 'uuid42',
-                 'version': 3,
+                 'version': 6,
                  'video': {'memory': 16384, 'model': 'cirrus'},
-                 'uefi': False
+                 'uefi': False,
+                 'configdrive': 'openstack-disk',
+                 'nvram_template': None,
+                 'secure_boot': False
              }),
             mock_create.mock_calls[0][1])
 
@@ -131,9 +138,12 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
                     'ssh_key': 'sshkey',
                     'user_data': 'userdata',
                     'uuid': 'uuid42',
-                    'version': 3,
+                    'version': 6,
                     'video': {'memory': 16384, 'model': 'cirrus'},
-                    'uefi': False
+                    'uefi': False,
+                    'configdrive': 'openstack-disk',
+                    'nvram_template': None,
+                    'secure_boot': False
                 })
     def test_from_db(self, mock_get):
         inst = instance.Instance.from_db('uuid42')
@@ -146,7 +156,10 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
         self.assertEqual('sshkey', inst.ssh_key)
         self.assertEqual('userdata', inst.user_data)
         self.assertEqual('uuid42', inst.uuid)
-        self.assertEqual(3, inst.version)
+        self.assertEqual(6, inst.version)
+        self.assertEqual('openstack-disk', inst.configdrive)
+        self.assertEqual(None, inst.nvram_template)
+        self.assertEqual(False, inst.secure_boot)
         self.assertEqual({'memory': 16384, 'model': 'cirrus'}, inst.video)
         self.assertEqual('/a/b/c/instances/uuid42', inst.instance_path)
 
@@ -191,12 +204,15 @@ class InstanceTestCase(base.ShakenFistTestCase):
                         'thisisuserdata'.encode('utf-8')), 'utf-8'),
                     'video': {'model': 'cirrus', 'memory': 16384},
                     'uefi': False,
-                    'version': 3
+                    'configdrive': 'openstack-disk',
+                    'version': 6,
+                    'nvram_template': None,
+                    'secure_boot': False
                 })
     def _make_instance(self, mock_get_instance, mock_create_instance):
         return instance.Instance.new(
             'cirros', 1, 1024,  'namespace',
-            uuid='fakeuuid',
+            instance_uuid='fakeuuid',
             disk_spec=[{
                 'base': 'cirros',
                 'size': 8
@@ -408,7 +424,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
         os.close(fd)
 
         try:
-            i._make_config_drive(cd_file)
+            i._make_config_drive_openstack_disk(cd_file)
             cd = pycdlib.PyCdlib()
             cd.open(cd_file)
 
@@ -536,7 +552,10 @@ GET_ALL_INSTANCES = [
         'user_data': None,
         'video': {'model': 'cirrus', 'memory': 16384},
         'uefi': False,
-        'version': 3
+        'configdrive': 'openstack-disk',
+        'version': 6,
+        'nvram_template': None,
+        'secure_boot': False
     }),
     # Present here, but not in the get (a race?)
     (None, {
@@ -554,7 +573,10 @@ GET_ALL_INSTANCES = [
         'user_data': None,
         'video': {'model': 'cirrus', 'memory': 16384},
         'uefi': False,
-        'version': 3
+        'configdrive': 'openstack-disk',
+        'version': 6,
+        'nvram_template': None,
+        'secure_boot': False
     }),
     (None, {
         'uuid': 'a7c5ecec-c3a9-4774-ad1b-249d9e90e806',
@@ -571,7 +593,10 @@ GET_ALL_INSTANCES = [
         'user_data': None,
         'video': {'model': 'cirrus', 'memory': 16384},
         'uefi': False,
-        'version': 3
+        'configdrive': 'openstack-disk',
+        'version': 6,
+        'nvram_template': None,
+        'secure_boot': False
     })
 ]
 
@@ -643,55 +668,6 @@ class InstancesTestCase(base.ShakenFistTestCase):
             uuids.append(i.uuid)
 
         self.assertEqual(['a7c5ecec-c3a9-4774-ad1b-249d9e90e806'], uuids)
-
-    @mock.patch('shakenfist.instance.Instance._db_get_attribute',
-                side_effect=[{'value': instance.Instance.STATE_DELETED, 'update_time': 1},
-                             {'value': instance.Instance.STATE_INITIAL,
-                                 'update_time': 1},
-                             {'value': instance.Instance.STATE_INITIAL, 'update_time': 1}])
-    @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
-    def test_state_filter_inactive(self, mock_get_all, mock_attr):
-        uuids = []
-        for i in instance.Instances([instance.inactive_states_filter]):
-            uuids.append(i.uuid)
-
-        self.assertEqual(['373a165e-9720-4e14-bd0e-9612de79ff15'], uuids)
-
-    @mock.patch('shakenfist.instance.Instance._db_get_attribute',
-                side_effect=[{'value': instance.Instance.STATE_DELETED, 'update_time': 'not_used'},
-                             {'value': 'not_used', 'update_time': time.time()},
-                             {'value': instance.Instance.STATE_DELETED,
-                                 'update_time': 'not_used'},
-                             {'value': 'not_used', 'update_time': time.time()},
-                             {'value': instance.Instance.STATE_INITIAL, 'update_time': 'not_used'}])
-    @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
-    def test_state_hard_delete_later(self, mock_get_all, mock_attr):
-        uuids = []
-        for i in instance.Instances([instance.inactive_states_filter,
-                                     partial(baseobject.state_age_filter, 500)]):
-            uuids.append(i.uuid)
-
-        self.assertEqual([], uuids)
-
-    @mock.patch('shakenfist.instance.Instance._db_get_attribute',
-                side_effect=[
-                    {'value': instance.Instance.STATE_DELETED,
-                        'update_time': time.time() - 1000},
-                    {'value': instance.Instance.STATE_DELETED,
-                        'update_time': time.time() - 1000},
-                    {'value': instance.Instance.STATE_DELETED,
-                        'update_time': time.time()},
-                    {'value': instance.Instance.STATE_DELETED,
-                        'update_time': time.time()},
-                    {'value': instance.Instance.STATE_INITIAL, 'update_time': 1}])
-    @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
-    def test_state_hard_delete_now(self, mock_get_all, mock_attr):
-        uuids = []
-        for i in instance.Instances([instance.inactive_states_filter,
-                                     partial(baseobject.state_age_filter, 500)]):
-            uuids.append(i.uuid)
-
-        self.assertEqual(['373a165e-9720-4e14-bd0e-9612de79ff15'], uuids)
 
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
     def test_namespace_filter(self, mock_get_all):

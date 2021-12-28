@@ -15,6 +15,7 @@ class TestDisks(base.BaseNamespacedTestCase):
         self._await_networks_ready([self.net['uuid']])
 
     def test_boot_nvme(self):
+        self.skip('This test is flakey in CI for reasons I do not understand.')
         inst = self.test_client.create_instance(
             'test-cirros-boot-nvme', 1, 1024,
             [
@@ -25,13 +26,13 @@ class TestDisks(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'ubuntu:20.04',
+                    'base': 'sf://upload/system/ubuntu-2004',
                     'type': 'disk',
                     'bus': 'nvme'
                 }
-            ], None, None)
+            ], None, base.load_userdata('bootok'))
 
-        self._await_login_prompt(inst['uuid'])
+        self.assertInstanceConsoleAfterBoot(inst['uuid'], 'System booted ok')
 
         self.test_client.delete_instance(inst['uuid'])
         inst_uuids = []

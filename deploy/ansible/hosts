@@ -4,11 +4,14 @@ localhost ansible_connection=local
 [primary_node]
 [network_node]
 [hypervisors]
+[storage]
 
 [allsf:children]
   primary_node
   network_node
   hypervisors
+  etcd_master
+  storage
 
 [allsf:vars]
   ansible_ssh_common_args='-o StrictHostKeyChecking=no'
@@ -16,6 +19,8 @@ localhost ansible_connection=local
 
 [etcd:children]
   hypervisors
+  network_node
   etcd_master
+  storage
 
 [etcd_master]

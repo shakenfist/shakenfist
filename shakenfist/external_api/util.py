@@ -59,12 +59,12 @@ def safe_get_network_interface(interface_uuid):
         log.info('Network not found or deleted')
         return None, None, api_base.error(404, 'interface network not found')
 
-    if get_jwt_identity() not in [n.namespace, 'system']:
+    if get_jwt_identity()[0] not in [n.namespace, 'system']:
         log.info('Interface not found, failed ownership test')
         return None, None, api_base.error(404, 'interface not found')
 
     i = Instance.from_db(ni.instance_uuid)
-    if get_jwt_identity() not in [i.namespace, 'system']:
+    if get_jwt_identity()[0] not in [i.namespace, 'system']:
         log.with_object(i).info('Instance not found, failed ownership test')
         return None, None, api_base.error(404, 'interface not found')
 

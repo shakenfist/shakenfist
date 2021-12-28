@@ -1,0 +1,11 @@
+#cloud-config
+
+# runcmd is only run on first boot. bootcmd is run for every boot, but
+# happens earlier in the boot process. It is sufficient for this use case
+# though.
+bootcmd:
+  - |
+    echo "" > /dev/console
+    echo "System booted ok" > /dev/console
+    echo "" > /dev/console
+    echo "System booted ok" > /dev/console

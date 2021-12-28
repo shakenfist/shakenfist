@@ -1,0 +1,261 @@
+autocancelConsecutiveBuilds()
+
+pipeline {
+  agent any
+
+  stages {
+    stage('Build infra') {
+      steps {
+        script {
+          timeout(time: 20, unit: 'MINUTES', activity: true) {
+            sh '''  mkdir -p $WORKSPACE/$BUILD_TAG
+
+                    if [ -e .git ]
+                    then
+                      echo "Detected existing git checkout."
+                      git remote -v
+                      gitmsg=`git log -1 --no-merges`
+
+                      if [ "https://github.com/shakenfist/shakenfist" == "https://github.com/shakenfist/shakenfist" ]
+                      then
+                        mkdir $WORKSPACE/$BUILD_TAG/shakenfist
+                        ls -A | grep -v $BUILD_TAG | xargs -t -I '__' mv __ $WORKSPACE/$BUILD_TAG/shakenfist/
+                      elif [ "https://github.com/shakenfist/shakenfist" == "https://github.com/shakenfist/client-python" ]
+                      then
+                        mkdir $WORKSPACE/$BUILD_TAG/client-python
+                        ls -A | grep -v $BUILD_TAG | xargs -t -I '__' mv __ $WORKSPACE/$BUILD_TAG/client-python/
+                      else
+                        echo "Unknown github_url!"
+                        exit 1
+                      fi
+                    fi
+
+                    if [ ! -e $WORKSPACE/$BUILD_TAG/shakenfist ]
+                    then
+                      echo "Performing shakenfist git checkout."
+                      project="shakenfist"
+                      search=" Depends on https://github.com/shakenfist/$project/"
+                      deppr=`echo $gitmsg | egrep "$search" | sed "s|.*$search||"`
+
+                      cd $WORKSPACE/$BUILD_TAG
+                      git clone https://github.com/shakenfist/shakenfist
+                      cd shakenfist
+
+                      if [ "%$deppr%" == "%%" ]
+                      then
+                        git checkout
+                      else
+                        git fetch origin $deppr/head:dependson
+                        git checkout dependson
+                      fi
+                    fi
+
+                    if [ ! -e $WORKSPACE/$BUILD_TAG/client-python ]
+                    then
+                      echo "Performing client-python git checkout."
+                      project="client-python"
+                      search=" Depends on https://github.com/shakenfist/$project/"
+                      deppr=`echo $gitmsg | egrep "$search" | sed "s|.*$search||"`
+
+                      cd $WORKSPACE/$BUILD_TAG
+                      git clone https://github.com/shakenfist/client-python
+                      cd client-python
+
+                      if [ "%$deppr%" == "%%" ]
+                      then
+                        git checkout master
+                      else
+                        git fetch origin $deppr/head:dependson
+                        git checkout dependson
+                      fi
+                    fi
+
+                    SOURCE_PATH="$WORKSPACE/$BUILD_TAG"
+
+                    echo "==== shakenfist git log ===="
+                    cd $SOURCE_PATH/shakenfist
+                    git log -5 --no-merges
+
+                    echo "==== client-python git log ===="
+                    cd $SOURCE_PATH/client-python
+                    git log -5 --no-merges
+
+                    echo "==== end git logs ===="
+
+                    cd $SOURCE_PATH/shakenfist
+                    . /home/jenkins/sf-ci
+                    ansible-playbook -i /home/jenkins/hosts \
+                        --extra-vars "identifier=$BUILD_TAG source_path=$SOURCE_PATH \
+                        base_image=label:sfci-debian-10 \
+                        base_image_user=debian" \
+                        deploy/ansible/ci-topology-singleton-etcd.yml
+              '''
+          }
+        }
+      }
+    }
+    stage('Run installer on primary') {
+      steps {
+        script {
+          timeout(time: 20, unit: 'MINUTES', activity: true) {
+            sh '''  . $WORKSPACE/$BUILD_TAG/ci-environment.sh
+                    ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no \
+                        -o UserKnownHostsFile=/dev/null \
+                        debian@$primary sudo /root/sf-deploy.sh
+                    echo ""
+                    echo ""
+                    ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no \
+                        -o UserKnownHostsFile=/dev/null \
+                        debian@$primary \
+                        'sudo rm /etc/apache2/sites-enabled/*; sudo a2ensite sf-example.conf; sudo apachectl graceful'
+              '''
+          }
+        }
+      }
+    }
+    stage('Import cached images') {
+      steps {
+        script {
+          timeout(time: 2, unit: 'MINUTES', activity: true) {
+            sh '''  . $WORKSPACE/$BUILD_TAG/ci-environment.sh
+                    ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                        debian@$primary \
+                        '. /etc/sf/sfrc; sf-client artifact upload ubuntu-1804 /srv/ci/ubuntu:18.04'
+                    ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                        debian@$primary \
+                        '. /etc/sf/sfrc; sf-client artifact upload ubuntu-2004 /srv/ci/ubuntu:20.04'
+                    ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                        debian@$primary \
+                        '. /etc/sf/sfrc; sf-client artifact upload cirros /srv/ci/cirros'
+              '''
+          }
+        }
+      }
+    }
+    stage('Create a base level of activity in the cluster') {
+      steps {
+        script {
+          timeout(time: 2, unit: 'MINUTES', activity: true) {
+            sh '''  . $WORKSPACE/$BUILD_TAG/ci-environment.sh
+                    ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                        debian@$primary \
+                        'echo "==== sfrc ===="; cat /etc/sf/sfrc; echo "==== end sfrc ===="'
+                    echo ""
+                    echo ""
+                    ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                        debian@$primary \
+                        '. /etc/sf/sfrc; for i in `seq 100`; do sf-client --async=continue network create background-$i 10.$i.0.0/24; done'
+              '''
+          }
+        }
+      }
+    }
+    stage('Run CI tests on primary') {
+      steps {
+        script {
+          timeout(time: 60, unit: 'MINUTES', activity: true) {
+            sh '''  . $WORKSPACE/$BUILD_TAG/ci-environment.sh
+                    scp -rp -i /home/jenkins/id_ci -o StrictHostKeyChecking=no \
+                        -o UserKnownHostsFile=/dev/null \
+                        $source_path/shakenfist \
+                        debian@$primary:shakenfist
+                    ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                        debian@$primary "cd shakenfist/deploy; SHAKENFIST_CI_CONCURRENCY=6 tox -epy3"
+              '''
+          }
+        }
+      }
+    }
+    stage('Log check') {
+      steps {
+        sh '''  # Copy across syslog
+                mkdir -p $WORKSPACE_TMP
+                . $WORKSPACE/$BUILD_TAG/ci-environment.sh
+                scp -rp -i /home/jenkins/id_ci -o StrictHostKeyChecking=no \
+                    -o UserKnownHostsFile=/dev/null \
+                    debian@$primary:/var/log/syslog \
+                    $WORKSPACE_TMP/syslog
+
+                # Ensure we don't have any tracebacks
+                if [ `grep -c "Traceback (most recent call last):" $WORKSPACE_TMP/syslog` -gt 0 ]
+                then
+                  echo "We have tracebacks in the logs!"
+                  exit 1
+                fi
+
+                # Ensure we didn't log any errors -- note the inclusion of the start
+                # of the process name here to avoid errors from things like prometheus
+                # node exporter.
+                if [ `grep -c "ERROR sf" $WORKSPACE_TMP/syslog` -gt 0 ]
+                then
+                  echo "Errors were logged!"
+                  exit 1
+                fi
+
+                # Ensure nothing died
+                if [ `grep -c "died" $WORKSPACE_TMP/syslog` -gt 0 ]
+                then
+                  echo "A process died!"
+                  exit 1
+                fi
+
+                # Ensure no leaked vxlans
+                if [ `grep -c "Extra vxlan present" $WORKSPACE_TMP/syslog` -gt 0 ]
+                then
+                  echo "vxlans leaked!"
+                  exit 1
+                fi
+          '''
+      }
+    }
+    stage('Process check') {
+      steps {
+        sh '''  # No zombies!
+                if [ `ps -ef | grep sf | grep -c defunct` -gt 0 ]
+                then
+                  echo "We have zombies!"
+                  exit 1
+                fi
+          '''
+      }
+    }
+  }
+
+  post {
+    always {
+      sh '''  set -x
+              . /home/jenkins/sf-ci
+              . $WORKSPACE/$BUILD_TAG/ci-environment.sh || true
+
+              echo "=============================="
+              ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                  debian@$primary sudo cat /etc/sf/sfrc || true
+
+              echo "=============================="
+              ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                  debian@$primary ps -ef || true | grep sf
+
+              echo "=============================="
+              ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                  debian@$primary sudo cat /etc/sf/shakenfist.json || true
+
+              echo "=============================="
+              # We do not use the locally cached syslog from the log check here,
+              # because if the CI run failed earlier, the log check was skipped.
+              ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                  debian@$primary sudo cat /var/log/syslog || true
+
+              echo "=============================="
+
+              if [ -e $source_path/keepme ]
+              then
+                echo "Retaining CI environment because you asked nicely."
+              else
+                sf-client namespace clean --namespace $BUILD_TAG --confirm
+              fi
+
+              rm -rf $WORKSPACE/$BUILD_TAG
+          '''
+    }
+  }
+}

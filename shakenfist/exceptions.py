@@ -25,8 +25,6 @@ class NoStateTransitionsDefined(ObjectException):
 
 
 # Instance
-
-
 class InstanceException(Exception):
     pass
 
@@ -39,6 +37,11 @@ class InstanceBadDiskSpecification(InstanceException):
     pass
 
 
+class NVRAMTemplateMissing(InstanceException):
+    pass
+
+
+# Scheduler
 class SchedulerException(Exception):
     pass
 
@@ -76,6 +79,19 @@ class BadObjectVersion(DatabaseException):
     pass
 
 
+class PreExistingReadOnlyCache(DatabaseException):
+    pass
+
+
+class ForbiddenWhileUsingReadOnlyCache(DatabaseException):
+    pass
+
+
+class PrefixNotInCache(DatabaseException):
+    pass
+
+
+# Virt
 class VirtException(Exception):
     pass
 
@@ -84,6 +100,7 @@ class NoDomainException(VirtException):
     pass
 
 
+# Config
 class FlagException(Exception):
     pass
 
@@ -94,6 +111,10 @@ class BadCheckSum(Exception):
 
 
 class ImagesCannotShrinkException(Exception):
+    pass
+
+
+class ImageMissingFromCache(Exception):
     pass
 
 
@@ -177,9 +198,9 @@ class BlobMissing(ArtifactException):
     pass
 
 
-class BlobRefCountDecrementBelowZero(ArtifactException):
+class BlobDeleted(ArtifactException):
     pass
 
 
-class BlobDeleted(ArtifactException):
+class BlobFetchFailed(Exception):
     pass

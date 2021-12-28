@@ -1,3 +1,4 @@
+from collections import defaultdict
 from functools import partial
 import time
 
@@ -6,6 +7,8 @@ from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist.config import config
+from shakenfist.constants import GiB
+from shakenfist import db
 from shakenfist import etcd
 from shakenfist import logutil
 from shakenfist.util import general as util_general
@@ -20,10 +23,17 @@ class Node(dbo):
 
     # docs/development/state_machine.md has a description of these states.
     STATE_MISSING = 'missing'
+    STATE_STOPPING = 'stopping'
+    STATE_STOPPED = 'stopped'
 
     state_targets = {
         None: (dbo.STATE_CREATED, dbo.STATE_ERROR, STATE_MISSING),
-        dbo.STATE_CREATED: (dbo.STATE_DELETED, dbo.STATE_ERROR, STATE_MISSING),
+        dbo.STATE_CREATED: (dbo.STATE_DELETED, dbo.STATE_ERROR, STATE_MISSING,
+                            STATE_STOPPING),
+        STATE_STOPPING: (STATE_STOPPED, dbo.STATE_DELETED, dbo.STATE_ERROR,
+                         dbo.STATE_CREATED),
+        STATE_STOPPED: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR),
+
         # A node can return from the dead...
         dbo.STATE_ERROR: (dbo.STATE_CREATED, dbo.STATE_DELETED),
         STATE_MISSING: (dbo.STATE_CREATED, dbo.STATE_ERROR)
@@ -35,6 +45,7 @@ class Node(dbo):
                                    static_values.get('version'))
 
         self.__ip = static_values['ip']
+        self.__fqdn = static_values['fqdn']
 
     @classmethod
     def new(cls, name, ip):
@@ -92,6 +103,10 @@ class Node(dbo):
     def ip(self):
         return self.__ip
 
+    @property
+    def fqdn(self):
+        return self.__fqdn
+
     # Values routed to attributes, writes are via helper methods.
     @property
     def last_seen(self):
@@ -117,4 +132,32 @@ class Nodes(dbo_iter):
 active_states_filter = partial(
     baseobject.state_filter, [dbo.STATE_CREATED])
 inactive_states_filter = partial(
-    baseobject.state_filter, [dbo.STATE_DELETED, dbo.STATE_ERROR, 'missing'])
+    baseobject.state_filter, [dbo.STATE_DELETED, dbo.STATE_ERROR, Node.STATE_MISSING])
+
+
+def _sort_by_key(d):
+    for k in sorted(d, reverse=True):
+        for v in d[k]:
+            yield v
+
+
+def nodes_by_free_disk_descending(minimum=0, maximum=-1, intention=None):
+    by_disk = defaultdict(list)
+    if not intention:
+        intention = ''
+    else:
+        intention = '_%s' % intention
+
+    for n in Nodes([active_states_filter]):
+        metrics = db.get_metrics(n.fqdn)
+        disk_free_gb = int(
+            int(metrics.get('disk_free%s' % intention, '0')) / GiB)
+
+        if disk_free_gb < minimum:
+            continue
+        if maximum != -1 and disk_free_gb > maximum:
+            continue
+
+        by_disk[disk_free_gb].append(n.fqdn)
+
+    return list(_sort_by_key(by_disk))

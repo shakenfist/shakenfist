@@ -35,15 +35,13 @@
           #!/bin/bash
           ansible-galaxy install -r /srv/shakenfist/venv/share/shakenfist/installer/requirements.yml
 
-          export CLOUD=metal
           export ADMIN_PASSWORD=foobar
           export FLOATING_IP_BLOCK="10.10.10.0/24"
-          export BOOTDELAY=0
           export DEPLOY_NAME="metalci"
-          export METAL_SSH_USER="{{base_image_user}}"
-          export METAL_SSH_KEY_FILENAME="/root/.ssh/id_rsa"
+          export SSH_USER="{{base_image_user}}"
+          export SSH_KEY_FILENAME="/root/.ssh/id_rsa"
           export HTTP_PROXY="http://192.168.1.50:3128"
-          export INCLUDE_TRACEBACKS="True"
+          export INCLUDE_TRACEBACKS=1
 
           export KSM_ENABLED=0
 
@@ -112,3 +110,14 @@
         owner: root
         group: root
         mode: u=rx
+
+- hosts: sf-1, sf-2, sf-3
+  gather_facts: yes
+  connection: ssh
+  become: true
+
+  tasks:
+    - name: Create a RAM disk for etcd to make it more reliable in CI
+      shell: |
+        mkdir -p /var/lib/etcd
+        mount -t tmpfs -o rw,size=2G tmpfs /var/lib/etcd

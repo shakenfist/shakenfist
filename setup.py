@@ -37,14 +37,14 @@ setuptools.setup(
                 'deploy/ansible/files/libvirt.tmpl',
                 'deploy/ansible/files/dhcp.tmpl',
                 'deploy/ansible/files/dhcphosts.tmpl',
-                'deploy/ansible/files/sf.service'
+                'deploy/ansible/files/sf.service',
+                'deploy/ansible/files/config'
             ]
         ),
         (
             'share/shakenfist/installer', [
                 'deploy.tgz',
                 'deploy/install',
-                'deploy/uninstall',
                 'deploy/requirements.yml'
             ]
         ),

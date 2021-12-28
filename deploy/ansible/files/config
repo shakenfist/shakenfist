@@ -1,0 +1,37 @@
+SHAKENFIST_NODE_EGRESS_IP="{{node_egress_ip}}"
+SHAKENFIST_NODE_EGRESS_NIC="{{node_egress_nic}}"
+SHAKENFIST_NODE_MESH_IP="{{node_mesh_ip}}"
+SHAKENFIST_NODE_MESH_NIC="{{node_mesh_nic}}"
+SHAKENFIST_NODE_NAME="{{node_name}}"
+
+{% if inventory_hostname in groups['etcd_master'] %}
+SHAKENFIST_NODE_IS_ETCD_MASTER=True
+{% else %}
+SHAKENFIST_NODE_IS_ETCD_MASTER=False
+{% endif %}
+
+{% if inventory_hostname in groups['hypervisors'] %}
+SHAKENFIST_NODE_IS_HYPERVISOR=True
+{% else %}
+SHAKENFIST_NODE_IS_HYPERVISOR=False
+{% endif %}
+
+{% if inventory_hostname in groups['network_node'] %}
+SHAKENFIST_NODE_IS_NETWORK_NODE=True
+{% else %}
+SHAKENFIST_NODE_IS_NETWORK_NODE=False
+{% endif %}
+
+SHAKENFIST_FLOATING_NETWORK="{{floating_network_ipblock}}"
+SHAKENFIST_NETWORK_NODE_IP="{{hostvars[groups['network_node'][0]]['node_mesh_ip']}}"
+SHAKENFIST_AUTH_SECRET_SEED="{{hostvars['localhost']['auth_secret']}}"
+SHAKENFIST_INCLUDE_TRACEBACKS="{{hostvars['localhost']['include_tracebacks']}}"
+
+# Cluster tuning.
+SHAKENFIST_RAM_SYSTEM_RESERVATION={{hostvars['localhost']['ram_system_reservation']}}
+SHAKENFIST_MAX_HYPERVISOR_MTU={{hostvars[groups['primary_node'][0]]['lowest_mtu']}}
+SHAKENFIST_DNS_SERVER="{{dns_server}}"
+
+{% if http_proxy != '' %}
+SHAKENFIST_HTTP_PROXY_SERVER="{{http_proxy}}"
+{% endif %}

@@ -1,17 +1,16 @@
 import hashlib
 import os
-import random
+import pathlib
 import requests
 import shutil
-import time
 import uuid
 
 from shakenfist.artifact import Artifact, BLOB_URL
 from shakenfist import blob
 from shakenfist.blob import Blob
 from shakenfist.config import config
-from shakenfist import constants
-from shakenfist import db
+from shakenfist.constants import (QCOW2_CLUSTER_SIZE, LOCK_REFRESH_SECONDS,
+                                  KiB, MiB)
 from shakenfist import exceptions
 from shakenfist import image_resolver
 from shakenfist import logutil
@@ -33,7 +32,7 @@ class ImageFetchHelper(object):
             {'url': self.url, 'artifact': self.__artifact.uuid})
 
     def get_image(self):
-        with self.__artifact.get_lock(ttl=(12 * constants.LOCK_REFRESH_SECONDS),
+        with self.__artifact.get_lock(ttl=(12 * LOCK_REFRESH_SECONDS),
                                       timeout=config.MAX_IMAGE_TRANSFER_SECONDS) as lock:
             b = self.transfer_image(lock)
             self.transcode_image(lock, b)
@@ -109,7 +108,11 @@ class ImageFetchHelper(object):
         cached = util_general.file_permutation_exists(
             os.path.join(config.STORAGE_PATH, 'image_cache', b.uuid),
             ['iso', 'qcow2'])
-        if not cached:
+        if cached:
+            # We touch the file here, because we want to know when it was last used.
+            pathlib.Path(cached).touch(exist_ok=True)
+
+        else:
             blob_path = os.path.join(config.STORAGE_PATH, 'blobs', b.uuid)
             mimetype = b.info.get('mime-type', '')
 
@@ -129,11 +132,25 @@ class ImageFetchHelper(object):
 
                 cache_path = os.path.join(
                     config.STORAGE_PATH, 'image_cache', b.uuid + '.qcow2')
-                if util_image.identify(blob_path).get('file format', '') == 'qcow2':
+                cache_info = util_image.identify(blob_path)
+
+                # Convert the cluster size from qemu format to an int
+                cluster_size_as_int = QCOW2_CLUSTER_SIZE
+                if cluster_size_as_int.endswith('M'):
+                    cluster_size_as_int = int(
+                        cluster_size_as_int[:-1]) * MiB
+                elif cluster_size_as_int.endswith('K'):
+                    cluster_size_as_int = int(
+                        cluster_size_as_int[:-1]) * KiB
+                else:
+                    cluster_size_as_int = int(cluster_size_as_int)
+
+                if (cache_info.get('file format', '') == 'qcow2' and
+                        cache_info.get('cluster_size', 0) == cluster_size_as_int):
                     util_general.link(blob_path, cache_path)
                 else:
                     with util_general.RecordedOperation('transcode image', self.instance):
-                        self.log.with_fields({'blob': b}).info(
+                        self.log.with_object(b).info(
                             'Transcoding %s -> %s' % (blob_path, cache_path))
                         util_image.create_qcow2(
                             [lock], blob_path, cache_path)
@@ -149,41 +166,12 @@ class ImageFetchHelper(object):
         """Fetch a blob from the cluster."""
 
         blob_uuid = url[len(BLOB_URL):]
-        blob_dir = os.path.join(config.STORAGE_PATH, 'blobs')
-        blob_path = os.path.join(blob_dir, blob_uuid)
-        os.makedirs(blob_dir, exist_ok=True)
 
         b = Blob.from_db(blob_uuid)
         if not b:
             raise exceptions.BlobMissing(blob_uuid)
 
-        locations = b.locations
-        random.shuffle(locations)
-        blob_source = locations[0]
-
-        if not os.path.exists(blob_path):
-            with util_general.RecordedOperation('fetch blob', self.instance):
-                url = 'http://%s:%d/blob/%s' % (blob_source, config.API_PORT,
-                                                blob_uuid)
-                admin_token = util_general.get_api_token(
-                    'http://%s:%d' % (blob_source, config.API_PORT))
-                r = requests.request('GET', url, stream=True,
-                                     headers={'Authorization': admin_token,
-                                              'User-Agent': util_general.get_user_agent()})
-
-                with open(blob_path + '.partial', 'wb') as f:
-                    last_refresh = 0
-
-                    for chunk in r.iter_content(chunk_size=8192):
-                        f.write(chunk)
-
-                        if time.time() - last_refresh > constants.LOCK_REFRESH_SECONDS:
-                            db.refresh_locks([lock])
-                            last_refresh = time.time()
-
-                os.rename(blob_path + '.partial', blob_path)
-                b.observe()
-
+        b.ensure_local([lock])
         return b
 
     def _http_get_inner(self, lock, url, checksum, checksum_type):
@@ -192,8 +180,7 @@ class ImageFetchHelper(object):
         with util_general.RecordedOperation('fetch image', self.instance):
             resp = self._open_connection(url)
             blob_uuid = str(uuid.uuid4())
-            self.log.with_fields({
-                'artifact': self.__artifact.uuid,
+            self.log.with_object(self.__artifact).with_fields({
                 'blob': blob_uuid,
                 'url': url}).info('Commencing HTTP fetch to blob')
             b = blob.http_fetch(resp, blob_uuid, [lock], self.log)
@@ -207,6 +194,7 @@ class ImageFetchHelper(object):
 
             # Only persist values after the file has been verified.
             b.observe()
+            b.request_replication()
             return b
 
     def _open_connection(self, url):

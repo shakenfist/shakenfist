@@ -47,7 +47,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'cirros',
+                    'base': 'sf://upload/system/cirros',
                     'type': 'disk'
                 }
             ], None, None)
@@ -62,7 +62,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'cirros',
+                    'base': 'sf://upload/system/cirros',
                     'type': 'disk'
                 }
             ], None, None)
@@ -95,7 +95,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'cirros',
+                    'base': 'sf://upload/system/cirros',
                     'type': 'disk'
                 }
             ], None, None)
@@ -110,7 +110,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'cirros',
+                    'base': 'sf://upload/system/cirros',
                     'type': 'disk'
                 }
             ], None, None)
@@ -143,7 +143,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'cirros',
+                    'base': 'sf://upload/system/cirros',
                     'type': 'disk'
                 }
             ], None, None)
@@ -158,7 +158,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'cirros',
+                    'base': 'sf://upload/system/cirros',
                     'type': 'disk'
                 }
             ], None, None)
@@ -198,7 +198,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'cirros',
+                    'base': 'sf://upload/system/cirros',
                     'type': 'disk'
                 }
             ], None, None)
@@ -231,7 +231,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'cirros',
+                    'base': 'sf://upload/system/cirros',
                     'type': 'disk'
                 }
             ], None, None)
@@ -248,7 +248,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'cirros',
+                    'base': 'sf://upload/system/cirros',
                     'type': 'disk'
                 }
             ], None, None)
@@ -271,7 +271,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'cirros',
+                    'base': 'sf://upload/system/cirros',
                     'type': 'disk'
                 }
             ], None, None)
@@ -316,7 +316,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                 [
                     {
                         'size': 8,
-                        'base': 'cirros',
+                        'base': 'sf://upload/system/cirros',
                         'type': 'disk'
                     }
                 ], None, None, force_placement='sf-2')
@@ -331,7 +331,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                 [
                     {
                         'size': 8,
-                        'base': 'ubuntu:20.04',
+                        'base': 'sf://upload/system/ubuntu-2004',
                         'type': 'disk'
                     }
                 ], None, None, force_placement='sf-2')
@@ -346,7 +346,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                 [
                     {
                         'size': 8,
-                        'base': 'ubuntu:20.04',
+                        'base': 'sf://upload/system/ubuntu-2004',
                         'type': 'disk'
                     }
                 ], None, None, force_placement='sf-3')

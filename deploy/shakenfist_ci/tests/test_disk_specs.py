@@ -12,7 +12,7 @@ class TestDiskSpecifications(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'cirros',
+                    'base': 'sf://upload/system/cirros',
                     'type': 'disk'
                 }
             ], None, None)
@@ -31,7 +31,7 @@ class TestDiskSpecifications(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'cirros',
+                    'base': 'sf://upload/system/cirros',
                     'type': 'disk',
                     'bus': 'ide'
                 }
@@ -51,7 +51,7 @@ class TestDiskSpecifications(base.BaseNamespacedTestCase):
             [
                 {
                     'size': '8',
-                    'base': 'cirros',
+                    'base': 'sf://upload/system/cirros',
                     'type': 'disk'
                 }
             ], None, None)
@@ -64,7 +64,7 @@ class TestDiskSpecifications(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'cirros',
+                    'base': 'sf://upload/system/cirros',
                     'type': 'disk',
                     'bus': 'ide'
                 },

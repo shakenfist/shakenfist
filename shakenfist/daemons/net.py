@@ -1,4 +1,4 @@
-import copy
+from collections import defaultdict
 import itertools
 import time
 
@@ -44,19 +44,15 @@ class Monitor(daemon.WorkerPoolDaemon):
                 inst = instance.Instance.from_db(ni.instance_uuid)
                 if not inst:
                     ni.delete()
-                    LOG.with_fields({
-                        'instance': ni.instance_uuid,
-                        'networkinterface': ni.uuid
-                    }).info('Deleted stray network interface for missing instance')
+                    LOG.with_object(ni).with_field('instance', ni.instance_uuid).info(
+                        'Deleted stray network interface for missing instance')
                 else:
                     s = inst.state
                     if (s.update_time + 30 < t and
                             s.value in [dbo.STATE_DELETED, dbo.STATE_ERROR, 'unknown']):
                         ni.delete()
-                        LOG.with_fields({
-                            'instance': ni.instance_uuid,
-                            'networkinterface': ni.uuid
-                        }).info('Deleted stray network interface')
+                        LOG.with_object(ni).with_field('instance', ni.instance_uuid).info(
+                            'Deleted stray network interface')
 
     def _maintain_networks(self):
         LOG.info('Maintaining networks')
@@ -159,7 +155,7 @@ class Monitor(daemon.WorkerPoolDaemon):
         # We keep a global cache of extra vxlans we've seen before, so that
         # we only warn about them when they've been stray for five minutes.
         global EXTRA_VLANS_HISTORY
-        for vxid in copy.copy(EXTRA_VLANS_HISTORY):
+        for vxid in EXTRA_VLANS_HISTORY.copy():
             if vxid not in extra_vxids:
                 del EXTRA_VLANS_HISTORY[vxid]
         for vxid in extra_vxids:
@@ -297,10 +293,10 @@ class Monitor(daemon.WorkerPoolDaemon):
             n.add_floating_ip(ni.floating.get('floating_address'), ni.ipv4)
 
     def _process_network_node_workitems(self):
-        while True:
+        while self.running:
             jobname, workitem = etcd.dequeue('networknode')
             if not workitem:
-                time.sleep(0.2)
+                return
             else:
                 try:
                     log_ctx = LOG.with_field('workitem', workitem)
@@ -387,9 +383,8 @@ class Monitor(daemon.WorkerPoolDaemon):
             floating_ipm.persist()
 
     def _validate_mtus(self):
-        by_mtu = {}
+        by_mtu = defaultdict(list)
         for iface, mtu in util_network.get_interface_mtus():
-            by_mtu.setdefault(mtu, [])
             by_mtu[mtu].append(iface)
 
         for mtu in sorted(by_mtu):
@@ -415,41 +410,50 @@ class Monitor(daemon.WorkerPoolDaemon):
         while True:
             try:
                 self.reap_workers()
-                worker_pids = []
-                for w in self.workers:
-                    worker_pids.append(w.pid)
 
-                if config.NODE_IS_NETWORK_NODE and network_worker not in worker_pids:
-                    network_worker = self.start_workitem(
-                        self._process_network_node_workitems, [], 'net-worker')
+                if self.running:
+                    worker_pids = []
+                    for w in self.workers:
+                        worker_pids.append(w.pid)
 
-                if time.time() - last_management > 30:
-                    # Management tasks are treated as extra workers, and run in
-                    # parallel with other network work items.
-                    if stray_interface_worker not in worker_pids:
-                        LOG.info('Scanning for stray network interfaces')
-                        stray_interface_worker = self.start_workitem(
-                            self._remove_stray_interfaces, [], 'stray-nics')
+                    if config.NODE_IS_NETWORK_NODE and network_worker not in worker_pids:
+                        network_worker = self.start_workitem(
+                            self._process_network_node_workitems, [], 'net-worker')
 
-                    if maintain_networks_worker not in worker_pids:
-                        LOG.info('Maintaining existing networks')
-                        maintain_networks_worker = self.start_workitem(
-                            self._maintain_networks, [], 'maintain')
+                    if time.time() - last_management > 30:
+                        # Management tasks are treated as extra workers, and run in
+                        # parallel with other network work items.
+                        if stray_interface_worker not in worker_pids:
+                            LOG.info('Scanning for stray network interfaces')
+                            stray_interface_worker = self.start_workitem(
+                                self._remove_stray_interfaces, [], 'stray-nics')
 
-                    if mtu_validation_worker not in worker_pids:
-                        LOG.info('Validating network interface MTUs')
-                        mtu_validation_worker = self.start_workitem(
-                            self._validate_mtus, [], 'mtus')
+                        if maintain_networks_worker not in worker_pids:
+                            LOG.info('Maintaining existing networks')
+                            maintain_networks_worker = self.start_workitem(
+                                self._maintain_networks, [], 'maintain')
 
-                    if config.NODE_IS_NETWORK_NODE:
-                        LOG.info('Reaping stray floating IPs')
-                        if floating_ip_reap_worker not in worker_pids:
-                            floating_ip_reap_worker = self.start_workitem(
-                                self._reap_leaked_floating_ips, [], 'fip-reaper')
+                        if mtu_validation_worker not in worker_pids:
+                            LOG.info('Validating network interface MTUs')
+                            mtu_validation_worker = self.start_workitem(
+                                self._validate_mtus, [], 'mtus')
 
-                    last_management = time.time()
+                        if config.NODE_IS_NETWORK_NODE:
+                            LOG.info('Reaping stray floating IPs')
+                            if floating_ip_reap_worker not in worker_pids:
+                                floating_ip_reap_worker = self.start_workitem(
+                                    self._reap_leaked_floating_ips, [], 'fip-reaper')
 
-                time.sleep(1)
+                        last_management = time.time()
+
+                elif len(self.workers) > 0:
+                    LOG.info('Waiting for %d workers to finish'
+                             % len(self.workers))
+
+                else:
+                    return
+
+                time.sleep(0.2)
 
             except Exception as e:
-                util_general.ignore_exception(daemon.process_name('queues'), e)
+                util_general.ignore_exception('network worker', e)

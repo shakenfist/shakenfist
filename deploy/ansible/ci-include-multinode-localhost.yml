@@ -22,18 +22,38 @@
       - "Public network is {{publicnetwork['meta']['uuid']}}"
       - "Mesh traffic network is {{meshnetwork['meta']['uuid']}}"
 
+- name: Setup cloud-config to add a password to CI nodes for debugging
+  set_fact:
+    userdata_decoded: |
+      #cloud-config
+      ssh_pwauth: True
+      chpasswd: { expire: False }
+
+      users:
+        - name: ciuser
+          lock-passwd: False
+          sudo: [ "ALL=(ALL) NOPASSWD:ALL" ]
+          shell: /bin/bash
+          # This password hash is generated with mkpasswd --method=SHA-512 --rounds=4096
+          passwd: "$6$rounds=4096$jBqTFFRr$75ehRH5AtiUxWMlFf1Ji.szp1NCjut2WiiD./QHsfWbCfKKjX1bs6MtBcWedlqKwcBKEPP/oLinTbH6gwcwUA1"
+
+- name: Encode user data
+  set_fact:
+    userdata_encoded: "{{ userdata_decoded | b64encode }}"
+
 - name: Create a primary instance
   sf_instance:
     name: "primary"
     cpu: 4
     ram: 4096
     disks:
-      - "30@{{base_image}}"
+      - "100@{{base_image}}"
     networkspecs:
       - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
       - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
     ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
     namespace: "{{identifier}}"
+    user_data: "{{userdata_encoded}}"
     state: present
   register: primary
 
@@ -55,12 +75,13 @@
     cpu: 4
     ram: 12288
     disks:
-      - "50@{{base_image}}"
+      - "100@{{base_image}}"
     networkspecs:
       - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
       - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
     ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
     namespace: "{{identifier}}"
+    user_data: "{{userdata_encoded}}"
     state: present
   register: sf1
 
@@ -82,12 +103,13 @@
     cpu: 4
     ram: 12288
     disks:
-      - "50@{{base_image}}"
+      - "100@{{base_image}}"
     networkspecs:
       - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
       - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
     ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
     namespace: "{{identifier}}"
+    user_data: "{{userdata_encoded}}"
     state: present
   register: sf2
 
@@ -109,12 +131,13 @@
     cpu: 4
     ram: 12288
     disks:
-      - "50@{{base_image}}"
+      - "100@{{base_image}}"
     networkspecs:
       - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
       - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
     ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
     namespace: "{{identifier}}"
+    user_data: "{{userdata_encoded}}"
     state: present
   register: sf3
 
@@ -136,12 +159,13 @@
     cpu: 4
     ram: 12288
     disks:
-      - "50@{{base_image}}"
+      - "100@{{base_image}}"
     networkspecs:
       - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
       - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
     ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
     namespace: "{{identifier}}"
+    user_data: "{{userdata_encoded}}"
     state: present
   register: sf4
 
@@ -163,12 +187,13 @@
     cpu: 4
     ram: 12288
     disks:
-      - "50@{{base_image}}"
+      - "100@{{base_image}}"
     networkspecs:
       - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
       - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
     ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
     namespace: "{{identifier}}"
+    user_data: "{{userdata_encoded}}"
     state: present
   register: sf5
 

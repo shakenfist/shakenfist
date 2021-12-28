@@ -90,6 +90,11 @@ class DHCP(object):
             if not psutil.pid_exists(pid):
                 return False
             os.kill(pid, sig)
+            if sig == signal.SIGKILL:
+                try:
+                    os.waitpid(pid, 0)
+                except ChildProcessError:
+                    pass
             return True
         return False
 

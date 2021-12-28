@@ -16,11 +16,18 @@
     mode: u=r,g=r,o=r
   when: ansible_distribution == 'Debian'
 
-- name: Enable eth1 (Debian)
+# This is a bit terrible. We're doing two things here (not in order): we're
+# configuring the mesh network interface (eth1), but we're also arguing with
+# ifup / systemd networking about eth0 and whether DHCP leases should be
+# renewed. I think this is papering over a negative interaction between
+# debian and cloud-init, but I am not entirely sure what the issue is here.
+- name: Enable networking (Debian)
   shell: |
+    ifup --ignore-errors eth0
     ifdown eth1
     sleep 1
     ifup eth1
+    systemctl restart networking
   when: ansible_distribution == 'Debian'
 
 - name: Configure the mesh interface (Ubuntu)

@@ -1,3 +1,6 @@
+# NOTE(mikal): this topology is different from the others as it now uses getsf
+# to perform the localhost install.
+
 - hosts: localhost
   gather_facts: yes
   connection: ssh
@@ -11,61 +14,67 @@
     - include_tasks: ci-include-singlenode-localhost.yml
     - include_tasks: ci-include-common-localhost.yml
 
-- hosts: sfall
+- hosts: primary
   gather_facts: yes
   become: true
   vars:
     source_path: "/home/jenkins/src/shakenfist/"
 
   tasks:
-    - include_tasks: ci-include-common-sfnodes.yml
+    - name: Disable logrotate
+      service:
+        name: logrotate
+        enabled: no
+        state: stopped
 
-- hosts: primary
-  gather_facts: yes
-  connection: ssh
-  become: true
+    - name: Disable logrotate.timer
+      service:
+        name: logrotate.timer
+        enabled: no
+        state: stopped
 
-  tasks:
-    - include_tasks: ci-include-common-primary.yml
-
-    - name: Copy install configuration to primary node
+    - name: Use CI package cache to speed things up
       copy:
         content: |
-          #!/bin/bash
-          ansible-galaxy install -r /srv/shakenfist/venv/share/shakenfist/installer/requirements.yml
-
-          export CLOUD=metal
-          export ADMIN_PASSWORD=foobar
-          export FLOATING_IP_BLOCK="10.10.10.0/24"
-          export BOOTDELAY=0
-          export DEPLOY_NAME="metalci"
-          export METAL_SSH_USER="{{base_image_user}}"
-          export METAL_SSH_KEY_FILENAME="/root/.ssh/id_rsa"
-          export HTTP_PROXY="http://192.168.1.50:3128"
-          export INCLUDE_TRACEBACKS="True"
-
-          export KSM_ENABLED=0
-
-          read -r -d '' TOPOLOGY <<'EOF'
-          [
-            {
-              "name": "sf-1",
-              "node_egress_ip": "{{hostvars['primary']['egress_ip']}}",
-              "node_egress_nic": "eth0",
-              "node_mesh_ip": "{{hostvars['primary']['egress_ip']}}",
-              "node_mesh_nic": "eth0",
-              "primary_node": true,
-              "hypervisor": true,
-              "network_node": true,
-              "etcd_master": true,
-              "api_url": "http://localhost:13000"
-            }
-          ]
-          EOF
-          export TOPOLOGY
-
-          /srv/shakenfist/venv/share/shakenfist/installer/install
-        dest: "/root/sf-deploy.sh"
+          Acquire::http::Proxy "http://192.168.1.50:8000";
+        dest: /etc/apt/apt.conf.d/00proxy
         owner: root
         group: root
-        mode: u=rx
+        mode: u=r,g=r,o=r
+
+    - name: Copy getsf
+      copy:
+        src: "{{source_path}}/shakenfist/deploy/getsf"
+        dest: "/tmp/getsf"
+        mode: ugo+rwx
+
+    - name: Copy server wheel file
+      copy:
+        src: "{{source_path}}/shakenfist/dist/{{hostvars['localhost']['server_wheel_file']}}"
+        dest: "/tmp/{{hostvars['localhost']['server_wheel_file']}}"
+
+    - name: Copy client wheel file
+      copy:
+        src: "{{source_path}}/client-python/dist/{{hostvars['localhost']['client_wheel_file']}}"
+        dest: "/tmp/{{hostvars['localhost']['client_wheel_file']}}"
+
+    - name: Create a RAM disk for etcd to make it more reliable in CI
+      shell: |
+        mkdir -p /var/lib/etcd
+        mount -t tmpfs -o rw,size=2G tmpfs /var/lib/etcd
+
+    - name: Write a simple getsf wrapper
+      copy:
+        content: |
+          export GETSF_FLOATING_BLOCK=192.168.10.0/24
+          export GETSF_DEPLOY_NAME=bonkerslab
+          export GETSF_RELEASE=local
+          export GETSF_NODES=localhost
+          export GETSF_WARNING=yes
+
+          export GETSF_SERVER_PACKAGE="/tmp/{{hostvars['localhost']['server_wheel_file']}}"
+          export GETSF_CLIENT_PACKAGE="/tmp/{{hostvars['localhost']['client_wheel_file']}}"
+
+          sudo --preserve-env /tmp/getsf
+        dest: "/tmp/getsf-wrapper"
+        mode: ugo+rwx

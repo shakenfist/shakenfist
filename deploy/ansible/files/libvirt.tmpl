@@ -5,19 +5,28 @@
   <currentMemory unit='KiB'>{{memory}}</currentMemory>
   <vcpu placement='static'>{{vcpus}}</vcpu>
   <os>
-    <type arch='x86_64' machine='pc-i440fx-2.8'>hvm</type>
+    <type arch='x86_64' machine='{{machine_type}}'>hvm</type>
     <boot dev='hd'/>
     <boot dev='cdrom'/>
     <bootmenu enable='yes' timeout='3000'/>
 
     {%- if uefi -%}
+    {%- if secure_boot -%}
+    <loader readonly='yes' secure='yes' type='pflash'>/usr/share/OVMF/OVMF_CODE.secboot.fd</loader>
+    {%- else -%}
     <loader readonly='yes' type='pflash'>/usr/share/OVMF/OVMF_CODE.fd</loader>
-    <nvram>{{instance_path}}/nvram</nvram>
+    {%- endif -%}
+    <nvram {{nvram_template_attribute}}>{{instance_path}}/nvram</nvram>
     {%- endif -%}
   </os>
   <features>
     <acpi/>
     <apic/>
+    {%- if secure_boot -%}
+    <smm state='on'>
+      <tseg unit='MiB'>48</tseg>
+    </smm>
+    {%- endif -%}
   </features>
   <cpu mode='host-passthrough'>
   </cpu>
@@ -39,7 +48,7 @@
     {%- for disk in disks %}
     {%- if disk.bus != 'nvme' %}
     <disk type='{{disk.source_type}}' device='{{disk.present_as}}'>
-      <driver name='qemu' type='{{disk.type}}'/>
+      <driver name='qemu' type='{{disk.type}}' cache='{{disk.cache_mode}}'/>
       {{disk.source}}
       {{disk.backing}}
       <target dev='{{disk.device}}' bus='{{disk.bus}}'/>
@@ -47,6 +56,56 @@
     {%- endif %}
     {%- endfor %}
 
+    {%- if machine_type == 'q35' -%}
+    <!-- NOTE(mikal): q35 is pcie -->
+    <controller type='pci' index='0' model='pcie-root'/>
+    <controller type='pci' index='1' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='1' port='0x10'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x0' multifunction='on'/>
+    </controller>
+    <controller type='pci' index='2' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='2' port='0x11'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x1'/>
+    </controller>
+    <controller type='pci' index='3' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='3' port='0x12'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x2'/>
+    </controller>
+    <controller type='pci' index='4' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='4' port='0x13'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x3'/>
+    </controller>
+    <controller type='pci' index='5' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='5' port='0x14'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x4'/>
+    </controller>
+    <controller type='pci' index='6' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='6' port='0x15'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x5'/>
+    </controller>
+    <controller type='pci' index='7' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='7' port='0x16'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x6'/>
+    </controller>
+    <controller type='usb' index='0' model='qemu-xhci' ports='15'>
+      <address type='pci' domain='0x0000' bus='0x03' slot='0x00' function='0x0'/>
+    </controller>
+    <controller type='sata' index='0'>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x1f' function='0x2'/>
+    </controller>
+    <rng model='virtio'>
+      <backend model='random'>/dev/urandom</backend>
+      <address type='pci' domain='0x0000' bus='0x06' slot='0x00' function='0x0'/>
+    </rng>
+    {%- else -%}
+    <!-- NOTE(mikal): i440fx is pci -->
     <controller type='usb' index='0' model='ich9-ehci1'>
       <address type='pci' domain='0x0000' bus='0x00' slot='0x04' function='0x7'/>
     </controller>
@@ -66,6 +125,11 @@
     <controller type='ide' index='0'>
       <address type='pci' domain='0x0000' bus='0x00' slot='0x01' function='0x1'/>
     </controller>
+    <rng model='virtio'>
+      <backend model='random'>/dev/urandom</backend>
+      <address type='pci' domain='0x0000' bus='0x06' slot='0x01' function='0x0'/>
+    </rng>
+    {%- endif -%}
 
     {% for net in networks %}
     <interface type='bridge'>
@@ -100,7 +164,7 @@
     <input type='keyboard' bus='ps2'/>
     <video>
       <model type='{{video_model}}' vram='{{video_memory}}' heads='1' primary='yes'/>
-      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x0'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x05' function='0x0'/>
     </video>
     <memballoon model='virtio'>
       <address type='pci' domain='0x0000' bus='0x00' slot='0x06' function='0x0'/>
@@ -109,6 +173,9 @@
 
   <!-- NOTE(mikal): this is required to support things like NVME disks. -->
   <qemu:commandline>
+  {%- if secure_boot -%}
+    <qemu:arg value='-global'/><qemu:arg value='ICH9-LPC.disable_s3=1'/>
+  {%- endif -%}
   {%- for extra in extracommands %}
     <qemu:arg value='{{extra}}'/>
   {%- endfor %}

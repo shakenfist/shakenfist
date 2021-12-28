@@ -54,10 +54,11 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         a = json.loads(self._exec_client(
             '--json artifact show %s' % cirros_uuid))
         while time.time() - start_time < 5 * 60 * base.NETWORK_PATIENCE_FACTOR:
-            while not a.get('blob_uuid', None):
-                time.sleep(5)
-                a = json.loads(self._exec_client('--json artifact show %s'
-                                                 % cirros_uuid))
+            if a.get('blob_uuid'):
+                break
+            time.sleep(5)
+            a = json.loads(self._exec_client('--json artifact show %s'
+                                             % cirros_uuid))
 
         self.assertIn('blob_uuid', a)
 
@@ -96,7 +97,8 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         while time.time() - start_time < 5 * 60 * base.NETWORK_PATIENCE_FACTOR:
             versions = json.loads(self._exec_client(
                 'artifact versions %s' % artifact_uuid))
-            if len(versions) == 5:
+            # Number of versions will be limited to the max_versions setting
+            if len(versions) == 3:
                 return
             time.sleep(30)
 
@@ -110,12 +112,11 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'cirros',
+                    'base': 'sf://upload/system/cirros',
                     'type': 'disk'
                 }
             ], None, None)
-
-        self._await_login_prompt(inst1['uuid'])
+        self._await_instances_ready([inst1['uuid']])
 
         # Take a snapshot
         snap1 = json.loads(self._exec_client(
@@ -148,6 +149,7 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 }
             ], None, None)
+        self._await_instances_ready([inst2['uuid']])
 
         # Test instance is listed against blob in snapshot listing
         show_info = json.loads(self._exec_client(

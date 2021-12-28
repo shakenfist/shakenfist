@@ -27,7 +27,7 @@ class TestSystemNamespace(base.BaseTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'cirros',
+                    'base': 'sf://upload/system/cirros',
                     'type': 'disk'
                 }
             ], None, None)

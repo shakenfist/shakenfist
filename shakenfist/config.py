@@ -22,11 +22,11 @@ class SFConfig(BaseSettings):
     # API Options
     API_PORT: int = Field(13000, description='Port for the REST API')
     API_TIMEOUT: int = Field(
-        900,
+        30,
         description='How long gunicorn processes can use for a single request'
     )
     API_ASYNC_WAIT: int = Field(
-        30,
+        15,
         description='How long we wait for an async operation to complete '
                     'before returning to the user'
     )
@@ -45,9 +45,9 @@ class SFConfig(BaseSettings):
     )
     API_COMMAND_LINE: str = Field(
         (
-            '/srv/shakenfist/venv/bin/gunicorn --workers 10 --bind 0.0.0.0:%(port)d --log-syslog '
-            '--log-syslog-prefix sf --timeout %(timeout)s --name "%(name)s" '
-            'shakenfist.external_api.app:app'
+            '/srv/shakenfist/venv/bin/gunicorn --workers %(workers)d --bind 0.0.0.0:%(port)d '
+            '--log-syslog --log-syslog-prefix sf --timeout %(timeout)s --name "%(name)s" '
+            '--pid /var/run/sf/gunicorn.pid shakenfist.external_api.app:app'
         ),
         description='The gunicorn command line to use'
     )
@@ -67,6 +67,9 @@ class SFConfig(BaseSettings):
     )
     RAM_SYSTEM_RESERVATION: float = Field(
         5.0, description='How much RAM is reserved for the OS'
+    )
+    MINIMUM_FREE_DISK: int = Field(
+        20, description='Shaken Fist attempts to leave this amount of disk free'
     )
 
     # Network Options
@@ -163,9 +166,17 @@ class SFConfig(BaseSettings):
         1800, description='How long to wait for an image transfer to occur before giving up'
     )
 
+    # Artifact options
+    ARTIFACT_MAX_VERSIONS_DEFAULT: int = Field(
+        3, description='Default number of versions to keep within an artifact'
+    )
+
     # Other options
     BLOB_REPLICATION_FACTOR: int = Field(
         2, description='How many copies of each blob we like to have.'
+    )
+    MAX_CONCURRENT_BLOB_TRANSFERS: int = Field(
+        20, description='How many concurrent blob transfers we can have queued.'
     )
     ZONE: str = Field(
         'shakenfist', description='What nova called an availability zone'
@@ -218,6 +229,11 @@ class SFConfig(BaseSettings):
         'libvirt-qemu', description='Name of the libvirt group'
     )
 
+    ENABLE_EVENTS: bool = Field(
+        True, description='Record events about objects in the database. '
+                          'Consider disabling if you have etcd performance issues.'
+    )
+
     # Logging
     SLOW_LOCK_THRESHOLD: float = 5.0
     LOGLEVEL_API: str = 'info'
@@ -229,6 +245,10 @@ class SFConfig(BaseSettings):
     LOGLEVEL_QUEUES: str = 'info'
     LOG_METHOD_TRACE: bool = Field(
         False, description='Add method name and module line number to log messages'
+    )
+
+    EXCESSIVE_ETCD_CACHE_LOGGING: bool = Field(
+        False, description='Record detailed information about etcd cache performance.'
     )
 
     class Config:

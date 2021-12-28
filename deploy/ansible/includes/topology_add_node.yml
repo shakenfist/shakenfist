@@ -1,14 +1,16 @@
 - name: Add {{item['name']}} to ansible
   add_host:
     hostname: "{{item['name']}}"
+    # This var is required for the etcd installer
+    ansible_fqdn: "{{item['name']}}"
     ansible_ssh_host: "{{item['node_egress_ip']}}"
     ansible_ssh_user: "{{ssh_user}}"
-    ansible_ssh_private_key_filename: "{{ssh_key_filename}}"
+    ansible_ssh_private_key_file: "{{ssh_key_filename}}"
 
 - name: Add {{item['name']}} as a hypervisor (if configured)
   add_host:
     hostname: "{{item['name']}}"
-    groups: hypervisors
+    groups: hypervisors, sf_promethus_exporters
   when: item.get('hypervisor', False)
 
 - name: Add {{item['name']}} as an etcd master (if configured)
@@ -20,7 +22,7 @@
 - name: Add {{item['name']}} as a network node (if configured, should only be one)
   add_host:
     hostname: "{{item['name']}}"
-    groups: network_node
+    groups: network_node, sf_promethus_exporters
   when: item.get('network_node', False)
 
 - name: Add {{item['name']}} as a primary node (if configured, should only be one)
@@ -28,6 +30,12 @@
     hostname: "{{item['name']}}"
     groups: primary_node
   when: item.get('primary_node', False)
+
+- name: Add {{item['name']}} as a storage node (if configured, should only be one)
+  add_host:
+    hostname: "{{item['name']}}"
+    groups: storage, sf_promethus_exporters
+  when: item.get('storage', False)
 
 - name: Record API URL from primary node
   set_fact:

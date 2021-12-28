@@ -4,11 +4,14 @@ import setproctitle
 import time
 import os
 import psutil
+import signal
+import sys
 
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.daemons import external_api as external_api_daemon
 from shakenfist.daemons import cleaner as cleaner_daemon
+from shakenfist.daemons import cluster as cluster_daemon
 from shakenfist.daemons import queues as queues_daemon
 from shakenfist.daemons import net as net_daemon
 from shakenfist.daemons import resources as resource_daemon
@@ -99,7 +102,7 @@ def restore_instances():
                     inst.create_on_hypervisor()
             except Exception as e:
                 util_general.ignore_exception(
-                    'restore instance %s' % inst.uuid, e)
+                    'restore instance %s' % inst, e)
                 inst.etcd.enqueue_delete_due_error(
                     'exception while restoring instance on daemon restart')
 
@@ -107,6 +110,7 @@ def restore_instances():
 DAEMON_IMPLEMENTATIONS = {
     'api': external_api_daemon,
     'cleaner': cleaner_daemon,
+    'cluster': cluster_daemon,
     'net': net_daemon,
     'queues': queues_daemon,
     'resources': resource_daemon,
@@ -125,6 +129,10 @@ def main():
     setproctitle.setproctitle(
         daemon.process_name('main') + '-v%s' % util_general.get_version())
 
+    # If you ran this, it means we're not shutting down any more
+    n = Node.new(config.NODE_NAME, config.NODE_MESH_IP)
+    n.state = Node.STATE_CREATED
+
     # Log configuration on startup
     for key, value in config.dict().items():
         LOG.info('Configuration item %s = %s' % (key, value))
@@ -139,7 +147,13 @@ def main():
     def _start_daemon(d):
         pid = os.fork()
         if pid == 0:
-            DAEMON_IMPLEMENTATIONS[d].Monitor(d).run()
+            try:
+                DAEMON_IMPLEMENTATIONS[d].Monitor(d).run()
+                sys.exit(0)
+            except Exception as e:
+                util_general.ignore_exception('daemon creation', e)
+                sys.exit(1)
+
         DAEMON_PIDS[pid] = d
         LOG.with_field('pid', pid).info('Started %s' % d)
 
@@ -206,7 +220,7 @@ def main():
             if d not in running_daemons:
                 _start_daemon(d)
 
-        for d in DAEMON_PIDS:
+        for d in list(DAEMON_PIDS):
             if not psutil.pid_exists(d):
                 LOG.warning('%s pid is missing, restarting' % DAEMON_PIDS[d])
                 _start_daemon(DAEMON_PIDS[d])
@@ -214,15 +228,40 @@ def main():
     _audit_daemons()
     restore_instances()
 
+    running = True
     while True:
         time.sleep(10)
 
-        wpid, _ = os.waitpid(-1, os.WNOHANG)
-        while wpid != 0:
-            LOG.warning('%s died (pid %d)'
-                        % (DAEMON_PIDS.get(wpid, 'unknown'), wpid))
-            del DAEMON_PIDS[wpid]
+        try:
             wpid, _ = os.waitpid(-1, os.WNOHANG)
+            while wpid != 0:
+                LOG.warning('%s exited (pid %d)'
+                            % (DAEMON_PIDS.get(wpid, 'unknown'), wpid))
+                if wpid in DAEMON_PIDS:
+                    del DAEMON_PIDS[wpid]
+                wpid, _ = os.waitpid(-1, os.WNOHANG)
 
-        _audit_daemons()
-        Node.observe_this_node()
+        except ChildProcessError:
+            # We get this if there are no child processes
+            pass
+
+        n = Node.from_db(config.NODE_NAME)
+        if n.state.value not in [Node.STATE_STOPPING, Node.STATE_STOPPED]:
+            _audit_daemons()
+            Node.observe_this_node()
+
+        elif len(DAEMON_PIDS) == 0:
+            n.state = Node.STATE_STOPPED
+            return
+
+        else:
+            if running:
+                for pid in DAEMON_PIDS:
+                    try:
+                        os.kill(pid, signal.SIGTERM)
+                        LOG.info('Sent SIGTERM to %s (pid %s)'
+                                 % (DAEMON_PIDS.get(pid, 'unknown'), pid))
+                    except OSError as e:
+                        LOG.warn('Failed to send SIGTERM to %s: %s' % (pid, e))
+
+            running = False

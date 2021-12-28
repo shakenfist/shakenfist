@@ -3,117 +3,93 @@ title: Installation
 ---
 # Installing Shaken Fist
 
-This guide will assume that you want to install Shaken Fist on a single local machine (that is, the one you're going to run ansible on). This is by no means the only installation option, but is the most simple to get people started.
+The purpose of this guide is to walk you through a Shaken Fist installation. Shaken Fist will work just fine on a single machine, although its also happy to run on clusters of machines. We'll discuss the general guidance for install options as we go.
 
-Shaken Fist only supports Ubuntu 20.04, Debian 10, and Debian 11, so if you're running on localhost that implies that you must be running a recent Ubuntu or Debian on your development machine. Note as well that the deployer installs software and changes the configuration of your networking, so be careful when running it on machines you are fond of.
+Shaken Fist only supports Ubuntu 20.04, Debian 10, and Debian 11, so if you're running on localhost that implies that you must be running a recent Ubuntu or Debian on your development machine. Note as well that the deployer installs software and changes the configuration of your networking, so be careful when running it on machines you are fond of. This documentation was most recently tested against Debian 11, in November 2021. Bug reports are welcome if you have any issues, and may be filed at https://github.com/shakenfist/shakenfist/issues
 
-Note that we used to recommend deployers run the installer from git, but we've outgrown that approach. If you see that mentioned in the documentation, you are likely reading outdated guides.
-
-First install some dependencies:
-
-```bash
-sudo apt-get update
-sudo apt-get -y dist-upgrade
-sudo apt-get -y install ansible tox pwgen build-essential python3-dev python3-wheel \
-    python3-pip python3-venv curl ansible vim git pwgen
-    python3-pip curl ansible vim git pwgen
-```
-
-And then manually upgrade pip:
-
-```
-sudo pip3 install -U pip
-sudo apt-get remove -y python3-pip
-```
-
-We require that Shaken Fist be installed into a venv at /srv/shakenfist/venv on each Shaken Fist machine. Create that now:
-
-```
-sudo mkdir -p /srv/shakenfist/venv
-sudo chown -R `whoami`.`whoami` /srv/shakenfist/venv
-python3 -mvenv --system-site-packages /srv/shakenfist/venv
-```
-
-Next install your desired Shaken Fist pip package. The default should be the latest release.
-
-```
-/srv/shakenfist/venv/bin/pip install -U shakenfist shakenfist_client
-```
-
-Because we're fancy, we should also create a symlink to the `sf-client` command so its easy to use without arguing with the virtual environment:
-
-```
-sudo ln -s /srv/shakenfist/venv/bin/sf-client /usr/local/bin/sf-client
-```
-
-We need to install required ansible-galaxy roles, which are described by a requirements file packaged with the server package. Do that like this:
-
-```
-ansible-galaxy install -r /srv/shakenfist/venv/share/installer/requirements.yml
-```
-
-And then run the installer. We describe the correct invocation for a local development environment in the section below.
-
-## Local development
-
-Shaken Fist uses ansible as its installer, with terraform to bring up cloud resources. Because we're going to install Shaken Fist on localhost, there isn't much terraform in this example. Installation is run by a simple wrapper called "install.sh".
-
-We also make the assumption that developer laptops move around more than servers. In a traditional install we detect the primary NIC of the machine and then use that to build VXLAN meshes. For localhost single node deploys we instead create a bridge called "brsf" and then use that as our primary NIC. This means your machine can move around and have different routes to the internet over time, but it also means its fiddly to convert a localhost install into a real production cluster. Please only use localhost installs for development purposes.
-
-```
-sudo CLOUD=localhost /srv/shakenfist/venv/share/shakenfist/installer/install
-```
-
-## Cluster installation
-
-Installation is similar to that done on localhost, but there are some extra steps. First off, each machine in the cluster should match this description:
+Each machine in the cluster should match this description:
 
 * Have virtualization extensions enabled in the BIOS.
-* Have jumbo frames enabled on the switch.
-* Have a cloudadmin account setup with passwordless sudo, and a ssh key in its authorized_keys file. This is an ansible requirement.
+* Have jumbo frames enabled on the switch for the "mesh interface" for installations of more than one machine. Shaken Fist can optionally run internal traffic such as etcd and virtual network meshes on a separate interface to traffic egressing the cluster. Whichever interface you specify as being used for virtual network mesh traffic must have jumbo frames enabled for the virtual networks to function correctly.
+* Have at least 1 gigabit connectivity on the "mesh interface". This is a requirement of etcd.
+* Have a cloudadmin account setup with passwordless sudo, and a ssh key in its authorized_keys file. This is an ansible requirement, although the exact username is configurable in the SSH_USER variable.
 
-Now create a file called sf-deploy.sh, which contains the details of your installation. For my home cluster, it looks like this:
+We now have a fancy helper to help you install your first localhost cluster, so let's give that a go:
+
+```bash
+curl https://github.com/shakenfist/shakenfist/blob/develop/getsf
+chmod ugo+rx getsf
+sudo ./getsf
+```
+
+This script will then walk you through the installation steps, asking questions as you go. The script leaves you with an installer configuration at `/root/sf-deploy`, which is the basis for later upgrades and cluster expansions.
+
+You can script the answers to `getsf` by setting environment variables. For example:
+
+```bash
+export GETSF_FLOATING_BLOCK=192.168.10.0/24
+export GETSF_DEPLOY_NAME=bonkerslab
+export GETSF_RELEASE=pre-release
+export GETSF_NODES=localhost
+export GETSF_WARNING=yes
+sudo --preserve-env ./getsf
+```
+
+## Sample configuration for a multi-node deploy
+
+However, if you're performing a multinode deploy, the process is currently much more manual. The intent is to expand `getsf` to handle multiple nodes, but that work is not yet complete.
+
+For now, you'll need to write a configuration file a bit like this on the primary node:
 
 ```
-#!/bin/bash
-
-export CLOUD=metal
-export ADMIN_PASSWORD=...a...password...
+export ADMIN_PASSWORD=engeeF1o
 export FLOATING_IP_BLOCK="192.168.10.0/24"
-export BOOTDELAY=0
 export DEPLOY_NAME="bonkerslab"
-export METAL_SSH_USER="cloudadmin"
-export METAL_SSH_KEY_FILENAME="/root/.ssh/id_rsa"
+export SSH_USER="cloudadmin"
+export SSH_KEY_FILENAME="/root/.ssh/id_rsa"
 
 export KSM_ENABLED=1
 
-# Metal topology is in JSON
+# Topology is in JSON
 read -r -d '' TOPOLOGY <<'EOF'
 [
-    {
-        "name": "sf-1",
-        "node_egress_ip": "10.0.0.1",
-        "node_egress_nic": "eth0",
-        "node_mesh_ip": "10.0.1.1",
-        "node_mesh_nic": "eth1",
-        "etcd_master": true
-    },
-    {
-        "name": "sf-2",
-        "node_egress_ip": "10.0.0.2",
-        "node_egress_nic": "eth0",
-        "node_mesh_ip": "10.0.1.2",
-        "node_mesh_nic": "eth1",
-        "etcd_master": true
-    },
-    {
-        "name": "sf-3",
-        "node_egress_ip": "10.0.0.3",
-        "node_egress_nic": "eth0",
-        "node_mesh_ip": "10.0.1.3",
-        "node_mesh_nic": "eth1",
-        "etcd_master": true
-    }
+  {
+    "name": "sf-primary",
+    "node_egress_ip": "192.168.1.50",
+    "node_egress_nic": "enp0s31f6",
+    "node_mesh_ip": "192.168.21.50",
+    "node_mesh_nic": "enp0s31f6:1",
+    "primary_node": true,
+    "api_url": "https://...your...install...here.com/api"
+  },
+  {
+    "name": "sf-1",
+    "node_egress_ip": "192.168.1.51",
+    "node_egress_nic": "enp5s0",
+    "node_mesh_ip": "192.168.21.51",
+    "node_mesh_nic": "eno1",
+    "etcd_master": true,
+    "network_node": true,
+    "hypervisor": true
+  },
+  {
+    "name": "sf-2",
+    "node_egress_ip": "192.168.1.52",
+    "node_egress_nic": "enp5s0",
+    "node_mesh_ip": "192.168.21.52",
+    "node_mesh_nic": "eno1",
+    "etcd_master": true,
+    "hypervisor": true
+  },
+  {
+    "name": "sf-3",
+    "node_egress_ip": "192.168.1.53",
+    "node_egress_nic": "enp5s0",
+    "node_mesh_ip": "192.168.21.53",
+    "node_mesh_nic": "eno1",
+    "etcd_master": true,
+    "hypervisor": true
+  },
 ]
 EOF
 export TOPOLOGY
@@ -121,13 +97,74 @@ export TOPOLOGY
 /srv/shakenfist/venv/share/shakenfist/installer/install
 ```
 
-Not every node needs to be an etcd_master. I'd select three in most situations. And then we can run the installer:
+## Notes for multi-node installations
+
+Not every node needs to be an etcd_master. I'd select three in most situations. One node must be marked as the primary node, and one must be marked as the network node. It is not currently supported having more than one of each of those node types.
+
+* The primary node runs an apache load balancer across the API servers in the cluster, and therefore needs to be accessable to your users on HTTP and HTTPS.
+* The network node is the ingress and egress point for all virtual networks, and is where floating IPs live, so it needs to be setup as the gateway fro your floating IP block.
+
+Some of the considerations here can be subtle. Please reach out if you need a hand.
+
+For a node complicated installation, `sf-deploy` might like this:
 
 ```
-chmod +x sf-deploy.sh
-sudo ./sf-deploy.sh
-```
+#!/bin/bash
 
+export ADMIN_PASSWORD=engeeF1o
+export FLOATING_IP_BLOCK="192.168.10.0/24"
+export DEPLOY_NAME="bonkerslab"
+export SSH_USER="cloudadmin"
+export SSH_KEY_FILENAME="/root/.ssh/id_rsa"
+
+export KSM_ENABLED=1
+
+# Topology is in JSON
+read -r -d '' TOPOLOGY <<'EOF'
+[
+  {
+    "name": "sf-primary",
+    "node_egress_ip": "192.168.1.50",
+    "node_egress_nic": "enp0s31f6",
+    "node_mesh_ip": "192.168.21.50",
+    "node_mesh_nic": "enp0s31f6:1",
+    "primary_node": true,
+    "api_url": "https://...your...install...here.com/api"
+  },
+  {
+    "name": "sf-1",
+    "node_egress_ip": "192.168.1.51",
+    "node_egress_nic": "enp5s0",
+    "node_mesh_ip": "192.168.21.51",
+    "node_mesh_nic": "eno1",
+    "etcd_master": true,
+    "network_node": true,
+    "hypervisor": true
+  },
+  {
+    "name": "sf-2",
+    "node_egress_ip": "192.168.1.52",
+    "node_egress_nic": "enp5s0",
+    "node_mesh_ip": "192.168.21.52",
+    "node_mesh_nic": "eno1",
+    "etcd_master": true,
+    "hypervisor": true
+  },
+  {
+    "name": "sf-3",
+    "node_egress_ip": "192.168.1.53",
+    "node_egress_nic": "enp5s0",
+    "node_mesh_ip": "192.168.21.53",
+    "node_mesh_nic": "eno1",
+    "etcd_master": true,
+    "hypervisor": true
+  },
+]
+EOF
+export TOPOLOGY
+
+/srv/shakenfist/venv/share/shakenfist/installer/install
+```
 
 ## Your first instance
 
@@ -210,54 +247,6 @@ Interfaces:
 
 Probably the easiest way to interact with this instance is to connect to its console port, which is the serial console of the instance over telnet. In the case above, that is available on port 31829 on localhost (my laptop is called marvin).
 
-## Real world cluster deployments
-
-It is probably best to start with a localhost deployment first to become familiar with Shaken Fist. From that, you can build out your real world deployment. Deployments are based on Hashicorp terraform
-configuration found in deploy/ansible/terraform/<cloud> where "cloud" is one of the following at the time of writing:
-
-* aws: Amazon EC2 bare metal (3 node cluster)
-* aws-single-node: Amazon EC2 bare metal (1 node cluster), note that the CI tests will not pass on a single node cluster
-* gcp: Google cloud, using nested virtualization (see additional steps below). **This deployment option is not for production use because of its lack of bare metal support and low MTUs affecting virtual network performance. We mainly use it for CI testing.**
-* metal: Bare metal provisioned outside of terraform
-* openstack: OpenStack, using nested virtualization
-* shakenfist: Shaken Fist can self host, this is useful for CI for example
-
-### Common first steps
-
-```bash
-sudo apt-get install ansible tox pwgen build-essential python3-dev python3-wheel curl
-git clone https://github.com/shakenfist/deploy
-ansible-galaxy install andrewrothstein.etcd-cluster andrewrothstein.terraform andrewrothstein.go
-```
-
-### Google Cloud additional first steps
-
-On Google Cloud, you need to enable nested virt first:
-
-```bash
-# Create an image with nested virt enabled (only once)
-gcloud compute disks create sf-source-disk --image-project ubuntu-os-cloud \
-    --image-family ubuntu-1804-lts --zone us-central1-b
-gcloud compute images create sf-image \
-  --source-disk sf-source-disk --source-disk-zone us-central1-b \
-  --licenses "https://compute.googleapis.com/compute/v1/projects/vm-options/global/licenses/enable-vmx"
-```
-
-Please note that the gcp-xl cloud is a special definition used for larger scale CI testing. You're welcome to use it, but it does assume that the node performing the deployment is a Google cloud instance.
-
-### VMWare ESXi additional first steps
-
-The "metal" installation option can be used to create a test cluster on VMWare ESXi hypervisors.
-
-Virtual machines hosted under ESXi need two CPU options enabled.
-
-```
-Hardware virtualization:
-    Expose hardware assisted virtualization to the guest OS
-
-Performance counters:
-    Enable virtualized CPU performance counters
-```
 
 ### Other caveats
 
@@ -266,46 +255,17 @@ The installer will also enforce the following sanity checks:
 * That KVM will operate on your machines. This is generally fine unless you're using virtual machines at which point nested virtualization needs to be enabled.
 * That your network interface MTU is greater than 2,000 bytes. This is required because the VXLAN mesh our virtual networks use add overhead to packets and a standard MTU of 1500 bytes for the physical network will result in packets being fragmented too frequently on the virtual networks. You can set a higher MTU if you desire, I generally select 9,000 bytes.
 
-### Deployment
-
-Each deployment takes slight different arguments. I tend to write a small shell script to wrap these up for
-convenience. Here's an example for a bare metal deployment:
-
-```bash
-$ cat ~/sf-deploys/cbr-remote.sh
-#!/bin/bash
-
-export CLOUD=metal
-export ADMIN_PASSWORD="p4ssw0rd"
-export FLOATING_IP_BLOCK="192.168.20.0/24"
-export BOOTDELAY=0
-
-# Tests are not currently safe for clusters whose data you are fond of
-export SKIP_SF_TESTS=1
-
-./deployandtest.sh
-```
-
-I then execute that script from the deploy/ansible directory to do a deployment or upgrade. Note that running the
-CI suite will destroy the contents of your cloud so be sure to use SKIP_SF_TESTS if you're upgrading a cluster
-with real users.
-
 ### Deployment variables
 
-| Option | Terraform definition | Description |
-|--------|----------------------|-------------|
-| CLOUD | All | The terraform definition to use |
-| ADMIN_PASSWORD | All | The admin password for the cloud once installed |
-| DNS_SERVER | All | The DNS server to configure instances with via DHCP. Defaults to 8.8.8.8 |
-| HTTP_PROXY | All | A URL for a HTTP proxy to use for image downloads. For example http://localhost:3128 |
-| INCLUDE_TRACEBACKS | All | Whether to include tracebacks in server 500 errors. Never set this to true in production! |
-| FLOATING_IP_BLOCK | All | The IP range to use for the floating network |
-| BOOTDELAY | All | How long to wait for terraform deployed instances to boot before continuing with install, in minutes |
-| SKIP_SF_TEST | All | Set to 1 to skip running destructive testing of the cloud |
-| KSM_ENABLED | All | Set to 1 to enable KSM, 0 to disable |
-| DEPLOY_NAME | All | The name of the deployment to use as an external label for prometheus |
-| TOPOLOGY | metal | The topology of the metal cluster, as described above |
-| METAL_SSH_KEY_FILENAME | metal | The path to a ssh private key file to use for authentication. It is assumed that the public key is at ```${METAL_SSH_KEY_FILENAME}.pub```. |
-| METAL_SSH_USER | metal | The username to ssh as. |
-| SHAKENFIST_KEY | shakenfist | The authentication key for a user on the shakenfist cluster to deploy in |
-| SHAKENFIST_SSH_KEY | shakenfist | The _path_ to a SSH key to use for ansible |
+| Option | Description |
+|--------|-------------|
+| ADMIN_PASSWORD | The admin password for the cloud once installed |
+| DNS_SERVER | The DNS server to configure instances with via DHCP. Defaults to 8.8.8.8 |
+| HTTP_PROXY | A URL for a HTTP proxy to use for image downloads. For example http://localhost:3128 |
+| INCLUDE_TRACEBACKS | Whether to include tracebacks in server 500 errors. Never set this to true in production! |
+| FLOATING_IP_BLOCK | The IP range to use for the floating network |
+| KSM_ENABLED | Set to 1 to enable KSM, 0 to disable |
+| DEPLOY_NAME | The name of the deployment to use as an external label for prometheus |
+| TOPOLOGY | The topology of the cluster, as described above |
+| SSH_KEY_FILENAME | The path to a ssh private key file to use for authentication. It is assumed that the public key is at ```${SSH_KEY_FILENAME}.pub```. |
+| SSH_USER | The username to ssh as. |

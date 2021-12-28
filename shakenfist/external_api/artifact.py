@@ -1,6 +1,5 @@
 import flask
-from flask_jwt_extended import get_jwt_identity
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, get_jwt_identity
 import json
 import os
 import requests
@@ -17,7 +16,6 @@ from shakenfist.external_api import base as api_base
 from shakenfist.config import config
 from shakenfist import db
 from shakenfist import etcd
-from shakenfist import images
 from shakenfist import logutil
 from shakenfist.tasks import FetchImageTask
 from shakenfist.upload import Upload
@@ -46,7 +44,8 @@ class ArtifactEndpoint(api_base.Resource):
     @jwt_required
     @arg_is_artifact_uuid
     def get(self, artifact_uuid=None, artifact_from_db=None):
-        return artifact_from_db.external_view()
+        with etcd.ThreadLocalReadOnlyCache():
+            return artifact_from_db.external_view()
 
     @jwt_required
     @arg_is_artifact_uuid
@@ -63,6 +62,7 @@ class ArtifactEndpoint(api_base.Resource):
         the user does not do that.
         """
         # TODO(andy): Enforce namespace permissions when snapshots have namespaces
+        # TODO(mikal): this should all be refactored to be in the object
 
         if artifact_from_db.state.value == Artifact.STATE_DELETED:
             # Already deleted, nothing to do.
@@ -73,15 +73,16 @@ class ArtifactEndpoint(api_base.Resource):
         sole_ref_in_use = []
         for blob_index in artifact_from_db.get_all_indexes():
             b = Blob.from_db(blob_index['blob_uuid'])
-            blobs.append(b)
-            if b.ref_count == 1:
-                sole_ref_in_use += b.instances
+            if b:
+                blobs.append(b)
+                if b.ref_count == 1:
+                    sole_ref_in_use += b.instances
         if sole_ref_in_use:
             return api_base.error(
                 400, 'Cannot delete last reference to blob in use by instance (%s)' % (
                     ', '.join(sole_ref_in_use), ))
 
-        artifact_from_db.state = Artifact.STATE_DELETED
+        artifact_from_db.delete()
         for b in blobs:
             b.ref_count_dec()
 
@@ -90,15 +91,17 @@ class ArtifactsEndpoint(api_base.Resource):
     @jwt_required
     def get(self, node=None):
         retval = []
-        for a in Artifacts(filters=[baseobject.active_states_filter]):
-            if node:
-                idx = a.most_recent_index
-                if 'blob_uuid' in idx:
-                    b = Blob.from_db(idx['blob_uuid'])
-                    if b and node in b.locations:
-                        retval.append(a.external_view())
-            else:
-                retval.append(a.external_view())
+
+        with etcd.ThreadLocalReadOnlyCache():
+            for a in Artifacts(filters=[baseobject.active_states_filter]):
+                if node:
+                    idx = a.most_recent_index
+                    if 'blob_uuid' in idx:
+                        b = Blob.from_db(idx['blob_uuid'])
+                        if b and node in b.locations:
+                            retval.append(a.external_view())
+                else:
+                    retval.append(a.external_view())
 
         return retval
 
@@ -118,9 +121,7 @@ class ArtifactsEndpoint(api_base.Resource):
 
 class ArtifactUploadEndpoint(api_base.Resource):
     @jwt_required
-    def post(self, artifact_name=None, upload_uuid=None):
-        url = '%s%s/%s' % (UPLOAD_URL, get_jwt_identity(), artifact_name)
-        a = Artifact.from_url(Artifact.TYPE_IMAGE, url)
+    def post(self, artifact_name=None, upload_uuid=None, source_url=None):
         u = Upload.from_db(upload_uuid)
         if not u:
             return api_base.error(404, 'upload not found')
@@ -130,7 +131,7 @@ class ArtifactUploadEndpoint(api_base.Resource):
                                       flask.request.environ['PATH_INFO'])
             api_token = util_general.get_api_token(
                 'http://%s:%d' % (u.node, config.API_PORT),
-                namespace=get_jwt_identity())
+                namespace=get_jwt_identity()[0])
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'], url,
                 data=json.dumps(api_base.flask_get_post_body()),
@@ -144,10 +145,13 @@ class ArtifactUploadEndpoint(api_base.Resource):
             resp.status_code = r.status_code
             return resp
 
-        with a.get_lock(ttl=(12 * constants.LOCK_REFRESH_SECONDS),
-                        timeout=config.MAX_IMAGE_TRANSFER_SECONDS) as lock:
-            helper = images.ImageFetchHelper(None, url)
+        if not source_url:
+            source_url = ('%s%s/%s'
+                          % (UPLOAD_URL, get_jwt_identity()[0], artifact_name))
+        a = Artifact.from_url(Artifact.TYPE_IMAGE, source_url)
 
+        with a.get_lock(ttl=(12 * constants.LOCK_REFRESH_SECONDS),
+                        timeout=config.MAX_IMAGE_TRANSFER_SECONDS):
             blob_uuid = str(uuid.uuid4())
             blob_dir = os.path.join(config.STORAGE_PATH, 'blobs')
             blob_path = os.path.join(blob_dir, blob_uuid)
@@ -163,11 +167,15 @@ class ArtifactUploadEndpoint(api_base.Resource):
                 blob_uuid, st.st_size,
                 time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime()),
                 time.time())
+            b.state = Blob.STATE_CREATED
             b.ref_count_inc()
             b.observe()
-            helper.transcode_image(lock, b)
+            b.request_replication()
 
+            a.state = Artifact.STATE_CREATED
             a.add_event('upload', None, None, 'success')
+            a.add_index(b.uuid)
+            a.state = Artifact.STATE_CREATED
             return a.external_view()
 
 
@@ -190,6 +198,16 @@ class ArtifactVersionsEndpoint(api_base.Resource):
             retval.append(bout)
         return retval
 
+    @jwt_required
+    @arg_is_artifact_uuid
+    def post(self, artifact_uuid=None, artifact_from_db=None,
+             max_versions=config.ARTIFACT_MAX_VERSIONS_DEFAULT):
+        try:
+            mv = int(max_versions)
+        except ValueError:
+            return api_base.error(400, 'max version is not an integer')
+        artifact_from_db.max_versions = mv
+
 
 class ArtifactVersionEndpoint(api_base.Resource):
     @jwt_required
@@ -204,8 +222,6 @@ class ArtifactVersionEndpoint(api_base.Resource):
         for idx in indexes:
             if idx['index'] == ver_index:
                 artifact_from_db.del_index(idx['index'])
-                b = Blob.from_db(idx['blob_uuid'])
-                b.ref_count_dec()
                 if len(indexes) == 1:
                     artifact_from_db.state = Artifact.STATE_DELETED
                 return

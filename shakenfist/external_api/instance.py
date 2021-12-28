@@ -1,7 +1,7 @@
+from collections import defaultdict
 from functools import partial
 import flask
-from flask_jwt_extended import get_jwt_identity
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, get_jwt_identity
 import re
 import uuid
 
@@ -9,7 +9,6 @@ from shakenfist.artifact import (
     Artifact, BLOB_URL, LABEL_URL, SNAPSHOT_URL, UPLOAD_URL)
 from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
@@ -73,31 +72,54 @@ class InstanceEndpoint(api_base.Resource):
         instance_from_db.enqueue_delete_remote(node)
 
 
+def _artifact_safety_checks(a):
+    if not a:
+        return api_base.error(404, 'artifact not found')
+    if a.state.value != Artifact.STATE_CREATED:
+        return api_base.error(
+            404, 'artifact not ready (state=%s)' % a.state.value)
+    return
+
+
 class InstancesEndpoint(api_base.Resource):
     @jwt_required
     def get(self, all=False):
-        filters = [partial(baseobject.namespace_filter, get_jwt_identity())]
-        if not all:
-            filters.append(instance.active_states_filter)
+        with etcd.ThreadLocalReadOnlyCache():
+            filters = [partial(baseobject.namespace_filter,
+                               get_jwt_identity()[0])]
+            if not all:
+                filters.append(instance.active_states_filter)
 
-        retval = []
-        for i in instance.Instances(filters):
-            # This forces the instance through the external view rehydration
-            retval.append(i.external_view())
-        return retval
+            retval = []
+            for i in instance.Instances(filters):
+                # This forces the instance through the external view rehydration
+                retval.append(i.external_view())
+            return retval
 
     @jwt_required
     @api_base.requires_namespace_exist
     def post(self, name=None, cpus=None, memory=None, network=None, disk=None,
              ssh_key=None, user_data=None, placed_on=None, namespace=None,
-             video=None, uefi=False):
+             video=None, uefi=False, configdrive=None, metadata=None,
+             nvram_template=None, secure_boot=False):
         global SCHEDULER
 
+        instance_uuid = str(uuid.uuid4())
+
+        # There is a wart in the qemu machine type naming. 'pc' is shorthand for
+        # "the most recent version of pc-i440fx", whereas 'q35' is shorthand for
+        # "the most recent version of pc-q35" you have. We default to i440fx
+        # unless you specify secure boot. We could infer the machine type from
+        # the use of secure boot in the libvirt template later, but I want to be
+        # more explicit in case we want to add other machine types later (microvm
+        # for example).
+        machine_type = 'pc'
+
         if not namespace:
-            namespace = get_jwt_identity()
+            namespace = get_jwt_identity()[0]
 
         # If accessing a foreign namespace, we need to be an admin
-        if get_jwt_identity() not in [namespace, 'system']:
+        if get_jwt_identity()[0] not in [namespace, 'system']:
             return api_base.error(
                 401, 'only admins can create resources in a different namespace')
 
@@ -108,6 +130,13 @@ class InstancesEndpoint(api_base.Resource):
                       'That is, less than 63 characters and in the character set: '
                       'a-z, A-Z, 0-9, or hyphen (-).' % name))
 
+        # Secure boot requires UEFI
+        if secure_boot and not uefi:
+            return api_base.error(400, 'secure boot requires UEFI be enabled')
+
+        if secure_boot:
+            machine_type = 'q35'
+
         # If we are placed, make sure that node exists
         if placed_on:
             n = Node.from_db(placed_on)
@@ -115,6 +144,12 @@ class InstancesEndpoint(api_base.Resource):
                 return api_base.error(404, 'Specified node does not exist')
             if n.state.value != Node.STATE_CREATED:
                 return api_base.error(404, 'Specified node not ready')
+
+        # Make sure we've been given a valid configdrive option
+        if not configdrive:
+            configdrive = 'openstack-disk'
+        elif configdrive not in ['openstack-disk', 'none']:
+            return api_base.error(400, 'invalid config drive type: "%s"' % configdrive)
 
         # Sanity check and lookup blobs for disks where relevant
         if not disk:
@@ -127,44 +162,31 @@ class InstancesEndpoint(api_base.Resource):
 
             # Convert internal shorthand forms into specific blobs
             disk_base = d.get('base')
-            if not disk_base:
-                disk_base = ''
+            if util_general.noneish(disk_base):
+                d['disk_base'] = None
 
-            if disk_base.startswith('label:'):
+            elif disk_base.startswith('label:'):
                 label = disk_base[len('label:'):]
                 a = Artifact.from_url(
-                    Artifact.TYPE_LABEL, '%s%s/%s' % (LABEL_URL, get_jwt_identity(), label))
-                if not a:
-                    return api_base.error(404, 'label %s not found' % label)
-                if a.state.value != Artifact.STATE_CREATED:
-                    return api_base.error(404, 'label %s is not ready (state=%s)'
-                                          % (label, a.state.value))
-                blob_uuid = a.most_recent_index.get('blob_uuid')
+                    Artifact.TYPE_LABEL, '%s%s/%s' % (LABEL_URL, get_jwt_identity()[0], label))
+                err = _artifact_safety_checks(a)
+                if err:
+                    return err
+
+                blob_uuid = a.resolve_to_blob()
                 if not blob_uuid:
-                    return api_base.error(404, 'label %s not found (no versions)' % label)
-                b = Blob.from_db(blob_uuid)
-                if not b:
-                    return api_base.error(404, 'artifact references non-existent blob (%s)' % blob_uuid)
-                if b.state == Blob.STATE_DELETED:
-                    return api_base.error(404, 'artifact references deleted blob (%s)' % blob_uuid)
+                    return api_base.error(404, 'Could not resolve label %s to a blob' % label)
                 d['blob_uuid'] = blob_uuid
 
             elif disk_base.startswith(SNAPSHOT_URL):
                 a = Artifact.from_db(disk_base[len(SNAPSHOT_URL):])
-                if not a:
-                    return api_base.error(
-                        404, 'snapshot %s not found' % disk_base[len(SNAPSHOT_URL):])
-                if a.state.value != Artifact.STATE_CREATED:
-                    return api_base.error(404, 'label %s is not ready (state=%s)'
-                                          % (label, a.state.value))
-                blob_uuid = a.most_recent_index.get('blob_uuid')
+                err = _artifact_safety_checks(a)
+                if err:
+                    return err
+
+                blob_uuid = a.resolve_to_blob()
                 if not blob_uuid:
-                    return api_base.error(404, 'snapshot not found (no versions)')
-                b = Blob.from_db(blob_uuid)
-                if not b:
-                    return api_base.error(404, 'artifact references non-existent blob (%s)' % blob_uuid)
-                if b.state == Blob.STATE_DELETED:
-                    return api_base.error(404, 'artifact references deleted blob (%s)' % blob_uuid)
+                    return api_base.error(404, 'Could not resolve snapshot to a blob')
                 d['blob_uuid'] = blob_uuid
 
             elif disk_base.startswith(UPLOAD_URL) or disk_base.startswith(LABEL_URL):
@@ -172,20 +194,13 @@ class InstancesEndpoint(api_base.Resource):
                     a = Artifact.from_url(Artifact.TYPE_IMAGE, disk_base)
                 else:
                     a = Artifact.from_url(Artifact.TYPE_LABEL, disk_base)
-                if not a:
-                    return api_base.error(404, 'artifact %s not found' % disk_base)
-                if a.state.value != Artifact.STATE_CREATED:
-                    return api_base.error(404, 'label %s is not ready (state=%s)'
-                                          % (label, a.state.value))
+                err = _artifact_safety_checks(a)
+                if err:
+                    return err
 
-                blob_uuid = a.most_recent_index.get('blob_uuid')
+                blob_uuid = a.resolve_to_blob()
                 if not blob_uuid:
-                    return api_base.error(404, 'artifact not found (no versions)')
-                b = Blob.from_db(blob_uuid)
-                if not b:
-                    return api_base.error(404, 'artifact references non-existent blob (%s)' % blob_uuid)
-                if b.state == Blob.STATE_DELETED:
-                    return api_base.error(404, 'artifact references deleted blob (%s)' % blob_uuid)
+                    return api_base.error(404, 'Could not resolve artifact to a blob')
                 d['blob_uuid'] = blob_uuid
 
             elif disk_base.startswith(BLOB_URL):
@@ -200,6 +215,45 @@ class InstancesEndpoint(api_base.Resource):
             transformed_disk.append(d)
 
         disk = transformed_disk
+
+        # Perform a similar translation for NVRAM templates, turning them into
+        # blob UUIDs.
+        if nvram_template:
+            original_template = nvram_template
+            if nvram_template.startswith('label:'):
+                label = nvram_template[len('label:'):]
+                url = '%s%s/%s' % (LABEL_URL, get_jwt_identity()[0], label)
+                a = Artifact.from_url(Artifact.TYPE_LABEL, url)
+                err = _artifact_safety_checks(a)
+                if err:
+                    return err
+
+                blob_uuid = a.resolve_to_blob()
+                if not blob_uuid:
+                    return api_base.error(404, 'Could not resolve label %s to a blob' % label)
+                LOG.with_field('instance', instance_uuid).with_fields({
+                    'original_template': original_template,
+                    'label': label,
+                    'source_url': url,
+                    'artifact': a.uuid,
+                    'blob': blob_uuid
+                }).info('NVRAM template label resolved')
+                nvram_template = blob_uuid
+
+            elif nvram_template.startswith(BLOB_URL):
+                nvram_template = nvram_template[len(BLOB_URL):]
+                LOG.with_field('instance', instance_uuid).with_fields({
+                    'original_template': original_template,
+                    'blob': nvram_template
+                }).info('NVRAM template URL converted')
+                nvram_template = blob_uuid
+
+        # Make sure that we are on a compatible machine type if we specify any
+        # IDE attachments.
+        if machine_type == 'q35':
+            for d in disk:
+                if d.get('bus') == 'ide':
+                    return api_base.error(400, 'secure boot machine type does not support IDE')
 
         if network:
             for netdesc in network:
@@ -238,6 +292,7 @@ class InstancesEndpoint(api_base.Resource):
 
         # Create instance object
         inst = instance.Instance.new(
+            instance_uuid=instance_uuid,
             name=name,
             disk_spec=disk,
             memory=memory,
@@ -247,11 +302,27 @@ class InstancesEndpoint(api_base.Resource):
             namespace=namespace,
             video=video,
             uefi=uefi,
-            requested_placement=placed_on
+            configdrive=configdrive,
+            requested_placement=placed_on,
+            nvram_template=nvram_template,
+            secure_boot=secure_boot,
+            machine_type=machine_type
         )
 
         # Initialise metadata
-        db.persist_metadata('instance', inst.uuid, {})
+        if metadata:
+            if not isinstance(metadata, dict):
+                return api_base.error(400, 'metadata must be a dictionary')
+
+            for k, v in metadata.items():
+                err = _validate_instance_metadata(k, v)
+                if err:
+                    return api_base.error(400, err)
+
+            db.persist_metadata('instance', inst.uuid, metadata)
+
+        else:
+            db.persist_metadata('instance', inst.uuid, {})
 
         # Allocate IP addresses
         order = 0
@@ -353,10 +424,11 @@ class InstancesEndpoint(api_base.Resource):
         # Create a queue entry for the instance start
         tasks = [PreflightInstanceTask(inst.uuid, network)]
         for disk in inst.disk_spec:
+            disk_base = disk.get('base')
             if disk.get('blob_uuid'):
                 tasks.append(FetchImageTask(
                     '%s%s' % (BLOB_URL, disk['blob_uuid']), inst.uuid))
-            elif disk.get('base'):
+            elif not util_general.noneish(disk_base):
                 tasks.append(FetchImageTask(disk['base'], inst.uuid))
         tasks.append(StartInstanceTask(inst.uuid, network))
         tasks.extend(float_tasks)
@@ -373,7 +445,7 @@ class InstancesEndpoint(api_base.Resource):
         if confirm is not True:
             return api_base.error(400, 'parameter confirm is not set true')
 
-        if get_jwt_identity() == 'system':
+        if get_jwt_identity()[0] == 'system':
             if not isinstance(namespace, str):
                 # A client using a system key must specify the namespace. This
                 # ensures that deleting all instances in the cluster (by
@@ -381,12 +453,12 @@ class InstancesEndpoint(api_base.Resource):
                 return api_base.error(400, 'system user must specify parameter namespace')
 
         else:
-            if namespace and namespace != get_jwt_identity():
+            if namespace and namespace != get_jwt_identity()[0]:
                 return api_base.error(401, 'you cannot delete other namespaces')
-            namespace = get_jwt_identity()
+            namespace = get_jwt_identity()[0]
 
         waiting_for = []
-        tasks_by_node = {}
+        tasks_by_node = defaultdict(list)
         for inst in instance.Instances([partial(baseobject.namespace_filter, namespace),
                                         instance.active_states_filter]):
             # If this instance is not on a node, just do the DB cleanup locally
@@ -396,7 +468,6 @@ class InstancesEndpoint(api_base.Resource):
             else:
                 node = dbplacement['node']
 
-            tasks_by_node.setdefault(node, [])
             tasks_by_node[node].append(DeleteInstanceTask(inst.uuid))
             waiting_for.append(inst.uuid)
 
@@ -529,11 +600,45 @@ class InstanceMetadatasEndpoint(api_base.Resource):
         return api_util.metadata_putpost('instance', instance_uuid, key, value)
 
 
+def _validate_instance_metadata(key, value):
+    # Reserved key "tags" should be validated to avoid unexpected failures
+    if key == instance.Instance.METADATA_KEY_TAGS:
+        if not isinstance(value, list):
+            return api_base.error(400, 'value for "tags" key should a list')
+
+    # Reserved key "affinity" should be validated to avoid unexpected
+    # failures during instance creation.
+    elif key == instance.Instance.METADATA_KEY_AFFINITY:
+        if not isinstance(value, dict):
+            return api_base.error(
+                400,
+                'value for "affinity" key should a valid JSON dictionary')
+
+        for key_type, dv in value.items():
+            if key_type not in ('cpu', 'disk', 'instance'):
+                return api_base.error(
+                    400, 'can only set affinity for cpu, disk or instance')
+
+            if not isinstance(dv, dict):
+                return api_base.error(
+                    400,
+                    'value for affinity key should a dictionary')
+            for v in dv.values():
+                try:
+                    int(v)
+                except ValueError:
+                    return api_base.error(
+                        400, 'affinity dictionary values should be integers')
+
+
 class InstanceMetadataEndpoint(api_base.Resource):
     @jwt_required
     @api_base.arg_is_instance_uuid
     @api_base.requires_instance_ownership
     def put(self, instance_uuid=None, key=None, value=None, instance_from_db=None):
+        err = _validate_instance_metadata(key, value)
+        if err:
+            return err
         return api_util.metadata_putpost('instance', instance_uuid, key, value)
 
     @jwt_required
@@ -560,7 +665,7 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
         parsed_length = None
 
         if not length:
-            parsed_length = -1
+            parsed_length = 10240
         else:
             try:
                 parsed_length = int(length)
@@ -577,3 +682,10 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
             mimetype='text/plain')
         resp.status_code = 200
         return resp
+
+    @jwt_required
+    @api_base.arg_is_instance_uuid
+    @api_base.requires_instance_ownership
+    @api_base.redirect_instance_request
+    def delete(self, instance_uuid=None, instance_from_db=None):
+        instance_from_db.delete_console_data()

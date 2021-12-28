@@ -165,16 +165,26 @@ class AuthTestCase(base.ShakenFistTestCase):
             },
             resp.get_json())
 
-    @mock.patch('shakenfist.external_api.auth.AuthEndpoint._get_keys',
-                return_value=(None, [_encode_key('cheese')]))
+    @mock.patch('shakenfist.db.get_namespace',
+                return_value={
+                    'service_key': None,
+                    'keys': {
+                        'key1': str(base64.b64encode(_encode_key('bacon')), 'utf-8')
+                    }
+                })
     def test_post_auth(self, mock_get_keys):
         resp = self.client.post(
-            '/auth', data=json.dumps({'namespace': 'banana', 'key': 'cheese'}))
+            '/auth', data=json.dumps({'namespace': 'banana', 'key': 'bacon'}))
         self.assertEqual(200, resp.status_code)
         self.assertIn('access_token', resp.get_json())
 
-    @mock.patch('shakenfist.external_api.auth.AuthEndpoint._get_keys',
-                return_value=('cheese', [_encode_key('bacon')]))
+    @mock.patch('shakenfist.db.get_namespace',
+                return_value={
+                    'service_key': 'cheese',
+                    'keys': {
+                        'key1': str(base64.b64encode(_encode_key('bacon')), 'utf-8')
+                    }
+                })
     def test_post_auth_not_authorized(self, mock_get_keys):
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'banana', 'key': 'hamster'}))
@@ -298,8 +308,13 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         self.client = external_api.app.test_client()
 
         # Make a fake auth token
-        with mock.patch('shakenfist.external_api.auth.AuthEndpoint._get_keys',
-                        return_value=('foo', ['bar'])):
+        with mock.patch('shakenfist.db.get_namespace',
+                        return_value={
+                            'service_key': 'foo',
+                            'keys': {
+                                'key1': str(base64.b64encode(_encode_key('bar')))
+                            }
+                        }):
             resp = self.client.post(
                 '/auth', data=json.dumps({'namespace': 'system', 'key': 'foo'}))
             self.assertEqual(200, resp.status_code)
@@ -533,6 +548,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
                 return_value={
                     'cpus': 1,
                     'disk_spec': [{}],
+                    'machine_type': 'pc',
                     'memory': 2048,
                     'name': 'barry',
                     'namespace': 'namespace',
@@ -540,9 +556,12 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
                     'ssh_key': 'sshkey',
                     'user_data': 'userdata',
                     'uuid': 'uuid42',
-                    'version': 3,
+                    'version': 6,
                     'video': {'memory': 16384, 'model': 'cirrus'},
-                    'uefi': False
+                    'uefi': False,
+                    'configdrive': 'openstack-disk',
+                    'nvram_template': None,
+                    'secure_boot': False
                 })
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 return_value={})
@@ -556,6 +575,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
             'disk_spec': [{}],
             'error_message': None,
             'interfaces': [],
+            'machine_type': 'pc',
             'memory': 2048,
             'name': 'barry',
             'namespace': 'namespace',
@@ -564,11 +584,14 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
             'ssh_key': 'sshkey',
             'state': None,
             'uefi': False,
+            'configdrive': 'openstack-disk',
             'user_data': 'userdata',
             'uuid': 'uuid42',
             'vdi_port': None,
-            'version': 3,
-            'video': {'memory': 16384, 'model': 'cirrus'}
+            'version': 6,
+            'video': {'memory': 16384, 'model': 'cirrus'},
+            'nvram_template': None,
+            'secure_boot': False
         }, resp.get_json())
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
@@ -903,8 +926,13 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
     def test_post_instance_only_system_specifies_namespaces(
             self, mock_ipmanager, mock_lock, mock_net, mock_net_attribute,
             mock_get_artifact):
-        with mock.patch('shakenfist.external_api.auth.AuthEndpoint._get_keys',
-                        return_value=('foo', ['bar'])):
+        with mock.patch('shakenfist.db.get_namespace',
+                        return_value={
+                            'service_key': 'foo',
+                            'keys': {
+                                'key1': str(base64.b64encode(_encode_key('bar')))
+                            }
+                        }):
             resp = self.client.post(
                 '/auth', data=json.dumps({'namespace': 'banana', 'key': 'foo'}))
             self.assertEqual(200, resp.status_code)
@@ -978,8 +1006,13 @@ class ExternalApiNetworkTestCase(base.ShakenFistTestCase):
         self.client = external_api.app.test_client()
 
         # Make a fake auth token
-        with mock.patch('shakenfist.external_api.auth.AuthEndpoint._get_keys',
-                        return_value=('foo', ['bar'])):
+        with mock.patch('shakenfist.db.get_namespace',
+                        return_value={
+                            'service_key': 'foo',
+                            'keys': {
+                                'key1': str(base64.b64encode(_encode_key('bar')))
+                            }
+                        }):
             resp = self.client.post(
                 '/auth', data=json.dumps({'namespace': 'system', 'key': 'foo'}))
             self.assertEqual(200, resp.status_code)
@@ -1109,23 +1142,34 @@ class ExternalApiNoNamespaceMockTestCase(base.ShakenFistTestCase):
         self.client = external_api.app.test_client()
 
         # Make a fake auth token
-        with mock.patch('shakenfist.external_api.auth.AuthEndpoint._get_keys',
-                        return_value=('foo', ['bar'])):
-            with mock.patch('shakenfist.db.get_namespace'):
-                resp = self.client.post(
-                    '/auth', data=json.dumps({'namespace': 'system', 'key': 'foo'}))
-                self.assertEqual(200, resp.status_code)
-                self.auth_header = 'Bearer %s' % resp.get_json()[
-                    'access_token']
+        with mock.patch('shakenfist.db.get_namespace',
+                        return_value={
+                            'service_key': 'foo',
+                            'keys': {
+                                'key1': str(base64.b64encode(_encode_key('bar')))
+                            }
+                        }):
+            resp = self.client.post(
+                '/auth', data=json.dumps({'namespace': 'system', 'key': 'foo'}))
+            self.assertEqual(200, resp.status_code)
+            self.auth_header = 'Bearer %s' % resp.get_json()[
+                'access_token']
 
     @mock.patch('shakenfist.db.get_lock')
-    @mock.patch('shakenfist.etcd.get', return_value={'keys': {'mykey': 'foo'}})
+    @mock.patch('shakenfist.db.get_namespace',
+                return_value={
+                    'service_key': 'foo',
+                    'keys': {
+                        'mykey': str(base64.b64encode(_encode_key('bar')))
+                    }
+                })
     @mock.patch('shakenfist.etcd.put')
     def test_delete_namespace_key(self, mock_put, mock_get, mock_lock):
         resp = self.client.delete('/auth/namespaces/system/keys/mykey',
                                   headers={'Authorization': self.auth_header})
         self.assertEqual(200, resp.status_code)
-        mock_put.assert_called_with('namespace', None, 'system', {'keys': {}})
+        mock_put.assert_called_with('namespace', None, 'system',
+                                    {'service_key': 'foo', 'keys': {}})
 
     @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.etcd.get', return_value=None)

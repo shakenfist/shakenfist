@@ -23,7 +23,8 @@ from shakenfist.tasks import (QueueTask,
                               DestroyNetworkTask,
                               DeleteNetworkWhenClean,
                               FloatNetworkInterfaceTask,
-                              SnapshotTask)
+                              SnapshotTask,
+                              FetchBlobTask)
 from shakenfist import net
 from shakenfist import networkinterface
 from shakenfist import scheduler
@@ -117,7 +118,7 @@ def handle(jobname, workitem):
                     etcd.enqueue('%s-metrics' % config.NODE_NAME, {})
                 except Exception as e:
                     util_general.ignore_exception(
-                        daemon.process_name('queues'), e)
+                        'instance %s delete task' % inst, e)
 
             elif isinstance(task, FloatNetworkInterfaceTask):
                 # Just punt it to the network node now that the interface is ready
@@ -161,6 +162,28 @@ def handle(jobname, workitem):
                 n = net.Network.from_db(task.network_uuid())
                 n.delete_on_hypervisor()
 
+            elif isinstance(task, FetchBlobTask):
+                metrics = db.get_metrics(config.NODE_NAME)
+                b = blob.Blob.from_db(task.blob_uuid())
+                if not b:
+                    log.with_fields({
+                        'blob': task.blob_uuid()
+                    }).info('Cannot replicate blob, not found')
+
+                elif (int(metrics.get('disk_free_blobs', 0)) - int(b.size) <
+                      config.MINIMUM_FREE_DISK):
+                    log.with_fields({
+                        'blob': task.blob_uuid()
+                    }).info('Cannot replicate blob, insufficient space')
+
+                else:
+                    log.with_object(b).info('Replicating blob')
+                    size = b.ensure_local([])
+                    log.with_object(b).with_fields({
+                        'transferred': size,
+                        'expected': b.size
+                    }).info('Replicating blob complete')
+
             else:
                 log_i.with_field('task', task).error(
                     'Unhandled task - dropped')
@@ -190,7 +213,7 @@ def handle(jobname, workitem):
 
     except Exception as e:
         # Logging ignored exception - this should be investigated
-        util_general.ignore_exception(daemon.process_name('queues'), e)
+        util_general.ignore_exception('queue worker', e)
         if inst:
             inst.enqueue_delete_due_error('Failed queue task: %s' % e)
 
@@ -359,7 +382,7 @@ def instance_delete(inst):
             if not i.uuid == inst.uuid:
                 for iface_uuid in inst.interfaces:
                     ni = networkinterface.NetworkInterface.from_db(iface_uuid)
-                    if ni.network_uuid not in host_networks:
+                    if ni and ni.network_uuid not in host_networks:
                         host_networks.append(ni.network_uuid)
 
         inst.delete()
@@ -383,9 +406,14 @@ def instance_delete(inst):
 
 def snapshot(inst, disk, artifact_uuid, blob_uuid):
     b = blob.snapshot_disk(disk, blob_uuid)
-    b.ref_count_inc()
     a = Artifact.from_db(artifact_uuid)
-    a.state = dbo.STATE_CREATED
+
+    if b.state.value == blob.Blob.STATE_DELETED:
+        # The blob was deleted while it was being created
+        a.state = Artifact.STATE_ERROR
+    else:
+        b.ref_count_inc()
+        a.state = Artifact.STATE_CREATED
 
 
 class Monitor(daemon.WorkerPoolDaemon):
@@ -395,8 +423,16 @@ class Monitor(daemon.WorkerPoolDaemon):
         while True:
             try:
                 self.reap_workers()
-                if not self.dequeue_work_item(config.NODE_NAME, handle):
+
+                if self.running:
+                    if not self.dequeue_work_item(config.NODE_NAME, handle):
+                        time.sleep(0.2)
+                elif len(self.workers) > 0:
+                    LOG.info('Waiting for %d workers to finish'
+                             % len(self.workers))
                     time.sleep(0.2)
+                else:
+                    return
 
             except Exception as e:
-                util_general.ignore_exception(daemon.process_name('queues'), e)
+                util_general.ignore_exception('queue worker', e)

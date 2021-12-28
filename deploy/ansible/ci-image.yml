@@ -73,6 +73,35 @@
         group: root
         mode: u=r,g=r,o=r
 
+    # Setup ansible PPA so we get never versions for Ubuntu to work around
+    # https://github.com/ansible/ansible/issues/69401
+    - name: Setup Ansible PPA
+      copy:
+        content: |
+          deb http://ppa.launchpad.net/ansible/ansible/ubuntu focal main
+        dest: /etc/apt/sources.list.d/ansible.list
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
+      when: ansible_distribution == 'Ubuntu'
+
+    # As recommended on the ansible apt module documentation...
+    - name: Install packages only when the apt process is not locked
+      apt:
+        name: gnupg
+        state: present
+      register: apt_action
+      retries: 100
+      until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
+
+    # Add GPG key for Ansible PPA
+    - name: Force an apt-get update with Ansible PPA
+      shell: |
+        apt-get update
+        apt-get install gnupg
+        apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367
+      when: ansible_distribution == 'Ubuntu'
+
     # I am unsure why I need to manually force this, but I do need to.
     - name: Force an apt-get update
       shell: apt-get update
@@ -87,18 +116,138 @@
     - name: Install dependencies
       apt:
         name:
-          [
-            git,
-            python3-dev,
-            python3-grpcio,
-            python3-pip,
-            python3-venv,
-            python3-wheel,
-            python3,
-            pwgen,
-            tox,
-          ]
+          - ansible
+          - apache2
+          - git
+          - prometheus
+          - pwgen
+          - python3
+          - python3-dev
+          - python3-grpcio
+          - python3-pip
+          - python3-venv
+          - python3-wheel
+          - tox
         state: latest
+
+    - name: Install non-hypervisor dependencies
+      apt:
+        name:
+          - arping
+          - bridge-utils
+          - cpu-checker
+          - dnsmasq
+          - dnsutils
+          - hddtemp
+          - libmagic-dev
+          - libssl-dev
+          - libssl-dev
+          - libvirt-daemon-system
+          - libvirt-dev
+          - lm-sensors
+          - net-tools
+          - ovmf
+          - prometheus-node-exporter
+          - python3-libvirt
+          - python3-venv
+          - qemu-kvm
+          - unzip
+        state: latest
+
+    - name: Install Grafana prerequisites
+      apt:
+        name: ["apt-transport-https", "software-properties-common"]
+        update_cache: yes
+        state: latest
+
+    - name: Add Grafana GPG key
+      apt_key: url=https://packages.grafana.com/gpg.key
+
+    - name: Add Grafana APT repository
+      apt_repository:
+        repo: deb [arch=amd64] http://packages.grafana.com/oss/deb stable main
+
+    - name: Install Grafana
+      apt:
+        name: ["grafana"]
+        update_cache: yes
+
+    - name: Copy ansible config
+      copy:
+        src: /etc/ansible/ansible.cfg
+        dest: /etc/ansible/ansible.cfg
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
+
+    - name: Copy SF installer ansible requirements
+      copy:
+        src: ../../requirements.yml
+        dest: /tmp/ansible-requirements.yml
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
+
+    - name: Install ansible galaxy roles
+      shell: ansible-galaxy install -r /tmp/ansible-requirements.yml
+
+    - name: Copy SF requirements.txt
+      copy:
+        src: ../../../requirements.txt
+        dest: /tmp/sf-requirements.txt
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
+
+    - name: Copy SF client requirements.txt
+      copy:
+        src: ../../../../client-python/requirements.txt
+        dest: /tmp/client-requirements.txt
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
+
+    - name: Make venv and install server wheel
+      shell: |
+        python3 -m venv --system-site-packages /srv/shakenfist/venv
+        /srv/shakenfist/venv/bin/pip install -U pip
+        /srv/shakenfist/venv/bin/pip install -U -r /tmp/sf-requirements.txt
+        /srv/shakenfist/venv/bin/pip install -U -r /tmp/client-requirements.txt
+
+    - name: Make a directory for cached images
+      file:
+        path: /srv/ci
+        state: directory
+        mode: "0755"
+
+    - name: Cache most images used during CI to reduce network traffic
+      get_url:
+        url: "{{item.url}}"
+        dest: "/srv/ci/{{item.name}}"
+        mode: u+r
+      loop:
+        - {
+            url: "https://cloud-images.ubuntu.com/releases/bionic/release/ubuntu-18.04-server-cloudimg-amd64.img",
+            name: "ubuntu:18.04",
+          }
+        - {
+            url: "https://cloud-images.ubuntu.com/releases/focal/release/ubuntu-20.04-server-cloudimg-amd64.img",
+            name: "ubuntu:20.04",
+          }
+        - {
+            url: "https://download.cirros-cloud.net/0.5.2/cirros-0.5.2-x86_64-disk.img",
+            name: "cirros",
+          }
+
+    - name: Try and avoid the disk being corrupt when snapshot
+      shell: |
+        sleep 5
+        sync
+        sleep 1
+        sync
+        sleep 1
+        sync
+        sleep 1
 
 - hosts: localhost
   gather_facts: no
@@ -186,6 +335,11 @@
     - name: Add the snapshot to the label
       shell: |
         sf-client label update "{{label}}" "{{hostvars['localhost']['snapshot_uuid']}}"
+
+    - name: Delete the snapshot (its a label now if it passed)
+      sf_snapshot:
+        uuid: "{{cisnapshot['meta']['vda']['artifact_uuid']}}"
+        state: absent
 
     - name: Delete test instance
       sf_instance:

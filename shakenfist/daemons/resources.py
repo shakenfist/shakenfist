@@ -75,13 +75,39 @@ def _get_stats():
             ksm_details['memory_ksm_%s' % ent] = int(f.read().rstrip())
     retval.update(ksm_details)
 
-    # Disk info
-    s = os.statvfs(config.STORAGE_PATH)
+    # Disk info. There could be more than one filesystem here, so we track
+    # all of the paths we're fond of.
+    fsids = []
+    minimum = -1
+    total = 0
+    used = 0
+
+    for path in ['', 'blobs', 'image_cache', 'instances', 'uploads']:
+        # We need to make the paths we check if they don't exist, otherwise
+        # they wont be included in the metrics and things get confused.
+        fullpath = os.path.join(config.STORAGE_PATH, path)
+        os.makedirs(fullpath, exist_ok=True)
+        s = os.statvfs(fullpath)
+        free = s.f_frsize * s.f_bavail
+
+        if s.f_fsid not in fsids:
+            total += s.f_frsize * s.f_blocks
+            used += s.f_frsize * (s.f_blocks - s.f_bfree)
+            if minimum == -1 or free < minimum:
+                minimum = free
+
+        if path == '':
+            path = 'sfroot'
+        retval['disk_free_%s' % path] = free
+
+    retval.update({
+        'disk_total': total,
+        'disk_free': minimum,
+        'disk_used': used
+    })
+
     disk_counters = psutil.disk_io_counters()
     retval.update({
-        'disk_total': s.f_frsize * s.f_blocks,
-        'disk_free': s.f_frsize * s.f_bavail,
-        'disk_used': s.f_frsize * (s.f_blocks - s.f_bfree),
         'disk_read_bytes': disk_counters.read_bytes,
         'disk_write_bytes': disk_counters.write_bytes,
     })
@@ -153,9 +179,10 @@ class Monitor(daemon.Daemon):
 
     def run(self):
         LOG.info('Starting')
-        gauges = {'updated_at': Gauge('updated_at',
-                                      'The last time metrics were updated')
-                  }
+        gauges = {
+            'updated_at': Gauge('updated_at',
+                                'The last time metrics were updated')
+        }
 
         last_metrics = 0
 
@@ -171,7 +198,7 @@ class Monitor(daemon.Daemon):
             db.update_metrics_bulk(stats)
             gauges['updated_at'].set_to_current_time()
 
-        while True:
+        while self.running:
             try:
                 jobname, _ = etcd.dequeue('%s-metrics' % config.NODE_NAME)
                 if jobname:
