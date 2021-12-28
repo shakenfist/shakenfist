@@ -201,6 +201,10 @@ class Monitor(daemon.Daemon):
         # Replicate under replicated blobs, but only if we don't have heaps of
         # queued replications already
         for blob_uuid, excess in underreplicated:
+            LOG.with_fields({
+                'current': len(current_fetches),
+                'maximum': config.MAX_CONCURRENT_BLOB_TRANSFERS
+            }).info('Concurrent blob transfers')
             if len(current_fetches) > config.MAX_CONCURRENT_BLOB_TRANSFERS:
                 LOG.info(
                     'Too many concurrent blob transfers queued, not queueing more')
