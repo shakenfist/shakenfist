@@ -12,11 +12,7 @@ from shakenfist import blob
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
-from shakenfist import logutil
 from shakenfist.config import config
-
-
-LOG, _ = logutil.setup(__name__)
 
 
 BLOB_URL = 'sf://blob/'
@@ -158,7 +154,7 @@ class Artifact(dbo):
         # Insert blob information
         blobs = {}
         for blob_index in self.get_all_indexes():
-            blob_uuid = blob_index['blob_uuid']
+            blob_uuid = blob_index.get('blob_uuid')
             b = blob.Blob.from_db(blob_uuid)
             if b:
                 # Blobs might have a UUID listed but not yet be instantiated.
@@ -191,7 +187,9 @@ class Artifact(dbo):
                 'blob_uuid': blob_uuid
             }
             self._db_set_attribute('index_%012d' % index, entry)
-            self.log.with_fields(entry).info('Added index to artifact')
+            self.log.is_event().with_fields({
+                'index': index,
+                'blob': blob_uuid}).info('Added artifact version')
             self.delete_old_versions()
             return entry
 
@@ -201,8 +199,6 @@ class Artifact(dbo):
         max = self.max_versions
         if len(indexes) > max:
             for i in sorted(indexes)[:-max]:
-                self.log.with_field(
-                    'index', i).info('Deleting artifact version')
                 self.del_index(i)
 
     def del_index(self, index):
@@ -211,9 +207,14 @@ class Artifact(dbo):
             self.log.withField('index', index).warn('Cannot find index in DB')
             return
         self._db_delete_attribute('index_%012d' % index)
+
         b = blob.Blob.from_db(index_data['blob_uuid'])
         if b:
             b.ref_count_dec()
+
+        self.log.is_event().with_fields({
+            'index': index,
+            'blob': index_data['blob_uuid']}).info('Deleted artifact version')
 
     def delete(self):
         self.state = self.STATE_DELETED
