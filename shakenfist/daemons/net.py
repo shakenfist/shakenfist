@@ -168,9 +168,6 @@ class Monitor(daemon.WorkerPoolDaemon):
                 LOG.with_field('vxid', vxid).warning(
                     'Extra vxlan present!')
 
-        # And record vxids in the database
-        db.persist_node_vxid_mapping(config.NODE_NAME, vxid_to_mac)
-
     def _process_network_workitem(self, log_ctx, workitem):
         log_ctx = log_ctx.with_network(workitem.network_uuid())
         n = net.Network.from_db(workitem.network_uuid())
