@@ -56,28 +56,6 @@ def persist_ipmanager(network_uuid, data):
 def delete_ipmanager(network_uuid):
     etcd.delete('ipmanager', None, uuid)
 
-
-#####################################################################
-# Snapshots
-#####################################################################
-
-
-def create_snapshot(snapshot_uuid, device, instance_uuid, created):
-    etcd.put(
-        'snapshot', instance_uuid, created,
-        {
-            'uuid': snapshot_uuid,
-            'device': device,
-            'instance_uuid': instance_uuid,
-            'created': created
-        })
-
-
-def get_instance_snapshots(instance_uuid):
-    for _, m in etcd.get_all('snapshot', instance_uuid,
-                             sort_order='ascend'):
-        yield m
-
 #####################################################################
 # Events
 #####################################################################
