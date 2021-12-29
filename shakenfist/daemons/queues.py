@@ -163,7 +163,12 @@ def handle(jobname, workitem):
                 n.delete_on_hypervisor()
 
             elif isinstance(task, FetchBlobTask):
-                metrics = db.get_metrics(config.NODE_NAME)
+                metrics = etcd.get('metrics', config.NODE_NAME, None)
+                if metrics:
+                    metrics = metrics.get('metrics', {})
+                else:
+                    metrics = {}
+
                 b = blob.Blob.from_db(task.blob_uuid())
                 if not b:
                     log.with_fields({
