@@ -50,7 +50,7 @@ class ImageFetchHelper(object):
             dirty = False
 
             if most_recent.get('index', 0) == 0:
-                self.log.info('Cluster does not have a copy of image')
+                self.log.is_event().info('Cluster does not have a copy of image')
                 dirty = True
             else:
                 most_recent_blob = Blob.from_db(most_recent['blob_uuid'])
@@ -59,23 +59,25 @@ class ImageFetchHelper(object):
                 if not most_recent_blob.modified:
                     dirty = True
                 elif most_recent_blob.modified != resp.headers.get('Last-Modified'):
-                    self.__artifact.add_event(
-                        'image requires fetch', None, None,
-                        'Last-Modified: %s -> %s' % (most_recent_blob.modified,
-                                                     resp.headers.get('Last-Modified')))
+                    self.log.is_event().with_field(
+                        'Last-Modified',
+                        '%s -> %s' % (most_recent_blob.modified,
+                                      resp.headers.get('Last-Modified'))).info(
+                        'Image requires fetch')
                     dirty = True
 
                 if not most_recent_blob.size:
                     dirty = True
                 elif most_recent_blob.size != resp.headers.get('Content-Length'):
-                    self.__artifact.add_event(
-                        'image requires fetch', None, None,
-                        'Content-Length: %s -> %s' % (most_recent_blob.size,
-                                                      resp.headers.get('Content-Length')))
+                    self.log.is_event().with_field(
+                        'Content-Length',
+                        '%s -> %s' % (most_recent_blob.size,
+                                      resp.headers.get('Content-Length'))).info(
+                        'Image requires fetch')
                     dirty = True
 
             if dirty:
-                self.log.info('Cluster cached image is stale')
+                self.log.is_event().info('Cluster cached image is stale')
             else:
                 url = '%s%s' % (BLOB_URL, most_recent_blob.uuid)
                 self.log.info('Using cached image from cluster')
@@ -86,7 +88,7 @@ class ImageFetchHelper(object):
             self.log.info('Fetching image from within the cluster')
             b = self._blob_get(lock, url)
         else:
-            self.log.info('Fetching image from the internet')
+            self.log.is_event().info('Fetching image from the internet')
             b = self._http_get_inner(lock, url, checksum, checksum_type)
             # Ref count increased here since it is known here whether the blob
             # will be used from within the cluster or newly created.
@@ -180,7 +182,7 @@ class ImageFetchHelper(object):
         with util_general.RecordedOperation('fetch image', self.instance):
             resp = self._open_connection(url)
             blob_uuid = str(uuid.uuid4())
-            self.log.with_object(self.__artifact).with_fields({
+            self.log.is_event().with_object(self.__artifact).with_fields({
                 'blob': blob_uuid,
                 'url': url}).info('Commencing HTTP fetch to blob')
             b = blob.http_fetch(resp, blob_uuid, [lock], self.log)
