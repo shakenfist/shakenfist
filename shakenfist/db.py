@@ -173,15 +173,3 @@ def persist_metadata(object_type, name, metadata):
 
 def delete_metadata(object_type, name):
     etcd.delete('metadata', object_type, name)
-
-#####################################################################
-# vxid mappings
-#####################################################################
-
-
-def persist_node_vxid_mapping(node, vxid_to_mac):
-    etcd.put('vxid_mapping', None, node, vxid_to_mac)
-
-
-def get_node_vxid_mapping(node):
-    etcd.get('vxid_mapping', None, node)
