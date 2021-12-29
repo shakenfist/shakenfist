@@ -7,7 +7,6 @@ from prometheus_client import start_http_server
 
 from shakenfist.daemons import daemon
 from shakenfist.config import config
-from shakenfist import db
 from shakenfist import etcd
 from shakenfist import logutil
 from shakenfist.util import general as util_general
@@ -195,7 +194,14 @@ class Monitor(daemon.Daemon):
                     gauges[metric] = Gauge(metric, '')
                 gauges[metric].set(stats[metric])
 
-            db.update_metrics_bulk(stats)
+            etcd.put(
+                'metrics', config.NODE_NAME, None,
+                {
+                    'fqdn': config.NODE_NAME,
+                    'timestamp': time.time(),
+                    'metrics': stats
+                },
+                ttl=120)
             gauges['updated_at'].set_to_current_time()
 
         while self.running:

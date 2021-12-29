@@ -8,7 +8,7 @@ import uuid
 
 from shakenfist.config import config
 from shakenfist.constants import GiB
-from shakenfist import db
+from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import logutil
@@ -59,16 +59,19 @@ class Scheduler(object):
         metrics = {}
 
         for n in Nodes([node_active_states_filter]):
-            node_name = n.uuid
             try:
-                new_metrics = db.get_metrics(node_name)
-                self.log.with_object(n).debug(
-                    'Metrics for node: %s', new_metrics)
+                new_metrics = etcd.get('metrics', n.uuid, None)
                 if new_metrics:
-                    metrics[node_name] = new_metrics
+                    new_metrics = new_metrics.get('metrics', {})
                 else:
                     self.log.with_object(n).warning(
                         'Empty metrics from database for node')
+                    new_metrics = {}
+
+                self.log.with_object(n).debug(
+                    'Metrics for node: %s', new_metrics)
+                metrics[n.uuid] = new_metrics
+
             except exceptions.ReadException:
                 self.log.with_object(n).warning(
                     'Refreshing metrics for node failed')

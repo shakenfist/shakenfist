@@ -8,7 +8,6 @@ from shakenfist.baseobject import (
     DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist.config import config
 from shakenfist.constants import GiB
-from shakenfist import db
 from shakenfist import etcd
 from shakenfist import logutil
 from shakenfist.util import general as util_general
@@ -149,7 +148,12 @@ def nodes_by_free_disk_descending(minimum=0, maximum=-1, intention=None):
         intention = '_%s' % intention
 
     for n in Nodes([active_states_filter]):
-        metrics = db.get_metrics(n.fqdn)
+        metrics = etcd.get('metrics', n.fqdn, None)
+        if metrics:
+            metrics = metrics.get('metrics', {})
+        else:
+            metrics = {}
+
         disk_free_gb = int(
             int(metrics.get('disk_free%s' % intention, '0')) / GiB)
 

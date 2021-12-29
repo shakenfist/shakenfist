@@ -114,28 +114,6 @@ def get_events(object_type, object_uuid):
                              sort_order='ascend'):
         yield m
 
-#####################################################################
-# Metrics
-#####################################################################
-
-
-def update_metrics_bulk(metrics):
-    etcd.put(
-        'metrics', config.NODE_NAME, None,
-        {
-            'fqdn': config.NODE_NAME,
-            'timestamp': time.time(),
-            'metrics': metrics
-        },
-        ttl=120)
-
-
-def get_metrics(fqdn):
-    d = etcd.get('metrics', fqdn, None)
-    if not d:
-        return {}
-    return d.get('metrics', {})
-
 
 #####################################################################
 # Namespaces
