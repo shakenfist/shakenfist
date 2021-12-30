@@ -25,6 +25,12 @@
     groups: network_node, sf_promethus_exporters
   when: item.get('network_node', False)
 
+- name: Add {{item['name']}} as an eventlog node (if configured, should only be one)
+  add_host:
+    hostname: "{{item['name']}}"
+    groups: eventlog_node
+  when: item.get('eventlog_node', False)
+
 - name: Add {{item['name']}} as a primary node (if configured, should only be one)
   add_host:
     hostname: "{{item['name']}}"

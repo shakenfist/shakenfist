@@ -12,6 +12,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import etcd
+from shakenfist import eventlog
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
 from shakenfist import net
@@ -81,8 +82,8 @@ class NetworkEndpoint(api_base.Resource):
         ifaces = list(networkinterface.interfaces_for_network(n))
         if len(ifaces) > 0:
             for iface in ifaces:
-                LOG.withFields({'network_interface': iface.uuid,
-                                'state': iface.state}).info('Blocks network delete')
+                LOG.with_fields({'network_interface': iface.uuid,
+                                 'state': iface.state}).info('Blocks network delete')
             return api_base.error(403, 'you cannot delete an in use network')
 
         # Check if network has already been deleted
@@ -195,8 +196,10 @@ class NetworkEventsEndpoint(api_base.Resource):
     @jwt_required
     @api_base.arg_is_network_uuid
     @api_base.requires_network_ownership
+    @api_base.redirect_to_eventlog_node
     def get(self, network_uuid=None, network_from_db=None):
-        return list(db.get_events('network', network_uuid))
+        with eventlog.EventLog('network', network_uuid) as eventdb:
+            return list(eventdb.read_events())
 
 
 class NetworkInterfacesEndpoint(api_base.Resource):

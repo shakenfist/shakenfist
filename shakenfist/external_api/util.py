@@ -37,7 +37,8 @@ def assign_floating_ip(ni):
         return api_base.error(404, 'floating network not found')
 
     # Address is allocated and added to the record here, so the job has it later.
-    db.add_event('interface', ni.uuid, 'api', 'float', None, None)
+    db.add_event('interface', ni.uuid, 'api', 'float', None,
+                 'Interface floated')
     with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Interface float'):
         ipm = IPManager.from_db('floating')
         addr = ipm.get_random_free_address(ni.unique_label())

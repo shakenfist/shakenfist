@@ -53,6 +53,10 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
             NODE_NAME="node01",
         )
 
+        self.add_event = mock.patch('shakenfist.db.add_event')
+        self.mock_add_event = self.add_event.start()
+        self.addCleanup(self.add_event.stop)
+
         self.config = mock.patch('shakenfist.instance.config',
                                  fake_config)
         self.mock_config = self.config.start()
@@ -96,14 +100,14 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             ('attribute/instance', 'uuid42', 'state',
              State(instance.Instance.STATE_INITIAL, 1234)),
-            mock_put.mock_calls[1][1])
+            mock_put.mock_calls[0][1])
         self.assertEqual(
             ('attribute/instance', 'uuid42', 'error', {'message': None}),
-            mock_put.mock_calls[3][1])
+            mock_put.mock_calls[1][1])
         self.assertEqual(
             ('attribute/instance', 'uuid42',
              'power_state', {'power_state': instance.Instance.STATE_INITIAL}),
-            mock_put.mock_calls[4][1])
+            mock_put.mock_calls[2][1])
 
         self.assertEqual(
             ('instance', None, 'uuid42',
@@ -185,6 +189,10 @@ class InstanceTestCase(base.ShakenFistTestCase):
         self.put = mock.patch('shakenfist.etcd.put')
         self.mock_put = self.put.start()
         self.addCleanup(self.put.stop)
+
+        self.add_event = mock.patch('shakenfist.db.add_event')
+        self.mock_add_event = self.add_event.start()
+        self.addCleanup(self.add_event.stop)
 
     @mock.patch('shakenfist.instance.Instance._db_create')
     @mock.patch('shakenfist.instance.Instance._db_get',

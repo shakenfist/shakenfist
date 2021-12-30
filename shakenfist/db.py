@@ -1,6 +1,5 @@
 # Copyright 2020 Michael Still
 
-import time
 import uuid
 
 from shakenfist.config import config
@@ -61,36 +60,19 @@ def delete_ipmanager(network_uuid):
 #####################################################################
 
 
+# TODO(mikal): this should all eventually route through the logging
+# infrastructure, not here.
 def add_event(object_type, object_uuid, operation, phase, duration, message):
     if config.ENABLE_EVENTS:
-        t = time.time()
-        LOG.with_fields(
-            {
-                object_type: object_uuid,
-                'fqdn': config.NODE_NAME,
-                'operation': operation,
-                'phase': phase,
-                'duration': duration,
-                'message': message
-            }).info('Added event')
-        etcd.put(
-            'event/%s' % object_type, object_uuid, t,
-            {
-                'timestamp': t,
-                'object_type': object_type,
-                'object_uuid': object_uuid,
-                'fqdn': config.NODE_NAME,
-                'operation': operation,
-                'phase': phase,
-                'duration': duration,
-                'message': message
-            })
+        if not message:
+            message = operation
 
-
-def get_events(object_type, object_uuid):
-    for _, m in etcd.get_all('event/%s' % object_type, object_uuid,
-                             sort_order='ascend'):
-        yield m
+        LOG.is_event().with_field(object_type, object_uuid).with_fields({
+            'fqdn': config.NODE_NAME,
+            'operation': operation,
+            'phase': phase,
+            'duration': duration,
+        }).info(message)
 
 
 #####################################################################

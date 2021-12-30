@@ -358,7 +358,8 @@ def instance_delete(inst):
         # in a transition state.
         if not inst.state.value.endswith('-error'):
             inst.state = dbo.STATE_DELETE_WAIT
-        db.add_event('instance', inst.uuid, 'queued', 'delete', None, None)
+        db.add_event('instance', inst.uuid, 'queued', 'delete', None,
+                     'Instance deleted')
 
         # Create list of networks used by instance. We cannot use the
         # interfaces cached in the instance here, because the instance

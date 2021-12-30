@@ -98,7 +98,16 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
 
     @staticmethod
     def _normalize(fields):
-        return {k.lower(): v for k, v in fields.items()} if isinstance(fields, dict) else {}
+        out = {}
+        if isinstance(fields, dict):
+            for k, v in fields.items():
+                # Some field names are reserved by the python logging implementation
+                # and cannot be used.
+                if k in ['name', 'level', 'fn', 'lno', 'msg', 'args', 'exc_info',
+                         'func', 'sinfo']:
+                    k = '_%s' % k
+                out[k.lower()] = v
+        return out
 
     def withPrefix(self, prefix=None):
         return self.with_prefix(prefix)
@@ -131,6 +140,9 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
     def with_prefix(self, prefix=None):
         return self if prefix is None else SFCustomAdapter(self._logger, self._extra, prefix)
 
+    def is_event(self):
+        return self.with_field('is_event', True)
+
     def process(self, msg, kwargs):
         msg = '%s[%s] %s' % (setproctitle.getproctitle(), os.getpid(), msg)
         kwargs["extra"] = self.extra
@@ -138,7 +150,18 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
         if config.LOG_METHOD_TRACE:
             self._extra['method'] = util_callstack.get_caller(-5)
 
+        # Emit events
+        # if self._extra.get('is_event', False):
+        #    self._emit_event(msg, self._extra)
+
+        # Emit log message
+        # msg = '%s[%s] %s' % (setproctitle.getproctitle(), os.getpid(),
+        #                     msg)
+        #kwargs['extra'] = self._extra
         return msg, kwargs
+
+    def _emit_event(self, msg, extra):
+        pass
 
     #
     # Convenience methods

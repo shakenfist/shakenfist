@@ -271,7 +271,8 @@ class Monitor(daemon.WorkerPoolDaemon):
         if isinstance(workitem, DefloatNetworkInterfaceTask):
             n.remove_floating_ip(ni.floating.get('floating_address'), ni.ipv4)
 
-            db.add_event('interface', ni.uuid, 'api', 'defloat', None, None)
+            db.add_event('interface', ni.uuid, 'api', 'defloat', None,
+                         'Interface defloated')
             with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Instance defloat'):
                 ipm = IPManager.from_db('floating')
                 ipm.release(ni.floating.get('floating_address'))

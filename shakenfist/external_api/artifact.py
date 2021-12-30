@@ -12,9 +12,9 @@ from shakenfist.blob import Blob
 from shakenfist import baseobject
 from shakenfist import constants
 from shakenfist.daemons import daemon
+from shakenfist import eventlog
 from shakenfist.external_api import base as api_base
 from shakenfist.config import config
-from shakenfist import db
 from shakenfist import etcd
 from shakenfist import logutil
 from shakenfist.tasks import FetchImageTask
@@ -180,10 +180,13 @@ class ArtifactUploadEndpoint(api_base.Resource):
 
 
 class ArtifactEventsEndpoint(api_base.Resource):
+    # TODO(andy): include artifact ownership
     @jwt_required
-    # TODO(andy): Should images be owned? Personalised images should be owned.
-    def get(self, artifact_uuid):
-        return list(db.get_events('artifact', artifact_uuid))
+    @arg_is_artifact_uuid
+    @api_base.redirect_to_eventlog_node
+    def get(self, artifact_uuid=None, artifact_from_db=None):
+        with eventlog.EventLog('artifact', artifact_uuid) as eventdb:
+            return list(eventdb.read_events())
 
 
 class ArtifactVersionsEndpoint(api_base.Resource):

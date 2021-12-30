@@ -65,7 +65,8 @@ class DatabaseBackedObject(object):
         etcd.create(cls.object_type, None, object_uuid, metadata)
 
         db.add_event(
-            cls.object_type, object_uuid, 'db record created', None, None, None)
+            cls.object_type, object_uuid, 'db record created', None, None,
+            'Object created')
 
     @classmethod
     def _db_get(cls, object_uuid):
