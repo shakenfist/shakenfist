@@ -59,14 +59,10 @@ class DatabaseBackedObject(object):
         # NOTE(mikal): the copy() here is important. The logging framework mucks
         # with the metadata dictionary it is passed in such a way that object
         # creation breaks. Only give it a copy!
-        LOG.with_fields(metadata.copy()).with_field(
+        LOG.is_event().with_fields(metadata.copy()).with_field(
             cls.object_type, object_uuid).debug('Object created')
         metadata['uuid'] = object_uuid
         etcd.create(cls.object_type, None, object_uuid, metadata)
-
-        db.add_event(
-            cls.object_type, object_uuid, 'db record created', None, None,
-            'Object created')
 
     @classmethod
     def _db_get(cls, object_uuid):
@@ -170,8 +166,9 @@ class DatabaseBackedObject(object):
 
             new_state = State(new_value, time.time())
             self._db_set_attribute('state', new_state)
-            self.add_event('state changed',
-                           '%s -> %s' % (orig.value, new_value))
+            self.log.is_event().with_fields({
+                'from': orig.value,
+                'to': new_value}).info('State changed')
             self.error = None
 
     @property
