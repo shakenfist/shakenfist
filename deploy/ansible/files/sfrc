@@ -1,5 +1,5 @@
 # Command line hinting
-eval "$(_SF_CLIENT_COMPLETE=source sf-client)"
+eval "$(_SF_CLIENT_COMPLETE=bash_source sf-client)"
 
 # Use the v3 etcd API
 export ETCDCTL_API=3
