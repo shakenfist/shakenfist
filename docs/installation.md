@@ -17,7 +17,7 @@ Each machine in the cluster should match this description:
 We now have a fancy helper to help you install your first localhost cluster, so let's give that a go:
 
 ```bash
-curl https://github.com/shakenfist/shakenfist/blob/develop/getsf
+curl https://raw.githubusercontent.com/shakenfist/shakenfist/develop/deploy/getsf -o getsf
 chmod ugo+rx getsf
 sudo ./getsf
 ```
