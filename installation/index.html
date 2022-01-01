@@ -821,7 +821,7 @@
 <li>Have a cloudadmin account setup with passwordless sudo, and a ssh key in its authorized_keys file. This is an ansible requirement, although the exact username is configurable in the SSH_USER variable.</li>
 </ul>
 <p>We now have a fancy helper to help you install your first localhost cluster, so let's give that a go:</p>
-<pre><code class="language-bash">curl https://github.com/shakenfist/shakenfist/blob/develop/getsf
+<pre><code class="language-bash">curl https://raw.githubusercontent.com/shakenfist/shakenfist/develop/deploy/getsf -o getsf
 chmod ugo+rx getsf
 sudo ./getsf
 </code></pre>
