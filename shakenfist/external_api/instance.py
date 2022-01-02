@@ -290,6 +290,15 @@ class InstancesEndpoint(api_base.Resource):
             if 'memory' not in video:
                 return api_base.error(400, 'video specification requires "memory"')
 
+        # Validate metadata before instance creation
+        if metadata:
+            if not isinstance(metadata, dict):
+                return api_base.error(400, 'metadata must be a dictionary')
+            for k, v in metadata.items():
+                err = _validate_instance_metadata(k, v)
+                if err:
+                    return err
+
         # Create instance object
         inst = instance.Instance.new(
             instance_uuid=instance_uuid,
@@ -311,16 +320,7 @@ class InstancesEndpoint(api_base.Resource):
 
         # Initialise metadata
         if metadata:
-            if not isinstance(metadata, dict):
-                return api_base.error(400, 'metadata must be a dictionary')
-
-            for k, v in metadata.items():
-                err = _validate_instance_metadata(k, v)
-                if err:
-                    return api_base.error(400, err)
-
             db.persist_metadata('instance', inst.uuid, metadata)
-
         else:
             db.persist_metadata('instance', inst.uuid, {})
 
@@ -462,11 +462,11 @@ class InstancesEndpoint(api_base.Resource):
         for inst in instance.Instances([partial(baseobject.namespace_filter, namespace),
                                         instance.active_states_filter]):
             # If this instance is not on a node, just do the DB cleanup locally
-            dbplacement = inst.placement
-            if not dbplacement.get('node'):
+            db_placement = inst.placement
+            if not db_placement.get('node'):
                 node = config.NODE_NAME
             else:
-                node = dbplacement['node']
+                node = db_placement['node']
 
             tasks_by_node[node].append(DeleteInstanceTask(inst.uuid))
             waiting_for.append(inst.uuid)
@@ -597,6 +597,9 @@ class InstanceMetadatasEndpoint(api_base.Resource):
     @api_base.arg_is_instance_uuid
     @api_base.requires_instance_ownership
     def post(self, instance_uuid=None, key=None, value=None, instance_from_db=None):
+        err = _validate_instance_metadata(key, value)
+        if err:
+            return err
         return api_util.metadata_putpost('instance', instance_uuid, key, value)
 
 
@@ -611,8 +614,7 @@ def _validate_instance_metadata(key, value):
     elif key == instance.Instance.METADATA_KEY_AFFINITY:
         if not isinstance(value, dict):
             return api_base.error(
-                400,
-                'value for "affinity" key should a valid JSON dictionary')
+                400, 'value for "affinity" key should a valid JSON dictionary')
 
         for key_type, dv in value.items():
             if key_type not in ('cpu', 'disk', 'instance'):
@@ -621,8 +623,7 @@ def _validate_instance_metadata(key, value):
 
             if not isinstance(dv, dict):
                 return api_base.error(
-                    400,
-                    'value for affinity key should a dictionary')
+                    400, 'value for affinity key should a dictionary')
             for v in dv.values():
                 try:
                     int(v)
