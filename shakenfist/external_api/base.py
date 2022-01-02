@@ -181,23 +181,28 @@ def requires_instance_active(func):
     return wrapper
 
 
+def get_network_uuid(network_name):
+    if network_name and valid_uuid4(network_name):
+        # Already a valid UUID
+        return network_name
+
+    # Check if valid name of an active network
+    filters = [
+        partial(baseobject.namespace_filter, get_jwt_identity()[0]),
+        baseobject.active_states_filter,
+    ]
+    for n in net.Networks(filters):
+        # Duplicate name behaviour is "not defined" for the user therefore we
+        # just return the first network found.
+        if n.name == network_name:
+            return n.uuid
+
+
 def arg_is_network_uuid(func):
     # Method uses the network from the db
     def wrapper(*args, **kwargs):
         with ThreadLocalReadOnlyCache():
-            net_uuid = kwargs.get('network_uuid')
-            if net_uuid and not valid_uuid4(net_uuid):
-                # Check if uuid is a valid name of an network
-                filters = [
-                    partial(baseobject.namespace_filter, get_jwt_identity()[0]),
-                    baseobject.active_states_filter,
-                ]
-                for n in net.Networks(filters):
-                    # Duplicate name behaviour is "not defined" therefore we
-                    # just return the first network found.
-                    if n.name == net_uuid:
-                        net_uuid = n.uuid
-                        break
+            net_uuid = get_network_uuid(kwargs.get('network_uuid'))
             if net_uuid:
                 # Retrieve the actual network via it's UUID
                 kwargs['network_from_db'] = net.Network.from_db(net_uuid)

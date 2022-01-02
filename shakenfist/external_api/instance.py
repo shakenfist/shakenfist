@@ -120,8 +120,7 @@ class InstancesEndpoint(api_base.Resource):
 
         # If accessing a foreign namespace, we need to be an admin
         if get_jwt_identity()[0] not in [namespace, 'system']:
-            return api_base.error(
-                401, 'only admins can create resources in a different namespace')
+            return api_base.error(404, 'namespace not found')
 
         # Check that the instance name is safe for use as a DNS host name
         if name != re.sub(r'([^a-zA-Z0-9\-])', '', name) or len(name) > 63:
@@ -253,18 +252,27 @@ class InstancesEndpoint(api_base.Resource):
         if machine_type == 'q35':
             for d in disk:
                 if d.get('bus') == 'ide':
-                    return api_base.error(400, 'secure boot machine type does not support IDE')
+                    return api_base.error(
+                        400, 'secure boot machine type does not support IDE')
 
         if network:
             for netdesc in network:
                 if not isinstance(netdesc, dict):
-                    return api_base.error(400,
-                                          'network specification should contain JSON objects')
+                    return api_base.error(
+                        400, 'network specification should contain JSON objects')
 
                 if 'network_uuid' not in netdesc:
-                    return api_base.error(400, 'network specification is missing network_uuid')
+                    return api_base.error(
+                        400, 'network specification is missing network_uuid')
 
-                net_uuid = netdesc['network_uuid']
+                # Allow network to be specified by name or UUID (and error early
+                # if not found)
+                net_uuid = api_base.get_network_uuid(netdesc['network_uuid'])
+                if not net_uuid:
+                    return api_base.error(
+                        404, 'network %s not found' % netdesc['network_uuid'])
+                netdesc['network_uuid'] = net_uuid
+
                 if netdesc.get('address') and not util_general.noneish(netdesc.get('address')):
                     # The requested address must be within the ip range specified
                     # for that virtual network, unless it is equivalent to "none".
