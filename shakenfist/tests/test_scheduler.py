@@ -42,7 +42,7 @@ class LowResourceTestCase(SchedulerTestCase):
     """Test low resource exceptions."""
 
     def test_no_metrics(self):
-        fake_inst = self.mock_etcd.createInstance('fake-inst', 'fakeuuid')
+        fake_inst = self.mock_etcd.create_instance('fake-inst', 'fakeuuid')
         exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().place_instance,
                                 fake_inst,
@@ -56,7 +56,7 @@ class LowResourceTestCase(SchedulerTestCase):
             'cpu_available': 12
         })
 
-        fake_inst = self.mock_etcd.createInstance('fake-inst', 'fakeuuid', cpus=6)
+        fake_inst = self.mock_etcd.create_instance('fake-inst', 'fakeuuid', cpus=6)
         exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().place_instance,
                                 fake_inst,
@@ -74,7 +74,7 @@ class LowResourceTestCase(SchedulerTestCase):
             'cpu_available': 4
         })
 
-        fake_inst = self.mock_etcd.createInstance('fake-inst', 'fakeuuid')
+        fake_inst = self.mock_etcd.create_instance('fake-inst', 'fakeuuid')
         exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().place_instance,
                                 fake_inst,
@@ -92,7 +92,7 @@ class LowResourceTestCase(SchedulerTestCase):
             'cpu_available': 12
         })
 
-        fake_inst = self.mock_etcd.createInstance('fake-inst', 'fakeuuid')
+        fake_inst = self.mock_etcd.create_instance('fake-inst', 'fakeuuid')
         exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().place_instance,
                                 fake_inst,
@@ -111,7 +111,7 @@ class LowResourceTestCase(SchedulerTestCase):
             'cpu_available': 12
         })
 
-        fake_inst = self.mock_etcd.createInstance('fake-inst', 'fakeuuid')
+        fake_inst = self.mock_etcd.create_instance('fake-inst', 'fakeuuid')
         exc = self.assertRaises(exceptions.LowResourceException,
                                 scheduler.Scheduler().place_instance,
                                 fake_inst,
@@ -129,7 +129,7 @@ class LowResourceTestCase(SchedulerTestCase):
             'cpu_available': 12
         })
 
-        fake_inst = self.mock_etcd.createInstance(
+        fake_inst = self.mock_etcd.create_instance(
             'fake-inst', 'fakeuuid', disk_spec=[{
                     'base': 'cirros',
                             'size': 21
@@ -144,7 +144,7 @@ class LowResourceTestCase(SchedulerTestCase):
     def test_ok(self):
         self.mock_etcd.set_node_metrics_same()
 
-        fake_inst = self.mock_etcd.createInstance('fake-inst', 'fakeuuid')
+        fake_inst = self.mock_etcd.create_instance('fake-inst', 'fakeuuid')
 
         nodes = scheduler.Scheduler().place_instance(fake_inst, [])
         self.assertSetEqual(set(self.mock_etcd.node_names)-{'node1_net', },
@@ -155,11 +155,11 @@ class CorrectAllocationTestCase(SchedulerTestCase):
     """Test correct node allocation."""
 
     def test_any_node_but_not_network_node(self):
-        self.mock_etcd.createInstance('instance-1', 'uuid-inst-1',
-                                      place_on_node='node3')
+        self.mock_etcd.create_instance('instance-1', 'uuid-inst-1',
+                                       place_on_node='node3')
         self.mock_etcd.set_node_metrics_same()
 
-        fake_inst = self.mock_etcd.createInstance('fake-inst', 'fakeuuid')
+        fake_inst = self.mock_etcd.create_instance('fake-inst', 'fakeuuid')
         nets = [{'network_uuid': 'uuid-net2'}]
 
         nodes = scheduler.Scheduler().place_instance(fake_inst, nets)
@@ -175,13 +175,13 @@ class ForcedCandidatesTestCase(SchedulerTestCase):
         self.mock_etcd.set_node_metrics_same()
 
     def test_only_two(self):
-        fake_inst = self.mock_etcd.createInstance('fake-inst', 'fakeuuid')
+        fake_inst = self.mock_etcd.create_instance('fake-inst', 'fakeuuid')
         nodes = scheduler.Scheduler().place_instance(
             fake_inst, [], candidates=['node1_net', 'node2'])
         self.assertSetEqual({'node2', }, set(nodes))
 
     def test_no_such_node(self):
-        fake_inst = self.mock_etcd.createInstance('fake-inst', 'fakeuuid')
+        fake_inst = self.mock_etcd.create_instance('fake-inst', 'fakeuuid')
         self.assertRaises(
             exceptions.CandidateNodeNotFoundException,
             scheduler.Scheduler().place_instance,
@@ -202,7 +202,7 @@ class MetricsRefreshTestCase(SchedulerTestCase):
             'cpu_available': 12
         })
 
-        fake_inst = self.mock_etcd.createInstance('fake-inst', 'fakeuuid')
+        fake_inst = self.mock_etcd.create_instance('fake-inst', 'fakeuuid')
 
         s = scheduler.Scheduler()
         s.place_instance(fake_inst, None)
@@ -230,82 +230,82 @@ class CPUloadAffinityTestCase(SchedulerTestCase):
         self.mock_etcd.set_node_metrics_same()
 
     def test_affinity_to_same_node(self):
-        self.mock_etcd.createInstance('instance-1', 'uuid-inst-1',
-                                      place_on_node='node3',
-                                      metadata={'tags': ['socialite']})
+        self.mock_etcd.create_instance('instance-1', 'uuid-inst-1',
+                                       place_on_node='node3',
+                                       metadata={'tags': ['socialite']})
 
         # Start test
-        inst = self.mock_etcd.createInstance('instance-3', 'uuid-inst-3',
-                                             metadata={
-                                                "affinity": {
-                                                    "cpu": {
-                                                        "socialite": 2,
-                                                        "nerd": -100,
-                                                    }
-                                                },
-                                             })
+        inst = self.mock_etcd.create_instance('instance-3', 'uuid-inst-3',
+                                              metadata={
+                                                 "affinity": {
+                                                     "cpu": {
+                                                         "socialite": 2,
+                                                         "nerd": -100,
+                                                     }
+                                                 },
+                                              })
 
         nodes = scheduler.Scheduler().place_instance(inst, [])
         self.assertSetEqual({'node3'}, set(nodes))
 
     def test_anti_affinity_single_inst(self):
-        self.mock_etcd.createInstance('instance-1', 'uuid-inst-1',
-                                      place_on_node='node3',
-                                      metadata={'tags': ['nerd']})
+        self.mock_etcd.create_instance('instance-1', 'uuid-inst-1',
+                                       place_on_node='node3',
+                                       metadata={'tags': ['nerd']})
 
         # Start test
-        inst = self.mock_etcd.createInstance('instance-3', 'uuid-inst-3',
-                                             metadata={
-                                                "affinity": {
-                                                    "cpu": {
-                                                        "socialite": 2,
-                                                        "nerd": -100,
-                                                    }
-                                                },
-                                             })
+        inst = self.mock_etcd.create_instance('instance-3', 'uuid-inst-3',
+                                              metadata={
+                                                 "affinity": {
+                                                     "cpu": {
+                                                         "socialite": 2,
+                                                         "nerd": -100,
+                                                     }
+                                                 },
+                                              })
         nodes = scheduler.Scheduler().place_instance(inst, [])
         self.assertSetEqual({'node2', 'node4'}, set(nodes))
 
     def test_anti_affinity_multiple_inst(self):
-        self.mock_etcd.createInstance('instance-1', 'uuid-inst-1',
-                                      place_on_node='node3',
-                                      metadata={'tags': ['nerd']})
+        self.mock_etcd.create_instance('instance-1', 'uuid-inst-1',
+                                       place_on_node='node3',
+                                       metadata={'tags': ['nerd']})
 
-        self.mock_etcd.createInstance('instance-2', 'uuid-inst-2',
-                                      place_on_node='node4',
-                                      metadata={'tags': ['nerd']})
+        self.mock_etcd.create_instance('instance-2', 'uuid-inst-2',
+                                       place_on_node='node4',
+                                       metadata={'tags': ['nerd']})
 
         # Start test
-        inst = self.mock_etcd.createInstance('instance-3', 'uuid-inst-3',
-                                             metadata={
-                                                "affinity": {
-                                                    "cpu": {
-                                                        "socialite": 2,
-                                                        "nerd": -100,
-                                                    }
-                                                },
-                                             })
+        inst = self.mock_etcd.create_instance('instance-3', 'uuid-inst-3',
+                                              metadata={
+                                                 "affinity": {
+                                                     "cpu": {
+                                                         "socialite": 2,
+                                                         "nerd": -100,
+                                                     }
+                                                 },
+                                              })
         nodes = scheduler.Scheduler().place_instance(inst, [])
         self.assertSetEqual({'node2'}, set(nodes))
 
     def test_anti_affinity_multiple_inst_different_tags(self):
-        self.mock_etcd.createInstance('instance-1', 'uuid-inst-1',
-                                      place_on_node='node3',
-                                      metadata={'tags': ['socialite']})
+        self.mock_etcd.create_instance('instance-1', 'uuid-inst-1',
+                                       place_on_node='node3',
+                                       metadata={'tags': ['socialite']})
 
-        self.mock_etcd.createInstance('instance-2', 'uuid-inst-2',
-                                      place_on_node='node4',
-                                      metadata={'tags': ['nerd']})
+        self.mock_etcd.create_instance('instance-2', 'uuid-inst-2',
+                                       place_on_node='node4',
+                                       metadata={'tags': ['nerd']})
 
         # Start test
-        inst = self.mock_etcd.createInstance('instance-3', 'uuid-inst-3',
-                                             metadata={
-                                                "affinity": {
-                                                    "cpu": {
-                                                        "socialite": 2,
-                                                        "nerd": -100,
-                                                    }
-                                                },
-                                             })
+        inst = self.mock_etcd.create_instance('instance-3', 'uuid-inst-3',
+                                              metadata={
+                                                 "affinity": {
+                                                     "cpu": {
+                                                         "socialite": 2,
+                                                         "nerd": -100,
+                                                     }
+                                                 },
+                                              })
         nodes = scheduler.Scheduler().place_instance(inst, [])
         self.assertSetEqual({'node3'}, set(nodes))
