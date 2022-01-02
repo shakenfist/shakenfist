@@ -348,6 +348,9 @@ class Instance(dbo):
     def tags(self):
         # TODO(andy) Move metadata to a new DBO subclass "DBO with metadata"
         meta = db.get_metadata('instance', self.uuid)
+        if not meta:
+            # Gracefully handle malformed instances
+            return None
         return meta.get(self.METADATA_KEY_TAGS, None)
 
     # Implementation
