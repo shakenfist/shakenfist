@@ -5,25 +5,29 @@ from flask_jwt_extended.exceptions import (
     RevokedTokenError, FreshTokenRequired, CSRFError
 )
 from flask_jwt_extended import decode_token, get_jwt_identity
+from functools import partial
 import json
 from jwt.exceptions import DecodeError, PyJWTError
 import requests
 import sys
 import traceback
+import uuid
 
+from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
-from shakenfist.instance import Instance
+from shakenfist.etcd import ThreadLocalReadOnlyCache
+from shakenfist import instance
 from shakenfist import logutil
-from shakenfist.net import Network
+from shakenfist import net
 from shakenfist.upload import Upload
 from shakenfist.util import general as util_general
 
+
 LOG, HANDLER = logutil.setup(__name__)
 daemon.set_log_level(LOG, 'api')
-
 
 TESTING = False
 
@@ -68,16 +72,37 @@ def caller_is_admin(func):
     return wrapper
 
 
+def valid_uuid4(uuid_string):
+    try:
+        uuid.UUID(uuid_string, version=4)
+    except ValueError:
+        return False
+    return True
+
+
 def arg_is_instance_uuid(func):
     # Method uses the instance from the db
     def wrapper(*args, **kwargs):
-        if 'instance_uuid' in kwargs:
-            kwargs['instance_from_db'] = Instance.from_db(
-                kwargs['instance_uuid'])
-        if not kwargs.get('instance_from_db'):
-            LOG.with_instance(kwargs['instance_uuid']).info(
-                'Instance not found, genuinely missing')
-            return error(404, 'instance not found')
+        with ThreadLocalReadOnlyCache():
+            inst_uuid = kwargs.get('instance_uuid')
+            if inst_uuid and not valid_uuid4(inst_uuid):
+                # Check if uuid is a valid name of an instance
+                filters = [
+                    partial(baseobject.namespace_filter, get_jwt_identity()[0]),
+                    instance.active_states_filter,
+                ]
+                for i in instance.Instances(filters):
+                    if i.name == inst_uuid:
+                        inst_uuid = i.uuid
+                        break
+            if inst_uuid:
+                # Retrieve the actual instance via it's UUID
+                kwargs['instance_from_db'] = instance.Instance.from_db(inst_uuid)
+
+            if not kwargs.get('instance_from_db'):
+                LOG.with_instance(kwargs['instance_uuid']).info(
+                    'Instance not found, missing or deleted')
+                return error(404, 'instance not found')
 
         return func(*args, **kwargs)
     return wrapper
@@ -147,7 +172,7 @@ def requires_instance_active(func):
             return error(404, 'instance not found')
 
         i = kwargs['instance_from_db']
-        if i.state.value != Instance.STATE_CREATED:
+        if i.state.value != instance.Instance.STATE_CREATED:
             LOG.with_instance(i).info(
                 'Instance not ready (%s)' % i.state.value)
             return error(406, 'instance %s is not ready (%s)' % (i.uuid, i.state.value))
@@ -159,13 +184,28 @@ def requires_instance_active(func):
 def arg_is_network_uuid(func):
     # Method uses the network from the db
     def wrapper(*args, **kwargs):
-        if 'network_uuid' in kwargs:
-            kwargs['network_from_db'] = Network.from_db(
-                kwargs['network_uuid'])
-        if not kwargs.get('network_from_db'):
-            LOG.with_field('network', kwargs['network_uuid']).info(
-                'Network not found, missing or deleted')
-            return error(404, 'network not found')
+        with ThreadLocalReadOnlyCache():
+            net_uuid = kwargs.get('network_uuid')
+            if net_uuid and not valid_uuid4(net_uuid):
+                # Check if uuid is a valid name of an network
+                filters = [
+                    partial(baseobject.namespace_filter, get_jwt_identity()[0]),
+                    baseobject.active_states_filter,
+                ]
+                for n in net.Networks(filters):
+                    # Duplicate name behaviour is "not defined" therefore we
+                    # just return the first network found.
+                    if n.name == net_uuid:
+                        net_uuid = n.uuid
+                        break
+            if net_uuid:
+                # Retrieve the actual network via it's UUID
+                kwargs['network_from_db'] = net.Network.from_db(net_uuid)
+
+            if not kwargs.get('network_from_db'):
+                LOG.with_network(net_uuid).info(
+                    'Network not found, missing or deleted')
+                return error(404, 'network not found')
 
         return func(*args, **kwargs)
     return wrapper

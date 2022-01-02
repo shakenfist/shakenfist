@@ -105,8 +105,7 @@ class NetworksEndpoint(api_base.Resource):
     })
     @jwt_required
     def get(self, all=False):
-        filters = [partial(baseobject.namespace_filter,
-                           get_jwt_identity()[0])]
+        filters = [partial(baseobject.namespace_filter, get_jwt_identity()[0])]
         if not all:
             filters.append(baseobject.active_states_filter)
 
