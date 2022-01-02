@@ -48,7 +48,7 @@ def observe(path, instance_uuid):
 
     buffer = ''
     while True:
-        # Detect file trunctations, and die if we see one. We will be restarted
+        # Detect file truncations, and die if we see one. We will be restarted
         # by the monitor process.
         if not os.path.exists(path):
             return
@@ -83,7 +83,7 @@ class Monitor(daemon.Daemon):
         LOG.info('Starting')
         observers = {}
 
-        while self.running:
+        while not self.exit.is_set():
             # Cleanup terminated observers
             all_observers = list(observers.keys())
             for instance_uuid in all_observers:
@@ -141,7 +141,7 @@ class Monitor(daemon.Daemon):
                 db.add_event(
                     'instance', instance_uuid, 'trigger monitor', 'finished', None, None)
 
-            time.sleep(1)
+            self.exit.wait(1)
 
         # No longer running, clean up all trigger deaemons
         for instance_uuid in observers:

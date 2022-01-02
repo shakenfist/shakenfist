@@ -290,7 +290,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             n.add_floating_ip(ni.floating.get('floating_address'), ni.ipv4)
 
     def _process_network_node_workitems(self):
-        while self.running:
+        while not self.exit.is_set():
             jobname, workitem = etcd.dequeue('networknode')
             if not workitem:
                 return
@@ -313,7 +313,7 @@ class Monitor(daemon.WorkerPoolDaemon):
         # Block until the network node queue is idle to avoid races
         processing, waiting = etcd.get_queue_length('networknode')
         while processing + waiting > 0:
-            time.sleep(1)
+            self.exit.wait(60)
             processing, waiting = etcd.get_queue_length('networknode')
 
         # Ensure we haven't leaked any floating IPs (because we used to)
@@ -408,7 +408,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             try:
                 self.reap_workers()
 
-                if self.running:
+                if not self.exit.is_set():
                     worker_pids = []
                     for w in self.workers:
                         worker_pids.append(w.pid)
@@ -446,11 +446,12 @@ class Monitor(daemon.WorkerPoolDaemon):
                 elif len(self.workers) > 0:
                     LOG.info('Waiting for %d workers to finish'
                              % len(self.workers))
+                    # TODO(andy) This spams the log
 
                 else:
                     return
 
-                time.sleep(0.2)
+                self.exit.wait(0.2)
 
             except Exception as e:
                 util_general.ignore_exception('network worker', e)

@@ -230,7 +230,7 @@ def main():
 
     running = True
     while True:
-        time.sleep(10)
+        time.sleep(5)
 
         try:
             wpid, _ = os.waitpid(-1, os.WNOHANG)

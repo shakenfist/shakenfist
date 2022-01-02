@@ -204,7 +204,7 @@ class Monitor(daemon.Daemon):
                 ttl=120)
             gauges['updated_at'].set_to_current_time()
 
-        while self.running:
+        while not self.exit.is_set():
             try:
                 jobname, _ = etcd.dequeue('%s-metrics' % config.NODE_NAME)
                 if jobname:
@@ -213,7 +213,7 @@ class Monitor(daemon.Daemon):
                         last_metrics = time.time()
                     etcd.resolve('%s-metrics' % config.NODE_NAME, jobname)
                 else:
-                    time.sleep(0.2)
+                    self.exit.wait(0.2)
 
                 timer = time.time() - last_metrics
                 if timer > config.SCHEDULER_CACHE_TIMEOUT:

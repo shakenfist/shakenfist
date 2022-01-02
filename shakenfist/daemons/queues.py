@@ -1,6 +1,5 @@
 import requests
 import setproctitle
-import time
 
 from shakenfist.artifact import Artifact
 from shakenfist import blob
@@ -429,13 +428,13 @@ class Monitor(daemon.WorkerPoolDaemon):
             try:
                 self.reap_workers()
 
-                if self.running:
+                if not self.exit.is_set():
                     if not self.dequeue_work_item(config.NODE_NAME, handle):
-                        time.sleep(0.2)
+                        self.exit.wait(0.2)
                 elif len(self.workers) > 0:
                     LOG.info('Waiting for %d workers to finish'
                              % len(self.workers))
-                    time.sleep(0.2)
+                    self.exit.wait(0.2)
                 else:
                     return
 
