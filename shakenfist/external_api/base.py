@@ -93,14 +93,13 @@ def arg_is_instance_uuid(func):
                 ]
                 for i in instance.Instances(filters):
                     if i.name == inst_uuid:
-                        inst_uuid = i.uuid
+                        kwargs['instance_from_db'] = i
                         break
-            if inst_uuid:
-                # Retrieve the actual instance via it's UUID
+            else:
                 kwargs['instance_from_db'] = instance.Instance.from_db(inst_uuid)
 
             if not kwargs.get('instance_from_db'):
-                LOG.with_instance(kwargs['instance_uuid']).info(
+                LOG.with_field('instance', kwargs.get('instance_uuid')).info(
                     'Instance not found, missing or deleted')
                 return error(404, 'instance not found')
 
@@ -208,7 +207,7 @@ def arg_is_network_uuid(func):
                 kwargs['network_from_db'] = net.Network.from_db(net_uuid)
 
             if not kwargs.get('network_from_db'):
-                LOG.with_network(net_uuid).info(
+                LOG.with_field('network', kwargs.get('network_uuid')).info(
                     'Network not found, missing or deleted')
                 return error(404, 'network not found')
 

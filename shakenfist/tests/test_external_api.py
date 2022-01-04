@@ -10,6 +10,7 @@ from shakenfist.baseobject import (
     State)
 from shakenfist.config import config, BaseSettings, SFConfig
 from shakenfist.external_api import app as external_api
+from shakenfist.instance import Instance
 from shakenfist.ipmanager import IPManager
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
@@ -534,229 +535,24 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
                          resp.get_json())
         self.assertEqual(404, resp.status_code)
 
-    # TODO(mikal): do better with covering interfaces here
-    @mock.patch('shakenfist.networkinterface.NetworkInterface.from_db')
-    @mock.patch('shakenfist.instance.Instance._db_get',
-                return_value={
-                    'cpus': 1,
-                    'disk_spec': [{}],
-                    'machine_type': 'pc',
-                    'memory': 2048,
-                    'name': 'barry',
-                    'namespace': 'namespace',
-                    'requested_placement': None,
-                    'ssh_key': 'sshkey',
-                    'user_data': 'userdata',
-                    'uuid': 'uuid42',
-                    'version': 6,
-                    'video': {'memory': 16384, 'model': 'cirrus'},
-                    'uefi': False,
-                    'configdrive': 'openstack-disk',
-                    'nvram_template': None,
-                    'secure_boot': False
-                })
-    @mock.patch('shakenfist.instance.Instance._db_get_attribute',
-                return_value={})
-    def test_get_instance(self, mock_get_instance_attribute, mock_get_instance,
-                          mock_get_interface):
-        resp = self.client.get(
-            '/instances/foo', headers={'Authorization': self.auth_header})
-        self.assertEqual({
-            'console_port': None,
-            'cpus': 1,
-            'disk_spec': [{}],
-            'error_message': None,
-            'interfaces': [],
-            'machine_type': 'pc',
-            'memory': 2048,
-            'name': 'barry',
-            'namespace': 'namespace',
-            'node': None,
-            'power_state': None,
-            'ssh_key': 'sshkey',
-            'state': None,
-            'uefi': False,
-            'configdrive': 'openstack-disk',
-            'user_data': 'userdata',
-            'uuid': 'uuid42',
-            'vdi_port': None,
-            'version': 6,
-            'video': {'memory': 16384, 'model': 'cirrus'},
-            'nvram_template': None,
-            'secure_boot': False
-        }, resp.get_json())
-        self.assertEqual(200, resp.status_code)
-        self.assertEqual('application/json', resp.content_type)
-
-    @mock.patch('shakenfist.instance.Instance._db_get', return_value=None)
-    def test_get_instance_not_found(self, mock_get_instance):
-        resp = self.client.get(
-            '/instances/foo', headers={'Authorization': self.auth_header})
-        self.assertEqual({'error': 'instance not found', 'status': 404},
-                         resp.get_json())
-        self.assertEqual(404, resp.status_code)
-        self.assertEqual('application/json', resp.content_type)
-
-    @mock.patch('shakenfist.instance.Instance._db_get',
-                return_value={'uuid': 'foo',
-                              'name': 'banana',
-                              'namespace': 'foo',
-                              'disk_spec': [{'size': 4, 'base': 'foo'}]})
-    @mock.patch('shakenfist.db.get_metadata', return_value={'a': 'a', 'b': 'b'})
-    def test_get_instance_metadata(self, mock_get_instance, mock_md_get):
-        resp = self.client.get(
-            '/instances/foo/metadata', headers={'Authorization': self.auth_header})
-        self.assertEqual({'a': 'a', 'b': 'b'}, resp.get_json())
-        self.assertEqual('application/json', resp.content_type)
-        self.assertEqual(200, resp.status_code)
-
-    @mock.patch('shakenfist.instance.Instance._db_get',
-                return_value={'uuid': 'foo',
-                              'name': 'banana',
-                              'namespace': 'foo',
-                              'disk_spec': [{'size': 4, 'base': 'foo'}]})
-    @mock.patch('shakenfist.db.get_metadata', return_value={})
-    @mock.patch('shakenfist.db.persist_metadata')
-    @mock.patch('shakenfist.db.get_lock')
-    def test_put_instance_metadata(self, mock_get_lock, mock_md_put,
-                                   mock_md_get, mock_get_instance):
-        resp = self.client.put('/instances/foo/metadata/foo',
-                               headers={'Authorization': self.auth_header},
-                               data=json.dumps({
-                                   'key': 'foo',
-                                   'value': 'bar'
-                               }))
-        self.assertEqual(None, resp.get_json())
-        self.assertEqual(200, resp.status_code)
-        mock_md_put.assert_called_with('instance', 'foo', {'foo': 'bar'})
-
-    @mock.patch('shakenfist.instance.Instance._db_get',
-                return_value={'uuid': 'foo',
-                              'name': 'banana',
-                              'namespace': 'foo',
-                              'disk_spec': [{'size': 4, 'base': 'foo'}]})
-    @mock.patch('shakenfist.db.get_metadata', return_value={})
-    @mock.patch('shakenfist.db.persist_metadata')
-    @mock.patch('shakenfist.db.get_lock')
-    def test_post_instance_metadata(self, mock_get_lock, mock_md_put,
-                                    mock_md_get, mock_get_instance):
-        resp = self.client.post('/instances/foo/metadata',
-                                headers={'Authorization': self.auth_header},
-                                data=json.dumps({
-                                    'key': 'foo',
-                                    'value': 'bar'
-                                }))
-        self.assertEqual(None, resp.get_json())
-        self.assertEqual(200, resp.status_code)
-        mock_md_put.assert_called_with('instance', 'foo', {'foo': 'bar'})
-
-    def test_get_network_metadata(self):
-        self.mock_etcd.create_network('banana', namespace='foo',
-                                      uuid='12345678-1234-4321-1234-123456789012',
-                                      metadata={'a': 'a', 'b': 'b'})
-        resp = self.client.get(
-            '/networks/12345678-1234-4321-1234-123456789012/metadata',
-            headers={'Authorization': self.auth_header})
-        self.assertEqual({'a': 'a', 'b': 'b'}, resp.get_json())
-        self.assertEqual(200, resp.status_code)
-        self.assertEqual('application/json', resp.content_type)
-
-    def test_put_network_metadata(self):
-        self.mock_etcd.create_network('banana', namespace='foo',
-                                      uuid='12345678-1234-4321-1234-123456789012')
-        resp = self.client.put('/networks/12345678-1234-4321-1234-123456789012/metadata/foo',
-                               headers={'Authorization': self.auth_header},
-                               data=json.dumps({
-                                   'key': 'foo',
-                                   'value': 'bar'
-                               }))
-        self.assertEqual(None, resp.get_json())
-        self.assertEqual(200, resp.status_code)
-        self.assertEqual(
-            {'foo': 'bar'},
-            json.loads(self.mock_etcd.db['/sf/metadata/network/12345678-1234-4321-1234-123456789012']))
-
-    def test_post_network_metadata(self):
-        self.mock_etcd.create_network('banana', namespace='foo',
-                                      uuid='12345678-1234-4321-1234-123456789012')
-        resp = self.client.post('/networks/12345678-1234-4321-1234-123456789012/metadata',
-                                headers={'Authorization': self.auth_header},
-                                data=json.dumps({
-                                    'key': 'foo',
-                                    'value': 'bar'
-                                }))
-        self.assertEqual(None, resp.get_json())
-        self.assertEqual(200, resp.status_code)
-        self.assertEqual(
-            {'foo': 'bar'},
-            json.loads(self.mock_etcd.db['/sf/metadata/network/12345678-1234-4321-1234-123456789012']))
-
-    @mock.patch('shakenfist.instance.Instance._db_get',
-                return_value={'uuid': 'foo',
-                              'name': 'banana',
-                              'namespace': 'foo',
-                              'disk_spec': [{'size': 4, 'base': 'foo'}]})
-    @mock.patch('shakenfist.db.get_metadata', return_value={'foo': 'bar', 'real': 'smart'})
-    @mock.patch('shakenfist.db.persist_metadata')
-    @mock.patch('shakenfist.db.get_lock')
-    def test_delete_instance_metadata(self, mock_get_lock, mock_md_put,
-                                      mock_md_get, mock_get_instance):
-        resp = self.client.delete('/instances/foo/metadata/foo',
-                                  headers={'Authorization': self.auth_header})
-        self.assertEqual(None, resp.get_json())
-        mock_md_put.assert_called_with('instance', 'foo', {'real': 'smart'})
-        self.assertEqual(200, resp.status_code)
-
-    @mock.patch('shakenfist.instance.Instance._db_get',
-                return_value={'uuid': 'foo',
-                              'name': 'banana',
-                              'namespace': 'foo',
-                              'disk_spec': [{'size': 4, 'base': 'foo'}]})
-    @mock.patch('shakenfist.db.get_metadata', return_value={'foo': 'bar', 'real': 'smart'})
-    @mock.patch('shakenfist.db.persist_metadata')
-    @mock.patch('shakenfist.db.get_lock')
-    def test_delete_instance_metadata_bad_key(self, mock_get_lock,
-                                              mock_md_put, mock_md_get,
-                                              mock_get_instance):
-        resp = self.client.delete('/instances/foo/metadata/wrong',
-                                  headers={'Authorization': self.auth_header})
-        self.assertEqual({'error': 'key not found', 'status': 404},
-                         resp.get_json())
-        self.assertEqual(404, resp.status_code)
-
-    def test_delete_network_metadata(self):
-        self.mock_etcd.create_network('banana', namespace='foo',
-                                      uuid='12345678-1234-4321-1234-123456789012',
-                                      metadata={'foo': 'bar', 'real': 'smart'})
-        resp = self.client.delete('/networks/12345678-1234-4321-1234-123456789012/metadata/foo',
-                                  headers={'Authorization': self.auth_header})
-        self.assertEqual(None, resp.get_json())
-        self.assertEqual(200, resp.status_code)
-        self.assertEqual(
-            {'real': 'smart'},
-            json.loads(self.mock_etcd.db['/sf/metadata/network/12345678-1234-4321-1234-123456789012']))
-
-    def test_delete_network_metadata_bad_key(self):
-        self.mock_etcd.create_network('banana', namespace='foo',
-                                      uuid='12345678-1234-4321-1234-123456789012',
-                                      metadata={'foo': 'bar', 'real': 'smart'})
-        resp = self.client.delete(
-            '/networks/12345678-1234-4321-1234-123456789012/metadata/wrong',
-            headers={'Authorization': self.auth_header})
-        self.assertEqual({'error': 'key not found', 'status': 404},
-                         resp.get_json())
-        self.assertEqual(404, resp.status_code)
-
-    def test_get_instance_by_name_1(self):
-        self.mock_etcd.create_instance('barry',
-                                       '12345678-1234-4321-1234-123456789012')
+    def test_get_instance(self):
+        self.mock_etcd.create_instance('barry')
+        self.mock_etcd.create_instance('alice')
+        self.mock_etcd.create_instance('bob')
 
         # Instance by name
         resp = self.client.get('/instances/barry',
                                headers={'Authorization': self.auth_header})
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
-        self.assertEqual('12345678-1234-4321-1234-123456789012',
+        self.assertEqual('12345678-1234-4321-1234-000000000001',
+                         resp.get_json().get('uuid'))
+
+        resp = self.client.get('/instances/bob',
+                               headers={'Authorization': self.auth_header})
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual('application/json', resp.content_type)
+        self.assertEqual('12345678-1234-4321-1234-000000000003',
                          resp.get_json().get('uuid'))
 
         # Instance by name - WRONG
@@ -765,16 +561,183 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(404, resp.status_code)
 
         # Instance by UUID
-        resp = self.client.get('/instances/12345678-1234-4321-1234-123456789012',
+        resp = self.client.get('/instances/12345678-1234-4321-1234-000000000001',
                                headers={'Authorization': self.auth_header})
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
-        self.assertEqual('12345678-1234-4321-1234-123456789012',
+        self.assertEqual('12345678-1234-4321-1234-000000000001',
                          resp.get_json().get('uuid'))
 
         # Instance by UUID - WRONG
         resp = self.client.get('/instances/12345678-1234-4321-1234-111111111111',
                                headers={'Authorization': self.auth_header})
+        self.assertEqual(404, resp.status_code)
+
+    def test_get_instance_metadata(self):
+        self.mock_etcd.create_instance('banana', metadata={'a': 'a', 'b': 'b'})
+        resp = self.client.get(
+            '/instances/12345678-1234-4321-1234-000000000001/metadata',
+            headers={'Authorization': self.auth_header})
+        self.assertEqual({'a': 'a', 'b': 'b'}, resp.get_json())
+        self.assertEqual('application/json', resp.content_type)
+        self.assertEqual(200, resp.status_code)
+
+    def test_put_instance_metadata(self):
+        self.mock_etcd.create_instance('banana')
+        resp = self.client.put(
+            '/instances/12345678-1234-4321-1234-000000000001/metadata/foo',
+            headers={'Authorization': self.auth_header},
+            data=json.dumps({
+                'key': 'foo',
+                'value': 'bar'
+            }))
+        self.assertEqual(None, resp.get_json())
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(
+            {'foo': 'bar'},
+            json.loads(self.mock_etcd.db[
+                '/sf/metadata/instance/12345678-1234-4321-1234-000000000001']))
+
+    def test_post_instance_metadata(self):
+        self.mock_etcd.create_instance('banana')
+        resp = self.client.post(
+            '/instances/12345678-1234-4321-1234-000000000001/metadata',
+            headers={'Authorization': self.auth_header},
+            data=json.dumps({
+                'key': 'foo',
+                'value': 'bar'
+            }))
+        self.assertEqual(None, resp.get_json())
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(
+            {'foo': 'bar'},
+            json.loads(self.mock_etcd.db[
+                '/sf/metadata/instance/12345678-1234-4321-1234-000000000001']))
+
+    def test_get_network(self):
+        self.mock_etcd.create_network('barry')
+        self.mock_etcd.create_network('alice')
+        self.mock_etcd.create_network('bob')
+
+        # Instance by name
+        resp = self.client.get('/networks/barry',
+                               headers={'Authorization': self.auth_header})
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual('application/json', resp.content_type)
+        self.assertEqual('12345678-1234-4321-1234-000000000001',
+                         resp.get_json().get('uuid'))
+
+        resp = self.client.get('/networks/bob',
+                               headers={'Authorization': self.auth_header})
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual('application/json', resp.content_type)
+        self.assertEqual('12345678-1234-4321-1234-000000000003',
+                         resp.get_json().get('uuid'))
+
+        # Instance by name - WRONG
+        resp = self.client.get('/networks/bazza',
+                               headers={'Authorization': self.auth_header})
+        self.assertEqual(404, resp.status_code)
+
+        # Instance by UUID
+        resp = self.client.get('/networks/12345678-1234-4321-1234-000000000001',
+                               headers={'Authorization': self.auth_header})
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual('application/json', resp.content_type)
+        self.assertEqual('12345678-1234-4321-1234-000000000001',
+                         resp.get_json().get('uuid'))
+
+        # Instance by UUID - WRONG
+        resp = self.client.get('/networks/12345678-1234-4321-1234-111111111111',
+                               headers={'Authorization': self.auth_header})
+        self.assertEqual(404, resp.status_code)
+
+    def test_get_network_metadata(self):
+        self.mock_etcd.create_network('banana', namespace='foo',
+                                      metadata={'a': 'a', 'b': 'b'})
+        resp = self.client.get(
+            '/networks/12345678-1234-4321-1234-000000000001/metadata',
+            headers={'Authorization': self.auth_header})
+        self.assertEqual({'a': 'a', 'b': 'b'}, resp.get_json())
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual('application/json', resp.content_type)
+
+    def test_put_network_metadata(self):
+        self.mock_etcd.create_network('banana', namespace='foo')
+        resp = self.client.put(
+            '/networks/12345678-1234-4321-1234-000000000001/metadata/foo',
+            headers={'Authorization': self.auth_header},
+            data=json.dumps({
+                'key': 'foo',
+                'value': 'bar'
+            }))
+        self.assertEqual(None, resp.get_json())
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(
+            {'foo': 'bar'},
+            json.loads(self.mock_etcd.db[
+                '/sf/metadata/network/12345678-1234-4321-1234-000000000001']))
+
+    def test_post_network_metadata(self):
+        self.mock_etcd.create_network('banana', namespace='foo')
+        resp = self.client.post(
+            '/networks/12345678-1234-4321-1234-000000000001/metadata',
+            headers={'Authorization': self.auth_header},
+            data=json.dumps({
+                'key': 'foo',
+                'value': 'bar'
+            }))
+        self.assertEqual(None, resp.get_json())
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(
+            {'foo': 'bar'},
+            json.loads(self.mock_etcd.db[
+                '/sf/metadata/network/12345678-1234-4321-1234-000000000001']))
+
+    def test_delete_instance_metadata(self):
+        self.mock_etcd.create_instance('banana',
+                                       metadata={'foo': 'bar', 'real': 'smart'})
+        resp = self.client.delete(
+            '/instances/12345678-1234-4321-1234-000000000001/metadata/foo',
+            headers={'Authorization': self.auth_header})
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(None, resp.get_json())
+        self.assertEqual(
+            {'real': 'smart'},
+            json.loads(self.mock_etcd.db[
+                '/sf/metadata/instance/12345678-1234-4321-1234-000000000001']))
+
+    def test_delete_instance_metadata_bad_key(self):
+        self.mock_etcd.create_instance('banana',
+                                       metadata={'foo': 'bar', 'real': 'smart'})
+        resp = self.client.delete(
+            '/instances/12345678-1234-4321-1234-000000000001/metadata/wrong',
+            headers={'Authorization': self.auth_header})
+        self.assertEqual({'error': 'key not found', 'status': 404},
+                         resp.get_json())
+        self.assertEqual(404, resp.status_code)
+
+    def test_delete_network_metadata(self):
+        self.mock_etcd.create_network('banana', namespace='foo',
+                                      metadata={'foo': 'bar', 'real': 'smart'})
+        resp = self.client.delete(
+            '/networks/12345678-1234-4321-1234-000000000001/metadata/foo',
+            headers={'Authorization': self.auth_header})
+        self.assertEqual(None, resp.get_json())
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(
+            {'real': 'smart'},
+            json.loads(self.mock_etcd.db[
+                '/sf/metadata/network/12345678-1234-4321-1234-000000000001']))
+
+    def test_delete_network_metadata_bad_key(self):
+        self.mock_etcd.create_network('banana', namespace='foo',
+                                      metadata={'foo': 'bar', 'real': 'smart'})
+        resp = self.client.delete(
+            '/networks/12345678-1234-4321-1234-000000000001/metadata/wrong',
+            headers={'Authorization': self.auth_header})
+        self.assertEqual({'error': 'key not found', 'status': 404},
+                         resp.get_json())
         self.assertEqual(404, resp.status_code)
 
 

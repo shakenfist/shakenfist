@@ -7,6 +7,7 @@
 import base64
 import bcrypt
 from collections import defaultdict
+from itertools import count
 import json
 import mock
 import time
@@ -29,6 +30,7 @@ class MockEtcd():
     def __init__(self, test_obj, nodes=None, node_count=0):
         self.test_obj = test_obj
         self.db = {}
+        self.obj_counter = count(1)
 
         # Define ShakenFist Nodes
         if nodes is not None:
@@ -74,6 +76,10 @@ class MockEtcd():
         # Setup basic DB data
         for n in self.nodes:
             Node.new(n[0], n[1])
+
+    def next_uuid(self):
+        """Generate predictable UUIDs that are unique during the testcase"""
+        return '12345678-1234-4321-1234-%012i' % next(self.obj_counter)
 
     #
     # DB operations - Low level
@@ -152,7 +158,7 @@ class MockEtcd():
         db.persist_namespace(namespace, rec)
 
     def create_instance(self, name,
-                        uuid='12345678-1234-4321-1234-123456789012',
+                        uuid=None,
                         cpus=1,
                         disk_spec=[{'base': 'cirros', 'size': 21}],
                         memory=1024,
@@ -167,6 +173,9 @@ class MockEtcd():
                         set_state=Instance.STATE_CREATED,
                         place_on_node='',
                         ):
+
+        if not uuid:
+            uuid = self.next_uuid()
 
         inst = Instance.new(name=name,
                             cpus=cpus,
@@ -206,7 +215,7 @@ class MockEtcd():
         return inst
 
     def create_network(self, name,
-                       uuid='12345678-1234-4321-1234-123456789012',
+                       uuid=None,
                        namespace='unittest',
                        netblock='10.9.8.0/24',
                        provide_dhcp=False,
@@ -215,6 +224,9 @@ class MockEtcd():
                        metadata={},
                        set_state=Network.STATE_CREATED,
                        ):
+
+        if not uuid:
+            uuid = self.next_uuid()
 
         network = Network.new(name=name,
                               namespace=namespace,
