@@ -15,7 +15,7 @@ from shakenfist.config import config
 from shakenfist.constants import LOCK_REFRESH_SECONDS, GiB
 from shakenfist import db
 from shakenfist import etcd
-from shakenfist.exceptions import BlobDeleted, BlobFetchFailed
+from shakenfist.exceptions import BlobDeleted, BlobFetchFailed, BlobDependancyMissing
 from shakenfist import instance
 from shakenfist import logutil
 from shakenfist.node import Node, nodes_by_free_disk_descending
@@ -29,7 +29,7 @@ LOG, _ = logutil.setup(__name__)
 
 class Blob(dbo):
     object_type = 'blob'
-    current_version = 2
+    current_version = 3
     state_targets = {
         None: (dbo.STATE_INITIAL),
         dbo.STATE_INITIAL: (dbo.STATE_CREATED, dbo.STATE_ERROR, dbo.STATE_DELETED),
@@ -45,9 +45,10 @@ class Blob(dbo):
         self.__size = static_values['size']
         self.__modified = static_values['modified']
         self.__fetched_at = static_values['fetched_at']
+        self.__depends_on = static_values['depends_on']
 
     @classmethod
-    def new(cls, blob_uuid, size, modified, fetched_at):
+    def new(cls, blob_uuid, size, modified, fetched_at, depends_on=None):
         Blob._db_create(
             blob_uuid,
             {
@@ -55,6 +56,7 @@ class Blob(dbo):
                 'size': size,
                 'modified': modified,
                 'fetched_at': fetched_at,
+                'depends_on': depends_on,
 
                 'version': cls.current_version
             }
@@ -73,6 +75,7 @@ class Blob(dbo):
             'size': self.size,
             'modified': self.modified,
             'fetched_at': self.fetched_at,
+            'depends_on': self.depends_on,
             'locations': self.locations,
             'reference_count': self.ref_count,
             'instances': self.instances
@@ -93,6 +96,10 @@ class Blob(dbo):
     @property
     def fetched_at(self):
         return self.__fetched_at
+
+    @property
+    def depends_on(self):
+        return self.__depends_on
 
     # Values routed to attributes
     @property
@@ -202,12 +209,18 @@ class Blob(dbo):
             return new_count
 
     def ensure_local(self, locks):
-        with self.get_lock(config.NODE_NAME) as blob_lock:
-            if self.state.value != self.STATE_CREATED:
-                self.log.warning(
-                    'Blob not in created state, replication cancelled')
-                return
+        if self.state.value != self.STATE_CREATED:
+            self.log.warning(
+                'Blob not in created state, replication cancelled')
+            return
 
+        # Replicate any blob this blob depends on
+        if self.depends_on:
+            dep_blob = Blob.from_db(self.depends_on)
+            dep_blob.ensure_local(locks)
+
+        # Actually replicate this blob
+        with self.get_lock(config.NODE_NAME) as blob_lock:
             blob_dir = os.path.join(config.STORAGE_PATH, 'blobs')
             blob_path = os.path.join(blob_dir, self.uuid)
             os.makedirs(blob_dir, exist_ok=True)
@@ -345,19 +358,31 @@ def ensure_blob_path():
     os.makedirs(blobs_path, exist_ok=True)
 
 
-def snapshot_disk(disk, blob_uuid, related_object=None):
+def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
     if not os.path.exists(disk['path']):
         return
     ensure_blob_path()
     dest_path = Blob.filepath(blob_uuid)
 
     # Actually make the snapshot
+    depends_on = None
     with util_general.RecordedOperation('snapshot %s' % disk['device'], related_object):
-        util_image.snapshot(None, disk['path'], dest_path)
+        depends_on = util_image.snapshot(
+            None, disk['path'], dest_path, thin=thin)
         st = os.stat(dest_path)
 
+    # Check that the dependancy (if any) actually exists. This test can fail when
+    # the blob used to start an instance has been deleted already.
+    if depends_on:
+        dep_blob = Blob.from_db(depends_on)
+        if not dep_blob or dep_blob.state.value != Blob.STATE_CREATED:
+            raise BlobDependancyMissing(
+                'Snapshot depends on blob UUID %s, which is missing'
+                % depends_on)
+
     # And make the associated blob
-    b = Blob.new(blob_uuid, st.st_size, time.time(), time.time())
+    b = Blob.new(blob_uuid, st.st_size, time.time(), time.time(),
+                 depends_on=depends_on)
     b.state = Blob.STATE_CREATED
     b.observe()
     b.request_replication()

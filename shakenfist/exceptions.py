@@ -208,3 +208,7 @@ class BlobDeleted(ArtifactException):
 
 class BlobFetchFailed(Exception):
     pass
+
+
+class BlobDependancyMissing(Exception):
+    pass
