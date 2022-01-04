@@ -9,6 +9,8 @@ import string
 import sys
 import time
 import traceback
+import uuid
+
 
 # To avoid circular imports, util modules should only import a limited
 # set of shakenfist modules, mainly exceptions, logutils, and specific
@@ -144,3 +146,11 @@ def link(source, destination):
         os.symlink(source, destination)
 
     pathlib.Path(destination).touch(exist_ok=True)
+
+
+def valid_uuid4(uuid_string):
+    try:
+        uuid.UUID(uuid_string, version=4)
+    except ValueError:
+        return False
+    return True

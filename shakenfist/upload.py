@@ -38,17 +38,6 @@ class Upload(dbo):
         u.state = Upload.STATE_CREATED
         return u
 
-    @staticmethod
-    def from_db(upload_uuid):
-        if not upload_uuid:
-            return None
-
-        static_values = Upload._db_get(upload_uuid)
-        if not static_values:
-            return None
-
-        return Upload(static_values)
-
     # Static values
     @property
     def node(self):

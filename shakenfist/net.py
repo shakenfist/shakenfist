@@ -123,20 +123,6 @@ class Network(dbo):
 
         return n
 
-    @staticmethod
-    def from_db(uuid):
-        if not uuid:
-            return None
-
-        # NOTE(mikal): we used to lock around this fetch from the database,
-        # but I am hoping that moving state into an attribute means that's
-        # not necessary any more.
-        static_values = Network._db_get(uuid)
-        if not static_values:
-            return None
-
-        return Network(static_values)
-
     def external_view(self):
         # If this is an external view, then mix back in attributes that users
         # expect

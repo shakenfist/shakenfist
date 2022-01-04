@@ -78,17 +78,6 @@ class Artifact(dbo):
         return a
 
     @staticmethod
-    def from_db(artifact_uuid):
-        if not artifact_uuid:
-            return None
-
-        static_values = Artifact._db_get(artifact_uuid)
-        if not static_values:
-            return None
-
-        return Artifact(static_values)
-
-    @staticmethod
     def from_url(artifact_type, url, max_versions=0):
         artifacts = list(Artifacts([partial(url_filter, url),
                                     partial(type_filter, artifact_type),
