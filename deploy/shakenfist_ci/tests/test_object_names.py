@@ -21,7 +21,7 @@ class TestObjectNames(base.BaseNamespacedTestCase):
                 '192.168.242.0/24', True, True, i+'_net')
             nets[i+'_net'] = n['uuid']
 
-        for name, uuid in nets:
+        for name, uuid in nets.items():
             n = self.system_client.get_network(name)
             self.assertEqual(uuid, n['uuid'])
 

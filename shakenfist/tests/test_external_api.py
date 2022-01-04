@@ -972,6 +972,62 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
             resp.get_json())
         self.assertEqual(404, resp.status_code)
 
+    def test_post_instance_specific_ip(self):
+        self.mock_etcd.create_network('betsy', netblock='10.1.2.0/24',
+                                      namespace='two')
+
+        # Request in range IP address
+        resp = self.client.post(
+            '/instances',
+            headers={'Authorization': self.auth_token_two},
+            data=json.dumps({
+                'name': 'test-instance',
+                'cpus': 1,
+                'memory': 1024,
+                'network': [{'network_uuid': 'betsy',
+                             'address': '10.1.2.11'}],
+                'disk': [{'size': 8,
+                          'base': 'cirros'}],
+                'namespace': 'two',
+            }))
+        self.assertEqual(200, resp.status_code)
+
+        # Request out of range IP address
+        resp = self.client.post(
+            '/instances',
+            headers={'Authorization': self.auth_token_two},
+            data=json.dumps({
+                'name': 'test-instance',
+                'cpus': 1,
+                'memory': 1024,
+                'network': [{'network_uuid': 'betsy',
+                             'address': '10.1.200.11'}],
+                'disk': [{'size': 8,
+                          'base': 'cirros'}],
+                'namespace': 'two',
+            }))
+        self.assertEqual(400, resp.status_code)
+
+        # Check that instance create API catches duplicate network names
+        self.mock_etcd.create_network('betsy', netblock='10.1.3.0/24',
+                                      namespace='two')
+        resp = self.client.post(
+            '/instances',
+            headers={'Authorization': self.auth_token_two},
+            data=json.dumps({
+                'name': 'test-instance',
+                'cpus': 1,
+                'memory': 1024,
+                'network': [{'network_uuid': 'betsy',
+                             'address': '10.1.2.11'}],
+                'disk': [{'size': 8,
+                          'base': 'cirros'}],
+                'namespace': 'two',
+            }))
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual('multiple networks have the name "betsy"',
+                         resp.get_json().get('error'))
+
 
 class ExternalApiNetworkTestCase(base.ShakenFistTestCase):
     def setUp(self):

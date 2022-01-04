@@ -270,7 +270,11 @@ class InstancesEndpoint(api_base.Resource):
 
                 # Allow network to be specified by name or UUID (and error early
                 # if not found)
-                n = net.Network.from_db_by_ref(netdesc['network_uuid'])
+                try:
+                    n = net.Network.from_db_by_ref(netdesc['network_uuid'])
+                except exceptions.MultipleObjects as e:
+                    return api_base.error(400, str(e))
+
                 if not n:
                     return api_base.error(
                         404, 'network %s not found' % netdesc['network_uuid'])
@@ -279,7 +283,7 @@ class InstancesEndpoint(api_base.Resource):
                 if netdesc.get('address') and not util_general.noneish(netdesc.get('address')):
                     # The requested address must be within the ip range specified
                     # for that virtual network, unless it is equivalent to "none".
-                    ipm = IPManager.from_db(network.uuid)
+                    ipm = IPManager.from_db(n.uuid)
                     if not ipm.is_in_range(netdesc['address']):
                         return api_base.error(400,
                                               'network specification requests an address outside the '
