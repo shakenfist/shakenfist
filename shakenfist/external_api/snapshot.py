@@ -24,7 +24,7 @@ class InstanceSnapshotEndpoint(api_base.Resource):
         if not thin:
             thin = config.SNAPSHOTS_DEFAULT_TO_THIN
         return instance_from_db.snapshot(
-            all=all, device=device, max_versions=max_versions)
+            all=all, device=device, max_versions=max_versions, thin=thin)
 
     @jwt_required
     @api_base.arg_is_instance_ref
