@@ -162,6 +162,7 @@ class Artifact(dbo):
                     'instances': blob_usage.get(blob_uuid, []),
                     'size': b.size,
                     'reference_count': b.ref_count,
+                    'depends_on': b.depends_on
                 }
         a['blobs'] = blobs
         return a

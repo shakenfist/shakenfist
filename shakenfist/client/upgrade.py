@@ -110,6 +110,23 @@ def main():
                     etcd_client.put(metadata['key'],
                                     json.dumps(i, indent=4, sort_keys=True))
 
+        if minor <= 5:
+            for data, metadata in etcd_client.get_prefix('/sf/blob/'):
+                b = json.loads(data.decode('utf-8'))
+                changed = False
+
+                # Find version 3 instances and migrate them to version 4
+                if b.get('version') == 2:
+                    i['depends_on'] = None
+                    i['version'] = 3
+                    changed = True
+
+                if changed:
+                    print('--> Upgraded blob %s to version %d'
+                          % (b['uuid'], b['version']))
+                    etcd_client.put(metadata['key'],
+                                    json.dumps(b, indent=4, sort_keys=True))
+
 
 if __name__ == '__main__':
     main()
