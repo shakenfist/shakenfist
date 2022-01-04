@@ -4,13 +4,11 @@ import json
 import logging
 import mock
 
-
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     State)
 from shakenfist.config import config, BaseSettings, SFConfig
 from shakenfist.external_api import app as external_api
-from shakenfist.instance import Instance
 from shakenfist.ipmanager import IPManager
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
@@ -311,7 +309,19 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'system', 'key': 'bar'}))
         self.assertEqual(200, resp.status_code)
-        self.auth_header = 'Bearer %s' % resp.get_json()['access_token']
+        self.auth_token = 'Bearer %s' % resp.get_json()['access_token']
+
+        self.mock_etcd.create_namespace('two', 'key1', 'space')
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'two', 'key': 'space'}))
+        self.assertEqual(200, resp.status_code)
+        self.auth_token_two = 'Bearer %s' % resp.get_json()['access_token']
+
+        self.mock_etcd.create_namespace('three', 'key1', 'pass')
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'three', 'key': 'pass'}))
+        self.assertEqual(200, resp.status_code)
+        self.auth_token_three = 'Bearer %s' % resp.get_json()['access_token']
 
 
 class ExternalApiGeneralTestCase(ExternalApiTestCase):
@@ -324,7 +334,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
 
     def test_auth_add_key_missing_args(self):
         resp = self.client.post('/auth/namespaces',
-                                headers={'Authorization': self.auth_header},
+                                headers={'Authorization': self.auth_token},
                                 data=json.dumps({}))
         self.assertEqual(400, resp.status_code)
         self.assertEqual(
@@ -339,7 +349,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
     @mock.patch('shakenfist.etcd.put')
     def test_auth_add_key_missing_keyname(self, mock_put, mock_get, mock_lock):
         resp = self.client.post('/auth/namespaces',
-                                headers={'Authorization': self.auth_header},
+                                headers={'Authorization': self.auth_token},
                                 data=json.dumps({
                                     'namespace': 'foo'
                                 }))
@@ -351,7 +361,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
     @mock.patch('shakenfist.etcd.put')
     def test_auth_add_key_missing_key(self, mock_put, mock_get, mock_lock):
         resp = self.client.post('/auth/namespaces',
-                                headers={'Authorization': self.auth_header},
+                                headers={'Authorization': self.auth_token},
                                 data=json.dumps({
                                     'namespace': 'foo',
                                     'key_name': 'bernard'
@@ -368,7 +378,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
     @mock.patch('shakenfist.etcd.get', return_value=None)
     def test_auth_add_key_illegal_keyname(self, mock_get, mock_lock):
         resp = self.client.post('/auth/namespaces',
-                                headers={'Authorization': self.auth_header},
+                                headers={'Authorization': self.auth_token},
                                 data=json.dumps({
                                     'namespace': 'foo',
                                     'key_name': 'service_key',
@@ -390,13 +400,13 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
                 ])
     def test_get_namespaces(self, mock_get_all):
         resp = self.client.get('/auth/namespaces',
-                               headers={'Authorization': self.auth_header})
+                               headers={'Authorization': self.auth_token})
         self.assertEqual(200, resp.status_code)
         self.assertEqual(['aaa', 'bbb', 'ccc'], resp.get_json())
 
     def test_delete_namespace_missing_args(self):
         resp = self.client.delete('/auth/namespaces',
-                                  headers={'Authorization': self.auth_header})
+                                  headers={'Authorization': self.auth_token})
         self.assertEqual(405, resp.status_code)
         self.assertEqual(
             {
@@ -406,7 +416,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
 
     def test_delete_namespace_system(self):
         resp = self.client.delete('/auth/namespaces/system',
-                                  headers={'Authorization': self.auth_header})
+                                  headers={'Authorization': self.auth_token})
         self.assertEqual(403, resp.status_code)
         self.assertEqual(
             {
@@ -422,7 +432,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
     def test_delete_namespace_with_instances(self, mock_get_instances,
                                              mock_get_instance_attribute):
         resp = self.client.delete('/auth/namespaces/foo',
-                                  headers={'Authorization': self.auth_header})
+                                  headers={'Authorization': self.auth_token})
         self.assertEqual(400, resp.status_code)
         self.assertEqual(
             {
@@ -436,7 +446,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
                 return_value=[FakeNetwork(uuid='123', state=dbo.STATE_CREATED)])
     def test_delete_namespace_with_networks(self, mock_get_networks, mock_get_instances):
         resp = self.client.delete('/auth/namespaces/foo',
-                                  headers={'Authorization': self.auth_header})
+                                  headers={'Authorization': self.auth_token})
         self.assertEqual(400, resp.status_code)
         self.assertEqual(
             {
@@ -447,7 +457,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
 
     def test_delete_namespace_key_missing_args(self):
         resp = self.client.delete('/auth/namespaces/system/',
-                                  headers={'Authorization': self.auth_header})
+                                  headers={'Authorization': self.auth_token})
         self.assertEqual(404, resp.status_code)
         self.assertEqual(None, resp.get_json())
 
@@ -455,7 +465,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
     @mock.patch('shakenfist.etcd.get', return_value={'keys': {}})
     def test_delete_namespace_key_missing_key(self, mock_get, mock_lock):
         resp = self.client.delete('/auth/namespaces/system/keys/mykey',
-                                  headers={'Authorization': self.auth_header})
+                                  headers={'Authorization': self.auth_token})
         self.assertEqual(404, resp.status_code)
         self.assertEqual(
             {
@@ -467,7 +477,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
     @mock.patch('shakenfist.db.get_metadata', return_value={'a': 'a', 'b': 'b'})
     def test_get_namespace_metadata(self, mock_md_get):
         resp = self.client.get(
-            '/auth/namespaces/system/metadata', headers={'Authorization': self.auth_header})
+            '/auth/namespaces/system/metadata', headers={'Authorization': self.auth_token})
         self.assertEqual({'a': 'a', 'b': 'b'}, resp.get_json())
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
@@ -478,7 +488,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
     def test_put_namespace_metadata(self, mock_get_lock, mock_md_put,
                                     mock_md_get):
         resp = self.client.put('/auth/namespaces/system/metadata/foo',
-                               headers={'Authorization': self.auth_header},
+                               headers={'Authorization': self.auth_token},
                                data=json.dumps({
                                    'key': 'foo',
                                    'value': 'bar'
@@ -493,7 +503,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
     def test_post_namespace_metadata(self, mock_get_lock, mock_md_put,
                                      mock_md_get):
         resp = self.client.post('/auth/namespaces/system/metadata',
-                                headers={'Authorization': self.auth_header},
+                                headers={'Authorization': self.auth_token},
                                 data=json.dumps({
                                     'key': 'foo',
                                     'value': 'bar'
@@ -508,7 +518,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
     def test_delete_namespace_metadata(self, mock_get_lock, mock_md_put,
                                        mock_md_get):
         resp = self.client.delete('/auth/namespaces/system/metadata/foo',
-                                  headers={'Authorization': self.auth_header})
+                                  headers={'Authorization': self.auth_token})
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
         mock_md_put.assert_called_with('namespace', 'system', {'real': 'smart'})
@@ -519,7 +529,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
     def test_delete_namespace_metadata_bad_key(self, mock_get_lock,
                                                mock_md_put, mock_md_get):
         resp = self.client.delete('/auth/namespaces/system/metadata/wrong',
-                                  headers={'Authorization': self.auth_header})
+                                  headers={'Authorization': self.auth_token})
         self.assertEqual({'error': 'key not found', 'status': 404},
                          resp.get_json())
         self.assertEqual(404, resp.status_code)
@@ -530,7 +540,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
     def test_delete_namespace_metadata_no_keys(self, mock_get_lock,
                                                mock_md_put, mock_md_get):
         resp = self.client.delete('/auth/namespaces/system/metadata/wrong',
-                                  headers={'Authorization': self.auth_header})
+                                  headers={'Authorization': self.auth_token})
         self.assertEqual({'error': 'key not found', 'status': 404},
                          resp.get_json())
         self.assertEqual(404, resp.status_code)
@@ -542,14 +552,14 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
 
         # Instance by name
         resp = self.client.get('/instances/barry',
-                               headers={'Authorization': self.auth_header})
+                               headers={'Authorization': self.auth_token})
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
         self.assertEqual('12345678-1234-4321-1234-000000000001',
                          resp.get_json().get('uuid'))
 
         resp = self.client.get('/instances/bob',
-                               headers={'Authorization': self.auth_header})
+                               headers={'Authorization': self.auth_token})
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
         self.assertEqual('12345678-1234-4321-1234-000000000003',
@@ -557,12 +567,12 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
 
         # Instance by name - WRONG
         resp = self.client.get('/instances/bazza',
-                               headers={'Authorization': self.auth_header})
+                               headers={'Authorization': self.auth_token})
         self.assertEqual(404, resp.status_code)
 
         # Instance by UUID
         resp = self.client.get('/instances/12345678-1234-4321-1234-000000000001',
-                               headers={'Authorization': self.auth_header})
+                               headers={'Authorization': self.auth_token})
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
         self.assertEqual('12345678-1234-4321-1234-000000000001',
@@ -570,14 +580,52 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
 
         # Instance by UUID - WRONG
         resp = self.client.get('/instances/12345678-1234-4321-1234-111111111111',
-                               headers={'Authorization': self.auth_header})
+                               headers={'Authorization': self.auth_token})
+        self.assertEqual(404, resp.status_code)
+
+    def test_get_instance_by_namespace(self):
+        self.mock_etcd.create_instance('barry')
+        self.mock_etcd.create_instance('barry', namespace='two')
+        self.mock_etcd.create_instance('bob', namespace='two')
+
+        # Instance by name
+        resp = self.client.get('/instances/barry',
+                               headers={'Authorization': self.auth_token})
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual('application/json', resp.content_type)
+        self.assertEqual(
+            {'error': 'multiple instances have the name "barry"', 'status': 400},
+            resp.get_json())
+
+        resp = self.client.get('/instances/barry',
+                               headers={'Authorization': self.auth_token_two})
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual('application/json', resp.content_type)
+        self.assertEqual('12345678-1234-4321-1234-000000000002',
+                         resp.get_json().get('uuid'))
+
+        resp = self.client.get('/instances/bob',
+                               headers={'Authorization': self.auth_token})
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual('application/json', resp.content_type)
+        self.assertEqual('12345678-1234-4321-1234-000000000003',
+                         resp.get_json().get('uuid'))
+
+        # Instance by name - WRONG name
+        resp = self.client.get('/instances/bazza',
+                               headers={'Authorization': self.auth_token_two})
+        self.assertEqual(404, resp.status_code)
+
+        # Instance by name - WRONG namespace
+        resp = self.client.get('/instances/barry',
+                               headers={'Authorization': self.auth_token_three})
         self.assertEqual(404, resp.status_code)
 
     def test_get_instance_metadata(self):
         self.mock_etcd.create_instance('banana', metadata={'a': 'a', 'b': 'b'})
         resp = self.client.get(
             '/instances/12345678-1234-4321-1234-000000000001/metadata',
-            headers={'Authorization': self.auth_header})
+            headers={'Authorization': self.auth_token})
         self.assertEqual({'a': 'a', 'b': 'b'}, resp.get_json())
         self.assertEqual('application/json', resp.content_type)
         self.assertEqual(200, resp.status_code)
@@ -586,7 +634,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.mock_etcd.create_instance('banana')
         resp = self.client.put(
             '/instances/12345678-1234-4321-1234-000000000001/metadata/foo',
-            headers={'Authorization': self.auth_header},
+            headers={'Authorization': self.auth_token},
             data=json.dumps({
                 'key': 'foo',
                 'value': 'bar'
@@ -602,7 +650,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.mock_etcd.create_instance('banana')
         resp = self.client.post(
             '/instances/12345678-1234-4321-1234-000000000001/metadata',
-            headers={'Authorization': self.auth_header},
+            headers={'Authorization': self.auth_token},
             data=json.dumps({
                 'key': 'foo',
                 'value': 'bar'
@@ -621,14 +669,14 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
 
         # Instance by name
         resp = self.client.get('/networks/barry',
-                               headers={'Authorization': self.auth_header})
+                               headers={'Authorization': self.auth_token})
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
         self.assertEqual('12345678-1234-4321-1234-000000000001',
                          resp.get_json().get('uuid'))
 
         resp = self.client.get('/networks/bob',
-                               headers={'Authorization': self.auth_header})
+                               headers={'Authorization': self.auth_token})
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
         self.assertEqual('12345678-1234-4321-1234-000000000003',
@@ -636,12 +684,12 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
 
         # Instance by name - WRONG
         resp = self.client.get('/networks/bazza',
-                               headers={'Authorization': self.auth_header})
+                               headers={'Authorization': self.auth_token})
         self.assertEqual(404, resp.status_code)
 
         # Instance by UUID
         resp = self.client.get('/networks/12345678-1234-4321-1234-000000000001',
-                               headers={'Authorization': self.auth_header})
+                               headers={'Authorization': self.auth_token})
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
         self.assertEqual('12345678-1234-4321-1234-000000000001',
@@ -649,7 +697,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
 
         # Instance by UUID - WRONG
         resp = self.client.get('/networks/12345678-1234-4321-1234-111111111111',
-                               headers={'Authorization': self.auth_header})
+                               headers={'Authorization': self.auth_token})
         self.assertEqual(404, resp.status_code)
 
     def test_get_network_metadata(self):
@@ -657,7 +705,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
                                       metadata={'a': 'a', 'b': 'b'})
         resp = self.client.get(
             '/networks/12345678-1234-4321-1234-000000000001/metadata',
-            headers={'Authorization': self.auth_header})
+            headers={'Authorization': self.auth_token})
         self.assertEqual({'a': 'a', 'b': 'b'}, resp.get_json())
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
@@ -666,7 +714,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.mock_etcd.create_network('banana', namespace='foo')
         resp = self.client.put(
             '/networks/12345678-1234-4321-1234-000000000001/metadata/foo',
-            headers={'Authorization': self.auth_header},
+            headers={'Authorization': self.auth_token},
             data=json.dumps({
                 'key': 'foo',
                 'value': 'bar'
@@ -682,7 +730,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.mock_etcd.create_network('banana', namespace='foo')
         resp = self.client.post(
             '/networks/12345678-1234-4321-1234-000000000001/metadata',
-            headers={'Authorization': self.auth_header},
+            headers={'Authorization': self.auth_token},
             data=json.dumps({
                 'key': 'foo',
                 'value': 'bar'
@@ -699,7 +747,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
                                        metadata={'foo': 'bar', 'real': 'smart'})
         resp = self.client.delete(
             '/instances/12345678-1234-4321-1234-000000000001/metadata/foo',
-            headers={'Authorization': self.auth_header})
+            headers={'Authorization': self.auth_token})
         self.assertEqual(200, resp.status_code)
         self.assertEqual(None, resp.get_json())
         self.assertEqual(
@@ -712,7 +760,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
                                        metadata={'foo': 'bar', 'real': 'smart'})
         resp = self.client.delete(
             '/instances/12345678-1234-4321-1234-000000000001/metadata/wrong',
-            headers={'Authorization': self.auth_header})
+            headers={'Authorization': self.auth_token})
         self.assertEqual({'error': 'key not found', 'status': 404},
                          resp.get_json())
         self.assertEqual(404, resp.status_code)
@@ -722,7 +770,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
                                       metadata={'foo': 'bar', 'real': 'smart'})
         resp = self.client.delete(
             '/networks/12345678-1234-4321-1234-000000000001/metadata/foo',
-            headers={'Authorization': self.auth_header})
+            headers={'Authorization': self.auth_token})
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
@@ -731,11 +779,11 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
                 '/sf/metadata/network/12345678-1234-4321-1234-000000000001']))
 
     def test_delete_network_metadata_bad_key(self):
-        self.mock_etcd.create_network('banana', namespace='foo',
+        self.mock_etcd.create_network('banana', namespace='system',
                                       metadata={'foo': 'bar', 'real': 'smart'})
         resp = self.client.delete(
             '/networks/12345678-1234-4321-1234-000000000001/metadata/wrong',
-            headers={'Authorization': self.auth_header})
+            headers={'Authorization': self.auth_token})
         self.assertEqual({'error': 'key not found', 'status': 404},
                          resp.get_json())
         self.assertEqual(404, resp.status_code)
@@ -782,7 +830,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
             mock_get_instances, mock_enqueue):
 
         resp = self.client.delete('/instances',
-                                  headers={'Authorization': self.auth_header},
+                                  headers={'Authorization': self.auth_token},
                                   data=json.dumps({
                                       'confirm': True,
                                       'namespace': 'system'
@@ -794,7 +842,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
 
     def test_post_instance_no_disk(self):
         resp = self.client.post('/instances',
-                                headers={'Authorization': self.auth_header},
+                                headers={'Authorization': self.auth_token},
                                 data=json.dumps({
                                     'name': 'test-instance',
                                     'cpus': 1,
@@ -813,7 +861,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
 
     def test_post_instance_invalid_disk(self):
         resp = self.client.post('/instances',
-                                headers={'Authorization': self.auth_header},
+                                headers={'Authorization': self.auth_token},
                                 data=json.dumps({
                                     'name': 'test-instance',
                                     'cpus': 1,
@@ -833,7 +881,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
     @mock.patch('shakenfist.artifact.Artifact.from_url')
     def test_post_instance_invalid_network(self, mock_get_artifact):
         resp = self.client.post('/instances',
-                                headers={'Authorization': self.auth_header},
+                                headers={'Authorization': self.auth_token},
                                 data=json.dumps({
                                     'name': 'test-instance',
                                     'cpus': 1,
@@ -854,7 +902,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
     @mock.patch('shakenfist.artifact.Artifact.from_url')
     def test_post_instance_invalid_network_uuid(self, mock_get_artifact):
         resp = self.client.post('/instances',
-                                headers={'Authorization': self.auth_header},
+                                headers={'Authorization': self.auth_token},
                                 data=json.dumps({
                                     'name': 'test-instance',
                                     'cpus': 1,
@@ -979,7 +1027,7 @@ class ExternalApiNetworkTestCase(base.ShakenFistTestCase):
             resp = self.client.post(
                 '/auth', data=json.dumps({'namespace': 'system', 'key': 'foo'}))
             self.assertEqual(200, resp.status_code)
-            self.auth_header = 'Bearer %s' % resp.get_json()['access_token']
+            self.auth_token = 'Bearer %s' % resp.get_json()['access_token']
 
     @mock.patch('shakenfist.net.Network._db_get_attribute',
                 return_value={'value': dbo.STATE_CREATED, 'update_time': 2})
@@ -1027,7 +1075,7 @@ class ExternalApiNetworkTestCase(base.ShakenFistTestCase):
 
         self.client = external_api.app.test_client()
         resp = self.client.delete('/networks',
-                                  headers={'Authorization': self.auth_header},
+                                  headers={'Authorization': self.auth_token},
                                   data=json.dumps({
                                       'confirm': True,
                                       'namespace': 'foo'
@@ -1061,7 +1109,7 @@ class ExternalApiNetworkTestCase(base.ShakenFistTestCase):
                                                 mock_db_get_networks,
                                                 mock_db_get_network):
         resp = self.client.delete('/networks',
-                                  headers={'Authorization': self.auth_header},
+                                  headers={'Authorization': self.auth_token},
                                   data=json.dumps({
                                       'confirm': True,
                                       'namespace': 'foo'
@@ -1115,7 +1163,7 @@ class ExternalApiNoNamespaceMockTestCase(base.ShakenFistTestCase):
             resp = self.client.post(
                 '/auth', data=json.dumps({'namespace': 'system', 'key': 'foo'}))
             self.assertEqual(200, resp.status_code)
-            self.auth_header = 'Bearer %s' % resp.get_json()[
+            self.auth_token = 'Bearer %s' % resp.get_json()[
                 'access_token']
 
     @mock.patch('shakenfist.db.get_lock')
@@ -1129,7 +1177,7 @@ class ExternalApiNoNamespaceMockTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.etcd.put')
     def test_delete_namespace_key(self, mock_put, mock_get, mock_lock):
         resp = self.client.delete('/auth/namespaces/system/keys/mykey',
-                                  headers={'Authorization': self.auth_header})
+                                  headers={'Authorization': self.auth_token})
         self.assertEqual(200, resp.status_code)
         mock_put.assert_called_with('namespace', None, 'system',
                                     {'service_key': 'foo', 'keys': {}})
@@ -1140,7 +1188,7 @@ class ExternalApiNoNamespaceMockTestCase(base.ShakenFistTestCase):
     @mock.patch('bcrypt.hashpw', return_value='terminator'.encode('utf-8'))
     def test_auth_add_key_new_namespace(self, mock_hashpw, mock_put, mock_get, mock_lock):
         resp = self.client.post('/auth/namespaces',
-                                headers={'Authorization': self.auth_header},
+                                headers={'Authorization': self.auth_token},
                                 data=json.dumps({
                                     'namespace': 'foo',
                                     'key_name': 'bernard',

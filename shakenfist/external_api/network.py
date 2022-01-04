@@ -91,6 +91,9 @@ class NetworkEndpoint(api_base.Resource):
 
         _delete_network(network_from_db)
 
+        # Return UUID in case API call was made using object name
+        return {'uuid': network_from_db.uuid}
+
 
 class NetworksEndpoint(api_base.Resource):
     @marshal_with({

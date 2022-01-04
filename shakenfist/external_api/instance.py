@@ -71,6 +71,9 @@ class InstanceEndpoint(api_base.Resource):
 
         instance_from_db.enqueue_delete_remote(node)
 
+        # Return UUID in case API call was made using object name
+        return {'uuid': instance_from_db.uuid}
+
 
 def _artifact_safety_checks(a):
     if not a:
@@ -267,28 +270,25 @@ class InstancesEndpoint(api_base.Resource):
 
                 # Allow network to be specified by name or UUID (and error early
                 # if not found)
-                net_uuid = api_base.get_network_uuid(netdesc['network_uuid'])
-                if not net_uuid:
+                n = net.Network.from_db_by_ref(netdesc['network_uuid'])
+                if not n:
                     return api_base.error(
                         404, 'network %s not found' % netdesc['network_uuid'])
-                netdesc['network_uuid'] = net_uuid
+                netdesc['network_uuid'] = n.uuid
 
                 if netdesc.get('address') and not util_general.noneish(netdesc.get('address')):
                     # The requested address must be within the ip range specified
                     # for that virtual network, unless it is equivalent to "none".
-                    ipm = IPManager.from_db(net_uuid)
+                    ipm = IPManager.from_db(network.uuid)
                     if not ipm.is_in_range(netdesc['address']):
                         return api_base.error(400,
                                               'network specification requests an address outside the '
                                               'range of the network')
 
-                n = net.Network.from_db(net_uuid)
-                if not n:
-                    return api_base.error(404, 'network %s does not exist' % net_uuid)
                 if n.state.value != net.Network.STATE_CREATED:
                     return api_base.error(406, 'network %s is not ready (%s)' % (n.uuid, n.state.value))
                 if n.namespace != namespace:
-                    return api_base.error(404, 'network %s does not exist' % net_uuid)
+                    return api_base.error(404, 'network %s does not exist' % n.uuid)
 
         if not video:
             video = {'model': 'cirrus', 'memory': 16384}

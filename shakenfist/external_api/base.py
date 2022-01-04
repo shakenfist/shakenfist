@@ -5,21 +5,19 @@ from flask_jwt_extended.exceptions import (
     RevokedTokenError, FreshTokenRequired, CSRFError
 )
 from flask_jwt_extended import decode_token, get_jwt_identity
-from functools import partial
 import json
 from jwt.exceptions import DecodeError, PyJWTError
 import requests
 import sys
 import traceback
-import uuid
 
-from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
+from shakenfist import exceptions
 from shakenfist.etcd import ThreadLocalReadOnlyCache
-from shakenfist import instance
+from shakenfist.instance import Instance
 from shakenfist import logutil
 from shakenfist import net
 from shakenfist.upload import Upload
@@ -72,37 +70,22 @@ def caller_is_admin(func):
     return wrapper
 
 
-def valid_uuid4(uuid_string):
-    try:
-        uuid.UUID(uuid_string, version=4)
-    except ValueError:
-        return False
-    return True
-
-
 def arg_is_instance_uuid(func):
     # Method uses the instance from the db
     def wrapper(*args, **kwargs):
         with ThreadLocalReadOnlyCache():
-            inst_uuid = kwargs.get('instance_uuid')
-            if inst_uuid and not valid_uuid4(inst_uuid):
-                # Check if uuid is a valid name of an instance
-                filters = [
-                    partial(baseobject.namespace_filter, get_jwt_identity()[0]),
-                    instance.active_states_filter,
-                ]
-                for i in instance.Instances(filters):
-                    if i.name == inst_uuid:
-                        kwargs['instance_from_db'] = i
-                        break
-            else:
-                kwargs['instance_from_db'] = instance.Instance.from_db(inst_uuid)
+            try:
+                inst = Instance.from_db_by_ref(kwargs.get('instance_uuid'),
+                                               get_jwt_identity()[0])
+            except exceptions.MultipleObjects as e:
+                return error(400, str(e))
 
-            if not kwargs.get('instance_from_db'):
+            if not inst:
                 LOG.with_field('instance', kwargs.get('instance_uuid')).info(
                     'Instance not found, missing or deleted')
                 return error(404, 'instance not found')
 
+        kwargs['instance_from_db'] = inst
         return func(*args, **kwargs)
     return wrapper
 
@@ -171,7 +154,7 @@ def requires_instance_active(func):
             return error(404, 'instance not found')
 
         i = kwargs['instance_from_db']
-        if i.state.value != instance.Instance.STATE_CREATED:
+        if i.state.value != Instance.STATE_CREATED:
             LOG.with_instance(i).info(
                 'Instance not ready (%s)' % i.state.value)
             return error(406, 'instance %s is not ready (%s)' % (i.uuid, i.state.value))
@@ -180,37 +163,22 @@ def requires_instance_active(func):
     return wrapper
 
 
-def get_network_uuid(network_name):
-    if network_name and valid_uuid4(network_name):
-        # Already a valid UUID
-        return network_name
-
-    # Check if valid name of an active network
-    filters = [
-        partial(baseobject.namespace_filter, get_jwt_identity()[0]),
-        baseobject.active_states_filter,
-    ]
-    for n in net.Networks(filters):
-        # Duplicate name behaviour is "not defined" for the user therefore we
-        # just return the first network found.
-        if n.name == network_name:
-            return n.uuid
-
-
 def arg_is_network_uuid(func):
     # Method uses the network from the db
     def wrapper(*args, **kwargs):
         with ThreadLocalReadOnlyCache():
-            net_uuid = get_network_uuid(kwargs.get('network_uuid'))
-            if net_uuid:
-                # Retrieve the actual network via it's UUID
-                kwargs['network_from_db'] = net.Network.from_db(net_uuid)
+            try:
+                network = net.Network.from_db_by_ref(kwargs.get('network_uuid'),
+                                                     get_jwt_identity()[0])
+            except exceptions.MultipleObjects as e:
+                return error(400, str(e))
 
-            if not kwargs.get('network_from_db'):
+            if not network:
                 LOG.with_field('network', kwargs.get('network_uuid')).info(
                     'Network not found, missing or deleted')
                 return error(404, 'network not found')
 
+        kwargs['network_from_db'] = network
         return func(*args, **kwargs)
     return wrapper
 
@@ -413,7 +381,7 @@ def generic_wrapper(func):
             return func(*args, **kwargs)
 
         except TypeError as e:
-            return error(400, str(e), suppress_traceback=True)
+            return error(400, str(e), suppress_traceback=False)
 
         except DecodeError:
             # Send a more informative message than 'Not enough segments'
