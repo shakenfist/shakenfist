@@ -28,9 +28,9 @@ class TestObjectNames(base.BaseNamespacedTestCase):
         self._await_networks_ready(['barry_net'])
 
         inst_uuids = {}
-        for i in ['barry', 'dave']:
+        for name in ['barry', 'dave', 'trouble-writing-tests']:
             new_inst = self.test_client.create_instance(
-                'test-cirros-%s' % i, 1, 1024,
+                name, 1, 1024,
                 [
                     {
                         'network_uuid': 'barry_net'
@@ -44,7 +44,7 @@ class TestObjectNames(base.BaseNamespacedTestCase):
                     }
                 ], None, None,
                 namespace=self.namespace)
-            inst_uuids[i] = new_inst['uuid']
+            inst_uuids[name] = new_inst['uuid']
 
         # Get instance by name
         for name, uuid in inst_uuids.items():
