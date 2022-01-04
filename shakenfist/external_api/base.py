@@ -70,18 +70,18 @@ def caller_is_admin(func):
     return wrapper
 
 
-def arg_is_instance_uuid(func):
+def arg_is_instance_ref(func):
     # Method uses the instance from the db
     def wrapper(*args, **kwargs):
         with ThreadLocalReadOnlyCache():
             try:
-                inst = Instance.from_db_by_ref(kwargs.get('instance_uuid'),
+                inst = Instance.from_db_by_ref(kwargs.get('instance_ref'),
                                                get_jwt_identity()[0])
             except exceptions.MultipleObjects as e:
                 return error(400, str(e))
 
             if not inst:
-                LOG.with_field('instance', kwargs.get('instance_uuid')).info(
+                LOG.with_field('instance', kwargs.get('instance_ref')).info(
                     'Instance not found, missing or deleted')
                 return error(404, 'instance not found')
 
@@ -128,10 +128,10 @@ def redirect_instance_request(func):
 
 
 def requires_instance_ownership(func):
-    # Requires that @arg_is_instance_uuid has already run
+    # Requires that @arg_is_instance_ref has already run
     def wrapper(*args, **kwargs):
         if not kwargs.get('instance_from_db'):
-            LOG.with_field('instance', kwargs['instance_uuid']).info(
+            LOG.with_field('instance', kwargs['instance_ref']).info(
                 'Instance not found, kwarg missing')
             return error(404, 'instance not found')
 
@@ -146,10 +146,10 @@ def requires_instance_ownership(func):
 
 
 def requires_instance_active(func):
-    # Requires that @arg_is_instance_uuid has already run
+    # Requires that @arg_is_instance_ref has already run
     def wrapper(*args, **kwargs):
         if not kwargs.get('instance_from_db'):
-            LOG.with_field('instance', kwargs['instance_uuid']).info(
+            LOG.with_field('instance', kwargs['instance_ref']).info(
                 'Instance not found, kwarg missing')
             return error(404, 'instance not found')
 
@@ -163,18 +163,18 @@ def requires_instance_active(func):
     return wrapper
 
 
-def arg_is_network_uuid(func):
+def arg_is_network_ref(func):
     # Method uses the network from the db
     def wrapper(*args, **kwargs):
         with ThreadLocalReadOnlyCache():
             try:
-                network = net.Network.from_db_by_ref(kwargs.get('network_uuid'),
+                network = net.Network.from_db_by_ref(kwargs.get('network_ref'),
                                                      get_jwt_identity()[0])
             except exceptions.MultipleObjects as e:
                 return error(400, str(e))
 
             if not network:
-                LOG.with_field('network', kwargs.get('network_uuid')).info(
+                LOG.with_field('network', kwargs.get('network_ref')).info(
                     'Network not found, missing or deleted')
                 return error(404, 'network not found')
 
@@ -210,9 +210,9 @@ def redirect_to_network_node(func):
 
 
 def requires_network_ownership(func):
-    # Requires that @arg_is_network_uuid has already run
+    # Requires that @arg_is_network_ref has already run
     def wrapper(*args, **kwargs):
-        log = LOG.with_field('network', kwargs['network_uuid'])
+        log = LOG.with_field('network', kwargs['network_ref'])
 
         if not kwargs.get('network_from_db'):
             log.info('Network not found, kwarg missing')
@@ -227,9 +227,9 @@ def requires_network_ownership(func):
 
 
 def requires_network_active(func):
-    # Requires that @arg_is_network_uuid has already run
+    # Requires that @arg_is_network_ref has already run
     def wrapper(*args, **kwargs):
-        log = LOG.with_field('network', kwargs['network_uuid'])
+        log = LOG.with_field('network', kwargs['network_ref'])
 
         if not kwargs.get('network_from_db'):
             log.info('Network not found, kwarg missing')

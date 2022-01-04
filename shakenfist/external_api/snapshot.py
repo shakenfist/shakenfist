@@ -21,11 +21,11 @@ daemon.set_log_level(LOG, 'api')
 
 class InstanceSnapshotEndpoint(api_base.Resource):
     @jwt_required
-    @api_base.arg_is_instance_uuid
+    @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
-    def post(self, instance_uuid=None, instance_from_db=None, all=None,
+    def post(self, instance_ref=None, instance_from_db=None, all=None,
              device=None, max_versions=0):
         disks = instance_from_db.block_devices['devices']
         if instance_from_db.uefi:
@@ -46,7 +46,7 @@ class InstanceSnapshotEndpoint(api_base.Resource):
         elif not all:
             disks = [disks[0]]
         LOG.with_fields({
-            'instance': instance_uuid,
+            'instance': instance_from_db.uuid,
             'devices': disks}).info('Devices for snapshot')
 
         out = {}
@@ -63,7 +63,7 @@ class InstanceSnapshotEndpoint(api_base.Resource):
             a = Artifact.from_url(
                 Artifact.TYPE_SNAPSHOT,
                 '%s%s/%s' % (artifact.INSTANCE_URL,
-                             instance_uuid, disk['device']),
+                             instance_from_db.uuid, disk['device']),
                 max_versions)
 
             blob_uuid = str(uuid.uuid4())
@@ -91,7 +91,8 @@ class InstanceSnapshotEndpoint(api_base.Resource):
 
             else:
                 etcd.enqueue(config.NODE_NAME, {
-                    'tasks': [SnapshotTask(instance_uuid, disk, a.uuid, blob_uuid)],
+                    'tasks': [SnapshotTask(
+                        instance_from_db.uuid, disk, a.uuid, blob_uuid)],
                 })
             instance_from_db.add_event('api', 'snapshot of %s requested' % disk,
                                        None, a.uuid)
@@ -99,11 +100,12 @@ class InstanceSnapshotEndpoint(api_base.Resource):
         return out
 
     @jwt_required
-    @api_base.arg_is_instance_uuid
+    @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
-    def get(self, instance_uuid=None, instance_from_db=None):
+    def get(self, instance_ref=None, instance_from_db=None):
         out = []
-        for snap in Artifacts([partial(artifact.instance_snapshot_filter, instance_uuid)]):
+        for snap in Artifacts([
+                partial(artifact.instance_snapshot_filter, instance_from_db.uuid)]):
             ev = snap.external_view_without_index()
             for idx in snap.get_all_indexes():
                 # Give the blob uuid a better name
