@@ -243,6 +243,19 @@ class Instance(dbo):
             else:
                 i['interfaces'].append(ni.external_view())
 
+        # Mix in details of the configured disks. We don't have all the details
+        # in the block devices structure until _initialize_block_devices() is
+        # called. If not yet configured, we just return None.
+        i['disks'] = []
+        for disk in self.block_devices.get('devices', []):
+            i['disks'].append({
+                'device': disk['device'],
+                'bus': disk['bus'],
+                'size': disk.get('size'),
+                'blob_uuid': disk.get('blob_uuid'),
+                'snapshot_ignores': disk.get('snapshot_ignores')
+            })
+
         return i
 
     # Static values
@@ -1084,7 +1097,7 @@ class Instance(dbo):
         self.error = error_msg
         self.enqueue_delete_remote(config.NODE_NAME)
 
-    def snapshot(self, all=False, device=None, max_versions=None):
+    def snapshot(self, all=False, device=None, max_versions=None, thin=False):
         disks = self.block_devices['devices']
 
         # Include NVRAM as a snapshot option if we are UEFI booted
@@ -1148,7 +1161,8 @@ class Instance(dbo):
 
             else:
                 etcd.enqueue(config.NODE_NAME, {
-                    'tasks': [SnapshotTask(self.uuid, disk, a.uuid, blob_uuid)],
+                    'tasks': [SnapshotTask(self.uuid, disk, a.uuid, blob_uuid,
+                                           thin=thin)],
                 })
             self.add_event(
                 'api',

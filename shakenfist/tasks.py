@@ -235,19 +235,23 @@ class FetchImageTask(ImageTask):
 class SnapshotTask(QueueTask):
     _name = 'snapshot'
 
-    def __init__(self, instance_uuid, disk, artifact_uuid, blob_uuid):
+    def __init__(self, instance_uuid, disk, artifact_uuid, blob_uuid, thin=False):
         super(SnapshotTask, self).__init__()
         self._instance_uuid = instance_uuid
         self._disk = disk
         self._artifact_uuid = artifact_uuid
         self._blob_uuid = blob_uuid
+        self._thin = thin
 
     def obj_dict(self):
-        return {**super(SnapshotTask, self).obj_dict(),
-                'instance_uuid': self._instance_uuid,
-                'disk': self._disk,
-                'artifact_uuid': self._artifact_uuid,
-                'blob_uuid': self._blob_uuid}
+        return {
+            **super(SnapshotTask, self).obj_dict(),
+            'instance_uuid': self._instance_uuid,
+            'disk': self._disk,
+            'artifact_uuid': self._artifact_uuid,
+            'blob_uuid': self._blob_uuid,
+            'thin': self._thin
+        }
 
     # Data methods
     def instance_uuid(self):
@@ -261,6 +265,9 @@ class SnapshotTask(QueueTask):
 
     def blob_uuid(self):
         return self._blob_uuid
+
+    def thin(self):
+        return self._thin
 
 #
 # Blob tasks

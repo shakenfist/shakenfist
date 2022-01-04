@@ -124,8 +124,8 @@ def handle(jobname, workitem):
                 etcd.enqueue('networknode', task)
 
             elif isinstance(task, SnapshotTask):
-                snapshot(inst, task.disk(),
-                         task.artifact_uuid(), task.blob_uuid())
+                snapshot(inst, task.disk(), task.artifact_uuid(), task.blob_uuid(),
+                         task.thin())
 
             elif isinstance(task, DeleteNetworkWhenClean):
                 # Check if any interfaces remain on network

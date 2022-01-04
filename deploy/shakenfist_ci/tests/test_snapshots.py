@@ -57,6 +57,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         snap1_info = self.test_client.get_artifact(snapshot_uuid)
         self.assertEqual(1, len(snap1_info.get('blobs', [])))
         self.assertEqual(1, snap1_info['blobs']['1']['reference_count'])
+        self.assertEqual(None, snap1_info['blobs']['1']['depends_on'])
 
         # Take another snapshot, we only get the new snapshot returned
         snap2 = self.test_client.snapshot_instance(inst1['uuid'])
@@ -367,3 +368,86 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                 'sf://instance/%s' % inst['uuid']))
 
         self.test_client.delete_instance(inst['uuid'])
+
+    def test_thin_snapshots(self):
+        inst1 = self.test_client.create_instance(
+            'thin-original', 1, 1024,
+            [
+                {
+                    'network_uuid': self.net['uuid']
+                }
+            ],
+            [
+                {
+                    'size': 20,
+                    'base': 'sf://upload/system/ubuntu-2004',
+                    'type': 'disk'
+                }
+            ], None, base.load_userdata('writedata'))
+
+        self.assertIsNotNone(inst1['uuid'])
+        self.assertIsNotNone(inst1['node'])
+
+        self._await_login_prompt(inst1['uuid'])
+        self.assertInstanceConsoleAfterBoot(inst1['uuid'], 'System booted ok')
+
+        # Take a snapshot
+        snap1 = self.test_client.snapshot_instance(inst1['uuid'], thin=True)
+        self.assertIsNotNone(snap1)
+        self.assertEqual(1, snap1['vda']['artifact_index'])
+
+        # Wait until the blob uuid specified above is the one used for the
+        # current snapshot
+        start_time = time.time()
+        while time.time() - start_time < 300:
+            snapshots = self.test_client.get_instance_snapshots(inst1['uuid'])
+            if snapshots and snapshots[-1].get('blob_uuid') == snap1['vda']['blob_uuid']:
+                break
+            time.sleep(5)
+
+        self.assertEqual(1, len(snapshots))
+        self.assertEqual('created', snapshots[0]['state'])
+
+        # Check blob exists, has correct reference count, and depends on previous
+        # blob
+        snapshot_uuid = snapshots[-1]['uuid']
+        snap1_info = self.test_client.get_artifact(snapshot_uuid)
+        self.assertEqual(1, len(snap1_info.get('blobs', [])))
+        self.assertEqual(1, snap1_info['blobs']['1']['reference_count'])
+        self.assertNotEqual(None, snap1_info['blobs']['1']['depends_on'])
+
+        # Refresh our view of the instance
+        inst1 = self.test_client.get_instance(inst1['uuid'])
+
+        # We wrote 50mb of data in our boot script, but there will also be other
+        # changes (disk resize, log files, etc). Let's just make sure the snapshot
+        # is a lot smaller than the base image.
+        b = self.test_client.get_blob(inst1['disks'][0]['blob_uuid'])
+        self.assertNotEqual(None, b['size'])
+        self.assertLess(snap1_info['blobs']['1']['size'], b['size'])
+
+        # Try booting an instance with the thin snapshot
+        inst2 = self.test_client.create_instance(
+            'thin-snapshot', 1, 1024,
+            [
+                {
+                    'network_uuid': self.net['uuid']
+                }
+            ],
+            [
+                {
+                    'size': 20,
+                    'base': 'sf://blob/%s' % inst1['disks'][0]['blob_uuid'],
+                    'type': 'disk'
+                }
+            ], None, base.load_userdata('writedata'))
+
+        self.assertIsNotNone(inst2['uuid'])
+        self.assertIsNotNone(inst2['node'])
+
+        self._await_login_prompt(inst2['uuid'])
+        self.assertInstanceConsoleAfterBoot(inst2['uuid'], 'System booted ok')
+
+        # Cleanup
+        self.test_client.delete_instance(inst1['uuid'])
+        self.test_client.delete_instance(inst2['uuid'])
