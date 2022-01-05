@@ -46,9 +46,11 @@ class Blob(dbo):
         self.__modified = static_values['modified']
         self.__fetched_at = static_values['fetched_at']
         self.__depends_on = static_values['depends_on']
+        self.__is_transcode_of = static_values['is_transcode_of']
 
     @classmethod
-    def new(cls, blob_uuid, size, modified, fetched_at, depends_on=None):
+    def new(cls, blob_uuid, size, modified, fetched_at, depends_on=None,
+            is_transcode_of=None):
         Blob._db_create(
             blob_uuid,
             {
@@ -57,6 +59,7 @@ class Blob(dbo):
                 'modified': modified,
                 'fetched_at': fetched_at,
                 'depends_on': depends_on,
+                'is_transcode_of': is_transcode_of,
 
                 'version': cls.current_version
             }
@@ -76,6 +79,7 @@ class Blob(dbo):
             'modified': self.modified,
             'fetched_at': self.fetched_at,
             'depends_on': self.depends_on,
+            'is_transcode_of': self.__is_transcode_of,
             'locations': self.locations,
             'reference_count': self.ref_count,
             'instances': self.instances
@@ -101,6 +105,10 @@ class Blob(dbo):
     def depends_on(self):
         return self.__depends_on
 
+    @property
+    def is_transcode_of(self):
+        return self.__is_transcode_of
+
     # Values routed to attributes
     @property
     def locations(self):
@@ -124,6 +132,19 @@ class Blob(dbo):
         if not count:
             return 0
         return int(count.get('ref_count', 0))
+
+    @property
+    def transcoded(self):
+        transcoded = self._db_get_attribute('transcoded')
+        if not transcoded:
+            return {}
+        return transcoded
+
+    def add_transcode(self, style, blob_uuid):
+        with self.get_lock(op='Update trancoded versions'):
+            transcoded = self.transcoded
+            transcoded[style] = blob_uuid
+            self._db_set_attribute('transcoded', transcoded)
 
     # Derived values
     @property
@@ -205,6 +226,12 @@ class Blob(dbo):
             # If no references then the blob cannot be used, therefore delete.
             if new_count == 0:
                 self.state = self.STATE_DELETED
+
+            # Clean up any transcodes too
+            for transcoded_blob_uuid in self.transcoded.values():
+                transcoded_blob = Blob.from_db(transcoded_blob_uuid)
+                if transcoded_blob:
+                    transcoded_blob.ref_count_dec()
 
             return new_count
 
