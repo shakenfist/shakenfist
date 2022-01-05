@@ -8,6 +8,7 @@ from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import logutil
+from shakenfist.util import general as util_general
 
 
 LOG, _ = logutil.setup(__name__)
@@ -24,6 +25,13 @@ class DatabaseBackedObject(object):
     STATE_DELETED = 'deleted'
     STATE_DELETE_WAIT = 'delete_wait'
     STATE_ERROR = 'error'
+
+    ACTIVE_STATES = set([STATE_INITIAL,
+                         STATE_CREATING,
+                         STATE_CREATED,
+                         STATE_ERROR,
+                         STATE_DELETE_WAIT
+                         ])
 
     def __init__(self, object_uuid, version=None, in_memory_only=False):
         self.__uuid = object_uuid
@@ -53,6 +61,46 @@ class DatabaseBackedObject(object):
         if not self.__in_memory_only:
             db.add_event(
                 self.object_type, self.__uuid, operation, phase, duration, msg)
+
+    @classmethod
+    def from_db(cls, object_uuid):
+        if not object_uuid:
+            return None
+
+        static_values = cls._db_get(object_uuid)
+        if not static_values:
+            return None
+
+        return cls(static_values)
+
+    @classmethod
+    def from_db_by_ref(cls, object_ref, namespace=None):
+        if object_ref and util_general.valid_uuid4(object_ref):
+            # Already a valid UUID
+            return cls.from_db(object_ref)
+
+        # Check if valid name of an active object
+        filters = [partial(state_filter, cls.ACTIVE_STATES)]
+        if namespace:
+            filters.append(partial(namespace_filter, namespace))
+
+        found_obj = None
+        for o in cls.filter(filters):
+            if o.name == object_ref:
+                if found_obj:
+                    raise exceptions.MultipleObjects(
+                        'multiple %ss have the name "%s"' % (
+                            cls.object_type, object_ref))
+                found_obj = o
+
+        return found_obj
+
+    @classmethod
+    def filter(cls, filters):
+        for _, o in etcd.get_all(cls.object_type, None):
+            obj = cls(o)
+            if all([f(obj) for f in filters]):
+                yield obj
 
     @classmethod
     def _db_create(cls, object_uuid, metadata):
@@ -209,12 +257,7 @@ def state_filter(states, o):
 
 # Do not use these filters for instances or nodes, use the more
 # specific ones instead
-active_states_filter = partial(
-    state_filter, [DatabaseBackedObject.STATE_INITIAL,
-                   DatabaseBackedObject.STATE_CREATING,
-                   DatabaseBackedObject.STATE_CREATED,
-                   DatabaseBackedObject.STATE_ERROR,
-                   DatabaseBackedObject.STATE_DELETE_WAIT])
+active_states_filter = partial(state_filter, DatabaseBackedObject.ACTIVE_STATES)
 
 
 def state_age_filter(delay, o):

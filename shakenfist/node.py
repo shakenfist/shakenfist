@@ -25,6 +25,8 @@ class Node(dbo):
     STATE_STOPPING = 'stopping'
     STATE_STOPPED = 'stopped'
 
+    ACTIVE_STATES = set([dbo.STATE_CREATED])
+
     state_targets = {
         None: (dbo.STATE_CREATED, dbo.STATE_ERROR, STATE_MISSING),
         dbo.STATE_CREATED: (dbo.STATE_DELETED, dbo.STATE_ERROR, STATE_MISSING,
@@ -74,17 +76,6 @@ class Node(dbo):
                                 'release': util_general.get_version()
                             })
 
-    @staticmethod
-    def from_db(fqdn):
-        if not fqdn:
-            return None
-
-        static_values = Node._db_get(fqdn)
-        if not static_values:
-            return None
-
-        return Node(static_values)
-
     def external_view(self):
         # If this is an external view, then mix back in attributes that users
         # expect
@@ -128,8 +119,7 @@ class Nodes(dbo_iter):
                 yield out
 
 
-active_states_filter = partial(
-    baseobject.state_filter, [dbo.STATE_CREATED])
+active_states_filter = partial(baseobject.state_filter, Node.ACTIVE_STATES)
 inactive_states_filter = partial(
     baseobject.state_filter, [dbo.STATE_DELETED, dbo.STATE_ERROR, Node.STATE_MISSING])
 

@@ -108,31 +108,31 @@ api.add_resource(api_blob.BlobsEndpoint, '/blob')
 api.add_resource(api_blob.BlobEndpoint, '/blob/<blob_uuid>')
 
 api.add_resource(api_instance.InstancesEndpoint, '/instances')
-api.add_resource(api_instance.InstanceEndpoint, '/instances/<instance_uuid>')
+api.add_resource(api_instance.InstanceEndpoint, '/instances/<instance_ref>')
 api.add_resource(api_instance.InstanceEventsEndpoint,
-                 '/instances/<instance_uuid>/events')
+                 '/instances/<instance_ref>/events')
 api.add_resource(api_instance.InstanceInterfacesEndpoint,
-                 '/instances/<instance_uuid>/interfaces')
+                 '/instances/<instance_ref>/interfaces')
 api.add_resource(api_snapshot.InstanceSnapshotEndpoint,
-                 '/instances/<instance_uuid>/snapshot')
+                 '/instances/<instance_ref>/snapshot')
 api.add_resource(api_instance.InstanceRebootSoftEndpoint,
-                 '/instances/<instance_uuid>/rebootsoft')
+                 '/instances/<instance_ref>/rebootsoft')
 api.add_resource(api_instance.InstanceRebootHardEndpoint,
-                 '/instances/<instance_uuid>/reboothard')
+                 '/instances/<instance_ref>/reboothard')
 api.add_resource(api_instance.InstancePowerOffEndpoint,
-                 '/instances/<instance_uuid>/poweroff')
+                 '/instances/<instance_ref>/poweroff')
 api.add_resource(api_instance.InstancePowerOnEndpoint,
-                 '/instances/<instance_uuid>/poweron')
+                 '/instances/<instance_ref>/poweron')
 api.add_resource(api_instance.InstancePauseEndpoint,
-                 '/instances/<instance_uuid>/pause')
+                 '/instances/<instance_ref>/pause')
 api.add_resource(api_instance.InstanceUnpauseEndpoint,
-                 '/instances/<instance_uuid>/unpause')
+                 '/instances/<instance_ref>/unpause')
 api.add_resource(api_instance.InstanceMetadatasEndpoint,
-                 '/instances/<instance_uuid>/metadata')
+                 '/instances/<instance_ref>/metadata')
 api.add_resource(api_instance.InstanceMetadataEndpoint,
-                 '/instances/<instance_uuid>/metadata/<key>')
+                 '/instances/<instance_ref>/metadata/<key>')
 api.add_resource(api_instance.InstanceConsoleDataEndpoint,
-                 '/instances/<instance_uuid>/consoledata')
+                 '/instances/<instance_ref>/consoledata')
 
 api.add_resource(api_interface.InterfaceEndpoint,
                  '/interfaces/<interface_uuid>')
@@ -155,17 +155,17 @@ api.add_resource(api_artifact.ArtifactVersionEndpoint,
 api.add_resource(api_label.LabelEndpoint, '/label/<label_name>')
 
 api.add_resource(api_network.NetworksEndpoint, '/networks')
-api.add_resource(api_network.NetworkEndpoint, '/networks/<network_uuid>')
+api.add_resource(api_network.NetworkEndpoint, '/networks/<network_ref>')
 api.add_resource(api_network.NetworkEventsEndpoint,
-                 '/networks/<network_uuid>/events')
+                 '/networks/<network_ref>/events')
 api.add_resource(api_network.NetworkInterfacesEndpoint,
-                 '/networks/<network_uuid>/interfaces')
+                 '/networks/<network_ref>/interfaces')
 api.add_resource(api_network.NetworkMetadatasEndpoint,
-                 '/networks/<network_uuid>/metadata')
+                 '/networks/<network_ref>/metadata')
 api.add_resource(api_network.NetworkMetadataEndpoint,
-                 '/networks/<network_uuid>/metadata/<key>')
+                 '/networks/<network_ref>/metadata/<key>')
 api.add_resource(api_network.NetworkPingEndpoint,
-                 '/networks/<network_uuid>/ping/<address>')
+                 '/networks/<network_ref>/ping/<address>')
 
 api.add_resource(api_node.NodesEndpoint, '/nodes')
 

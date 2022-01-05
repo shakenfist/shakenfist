@@ -64,17 +64,6 @@ class Blob(dbo):
         b.state = Blob.STATE_INITIAL
         return b
 
-    @staticmethod
-    def from_db(blob_uuid):
-        if not blob_uuid:
-            return None
-
-        static_values = Blob._db_get(blob_uuid)
-        if not static_values:
-            return None
-
-        return Blob(static_values)
-
     def external_view(self):
         # If this is an external view, then mix back in attributes that users
         # expect

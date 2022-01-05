@@ -24,6 +24,10 @@ class NoStateTransitionsDefined(ObjectException):
     pass
 
 
+class MultipleObjects(ObjectException):
+    pass
+
+
 # Instance
 class InstanceException(Exception):
     pass
