@@ -1,6 +1,6 @@
 import os
 import re
-
+import shutil
 
 # To avoid circular imports, util modules should only import a limited
 # set of shakenfist modules, mainly exceptions, logutils, and specific
@@ -140,13 +140,20 @@ def snapshot(locks, source, destination, thin=False):
         backing_path, backing_uuid_with_extension = os.path.split(backing_file)
         backing_uuid = backing_uuid_with_extension.split('.')[0]
 
+        _, destination_uuid = os.path.split(destination)
+        temporary_location = os.path.join(config.STORAGE_PATH, 'image_cache',
+                                          destination_uuid + '.partial')
+
         cmd = ('qemu-img convert --force-share -o cluster_size=%s -O qcow2 -B %s'
                % (constants.QCOW2_CLUSTER_SIZE, backing_uuid_with_extension))
         if config.COMPRESS_SNAPSHOTS:
             cmd += ' -c'
 
-        util_process.execute(locks, ' '.join([cmd, source, destination]),
+        util_process.execute(locks, ' '.join([cmd, source, temporary_location]),
                              iopriority=util_process.PRIORITY_LOW, cwd=backing_path)
+
+        # TODO(mikal): its likely this move should be done with a low IO priority?
+        shutil.move(temporary_location, destination)
         return backing_uuid
 
     # Produce a single file with any backing files flattened. This is also the
