@@ -397,6 +397,7 @@ class Monitor(daemon.WorkerPoolDaemon):
     def run(self):
         LOG.info('Starting')
         last_management = 0
+        last_shutdown_notification = 0
 
         network_worker = None
         stray_interface_worker = None
@@ -444,9 +445,10 @@ class Monitor(daemon.WorkerPoolDaemon):
                         last_management = time.time()
 
                 elif len(self.workers) > 0:
-                    LOG.info('Waiting for %d workers to finish'
-                             % len(self.workers))
-                    # TODO(andy) This spams the log
+                    if time.time() - last_shutdown_notification > 5:
+                        LOG.info('Waiting for %d workers to finish'
+                                 % len(self.workers))
+                        last_shutdown_notification = time.time()
 
                 else:
                     return
