@@ -127,7 +127,6 @@
           - python3-pip
           - python3-venv
           - python3-wheel
-          - tox
         state: latest
 
     - name: Install non-hypervisor dependencies
@@ -153,6 +152,11 @@
           - qemu-kvm
           - unzip
         state: latest
+
+    # This is driven by issues with the version of tox packaged on Debian 10
+    - name: Install modern tox and filelock (required by tox)
+      shell: |
+        pip3 install -U tox filelock
 
     - name: Install Grafana prerequisites
       apt:
