@@ -16,7 +16,6 @@ from shakenfist.daemons import queues as queues_daemon
 from shakenfist.daemons import net as net_daemon
 from shakenfist.daemons import resources as resource_daemon
 from shakenfist.daemons import triggers as trigger_daemon
-from shakenfist import db
 from shakenfist import etcd
 from shakenfist import instance
 from shakenfist.ipmanager import IPManager
@@ -90,9 +89,7 @@ def restore_instances():
     with util_general.RecordedOperation('restore instances', None):
         for inst in instances:
             try:
-                with db.get_lock(
-                        'instance', None, inst.uuid, ttl=120, timeout=120,
-                        op='Instance restore'):
+                with inst.get_lock(ttl=120, timeout=120, op='Instance restore'):
                     started = ['on', 'transition-to-on',
                                instance.Instance.STATE_INITIAL, 'unknown']
                     if inst.power_state not in started:

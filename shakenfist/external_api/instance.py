@@ -518,9 +518,7 @@ class InstanceRebootSoftEndpoint(api_base.Resource):
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
     def post(self, instance_ref=None, instance_from_db=None):
-        with db.get_lock(
-                'instance', None, instance_from_db.uuid, ttl=120, timeout=120,
-                op='Instance reboot soft'):
+        with instance_from_db.get_lock(op='Instance reboot soft'):
             instance_from_db.add_event('api', 'soft reboot')
             return instance_from_db.reboot(hard=False)
 
@@ -532,9 +530,7 @@ class InstanceRebootHardEndpoint(api_base.Resource):
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
     def post(self, instance_ref=None, instance_from_db=None):
-        with db.get_lock(
-                'instance', None, instance_from_db.uuid, ttl=120, timeout=120,
-                op='Instance reboot hard'):
+        with instance_from_db.get_lock(op='Instance reboot hard'):
             instance_from_db.add_event('api', 'hard reboot')
             return instance_from_db.reboot(hard=True)
 
@@ -546,9 +542,7 @@ class InstancePowerOffEndpoint(api_base.Resource):
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
     def post(self, instance_ref=None, instance_from_db=None):
-        with db.get_lock(
-                'instance', None, instance_from_db.uuid, ttl=120, timeout=120,
-                op='Instance power off'):
+        with instance_from_db.get_lock(op='Instance power off'):
             instance_from_db.add_event('api', 'poweroff')
             return instance_from_db.power_off()
 
@@ -560,9 +554,7 @@ class InstancePowerOnEndpoint(api_base.Resource):
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
     def post(self, instance_ref=None, instance_from_db=None):
-        with db.get_lock(
-                'instance', None, instance_from_db.uuid, ttl=120, timeout=120,
-                op='Instance power on'):
+        with instance_from_db.get_lock(op='Instance power on'):
             instance_from_db.add_event('api', 'poweron')
             return instance_from_db.power_on()
 
@@ -574,9 +566,7 @@ class InstancePauseEndpoint(api_base.Resource):
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
     def post(self, instance_ref=None, instance_from_db=None):
-        with db.get_lock(
-                'instance', None, instance_from_db.uuid, ttl=120, timeout=120,
-                op='Instance pause'):
+        with instance_from_db.get_lock(op='Instance pause'):
             instance_from_db.add_event('api', 'pause')
             return instance_from_db.pause()
 
@@ -588,9 +578,7 @@ class InstanceUnpauseEndpoint(api_base.Resource):
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
     def post(self, instance_ref=None, instance_from_db=None):
-        with db.get_lock(
-                'instance', None, instance_from_db.uuid, ttl=120, timeout=120,
-                op='Instance unpause'):
+        with instance_from_db.get_lock(op='Instance unpause'):
             instance_from_db.add_event('api', 'unpause')
             return instance_from_db.unpause()
 
@@ -662,8 +650,7 @@ class InstanceMetadataEndpoint(api_base.Resource):
         if not key:
             return api_base.error(400, 'no key specified')
 
-        with db.get_lock('metadata', 'instance', instance_from_db.uuid,
-                         op='Instance metadata delete'):
+        with instance_from_db.get_lock(op='Instance metadata delete'):
             md = db.get_metadata('instance', instance_from_db.uuid)
             if md is None or key not in md:
                 return api_base.error(404, 'key not found')
