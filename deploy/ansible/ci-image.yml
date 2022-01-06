@@ -125,7 +125,6 @@
           - python3-dev
           - python3-grpcio
           - python3-pip
-          - python3-venv
           - python3-wheel
         state: latest
 
@@ -152,10 +151,17 @@
           - unzip
         state: latest
 
+    - name: Install tox and dependencies via apt on Ubuntu
+      apt:
+        name:
+          - python3-venv
+          - tox
+      when: ansible_distribution == 'Ubuntu'
+
     # This is driven by issues with the version of tox packaged on Debian 10
-    - name: Install pip packages
-      shell: |
-        pip3 install -U tox filelock virtualenv
+    - name: Install tox and dependencies via pip on Debian
+      shell: pip3 install -U tox filelock virtualenv
+      when: ansible_distribution == 'Debian'
 
     - name: Install Grafana prerequisites
       apt:
