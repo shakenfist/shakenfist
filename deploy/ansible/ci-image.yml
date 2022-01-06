@@ -148,15 +148,14 @@
           - ovmf
           - prometheus-node-exporter
           - python3-libvirt
-          - python3-venv
           - qemu-kvm
           - unzip
         state: latest
 
     # This is driven by issues with the version of tox packaged on Debian 10
-    - name: Install modern tox and filelock (required by tox)
+    - name: Install pip packages
       shell: |
-        pip3 install -U tox filelock
+        pip3 install -U tox filelock virtualenv
 
     - name: Install Grafana prerequisites
       apt:
