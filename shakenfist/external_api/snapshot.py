@@ -94,8 +94,9 @@ class InstanceSnapshotEndpoint(api_base.Resource):
                     'tasks': [SnapshotTask(
                         instance_from_db.uuid, disk, a.uuid, blob_uuid)],
                 })
-            instance_from_db.add_event('api', 'snapshot of %s requested' % disk,
-                                       None, a.uuid)
+            instance_from_db.add_event(
+                'api', 'snapshot of %s requested' % disk['path'].split('/')[-1],
+                None, a.uuid)
 
         return out
 

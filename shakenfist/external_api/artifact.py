@@ -91,7 +91,6 @@ class ArtifactsEndpoint(api_base.Resource):
     @jwt_required
     def get(self, node=None):
         retval = []
-
         with etcd.ThreadLocalReadOnlyCache():
             for a in Artifacts(filters=[baseobject.active_states_filter]):
                 if node:
@@ -102,7 +101,6 @@ class ArtifactsEndpoint(api_base.Resource):
                             retval.append(a.external_view())
                 else:
                     retval.append(a.external_view())
-
         return retval
 
     @jwt_required

@@ -37,6 +37,11 @@ class Artifact(dbo):
         dbo.STATE_DELETED: (),
     }
 
+    ACTIVE_STATES = set([dbo.STATE_INITIAL,
+                         dbo.STATE_CREATED,
+                         dbo.STATE_ERROR,
+                         ])
+
     TYPE_SNAPSHOT = 'snapshot'
     TYPE_LABEL = 'label'
     TYPE_IMAGE = 'image'

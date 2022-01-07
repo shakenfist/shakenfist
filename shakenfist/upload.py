@@ -18,6 +18,8 @@ class Upload(dbo):
         dbo.STATE_DELETED: (),
     }
 
+    ACTIVE_STATES = set([dbo.STATE_CREATED])
+
     def __init__(self, static_values):
         super(Upload, self).__init__(static_values.get('uuid'),
                                      static_values.get('version'))

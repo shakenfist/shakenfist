@@ -5,6 +5,7 @@ import re
 # To avoid circular imports, util modules should only import a limited
 # set of shakenfist modules, mainly exceptions, logutils, and specific
 # other util modules.
+from shakenfist.config import config
 from shakenfist import constants
 from shakenfist import exceptions
 from shakenfist import logutil
@@ -124,9 +125,11 @@ def create_blank(locks, disk_file, disk_size):
 
 def snapshot(locks, source, destination):
     """Convert a possibly COW layered disk file into a snapshot."""
-
+    cmd = 'qemu-img convert --force-share -o cluster_size=%s -O qcow2' % (
+        constants.QCOW2_CLUSTER_SIZE)
+    if config.COMPRESS_SNAPSHOTS:
+        cmd += ' -c'
     util_process.execute(
         locks,
-        ('qemu-img convert --force-share -o cluster_size=%s -O qcow2 -c %s %s'
-         % (constants.QCOW2_CLUSTER_SIZE, source, destination)),
+        ' '.join([cmd, source, destination]),
         iopriority=util_process.PRIORITY_LOW)
