@@ -113,6 +113,34 @@ pipeline {
         }
       }
     }
+    stage('Wait for API to start answering') {
+      steps {
+        script {
+          timeout(time: 2, unit: 'MINUTES', activity: true) {
+            sh '''  set +e
+
+                    . $WORKSPACE/$BUILD_TAG/ci-environment.sh
+                    count=0
+                    while [ $count -lt 60 ]
+                    do
+
+                      ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                        debian@$primary \
+                        '. /etc/sf/sfrc; sf-client instance list'
+                      if [ $? == 0 ]; then
+                        exit 0
+                      fi
+
+                      count=$(( $count + 1 ))
+                      sleep 5
+                    done
+
+                    exit 1
+              '''
+          }
+        }
+      }
+    }
     stage('Import cached images') {
       steps {
         script {
