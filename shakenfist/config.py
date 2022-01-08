@@ -190,6 +190,10 @@ class SFConfig(BaseSettings):
         True, description='Compress snapshots taken of instances'
     )
 
+    SNAPSHOTS_DEFAULT_TO_THIN: bool = Field(
+        False, description='Whether snapshots are thin (just changes from base image) or thick'
+    )
+
     # Artifact options
     ARTIFACT_MAX_VERSIONS_DEFAULT: int = Field(
         3, description='Default number of versions to keep within an artifact'
