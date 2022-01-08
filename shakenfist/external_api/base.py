@@ -15,15 +15,17 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
+from shakenfist import exceptions
+from shakenfist.etcd import ThreadLocalReadOnlyCache
 from shakenfist.instance import Instance
 from shakenfist import logutil
-from shakenfist.net import Network
+from shakenfist import net
 from shakenfist.upload import Upload
 from shakenfist.util import general as util_general
 
+
 LOG, HANDLER = logutil.setup(__name__)
 daemon.set_log_level(LOG, 'api')
-
 
 TESTING = False
 
@@ -68,17 +70,22 @@ def caller_is_admin(func):
     return wrapper
 
 
-def arg_is_instance_uuid(func):
+def arg_is_instance_ref(func):
     # Method uses the instance from the db
     def wrapper(*args, **kwargs):
-        if 'instance_uuid' in kwargs:
-            kwargs['instance_from_db'] = Instance.from_db(
-                kwargs['instance_uuid'])
-        if not kwargs.get('instance_from_db'):
-            LOG.with_instance(kwargs['instance_uuid']).info(
-                'Instance not found, genuinely missing')
-            return error(404, 'instance not found')
+        with ThreadLocalReadOnlyCache():
+            try:
+                inst = Instance.from_db_by_ref(kwargs.get('instance_ref'),
+                                               get_jwt_identity()[0])
+            except exceptions.MultipleObjects as e:
+                return error(400, str(e))
 
+            if not inst:
+                LOG.with_field('instance', kwargs.get('instance_ref')).info(
+                    'Instance not found, missing or deleted')
+                return error(404, 'instance not found')
+
+        kwargs['instance_from_db'] = inst
         return func(*args, **kwargs)
     return wrapper
 
@@ -121,10 +128,10 @@ def redirect_instance_request(func):
 
 
 def requires_instance_ownership(func):
-    # Requires that @arg_is_instance_uuid has already run
+    # Requires that @arg_is_instance_ref has already run
     def wrapper(*args, **kwargs):
         if not kwargs.get('instance_from_db'):
-            LOG.with_field('instance', kwargs['instance_uuid']).info(
+            LOG.with_field('instance', kwargs['instance_ref']).info(
                 'Instance not found, kwarg missing')
             return error(404, 'instance not found')
 
@@ -139,10 +146,10 @@ def requires_instance_ownership(func):
 
 
 def requires_instance_active(func):
-    # Requires that @arg_is_instance_uuid has already run
+    # Requires that @arg_is_instance_ref has already run
     def wrapper(*args, **kwargs):
         if not kwargs.get('instance_from_db'):
-            LOG.with_field('instance', kwargs['instance_uuid']).info(
+            LOG.with_field('instance', kwargs['instance_ref']).info(
                 'Instance not found, kwarg missing')
             return error(404, 'instance not found')
 
@@ -156,17 +163,22 @@ def requires_instance_active(func):
     return wrapper
 
 
-def arg_is_network_uuid(func):
+def arg_is_network_ref(func):
     # Method uses the network from the db
     def wrapper(*args, **kwargs):
-        if 'network_uuid' in kwargs:
-            kwargs['network_from_db'] = Network.from_db(
-                kwargs['network_uuid'])
-        if not kwargs.get('network_from_db'):
-            LOG.with_field('network', kwargs['network_uuid']).info(
-                'Network not found, missing or deleted')
-            return error(404, 'network not found')
+        with ThreadLocalReadOnlyCache():
+            try:
+                network = net.Network.from_db_by_ref(kwargs.get('network_ref'),
+                                                     get_jwt_identity()[0])
+            except exceptions.MultipleObjects as e:
+                return error(400, str(e))
 
+            if not network:
+                LOG.with_field('network', kwargs.get('network_ref')).info(
+                    'Network not found, missing or deleted')
+                return error(404, 'network not found')
+
+        kwargs['network_from_db'] = network
         return func(*args, **kwargs)
     return wrapper
 
@@ -198,9 +210,9 @@ def redirect_to_network_node(func):
 
 
 def requires_network_ownership(func):
-    # Requires that @arg_is_network_uuid has already run
+    # Requires that @arg_is_network_ref has already run
     def wrapper(*args, **kwargs):
-        log = LOG.with_field('network', kwargs['network_uuid'])
+        log = LOG.with_field('network', kwargs['network_ref'])
 
         if not kwargs.get('network_from_db'):
             log.info('Network not found, kwarg missing')
@@ -215,9 +227,9 @@ def requires_network_ownership(func):
 
 
 def requires_network_active(func):
-    # Requires that @arg_is_network_uuid has already run
+    # Requires that @arg_is_network_ref has already run
     def wrapper(*args, **kwargs):
-        log = LOG.with_field('network', kwargs['network_uuid'])
+        log = LOG.with_field('network', kwargs['network_ref'])
 
         if not kwargs.get('network_from_db'):
             log.info('Network not found, kwarg missing')
@@ -369,7 +381,7 @@ def generic_wrapper(func):
             return func(*args, **kwargs)
 
         except TypeError as e:
-            return error(400, str(e), suppress_traceback=True)
+            return error(400, str(e), suppress_traceback=False)
 
         except DecodeError:
             # Send a more informative message than 'Not enough segments'

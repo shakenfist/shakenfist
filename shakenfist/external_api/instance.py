@@ -43,16 +43,16 @@ SCHEDULER = None
 
 class InstanceEndpoint(api_base.Resource):
     @jwt_required
-    @api_base.arg_is_instance_uuid
+    @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
-    def get(self, instance_uuid=None, instance_from_db=None):
+    def get(self, instance_ref=None, instance_from_db=None):
         return instance_from_db.external_view()
 
     @jwt_required
-    @api_base.arg_is_instance_uuid
+    @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.requires_namespace_exist
-    def delete(self, instance_uuid=None, instance_from_db=None, namespace=None):
+    def delete(self, instance_ref=None, instance_from_db=None, namespace=None):
         # Check if instance has already been deleted
         if instance_from_db.state.value == dbo.STATE_DELETED:
             return api_base.error(404, 'instance not found')
@@ -70,6 +70,9 @@ class InstanceEndpoint(api_base.Resource):
             node = placement['node']
 
         instance_from_db.enqueue_delete_remote(node)
+
+        # Return UUID in case API call was made using object name
+        return {'uuid': instance_from_db.uuid}
 
 
 def _artifact_safety_checks(a):
@@ -120,8 +123,7 @@ class InstancesEndpoint(api_base.Resource):
 
         # If accessing a foreign namespace, we need to be an admin
         if get_jwt_identity()[0] not in [namespace, 'system']:
-            return api_base.error(
-                401, 'only admins can create resources in a different namespace')
+            return api_base.error(404, 'namespace not found')
 
         # Check that the instance name is safe for use as a DNS host name
         if name != re.sub(r'([^a-zA-Z0-9\-])', '', name) or len(name) > 63:
@@ -253,34 +255,44 @@ class InstancesEndpoint(api_base.Resource):
         if machine_type == 'q35':
             for d in disk:
                 if d.get('bus') == 'ide':
-                    return api_base.error(400, 'secure boot machine type does not support IDE')
+                    return api_base.error(
+                        400, 'secure boot machine type does not support IDE')
 
         if network:
             for netdesc in network:
                 if not isinstance(netdesc, dict):
-                    return api_base.error(400,
-                                          'network specification should contain JSON objects')
+                    return api_base.error(
+                        400, 'network specification should contain JSON objects')
 
                 if 'network_uuid' not in netdesc:
-                    return api_base.error(400, 'network specification is missing network_uuid')
+                    return api_base.error(
+                        400, 'network specification is missing network_uuid')
 
-                net_uuid = netdesc['network_uuid']
+                # Allow network to be specified by name or UUID (and error early
+                # if not found)
+                try:
+                    n = net.Network.from_db_by_ref(netdesc['network_uuid'])
+                except exceptions.MultipleObjects as e:
+                    return api_base.error(400, str(e))
+
+                if not n:
+                    return api_base.error(
+                        404, 'network %s not found' % netdesc['network_uuid'])
+                netdesc['network_uuid'] = n.uuid
+
                 if netdesc.get('address') and not util_general.noneish(netdesc.get('address')):
                     # The requested address must be within the ip range specified
                     # for that virtual network, unless it is equivalent to "none".
-                    ipm = IPManager.from_db(net_uuid)
+                    ipm = IPManager.from_db(n.uuid)
                     if not ipm.is_in_range(netdesc['address']):
                         return api_base.error(400,
                                               'network specification requests an address outside the '
                                               'range of the network')
 
-                n = net.Network.from_db(net_uuid)
-                if not n:
-                    return api_base.error(404, 'network %s does not exist' % net_uuid)
                 if n.state.value != net.Network.STATE_CREATED:
                     return api_base.error(406, 'network %s is not ready (%s)' % (n.uuid, n.state.value))
                 if n.namespace != namespace:
-                    return api_base.error(404, 'network %s does not exist' % net_uuid)
+                    return api_base.error(404, 'network %s does not exist' % n.uuid)
 
         if not video:
             video = {'model': 'cirrus', 'memory': 16384}
@@ -289,6 +301,15 @@ class InstancesEndpoint(api_base.Resource):
                 return api_base.error(400, 'video specification requires "model"')
             if 'memory' not in video:
                 return api_base.error(400, 'video specification requires "memory"')
+
+        # Validate metadata before instance creation
+        if metadata:
+            if not isinstance(metadata, dict):
+                return api_base.error(400, 'metadata must be a dictionary')
+            for k, v in metadata.items():
+                err = _validate_instance_metadata(k, v)
+                if err:
+                    return err
 
         # Create instance object
         inst = instance.Instance.new(
@@ -311,16 +332,7 @@ class InstancesEndpoint(api_base.Resource):
 
         # Initialise metadata
         if metadata:
-            if not isinstance(metadata, dict):
-                return api_base.error(400, 'metadata must be a dictionary')
-
-            for k, v in metadata.items():
-                err = _validate_instance_metadata(k, v)
-                if err:
-                    return api_base.error(400, err)
-
             db.persist_metadata('instance', inst.uuid, metadata)
-
         else:
             db.persist_metadata('instance', inst.uuid, {})
 
@@ -462,11 +474,11 @@ class InstancesEndpoint(api_base.Resource):
         for inst in instance.Instances([partial(baseobject.namespace_filter, namespace),
                                         instance.active_states_filter]):
             # If this instance is not on a node, just do the DB cleanup locally
-            dbplacement = inst.placement
-            if not dbplacement.get('node'):
+            db_placement = inst.placement
+            if not db_placement.get('node'):
                 node = config.NODE_NAME
             else:
-                node = dbplacement['node']
+                node = db_placement['node']
 
             tasks_by_node[node].append(DeleteInstanceTask(inst.uuid))
             waiting_for.append(inst.uuid)
@@ -479,9 +491,9 @@ class InstancesEndpoint(api_base.Resource):
 
 class InstanceInterfacesEndpoint(api_base.Resource):
     @jwt_required
-    @api_base.arg_is_instance_uuid
+    @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
-    def get(self, instance_uuid=None, instance_from_db=None):
+    def get(self, instance_ref=None, instance_from_db=None):
         out = []
         for iface_uuid in instance_from_db.interfaces:
             ni, _, err = api_util.safe_get_network_interface(iface_uuid)
@@ -493,111 +505,102 @@ class InstanceInterfacesEndpoint(api_base.Resource):
 
 class InstanceEventsEndpoint(api_base.Resource):
     @jwt_required
-    @api_base.arg_is_instance_uuid
+    @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
-    def get(self, instance_uuid=None, instance_from_db=None):
-        return list(db.get_events('instance', instance_uuid))
+    def get(self, instance_ref=None, instance_from_db=None):
+        return list(db.get_events('instance', instance_from_db.uuid))
 
 
 class InstanceRebootSoftEndpoint(api_base.Resource):
     @jwt_required
-    @api_base.arg_is_instance_uuid
+    @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
-    def post(self, instance_uuid=None, instance_from_db=None):
-        with db.get_lock(
-                'instance', None, instance_uuid, ttl=120, timeout=120,
-                op='Instance reboot soft'):
+    def post(self, instance_ref=None, instance_from_db=None):
+        with instance_from_db.get_lock(op='Instance reboot soft'):
             instance_from_db.add_event('api', 'soft reboot')
             return instance_from_db.reboot(hard=False)
 
 
 class InstanceRebootHardEndpoint(api_base.Resource):
     @jwt_required
-    @api_base.arg_is_instance_uuid
+    @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
-    def post(self, instance_uuid=None, instance_from_db=None):
-        with db.get_lock(
-                'instance', None, instance_uuid, ttl=120, timeout=120,
-                op='Instance reboot hard'):
+    def post(self, instance_ref=None, instance_from_db=None):
+        with instance_from_db.get_lock(op='Instance reboot hard'):
             instance_from_db.add_event('api', 'hard reboot')
             return instance_from_db.reboot(hard=True)
 
 
 class InstancePowerOffEndpoint(api_base.Resource):
     @jwt_required
-    @api_base.arg_is_instance_uuid
+    @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
-    def post(self, instance_uuid=None, instance_from_db=None):
-        with db.get_lock(
-                'instance', None, instance_uuid, ttl=120, timeout=120,
-                op='Instance power off'):
+    def post(self, instance_ref=None, instance_from_db=None):
+        with instance_from_db.get_lock(op='Instance power off'):
             instance_from_db.add_event('api', 'poweroff')
             return instance_from_db.power_off()
 
 
 class InstancePowerOnEndpoint(api_base.Resource):
     @jwt_required
-    @api_base.arg_is_instance_uuid
+    @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
-    def post(self, instance_uuid=None, instance_from_db=None):
-        with db.get_lock(
-                'instance', None, instance_uuid, ttl=120, timeout=120,
-                op='Instance power on'):
+    def post(self, instance_ref=None, instance_from_db=None):
+        with instance_from_db.get_lock(op='Instance power on'):
             instance_from_db.add_event('api', 'poweron')
             return instance_from_db.power_on()
 
 
 class InstancePauseEndpoint(api_base.Resource):
     @jwt_required
-    @api_base.arg_is_instance_uuid
+    @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
-    def post(self, instance_uuid=None, instance_from_db=None):
-        with db.get_lock(
-                'instance', None, instance_uuid, ttl=120, timeout=120,
-                op='Instance pause'):
+    def post(self, instance_ref=None, instance_from_db=None):
+        with instance_from_db.get_lock(op='Instance pause'):
             instance_from_db.add_event('api', 'pause')
             return instance_from_db.pause()
 
 
 class InstanceUnpauseEndpoint(api_base.Resource):
     @jwt_required
-    @api_base.arg_is_instance_uuid
+    @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
-    def post(self, instance_uuid=None, instance_from_db=None):
-        with db.get_lock(
-                'instance', None, instance_uuid, ttl=120, timeout=120,
-                op='Instance unpause'):
+    def post(self, instance_ref=None, instance_from_db=None):
+        with instance_from_db.get_lock(op='Instance unpause'):
             instance_from_db.add_event('api', 'unpause')
             return instance_from_db.unpause()
 
 
 class InstanceMetadatasEndpoint(api_base.Resource):
     @jwt_required
-    @api_base.arg_is_instance_uuid
+    @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
-    def get(self, instance_uuid=None, instance_from_db=None):
-        md = db.get_metadata('instance', instance_uuid)
+    def get(self, instance_ref=None, instance_from_db=None):
+        md = db.get_metadata('instance', instance_from_db.uuid)
         if not md:
             return {}
         return md
 
     @jwt_required
-    @api_base.arg_is_instance_uuid
+    @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
-    def post(self, instance_uuid=None, key=None, value=None, instance_from_db=None):
-        return api_util.metadata_putpost('instance', instance_uuid, key, value)
+    def post(self, instance_ref=None, key=None, value=None, instance_from_db=None):
+        err = _validate_instance_metadata(key, value)
+        if err:
+            return err
+        return api_util.metadata_putpost('instance', instance_from_db.uuid, key, value)
 
 
 def _validate_instance_metadata(key, value):
@@ -611,8 +614,7 @@ def _validate_instance_metadata(key, value):
     elif key == instance.Instance.METADATA_KEY_AFFINITY:
         if not isinstance(value, dict):
             return api_base.error(
-                400,
-                'value for "affinity" key should a valid JSON dictionary')
+                400, 'value for "affinity" key should a valid JSON dictionary')
 
         for key_type, dv in value.items():
             if key_type not in ('cpu', 'disk', 'instance'):
@@ -621,8 +623,7 @@ def _validate_instance_metadata(key, value):
 
             if not isinstance(dv, dict):
                 return api_base.error(
-                    400,
-                    'value for affinity key should a dictionary')
+                    400, 'value for affinity key should a dictionary')
             for v in dv.values():
                 try:
                     int(v)
@@ -633,35 +634,36 @@ def _validate_instance_metadata(key, value):
 
 class InstanceMetadataEndpoint(api_base.Resource):
     @jwt_required
-    @api_base.arg_is_instance_uuid
+    @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
-    def put(self, instance_uuid=None, key=None, value=None, instance_from_db=None):
+    def put(self, instance_ref=None, key=None, value=None, instance_from_db=None):
         err = _validate_instance_metadata(key, value)
         if err:
             return err
-        return api_util.metadata_putpost('instance', instance_uuid, key, value)
+        return api_util.metadata_putpost(
+            'instance', instance_from_db.uuid, key, value)
 
     @jwt_required
-    @api_base.arg_is_instance_uuid
+    @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
-    def delete(self, instance_uuid=None, key=None, instance_from_db=None):
+    def delete(self, instance_ref=None, key=None, instance_from_db=None):
         if not key:
             return api_base.error(400, 'no key specified')
 
-        with db.get_lock('metadata', 'instance', instance_uuid, op='Instance metadata delete'):
-            md = db.get_metadata('instance', instance_uuid)
+        with instance_from_db.get_lock(op='Instance metadata delete'):
+            md = db.get_metadata('instance', instance_from_db.uuid)
             if md is None or key not in md:
                 return api_base.error(404, 'key not found')
             del md[key]
-            db.persist_metadata('instance', instance_uuid, md)
+            db.persist_metadata('instance', instance_from_db.uuid, md)
 
 
 class InstanceConsoleDataEndpoint(api_base.Resource):
     @jwt_required
-    @api_base.arg_is_instance_uuid
+    @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
-    def get(self, instance_uuid=None, length=None, instance_from_db=None):
+    def get(self, instance_ref=None, length=None, instance_from_db=None):
         parsed_length = None
 
         if not length:
@@ -684,8 +686,8 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
         return resp
 
     @jwt_required
-    @api_base.arg_is_instance_uuid
+    @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
-    def delete(self, instance_uuid=None, instance_from_db=None):
+    def delete(self, instance_ref=None, instance_from_db=None):
         instance_from_db.delete_console_data()

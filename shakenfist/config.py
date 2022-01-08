@@ -166,6 +166,10 @@ class SFConfig(BaseSettings):
         1800, description='How long to wait for an image transfer to occur before giving up'
     )
 
+    COMPRESS_SNAPSHOTS: bool = Field(
+        True, description='Compress snapshots taken of instances'
+    )
+
     # Artifact options
     ARTIFACT_MAX_VERSIONS_DEFAULT: int = Field(
         3, description='Default number of versions to keep within an artifact'

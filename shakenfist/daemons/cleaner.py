@@ -297,7 +297,7 @@ class Monitor(daemon.Daemon):
         # Delay first compaction until system startup load has reduced
         last_compaction = time.time() - random.randint(1, 20*60)
 
-        while self.running:
+        while not self.exit.is_set():
             # Update power state of all instances on this hypervisor
             LOG.info('Updating power states')
             self._update_power_states()
@@ -312,4 +312,4 @@ class Monitor(daemon.Daemon):
                     self._compact_etcd()
                     last_compaction = time.time()
 
-            time.sleep(60)
+            self.exit.wait(60)

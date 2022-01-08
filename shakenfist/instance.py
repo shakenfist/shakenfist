@@ -85,6 +85,17 @@ class Instance(dbo):
     STATE_CREATED_ERROR = 'created-error'
     STATE_DELETE_WAIT_ERROR = 'delete-wait-error'
 
+    ACTIVE_STATES = set([dbo.STATE_INITIAL,
+                         STATE_INITIAL_ERROR,
+                         STATE_PREFLIGHT,
+                         STATE_PREFLIGHT_ERROR,
+                         dbo.STATE_CREATING,
+                         STATE_CREATING_ERROR,
+                         dbo.STATE_CREATED,
+                         STATE_CREATED_ERROR,
+                         dbo.STATE_ERROR
+                         ])
+
     state_targets = {
         None: (dbo.STATE_INITIAL, dbo.STATE_ERROR),
         dbo.STATE_INITIAL: (STATE_PREFLIGHT, dbo.STATE_DELETE_WAIT,
@@ -169,17 +180,6 @@ class Instance(dbo):
         i._db_set_attribute(
             'power_state', {'power_state': cls.STATE_INITIAL})
         return i
-
-    @staticmethod
-    def from_db(instance_uuid):
-        if not instance_uuid:
-            return None
-
-        static_values = Instance._db_get(instance_uuid)
-        if not static_values:
-            return None
-
-        return Instance(static_values)
 
     def external_view(self):
         # If this is an external view, then mix back in attributes that users
@@ -348,6 +348,9 @@ class Instance(dbo):
     def tags(self):
         # TODO(andy) Move metadata to a new DBO subclass "DBO with metadata"
         meta = db.get_metadata('instance', self.uuid)
+        if not meta:
+            # Gracefully handle malformed instances
+            return None
         return meta.get(self.METADATA_KEY_TAGS, None)
 
     # Implementation
@@ -1097,12 +1100,7 @@ def placement_filter(node, inst):
 this_node_filter = partial(placement_filter, config.NODE_NAME)
 
 
-active_states_filter = partial(
-    baseobject.state_filter, [Instance.STATE_INITIAL, Instance.STATE_INITIAL_ERROR,
-                              Instance.STATE_PREFLIGHT, Instance.STATE_PREFLIGHT_ERROR,
-                              Instance.STATE_CREATING, Instance.STATE_CREATING_ERROR,
-                              Instance.STATE_CREATED, Instance.STATE_CREATED_ERROR,
-                              Instance.STATE_ERROR])
+active_states_filter = partial(baseobject.state_filter, Instance.ACTIVE_STATES)
 
 healthy_states_filter = partial(
     baseobject.state_filter, [Instance.STATE_INITIAL, Instance.STATE_PREFLIGHT,

@@ -2,6 +2,7 @@ import logging
 import multiprocessing
 import setproctitle
 import signal
+from threading import Event
 
 from shakenfist.config import config
 from shakenfist import etcd
@@ -49,13 +50,13 @@ class Daemon(object):
         self.log, _ = logutil.setup(name)
         set_log_level(self.log, name)
 
-        self.running = True
+        self.exit = Event()
         signal.signal(signal.SIGTERM, self.exit_gracefully)
 
     def exit_gracefully(self, sig, _frame):
         if sig == signal.SIGTERM:
-            self.running = False
             self.log.info('Caught SIGTERM, commencing shutdown')
+            self.exit.set()
 
 
 class WorkerPoolDaemon(Daemon):

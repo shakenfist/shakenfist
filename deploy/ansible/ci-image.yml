@@ -127,7 +127,6 @@
           - python3-pip
           - python3-venv
           - python3-wheel
-          - tox
         state: latest
 
     - name: Install non-hypervisor dependencies
@@ -149,10 +148,20 @@
           - ovmf
           - prometheus-node-exporter
           - python3-libvirt
-          - python3-venv
           - qemu-kvm
           - unzip
         state: latest
+
+    - name: Install tox and dependencies via apt on Ubuntu
+      apt:
+        name:
+          - tox
+      when: ansible_distribution == 'Ubuntu'
+
+    # This is driven by issues with the version of tox packaged on Debian 10
+    - name: Install tox and dependencies via pip on Debian
+      shell: pip3 install -U tox filelock virtualenv
+      when: ansible_distribution == 'Debian'
 
     - name: Install Grafana prerequisites
       apt:

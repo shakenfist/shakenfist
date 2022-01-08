@@ -8,7 +8,6 @@ from shakenfist.baseobject import (
     DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist.config import config
 from shakenfist.constants import GiB
-from shakenfist import db
 from shakenfist import etcd
 from shakenfist import logutil
 from shakenfist.util import general as util_general
@@ -25,6 +24,8 @@ class Node(dbo):
     STATE_MISSING = 'missing'
     STATE_STOPPING = 'stopping'
     STATE_STOPPED = 'stopped'
+
+    ACTIVE_STATES = set([dbo.STATE_CREATED])
 
     state_targets = {
         None: (dbo.STATE_CREATED, dbo.STATE_ERROR, STATE_MISSING),
@@ -75,17 +76,6 @@ class Node(dbo):
                                 'release': util_general.get_version()
                             })
 
-    @staticmethod
-    def from_db(fqdn):
-        if not fqdn:
-            return None
-
-        static_values = Node._db_get(fqdn)
-        if not static_values:
-            return None
-
-        return Node(static_values)
-
     def external_view(self):
         # If this is an external view, then mix back in attributes that users
         # expect
@@ -129,8 +119,7 @@ class Nodes(dbo_iter):
                 yield out
 
 
-active_states_filter = partial(
-    baseobject.state_filter, [dbo.STATE_CREATED])
+active_states_filter = partial(baseobject.state_filter, Node.ACTIVE_STATES)
 inactive_states_filter = partial(
     baseobject.state_filter, [dbo.STATE_DELETED, dbo.STATE_ERROR, Node.STATE_MISSING])
 
@@ -149,7 +138,12 @@ def nodes_by_free_disk_descending(minimum=0, maximum=-1, intention=None):
         intention = '_%s' % intention
 
     for n in Nodes([active_states_filter]):
-        metrics = db.get_metrics(n.fqdn)
+        metrics = etcd.get('metrics', n.fqdn, None)
+        if metrics:
+            metrics = metrics.get('metrics', {})
+        else:
+            metrics = {}
+
         disk_free_gb = int(
             int(metrics.get('disk_free%s' % intention, '0')) / GiB)
 

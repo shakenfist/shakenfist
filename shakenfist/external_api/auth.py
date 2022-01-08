@@ -182,6 +182,7 @@ class AuthNamespaceKeyEndpoint(api_base.Resource):
 
     @jwt_required
     @api_base.caller_is_admin
+    @api_base.requires_namespace_exist
     def delete(self, namespace, key_name):
         if not namespace:
             return api_base.error(400, 'no namespace specified')

@@ -56,28 +56,6 @@ def persist_ipmanager(network_uuid, data):
 def delete_ipmanager(network_uuid):
     etcd.delete('ipmanager', None, uuid)
 
-
-#####################################################################
-# Snapshots
-#####################################################################
-
-
-def create_snapshot(snapshot_uuid, device, instance_uuid, created):
-    etcd.put(
-        'snapshot', instance_uuid, created,
-        {
-            'uuid': snapshot_uuid,
-            'device': device,
-            'instance_uuid': instance_uuid,
-            'created': created
-        })
-
-
-def get_instance_snapshots(instance_uuid):
-    for _, m in etcd.get_all('snapshot', instance_uuid,
-                             sort_order='ascend'):
-        yield m
-
 #####################################################################
 # Events
 #####################################################################
@@ -113,28 +91,6 @@ def get_events(object_type, object_uuid):
     for _, m in etcd.get_all('event/%s' % object_type, object_uuid,
                              sort_order='ascend'):
         yield m
-
-#####################################################################
-# Metrics
-#####################################################################
-
-
-def update_metrics_bulk(metrics):
-    etcd.put(
-        'metrics', config.NODE_NAME, None,
-        {
-            'fqdn': config.NODE_NAME,
-            'timestamp': time.time(),
-            'metrics': metrics
-        },
-        ttl=120)
-
-
-def get_metrics(fqdn):
-    d = etcd.get('metrics', fqdn, None)
-    if not d:
-        return {}
-    return d.get('metrics', {})
 
 
 #####################################################################
@@ -173,15 +129,3 @@ def persist_metadata(object_type, name, metadata):
 
 def delete_metadata(object_type, name):
     etcd.delete('metadata', object_type, name)
-
-#####################################################################
-# vxid mappings
-#####################################################################
-
-
-def persist_node_vxid_mapping(node, vxid_to_mac):
-    etcd.put('vxid_mapping', None, node, vxid_to_mac)
-
-
-def get_node_vxid_mapping(node):
-    etcd.get('vxid_mapping', None, node)

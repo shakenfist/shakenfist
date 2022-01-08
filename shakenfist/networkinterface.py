@@ -78,17 +78,6 @@ class NetworkInterface(dbo):
 
         return ni
 
-    @staticmethod
-    def from_db(interface_uuid):
-        if not interface_uuid:
-            return None
-
-        static_values = NetworkInterface._db_get(interface_uuid)
-        if not static_values:
-            return None
-
-        return NetworkInterface(static_values)
-
     def external_view(self):
         # If this is an external view, then mix back in attributes that users
         # expect

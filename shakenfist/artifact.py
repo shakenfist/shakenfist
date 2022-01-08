@@ -37,6 +37,11 @@ class Artifact(dbo):
         dbo.STATE_DELETED: (),
     }
 
+    ACTIVE_STATES = set([dbo.STATE_INITIAL,
+                         dbo.STATE_CREATED,
+                         dbo.STATE_ERROR,
+                         ])
+
     TYPE_SNAPSHOT = 'snapshot'
     TYPE_LABEL = 'label'
     TYPE_IMAGE = 'image'
@@ -76,17 +81,6 @@ class Artifact(dbo):
         a.state = Artifact.STATE_INITIAL
         a.max_versions = max_versions
         return a
-
-    @staticmethod
-    def from_db(artifact_uuid):
-        if not artifact_uuid:
-            return None
-
-        static_values = Artifact._db_get(artifact_uuid)
-        if not static_values:
-            return None
-
-        return Artifact(static_values)
 
     @staticmethod
     def from_url(artifact_type, url, max_versions=0):

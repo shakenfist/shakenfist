@@ -52,18 +52,18 @@ def _delete_network(network_from_db, wait_interfaces=None):
 
 class NetworkEndpoint(api_base.Resource):
     @jwt_required
-    @api_base.arg_is_network_uuid
+    @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
-    def get(self, network_uuid=None, network_from_db=None):
+    def get(self, network_ref=None, network_from_db=None):
         return network_from_db.external_view()
 
     @jwt_required
-    @api_base.arg_is_network_uuid
+    @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.requires_namespace_exist
     @api_base.redirect_to_network_node
-    def delete(self, network_uuid=None, network_from_db=None, namespace=None):
-        if network_uuid == 'floating':
+    def delete(self, network_ref=None, network_from_db=None, namespace=None):
+        if network_ref == 'floating':
             return api_base.error(403, 'you cannot delete the floating network')
 
         n = net.Network.from_db(network_from_db.uuid)
@@ -91,6 +91,9 @@ class NetworkEndpoint(api_base.Resource):
 
         _delete_network(network_from_db)
 
+        # Return UUID in case API call was made using object name
+        return {'uuid': network_from_db.uuid}
+
 
 class NetworksEndpoint(api_base.Resource):
     @marshal_with({
@@ -105,16 +108,16 @@ class NetworksEndpoint(api_base.Resource):
     })
     @jwt_required
     def get(self, all=False):
-        filters = [partial(baseobject.namespace_filter,
-                           get_jwt_identity()[0])]
-        if not all:
-            filters.append(baseobject.active_states_filter)
+        with etcd.ThreadLocalReadOnlyCache():
+            filters = [partial(baseobject.namespace_filter, get_jwt_identity()[0])]
+            if not all:
+                filters.append(baseobject.active_states_filter)
 
-        retval = []
-        for n in net.Networks(filters):
-            # This forces the network through the external view rehydration
-            retval.append(n.external_view())
-        return retval
+            retval = []
+            for n in net.Networks(filters):
+                # This forces the network through the external view rehydration
+                retval.append(n.external_view())
+            return retval
 
     @jwt_required
     @api_base.requires_namespace_exist
@@ -193,17 +196,17 @@ class NetworksEndpoint(api_base.Resource):
 
 class NetworkEventsEndpoint(api_base.Resource):
     @jwt_required
-    @api_base.arg_is_network_uuid
+    @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
-    def get(self, network_uuid=None, network_from_db=None):
-        return list(db.get_events('network', network_uuid))
+    def get(self, network_ref=None, network_from_db=None):
+        return list(db.get_events('network', network_from_db.uuid))
 
 
 class NetworkInterfacesEndpoint(api_base.Resource):
     @jwt_required
-    @api_base.arg_is_network_uuid
+    @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
-    def get(self, network_uuid=None, network_from_db=None):
+    def get(self, network_ref=None, network_from_db=None):
         out = []
         for ni in networkinterface.interfaces_for_network(self.network):
             out.append(ni.external_view())
@@ -212,61 +215,57 @@ class NetworkInterfacesEndpoint(api_base.Resource):
 
 class NetworkMetadatasEndpoint(api_base.Resource):
     @jwt_required
-    @api_base.arg_is_network_uuid
+    @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
-    def get(self, network_uuid=None, network_from_db=None):
-        md = db.get_metadata('network', network_uuid)
+    def get(self, network_ref=None, network_from_db=None):
+        md = db.get_metadata('network', network_from_db.uuid)
         if not md:
             return {}
         return md
 
     @jwt_required
-    @api_base.arg_is_network_uuid
+    @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
-    def post(self, network_uuid=None, key=None, value=None, network_from_db=None):
-        return api_util.metadata_putpost('network', network_uuid, key, value)
+    def post(self, network_ref=None, key=None, value=None, network_from_db=None):
+        return api_util.metadata_putpost('network', network_from_db.uuid, key, value)
 
 
 class NetworkMetadataEndpoint(api_base.Resource):
     @jwt_required
-    @api_base.arg_is_network_uuid
+    @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
-    def put(self, network_uuid=None, key=None, value=None, network_from_db=None):
-        return api_util.metadata_putpost('network', network_uuid, key, value)
+    def put(self, network_ref=None, key=None, value=None, network_from_db=None):
+        return api_util.metadata_putpost('network', network_from_db.uuid, key, value)
 
     @jwt_required
-    @api_base.arg_is_network_uuid
+    @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
-    def delete(self, network_uuid=None, key=None, network_from_db=None):
+    def delete(self, network_ref=None, key=None, network_from_db=None):
         if not key:
             return api_base.error(400, 'no key specified')
 
-        with db.get_lock('metadata', 'network', network_uuid, op='Network metadata delete'):
-            md = db.get_metadata('network', network_uuid)
+        with db.get_lock('metadata', 'network', network_from_db.uuid, op='Network metadata delete'):
+            md = db.get_metadata('network', network_from_db.uuid)
             if md is None or key not in md:
                 return api_base.error(404, 'key not found')
             del md[key]
-            db.persist_metadata('network', network_uuid, md)
+            db.persist_metadata('network', network_from_db.uuid, md)
 
 
 class NetworkPingEndpoint(api_base.Resource):
     @jwt_required
-    @api_base.arg_is_network_uuid
+    @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.redirect_to_network_node
     @api_base.requires_network_active
-    def get(self, network_uuid=None, address=None, network_from_db=None):
-        ipm = IPManager.from_db(network_uuid)
+    def get(self, network_ref=None, address=None, network_from_db=None):
+        ipm = IPManager.from_db(network_from_db.uuid)
         if not ipm.is_in_range(address):
             return api_base.error(400, 'ping request for address outside network block')
 
-        n = net.Network.from_db(network_uuid)
-        if not n:
-            return api_base.error(404, 'network %s not found' % network_uuid)
-
         out, err = util_process.execute(
             None, 'ip netns exec %s ping -c 10 %s' % (
-                network_uuid, address),
+                network_from_db.uuid, address),
             check_exit_code=[0, 1])
         return {
             'stdout': out,

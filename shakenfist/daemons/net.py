@@ -168,9 +168,6 @@ class Monitor(daemon.WorkerPoolDaemon):
                 LOG.with_field('vxid', vxid).warning(
                     'Extra vxlan present!')
 
-        # And record vxids in the database
-        db.persist_node_vxid_mapping(config.NODE_NAME, vxid_to_mac)
-
     def _process_network_workitem(self, log_ctx, workitem):
         log_ctx = log_ctx.with_network(workitem.network_uuid())
         n = net.Network.from_db(workitem.network_uuid())
@@ -293,7 +290,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             n.add_floating_ip(ni.floating.get('floating_address'), ni.ipv4)
 
     def _process_network_node_workitems(self):
-        while self.running:
+        while not self.exit.is_set():
             jobname, workitem = etcd.dequeue('networknode')
             if not workitem:
                 return
@@ -316,7 +313,7 @@ class Monitor(daemon.WorkerPoolDaemon):
         # Block until the network node queue is idle to avoid races
         processing, waiting = etcd.get_queue_length('networknode')
         while processing + waiting > 0:
-            time.sleep(1)
+            self.exit.wait(60)
             processing, waiting = etcd.get_queue_length('networknode')
 
         # Ensure we haven't leaked any floating IPs (because we used to)
@@ -400,6 +397,7 @@ class Monitor(daemon.WorkerPoolDaemon):
     def run(self):
         LOG.info('Starting')
         last_management = 0
+        last_shutdown_notification = 0
 
         network_worker = None
         stray_interface_worker = None
@@ -411,7 +409,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             try:
                 self.reap_workers()
 
-                if self.running:
+                if not self.exit.is_set():
                     worker_pids = []
                     for w in self.workers:
                         worker_pids.append(w.pid)
@@ -447,13 +445,15 @@ class Monitor(daemon.WorkerPoolDaemon):
                         last_management = time.time()
 
                 elif len(self.workers) > 0:
-                    LOG.info('Waiting for %d workers to finish'
-                             % len(self.workers))
+                    if time.time() - last_shutdown_notification > 5:
+                        LOG.info('Waiting for %d workers to finish'
+                                 % len(self.workers))
+                        last_shutdown_notification = time.time()
 
                 else:
                     return
 
-                time.sleep(0.2)
+                self.exit.wait(0.2)
 
             except Exception as e:
                 util_general.ignore_exception('network worker', e)

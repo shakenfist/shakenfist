@@ -4,7 +4,10 @@
 # Mock the Etcd store with a Python dict.
 #
 
+import base64
+import bcrypt
 from collections import defaultdict
+from itertools import count
 import json
 import mock
 import time
@@ -12,6 +15,7 @@ import time
 from shakenfist import db
 from shakenfist.baseobject import DatabaseBackedObject
 from shakenfist.instance import Instance
+from shakenfist.net import Network
 from shakenfist.node import Node
 
 
@@ -26,6 +30,7 @@ class MockEtcd():
     def __init__(self, test_obj, nodes=None, node_count=0):
         self.test_obj = test_obj
         self.db = {}
+        self.obj_counter = count(1)
 
         # Define ShakenFist Nodes
         if nodes is not None:
@@ -72,6 +77,10 @@ class MockEtcd():
         for n in self.nodes:
             Node.new(n[0], n[1])
 
+    def next_uuid(self):
+        """Generate predictable UUIDs that are unique during the testcase"""
+        return '12345678-1234-4321-1234-%012i' % next(self.obj_counter)
+
     #
     # DB operations - Low level
     #
@@ -79,6 +88,7 @@ class MockEtcd():
     def create(self, path, encoded, lease=None):
         self.db[path] = encoded
         print('MockEtcd.create() %s: %s' % (path, encoded))
+        return True
 
     def get(self, path, metadata=False, sort_order=None, sort_target=None):
         d = self.db.get(path)
@@ -87,7 +97,7 @@ class MockEtcd():
             return None
         return [[d]]
 
-    def get_prefix(self, path, sort_order, sort_target):
+    def get_prefix(self, path, sort_order=None, sort_target=None):
         ret = []
         for k in sorted(self.db):
             if k.startswith(path):
@@ -135,21 +145,37 @@ class MockEtcd():
     # Database backed objects
     #
 
-    def createInstance(self, name, instance_uuid,
-                       cpus=1,
-                       disk_spec=[{'base': 'cirros', 'size': 21}],
-                       memory=1024,
-                       namespace='unittest',
-                       requested_placement='',
-                       ssh_key='ssh-rsa AAAAB3Nabc unit@test',
-                       user_data='',
-                       video='cirrus',
-                       uefi=False,
-                       configdrive='openstack-disk',
-                       metadata={},
-                       set_state=Instance.STATE_CREATED,
-                       place_on_node='',
-                       ):
+    def create_namespace(self, namespace, key_name, key):
+        encoded = str(base64.b64encode(bcrypt.hashpw(
+                      key.encode('utf-8'), bcrypt.gensalt())), 'utf-8')
+        rec = {
+                'name': namespace,
+                'keys': {
+                    key_name: encoded
+                }
+            }
+        db.persist_metadata('namespace', namespace, {})
+        db.persist_namespace(namespace, rec)
+
+    def create_instance(self, name,
+                        uuid=None,
+                        cpus=1,
+                        disk_spec=[{'base': 'cirros', 'size': 21}],
+                        memory=1024,
+                        namespace='unittest',
+                        requested_placement='',
+                        ssh_key='ssh-rsa AAAAB3Nabc unit@test',
+                        user_data='',
+                        video='cirrus',
+                        uefi=False,
+                        configdrive='openstack-disk',
+                        metadata={},
+                        set_state=Instance.STATE_CREATED,
+                        place_on_node='',
+                        ):
+
+        if not uuid:
+            uuid = self.next_uuid()
 
         inst = Instance.new(name=name,
                             cpus=cpus,
@@ -160,7 +186,7 @@ class MockEtcd():
                             user_data=user_data,
                             video=video,
                             requested_placement=requested_placement,
-                            instance_uuid=instance_uuid,
+                            instance_uuid=uuid,
                             uefi=uefi,
                             configdrive=configdrive,
                             )
@@ -187,3 +213,47 @@ class MockEtcd():
             inst.place_instance(place_on_node)
 
         return inst
+
+    def create_network(self, name,
+                       uuid=None,
+                       namespace='unittest',
+                       netblock='10.9.8.0/24',
+                       provide_dhcp=False,
+                       provide_nat=False,
+                       vxid=None,
+                       metadata={},
+                       set_state=Network.STATE_CREATED,
+                       ):
+
+        if not uuid:
+            uuid = self.next_uuid()
+
+        network = Network.new(name=name,
+                              namespace=namespace,
+                              netblock=netblock,
+                              provide_dhcp=provide_dhcp,
+                              provide_nat=provide_nat,
+                              uuid=uuid,
+                              vxid=vxid,
+                              )
+
+        self.persist_metadata(Network, network.uuid, metadata)
+
+        state_path = defaultdict(set)
+        for initial, allowed in Network.state_targets.items():
+            if allowed:
+                for a in allowed:
+                    state_path[a].add(initial)
+
+        def find_start(initial, dest):
+            for s in state_path[dest]:
+                if initial == s:
+                    return True
+                if find_start(initial, s):
+                    network.state = s
+                    return True
+            return False
+        find_start(Network.STATE_INITIAL, set_state)
+        network.state = set_state
+
+        return network

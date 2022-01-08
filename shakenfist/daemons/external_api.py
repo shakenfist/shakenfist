@@ -32,8 +32,6 @@ class Monitor(daemon.Daemon):
 
     def exit_gracefully(self, sig, _frame):
         if sig == signal.SIGTERM:
-            self.running = False
-
             if os.path.exists('/var/run/sf/gunicorn.pid'):
                 with open('/var/run/sf/gunicorn.pid') as f:
                     pid = int(f.read())

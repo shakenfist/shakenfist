@@ -18,6 +18,8 @@ class Upload(dbo):
         dbo.STATE_DELETED: (),
     }
 
+    ACTIVE_STATES = set([dbo.STATE_CREATED])
+
     def __init__(self, static_values):
         super(Upload, self).__init__(static_values.get('uuid'),
                                      static_values.get('version'))
@@ -37,17 +39,6 @@ class Upload(dbo):
         u = Upload(static_values)
         u.state = Upload.STATE_CREATED
         return u
-
-    @staticmethod
-    def from_db(upload_uuid):
-        if not upload_uuid:
-            return None
-
-        static_values = Upload._db_get(upload_uuid)
-        if not static_values:
-            return None
-
-        return Upload(static_values)
 
     # Static values
     @property

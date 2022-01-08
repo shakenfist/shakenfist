@@ -1,6 +1,5 @@
 import requests
 import setproctitle
-import time
 
 from shakenfist.artifact import Artifact
 from shakenfist import blob
@@ -163,7 +162,12 @@ def handle(jobname, workitem):
                 n.delete_on_hypervisor()
 
             elif isinstance(task, FetchBlobTask):
-                metrics = db.get_metrics(config.NODE_NAME)
+                metrics = etcd.get('metrics', config.NODE_NAME, None)
+                if metrics:
+                    metrics = metrics.get('metrics', {})
+                else:
+                    metrics = {}
+
                 b = blob.Blob.from_db(task.blob_uuid())
                 if not b:
                     log.with_fields({
@@ -424,13 +428,13 @@ class Monitor(daemon.WorkerPoolDaemon):
             try:
                 self.reap_workers()
 
-                if self.running:
+                if not self.exit.is_set():
                     if not self.dequeue_work_item(config.NODE_NAME, handle):
-                        time.sleep(0.2)
+                        self.exit.wait(0.2)
                 elif len(self.workers) > 0:
                     LOG.info('Waiting for %d workers to finish'
                              % len(self.workers))
-                    time.sleep(0.2)
+                    self.exit.wait(0.2)
                 else:
                     return
 
