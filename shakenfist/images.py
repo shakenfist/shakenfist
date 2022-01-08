@@ -10,8 +10,7 @@ from shakenfist.artifact import Artifact, BLOB_URL
 from shakenfist import blob
 from shakenfist.blob import Blob
 from shakenfist.config import config
-from shakenfist.constants import (QCOW2_CLUSTER_SIZE, LOCK_REFRESH_SECONDS,
-                                  KiB, MiB)
+from shakenfist.constants import QCOW2_CLUSTER_SIZE, LOCK_REFRESH_SECONDS
 from shakenfist import exceptions
 from shakenfist import image_resolver
 from shakenfist import logutil
@@ -168,16 +167,8 @@ class ImageFetchHelper(object):
                 config.STORAGE_PATH, 'image_cache', b.uuid + '.qcow2')
             cache_info = util_image.identify(blob_path)
 
-            # Convert the cluster size from qemu format to an int
-            cluster_size_as_int = QCOW2_CLUSTER_SIZE
-            if cluster_size_as_int.endswith('M'):
-                cluster_size_as_int = int(
-                    cluster_size_as_int[:-1]) * MiB
-            elif cluster_size_as_int.endswith('K'):
-                cluster_size_as_int = int(
-                    cluster_size_as_int[:-1]) * KiB
-            else:
-                cluster_size_as_int = int(cluster_size_as_int)
+            cluster_size_as_int = int(util_image.convert_numeric_qemu_value(
+                QCOW2_CLUSTER_SIZE))
 
             if (cache_info.get('file format', '') == 'qcow2' and
                     cache_info.get('cluster_size', 0) == cluster_size_as_int):

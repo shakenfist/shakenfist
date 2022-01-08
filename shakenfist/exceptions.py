@@ -210,5 +210,5 @@ class BlobFetchFailed(Exception):
     pass
 
 
-class BlobDependancyMissing(Exception):
+class BlobDependencyMissing(Exception):
     pass

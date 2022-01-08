@@ -18,6 +18,27 @@ LOG, _ = logutil.setup(__name__)
 VALUE_WITH_BRACKETS_RE = re.compile(r'.* \(([0-9]+) bytes\)')
 
 
+def convert_numeric_qemu_value(qemu_value):
+    if not isinstance(qemu_value, str):
+        return qemu_value
+
+    if qemu_value.endswith('T'):
+        qemu_value = float(qemu_value[:-1]) * constants.TiB
+    elif qemu_value.endswith('G'):
+        qemu_value = float(qemu_value[:-1]) * constants.GiB
+    elif qemu_value.endswith('M'):
+        qemu_value = float(qemu_value[:-1]) * constants.MiB
+    elif qemu_value.endswith('K'):
+        qemu_value = float(qemu_value[:-1]) * constants.KiB
+    else:
+        try:
+            qemu_value = float(qemu_value)
+        except ValueError:
+            pass
+
+    return qemu_value
+
+
 def identify(path):
     """Work out what an image is."""
 
@@ -39,14 +60,7 @@ def identify(path):
             if m:
                 value = float(m.group(1))
 
-            elif value.endswith('K'):
-                value = float(value[:-1]) * 1024
-            elif value.endswith('M'):
-                value = float(value[:-1]) * 1024 * 1024
-            elif value.endswith('G'):
-                value = float(value[:-1]) * 1024 * 1024 * 1024
-            elif value.endswith('T'):
-                value = float(value[:-1]) * 1024 * 1024 * 1024 * 1024
+            value = convert_numeric_qemu_value(value)
 
             try:
                 data[key] = float(value)

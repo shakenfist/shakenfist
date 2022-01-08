@@ -15,7 +15,7 @@ from shakenfist.config import config
 from shakenfist.constants import LOCK_REFRESH_SECONDS, GiB
 from shakenfist import db
 from shakenfist import etcd
-from shakenfist.exceptions import BlobDeleted, BlobFetchFailed, BlobDependancyMissing
+from shakenfist.exceptions import BlobDeleted, BlobFetchFailed, BlobDependencyMissing
 from shakenfist import instance
 from shakenfist import logutil
 from shakenfist.node import Node, nodes_by_free_disk_descending
@@ -46,11 +46,11 @@ class Blob(dbo):
         self.__modified = static_values['modified']
         self.__fetched_at = static_values['fetched_at']
         self.__depends_on = static_values['depends_on']
-        self.__is_transcode_of = static_values['is_transcode_of']
+        self.__transcodes = static_values['transcodes']
 
     @classmethod
     def new(cls, blob_uuid, size, modified, fetched_at, depends_on=None,
-            is_transcode_of=None):
+            transcodes=None):
         Blob._db_create(
             blob_uuid,
             {
@@ -59,7 +59,7 @@ class Blob(dbo):
                 'modified': modified,
                 'fetched_at': fetched_at,
                 'depends_on': depends_on,
-                'is_transcode_of': is_transcode_of,
+                'transcodes': transcodes,
 
                 'version': cls.current_version
             }
@@ -79,7 +79,7 @@ class Blob(dbo):
             'modified': self.modified,
             'fetched_at': self.fetched_at,
             'depends_on': self.depends_on,
-            'is_transcode_of': self.__is_transcode_of,
+            'transcodes': self.__transcodes,
             'locations': self.locations,
             'reference_count': self.ref_count,
             'instances': self.instances
@@ -106,8 +106,8 @@ class Blob(dbo):
         return self.__depends_on
 
     @property
-    def is_transcode_of(self):
-        return self.__is_transcode_of
+    def transcodes(self):
+        return self.__transcodes
 
     # Values routed to attributes
     @property
@@ -403,7 +403,7 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
     if depends_on:
         dep_blob = Blob.from_db(depends_on)
         if not dep_blob or dep_blob.state.value != Blob.STATE_CREATED:
-            raise BlobDependancyMissing(
+            raise BlobDependencyMissing(
                 'Snapshot depends on blob UUID %s, which is missing'
                 % depends_on)
 
