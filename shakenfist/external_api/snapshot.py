@@ -4,6 +4,7 @@ from functools import partial
 from shakenfist import artifact
 from shakenfist.artifact import Artifacts
 from shakenfist import blob
+from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist import logutil
@@ -20,6 +21,8 @@ class InstanceSnapshotEndpoint(api_base.Resource):
     @api_base.requires_instance_active
     def post(self, instance_ref=None, instance_from_db=None, all=None,
              device=None, max_versions=0, thin=None):
+        if not thin:
+            thin = config.SNAPSHOTS_DEFAULT_TO_THIN
         return instance_from_db.snapshot(
             all=all, device=device, max_versions=max_versions)
 
