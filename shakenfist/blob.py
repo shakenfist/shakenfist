@@ -276,7 +276,7 @@ class Blob(dbo):
                     try:
                         admin_token = util_general.get_api_token(
                             'http://%s:%d' % (blob_source, config.API_PORT))
-                        url = ('http://%s:%d/blob/%s?offset=%d'
+                        url = ('http://%s:%d/blobs/%s/data?offset=%d'
                                % (blob_source, config.API_PORT, self.uuid,
                                   total_bytes_received))
                         r = requests.request(

@@ -27,7 +27,7 @@ def _read_remote(target, blob_uuid, offset=0):
     api_token = util_general.get_api_token(
         'http://%s:%d' % (target, config.API_PORT),
         namespace=get_jwt_identity()[0])
-    url = 'http://%s:%d/blob/%s?offset=%d' % (
+    url = 'http://%s:%d/blobs/%s/data?offset=%d' % (
         target, config.API_PORT, blob_uuid, offset)
 
     r = requests.request('GET', url,
@@ -38,6 +38,16 @@ def _read_remote(target, blob_uuid, offset=0):
 
 
 class BlobEndpoint(api_base.Resource):
+    @jwt_required
+    def get(self, blob_uuid=None):
+        b = Blob.from_db(blob_uuid)
+        if not b:
+            return api_base.error(404, 'blob not found')
+
+        return b.external_view()
+
+
+class BlobDataEndpoint(api_base.Resource):
     # NOTE(mikal): note that arguments from URL routes (blob_uuid for example),
     # are not included in the webargs schema because webargs doesn't appear to
     # know how to find them.
