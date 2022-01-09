@@ -1,6 +1,6 @@
 import os
 import re
-
+import shutil
 
 # To avoid circular imports, util modules should only import a limited
 # set of shakenfist modules, mainly exceptions, logutils, and specific
@@ -16,6 +16,27 @@ LOG, _ = logutil.setup(__name__)
 
 
 VALUE_WITH_BRACKETS_RE = re.compile(r'.* \(([0-9]+) bytes\)')
+
+
+def convert_numeric_qemu_value(qemu_value):
+    if not isinstance(qemu_value, str):
+        return qemu_value
+
+    if qemu_value.endswith('T'):
+        qemu_value = float(qemu_value[:-1]) * constants.TiB
+    elif qemu_value.endswith('G'):
+        qemu_value = float(qemu_value[:-1]) * constants.GiB
+    elif qemu_value.endswith('M'):
+        qemu_value = float(qemu_value[:-1]) * constants.MiB
+    elif qemu_value.endswith('K'):
+        qemu_value = float(qemu_value[:-1]) * constants.KiB
+    else:
+        try:
+            qemu_value = float(qemu_value)
+        except ValueError:
+            pass
+
+    return qemu_value
 
 
 def identify(path):
@@ -39,14 +60,7 @@ def identify(path):
             if m:
                 value = float(m.group(1))
 
-            elif value.endswith('K'):
-                value = float(value[:-1]) * 1024
-            elif value.endswith('M'):
-                value = float(value[:-1]) * 1024 * 1024
-            elif value.endswith('G'):
-                value = float(value[:-1]) * 1024 * 1024 * 1024
-            elif value.endswith('T'):
-                value = float(value[:-1]) * 1024 * 1024 * 1024 * 1024
+            value = convert_numeric_qemu_value(value)
 
             try:
                 data[key] = float(value)
@@ -123,13 +137,46 @@ def create_blank(locks, disk_file, disk_size):
         iopriority=util_process.PRIORITY_LOW)
 
 
-def snapshot(locks, source, destination):
+def snapshot(locks, source, destination, thin=False):
     """Convert a possibly COW layered disk file into a snapshot."""
-    cmd = 'qemu-img convert --force-share -o cluster_size=%s -O qcow2' % (
-        constants.QCOW2_CLUSTER_SIZE)
+    backing_file = identify(source).get('backing file')
+    LOG.with_fields({
+        'source': source,
+        'backing file': backing_file}).debug('Detecting backing file for snapshot')
+
+    if thin and backing_file:
+        # NOTE(mikal): we use relative paths for the backing file when we create
+        # the snapshot because it makes it easier to move the stack of layers
+        # around, especially if a user downloads them. This means we need to make
+        # the snapshot in the image cache directory and then move it to the right
+        # place or qemu-img gets confused.
+        LOG.with_field('source', source).debug('Producing thin snapshot')
+        backing_path, backing_uuid_with_extension = os.path.split(backing_file)
+        backing_uuid = backing_uuid_with_extension.split('.')[0]
+
+        _, destination_uuid = os.path.split(destination)
+        temporary_location = os.path.join(config.STORAGE_PATH, 'image_cache',
+                                          destination_uuid + '.partial')
+
+        cmd = ('qemu-img convert --force-share -o cluster_size=%s -O qcow2 -B %s'
+               % (constants.QCOW2_CLUSTER_SIZE, backing_uuid_with_extension))
+        if config.COMPRESS_SNAPSHOTS:
+            cmd += ' -c'
+
+        util_process.execute(locks, ' '.join([cmd, source, temporary_location]),
+                             iopriority=util_process.PRIORITY_LOW, cwd=backing_path)
+
+        # TODO(mikal): its likely this move should be done with a low IO priority?
+        shutil.move(temporary_location, destination)
+        return backing_uuid
+
+    # Produce a single file with any backing files flattened. This is also the
+    # fall through from the "thin" option when no backing files are present.
+    cmd = ('qemu-img convert --force-share -o cluster_size=%s -O qcow2'
+           % constants.QCOW2_CLUSTER_SIZE)
     if config.COMPRESS_SNAPSHOTS:
         cmd += ' -c'
-    util_process.execute(
-        locks,
-        ' '.join([cmd, source, destination]),
-        iopriority=util_process.PRIORITY_LOW)
+
+    util_process.execute(locks, ' '.join([cmd, source, destination]),
+                         iopriority=util_process.PRIORITY_LOW)
+    return None

@@ -124,8 +124,8 @@ def handle(jobname, workitem):
                 etcd.enqueue('networknode', task)
 
             elif isinstance(task, SnapshotTask):
-                snapshot(inst, task.disk(),
-                         task.artifact_uuid(), task.blob_uuid())
+                snapshot(inst, task.disk(), task.artifact_uuid(), task.blob_uuid(),
+                         task.thin())
 
             elif isinstance(task, DeleteNetworkWhenClean):
                 # Check if any interfaces remain on network
@@ -408,8 +408,12 @@ def instance_delete(inst):
                         n.delete_on_hypervisor()
 
 
-def snapshot(inst, disk, artifact_uuid, blob_uuid):
-    b = blob.snapshot_disk(disk, blob_uuid)
+def snapshot(inst, disk, artifact_uuid, blob_uuid, thin=False):
+    try:
+        b = blob.snapshot_disk(disk, blob_uuid, thin=thin)
+    except exceptions.BlobDependencyMissing:
+        pass
+
     a = Artifact.from_db(artifact_uuid)
 
     if b.state.value == blob.Blob.STATE_DELETED:

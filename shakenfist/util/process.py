@@ -27,7 +27,7 @@ PRIORITY_HIGH = (2, 0)
 
 
 def execute(locks, command, check_exit_code=[0], env_variables=None,
-            namespace=None, iopriority=None):
+            namespace=None, iopriority=None, cwd=None):
     if namespace:
         command = 'ip netns exec %s %s' % (namespace, command)
 
@@ -42,7 +42,7 @@ def execute(locks, command, check_exit_code=[0], env_variables=None,
     if not locks:
         return processutils.execute(
             command, check_exit_code=check_exit_code,
-            env_variables=env_variables, shell=True)
+            env_variables=env_variables, shell=True, cwd=cwd)
 
     else:
         p = multiprocessing.Process(

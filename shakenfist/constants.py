@@ -2,6 +2,7 @@
 KiB = 1024
 MiB = 1024 * 1024
 GiB = 1024 * 1024 * 1024
+TiB = 1024 * 1024 * 1024 * 1024
 
 # Sometimes we hold a lock for a long time and need to refresh it. This
 # is how often we do that refresh.

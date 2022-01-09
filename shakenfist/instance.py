@@ -12,6 +12,7 @@ import random
 import shutil
 import socket
 import time
+from uuid import uuid4
 
 from shakenfist import artifact
 from shakenfist import baseobject
@@ -27,7 +28,7 @@ from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist import net
 from shakenfist import networkinterface
-from shakenfist.tasks import DeleteInstanceTask
+from shakenfist.tasks import DeleteInstanceTask, SnapshotTask
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
 from shakenfist.util import libvirt as util_libvirt
@@ -241,6 +242,19 @@ class Instance(dbo):
                     'Network interface missing')
             else:
                 i['interfaces'].append(ni.external_view())
+
+        # Mix in details of the configured disks. We don't have all the details
+        # in the block devices structure until _initialize_block_devices() is
+        # called. If not yet configured, we just return None.
+        i['disks'] = []
+        for disk in self.block_devices.get('devices', []):
+            i['disks'].append({
+                'device': disk['device'],
+                'bus': disk['bus'],
+                'size': disk.get('size'),
+                'blob_uuid': disk.get('blob_uuid'),
+                'snapshot_ignores': disk.get('snapshot_ignores')
+            })
 
         return i
 
@@ -1082,6 +1096,80 @@ class Instance(dbo):
 
         self.error = error_msg
         self.enqueue_delete_remote(config.NODE_NAME)
+
+    def snapshot(self, all=False, device=None, max_versions=None, thin=False):
+        disks = self.block_devices['devices']
+
+        # Include NVRAM as a snapshot option if we are UEFI booted
+        if self.uefi:
+            disks.append({
+                'type': 'nvram',
+                'device': 'nvram',
+                'path': os.path.join(self.instance_path, 'nvram'),
+                'snapshot_ignores': False
+            })
+
+        # Filter if requested
+        if device:
+            new_disks = []
+            for d in disks:
+                if d['device'] == device:
+                    new_disks.append(d)
+            disks = new_disks
+        elif not all:
+            disks = [disks[0]]
+        self.log.with_field('devices', disks).info('Devices for snapshot')
+
+        out = {}
+        for disk in disks:
+            if disk['snapshot_ignores']:
+                continue
+
+            if disk['type'] not in ['qcow2', 'nvram']:
+                continue
+
+            if not os.path.exists(disk['path']):
+                continue
+
+            a = artifact.Artifact.from_url(
+                artifact.Artifact.TYPE_SNAPSHOT,
+                '%s%s/%s' % (artifact.INSTANCE_URL, self.uuid, disk['device']),
+                max_versions)
+
+            blob_uuid = str(uuid4())
+            entry = a.add_index(blob_uuid)
+
+            out[disk['device']] = {
+                'source_url': a.source_url,
+                'artifact_uuid': a.uuid,
+                'artifact_index': entry['index'],
+                'blob_uuid': blob_uuid
+            }
+
+            if disk['type'] == 'nvram':
+                # These are small and don't use qemu-img to capture, so just
+                # do them now.
+                blob.ensure_blob_path()
+                dest_path = blob.Blob.filepath(blob_uuid)
+                shutil.copyfile(disk['path'], dest_path)
+
+                st = os.stat(dest_path)
+                b = blob.Blob.new(blob_uuid, st.st_size,
+                                  time.time(), time.time())
+                b.observe()
+                a.state = artifact.Artifact.STATE_CREATED
+
+            else:
+                etcd.enqueue(config.NODE_NAME, {
+                    'tasks': [SnapshotTask(self.uuid, disk, a.uuid, blob_uuid,
+                                           thin=thin)],
+                })
+            self.add_event(
+                'api',
+                'snapshot of %s requested' % disk['path'].split('/')[-1],
+                None, a.uuid)
+
+        return out
 
 
 class Instances(dbo_iter):

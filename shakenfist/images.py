@@ -3,14 +3,14 @@ import os
 import pathlib
 import requests
 import shutil
+import time
 import uuid
 
 from shakenfist.artifact import Artifact, BLOB_URL
 from shakenfist import blob
 from shakenfist.blob import Blob
 from shakenfist.config import config
-from shakenfist.constants import (QCOW2_CLUSTER_SIZE, LOCK_REFRESH_SECONDS,
-                                  KiB, MiB)
+from shakenfist.constants import QCOW2_CLUSTER_SIZE, LOCK_REFRESH_SECONDS
 from shakenfist import exceptions
 from shakenfist import image_resolver
 from shakenfist import logutil
@@ -20,6 +20,7 @@ from shakenfist.util import process as util_process
 
 
 LOG, _ = logutil.setup(__name__)
+TRANSCODE_DESCRIPTION = 'gunzip;qcow2;cluster_size'
 
 
 class ImageFetchHelper(object):
@@ -34,12 +35,25 @@ class ImageFetchHelper(object):
     def get_image(self):
         with self.__artifact.get_lock(ttl=(12 * LOCK_REFRESH_SECONDS),
                                       timeout=config.MAX_IMAGE_TRANSFER_SECONDS) as lock:
+            # Transfer the requested image, in its original format, from either
+            # within the cluster (if we have it cached), or from the source. This
+            # means that even if we have a cached post transcode version of the image
+            # we insist on having the original locally. This was mostly done because
+            # I am lazy, but it also serves as a partial access check.
             b = self.transfer_image(lock)
+
+            # We might already have a trancoded version of the image cached. If so
+            # we use that. Otherwise, we might have a transcoded version within the
+            # cluster, in which case we fetch it. The final option is we do an
+            # actual transcode ourselves. We need to do it this way because thin
+            # snapshots mean we need to try quite hard to have a static post
+            # transcode version of the image, and we don't completely trust the
+            # transcode process to be deterministic.
             self.transcode_image(lock, b)
 
     def transfer_image(self, lock):
         # NOTE(mikal): it is assumed the caller holds a lock on the artifact, and passes
-        # it in lock.
+        # it in.
 
         url, checksum, checksum_type = image_resolver.resolve(self.url)
 
@@ -103,63 +117,89 @@ class ImageFetchHelper(object):
             self.__artifact.add_index(b.uuid)
 
         # Transcode if required, placing the transcoded file in a well known location.
+        # Note that even if we cache the transcoded version as another blob, the
+        # transcoded version is stored in the image cache under the original blob's
+        # UUID.
         os.makedirs(
             os.path.join(config.STORAGE_PATH, 'image_cache'), exist_ok=True)
-        cached = util_general.file_permutation_exists(
+        cached_locally = util_general.file_permutation_exists(
             os.path.join(config.STORAGE_PATH, 'image_cache', b.uuid),
             ['iso', 'qcow2'])
-        if cached:
+        mimetype = b.info.get('mime-type', '')
+        cached_remotely = b.transcoded.get(TRANSCODE_DESCRIPTION)
+        cache_path = None
+
+        if cached_locally:
             # We touch the file here, because we want to know when it was last used.
-            pathlib.Path(cached).touch(exist_ok=True)
+            pathlib.Path(cached_locally).touch(exist_ok=True)
+            return
+
+        elif mimetype in ['application/x-cd-image', 'application/x-iso9660-image']:
+            blob_path = os.path.join(config.STORAGE_PATH, 'blobs', b.uuid)
+            cache_path = os.path.join(
+                config.STORAGE_PATH, 'image_cache', b.uuid + '.iso')
+            util_general.link(blob_path, cache_path)
+
+        elif cached_remotely:
+            remote_blob = Blob.from_db(cached_remotely)
+            if not remote_blob:
+                raise exceptions.BlobMissing(cached_remotely)
+            remote_blob.ensure_local([lock])
+
+            cache_path = os.path.join(
+                config.STORAGE_PATH, 'image_cache', b.uuid + '.qcow2')
+            remote_blob_path = os.path.join(
+                config.STORAGE_PATH, 'blobs', remote_blob.uuid)
+            util_general.link(remote_blob_path, cache_path)
 
         else:
             blob_path = os.path.join(config.STORAGE_PATH, 'blobs', b.uuid)
-            mimetype = b.info.get('mime-type', '')
 
-            if mimetype in ['application/x-cd-image', 'application/x-iso9660-image']:
+            if mimetype == 'application/gzip':
                 cache_path = os.path.join(
-                    config.STORAGE_PATH, 'image_cache', b.uuid + '.iso')
+                    config.STORAGE_PATH, 'image_cache', b.uuid)
+                with util_general.RecordedOperation('decompress image', self.instance):
+                    util_process.execute(
+                        [lock], 'gunzip -k -q -c %s > %s' % (blob_path, cache_path))
+                blob_path = cache_path
+
+            cache_path = os.path.join(
+                config.STORAGE_PATH, 'image_cache', b.uuid + '.qcow2')
+            cache_info = util_image.identify(blob_path)
+
+            cluster_size_as_int = int(util_image.convert_numeric_qemu_value(
+                QCOW2_CLUSTER_SIZE))
+
+            if (cache_info.get('file format', '') == 'qcow2' and
+                    cache_info.get('cluster_size', 0) == cluster_size_as_int):
                 util_general.link(blob_path, cache_path)
-
             else:
-                if mimetype == 'application/gzip':
-                    cache_path = os.path.join(
-                        config.STORAGE_PATH, 'image_cache', b.uuid)
-                    with util_general.RecordedOperation('decompress image', self.instance):
-                        util_process.execute(
-                            [lock], 'gunzip -k -q -c %s > %s' % (blob_path, cache_path))
-                    blob_path = cache_path
+                with util_general.RecordedOperation('transcode image', self.instance):
+                    self.log.with_object(b).info(
+                        'Transcoding %s -> %s' % (blob_path, cache_path))
+                    util_image.create_qcow2(
+                        [lock], blob_path, cache_path)
 
-                cache_path = os.path.join(
-                    config.STORAGE_PATH, 'image_cache', b.uuid + '.qcow2')
-                cache_info = util_image.identify(blob_path)
+            # Now create the cache of the transcode output
+            remote_blob_uuid = str(uuid.uuid4())
+            remote_blob_path = os.path.join(
+                config.STORAGE_PATH, 'blobs', remote_blob_uuid)
+            shutil.copyfile(cache_path, remote_blob_path)
+            st = os.stat(remote_blob_path)
 
-                # Convert the cluster size from qemu format to an int
-                cluster_size_as_int = QCOW2_CLUSTER_SIZE
-                if cluster_size_as_int.endswith('M'):
-                    cluster_size_as_int = int(
-                        cluster_size_as_int[:-1]) * MiB
-                elif cluster_size_as_int.endswith('K'):
-                    cluster_size_as_int = int(
-                        cluster_size_as_int[:-1]) * KiB
-                else:
-                    cluster_size_as_int = int(cluster_size_as_int)
+            remote_blob = Blob.new(
+                remote_blob_uuid, st.st_size, time.time(), time.time())
+            remote_blob.state = Blob.STATE_CREATED
+            remote_blob.observe()
+            remote_blob.request_replication()
 
-                if (cache_info.get('file format', '') == 'qcow2' and
-                        cache_info.get('cluster_size', 0) == cluster_size_as_int):
-                    util_general.link(blob_path, cache_path)
-                else:
-                    with util_general.RecordedOperation('transcode image', self.instance):
-                        self.log.with_object(b).info(
-                            'Transcoding %s -> %s' % (blob_path, cache_path))
-                        util_image.create_qcow2(
-                            [lock], blob_path, cache_path)
+            b.add_transcode(TRANSCODE_DESCRIPTION, remote_blob_uuid)
+            remote_blob.ref_count_inc()
 
-            shutil.chown(cache_path, config.LIBVIRT_USER,
-                         config.LIBVIRT_GROUP)
-            self.log.with_fields(util_general.stat_log_fields(cache_path)).info(
-                'Cache file %s created' % cache_path)
-
+        shutil.chown(cache_path, config.LIBVIRT_USER,
+                     config.LIBVIRT_GROUP)
+        self.log.with_fields(util_general.stat_log_fields(cache_path)).info(
+            'Cache file %s created' % cache_path)
         self.__artifact.state = Artifact.STATE_CREATED
 
     def _blob_get(self, lock, url):
