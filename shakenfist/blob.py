@@ -46,11 +46,9 @@ class Blob(dbo):
         self.__modified = static_values['modified']
         self.__fetched_at = static_values['fetched_at']
         self.__depends_on = static_values['depends_on']
-        self.__transcodes = static_values['transcodes']
 
     @classmethod
-    def new(cls, blob_uuid, size, modified, fetched_at, depends_on=None,
-            transcodes=None):
+    def new(cls, blob_uuid, size, modified, fetched_at, depends_on=None):
         Blob._db_create(
             blob_uuid,
             {
@@ -59,7 +57,6 @@ class Blob(dbo):
                 'modified': modified,
                 'fetched_at': fetched_at,
                 'depends_on': depends_on,
-                'transcodes': transcodes,
 
                 'version': cls.current_version
             }
@@ -79,7 +76,7 @@ class Blob(dbo):
             'modified': self.modified,
             'fetched_at': self.fetched_at,
             'depends_on': self.depends_on,
-            'transcodes': self.__transcodes,
+            'transcodes': self.transcoded,
             'locations': self.locations,
             'reference_count': self.ref_count,
             'instances': self.instances
@@ -104,10 +101,6 @@ class Blob(dbo):
     @property
     def depends_on(self):
         return self.__depends_on
-
-    @property
-    def transcodes(self):
-        return self.__transcodes
 
     # Values routed to attributes
     @property
