@@ -117,8 +117,8 @@ def main():
 
                 # Find version 3 instances and migrate them to version 4
                 if b.get('version') == 2:
-                    i['depends_on'] = None
-                    i['version'] = 3
+                    b['depends_on'] = None
+                    b['version'] = 3
                     changed = True
 
                 if changed:
