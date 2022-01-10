@@ -3,6 +3,8 @@
 import base64
 import bcrypt
 import click
+from etcd3gw.client import Etcd3Client
+import json
 import logging
 import time
 
@@ -45,6 +47,50 @@ def bootstrap_system_key(keyname, key):
 
 
 @click.command()
+def show_etcd_config():
+    value = Etcd3Client(
+        host='localhost', port=2379, protocol='http', api_path='/v3beta/').get(
+            '/sf/config', metadata=True)
+    if value is None or len(value) == 0:
+        click.echo('{}')
+    else:
+        click.echo(json.dumps(json.loads(
+            value[0][0]), indent=4, sort_keys=True))
+
+
+@click.command()
+@click.argument('flag')
+@click.argument('value')
+def set_etcd_config(flag, value):
+    client = Etcd3Client(host='localhost', port=2379, protocol='http',
+                         api_path='/v3beta/')
+    config = {}
+    current_config = client.get('/sf/config', metadata=True)
+    if current_config is None or len(current_config) == 0:
+        config = {}
+    else:
+        config = json.loads(current_config[0][0])
+
+    # Convert values if possible
+    if value in ['t', 'true', 'True']:
+        value = True
+    elif value in ['f', 'false', 'False']:
+        value = False
+    else:
+        try:
+            if value.find('.') != -1:
+                value = float(value)
+            else:
+                value = int(value)
+        except ValueError:
+            pass
+
+    click.echo('Setting %s to %s(%s)' % (flag, type(value), value))
+    config[flag] = value
+    client.put('/sf/config', json.dumps(config, indent=4, sort_keys=True))
+
+
+@click.command()
 def stop():
     click.echo('Gracefully stopping Shaken Fist on this node...')
     n = Node.from_db(config.NODE_NAME)
@@ -59,4 +105,6 @@ def stop():
 
 
 cli.add_command(bootstrap_system_key)
+cli.add_command(show_etcd_config)
+cli.add_command(set_etcd_config)
 cli.add_command(stop)

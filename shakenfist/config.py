@@ -1,5 +1,8 @@
 # Copyright 2019 Michael Still
 
+from etcd3gw.client import Etcd3Client
+from etcd3gw.exceptions import ConnectionFailedError
+import json
 import socket
 
 from pydantic import (
@@ -12,6 +15,22 @@ from pydantic import (
 
 def get_node_name():
     return socket.getfqdn()
+
+
+def etcd_settings(_settings):
+    try:
+        value = Etcd3Client(
+            host='localhost', port=2379, protocol='http', api_path='/v3beta/').get(
+                '/sf/config', metadata=True)
+        if value is None or len(value) == 0:
+            return {}
+        return json.loads(value[0][0])
+
+    except ConnectionFailedError:
+        # NOTE(mikal): I'm not sure this is the right approach, as it might cause
+        # us to silently ignore config errors. However, I can't just mock this away
+        # in tests because this code runs before the mocking occurs.
+        return {}
 
 
 class SFConfig(BaseSettings):
@@ -261,6 +280,10 @@ class SFConfig(BaseSettings):
 
     class Config:
         env_prefix = 'SHAKENFIST_'
+
+        @classmethod
+        def customise_sources(cls, init_settings, env_settings, file_secret_settings):
+            return init_settings, etcd_settings, env_settings, file_secret_settings
 
 
 config = SFConfig()
