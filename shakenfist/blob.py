@@ -220,11 +220,10 @@ class Blob(dbo):
             if new_count == 0:
                 self.state = self.STATE_DELETED
 
-            # Clean up any transcodes too
-            for transcoded_blob_uuid in self.transcoded.values():
-                transcoded_blob = Blob.from_db(transcoded_blob_uuid)
-                if transcoded_blob:
-                    transcoded_blob.ref_count_dec()
+                for transcoded_blob_uuid in self.transcoded.values():
+                    transcoded_blob = Blob.from_db(transcoded_blob_uuid)
+                    if transcoded_blob:
+                        transcoded_blob.ref_count_dec()
 
             return new_count
 
@@ -305,7 +304,7 @@ class Blob(dbo):
                     except (http.client.IncompleteRead,
                             urllib3.exceptions.ProtocolError,
                             requests.exceptions.ChunkedEncodingError) as e:
-                        # An API error (or timeout) occured. Retry unless we got nothing.
+                        # An API error (or timeout) occurred. Retry unless we got nothing.
                         if bytes_in_attempt > 0:
                             self.log.info('HTTP connection dropped, retrying')
                         else:

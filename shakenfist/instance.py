@@ -713,13 +713,38 @@ class Instance(dbo):
                             self.log.with_fields(util_general.stat_log_fields(disk['path'])).info(
                                 'COW layer %s created' % disk['path'])
 
-                            # Record the backing store for modern libvirts
-                            disk['backing'] = (
-                                '<backingStore type=\'file\'>\n'
-                                '        <format type=\'qcow2\'/>\n'
-                                '        <source file=\'%s\'/>\n'
-                                '      </backingStore>\n'
-                                % (cached_image_path))
+                            # Record the backing store for modern libvirt. This requires
+                            # walking the chain of dependencies. Backing chains only work
+                            # for qcow2 images. The backing image should already have been
+                            # transcoded as part of the image fetch process.
+                            backing_chain = []
+                            backing_uuid = disk['blob_uuid']
+                            while backing_uuid:
+                                backing_path = os.path.join(
+                                    config.STORAGE_PATH, 'image_cache', backing_uuid + '.qcow2')
+                                backing_chain.append(backing_path)
+                                backing_blob = blob.Blob.from_db(backing_uuid)
+                                backing_uuid = backing_blob.depends_on
+
+                            indent = '      '
+                            disk['backing'] = ''
+                            backing_chain.reverse()
+
+                            for backing_path in backing_chain:
+                                disk['backing'] = (
+                                    '%(indent)s<backingStore type=\'file\'>'
+                                    '%(indent)s  <format type=\'qcow2\'/>'
+                                    '%(indent)s  <source file=\'%(path)s\'/>\n'
+                                    '%(indent)s  %(chain)s\n'
+                                    '%(indent)s</backingStore>\n'
+                                    % {
+                                        'chain': disk['backing'],
+                                        'path': backing_path,
+                                        'indent': indent
+                                    })
+                                indent += '  '
+
+                            disk['backing'] = disk['backing'].lstrip()
 
                     elif not os.path.exists(disk['path']):
                         util_image.create_blank(
