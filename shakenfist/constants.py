@@ -37,3 +37,8 @@ DISK_CACHE_MODE = 'none'
 # need to re-transcode the images into the image cache. There is no automation
 # to support doing at at this time.
 QCOW2_CLUSTER_SIZE = '2048K'
+
+
+# This description is used to uniquely identify transcoded versions of images.
+# It is important that it be bumped when the transcode format changes.
+TRANSCODE_DESCRIPTION = 'gunzip;qcow2;cluster_size'
