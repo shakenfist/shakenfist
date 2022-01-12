@@ -10,7 +10,8 @@ from shakenfist.artifact import Artifact, BLOB_URL
 from shakenfist import blob
 from shakenfist.blob import Blob
 from shakenfist.config import config
-from shakenfist.constants import QCOW2_CLUSTER_SIZE, LOCK_REFRESH_SECONDS
+from shakenfist.constants import (QCOW2_CLUSTER_SIZE, LOCK_REFRESH_SECONDS,
+                                  TRANSCODE_DESCRIPTION)
 from shakenfist import exceptions
 from shakenfist import image_resolver
 from shakenfist import logutil
@@ -20,7 +21,6 @@ from shakenfist.util import process as util_process
 
 
 LOG, _ = logutil.setup(__name__)
-TRANSCODE_DESCRIPTION = 'gunzip;qcow2;cluster_size'
 
 
 class ImageFetchHelper(object):
@@ -33,6 +33,7 @@ class ImageFetchHelper(object):
             {'url': self.url, 'artifact': self.__artifact.uuid})
 
     def get_image(self):
+        fetched_blobs = []
         with self.__artifact.get_lock(ttl=(12 * LOCK_REFRESH_SECONDS),
                                       timeout=config.MAX_IMAGE_TRANSFER_SECONDS) as lock:
             # Transfer the requested image, in its original format, from either
@@ -40,7 +41,17 @@ class ImageFetchHelper(object):
             # means that even if we have a cached post transcode version of the image
             # we insist on having the original locally. This was mostly done because
             # I am lazy, but it also serves as a partial access check.
-            b = self.transfer_image(lock)
+            fetched_blobs.append(self.transfer_image(lock))
+
+            # If the image depends on another image, we must fetch that too.
+            depends_on = fetched_blobs[-1].depends_on
+            while depends_on:
+                self.log.with_fields({
+                    'parent_blob_uuid': fetched_blobs[-1].uuid,
+                    'child_blob_uuid': depends_on}).info('Fetching dependency')
+                fetched_blobs.append(
+                    self._blob_get(lock, 'sf://blob/%s' % depends_on))
+                depends_on = fetched_blobs[-1].depends_on
 
             # We might already have a trancoded version of the image cached. If so
             # we use that. Otherwise, we might have a transcoded version within the
@@ -49,7 +60,8 @@ class ImageFetchHelper(object):
             # snapshots mean we need to try quite hard to have a static post
             # transcode version of the image, and we don't completely trust the
             # transcode process to be deterministic.
-            self.transcode_image(lock, b)
+            for b in fetched_blobs:
+                self.transcode_image(lock, b)
 
     def transfer_image(self, lock):
         # NOTE(mikal): it is assumed the caller holds a lock on the artifact, and passes
@@ -177,24 +189,26 @@ class ImageFetchHelper(object):
                 with util_general.RecordedOperation('transcode image', self.instance):
                     self.log.with_object(b).info(
                         'Transcoding %s -> %s' % (blob_path, cache_path))
-                    util_image.create_qcow2(
-                        [lock], blob_path, cache_path)
+                    util_image.create_qcow2([lock], blob_path, cache_path)
 
             # Now create the cache of the transcode output
-            remote_blob_uuid = str(uuid.uuid4())
-            remote_blob_path = os.path.join(
-                config.STORAGE_PATH, 'blobs', remote_blob_uuid)
-            shutil.copyfile(cache_path, remote_blob_path)
-            st = os.stat(remote_blob_path)
+            transcode_blob_uuid = str(uuid.uuid4())
+            transcode_blob_path = os.path.join(
+                config.STORAGE_PATH, 'blobs', transcode_blob_uuid)
+            shutil.copyfile(cache_path, transcode_blob_path)
+            st = os.stat(transcode_blob_path)
 
-            remote_blob = Blob.new(
-                remote_blob_uuid, st.st_size, time.time(), time.time())
-            remote_blob.state = Blob.STATE_CREATED
-            remote_blob.observe()
-            remote_blob.request_replication()
+            transcode_blob = Blob.new(
+                transcode_blob_uuid, st.st_size, time.time(), time.time())
+            transcode_blob.state = Blob.STATE_CREATED
+            transcode_blob.observe()
+            transcode_blob.request_replication()
+            self.log.with_object(b).with_field(
+                'transcode_blob_uuid', transcode_blob_uuid).info(
+                'Recorded transcode')
 
-            b.add_transcode(TRANSCODE_DESCRIPTION, remote_blob_uuid)
-            remote_blob.ref_count_inc()
+            b.add_transcode(TRANSCODE_DESCRIPTION, transcode_blob_uuid)
+            transcode_blob.ref_count_inc()
 
         shutil.chown(cache_path, config.LIBVIRT_USER,
                      config.LIBVIRT_GROUP)
