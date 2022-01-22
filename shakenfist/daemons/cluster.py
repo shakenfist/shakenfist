@@ -18,7 +18,7 @@ from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import logutil
-from shakenfist import net
+from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist.node import (
     Node, Nodes,
@@ -33,7 +33,7 @@ OBJECT_NAMES_TO_CLASSES = {
     'artifact': artifact.Artifact,
     'blob': blob.Blob,
     'instance': instance.Instance,
-    'network': net.Network,
+    'network': network.Network,
     'networkinterface': networkinterface.NetworkInterface
 }
 

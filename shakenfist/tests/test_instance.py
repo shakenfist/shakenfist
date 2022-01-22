@@ -412,7 +412,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
                         'order': 1
                     })
                 ])
-    @mock.patch('shakenfist.net.Network.from_db',
+    @mock.patch('shakenfist.network.Network.from_db',
                 return_value=FakeNetwork())
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject.state',
                 new_callable=mock.PropertyMock)

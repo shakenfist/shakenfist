@@ -14,7 +14,7 @@ from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
-from shakenfist import net
+from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist.networkinterface import NetworkInterface
 from shakenfist.tasks import (
@@ -38,7 +38,7 @@ EXTRA_VLANS_HISTORY = {}
 
 class Monitor(daemon.WorkerPoolDaemon):
     def _remove_stray_interfaces(self):
-        for n in net.Networks([baseobject.active_states_filter]):
+        for n in network.Networks([baseobject.active_states_filter]):
             t = time.time()
             for ni in networkinterface.interfaces_for_network(n):
                 inst = instance.Instance.from_db(ni.instance_uuid)
@@ -86,13 +86,13 @@ class Monitor(daemon.WorkerPoolDaemon):
                         host_networks.append(ni.network_uuid)
         else:
             # For network nodes, its all networks
-            for n in net.Networks([baseobject.active_states_filter]):
+            for n in network.Networks([baseobject.active_states_filter]):
                 host_networks.append(n.uuid)
 
         # Ensure we are on every network we have a host for
-        for network in host_networks:
+        for network_uuid in host_networks:
             try:
-                n = net.Network.from_db(network)
+                n = network.Network.from_db(network_uuid)
                 if not n:
                     continue
 
@@ -170,7 +170,7 @@ class Monitor(daemon.WorkerPoolDaemon):
 
     def _process_network_workitem(self, log_ctx, workitem):
         log_ctx = log_ctx.with_network(workitem.network_uuid())
-        n = net.Network.from_db(workitem.network_uuid())
+        n = network.Network.from_db(workitem.network_uuid())
         if not n:
             log_ctx.warning('Received work item for non-existent network')
             return
@@ -198,7 +198,7 @@ class Monitor(daemon.WorkerPoolDaemon):
         #
         # Tasks that should NOT operate on a DEAD network
         #
-        if n.is_dead() and n.state.value != net.Network.STATE_DELETE_WAIT:
+        if n.is_dead() and n.state.value != network.Network.STATE_DELETE_WAIT:
             log_ctx.with_fields({'state': n.state,
                                  'workitem': workitem}).info(
                 'Received work item for a dead network and not delete_wait')
@@ -250,7 +250,7 @@ class Monitor(daemon.WorkerPoolDaemon):
 
     def _process_networkinterface_workitem(self, log_ctx, workitem):
         log_ctx = log_ctx.with_networkinterface(workitem.interface_uuid())
-        n = net.Network.from_db(workitem.network_uuid())
+        n = network.Network.from_db(workitem.network_uuid())
         if not n:
             log_ctx.warning('Received work item for non-existent network')
             return
@@ -262,7 +262,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             return
 
         # Tasks that should not operate on a dead or delete waiting network
-        if n.is_dead() and n.state.value != net.Network.STATE_DELETE_WAIT:
+        if n.is_dead() and n.state.value != network.Network.STATE_DELETE_WAIT:
             log_ctx.with_fields({'state': n.state,
                                  'workitem': workitem}).info(
                 'Received work item for a completely dead network')
@@ -324,7 +324,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             # Collect floating gateways and floating IPs, while ensuring that
             # they are correctly reserved on the floating network as well
             floating_gateways = []
-            for n in net.Networks([baseobject.active_states_filter]):
+            for n in network.Networks([baseobject.active_states_filter]):
                 fg = n.floating_gateway
                 if fg:
                     floating_gateways.append(fg)

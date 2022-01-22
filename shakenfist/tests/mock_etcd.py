@@ -15,7 +15,7 @@ import time
 from shakenfist import db
 from shakenfist.baseobject import DatabaseBackedObject
 from shakenfist.instance import Instance
-from shakenfist.net import Network
+from shakenfist.network import Network
 from shakenfist.node import Node
 
 
@@ -149,11 +149,11 @@ class MockEtcd():
         encoded = str(base64.b64encode(bcrypt.hashpw(
                       key.encode('utf-8'), bcrypt.gensalt())), 'utf-8')
         rec = {
-                'name': namespace,
-                'keys': {
-                    key_name: encoded
-                }
+            'name': namespace,
+            'keys': {
+                key_name: encoded
             }
+        }
         db.persist_metadata('namespace', namespace, {})
         db.persist_namespace(namespace, rec)
 
