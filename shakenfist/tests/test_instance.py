@@ -53,10 +53,14 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
             NODE_NAME="node01",
         )
 
-        self.config = mock.patch('shakenfist.instance.config',
-                                 fake_config)
+        self.config = mock.patch('shakenfist.instance.config', fake_config)
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
+
+        self.gmov = mock.patch(
+            'shakenfist.instance.get_minimum_object_version', return_value=6)
+        self.mock_gmov = self.gmov.start()
+        self.addCleanup(self.gmov.stop)
 
     @mock.patch('shakenfist.etcd.get',
                 return_value={
@@ -185,6 +189,11 @@ class InstanceTestCase(base.ShakenFistTestCase):
         self.put = mock.patch('shakenfist.etcd.put')
         self.mock_put = self.put.start()
         self.addCleanup(self.put.stop)
+
+        self.gmov = mock.patch(
+            'shakenfist.instance.get_minimum_object_version', return_value=6)
+        self.mock_gmov = self.gmov.start()
+        self.addCleanup(self.gmov.stop)
 
     @mock.patch('shakenfist.instance.Instance._db_create')
     @mock.patch('shakenfist.instance.Instance._db_get',
@@ -602,6 +611,14 @@ GET_ALL_INSTANCES = [
 
 
 class InstancesTestCase(base.ShakenFistTestCase):
+    def setUp(self):
+        super(InstancesTestCase, self).setUp()
+
+        self.gmov = mock.patch(
+            'shakenfist.instance.get_minimum_object_version', return_value=6)
+        self.mock_gmov = self.gmov.start()
+        self.addCleanup(self.gmov.stop)
+
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
     def test_base_iteration(self, mock_get_all):
         uuids = []

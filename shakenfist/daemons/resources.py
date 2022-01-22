@@ -5,6 +5,7 @@ import time
 from prometheus_client import Gauge
 from prometheus_client import start_http_server
 
+from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons import daemon
 from shakenfist.config import config
 from shakenfist import etcd
@@ -167,6 +168,11 @@ def _get_stats():
             'network_queue_processing': network_queue_processing,
             'network_queue_waiting': network_queue_waiting,
         })
+
+    # What object versions do we support?
+    for obj in OBJECT_NAMES_TO_CLASSES:
+        retval['object_version_%s' % obj] = \
+            OBJECT_NAMES_TO_CLASSES[obj].current_version
 
     return retval
 
