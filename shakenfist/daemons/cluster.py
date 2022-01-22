@@ -10,16 +10,14 @@ import time
 from shakenfist import artifact
 from shakenfist.baseobject import (DatabaseBackedObject as dbo,
                                    active_states_filter)
+from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
 from shakenfist import blob
 from shakenfist.config import config
-from shakenfist.constants import OBJECT_NAMES
 from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import logutil
-from shakenfist import network
-from shakenfist import networkinterface
 from shakenfist.node import (
     Node, Nodes,
     active_states_filter as node_active_states_filter,
@@ -29,13 +27,6 @@ from shakenfist.tasks import FetchBlobTask
 
 
 LOG, _ = logutil.setup(__name__)
-OBJECT_NAMES_TO_CLASSES = {
-    'artifact': artifact.Artifact,
-    'blob': blob.Blob,
-    'instance': instance.Instance,
-    'network': network.Network,
-    'networkinterface': networkinterface.NetworkInterface
-}
 
 
 class Monitor(daemon.Daemon):
@@ -61,7 +52,7 @@ class Monitor(daemon.Daemon):
         LOG.info('Running cluster maintenance')
 
         # Cleanup soft deleted objects
-        for objtype in OBJECT_NAMES:
+        for objtype in OBJECT_NAMES_TO_CLASSES:
             for _, objdata in etcd.get_all(objtype, None):
                 try:
                     obj = OBJECT_NAMES_TO_CLASSES[objtype].from_db(

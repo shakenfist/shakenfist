@@ -26,6 +26,7 @@ from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import logutil
+from shakenfist.metrics import get_minimum_object_version
 from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist.tasks import DeleteInstanceTask, SnapshotTask
@@ -77,6 +78,7 @@ def _safe_int_cast(i):
 class Instance(dbo):
     object_type = 'instance'
     current_version = 6
+    upgrade_supported = True
 
     # docs/development/state_machine.md has a description of these states.
     STATE_INITIAL_ERROR = 'initial-error'
@@ -123,6 +125,15 @@ class Instance(dbo):
     METADATA_KEY_AFFINITY = 'affinity'
 
     def __init__(self, static_values):
+        if static_values['version'] != self.current_version:
+            upgraded, static_values = self.upgrade(static_values)
+
+            if (upgraded and
+                    get_minimum_object_version('instance') == self.current_version):
+                etcd.put(self.object_type, None, self.uuid, static_values)
+                LOG.with_field(
+                    self.object_type, static_values['uuid']).info('Online upgrade committed')
+
         super(Instance, self).__init__(static_values.get('uuid'),
                                        static_values.get('version'))
 
@@ -141,6 +152,7 @@ class Instance(dbo):
         self.__nvram_template = static_values.get('nvram_template')
         self.__secure_boot = static_values.get('secure_boot', False)
         self.__machine_type = static_values.get('machine_type', 'pc')
+        self.__side_channels = static_values.get('side_channels', [])
 
         if not self.__disk_spec:
             # This should not occur since the API will filter for zero disks.
@@ -148,13 +160,46 @@ class Instance(dbo):
             raise exceptions.InstanceBadDiskSpecification()
 
     @classmethod
+    def upgrade(cls, static_values):
+        changed = False
+        starting_version = static_values.get('version')
+
+        if static_values.get('version') == 3:
+            static_values['configdrive'] = 'openstack-disk'
+            static_values['version'] = 4
+            changed = True
+
+        if static_values.get('version') == 4:
+            static_values['nvram_template'] = None
+            static_values['secure_boot'] = False
+            static_values['version'] = 5
+            changed = True
+
+        if static_values.get('version') == 5:
+            static_values['machine_type'] = 'pc'
+            static_values['version'] = 6
+            changed = True
+
+        if changed:
+            LOG.with_fields({
+                cls.object_type: static_values['uuid'],
+                'start_version': starting_version,
+                'final_version': static_values.get('version')
+            }).info('Object online upgraded')
+        return changed, static_values
+
+    @classmethod
     def new(cls, name=None, cpus=None, memory=None, namespace=None, ssh_key=None,
             disk_spec=None, user_data=None, video=None, requested_placement=None,
             instance_uuid=None, uefi=False, configdrive=None, nvram_template=None,
-            secure_boot=False, machine_type='pc'):
+            secure_boot=False, machine_type='pc', side_channels=None):
         if not configdrive:
             configdrive = 'openstack-disk'
 
+        # NOTE(mikal): we don't support creating older versions of objects here.
+        # I am not sure if that makes sense (what do you do if you need to make
+        # an older version but the caller requested a feature which requires the
+        # newer version?), but will call it out for now as a gap.
         static_values = {
             'cpus': cpus,
             'disk_spec': disk_spec,

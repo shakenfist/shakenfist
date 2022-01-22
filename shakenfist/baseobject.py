@@ -17,6 +17,7 @@ LOG, _ = logutil.setup(__name__)
 class DatabaseBackedObject(object):
     object_type = 'unknown'
     current_version = None
+    upgrade_supported = False
     state_targets = None
 
     STATE_INITIAL = 'initial'
@@ -117,15 +118,14 @@ class DatabaseBackedObject(object):
 
     @classmethod
     def _db_get(cls, object_uuid):
-        # NOTE(mikal): we don't do upgrades inflight. They are assumed to have
-        # been done as part of the upgrade process.
         o = etcd.get(cls.object_type, None, object_uuid)
         if not o:
             return None
 
         if o.get('version', 0) != cls.current_version:
-            raise exceptions.BadObjectVersion(
-                'Unknown version - %s: %s' % (cls.object_type, o))
+            if not cls.upgrade_supported:
+                raise exceptions.BadObjectVersion(
+                    'Unsupported object version - %s: %s' % (cls.object_type, o))
         return o
 
     # We need to force in memory values through JSON because some values require
