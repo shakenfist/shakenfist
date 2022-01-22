@@ -11,7 +11,7 @@ from shakenfist.external_api import (
     util as api_util)
 from shakenfist import instance
 from shakenfist import logutil
-from shakenfist import net
+from shakenfist import network
 
 
 LOG, HANDLER = logutil.setup(__name__)
@@ -115,7 +115,7 @@ class AuthNamespaceEndpoint(api_base.Resource):
             return api_base.error(400, 'you cannot delete a namespace with instances')
 
         networks = []
-        for n in net.networks_in_namespace(namespace):
+        for n in network.networks_in_namespace(namespace):
             if not n.is_dead():
                 LOG.withFields({'network': n.uuid,
                                 'state': n.state}).info('Blocks namespace delete')

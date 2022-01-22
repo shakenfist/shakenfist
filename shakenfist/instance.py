@@ -26,7 +26,7 @@ from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import logutil
-from shakenfist import net
+from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist.tasks import DeleteInstanceTask, SnapshotTask
 from shakenfist.util import general as util_general
@@ -837,7 +837,7 @@ class Instance(dbo):
                     }
                 )
 
-                n = net.Network.from_db(iface.network_uuid)
+                n = network.Network.from_db(iface.network_uuid)
                 nd['networks'].append(
                     {
                         'id': '%s-%s' % (iface.network_uuid, iface.order),
@@ -909,7 +909,7 @@ class Instance(dbo):
         networks = []
         for iface_uuid in self.interfaces:
             ni = networkinterface.NetworkInterface.from_db(iface_uuid)
-            n = net.Network.from_db(ni.network_uuid)
+            n = network.Network.from_db(ni.network_uuid)
             networks.append(
                 {
                     'macaddr': ni.macaddr,

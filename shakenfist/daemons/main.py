@@ -20,7 +20,7 @@ from shakenfist import etcd
 from shakenfist import instance
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
-from shakenfist import net
+from shakenfist import network
 from shakenfist.networkinterface import interfaces_for_instance
 from shakenfist.node import Node
 from shakenfist.util import general as util_general
@@ -75,16 +75,16 @@ def restore_instances():
             instances.append(inst)
 
     with util_general.RecordedOperation('restore networks', None):
-        for network in networks:
+        for network_uuid in networks:
             try:
-                n = net.Network.from_db(network)
+                n = network.Network.from_db(network_uuid)
                 if not n.is_dead():
                     LOG.with_object(n).info('Restoring network')
                     n.create_on_hypervisor()
                     n.ensure_mesh()
             except Exception as e:
                 util_general.ignore_exception(
-                    'restore network %s' % network, e)
+                    'restore network %s' % network_uuid, e)
 
     with util_general.RecordedOperation('restore instances', None):
         for inst in instances:
@@ -161,9 +161,9 @@ def main():
     # If I am the network node, I need some setup
     if config.NODE_IS_NETWORK_NODE:
         # Bootstrap the floating network in the Networks table
-        floating_network = net.Network.from_db('floating')
+        floating_network = network.Network.from_db('floating')
         if not floating_network:
-            floating_network = net.Network.create_floating_network(
+            floating_network = network.Network.create_floating_network(
                 config.FLOATING_NETWORK)
 
         subst = {

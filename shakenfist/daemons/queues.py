@@ -24,7 +24,7 @@ from shakenfist.tasks import (QueueTask,
                               FloatNetworkInterfaceTask,
                               SnapshotTask,
                               FetchBlobTask)
-from shakenfist import net
+from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist import scheduler
 from shakenfist.util import general as util_general
@@ -129,7 +129,7 @@ def handle(jobname, workitem):
 
             elif isinstance(task, DeleteNetworkWhenClean):
                 # Check if any interfaces remain on network
-                task_network = net.Network.from_db(task.network_uuid())
+                task_network = network.Network.from_db(task.network_uuid())
                 ifaces = networkinterface.interfaces_for_network(task_network)
                 cur_interfaces = {i.uuid: i for i in ifaces}
 
@@ -158,7 +158,7 @@ def handle(jobname, workitem):
                                  DestroyNetworkTask(task.network_uuid()))
 
             elif isinstance(task, HypervisorDestroyNetworkTask):
-                n = net.Network.from_db(task.network_uuid())
+                n = network.Network.from_db(task.network_uuid())
                 n.delete_on_hypervisor()
 
             elif isinstance(task, FetchBlobTask):
@@ -253,13 +253,13 @@ def image_fetch(url, inst):
             'Failed to fetch image: %s Exception: %s' % (url, e))
 
 
-def instance_preflight(inst, network):
+def instance_preflight(inst, netdescs):
     inst.state = instance.Instance.STATE_PREFLIGHT
 
     # Try to place on this node
     s = scheduler.Scheduler()
     try:
-        s.place_instance(inst, network, candidates=[config.NODE_NAME])
+        s.place_instance(inst, netdescs, candidates=[config.NODE_NAME])
         return None
 
     except exceptions.LowResourceException as e:
@@ -283,7 +283,7 @@ def instance_preflight(inst, network):
                 if node != config.NODE_NAME:
                     candidates.append(node)
 
-        candidates = s.place_instance(inst, network,
+        candidates = s.place_instance(inst, netdescs,
                                       candidates=candidates)
         inst.place_instance(candidates[0])
         return candidates[0]
@@ -296,7 +296,7 @@ def instance_preflight(inst, network):
             'Unable to find suitable node')
 
 
-def instance_start(inst, network):
+def instance_start(inst, netdescs):
     if inst.state.value.endswith('-error'):
         LOG.with_instance(inst).warning(
             'You cannot start an instance in an error state.')
@@ -310,9 +310,9 @@ def instance_start(inst, network):
         try:
             # Ensure networks are connected to this node
             iface_uuids = []
-            for netdesc in network:
+            for netdesc in netdescs:
                 iface_uuids.append(netdesc['iface_uuid'])
-                n = net.Network.from_db(netdesc['network_uuid'])
+                n = network.Network.from_db(netdesc['network_uuid'])
                 if not n:
                     inst.enqueue_delete_due_error(
                         'missing network: %s' % netdesc['network_uuid'])
@@ -392,11 +392,11 @@ def instance_delete(inst):
         inst.delete()
 
         # Check each network used by the deleted instance
-        for network in instance_networks:
-            n = net.Network.from_db(network)
+        for network_uuid in instance_networks:
+            n = network.Network.from_db(network_uuid)
             if n:
                 # If network used by another instance, only update
-                if network in host_networks:
+                if network_uuid in host_networks:
                     if n.state.value == dbo.STATE_DELETE_WAIT:
                         # Do not update a network about to be deleted
                         continue

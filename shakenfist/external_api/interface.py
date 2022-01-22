@@ -7,7 +7,7 @@ from shakenfist.external_api import (
     base as api_base,
     util as api_util)
 from shakenfist import logutil
-from shakenfist import net
+from shakenfist import network
 from shakenfist.tasks import (
     DefloatNetworkInterfaceTask,
     FloatNetworkInterfaceTask)
@@ -49,7 +49,7 @@ class InterfaceDefloatEndpoint(api_base.Resource):
         if err:
             return err
 
-        float_net = net.Network.from_db('floating')
+        float_net = network.Network.from_db('floating')
         if not float_net:
             return api_base.error(404, 'floating network not found')
 

@@ -19,7 +19,7 @@ from shakenfist import exceptions
 from shakenfist.etcd import ThreadLocalReadOnlyCache
 from shakenfist.instance import Instance
 from shakenfist import logutil
-from shakenfist import net
+from shakenfist import network
 from shakenfist.upload import Upload
 from shakenfist.util import general as util_general
 
@@ -168,17 +168,17 @@ def arg_is_network_ref(func):
     def wrapper(*args, **kwargs):
         with ThreadLocalReadOnlyCache():
             try:
-                network = net.Network.from_db_by_ref(kwargs.get('network_ref'),
-                                                     get_jwt_identity()[0])
+                n = network.Network.from_db_by_ref(kwargs.get('network_ref'),
+                                                   get_jwt_identity()[0])
             except exceptions.MultipleObjects as e:
                 return error(400, str(e))
 
-            if not network:
+            if not n:
                 LOG.with_field('network', kwargs.get('network_ref')).info(
                     'Network not found, missing or deleted')
                 return error(404, 'network not found')
 
-        kwargs['network_from_db'] = network
+        kwargs['network_from_db'] = n
         return func(*args, **kwargs)
     return wrapper
 
