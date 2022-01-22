@@ -14,7 +14,7 @@ class TestSerialConsole(base.BaseNamespacedTestCase):
 
     def test_serial_console(self):
         inst = self.test_client.create_instance(
-            'cirros', 1, 1024,
+            'test-serial-console', 1, 1024,
             [
                 {
                     'network_uuid': self.net['uuid']
@@ -23,15 +23,15 @@ class TestSerialConsole(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst['uuid'])
         self.assertIsNotNone(inst['node'])
 
-        self._await_login_prompt(inst['uuid'])
+        self._await_instance_ready(inst['uuid'])
 
         console = base.LoggingSocket(self.test_client, inst)
         self.assertTrue(console.execute('uptime').find('load average'))

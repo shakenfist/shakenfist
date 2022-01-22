@@ -118,6 +118,11 @@
         src: "{{source_path}}/client-python/dist/{{hostvars['localhost']['client_wheel_file']}}"
         dest: "/root/{{hostvars['localhost']['client_wheel_file']}}"
 
+    - name: Copy agent wheel file
+      copy:
+        src: "{{source_path}}/agent-python/dist/{{hostvars['localhost']['agent_wheel_file']}}"
+        dest: "/root/{{hostvars['localhost']['agent_wheel_file']}}"
+
     - name: Create a RAM disk for etcd to make it more reliable in CI
       shell: |
         mkdir -p /var/lib/etcd
@@ -135,6 +140,7 @@
 
           export GETSF_SERVER_PACKAGE="/root/{{hostvars['localhost']['server_wheel_file']}}"
           export GETSF_CLIENT_PACKAGE="/root/{{hostvars['localhost']['client_wheel_file']}}"
+          export GETSF_AGENT_PACKAGE="/root/{{hostvars['localhost']['agent_wheel_file']}}"
 
           export GETSF_SKIP_COMMON_IMAGES=1
 

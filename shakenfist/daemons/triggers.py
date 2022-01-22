@@ -1,21 +1,53 @@
 import multiprocessing
 import os
 import re
+import select
 import setproctitle
 import signal
+from shakenfist_agent import protocol
 import time
 
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import eventlog
+from shakenfist import instance
 from shakenfist import logutil
 
 
 LOG, _ = logutil.setup(__name__)
 
 
+class SFSocketAgent(protocol.SocketAgent):
+    def __init__(self, inst, path, logger=None):
+        super(SFSocketAgent, self).__init__(path, logger=logger)
+        self.instance = inst
+        self.instance_ready = False
+
+        self.poll_tasks.append(self.is_system_running)
+
+        self.add_command('is-system-running-response',
+                         self.is_system_running_response)
+
+    def is_system_running(self):
+        self.send_packet({'command': 'is-system-running'})
+
+    def is_system_running_response(self, packet):
+        ready = packet.get('result', 'False')
+        if ready:
+            if self.is_system_running in self.poll_tasks:
+                self.poll_tasks.remove(self.is_system_running)
+
+        if self.instance_ready != ready:
+            if ready:
+                self.instance.add_event2('instance is ready')
+            else:
+                self.instance.add_event2(
+                    'instance not ready (%s)' % packet.get('message', 'none'))
+            self.instance_ready = ready
+
+
 class Monitor(daemon.Daemon):
-    def _observe(self, path, instance_uuid):
+    def monitor(self, instance_uuid):
         setproctitle.setproctitle(
             '%s-%s' % (daemon.process_name('triggers'), instance_uuid))
         regexps = {
@@ -25,74 +57,162 @@ class Monitor(daemon.Daemon):
             'cloud-init complete': re.compile('.*Reached target.*Cloud-init target.*')
         }
 
-        while not os.path.exists(path):
+        inst = instance.Instance.from_db(instance_uuid)
+        log_ctx = LOG.with_instance(instance_uuid)
+        if inst.state.value == instance.Instance.STATE_DELETED:
+            return
+
+        console_path = os.path.join(inst.instance_path, 'console.log')
+        while not os.path.exists(console_path):
             time.sleep(1)
-        fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
+        console_fd = os.open(console_path, os.O_RDONLY | os.O_NONBLOCK)
 
         log_ctx = LOG.with_instance(instance_uuid)
-        log_ctx.with_field('path', path).info('Monitoring path for triggers')
         eventlog.add_event('instance', instance_uuid, 'trigger monitor',
                            'detected console log', None, None)
 
         # Sometimes the trigger process is slow to start, so rewind 4KB to ensure
         # that the last few log lines are not missed. (4KB since Cloud-Init can be
         # noisy after the login prompt.)
-        os.lseek(fd, max(0, os.fstat(fd).st_size - 4096), os.SEEK_SET)
+        os.lseek(console_fd, max(0, os.fstat(
+            console_fd).st_size - 4096), os.SEEK_SET)
 
-        # Record how long the file is, because we need to detect truncations and
-        # re-open.
-        previous_size = os.stat(path).st_size
+        # Record how long the console file is, because we need to detect truncations
+        # and re-open.
+        previous_size = os.stat(console_path).st_size
+
+        # If we have any side channels, open those as well.
+        sc_clients = {}
+        sc_connected = {}
+
+        def build_side_channel_sockets():
+            if not inst.side_channels:
+                return
+
+            for sc in inst.side_channels:
+                if sc not in sc_clients:
+                    sc_path = os.path.join(inst.instance_path, 'sc-%s' % sc)
+                    if os.path.exists(sc_path):
+                        try:
+                            sc_clients[sc] = SFSocketAgent(
+                                inst, sc_path, logger=log_ctx)
+                            sc_connected[sc] = False
+                            sc_clients[sc].send_ping()
+                        except (BrokenPipeError,
+                                ConnectionRefusedError,
+                                ConnectionResetError,
+                                FileNotFoundError):
+                            if sc in sc_clients:
+                                del sc_clients[sc]
+
+        build_side_channel_sockets()
 
         buffer = ''
         while True:
             # Detect file truncations, and die if we see one. We will be restarted
             # by the monitor process.
-            if not os.path.exists(path):
+            if not os.path.exists(console_path):
                 return
-            size = os.stat(path).st_size
-            if size < previous_size:
+
+            try:
+                size = os.stat(console_path).st_size
+                if size < previous_size:
+                    return
+            except FileNotFoundError:
                 return
             previous_size = size
 
-            # Read data, os.read() is non-blocking by the way.
-            d = os.read(fd, 1024).decode('utf-8', errors='ignore')
-            if d:
-                buffer += d
-                lines = buffer.split('\n')
-                buffer = lines[-1]
+            readable = [console_fd]
+            for sc in sc_clients.values():
+                readable.append(sc.input_fileno)
+            readable, _, exceptional = select.select(readable, [], readable, 1)
 
-                for line in lines:
-                    if line:
-                        for trigger in regexps:
-                            m = regexps[trigger].match(line)
-                            if m:
-                                log_ctx.with_field('trigger', trigger,
-                                                   ).info('Trigger matched')
-                                eventlog.add_event('instance', instance_uuid, 'trigger',
-                                                   None, None, trigger)
-            else:
-                # Only pause if there was no data to read
-                time.sleep(0.2)
+            for fd in readable:
+                if fd == console_fd:
+                    d = os.read(fd, 102400).decode('utf-8', errors='ignore')
+                    if d:
+                        buffer += d
+                        lines = buffer.split('\n')
+                        buffer = lines[-1]
+
+                        for line in lines:
+                            if line:
+                                for trigger in regexps:
+                                    m = regexps[trigger].match(line)
+                                    if m:
+                                        log_ctx.with_field('trigger', trigger,
+                                                           ).info('Trigger matched')
+                                        inst.add_event(
+                                            'trigger', None, None, trigger)
+                else:
+                    chan = None
+                    for sc in sc_clients:
+                        if fd == sc_clients[sc].input_fileno:
+                            chan = sc
+
+                    if chan:
+                        try:
+                            for packet in sc_clients[chan].find_packets():
+                                try:
+                                    if not sc_connected.get(chan, False):
+                                        inst.add_event2(
+                                            'side channel %s connected' % chan)
+                                        sc_connected[chan] = True
+
+                                    sc_clients[chan].dispatch_packet(
+                                        packet)
+                                except protocol.UnknownCommand:
+                                    log_ctx.with_field('sidechannel', chan).info(
+                                        'Ignored side channel packet: %s' % packet)
+
+                        except (BrokenPipeError,
+                                ConnectionRefusedError,
+                                ConnectionResetError,
+                                FileNotFoundError):
+                            del sc_clients[chan]
+
+            for fd in exceptional:
+                for sc_name in sc_clients:
+                    if fd == sc_clients[sc_name].input_fileno:
+                        sc_clients[sc_name].close()
+                        del sc_clients[sc_name]
+
+                if fd == console_fd:
+                    return
+
+            build_side_channel_sockets()
+
+            if inst.side_channels:
+                for sc in inst.side_channels:
+                    if sc in sc_clients:
+                        try:
+                            sc_clients[sc].poll()
+                        except (BrokenPipeError,
+                                ConnectionRefusedError,
+                                ConnectionResetError,
+                                FileNotFoundError):
+                            if sc in sc_clients:
+                                del sc_clients[sc]
 
     def run(self):
         LOG.info('Starting')
-        observers = {}
+        monitors = {}
 
         while not self.exit.is_set():
-            # Cleanup terminated observers
-            all_observers = list(observers.keys())
-            for instance_uuid in all_observers:
-                if not observers[instance_uuid].is_alive():
+            # Cleanup terminated monitors
+            all_monitors = list(monitors.keys())
+            for instance_uuid in all_monitors:
+                if not monitors[instance_uuid].is_alive():
                     # Reap process
-                    observers[instance_uuid].join(1)
+                    monitors[instance_uuid].join(1)
                     LOG.with_instance(instance_uuid
                                       ).info('Trigger observer has terminated')
                     eventlog.add_event(
                         'instance', instance_uuid, 'trigger monitor', 'crashed', None, None)
-                    del observers[instance_uuid]
+                    del monitors[instance_uuid]
 
-            # Audit desired observers
-            extra_instances = list(observers.keys())
+            # Audit desired monitors
+            extra_instances = list(monitors.keys())
             missing_instances = []
 
             # The goal here is to find all instances running on this node so
@@ -106,35 +226,33 @@ class Monitor(daemon.Daemon):
                     if instance_uuid in extra_instances:
                         extra_instances.remove(instance_uuid)
 
-                    if instance_uuid not in observers:
+                    if instance_uuid not in monitors:
                         missing_instances.append(instance_uuid)
 
-            # Start missing observers
+            # Start missing monitors
             for instance_uuid in missing_instances:
-                console_path = os.path.join(
-                    config.STORAGE_PATH, 'instances', instance_uuid, 'console.log')
                 p = multiprocessing.Process(
-                    target=self._observe, args=(console_path, instance_uuid),
+                    target=self.monitor, args=(instance_uuid,),
                     name='%s-%s' % (daemon.process_name('triggers'),
                                     instance_uuid))
                 p.start()
 
-                observers[instance_uuid] = p
+                monitors[instance_uuid] = p
                 LOG.with_instance(instance_uuid).info(
                     'Started trigger observer')
                 eventlog.add_event(
                     'instance', instance_uuid, 'trigger monitor', 'started', None, None)
 
-            # Cleanup extra observers
+            # Cleanup extra monitors
             for instance_uuid in extra_instances:
-                p = observers[instance_uuid]
+                p = monitors[instance_uuid]
                 try:
                     os.kill(p.pid, signal.SIGKILL)
-                    observers[instance_uuid].join(1)
+                    monitors[instance_uuid].join(1)
                 except Exception:
                     pass
 
-                del observers[instance_uuid]
+                del monitors[instance_uuid]
                 LOG.with_instance(instance_uuid).info(
                     'Finished trigger observer')
                 eventlog.add_event(
@@ -142,6 +260,5 @@ class Monitor(daemon.Daemon):
 
             self.exit.wait(1)
 
-        # No longer running, clean up all trigger daemons
-        for instance_uuid in observers:
-            os.kill(observers[instance_uuid].pid, signal.SIGKILL)
+        for instance_uuid in monitors:
+            os.kill(monitors[instance_uuid].pid, signal.SIGKILL)

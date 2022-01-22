@@ -33,7 +33,7 @@ class TestNamespace(base.BaseNamespacedTestCase):
         inst_uuids = set()
         for i in range(NUM_INSTANCES):
             new_inst = self.test_client.create_instance(
-                'test-cirros-%s' % i, 1, 1024,
+                'test-%s' % i, 1, 1024,
                 [
                     {
                         'network_uuid': self.net['uuid']
@@ -42,16 +42,15 @@ class TestNamespace(base.BaseNamespacedTestCase):
                 [
                     {
                         'size': 8,
-                        'base': 'sf://upload/system/cirros',
+                        'base': 'sf://upload/system/debian-11',
                         'type': 'disk'
                     }
-                ], None, None,
-                namespace=self.namespace)
+                ], None, None, namespace=self.namespace, side_channels=['sf-agent'])
             inst_uuids.add(new_inst['uuid'])
 
         # Wait for all instances to start
         for uuid in inst_uuids:
-            self._await_login_prompt(uuid)
+            self._await_instance_ready(uuid)
 
         # Run the test
         self.test_client.delete_all_instances(self.namespace)

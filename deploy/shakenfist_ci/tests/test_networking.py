@@ -38,7 +38,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
 
     def test_virtual_networks_are_separate(self):
         inst1 = self.test_client.create_instance(
-            'cirros', 1, 1024,
+            'test-networks-separate-1', 1, 1024,
             [
                 {
                     'network_uuid': self.net_one['uuid']
@@ -47,13 +47,13 @@ class TestNetworking(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         inst2 = self.test_client.create_instance(
-            'cirros', 1, 1024,
+            'test-networks-separate-1', 1, 1024,
             [
                 {
                     'network_uuid': self.net_two['uuid']
@@ -62,16 +62,16 @@ class TestNetworking(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst1['uuid'])
         self.assertIsNotNone(inst2['uuid'])
 
-        self._await_login_prompt(inst1['uuid'])
-        self._await_login_prompt(inst2['uuid'])
+        self._await_instance_ready(inst1['uuid'])
+        self._await_instance_ready(inst2['uuid'])
 
         nics = self.test_client.get_instance_interfaces(inst2['uuid'])
         self.assertEqual(1, len(nics))
@@ -86,7 +86,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
 
     def test_overlapping_virtual_networks_are_separate(self):
         inst1 = self.test_client.create_instance(
-            'cirros', 1, 1024,
+            'test-overlap-cidr-1', 1, 1024,
             [
                 {
                     'network_uuid': self.net_one['uuid']
@@ -95,13 +95,13 @@ class TestNetworking(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         inst2 = self.test_client.create_instance(
-            'cirros', 1, 1024,
+            'test-overlap-cidr-1', 1, 1024,
             [
                 {
                     'network_uuid': self.net_three['uuid']
@@ -110,16 +110,16 @@ class TestNetworking(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst1['uuid'])
         self.assertIsNotNone(inst2['uuid'])
 
-        self._await_login_prompt(inst1['uuid'])
-        self._await_login_prompt(inst2['uuid'])
+        self._await_instance_ready(inst1['uuid'])
+        self._await_instance_ready(inst2['uuid'])
 
         nics = self.test_client.get_instance_interfaces(inst2['uuid'])
         self.assertEqual(1, len(nics))
@@ -134,7 +134,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
 
     def test_single_virtual_networks_work(self):
         inst1 = self.test_client.create_instance(
-            'cirros', 1, 1024,
+            'test-networks-1', 1, 1024,
             [
                 {
                     'network_uuid': self.net_one['uuid']
@@ -143,13 +143,13 @@ class TestNetworking(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         inst2 = self.test_client.create_instance(
-            'cirros', 1, 1024,
+            'test-networks-2', 1, 1024,
             [
                 {
                     'network_uuid': self.net_one['uuid']
@@ -158,16 +158,16 @@ class TestNetworking(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst1['uuid'])
         self.assertIsNotNone(inst2['uuid'])
 
-        self._await_login_prompt(inst1['uuid'])
-        self._await_login_prompt(inst2['uuid'])
+        self._await_instance_ready(inst1['uuid'])
+        self._await_instance_ready(inst2['uuid'])
 
         nics = self.test_client.get_instance_interfaces(inst2['uuid'])
         self.assertEqual(1, len(nics))
@@ -188,7 +188,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
 
     def test_specific_ip_request(self):
         inst = self.test_client.create_instance(
-            'cirros', 1, 1024,
+            'test-specific-ip', 1, 1024,
             [
                 {
                     'network_uuid': self.net_four['uuid'],
@@ -198,10 +198,10 @@ class TestNetworking(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         self._await_instances_ready([inst['uuid']])
 
@@ -221,7 +221,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self.assertRaises(
             apiclient.RequestMalformedException,
             self.test_client.create_instance,
-            'cirros', 1, 1024,
+            'test-invalid-ip', 1, 1024,
             [
                 {
                     'network_uuid': self.net_four['uuid'],
@@ -231,14 +231,14 @@ class TestNetworking(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
     def test_specific_macaddress_request(self):
         inst = self.test_client.create_instance(
-            'cirros', 1, 1024,
+            'test-macaddress', 1, 1024,
             [
                 {
                     'network_uuid': self.net_four['uuid'],
@@ -248,10 +248,10 @@ class TestNetworking(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         self._await_instances_ready([inst['uuid']])
 
@@ -262,7 +262,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
 
     def test_interface_delete(self):
         inst1 = self.test_client.create_instance(
-            'cirros', 1, 1024,
+            'test-iface-delete', 1, 1024,
             [
                 {
                     'network_uuid': self.net_one['uuid']
@@ -271,13 +271,13 @@ class TestNetworking(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst1['uuid'])
-        self._await_login_prompt(inst1['uuid'])
+        self._await_instance_ready(inst1['uuid'])
 
         # We need to refresh our view of the instances, as it might have
         # changed as they started up
@@ -316,10 +316,10 @@ class TestNetworking(base.BaseNamespacedTestCase):
                 [
                     {
                         'size': 8,
-                        'base': 'sf://upload/system/cirros',
+                        'base': 'sf://upload/system/debian-11',
                         'type': 'disk'
                     }
-                ], None, None, force_placement='sf-2')
+                ], None, None, force_placement='sf-2', side_channels=['sf-agent'])
 
             inst_hyp1_vm2 = self.test_client.create_instance(
                 'dup2', 1, 1024,
@@ -334,7 +334,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                         'base': 'sf://upload/system/ubuntu-2004',
                         'type': 'disk'
                     }
-                ], None, None, force_placement='sf-2')
+                ], None, None, force_placement='sf-2', side_channels=['sf-agent'])
 
             inst_hyp2_vm1 = self.test_client.create_instance(
                 'dup3', 1, 1024,
@@ -349,18 +349,18 @@ class TestNetworking(base.BaseNamespacedTestCase):
                         'base': 'sf://upload/system/ubuntu-2004',
                         'type': 'disk'
                     }
-                ], None, None, force_placement='sf-3')
+                ], None, None, force_placement='sf-3', side_channels=['sf-agent'])
 
         except apiclient.ResourceNotFoundException as e:
             self.skip('Target node does not exist. %s' % e)
             return
 
         self.assertIsNotNone(inst_hyp1_vm1['uuid'])
-        self._await_login_prompt(inst_hyp1_vm1['uuid'])
+        self._await_instance_ready(inst_hyp1_vm1['uuid'])
         self.assertIsNotNone(inst_hyp1_vm2['uuid'])
-        self._await_login_prompt(inst_hyp1_vm2['uuid'])
+        self._await_instance_ready(inst_hyp1_vm2['uuid'])
         self.assertIsNotNone(inst_hyp2_vm1['uuid'])
-        self._await_login_prompt(inst_hyp2_vm1['uuid'])
+        self._await_instance_ready(inst_hyp2_vm1['uuid'])
 
         nics = self.test_client.get_instance_interfaces(inst_hyp1_vm2['uuid'])
         console = base.LoggingSocket(self.test_client, inst_hyp1_vm1)

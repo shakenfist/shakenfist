@@ -17,7 +17,7 @@ class TestConsoleLog(base.BaseNamespacedTestCase):
     def test_console_log(self):
         # Start our test instance
         inst = self.test_client.create_instance(
-            'cirros', 1, 1024,
+            'test-console', 1, 1024,
             [
                 {
                     'network_uuid': self.net['uuid']
@@ -26,14 +26,14 @@ class TestConsoleLog(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         # Wait for our test instance to boot
         self.assertIsNotNone(inst['uuid'])
-        self._await_login_prompt(inst['uuid'])
+        self._await_instance_ready(inst['uuid'])
 
         # Get 1000 bytes of console log
         c = self.test_client.get_console_data(inst['uuid'], 1000)

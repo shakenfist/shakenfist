@@ -14,7 +14,7 @@ class TestInstanceMetadata(base.BaseNamespacedTestCase):
 
     def test_simple(self):
         inst = self.test_client.create_instance(
-            'cirros', 1, 1024,
+            'test-simple-metadata', 1, 1024,
             [
                 {
                     'network_uuid': self.net['uuid']
@@ -23,10 +23,10 @@ class TestInstanceMetadata(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst['uuid'])
 

@@ -111,19 +111,19 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
 
         # Create an instance
         inst1 = self.test_client.create_instance(
-            'test-cirros-boot-no-network', 1, 1024, None,
+            'test-boot-no-network', 1, 1024, None,
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
         self._await_instances_ready([inst1['uuid']])
 
         # Take a snapshot
         snap1 = json.loads(self._exec_client(
-            '--json instance snapshot %s' % inst1['uuid']))
+            '--json --async block instance snapshot %s' % inst1['uuid']))
         self.assertIn('vda', snap1)
         self.assertIn('artifact_uuid', snap1['vda'])
         snap_uuid = snap1['vda']['artifact_uuid']
@@ -151,7 +151,7 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
                     'base': 'sf://snapshot/%s' % snap_uuid,
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
         self._await_instances_ready([inst2['uuid']])
 
         # Test instance is listed against blob in snapshot listing
@@ -166,7 +166,8 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
             inst2['uuid'], show_info['blobs']['1']['instances'][0])
 
         # Take a second snapshot of the original instance
-        self._exec_client('--json instance snapshot %s' % inst1['uuid'])
+        self._exec_client(
+            '--json --async block instance snapshot %s' % inst1['uuid'])
 
         # Check the second snapshot is listed
         show_info = json.loads(self._exec_client(

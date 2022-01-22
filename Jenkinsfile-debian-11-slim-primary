@@ -24,6 +24,10 @@ pipeline {
                       then
                         mkdir $WORKSPACE/$BUILD_TAG/client-python
                         ls -A | grep -v $BUILD_TAG | xargs -t -I '__' mv __ $WORKSPACE/$BUILD_TAG/client-python/
+                      elif [ "https://github.com/shakenfist/shakenfist" == "https://github.com/shakenfist/agent-python" ]
+                      then
+                        mkdir $WORKSPACE/$BUILD_TAG/agent-python
+                        ls -A | grep -v $BUILD_TAG | xargs -t -I '__' mv __ $WORKSPACE/$BUILD_TAG/agent-python/
                       else
                         echo "Unknown github_url!"
                         exit 1
@@ -70,6 +74,26 @@ pipeline {
                       fi
                     fi
 
+                    if [ ! -e $WORKSPACE/$BUILD_TAG/agent-python ]
+                    then
+                      echo "Performing agent-python git checkout."
+                      project="agent-python"
+                      search=" Depends on https://github.com/shakenfist/$project/"
+                      deppr=`echo $gitmsg | egrep "$search" | sed "s|.*$search||"`
+
+                      cd $WORKSPACE/$BUILD_TAG
+                      git clone https://github.com/shakenfist/agent-python
+                      cd agent-python
+
+                      if [ "%$deppr%" == "%%" ]
+                      then
+                        git checkout master
+                      else
+                        git fetch origin $deppr/head:dependson
+                        git checkout dependson
+                      fi
+                    fi
+
                     SOURCE_PATH="$WORKSPACE/$BUILD_TAG"
 
                     echo "==== shakenfist git log ===="
@@ -78,6 +102,10 @@ pipeline {
 
                     echo "==== client-python git log ===="
                     cd $SOURCE_PATH/client-python
+                    git log -5 --no-merges
+
+                    echo "==== agent-python git log ===="
+                    cd $SOURCE_PATH/agent-python
                     git log -5 --no-merges
 
                     echo "==== end git logs ===="
@@ -155,6 +183,9 @@ pipeline {
                     ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
                         debian@$primary \
                         '. /etc/sf/sfrc; sf-client artifact upload ubuntu-2004 /srv/ci/ubuntu:20.04'
+                    ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                        debian@$primary \
+                        '. /etc/sf/sfrc; sf-client artifact upload debian-11 /srv/ci/debian:11'
                     ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
                         debian@$primary \
                         '. /etc/sf/sfrc; sf-client artifact upload cirros /srv/ci/cirros'

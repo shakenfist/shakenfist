@@ -26,9 +26,9 @@ class TestUbuntu(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/ubuntu-1804',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
-        self._await_login_prompt(inst['uuid'])
+        self._await_instance_ready(inst['uuid'])
 
         # NOTE(mikal): Ubuntu 18.04 has a bug where DHCP doesn't always work in the
         # cloud image. This is ok though, because we should be using the config drive

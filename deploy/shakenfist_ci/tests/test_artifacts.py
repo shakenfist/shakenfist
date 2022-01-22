@@ -45,7 +45,7 @@ class TestImages(base.BaseNamespacedTestCase):
     def test_instance_invalid_image(self):
         # Start our test instance
         inst = self.test_client.create_instance(
-            'cirros', 1, 1024,
+            'nosuch', 1, 1024,
             [
                 {
                     'network_uuid': self.net['uuid']
@@ -57,10 +57,10 @@ class TestImages(base.BaseNamespacedTestCase):
                     'base': 'https://nosuch.shakenfist.com/foo',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         self.assertRaises(base.StartException,
-                          self._await_login_prompt, inst['uuid'])
+                          self._await_instance_ready, inst['uuid'])
         i = self.test_client.get_instance(inst['uuid'])
         self.assertEqual('error', i['state'])
 
@@ -74,7 +74,7 @@ class TestImages(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/ubuntu-2004',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst['uuid'])
 

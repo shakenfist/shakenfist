@@ -119,12 +119,13 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
                  'ssh_key': 'sshkey',
                  'user_data': 'userdata',
                  'uuid': 'uuid42',
-                 'version': 6,
+                 'version': 7,
                  'video': {'memory': 16384, 'model': 'cirrus'},
                  'uefi': False,
                  'configdrive': 'openstack-disk',
                  'nvram_template': None,
-                 'secure_boot': False
+                 'secure_boot': False,
+                 'side_channels': None
              }),
             mock_create.mock_calls[0][1])
 
@@ -157,7 +158,7 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
         self.assertEqual('sshkey', inst.ssh_key)
         self.assertEqual('userdata', inst.user_data)
         self.assertEqual('uuid42', inst.uuid)
-        self.assertEqual(6, inst.version)
+        self.assertEqual(7, inst.version)
         self.assertEqual('openstack-disk', inst.configdrive)
         self.assertEqual(None, inst.nvram_template)
         self.assertEqual(False, inst.secure_boot)

@@ -23,7 +23,7 @@ class TestCloudInit(base.BaseNamespacedTestCase):
 sudo echo 'banana' >  /tmp/output"""
 
         inst = self.test_client.create_instance(
-            'cirros', 1, 1024,
+            'test-instance', 1, 1024,
             [
                 {
                     'network_uuid': self.net_one['uuid']
@@ -35,7 +35,7 @@ sudo echo 'banana' >  /tmp/output"""
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
             ],
@@ -49,10 +49,11 @@ sudo echo 'banana' >  /tmp/output"""
             '9YN60gp4lZSKB19GaURxtbKWlajfEakn3mTm9JQH5eU48XIaCh+LcptKYd6lD'
             'BWeoicQzECQLMfnKuGpfoZsKbOTTeCzS0/q6guKLNgfXijpRf5uaZaTqQa18t'
             '8s= mikal@marvin"',
-            str(base64.b64encode(ud.encode('utf-8')), 'utf-8'))
+            str(base64.b64encode(ud.encode('utf-8')), 'utf-8'),
+            side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst['uuid'])
-        self._await_login_prompt(inst['uuid'])
+        self._await_instance_ready(inst['uuid'])
 
         console = base.LoggingSocket(self.test_client, inst)
         out = console.execute('cat /tmp/output')
@@ -81,7 +82,7 @@ sudo echo 'banana' >  /tmp/output"""
                     'base': 'sf://upload/system/ubuntu-2004',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst['uuid'])
 
@@ -89,7 +90,7 @@ sudo echo 'banana' >  /tmp/output"""
             time.sleep(1)
             inst = self.test_client.get_instance(inst['uuid'])
 
-        self._await_login_prompt(inst['uuid'])
+        self._await_instance_ready(inst['uuid'])
 
         ifaces = self.test_client.get_instance_interfaces(inst['uuid'])
         self.assertEqual(2, len(ifaces))

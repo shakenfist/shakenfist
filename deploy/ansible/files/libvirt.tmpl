@@ -169,6 +169,11 @@
     <memballoon model='virtio'>
       <address type='pci' domain='0x0000' bus='0x00' slot='0x06' function='0x0'/>
     </memballoon>
+
+    <!-- NOTE(mikal): this is how side channels are implemented. -->
+    {%- for extra in extradevices %}
+    {{extra}}
+    {%- endfor %}
   </devices>
 
   <!-- NOTE(mikal): this is required to support things like NVME disks. -->

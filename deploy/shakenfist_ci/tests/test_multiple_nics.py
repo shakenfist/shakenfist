@@ -27,7 +27,7 @@ sudo echo 'iface eth1 inet dhcp'  >> /etc/network/interfaces
 sudo /etc/init.d/S40network restart"""
 
         inst = self.test_client.create_instance(
-            'cirros', 1, 1024,
+            'test-multiple-nics', 1, 1024,
             [
                 {
                     'network_uuid': self.net_one['uuid']
@@ -39,15 +39,14 @@ sudo /etc/init.d/S40network restart"""
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, str(base64.b64encode(ud.encode('utf-8')), 'utf-8'))
+            ], None, str(base64.b64encode(ud.encode('utf-8')), 'utf-8'),
+            side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst['uuid'])
-
-        self._await_instances_ready([inst['uuid']])
-        self._await_login_prompt(inst['uuid'])
+        self._await_instance_ready(inst['uuid'])
 
         ifaces = self.test_client.get_instance_interfaces(inst['uuid'])
         self.assertEqual(2, len(ifaces))
