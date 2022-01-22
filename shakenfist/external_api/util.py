@@ -6,7 +6,7 @@ from shakenfist import db
 from shakenfist.instance import Instance
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
-from shakenfist import net
+from shakenfist import network
 from shakenfist.networkinterface import NetworkInterface
 
 
@@ -32,7 +32,7 @@ def metadata_putpost(meta_type, owner, key, value):
 
 
 def assign_floating_ip(ni):
-    float_net = net.Network.from_db('floating')
+    float_net = network.Network.from_db('floating')
     if not float_net:
         return api_base.error(404, 'floating network not found')
 
@@ -54,7 +54,7 @@ def safe_get_network_interface(interface_uuid):
     log = LOG.with_fields({'network': ni.network_uuid,
                            'networkinterface': ni.uuid})
 
-    n = net.Network.from_db(ni.network_uuid)
+    n = network.Network.from_db(ni.network_uuid)
     if not n:
         log.info('Network not found or deleted')
         return None, None, api_base.error(404, 'interface network not found')

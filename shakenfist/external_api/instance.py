@@ -20,7 +20,8 @@ from shakenfist.external_api import (
 from shakenfist import instance
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
-from shakenfist import net
+from shakenfist import network as sfnet  # Unfortunate, but we have an API arg
+# called network too.
 from shakenfist.networkinterface import NetworkInterface
 from shakenfist.node import Node
 from shakenfist import scheduler
@@ -271,7 +272,7 @@ class InstancesEndpoint(api_base.Resource):
                 # Allow network to be specified by name or UUID (and error early
                 # if not found)
                 try:
-                    n = net.Network.from_db_by_ref(netdesc['network_uuid'])
+                    n = sfnet.Network.from_db_by_ref(netdesc['network_uuid'])
                 except exceptions.MultipleObjects as e:
                     return api_base.error(400, str(e))
 
@@ -289,7 +290,7 @@ class InstancesEndpoint(api_base.Resource):
                                               'network specification requests an address outside the '
                                               'range of the network')
 
-                if n.state.value != net.Network.STATE_CREATED:
+                if n.state.value != sfnet.Network.STATE_CREATED:
                     return api_base.error(406, 'network %s is not ready (%s)' % (n.uuid, n.state.value))
                 if n.namespace != namespace:
                     return api_base.error(404, 'network %s does not exist' % n.uuid)
@@ -342,7 +343,7 @@ class InstancesEndpoint(api_base.Resource):
         updated_networks = []
         if network:
             for netdesc in network:
-                n = net.Network.from_db(netdesc['network_uuid'])
+                n = sfnet.Network.from_db(netdesc['network_uuid'])
                 if not n:
                     m = 'missing network %s during IP allocation phase' % (
                         netdesc['network_uuid'])
