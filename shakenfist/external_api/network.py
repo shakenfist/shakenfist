@@ -14,7 +14,7 @@ from shakenfist import db
 from shakenfist import etcd
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
-from shakenfist import net
+from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist.util import process as util_process
 from shakenfist.tasks import DestroyNetworkTask, DeleteNetworkWhenClean
@@ -26,13 +26,13 @@ daemon.set_log_level(LOG, 'api')
 
 def _delete_network(network_from_db, wait_interfaces=None):
     # Load network from DB to ensure obtaining correct lock.
-    n = net.Network.from_db(network_from_db.uuid)
+    n = network.Network.from_db(network_from_db.uuid)
     if not n:
         LOG.with_fields({'network_uuid': n.uuid}).warning(
             'delete_network: network does not exist')
         return api_base.error(404, 'network does not exist')
 
-    if n.is_dead() and n.state.value != net.Network.STATE_DELETE_WAIT:
+    if n.is_dead() and n.state.value != network.Network.STATE_DELETE_WAIT:
         # The network has been deleted. No need to attempt further effort.
         # We do allow attempts to delete networks in DELETE_WAIT.
         LOG.with_fields({'network_uuid': n.uuid,
@@ -41,7 +41,7 @@ def _delete_network(network_from_db, wait_interfaces=None):
         return api_base.error(404, 'network is deleted')
 
     if wait_interfaces:
-        n.state = net.Network.STATE_DELETE_WAIT
+        n.state = network.Network.STATE_DELETE_WAIT
         n.add_event('api', 'delete-wait')
         etcd.enqueue(config.NODE_NAME,
                      {'tasks': [DeleteNetworkWhenClean(n.uuid, wait_interfaces)]})
@@ -66,7 +66,7 @@ class NetworkEndpoint(api_base.Resource):
         if network_ref == 'floating':
             return api_base.error(403, 'you cannot delete the floating network')
 
-        n = net.Network.from_db(network_from_db.uuid)
+        n = network.Network.from_db(network_from_db.uuid)
         if not n:
             LOG.with_fields({'network_uuid': n.uuid}).warning(
                 'delete_network: network does not exist')
@@ -109,12 +109,13 @@ class NetworksEndpoint(api_base.Resource):
     @jwt_required
     def get(self, all=False):
         with etcd.ThreadLocalReadOnlyCache():
-            filters = [partial(baseobject.namespace_filter, get_jwt_identity()[0])]
+            filters = [partial(baseobject.namespace_filter,
+                               get_jwt_identity()[0])]
             if not all:
                 filters.append(baseobject.active_states_filter)
 
             retval = []
-            for n in net.Networks(filters):
+            for n in network.Networks(filters):
                 # This forces the network through the external view rehydration
                 retval.append(n.external_view())
             return retval
@@ -139,9 +140,9 @@ class NetworksEndpoint(api_base.Resource):
             return api_base.error(
                 401, 'only admins can create resources in a different namespace')
 
-        network = net.Network.new(name, namespace, netblock, provide_dhcp,
-                                  provide_nat)
-        return network.external_view()
+        n = network.Network.new(name, namespace, netblock, provide_dhcp,
+                                provide_nat)
+        return n.external_view()
 
     @jwt_required
     @api_base.requires_namespace_exist
@@ -171,8 +172,8 @@ class NetworksEndpoint(api_base.Resource):
 
         networks_del = []
         networks_unable = []
-        for n in net.Networks([partial(baseobject.namespace_filter, namespace),
-                               baseobject.active_states_filter]):
+        for n in network.Networks([partial(baseobject.namespace_filter, namespace),
+                                   baseobject.active_states_filter]):
             iface_on_net = list(networkinterface.interfaces_for_network(n))
             if not iface_on_net:
                 _delete_network(n)
