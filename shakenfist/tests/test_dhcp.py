@@ -6,9 +6,11 @@ import six
 import testtools
 from pydantic import AnyHttpUrl, IPvAnyAddress
 
-from shakenfist import dhcp
-from shakenfist.ipmanager import IPManager
 from shakenfist.config import BaseSettings
+from shakenfist.ipmanager import IPManager
+from shakenfist import dhcp
+from shakenfist.instance import Instance
+from shakenfist.networkinterface import NetworkInterface
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -130,28 +132,38 @@ class DHCPTestCase(testtools.TestCase):
     @mock.patch('os.path.exists', return_value=True)
     @mock.patch('shakenfist.networkinterface.NetworkInterfaces',
                 return_value=[
-                    FakeNetworkInterface({'uuid': 'notauuid1',
-                                          'instance_uuid': 'instuuid1',
-                                          'network_uuid': 'netuuid',
-                                          'macaddr': '1a:91:64:d2:15:39',
-                                          'ipv4': '127.0.0.5',
-                                          'order': 0}),
-                    FakeNetworkInterface({'uuid': 'notauuid2',
-                                          'instance_uuid': 'instuuid2',
-                                          'network_uuid': 'netuuid',
-                                          'macaddr': '1a:91:64:d2:15:40',
-                                          'ipv4': '127.0.0.6',
-                                          'order': 0})
+                    FakeNetworkInterface({
+                        'uuid': 'notauuid1',
+                        'instance_uuid': 'instuuid1',
+                        'network_uuid': 'netuuid',
+                        'macaddr': '1a:91:64:d2:15:39',
+                        'ipv4': '127.0.0.5',
+                        'order': 0,
+                        'version': NetworkInterface.current_version
+                    }),
+                    FakeNetworkInterface({
+                        'uuid': 'notauuid2',
+                        'instance_uuid': 'instuuid2',
+                        'network_uuid': 'netuuid',
+                        'macaddr': '1a:91:64:d2:15:40',
+                        'ipv4': '127.0.0.6',
+                        'order': 0,
+                        'version': NetworkInterface.current_version
+                    })
                 ])
     @mock.patch('shakenfist.instance.Instance._db_get',
-                side_effect=[
-                    {'uuid': 'instuuid1',
-                     'name': 'inst1',
-                     'disk_spec': [{'size': 4, 'base': 'foo'}]},
-                    {'uuid': 'instuuid2',
-                     'name': 'inst2',
-                     'disk_spec': [{'size': 4, 'base': 'foo'}]}
-                ])
+                side_effect=[{
+                    'uuid': 'instuuid1',
+                    'name': 'inst1',
+                    'disk_spec': [{'size': 4, 'base': 'foo'}],
+                    'version': Instance.current_version
+                },
+                    {
+                    'uuid': 'instuuid2',
+                    'name': 'inst2',
+                    'disk_spec': [{'size': 4, 'base': 'foo'}],
+                        'version': Instance.current_version
+                }])
     def test_make_hosts(self, mock_instances, mock_interfaces, mock_exists):
         d = dhcp.DHCP(FakeNetwork(), 'eth0')
 

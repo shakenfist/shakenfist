@@ -8,10 +8,10 @@ import uuid
 
 from shakenfist.config import config
 from shakenfist.constants import GiB
-from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import logutil
+from shakenfist.metrics import get_active_node_metrics
 from shakenfist import networkinterface
 from shakenfist.node import (
     Nodes, active_states_filter as node_active_states_filter)
@@ -56,27 +56,7 @@ class Scheduler(object):
 
     def refresh_metrics(self):
         self.log.debug('Refreshing metrics')
-        metrics = {}
-
-        for n in Nodes([node_active_states_filter]):
-            try:
-                new_metrics = etcd.get('metrics', n.uuid, None)
-                if new_metrics:
-                    new_metrics = new_metrics.get('metrics', {})
-                else:
-                    self.log.with_object(n).warning(
-                        'Empty metrics from database for node')
-                    new_metrics = {}
-
-                self.log.with_object(n).debug(
-                    'Metrics for node: %s', new_metrics)
-                metrics[n.uuid] = new_metrics
-
-            except exceptions.ReadException:
-                self.log.with_object(n).warning(
-                    'Refreshing metrics for node failed')
-
-        self.metrics = metrics
+        self.metrics = get_active_node_metrics()
         self.metrics_updated = time.time()
 
     def _has_sufficient_cpu(self, log_ctx, cpus, node):
