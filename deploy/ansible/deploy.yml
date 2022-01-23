@@ -115,7 +115,7 @@
           - unzip
         state: latest
 
-- hosts: hypervisors, network_node
+- hosts: hypervisors, network_node, eventlog_node
   any_errors_fatal: true
   become: yes
   become_method: sudo
@@ -445,7 +445,7 @@
             - job_name: 'shakenfist'
               static_configs:
                 - targets: [
-                      {% for svr in groups.sf_promethus_exporters %}
+                      {% for svr in groups.sf_prometheus_exporters %}
                         '{{hostvars[svr]['node_mesh_ip']}}:13001',
                       {% endfor %}
                     ]

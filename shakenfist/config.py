@@ -100,6 +100,9 @@ class SFConfig(BaseSettings):
     NETWORK_NODE_IP: str = Field(
         '', description='Mesh IP of the node which will egress all traffic',
     )
+    EVENTLOG_NODE_IP: str = Field(
+        '', description='Mesh IP of the node which stores event logs',
+    )
     DNS_SERVER: str = Field(
         '8.8.8.8',
         description='The DNS server to pass to instances via DHCP.'
@@ -223,6 +226,9 @@ class SFConfig(BaseSettings):
     )
     NODE_IS_NETWORK_NODE: bool = Field(
         False, description='True if this node is the network node.'
+    )
+    NODE_IS_EVENTLOG_NODE: bool = Field(
+        False, description='True if this node is a the eventlog node.'
     )
 
     DISK_BUS: str = Field(

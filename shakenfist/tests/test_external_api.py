@@ -1034,10 +1034,6 @@ class ExternalApiNetworkTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super(ExternalApiNetworkTestCase, self).setUp()
 
-        self.add_event = mock.patch('shakenfist.db.add_event')
-        self.mock_add_event = self.add_event.start()
-        self.addCleanup(self.add_event.stop)
-
         self.scheduler = mock.patch(
             'shakenfist.scheduler.Scheduler', FakeScheduler)
         self.mock_scheduler = self.scheduler.start()
@@ -1177,11 +1173,6 @@ class ExternalApiNetworkTestCase(base.ShakenFistTestCase):
 class ExternalApiNoNamespaceMockTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super(ExternalApiNoNamespaceMockTestCase, self).setUp()
-
-        self.add_event = mock.patch(
-            'shakenfist.db.add_event')
-        self.mock_add_event = self.add_event.start()
-        self.addCleanup(self.add_event.stop)
 
         self.scheduler = mock.patch(
             'shakenfist.scheduler.Scheduler', FakeScheduler)
