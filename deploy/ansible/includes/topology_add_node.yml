@@ -10,7 +10,7 @@
 - name: Add {{item['name']}} as a hypervisor (if configured)
   add_host:
     hostname: "{{item['name']}}"
-    groups: hypervisors, sf_promethus_exporters
+    groups: hypervisors, sf_prometheus_exporters
   when: item.get('hypervisor', False)
 
 - name: Add {{item['name']}} as an etcd master (if configured)
@@ -22,8 +22,14 @@
 - name: Add {{item['name']}} as a network node (if configured, should only be one)
   add_host:
     hostname: "{{item['name']}}"
-    groups: network_node, sf_promethus_exporters
+    groups: network_node, sf_prometheus_exporters
   when: item.get('network_node', False)
+
+- name: Add {{item['name']}} as a eventlog node (if configured, should only be one)
+  add_host:
+    hostname: "{{item['name']}}"
+    groups: eventlog_node, sf_prometheus_exporters
+  when: item.get('eventlog_node', False)
 
 - name: Add {{item['name']}} as a primary node (if configured, should only be one)
   add_host:
@@ -34,7 +40,7 @@
 - name: Add {{item['name']}} as a storage node (if configured, should only be one)
   add_host:
     hostname: "{{item['name']}}"
-    groups: storage, sf_promethus_exporters
+    groups: storage, sf_prometheus_exporters
   when: item.get('storage', False)
 
 - name: Record API URL from primary node

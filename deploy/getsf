@@ -274,6 +274,26 @@ else
     question_end
 
     question_start
+    echo "Each cluster also has exactly one event log node. This node hosts the"
+    echo "database of events experienced by various Shaken Fist objects. This data"
+    echo "is useful for debugging, and would also likely be how you would implement"
+    echo "a billing system for Shaken Fist. These databases can become quite large."
+    echo
+    echo "A common choice is to configure the primary node as the eventlog"
+    echo "node as well."
+    echo
+    echo "Of the nodes you entered above, which is the event log node?"
+    echo
+    if [ -z ${GETSF_NODE_EVENTLOG} ]; then
+        echo -n "(a node name from the previous list) >> "
+        read GETSF_NODE_EVENTLOG
+        record_answer GETSF_NODE_EVENTLOG "${GETSF_NODE_EVENTLOG}"
+    else
+        echo "(a node name from the previous list) >> ${GETSF_NODE_EVENTLOG}"
+    fi
+    question_end
+
+    question_start
     echo "Each cluster also needs etcd masters. etcd is where we store the"
     echo "state of the cluster. etcd has very specific latency requirements"
     echo "from both disk and network. So you shouldn't select nodes with"
@@ -600,6 +620,7 @@ for node in ${GETSF_NODES[@]}; do
         api_stanza='"api_url": "http://127.0.0.1:13000"'
         api_comma=','
         network_node="true"
+        eventlog_node="true"
         etcd_master_node="true"
         hypervisor_node="true"
         storage_node="false"
@@ -618,6 +639,12 @@ for node in ${GETSF_NODES[@]}; do
             network_node="true"
         else
             network_node="false"
+        fi
+
+        if [ $(echo "${GETSF_NODE_EVENTLOG}" | grep -c ${node}) -gt 0 ]; then
+            eventlog_node="true"
+        else
+            eventlog_node="false"
         fi
 
         if [ $(echo "${GETSF_NODE_ETCD_MASTER}" | grep -c ${node}) -gt 0 ]; then
@@ -648,6 +675,7 @@ for node in ${GETSF_NODES[@]}; do
     "node_mesh_ip": "${!calc_mesh_address}",
     "primary_node": ${primary_node},
     "network_node": ${network_node},
+    "eventlog_node": ${eventlog_node},
     "etcd_master": ${etcd_master_node},
     "hypervisor": ${hypervisor_node},
     "storage": ${storage_node}${api_comma}

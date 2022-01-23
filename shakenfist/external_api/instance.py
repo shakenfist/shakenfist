@@ -13,6 +13,7 @@ from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import etcd
+from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist.external_api import (
     base as api_base,
@@ -360,8 +361,8 @@ class InstancesEndpoint(api_base.Resource):
                 else:
                     with db.get_lock('ipmanager', None,  netdesc['network_uuid'],
                                      ttl=120, op='Network allocate IP'):
-                        db.add_event('network', netdesc['network_uuid'], 'allocate address',
-                                     None, None, inst.uuid)
+                        eventlog.add_event('network', netdesc['network_uuid'], 'allocate address',
+                                           None, None, inst.uuid)
                         ipm = IPManager.from_db(netdesc['network_uuid'])
                         if 'address' not in netdesc or not netdesc['address']:
                             netdesc['address'] = ipm.get_random_free_address(
@@ -508,8 +509,10 @@ class InstanceEventsEndpoint(api_base.Resource):
     @jwt_required
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
+    @api_base.redirect_to_eventlog_node
     def get(self, instance_ref=None, instance_from_db=None):
-        return list(db.get_events('instance', instance_from_db.uuid))
+        with eventlog.EventLog('instance', instance_from_db.uuid) as eventdb:
+            return list(eventdb.read_events())
 
 
 class InstanceRebootSoftEndpoint(api_base.Resource):

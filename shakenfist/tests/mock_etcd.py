@@ -97,7 +97,7 @@ class MockEtcd():
             return None
         return [[d]]
 
-    def get_prefix(self, path, sort_order=None, sort_target=None):
+    def get_prefix(self, path, sort_order=None, sort_target=None, limit=0):
         ret = []
         for k in sorted(self.db):
             if k.startswith(path):

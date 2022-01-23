@@ -9,10 +9,10 @@ import time
 from etcd3gw.client import Etcd3Client
 from etcd3gw.exceptions import InternalServerError
 from etcd3gw.lock import Lock
+from etcd3gw.utils import _encode, _increment_last_byte
 
 from shakenfist import baseobject
 from shakenfist.config import config
-from shakenfist import db
 from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist.tasks import QueueTask
@@ -43,6 +43,23 @@ class WrappedEtcdClient(Etcd3Client):
             host=host, port=port, protocol=protocol, ca_cert=ca_cert,
             cert_key=cert_key, cert_cert=cert_cert, timeout=timeout,
             api_path=api_path)
+
+    # Replace the upstream implementation with one which allows for limts on range
+    # queries instead of just erroring out for big result sets.
+    def get_prefix(self, key_prefix, sort_order=None, sort_target=None, limit=0):
+        """Get a range of keys with a prefix.
+
+        :param sort_order: 'ascend' or 'descend' or None
+        :param key_prefix: first key in range
+
+        :returns: sequence of (value, metadata) tuples
+        """
+        return self.get(key_prefix,
+                        metadata=True,
+                        range_end=_encode(_increment_last_byte(key_prefix)),
+                        sort_order=sort_order,
+                        sort_target=sort_target,
+                        limit=limit)
 
 
 # This read only cache is thread local, a bit like Flask's request object. Given
@@ -203,19 +220,12 @@ class ActualLock(Lock):
             if res:
                 duration = time.time() - start_time
                 if duration > threshold:
-                    db.add_event(self.objecttype, self.objectname,
-                                 'lock', 'acquired', None,
-                                 'Waited %d seconds for lock' % duration)
                     self.log_ctx.with_field('duration', duration
                                             ).info('Acquiring a lock was slow')
                 return self
 
             duration = time.time() - start_time
             if (duration > threshold and not slow_warned):
-                db.add_event(self.objecttype, self.objectname,
-                             'lock', 'acquire', None,
-                             'Waiting for lock more than threshold')
-
                 node, pid = self.get_holder()
                 self.log_ctx.with_fields({'duration': duration,
                                           'threshold': threshold,
@@ -228,9 +238,6 @@ class ActualLock(Lock):
             time.sleep(1)
 
         duration = time.time() - start_time
-        db.add_event(self.objecttype, self.objectname,
-                     'lock', 'failed', None,
-                     'Failed to acquire lock after %.02f seconds' % duration)
 
         node, pid = self.get_holder()
         self.log_ctx.with_fields({'duration': duration,
@@ -373,7 +380,7 @@ def get(objecttype, subtype, name):
 
 
 @retry_etcd_forever
-def get_all(objecttype, subtype, prefix=None, sort_order=None):
+def get_all(objecttype, subtype, prefix=None, sort_order=None, limit=0):
     path = _construct_key(objecttype, subtype, prefix)
 
     cache = read_only_cache()
@@ -383,12 +390,12 @@ def get_all(objecttype, subtype, prefix=None, sort_order=None):
     else:
         _record_uncached_read(path)
         for data, metadata in WrappedEtcdClient().get_prefix(
-                path, sort_order=sort_order, sort_target='key'):
+                path, sort_order=sort_order, sort_target='key', limit=limit):
             yield str(metadata['key'].decode('utf-8')), json.loads(data)
 
 
 @retry_etcd_forever
-def get_all_dict(objecttype, subtype=None, sort_order=None):
+def get_all_dict(objecttype, subtype=None, sort_order=None, limit=0):
     path = _construct_key(objecttype, subtype, None)
     key_val = {}
 
@@ -399,7 +406,7 @@ def get_all_dict(objecttype, subtype=None, sort_order=None):
     else:
         _record_uncached_read(path)
         for value in WrappedEtcdClient().get_prefix(
-                path, sort_order=sort_order, sort_target='key'):
+                path, sort_order=sort_order, sort_target='key', limit=limit):
             key_val[value[1]['key'].decode('utf-8')] = json.loads(value[0])
 
     return key_val

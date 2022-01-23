@@ -407,5 +407,31 @@ def generic_wrapper(func):
     return wrapper
 
 
+def redirect_to_eventlog_node(func):
+    # Redirect method to the event node
+    def wrapper(*args, **kwargs):
+        if not config.NODE_IS_EVENTLOG_NODE:
+            admin_token = util_general.get_api_token(
+                'http://%s:%d' % (config.EVENTLOG_NODE_IP, config.API_PORT),
+                namespace='system')
+            r = requests.request(
+                flask.request.environ['REQUEST_METHOD'],
+                'http://%s:%d%s'
+                % (config.EVENTLOG_NODE_IP, config.API_PORT,
+                   flask.request.environ['PATH_INFO']),
+                data=flask.request.data,
+                headers={'Authorization': admin_token,
+                         'User-Agent': util_general.get_user_agent()})
+
+            LOG.info('Returning proxied request: %d, %s'
+                     % (r.status_code, r.text))
+            resp = flask.Response(r.text, mimetype='application/json')
+            resp.status_code = r.status_code
+            return resp
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
 class Resource(flask_restful.Resource):
     method_decorators = [generic_wrapper]

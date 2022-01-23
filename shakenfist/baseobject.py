@@ -6,6 +6,7 @@ import time
 from shakenfist import constants
 from shakenfist import db
 from shakenfist import etcd
+from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist.util import general as util_general
@@ -60,7 +61,7 @@ class DatabaseBackedObject(object):
 
     def add_event(self, operation, phase, duration=None, msg=None):
         if not self.__in_memory_only:
-            db.add_event(
+            eventlog.add_event(
                 self.object_type, self.__uuid, operation, phase, duration, msg)
 
     @classmethod
@@ -113,7 +114,7 @@ class DatabaseBackedObject(object):
         metadata['uuid'] = object_uuid
         etcd.create(cls.object_type, None, object_uuid, metadata)
 
-        db.add_event(
+        eventlog.add_event(
             cls.object_type, object_uuid, 'db record created', None, None, None)
 
     @classmethod
@@ -219,7 +220,6 @@ class DatabaseBackedObject(object):
             self._db_set_attribute('state', new_state)
             self.add_event('state changed',
                            '%s -> %s' % (orig.value, new_value))
-            self.error = None
 
     @property
     def error(self):

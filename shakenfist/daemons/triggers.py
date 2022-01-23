@@ -9,8 +9,8 @@ import time
 from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist.daemons import daemon
-from shakenfist import db
 from shakenfist import etcd
+from shakenfist import eventlog
 from shakenfist import logutil
 from shakenfist import instance
 
@@ -34,8 +34,8 @@ def observe(path, instance_uuid):
 
     log_ctx = LOG.with_instance(instance_uuid)
     log_ctx.with_field('path', path).info('Monitoring path for triggers')
-    db.add_event('instance', instance_uuid, 'trigger monitor',
-                 'detected console log', None, None)
+    eventlog.add_event('instance', instance_uuid, 'trigger monitor',
+                       'detected console log', None, None)
 
     # Sometimes the trigger process is slow to start, so rewind 4KB to ensure
     # that the last few log lines are not missed. (4KB since Cloud-Init can be
@@ -71,8 +71,8 @@ def observe(path, instance_uuid):
                         if m:
                             log_ctx.with_field('trigger', trigger,
                                                ).info('Trigger matched')
-                            db.add_event('instance', instance_uuid, 'trigger',
-                                         None, None, trigger)
+                            eventlog.add_event('instance', instance_uuid, 'trigger',
+                                               None, None, trigger)
         else:
             # Only pause if there was no data to read
             time.sleep(0.2)
@@ -92,7 +92,7 @@ class Monitor(daemon.Daemon):
                     observers[instance_uuid].join(1)
                     LOG.with_instance(instance_uuid
                                       ).info('Trigger observer has terminated')
-                    db.add_event(
+                    eventlog.add_event(
                         'instance', instance_uuid, 'trigger monitor', 'crashed', None, None)
                     del observers[instance_uuid]
 
@@ -123,7 +123,7 @@ class Monitor(daemon.Daemon):
                 observers[instance_uuid] = p
                 LOG.with_instance(instance_uuid).info(
                     'Started trigger observer')
-                db.add_event(
+                eventlog.add_event(
                     'instance', instance_uuid, 'trigger monitor', 'started', None, None)
 
             # Cleanup extra observers
@@ -138,7 +138,7 @@ class Monitor(daemon.Daemon):
                 del observers[instance_uuid]
                 LOG.with_instance(instance_uuid).info(
                     'Finished trigger observer')
-                db.add_event(
+                eventlog.add_event(
                     'instance', instance_uuid, 'trigger monitor', 'finished', None, None)
 
             self.exit.wait(1)

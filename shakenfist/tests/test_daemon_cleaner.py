@@ -125,13 +125,12 @@ class CleanerTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.etcd.get', side_effect=fake_get)
     @mock.patch('shakenfist.db.get_lock')
     @mock.patch('shakenfist.node.Node.observe_this_node')
-    @mock.patch('shakenfist.db.add_event')
     @mock.patch('shakenfist.instance.Instance._db_get', side_effect=fake_instance_get)
     @mock.patch('shakenfist.etcd.put', side_effect=fake_put)
     @mock.patch('os.path.exists', side_effect=fake_exists)
     @mock.patch('time.time', return_value=7)
     def test_update_power_states(self, mock_time, mock_exists, mock_put,
-                                 mock_get_instance, mock_event, mock_see,
+                                 mock_get_instance, mock_see,
                                  mock_lock, mock_etcd_get, mock_error,
                                  mock_state_value, mock_state):
         mock_state_value.return_value = 'created'
