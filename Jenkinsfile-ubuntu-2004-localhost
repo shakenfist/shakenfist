@@ -63,7 +63,7 @@ pipeline {
 
                       if [ "%$deppr%" == "%%" ]
                       then
-                        git checkout master
+                        git checkout develop
                       else
                         git fetch origin $deppr/head:dependson
                         git checkout dependson
