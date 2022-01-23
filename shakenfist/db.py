@@ -1,9 +1,7 @@
 # Copyright 2020 Michael Still
 
-import time
 import uuid
 
-from shakenfist.config import config
 from shakenfist import constants
 from shakenfist import etcd
 from shakenfist import logutil
@@ -55,42 +53,6 @@ def persist_ipmanager(network_uuid, data):
 
 def delete_ipmanager(network_uuid):
     etcd.delete('ipmanager', None, uuid)
-
-#####################################################################
-# Events
-#####################################################################
-
-
-def add_event(object_type, object_uuid, operation, phase, duration, message):
-    if config.ENABLE_EVENTS:
-        t = time.time()
-        LOG.with_fields(
-            {
-                object_type: object_uuid,
-                'fqdn': config.NODE_NAME,
-                'operation': operation,
-                'phase': phase,
-                'duration': duration,
-                'message': message
-            }).info('Added event')
-        etcd.put(
-            'event/%s' % object_type, object_uuid, t,
-            {
-                'timestamp': t,
-                'object_type': object_type,
-                'object_uuid': object_uuid,
-                'fqdn': config.NODE_NAME,
-                'operation': operation,
-                'phase': phase,
-                'duration': duration,
-                'message': message
-            })
-
-
-def get_events(object_type, object_uuid):
-    for _, m in etcd.get_all('event/%s' % object_type, object_uuid,
-                             sort_order='ascend'):
-        yield m
 
 
 #####################################################################

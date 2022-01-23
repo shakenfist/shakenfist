@@ -6,8 +6,8 @@ from shakenfist import blob
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
-from shakenfist import db
 from shakenfist import etcd
+from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist import images
 from shakenfist import instance
@@ -79,8 +79,8 @@ def handle(jobname, workitem):
 
             if inst:
                 # TODO(andy) move to QueueTask
-                db.add_event('instance', inst.uuid, task.pretty_task_name(),
-                             'dequeued', None, 'Work item %s' % jobname)
+                eventlog.add_event('instance', inst.uuid, task.pretty_task_name(),
+                                   'dequeued', None, 'Work item %s' % jobname)
 
             if isinstance(task, FetchImageTask):
                 image_fetch(task.url(), inst)
@@ -357,7 +357,8 @@ def instance_delete(inst):
         # in a transition state.
         if not inst.state.value.endswith('-error'):
             inst.state = dbo.STATE_DELETE_WAIT
-        db.add_event('instance', inst.uuid, 'queued', 'delete', None, None)
+        eventlog.add_event('instance', inst.uuid,
+                           'queued', 'delete', None, None)
 
         # Create list of networks used by instance. We cannot use the
         # interfaces cached in the instance here, because the instance

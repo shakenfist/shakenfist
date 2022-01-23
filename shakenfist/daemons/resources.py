@@ -26,6 +26,7 @@ def _get_stats():
         'is_etcd_master': config.NODE_IS_ETCD_MASTER,
         'is_hypervisor': config.NODE_IS_HYPERVISOR,
         'is_network_node': config.NODE_IS_NETWORK_NODE,
+        'is_eventlog_node': config.NODE_IS_EVENTLOG_NODE,
     }
 
     # CPU info
@@ -82,7 +83,7 @@ def _get_stats():
     total = 0
     used = 0
 
-    for path in ['', 'blobs', 'image_cache', 'instances', 'uploads']:
+    for path in ['', 'blobs', 'events', 'image_cache', 'instances', 'uploads']:
         # We need to make the paths we check if they don't exist, otherwise
         # they wont be included in the metrics and things get confused.
         fullpath = os.path.join(config.STORAGE_PATH, path)

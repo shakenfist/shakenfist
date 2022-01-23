@@ -53,7 +53,7 @@ class ActualLockTestCase(base.ShakenFistTestCase):
 
     @mock.patch('shakenfist.etcd.ActualLock.get_holder',
                 return_value=('foo', '43'))
-    @mock.patch('shakenfist.db.add_event')
+    @mock.patch('shakenfist.eventlog.add_event')
     @mock.patch('time.time',
                 side_effect=[100.0, 101.0, 102.0, 103.0, 104.0, 105.0,
                              106.0, 107.0, 108.0, 109.0, 110.0, 111.0,
@@ -76,18 +76,12 @@ class ActualLockTestCase(base.ShakenFistTestCase):
             mock_sleep.assert_has_calls(
                 [mock.call(1), mock.call(1), mock.call(1), mock.call(1)])
 
-            mock_add_event.assert_has_calls(
-                [mock.call('instance', 'auuid', 'lock', 'acquire',
-                           None, 'Waiting for lock more than threshold'),
-                 mock.call('instance', 'auuid', 'lock', 'acquired',
-                           None, 'Waited 12 seconds for lock')])
-            mock_get_holder.assert_called_with()
-
+        mock_get_holder.assert_called_with()
         mock_release.assert_called_with()
 
     @mock.patch('shakenfist.etcd.ActualLock.get_holder',
                 return_value=('foo', '43'))
-    @mock.patch('shakenfist.db.add_event')
+    @mock.patch('shakenfist.eventlog.add_event')
     @mock.patch('time.time',
                 side_effect=[100.0, 101.0, 102.0, 103.0, 104.0, 105.0,
                              106.0, 107.0, 108.0, 109.0, 110.0, 111.0,
@@ -109,13 +103,7 @@ class ActualLockTestCase(base.ShakenFistTestCase):
         mock_acquire.assert_has_calls([mock.call(), mock.call()])
         mock_sleep.assert_has_calls([mock.call(1), mock.call(1)])
 
-        mock_add_event.assert_has_calls(
-            [mock.call('instance', 'auuid', 'lock', 'acquire', None,
-                       'Waiting for lock more than threshold'),
-             mock.call('instance', 'auuid', 'lock', 'failed', None,
-                       'Failed to acquire lock after 6.00 seconds')])
         mock_get_holder.assert_called_with()
-
         mock_release.assert_not_called()
 
 
@@ -256,7 +244,7 @@ class TaskDecodingETCDtestCase(base.ShakenFistTestCase):
 # Dequeue tasks from ETCD
 #
 class TaskDequeueTestCase(base.ShakenFistTestCase):
-    @mock.patch('etcd3gw.Etcd3Client.get_prefix', return_value=[(
+    @mock.patch('shakenfist.etcd.WrappedEtcdClient.get_prefix', return_value=[(
         '''{
             "tasks": [
                         {
@@ -283,7 +271,7 @@ class TaskDequeueTestCase(base.ShakenFistTestCase):
         self.assertCountEqual(expected, workitem['tasks'])
         self.assertSequenceEqual(expected, workitem['tasks'])
 
-    @mock.patch('etcd3gw.Etcd3Client.get_prefix', return_value=[(
+    @mock.patch('shakenfist.etcd.WrappedEtcdClient.get_prefix', return_value=[(
         '''{
             "tasks": [
                         {
@@ -310,7 +298,7 @@ class TaskDequeueTestCase(base.ShakenFistTestCase):
         self.assertCountEqual(expected, workitem['tasks'])
         self.assertSequenceEqual(expected, workitem['tasks'])
 
-    @mock.patch('etcd3gw.Etcd3Client.get_prefix', return_value=[(
+    @mock.patch('shakenfist.etcd.WrappedEtcdClient.get_prefix', return_value=[(
         '''{
             "tasks": [
                         {
@@ -338,7 +326,7 @@ class TaskDequeueTestCase(base.ShakenFistTestCase):
         self.assertCountEqual(expected, workitem['tasks'])
         self.assertSequenceEqual(expected, workitem['tasks'])
 
-    @mock.patch('etcd3gw.Etcd3Client.get_prefix', return_value=[(
+    @mock.patch('shakenfist.etcd.WrappedEtcdClient.get_prefix', return_value=[(
         '''{
             "tasks": [
                         {
@@ -378,7 +366,7 @@ class TaskDequeueTestCase(base.ShakenFistTestCase):
         self.assertCountEqual(expected, workitem['tasks'])
         self.assertSequenceEqual(expected, workitem['tasks'])
 
-    @mock.patch('etcd3gw.Etcd3Client.get_prefix', return_value=[(
+    @mock.patch('shakenfist.etcd.WrappedEtcdClient.get_prefix', return_value=[(
         '''{
             "tasks": [
                         {
@@ -406,7 +394,7 @@ class TaskDequeueTestCase(base.ShakenFistTestCase):
         self.assertCountEqual(expected, workitem['tasks'])
         self.assertSequenceEqual(expected, workitem['tasks'])
 
-    @mock.patch('etcd3gw.Etcd3Client.get_prefix', return_value=[(
+    @mock.patch('shakenfist.etcd.WrappedEtcdClient.get_prefix', return_value=[(
         '''{
             "tasks": [
                         {
@@ -441,7 +429,7 @@ class TaskDequeueTestCase(base.ShakenFistTestCase):
 class GeneralETCDtestCase(base.ShakenFistTestCase):
     maxDiff = None
 
-    @mock.patch('etcd3gw.Etcd3Client.get_prefix',
+    @mock.patch('shakenfist.etcd.WrappedEtcdClient.get_prefix',
                 return_value=[
                     ('''{"checksum": "ed44b9745b8d62bcbbc180b5f36c24bb",
                         "file_version": 1,
