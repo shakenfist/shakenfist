@@ -42,7 +42,7 @@ class WrappedEtcdClient(Etcd3Client):
             cert_key=cert_key, cert_cert=cert_cert, timeout=timeout,
             api_path=api_path)
 
-    # Replace the upstream implementation with one which allows for limts on range
+    # Replace the upstream implementation with one which allows for limtis on range
     # queries instead of just erroring out for big result sets.
     def get_prefix(self, key_prefix, sort_order=None, sort_target=None, limit=0):
         """Get a range of keys with a prefix.
