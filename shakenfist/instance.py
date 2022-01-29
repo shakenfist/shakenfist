@@ -565,12 +565,6 @@ class Instance(dbo):
         else:
             self.state = self.STATE_DELETED
 
-    def hard_delete(self):
-        etcd.delete('instance', None, self.uuid)
-        db.delete_metadata('instance', self.uuid)
-        etcd.delete_all('attribute/instance', self.uuid)
-        etcd.delete_all('event/instance', self.uuid)
-
     def _allocate_console_port(self):
         node = config.NODE_NAME
         consumed = [value['port']

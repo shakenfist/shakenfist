@@ -213,11 +213,6 @@ class Artifact(dbo):
     def delete(self):
         self.state = self.STATE_DELETED
 
-    def hard_delete(self):
-        etcd.delete('artifact', None, self.uuid)
-        etcd.delete_all('attribute/artifact', self.uuid)
-        etcd.delete_all('event/artifact', self.uuid)
-
     def resolve_to_blob(self):
         blob_uuid = self.most_recent_index.get('blob_uuid')
         if not blob_uuid:

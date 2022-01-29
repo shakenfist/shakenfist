@@ -518,11 +518,8 @@ class Network(dbo):
         ipm.delete()
 
     def hard_delete(self):
-        etcd.delete('network', None, self.uuid)
         etcd.delete('vxid', None, self.vxid)
-        etcd.delete_all('attribute/network', self.uuid)
-        etcd.delete_all('event/network', self.uuid)
-        db.delete_metadata('network', self.uuid)
+        super(Network, self).hard_delete()
 
     def is_dnsmasq_running(self):
         """Determine if dnsmasq process is running for this network"""

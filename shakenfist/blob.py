@@ -362,11 +362,6 @@ class Blob(dbo):
                     self.log.with_field('node', n).info(
                         'Instructed to replicate blob')
 
-    def hard_delete(self):
-        etcd.delete('blob', None, self.uuid)
-        etcd.delete_all('attribute/blob', self.uuid)
-        etcd.delete_all('event/blob', self.uuid)
-
     @staticmethod
     def filepath(blob_uuid):
         return os.path.join(config.STORAGE_PATH, 'blobs', blob_uuid)

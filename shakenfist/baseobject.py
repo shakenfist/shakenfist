@@ -237,6 +237,14 @@ class DatabaseBackedObject(object):
                     'Object not in error state (state=%s, object=%s)'
                     % (s, self.object_type))
         self._db_set_attribute('error', {'message': msg})
+        self.add_event('set error', 'complete', None, msg)
+
+    def hard_delete(self):
+        etcd.delete(self.object_type, None, self.uuid)
+        etcd.delete_all('attribute/%s' % self.object_type, self.uuid)
+        etcd.delete_all('event/%s' % self.object_type, self.uuid)
+        db.delete_metadata(self.object_type, self.uuid)
+        self.add_event('hard delete', 'complete', None, 'Hard deleted object')
 
 
 class DatabaseBackedObjectIterator(object):
@@ -257,7 +265,8 @@ def state_filter(states, o):
 
 # Do not use these filters for instances or nodes, use the more
 # specific ones instead
-active_states_filter = partial(state_filter, DatabaseBackedObject.ACTIVE_STATES)
+active_states_filter = partial(
+    state_filter, DatabaseBackedObject.ACTIVE_STATES)
 
 
 def state_age_filter(delay, o):
@@ -284,11 +293,11 @@ class State(object):
     def __hash__(self):
         return hash(str(self.obj_dict()))
 
-    @property
+    @ property
     def value(self):
         return self.__value
 
-    @property
+    @ property
     def update_time(self):
         return self.__update_time
 
