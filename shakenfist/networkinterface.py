@@ -149,10 +149,7 @@ class NetworkInterface(dbo):
 
     def hard_delete(self):
         etcd.delete('macaddress', None, self.macaddr)
-        etcd.delete('networkinterface', None, self.uuid)
-        etcd.delete_all('attribute/networkinterface', self.uuid)
-        etcd.delete_all('event/networkinterface', self.uuid)
-        db.delete_metadata('networkinterface', self.uuid)
+        super(NetworkInterface, self).hard_delete()
 
 
 class NetworkInterfaces(dbo_iter):

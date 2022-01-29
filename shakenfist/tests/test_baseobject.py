@@ -35,6 +35,7 @@ class DatabaseBackedObjectTestCase(base.ShakenFistTestCase):
         self.assertEqual(str(s),
                          "State({'value': 'state1', 'update_time': 3})")
 
+    @mock.patch('shakenfist.db.add_event')
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_set_attribute')
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get_attribute',
                 side_effect=[
@@ -44,7 +45,8 @@ class DatabaseBackedObjectTestCase(base.ShakenFistTestCase):
                     {'value': DatabaseBackedObject.STATE_ERROR, 'update_time': 4},
                     {'message': 'real bad'},
                 ])
-    def test_property_error_msg(self, mock_get_attribute, mock_set_attribute):
+    def test_property_error_msg(self, mock_get_attribute, mock_set_attribute,
+                                mock_add_event):
         d = DatabaseBackedObject('uuid')
         self.assertEqual(d.error, None)
         self.assertEqual(d.error, 'bad error')
