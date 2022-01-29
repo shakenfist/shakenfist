@@ -239,7 +239,6 @@ class DatabaseBackedObject(object):
     def hard_delete(self):
         etcd.delete(self.object_type, None, self.uuid)
         etcd.delete_all('attribute/%s' % self.object_type, self.uuid)
-        etcd.delete_all('event/%s' % self.object_type, self.uuid)
         db.delete_metadata(self.object_type, self.uuid)
         self.add_event('hard delete', 'complete', None, 'Hard deleted object')
 
