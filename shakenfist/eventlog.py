@@ -50,6 +50,11 @@ def add_event(object_type, object_uuid, operation, phase, duration, message):
                  })
 
 
+# Shim to track what hasn't been converted to the new style yet
+def add_event2(object_type, object_uuid, message, duration=None):
+    add_event(object_type, object_uuid, None, None, duration, message)
+
+
 class EventLog(object):
     def __init__(self, objtype, objuuid):
         self.objtype = objtype
