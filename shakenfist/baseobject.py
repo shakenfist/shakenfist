@@ -64,6 +64,12 @@ class DatabaseBackedObject(object):
             eventlog.add_event(
                 self.object_type, self.__uuid, operation, phase, duration, msg)
 
+    # Shim to track what hasn't been converted to the new style yet
+    def add_event2(self, message, duration=None):
+        if not self.__in_memory_only:
+            eventlog.add_event2(
+                self.object_type, self.__uuid, message, duration=duration)
+
     @classmethod
     def from_db(cls, object_uuid):
         if not object_uuid:
