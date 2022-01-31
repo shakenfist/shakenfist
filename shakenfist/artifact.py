@@ -186,7 +186,7 @@ class Artifact(dbo):
                 'blob_uuid': blob_uuid
             }
             self._db_set_attribute('index_%012d' % index, entry)
-            self.log.with_fields(entry).info('Added index to artifact')
+            self.add_event2('Added index %d to artifact' % index)
             self.delete_old_versions()
             return entry
 
@@ -196,9 +196,8 @@ class Artifact(dbo):
         max = self.max_versions
         if len(indexes) > max:
             for i in sorted(indexes)[:-max]:
-                self.log.with_field(
-                    'index', i).info('Deleting artifact version')
                 self.del_index(i)
+                self.add_event2('Deleted index %d from artifact' % i)
 
     def del_index(self, index):
         index_data = self._db_get_attribute('index_%012d' % index)

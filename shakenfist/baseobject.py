@@ -6,6 +6,7 @@ import time
 from shakenfist import constants
 from shakenfist import db
 from shakenfist import etcd
+from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist.util import general as util_general
@@ -60,8 +61,14 @@ class DatabaseBackedObject(object):
 
     def add_event(self, operation, phase, duration=None, msg=None):
         if not self.__in_memory_only:
-            db.add_event(
+            eventlog.add_event(
                 self.object_type, self.__uuid, operation, phase, duration, msg)
+
+    # Shim to track what hasn't been converted to the new style yet
+    def add_event2(self, message, duration=None):
+        if not self.__in_memory_only:
+            eventlog.add_event2(
+                self.object_type, self.__uuid, message, duration=duration)
 
     @classmethod
     def from_db(cls, object_uuid):
@@ -113,7 +120,7 @@ class DatabaseBackedObject(object):
         metadata['uuid'] = object_uuid
         etcd.create(cls.object_type, None, object_uuid, metadata)
 
-        db.add_event(
+        eventlog.add_event(
             cls.object_type, object_uuid, 'db record created', None, None, None)
 
     @classmethod
@@ -219,7 +226,6 @@ class DatabaseBackedObject(object):
             self._db_set_attribute('state', new_state)
             self.add_event('state changed',
                            '%s -> %s' % (orig.value, new_value))
-            self.error = None
 
     @property
     def error(self):
@@ -242,7 +248,6 @@ class DatabaseBackedObject(object):
     def hard_delete(self):
         etcd.delete(self.object_type, None, self.uuid)
         etcd.delete_all('attribute/%s' % self.object_type, self.uuid)
-        etcd.delete_all('event/%s' % self.object_type, self.uuid)
         db.delete_metadata(self.object_type, self.uuid)
         self.add_event('hard delete', 'complete', None, 'Hard deleted object')
 

@@ -16,6 +16,7 @@ import uuid
 # set of shakenfist modules, mainly exceptions, logutils, and specific
 # other util modules.
 from shakenfist import db
+from shakenfist import eventlog
 from shakenfist import logutil
 
 
@@ -29,24 +30,19 @@ class RecordedOperation():
 
     def __enter__(self):
         self.start_time = time.time()
-        object_type, object_uuid = self.unique_label()
-        if object_type and object_uuid:
-            db.add_event(object_type, object_uuid,
-                         self.operation, 'start', None, None)
         return self
 
     def __exit__(self, *args):
         duration = time.time() - self.start_time
-        log = LOG
         object_type, object_uuid = self.unique_label()
         if object_uuid:
             if object_type:
-                db.add_event(object_type, object_uuid,
-                             self.operation, 'finish', duration, None)
-                log = LOG.with_object(self.object)
+                eventlog.add_event2(object_type, object_uuid,
+                                    '%s complete' % self.operation, duration)
             else:
-                log = LOG.with_field({'label', self.object})
-        log.with_field('duration', duration).info('Finish %s', self.operation)
+                LOG.with_fields({
+                    'label': self.object,
+                    'duration': duration}).info('Finish %s', self.operation)
 
     def unique_label(self):
         if self.object:

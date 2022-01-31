@@ -35,7 +35,7 @@ class DatabaseBackedObjectTestCase(base.ShakenFistTestCase):
         self.assertEqual(str(s),
                          "State({'value': 'state1', 'update_time': 3})")
 
-    @mock.patch('shakenfist.db.add_event')
+    @mock.patch('shakenfist.eventlog.add_event')
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_set_attribute')
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get_attribute',
                 side_effect=[
