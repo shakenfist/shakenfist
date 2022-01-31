@@ -60,9 +60,16 @@ class DatabaseBackedObject(object):
         return (self.object_type, self.__uuid)
 
     def add_event(self, operation, phase, duration=None, msg=None):
-        if not self.__in_memory_only:
-            eventlog.add_event(
-                self.object_type, self.__uuid, operation, phase, duration, msg)
+        if self.__in_memory_only:
+            return
+
+        # We do not record events for network interfaces, as they are not an
+        # independent element like a blob or an instance.
+        if self.object_type == 'networkinterface':
+            return
+
+        eventlog.add_event(
+            self.object_type, self.__uuid, operation, phase, duration, msg)
 
     # Shim to track what hasn't been converted to the new style yet
     def add_event2(self, message, duration=None):
