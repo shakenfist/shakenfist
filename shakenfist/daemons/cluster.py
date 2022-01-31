@@ -18,6 +18,7 @@ from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import logutil
+from shakenfist import network
 from shakenfist.node import (
     Node, Nodes,
     active_states_filter as node_active_states_filter,
@@ -59,12 +60,23 @@ class Monitor(daemon.Daemon):
                         objdata['uuid'])
                     if (obj.state.value == dbo.STATE_DELETED and
                             time.time() - obj.state.update_time > config.CLEANER_DELAY):
-                        LOG.with_object(obj).info('Hard deleting')
                         obj.hard_delete()
                 except exceptions.BadObjectVersion:
                     LOG.with_fields({
                         objtype: obj.uuid
                     }).warning('Could not load object for hard delete, bad version')
+
+        # Cleanup vxids which specify a missing network
+        for k, objdata in etcd.get_all('vxlan', None):
+            network_uuid = objdata.get('network_uuid')
+            if network_uuid:
+                n = network.Network.from_db(network_uuid)
+                if not n:
+                    etcd.delete(k)
+                    LOG.with_fields({
+                        'network': network_uuid,
+                        'vxid record': k
+                    }).warning('Cleaning up leaked vxlan')
 
         # Prune artifacts which might have too many versions
         for a in artifact.Artifacts([]):
