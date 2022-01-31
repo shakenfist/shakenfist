@@ -611,14 +611,14 @@ def _validate_instance_metadata(key, value):
     # Reserved key "tags" should be validated to avoid unexpected failures
     if key == instance.Instance.METADATA_KEY_TAGS:
         if not isinstance(value, list):
-            return api_base.error(400, 'value for "tags" key should a list')
+            return api_base.error(400, 'value for "tags" key should be a JSON list')
 
     # Reserved key "affinity" should be validated to avoid unexpected
     # failures during instance creation.
     elif key == instance.Instance.METADATA_KEY_AFFINITY:
         if not isinstance(value, dict):
             return api_base.error(
-                400, 'value for "affinity" key should a valid JSON dictionary')
+                400, 'value for "affinity" key should be a valid JSON dictionary')
 
         for key_type, dv in value.items():
             if key_type not in ('cpu', 'disk', 'instance'):
@@ -627,7 +627,7 @@ def _validate_instance_metadata(key, value):
 
             if not isinstance(dv, dict):
                 return api_base.error(
-                    400, 'value for affinity key should a dictionary')
+                    400, 'value for affinity key should be a dictionary')
             for v in dv.values():
                 try:
                     int(v)
