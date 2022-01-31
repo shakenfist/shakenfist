@@ -71,11 +71,13 @@ class Monitor(daemon.Daemon):
             a.delete_old_versions()
 
         # Inspect current state of blobs, the actual changes are done below outside
-        # the read only cache.
+        # the read only cache. We define being low on disk has having less than three
+        # times the minimum amount of disk. This is so we start to rearrange blobs
+        # before scheduling starts to fail.
         overreplicated = {}
         underreplicated = []
         low_disk_nodes = nodes_by_free_disk_descending(
-            minimum=0, maximum=config.MINIMUM_FREE_DISK,
+            minimum=0, maximum=(config.MINIMUM_FREE_DISK * 3),
             intention='blobs')
 
         absent_nodes = []
