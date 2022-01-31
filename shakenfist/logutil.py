@@ -85,14 +85,15 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
         """
         self._logger = logger
 
+        self._extra = self._normalize(extra)
+        self._prefix = prefix
+
         # Attempt to lookup a request id for a flask request
         try:
-            extra['request-id'] = flask.request.environ.get('FLASK_REQUEST_ID')
+            self._extra['request-id'] = flask.request.environ.get('FLASK_REQUEST_ID')
         except RuntimeError:
             pass
 
-        self._extra = self._normalize(extra)
-        self._prefix = prefix
         super(SFCustomAdapter, self).__init__(
             self._logger, {'extra_fields': self._extra, 'prefix': self._prefix})
 
@@ -108,19 +109,16 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
 
     def with_fields(self, fields=None):
         extra = copy.deepcopy(self._extra)
-        if not fields:
-            fields = {}
+        fields = self._normalize(fields)
 
         # Handle "special fields" which might be internal objects
         for key in ['artifact', 'blob', 'instance', 'network', 'networkinterface', 'node']:
             if key in fields:
                 value = fields[key]
                 if not isinstance(value, str):
-                    value = value.uuid
-                extra.update({key: value})
-                del fields[key]
+                    fields[key] = value.uuid
 
-        extra.update(self._normalize(fields))
+        extra.update(fields)
         return SFCustomAdapter(self._logger, extra, self._prefix)
 
     def with_field(self, key, value):
