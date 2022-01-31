@@ -80,10 +80,6 @@ class Network(dbo):
             vxid = random.randint(1, 16777215)
         return vxid
 
-    @staticmethod
-    def deallocate_vxid(vxid):
-        etcd.delete('vxlan', None, vxid)
-
     @classmethod
     def new(cls, name, namespace, netblock, provide_dhcp=False,
             provide_nat=False, uuid=None, vxid=None):
@@ -518,7 +514,7 @@ class Network(dbo):
         ipm.delete()
 
     def hard_delete(self):
-        etcd.delete('vxid', None, self.vxid)
+        etcd.delete('vxlan', None, self.vxid)
         super(Network, self).hard_delete()
 
     def is_dnsmasq_running(self):
