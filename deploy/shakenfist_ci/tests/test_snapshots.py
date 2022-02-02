@@ -56,7 +56,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         snapshot_uuid = snapshots[-1]['uuid']
         snap1_info = self.test_client.get_artifact(snapshot_uuid)
         self.assertEqual(1, len(snap1_info.get('blobs', [])))
-        self.assertEqual(1, snap1_info['blobs']['1']['reference_count'])
+        self.assertEqual(1, snap1_info['blobs'][1]['reference_count'])
 
         # Take another snapshot, we only get the new snapshot returned
         snap2 = self.test_client.snapshot_instance(inst1['uuid'])
