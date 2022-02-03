@@ -1,3 +1,4 @@
+import json
 import os
 import sqlite3
 import time
@@ -11,16 +12,22 @@ from shakenfist import logutil
 LOG, _ = logutil.setup(__name__)
 
 
-VERSION = 1
+VERSION = 2
 CREATE_EVENT_TABLE = """CREATE TABLE IF NOT EXISTS events(
     timestamp real PRIMARY KEY, fqdn text,
-    operation text, phase text, duration float, message text)"""
+    operation text, phase text, duration float, message text,
+    extra text)"""
 CREATE_VERSION_TABLE = """CREATE TABLE IF NOT EXISTS version(version int)"""
 
 
-def add_event(object_type, object_uuid, operation, phase, duration, message):
+def add_event(object_type, object_uuid, operation, phase, duration, message,
+              extra=None):
     timestamp = time.time()
-    LOG.with_fields(
+
+    log = LOG
+    if extra:
+        log = log.with_fields(extra)
+    log.with_fields(
         {
             object_type: object_uuid,
             'fqdn': config.NODE_NAME,
@@ -33,7 +40,7 @@ def add_event(object_type, object_uuid, operation, phase, duration, message):
     if config.NODE_MESH_IP == config.EVENTLOG_NODE_IP:
         with EventLog(object_type, object_uuid) as eventdb:
             eventdb.write_event(timestamp, config.NODE_NAME, operation, phase,
-                                duration, message)
+                                duration, message, extra=extra)
     else:
         # We use the old eventlog mechanism as a queueing system to get the logs
         # to the eventlog node.
@@ -46,13 +53,15 @@ def add_event(object_type, object_uuid, operation, phase, duration, message):
                      'operation': operation,
                      'phase': phase,
                      'duration': duration,
-                     'message': message
+                     'message': message,
+                     'extra': extra
                  })
 
 
 # Shim to track what hasn't been converted to the new style yet
-def add_event2(object_type, object_uuid, message, duration=None):
-    add_event(object_type, object_uuid, None, None, duration, message)
+def add_event2(object_type, object_uuid, message, duration=None, extra=None):
+    add_event(object_type, object_uuid, None,
+              None, duration, message, extra=extra)
 
 
 class EventLog(object):
@@ -92,16 +101,32 @@ class EventLog(object):
 
         self.con = sqlite3.connect(self.dbpath)
         self.con.row_factory = sqlite3.Row
-        self.con.execute(CREATE_EVENT_TABLE)
-        self.con.execute(CREATE_VERSION_TABLE)
-
         cur = self.con.cursor()
-        cur.execute('SELECT * FROM version;')
-        if cur.rowcount < 1:
-            self.con.execute('INSERT INTO version VALUES (?)', (VERSION, ))
-        self.con.commit()
 
-    def write_event(self, timestamp, fqdn, operation, phase, duration, message):
+        # Check if we already have a version table with data
+        cur.execute("SELECT count(name) FROM sqlite_master WHERE "
+                    "type='table' AND name='version'")
+        if cur.fetchone()['count(name)'] == 0:
+            # We do not have a version table, skip to the latest version
+            self.con.execute(CREATE_EVENT_TABLE)
+            self.con.execute(CREATE_VERSION_TABLE)
+            self.con.execute('INSERT INTO version VALUES (?)', (VERSION, ))
+            self.con.commit()
+
+        else:
+            # Upgrade
+            cur.execute('SELECT * FROM version;')
+            ver = cur.fetchone()['version']
+
+            if ver == 1:
+                ver = 2
+                self.con.execute('ALTER TABLE events ADD COLUMN extra text')
+                self.con.execute(
+                    'UPDATE TABLE version SET version = ?', (ver,))
+                self.con.commit()
+
+    def write_event(self, timestamp, fqdn, operation, phase, duration, message,
+                    extra=None):
         if not self.con:
             dbdir = os.path.dirname(self.dbpath)
             os.makedirs(dbdir, exist_ok=True)
@@ -110,8 +135,10 @@ class EventLog(object):
         attempts = 0
         while attempts < 3:
             try:
-                self.con.execute('INSERT INTO events VALUES (?, ?, ?, ?, ?, ?)',
-                                 (timestamp, fqdn, operation, phase, duration, message))
+                self.con.execute(
+                    'INSERT INTO events VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    (timestamp, fqdn, operation, phase, duration, message,
+                     json.dumps(extra, cls=etcd.JSONEncoderCustomTypes)))
                 self.con.commit()
                 return
             except sqlite3.IntegrityError:
@@ -125,7 +152,8 @@ class EventLog(object):
             'operation': operation,
             'phase': phase,
             'duration': duration,
-            'message': message
+            'message': message,
+            'extra': extra
         }).error('Failed to record event after 3 retries')
 
     def read_events(self):

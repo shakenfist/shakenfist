@@ -72,10 +72,11 @@ class DatabaseBackedObject(object):
             self.object_type, self.__uuid, operation, phase, duration, msg)
 
     # Shim to track what hasn't been converted to the new style yet
-    def add_event2(self, message, duration=None):
+    def add_event2(self, message, duration=None, extra=None):
         if not self.__in_memory_only:
             eventlog.add_event2(
-                self.object_type, self.__uuid, message, duration=duration)
+                self.object_type, self.__uuid, message, duration=duration,
+                extra=extra)
 
     @classmethod
     def from_db(cls, object_uuid):
@@ -119,13 +120,10 @@ class DatabaseBackedObject(object):
 
     @classmethod
     def _db_create(cls, object_uuid, metadata):
-        LOG.with_fields(metadata).with_field(
-            cls.object_type, object_uuid).debug('Object created')
         metadata['uuid'] = object_uuid
         etcd.create(cls.object_type, None, object_uuid, metadata)
-
-        eventlog.add_event(
-            cls.object_type, object_uuid, 'db record created', None, None, None)
+        eventlog.add_event2(cls.object_type, object_uuid, 'db record created',
+                            extra=metadata)
 
     @classmethod
     def _db_get(cls, object_uuid):
@@ -162,6 +160,7 @@ class DatabaseBackedObject(object):
                 yield key, data
 
     def _db_set_attribute(self, attribute, value):
+        self.add_event2('set attribute', extra=value)
         if self.__in_memory_only:
             self.__in_memory_values[attribute] = json.dumps(
                 value, indent=4, sort_keys=True, cls=etcd.JSONEncoderCustomTypes)
@@ -228,8 +227,6 @@ class DatabaseBackedObject(object):
 
             new_state = State(new_value, time.time())
             self._db_set_attribute('state', new_state)
-            self.add_event('state changed',
-                           '%s -> %s' % (orig.value, new_value))
 
     @property
     def error(self):
@@ -247,13 +244,12 @@ class DatabaseBackedObject(object):
                     'Object not in error state (state=%s, object=%s)'
                     % (s, self.object_type))
         self._db_set_attribute('error', {'message': msg})
-        self.add_event('set error', 'complete', None, msg)
 
     def hard_delete(self):
         etcd.delete(self.object_type, None, self.uuid)
         etcd.delete_all('attribute/%s' % self.object_type, self.uuid)
         db.delete_metadata(self.object_type, self.uuid)
-        self.add_event('hard delete', 'complete', None, 'Hard deleted object')
+        self.add_event2('hard deleted object')
 
 
 class DatabaseBackedObjectIterator(object):
