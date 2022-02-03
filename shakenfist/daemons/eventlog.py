@@ -26,7 +26,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                     for k, v in results[(objtype, objuuid)]:
                         eventdb.write_event(
                             v['timestamp'], v['fqdn'], v['operation'], v['phase'],
-                            v['duration'], v['message'])
+                            v['duration'], v['message'], extra=v.get('extra'))
                         etcd.WrappedEtcdClient().delete(k)
 
             if not results:
