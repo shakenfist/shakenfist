@@ -650,12 +650,6 @@ class Network(dbo):
                     node_ips.add(n.ip)
 
             discovered = list(self.discover_mesh())
-            self.log.with_fields(
-                {
-                    'discovered': discovered,
-                    'node_ips': node_ips
-                }).debug('Discovered mesh elements')
-
             for n in discovered:
                 if n in node_ips:
                     node_ips.remove(n)
@@ -673,7 +667,7 @@ class Network(dbo):
                 self.add_event('add mesh elements', ' '.join(added))
 
     def _add_mesh_element(self, n):
-        self.log.info('Adding new mesh element %s', n)
+        self.add_event2('adding new mesh element', extra={'ip': n})
         subst = self.subst_dict()
         subst['node'] = n
         util_process.execute(None,
@@ -681,7 +675,7 @@ class Network(dbo):
                              'dst %(node)s dev %(vx_interface)s' % subst)
 
     def _remove_mesh_element(self, n):
-        self.log.info('Removing excess mesh element %s', n)
+        self.add_event2('removing excess mesh element', extra={'ip': n})
         subst = self.subst_dict()
         subst['node'] = n
         util_process.execute(None,
@@ -691,8 +685,8 @@ class Network(dbo):
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.
     def add_floating_ip(self, floating_address, inner_address):
-        self.log.info('Adding floating ip %s -> %s',
-                      floating_address, inner_address)
+        self.add_event2('adding floating ip %s -> %s'
+                        % (floating_address, inner_address))
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
         subst['floating_address_as_hex'] = '%08x' % int(
@@ -718,8 +712,8 @@ class Network(dbo):
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.
     def remove_floating_ip(self, floating_address, inner_address):
-        self.log.info('Removing floating ip %s -> %s',
-                      floating_address, inner_address)
+        self.add_event2('removing floating ip %s -> %s'
+                        % (floating_address, inner_address))
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
         subst['floating_address_as_hex'] = '%08x' % int(
