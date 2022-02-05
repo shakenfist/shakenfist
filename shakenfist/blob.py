@@ -78,9 +78,13 @@ class Blob(dbo):
             'depends_on': self.depends_on,
             'transcodes': self.transcoded,
             'locations': self.locations,
-            'reference_count': self.ref_count,
-            'instances': self.instances
+            'reference_count': self.ref_count
         }
+
+        # The order of these two calls matters, as instances updates last_used
+        # if there are instances using the blob
+        out['instances'] = self.instances
+        out['last_used'] = self.last_used
 
         out.update(self.info)
         return out
@@ -134,10 +138,21 @@ class Blob(dbo):
         return transcoded
 
     def add_transcode(self, style, blob_uuid):
+        self.record_usage()
         with self.get_lock(op='Update trancoded versions'):
             transcoded = self.transcoded
             transcoded[style] = blob_uuid
             self._db_set_attribute('transcoded', transcoded)
+
+    @property
+    def last_used(self):
+        last_used = self._db_get_attribute('last_used')
+        if not last_used:
+            return None
+        return last_used['last_used']
+
+    def record_usage(self):
+        self._db_set_attribute('last_used', {'last_used': time.time()})
 
     # Derived values
     @property
@@ -152,8 +167,26 @@ class Blob(dbo):
             # so it may not be ready yet. This means we will miss instances
             # which have been requested but not yet started.
             for d in inst.block_devices.get('devices', []):
-                if d.get('blob_uuid') == self.uuid:
+                if 'blob_uuid' not in d:
+                    continue
+
+                # This blob is in direct use
+                if d['blob_uuid'] == self.uuid:
                     instance_uuids.append(inst.uuid)
+                    continue
+
+                # The blob is deleted
+                disk_blob = Blob.from_db(d['blob_uuid'])
+                if not disk_blob:
+                    continue
+
+                # Recurse for dependencies
+                while disk_blob.depends_on:
+                    disk_blob = Blob(disk_blob.depends_on)
+                    if disk_blob and disk_blob.uuid == self.uuid:
+                        instance_uuids.append(inst.uuid)
+                        break
+
         return instance_uuids
 
     # Operations
