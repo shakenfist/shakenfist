@@ -122,8 +122,12 @@ class Monitor(daemon.Daemon):
                         }).info('Node is fetching blob')
                         current_fetches[task.blob_uuid].append(node)
 
+        in_use_blobs = []
         with etcd.ThreadLocalReadOnlyCache():
             for b in blob.Blobs([active_states_filter]):
+                if b.instances:
+                    in_use_blobs.append(b)
+
                 # If there is current work for a blob, we ignore it until that
                 # work completes
                 if b.uuid in current_fetches:
@@ -192,6 +196,10 @@ class Monitor(daemon.Daemon):
                             # much to over replicate by.
                             underreplicated.append((b.uuid, 1))
                             break
+
+        # Record blobs in use
+        for b in in_use_blobs:
+            b.record_usage()
 
         # Prune over replicated blobs
         for blob_uuid in overreplicated:
