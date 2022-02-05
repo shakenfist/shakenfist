@@ -20,15 +20,12 @@ def get_node_metrics(filters):
             if new_metrics:
                 new_metrics = new_metrics.get('metrics', {})
             else:
-                LOG.with_object(n).warning(
-                    'Empty metrics from database for node')
+                n.add_event2('empty metrics from database for node')
                 new_metrics = {}
-
-            LOG.with_object(n).debug('Metrics for node: %s', new_metrics)
             metrics[n.uuid] = new_metrics
 
         except exceptions.ReadException:
-            LOG.with_object(n).warning('Refreshing metrics for node failed')
+            n.add_event2('refreshing metrics for node failed')
 
     return metrics
 

@@ -245,7 +245,6 @@ class Blob(dbo):
             os.makedirs(blob_dir, exist_ok=True)
 
             if os.path.exists(blob_path):
-                self.log.info('Blob already exists!')
                 self.observe()
                 return
 
@@ -291,7 +290,7 @@ class Blob(dbo):
                                 self.log.with_fields({
                                     'bytes_fetched': total_bytes_received,
                                     'size': int(self.size)
-                                }).info('Fetch %.02f percent complete' % percentage)
+                                }).debug('Fetch %.02f percent complete' % percentage)
                                 previous_percentage = percentage
 
                         done = True
@@ -317,9 +316,7 @@ class Blob(dbo):
                     os.unlink(blob_path + '.partial')
                 raise BlobFetchFailed('Did not fetch enough data')
 
-            self.log.info('Completing transfer')
             os.rename(blob_path + '.partial', blob_path)
-
             self.log.with_fields({
                 'bytes_fetched': total_bytes_received,
                 'size': int(self.size)
@@ -385,7 +382,7 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
             None, disk['path'], dest_path, thin=thin)
         st = os.stat(dest_path)
 
-    # Check that the dependancy (if any) actually exists. This test can fail when
+    # Check that the dependency (if any) actually exists. This test can fail when
     # the blob used to start an instance has been deleted already.
     if depends_on:
         dep_blob = Blob.from_db(depends_on)
@@ -441,9 +438,7 @@ def http_fetch(resp, blob_uuid, locks, logs):
     if not total_size:
         total_size = fetched
 
-    b = Blob.new(blob_uuid,
-                 total_size,
-                 resp.headers.get('Last-Modified'),
+    b = Blob.new(blob_uuid, total_size, resp.headers.get('Last-Modified'),
                  time.time())
     b.state = Blob.STATE_CREATED
     b.observe()

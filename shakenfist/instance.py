@@ -156,7 +156,6 @@ class Instance(dbo):
 
         if not self.__disk_spec:
             # This should not occur since the API will filter for zero disks.
-            self.log.error('Found disk spec empty')
             raise exceptions.InstanceBadDiskSpecification()
 
     @classmethod
@@ -499,7 +498,6 @@ class Instance(dbo):
             placement['placement_attempts'] = placement.get(
                 'placement_attempts', 0) + 1
             self._db_set_attribute('placement', placement)
-            self.add_event('placement', None, None, location)
 
     def enforced_deletes_increment(self):
         with self.get_lock_attr('enforced_deletes',
@@ -529,8 +527,6 @@ class Instance(dbo):
             dbstate['power_state'] = state
             dbstate['power_state_updated'] = time.time()
             self._db_set_attribute('power_state', dbstate)
-            self.add_event('power state changed', '%s -> %s' %
-                           (dbstate['power_state_previous'], state))
 
     # NOTE(mikal): this method is now strictly the instance specific steps for
     # creation. It is assumed that the image sits in local cache already, and
@@ -559,10 +555,9 @@ class Instance(dbo):
                     attempts += 1
 
         if self.is_powered_on():
-            self.log.info('Instance now powered on')
             self.state = self.STATE_CREATED
         else:
-            self.log.info('Instance failed to power on')
+            self.add_event2('instance failed to power on')
             self.enqueue_delete_due_error('Instance failed to power on')
 
     def delete(self):
@@ -653,7 +648,6 @@ class Instance(dbo):
                     'vdi_port': self._allocate_console_port()
                 }
                 self.ports = p
-                self.log.with_fields(p).info('Console ports allocated')
 
     def deallocate_instance_ports(self):
         ports = self.ports
@@ -1066,13 +1060,13 @@ class Instance(dbo):
                 self.allocate_instance_ports()
                 return False
             else:
-                self.log.warning('Instance start error: %s', e)
+                self.add_event2('instance start error', extra={'message': e})
                 return False
 
         inst.setAutostart(1)
         self.update_power_state(
             util_libvirt.extract_power_state(libvirt, inst))
-        self.add_event('poweron', 'complete')
+        self.add_event2('poweron')
         return True
 
     def power_off(self):
@@ -1089,7 +1083,7 @@ class Instance(dbo):
                 self.log.error('Failed to delete domain: %s', e)
 
         self.update_power_state('off')
-        self.add_event('poweroff', 'complete')
+        self.add_event2('poweroff')
 
     def reboot(self, hard=False):
         libvirt = util_libvirt.get_libvirt()
@@ -1098,7 +1092,7 @@ class Instance(dbo):
             inst.reboot(flags=libvirt.VIR_DOMAIN_REBOOT_ACPI_POWER_BTN)
         else:
             inst.reset()
-        self.add_event('reboot', 'complete')
+        self.add_event2('reboot')
 
     def pause(self):
         libvirt = util_libvirt.get_libvirt()
@@ -1106,7 +1100,7 @@ class Instance(dbo):
         inst.suspend()
         self.update_power_state(
             util_libvirt.extract_power_state(libvirt, inst))
-        self.add_event('pause', 'complete')
+        self.add_event2('pause')
 
     def unpause(self):
         libvirt = util_libvirt.get_libvirt()
@@ -1114,7 +1108,7 @@ class Instance(dbo):
         inst.resume()
         self.update_power_state(
             util_libvirt.extract_power_state(libvirt, inst))
-        self.add_event('unpause', 'complete')
+        self.add_event2('unpause')
 
     def get_console_data(self, length):
         console_path = os.path.join(self.instance_path, 'console.log')
@@ -1128,10 +1122,6 @@ class Instance(dbo):
                 offset = max(0, file_length - length)
                 f.seek(offset)
             d = f.read()
-
-        self.log.info(
-            'Client requested %d bytes of console log, returning %d bytes',
-            length, len(d))
         return d
 
     def delete_console_data(self):
@@ -1139,8 +1129,7 @@ class Instance(dbo):
         if not os.path.exists(console_path):
             return
         os.truncate(console_path, 0)
-        self.add_event('console log cleared', None)
-        self.log.info('Console log cleared')
+        self.add_event2('console log cleared')
 
     def enqueue_delete_remote(self, node):
         etcd.enqueue(node, {
@@ -1148,8 +1137,6 @@ class Instance(dbo):
         })
 
     def enqueue_delete_due_error(self, error_msg):
-        self.log.with_field('error', error_msg).info('enqueue_instance_error')
-
         # Error needs to be set immediately so that API clients get
         # correct information. The VM and network tear down can be delayed.
         try:
@@ -1228,11 +1215,8 @@ class Instance(dbo):
                     'tasks': [SnapshotTask(self.uuid, disk, a.uuid, blob_uuid,
                                            thin=thin)],
                 })
-            self.add_event(
-                'api',
-                'snapshot of %s requested' % disk['path'].split('/')[-1],
-                None, a.uuid)
 
+        self.add_event2('snapshot', extra=out)
         return out
 
 

@@ -100,8 +100,6 @@ class IPManager(object):
         if not self.is_free(address):
             return False
 
-        self.log.with_field(*unique_label_tuple).with_field(
-            'address', address).info('Reserving address')
         self.in_use[address] = {
             'user': unique_label_tuple,
             'when': time.time()
@@ -113,7 +111,6 @@ class IPManager(object):
         if self.is_free(address):
             return
 
-        self.log.with_field('address', address).info('Releasing address')
         del self.in_use[address]
         self.in_use_counter -= 1
 
