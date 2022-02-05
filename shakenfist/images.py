@@ -83,28 +83,27 @@ class ImageFetchHelper(object):
                 resp = self._open_connection(url)
 
                 if not most_recent_blob.modified:
+                    self.__artifact.add_event2(
+                        'image requires fetch, no Last-Modified recorded')
                     dirty = True
                 elif most_recent_blob.modified != resp.headers.get('Last-Modified'):
-                    self.__artifact.add_event(
-                        'image requires fetch', None, None,
-                        'Last-Modified: %s -> %s' % (most_recent_blob.modified,
-                                                     resp.headers.get('Last-Modified')))
+                    self.__artifact.add_event2(
+                        'image requires fetch, Last-Modified: %s -> %s'
+                        % (most_recent_blob.modified, resp.headers.get('Last-Modified')))
                     dirty = True
 
                 if not most_recent_blob.size:
+                    self.__artifact.add_event2(
+                        'image requires fetch, no Content-Length recorded')
                     dirty = True
                 elif most_recent_blob.size != resp.headers.get('Content-Length'):
-                    self.__artifact.add_event(
-                        'image requires fetch', None, None,
-                        'Content-Length: %s -> %s' % (most_recent_blob.size,
-                                                      resp.headers.get('Content-Length')))
+                    self.__artifact.add_event2(
+                        'image requires fetch, Content-Length: %s -> %s'
+                        % (most_recent_blob.size, resp.headers.get('Content-Length')))
                     dirty = True
 
-            if dirty:
-                self.log.info('Cluster cached image is stale')
-            else:
+            if not dirty:
                 url = '%s%s' % (BLOB_URL, most_recent_blob.uuid)
-                self.log.info('Using cached image from cluster')
 
         # Ensure that we have the blob in the local store. This blob is in the
         # "original format" if downloaded from an HTTP source.
@@ -243,7 +242,8 @@ class ImageFetchHelper(object):
             if not verify_checksum(
                     os.path.join(config.STORAGE_PATH, 'blobs', b.uuid),
                     checksum, checksum_type):
-                self.instance.add_event('fetch image', 'bad checksum')
+                self.instance.add_event2('fetched image had bad checksum')
+                self.__artifact.add_event2('fetched image had bad checksum')
                 raise exceptions.BadCheckSum('url=%s' % url)
 
             # Only persist values after the file has been verified.
