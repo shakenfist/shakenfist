@@ -1564,7 +1564,7 @@
           },
           {
             "exemplar": true,
-            "expr": "disk_free / disk_total",
+            "expr": "node_filesystem_free_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"}",
             "hide": true,
             "interval": "",
             "legendFormat": "{{instance}}",
