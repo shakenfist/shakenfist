@@ -101,9 +101,6 @@ class SFConfig(BaseSettings):
     NETWORK_NODE_IP: str = Field(
         '', description='Mesh IP of the node which will egress all traffic',
     )
-    EVENTLOG_NODE_IP: str = Field(
-        '', description='Mesh IP of the node which stores event logs',
-    )
     DNS_SERVER: str = Field(
         '8.8.8.8',
         description='The DNS server to pass to instances via DHCP.'
@@ -200,6 +197,14 @@ class SFConfig(BaseSettings):
     # Artifact options
     ARTIFACT_MAX_VERSIONS_DEFAULT: int = Field(
         3, description='Default number of versions to keep within an artifact'
+    )
+
+    # Event options
+    EVENTLOG_NODE_IP: str = Field(
+        '', description='Mesh IP of the node which stores event logs',
+    )
+    USAGE_EVENT_FREQUENCY: int = Field(
+        60, description='How frequently to collect usage events.'
     )
 
     # Other options
