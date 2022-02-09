@@ -13,5 +13,6 @@ First off, Shaken Fist is an open source project covered by the Apache2 license.
 We try to track supporters here. Our apologies if we've missed someone, let us know and we'll fix it.
 
 * [Michael Still](https://www.madebymikal.com) and Andrew McCallum have contributed significant personal time to the project.
-* [FifthDomain](https://www.fifthdomain.com.au) has donated significant developer time as well.
+* [Aptira](https://www.aptira.com) has donated developer time, as well as provided invaluable feedback from the largest real world deployments that we've had so far.
+* [FifthDomain](https://www.fifthdomain.com.au) has also donated developer time.
 * [Shaken Fist was a recipient of a 2020 Icculus micro grant](https://icculus.org/microgrant2020/).
