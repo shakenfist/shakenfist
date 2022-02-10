@@ -17,7 +17,7 @@ CREATE_EVENT_TABLE = """CREATE TABLE IF NOT EXISTS events(
     timestamp real PRIMARY KEY, fqdn text,
     operation text, phase text, duration float, message text,
     extra text)"""
-CREATE_VERSION_TABLE = """CREATE TABLE IF NOT EXISTS version(version int)"""
+CREATE_VERSION_TABLE = """CREATE TABLE IF NOT EXISTS version(version int primary key)"""
 
 
 def add_event(object_type, object_uuid, operation, phase, duration, message,
