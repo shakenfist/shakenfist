@@ -155,7 +155,7 @@
         mode: "0755"
 
     - name: Install gunicorn
-      shell: /srv/shakenfist/venv/bin/pip install -U gunicorn
+      shell: /srv/shakenfist/venv/bin/pip install -U gunicorn gevent
 
     - name: Configure IPv6 to be disabled on boot
       copy:
