@@ -10,6 +10,7 @@ from shakenfist.daemons import daemon
 from shakenfist.config import config
 from shakenfist import etcd
 from shakenfist import logutil
+from shakenfist import instance
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
 
@@ -128,11 +129,12 @@ def _get_stats():
     total_instance_vcpus = 0
     total_instance_cpu_time = 0
 
-    for guest in conn.listAllDomains():
+    for domain_id in conn.listDomainsID():
+        domain = conn.lookupByID(domain_id)
         try:
-            active = guest.isActive() == 1
+            active = domain.isActive() == 1
             if active:
-                _, maxmem, mem, cpus, cpu_time = guest.info()
+                state, maxmem, mem, cpus, cpu_time = domain.info()
 
         except libvirt.libvirtError as e:
             LOG.debug('During resource calc ignored libvirt error: %s' % e)
@@ -186,15 +188,13 @@ class Monitor(daemon.Daemon):
     def run(self):
         LOG.info('Starting')
         gauges = {
-            'updated_at': Gauge('updated_at',
-                                'The last time metrics were updated')
+            'updated_at': Gauge('updated_at', 'The last time metrics were updated')
         }
 
         last_metrics = 0
+        last_billing = 0
 
         def update_metrics():
-            global last_metrics
-
             stats = _get_stats()
             for metric in stats:
                 if metric not in gauges:
@@ -211,6 +211,24 @@ class Monitor(daemon.Daemon):
                 ttl=120)
             gauges['updated_at'].set_to_current_time()
 
+        def emit_billing_statistics():
+            libvirt = util_libvirt.get_libvirt()
+            conn = libvirt.open('qemu:///system')
+
+            for domain_id in conn.listDomainsID():
+                try:
+                    domain = conn.lookupByID(domain_id)
+                    if domain.name().startswith('sf:'):
+                        instance_uuid = domain.name().split(':')[1]
+                        inst = instance.Instance.from_db(instance_uuid)
+                        if inst:
+                            inst.add_event2(
+                                'usage', extra=util_libvirt.extract_statistics(domain))
+
+                except libvirt.libvirtError:
+                    # The domain has likely been deleted.
+                    pass
+
         while not self.exit.is_set():
             try:
                 jobname, _ = etcd.dequeue('%s-metrics' % config.NODE_NAME)
@@ -222,10 +240,13 @@ class Monitor(daemon.Daemon):
                 else:
                     self.exit.wait(0.2)
 
-                timer = time.time() - last_metrics
-                if timer > config.SCHEDULER_CACHE_TIMEOUT:
+                if time.time() - last_metrics > config.SCHEDULER_CACHE_TIMEOUT:
                     update_metrics()
                     last_metrics = time.time()
+
+                if time.time() - last_billing > config.USAGE_EVENT_FREQUENCY:
+                    emit_billing_statistics()
+                    last_billing = time.time()
 
             except Exception as e:
                 util_general.ignore_exception('resource statistics', e)
