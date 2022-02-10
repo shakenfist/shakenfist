@@ -597,7 +597,9 @@ class Network(dbo):
         mesh_re = re.compile(r'00:00:00:00:00:00 dst (.*) self permanent')
 
         stdout, _ = util_process.execute(
-            None, 'bridge fdb show brport %(vx_interface)s' % self.subst_dict())
+            None, 'bridge fdb show brport %(vx_interface)s' % self.subst_dict(
+            ),
+            suppress_command_logging=True)
 
         for line in stdout.split('\n'):
             m = mesh_re.match(line)

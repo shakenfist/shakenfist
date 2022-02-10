@@ -45,8 +45,8 @@ def identify(path):
     if not os.path.exists(path):
         return {}
 
-    out, _ = util_process.execute(
-        None, 'qemu-img info --force-share %s' % path)
+    out, _ = util_process.execute(None, 'qemu-img info --force-share %s' % path,
+                                  suppress_command_logging=True)
 
     data = {}
     for line in out.split('\n'):
