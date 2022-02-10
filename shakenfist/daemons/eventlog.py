@@ -22,12 +22,16 @@ class Monitor(daemon.WorkerPoolDaemon):
                 results[(objtype, objuuid)].append((k, v))
 
             for objtype, objuuid in results:
-                with eventlog.EventLog(objtype, objuuid) as eventdb:
-                    for k, v in results[(objtype, objuuid)]:
-                        eventdb.write_event(
-                            v['timestamp'], v['fqdn'], v['operation'], v['phase'],
-                            v['duration'], v['message'], extra=v.get('extra'))
-                        etcd.WrappedEtcdClient().delete(k)
+                try:
+                    with eventlog.EventLog(objtype, objuuid) as eventdb:
+                        for k, v in results[(objtype, objuuid)]:
+                            eventdb.write_event(
+                                v['timestamp'], v['fqdn'], v['operation'], v['phase'],
+                                v['duration'], v['message'], extra=v.get('extra'))
+                            etcd.WrappedEtcdClient().delete(k)
+                except Exception as e:
+                    util_general.ignore_exception(
+                        'failed to write event for %s %s' % (objtype, objuuid), e)
 
             if not results:
                 time.sleep(0.2)
