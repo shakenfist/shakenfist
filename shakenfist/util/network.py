@@ -96,7 +96,7 @@ def get_interface_statistics(name, namespace=None):
             'No statistics for interface %s in namespace %s' % (name, namespace))
 
     stats = _clean_ip_json(stdout)
-    return stats.get('stats64')
+    return stats[0].get('stats64')
 
 
 def get_interface_mtus(namespace=None):

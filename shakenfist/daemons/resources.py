@@ -5,14 +5,17 @@ import time
 from prometheus_client import Gauge
 from prometheus_client import start_http_server
 
+from shakenfist import baseobject
 from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons import daemon
 from shakenfist.config import config
 from shakenfist import etcd
 from shakenfist import logutil
 from shakenfist import instance
+from shakenfist import network
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
+from shakenfist.util import network as util_network
 
 
 LOG, _ = logutil.setup(__name__)
@@ -228,6 +231,11 @@ class Monitor(daemon.Daemon):
                 except libvirt.libvirtError:
                     # The domain has likely been deleted.
                     pass
+
+            for n in network.Networks([baseobject.active_states_filter]):
+                interface = 'egr-%06x-o' % n.vxid
+                n.add_event2(
+                    'usage', extra=util_network.get_interface_statistics(interface))
 
         while not self.exit.is_set():
             try:
