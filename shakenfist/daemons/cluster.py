@@ -72,7 +72,7 @@ class Monitor(daemon.Daemon):
             if network_uuid:
                 n = network.Network.from_db(network_uuid)
                 if not n:
-                    etcd.delete(k)
+                    etcd.WrappedEtcdClient().delete(k)
                     LOG.with_fields({
                         'network': network_uuid,
                         'vxid record': k
