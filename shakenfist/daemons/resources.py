@@ -130,23 +130,28 @@ def _get_stats():
     total_instance_cpu_time = 0
 
     for domain_id in conn.listDomainsID():
-        domain = conn.lookupByID(domain_id)
         try:
-            active = domain.isActive() == 1
+            domain = conn.lookupByID(domain_id)
+            try:
+                active = domain.isActive() == 1
+                if active:
+                    state, maxmem, mem, cpus, cpu_time = domain.info()
+
+            except libvirt.libvirtError as e:
+                LOG.debug('During resource calc ignored libvirt error: %s' % e)
+                active = False
+
             if active:
-                state, maxmem, mem, cpus, cpu_time = domain.info()
+                total_instances += 1
+                total_active_instances += 1
+                total_instance_max_memory += maxmem
+                total_instance_actual_memory += mem
+                total_instance_vcpus += cpus
+                total_instance_cpu_time += cpu_time
 
-        except libvirt.libvirtError as e:
-            LOG.debug('During resource calc ignored libvirt error: %s' % e)
-            active = False
-
-        if active:
-            total_instances += 1
-            total_active_instances += 1
-            total_instance_max_memory += maxmem
-            total_instance_actual_memory += mem
-            total_instance_vcpus += cpus
-            total_instance_cpu_time += cpu_time
+        except libvirt.libvirtError:
+            # The domain has likely been deleted.
+            pass
 
     # Queue health statistics
     node_queue_processing, node_queue_waiting = etcd.get_queue_length(
