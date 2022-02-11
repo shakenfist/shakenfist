@@ -160,7 +160,22 @@ class DatabaseBackedObject(object):
                 yield key, data
 
     def _db_set_attribute(self, attribute, value):
-        self.add_event2('set attribute', extra=value)
+        # Some attributes are simply too frequently changed to have much meaning
+        # as an event.
+        if attribute not in ['last_seen']:
+            # Coerce the value into a dictionary.
+            if type(value) is State:
+                event_values = value.obj_dict()
+            elif type(value) is dict:
+                event_values = value.copy()
+            else:
+                event_values = {'value': value}
+
+            # Add the attribute we're setting to the event so we're not confused
+            # later.
+            event_values['attribute'] = attribute
+            self.add_event2('set attribute', extra=event_values)
+
         if self.__in_memory_only:
             self.__in_memory_values[attribute] = json.dumps(
                 value, indent=4, sort_keys=True, cls=etcd.JSONEncoderCustomTypes)
