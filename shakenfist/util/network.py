@@ -87,16 +87,17 @@ def get_interface_addresses(name, namespace=None):
 
 
 def get_interface_statistics(name, namespace=None):
-    stdout, _ = process.execute(
+    stdout, stderr = process.execute(
         None, 'ip -s -pretty -json link show %s' % name,
         check_exit_code=[0, 1], namespace=namespace)
 
     if not stdout:
         raise exceptions.NoInterfaceStatistics(
-            'No statistics for interface %s in namespace %s' % (name, namespace))
+            'No statistics for interface %s in namespace %s (%s)'
+            % (name, namespace, stderr))
 
     stats = _clean_ip_json(stdout)
-    return stats.get('stats64')
+    return stats[0].get('stats64')
 
 
 def get_interface_mtus(namespace=None):
