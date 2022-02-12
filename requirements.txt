@@ -15,7 +15,7 @@ tox                         # mit
 flake8                      # mit
 testtools                   # mit
 Werkzeug<2.0                # bsd
-flask<2.0                   # bsd
+flask                       # bsd
 flask_restful               # bsd
 psutil                      # bsd
 prometheus_client           # apache2
