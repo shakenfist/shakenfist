@@ -41,13 +41,24 @@ def extract_hypervisor_devices(domain):
     devices = tree.find('devices')
     for child in devices:
         if child.tag == 'disk':
-            disk_device = child.find('target').attrib.get('dev')
-            out['disk'].append(disk_device)
+            disk_xml = child.find('target')
+            if disk_xml:
+                disk_device = disk_xml.attrib.get('dev')
+                out['disk'].append(disk_device)
 
         if child.tag == 'interface':
-            mac_address = child.find('mac').attrib.get('address')
-            hypervisor_interface = child.find('target').attrib.get('dev')
-            out['network'].append((mac_address, hypervisor_interface))
+            mac_xml = child.find('mac')
+            mac_address = None
+            if mac_xml:
+                mac_address = mac_xml.attrib.get('address')
+
+            iface_xml = child.find('target')
+            hypervisor_interface = None
+            if iface_xml:
+                hypervisor_interface = iface_xml.attrib.get('dev')
+
+            if mac_address and hypervisor_interface:
+                out['network'].append((mac_address, hypervisor_interface))
 
     return out
 
