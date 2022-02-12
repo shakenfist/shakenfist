@@ -182,7 +182,7 @@ class Blob(dbo):
 
                 # Recurse for dependencies
                 while disk_blob.depends_on:
-                    disk_blob = Blob(disk_blob.depends_on)
+                    disk_blob = Blob.from_db(disk_blob.depends_on)
                     if disk_blob and disk_blob.uuid == self.uuid:
                         instance_uuids.append(inst.uuid)
                         break
