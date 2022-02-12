@@ -61,7 +61,8 @@ def check_for_interface(name, namespace=None, up=False):
 
     stdout, stderr = process.execute(
         None, 'ip -pretty -json link show %s' % name,
-        check_exit_code=[0, 1], namespace=namespace)
+        check_exit_code=[0, 1], namespace=namespace,
+        suppress_command_logging=True)
 
     if stderr.rstrip('\n').endswith(' does not exist.'):
         return False
@@ -103,7 +104,8 @@ def get_interface_statistics(name, namespace=None):
 def get_interface_mtus(namespace=None):
     stdout, _ = process.execute(
         None, 'ip -pretty -json link show',
-        check_exit_code=[0, 1], namespace=namespace)
+        check_exit_code=[0, 1], namespace=namespace,
+        suppress_command_logging=True)
 
     for elem in _clean_ip_json(stdout):
         yield elem['ifname'], elem['mtu']
@@ -112,7 +114,8 @@ def get_interface_mtus(namespace=None):
 def get_interface_mtu(interface, namespace=None):
     stdout, _ = process.execute(
         None, 'ip -pretty -json link show %s' % interface,
-        check_exit_code=[0, 1], namespace=namespace)
+        check_exit_code=[0, 1], namespace=namespace,
+        suppress_command_logging=True)
 
     for elem in _clean_ip_json(stdout):
         return elem['mtu']
