@@ -228,7 +228,8 @@ class Monitor(daemon.Daemon):
                         inst = instance.Instance.from_db(instance_uuid)
                         if inst:
                             inst.add_event2(
-                                'usage', extra=util_libvirt.extract_statistics(domain))
+                                'usage', extra=util_libvirt.extract_statistics(domain),
+                                suppress_event_logging=True)
 
                 except libvirt.libvirtError:
                     # The domain has likely been deleted.
