@@ -1,4 +1,3 @@
-
 from functools import partial
 import json
 import time
@@ -72,11 +71,11 @@ class DatabaseBackedObject(object):
             self.object_type, self.__uuid, operation, phase, duration, msg)
 
     # Shim to track what hasn't been converted to the new style yet
-    def add_event2(self, message, duration=None, extra=None):
+    def add_event2(self, message, duration=None, extra=None, suppress_event_logging=False):
         if not self.__in_memory_only:
             eventlog.add_event2(
                 self.object_type, self.__uuid, message, duration=duration,
-                extra=extra)
+                extra=extra, suppress_event_logging=suppress_event_logging)
 
     @classmethod
     def from_db(cls, object_uuid):
@@ -162,7 +161,7 @@ class DatabaseBackedObject(object):
     def _db_set_attribute(self, attribute, value):
         # Some attributes are simply too frequently changed to have much meaning
         # as an event.
-        if attribute not in ['last_seen']:
+        if (self.object_type, attribute) not in [('node', 'observed')]:
             # Coerce the value into a dictionary.
             if type(value) is State:
                 event_values = value.obj_dict()

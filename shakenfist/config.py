@@ -66,7 +66,7 @@ class SFConfig(BaseSettings):
         (
             '/srv/shakenfist/venv/bin/gunicorn --workers %(workers)d --bind 0.0.0.0:%(port)d '
             '--log-syslog --log-syslog-prefix sf --timeout %(timeout)s --name "%(name)s" '
-            '--pid /var/run/sf/gunicorn.pid --worker-class gevent '
+            '--pid /var/run/sf/gunicorn.pid --worker-class gevent --threads %(threads)d '
             'shakenfist.external_api.app:app'
         ),
         description='The gunicorn command line to use'

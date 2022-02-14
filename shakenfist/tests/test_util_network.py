@@ -23,7 +23,7 @@ class UtilTestCase(base.ShakenFistTestCase):
         self.assertEqual(False, found)
         mock_execute.assert_called_with(
             None, 'ip -pretty -json link show banana0',
-            check_exit_code=[0, 1], namespace=None)
+            check_exit_code=[0, 1], namespace=None, suppress_command_logging=True)
 
     @mock.patch(
         'shakenfist.util.process.execute',
@@ -41,7 +41,7 @@ class UtilTestCase(base.ShakenFistTestCase):
         self.assertEqual(True, found)
         mock_execute.assert_called_with(
             None, 'ip -pretty -json link show eth0',
-            check_exit_code=[0, 1], namespace=None)
+            check_exit_code=[0, 1], namespace=None, suppress_command_logging=True)
 
     @mock.patch(
         'shakenfist.util.process.execute',

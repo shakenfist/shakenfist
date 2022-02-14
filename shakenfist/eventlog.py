@@ -21,21 +21,22 @@ CREATE_VERSION_TABLE = """CREATE TABLE IF NOT EXISTS version(version int primary
 
 
 def add_event(object_type, object_uuid, operation, phase, duration, message,
-              extra=None):
+              extra=None, suppress_event_logging=False):
     timestamp = time.time()
 
-    log = LOG
-    if extra:
-        log = log.with_fields(extra)
-    log.with_fields(
-        {
-            object_type: object_uuid,
-            'fqdn': config.NODE_NAME,
-            'operation': operation,
-            'phase': phase,
-            'duration': duration,
-            'message': message
-        }).info('Added event')
+    if not suppress_event_logging:
+        log = LOG
+        if extra:
+            log = log.with_fields(extra)
+        log.with_fields(
+            {
+                object_type: object_uuid,
+                'fqdn': config.NODE_NAME,
+                'operation': operation,
+                'phase': phase,
+                'duration': duration,
+                'message': message
+            }).info('Added event')
 
     if config.NODE_MESH_IP == config.EVENTLOG_NODE_IP:
         with EventLog(object_type, object_uuid) as eventdb:
@@ -59,9 +60,10 @@ def add_event(object_type, object_uuid, operation, phase, duration, message,
 
 
 # Shim to track what hasn't been converted to the new style yet
-def add_event2(object_type, object_uuid, message, duration=None, extra=None):
-    add_event(object_type, object_uuid, None,
-              None, duration, message, extra=extra)
+def add_event2(object_type, object_uuid, message, duration=None, extra=None,
+               suppress_event_logging=False):
+    add_event(object_type, object_uuid, None, None, duration, message, extra=extra,
+              suppress_event_logging=suppress_event_logging)
 
 
 class EventLog(object):

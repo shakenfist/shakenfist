@@ -1060,7 +1060,8 @@ class Instance(dbo):
                 self.allocate_instance_ports()
                 return False
             else:
-                self.add_event2('instance start error', extra={'message': e})
+                self.add_event2('instance start error',
+                                extra={'message': str(e)})
                 return False
 
         inst.setAutostart(1)

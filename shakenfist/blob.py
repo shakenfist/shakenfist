@@ -281,10 +281,6 @@ class Blob(dbo):
                 self.observe()
                 return
 
-            locations = self.locations
-            random.shuffle(locations)
-            blob_source = locations[0]
-
             with open(blob_path + '.partial', 'wb') as f:
                 done = False
                 last_refresh = 0
@@ -293,8 +289,12 @@ class Blob(dbo):
 
                 total_bytes_received = 0
                 previous_percentage = 0
+                connection_failures = 0
 
                 while not done:
+                    locations = self.locations
+                    random.shuffle(locations)
+                    blob_source = locations[0]
                     bytes_in_attempt = 0
 
                     try:
@@ -307,6 +307,7 @@ class Blob(dbo):
                             'GET', url, stream=True,
                             headers={'Authorization': admin_token,
                                      'User-Agent': util_general.get_user_agent()})
+                        connection_failures = 0
 
                         for chunk in r.iter_content(chunk_size=8192):
                             f.write(chunk)
@@ -332,6 +333,13 @@ class Blob(dbo):
                             'size': int(self.size),
                             'done': done
                         }).info('HTTP request ran out of chunks')
+
+                    except urllib3.exceptions.NewConnectionError as e:
+                        connection_failures += 1
+                        if connection_failures > 2:
+                            self.log.error(
+                                'HTTP connection repeatedly failed: %s' % e)
+                            raise e
 
                     except (http.client.IncompleteRead,
                             urllib3.exceptions.ProtocolError,

@@ -149,7 +149,8 @@ class ImageFetchHelper(object):
             blob_path = os.path.join(config.STORAGE_PATH, 'blobs', b.uuid)
             cache_path = os.path.join(
                 config.STORAGE_PATH, 'image_cache', b.uuid + '.iso')
-            util_general.link(blob_path, cache_path)
+            if not os.path.exists(cache_path):
+                util_general.link(blob_path, cache_path)
 
         elif cached_remotely:
             remote_blob = Blob.from_db(cached_remotely)
@@ -161,7 +162,8 @@ class ImageFetchHelper(object):
                 config.STORAGE_PATH, 'image_cache', b.uuid + '.qcow2')
             remote_blob_path = os.path.join(
                 config.STORAGE_PATH, 'blobs', remote_blob.uuid)
-            util_general.link(remote_blob_path, cache_path)
+            if not os.path.exists(cache_path):
+                util_general.link(remote_blob_path, cache_path)
 
         else:
             blob_path = os.path.join(config.STORAGE_PATH, 'blobs', b.uuid)
