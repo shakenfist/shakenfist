@@ -298,12 +298,10 @@ def instance_preflight(inst, netdescs):
 
 def instance_start(inst, netdescs):
     if inst.state.value.endswith('-error'):
-        LOG.with_instance(inst).warning(
-            'You cannot start an instance in an error state.')
+        inst.add_event2('You cannot start an instance in an error state.')
         return
     if inst.state.value in (dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED):
-        LOG.with_instance(inst).warning(
-            'You cannot start an instance which has been deleted.')
+        inst.add_event2('You cannot start an instance which has been deleted.')
         return
 
     with inst.get_lock(ttl=900, op='Instance start') as lock:
@@ -327,8 +325,18 @@ def instance_start(inst, netdescs):
                 # detection code in the net daemon to work correctly.
                 ni = networkinterface.NetworkInterface.from_db(
                     netdesc['iface_uuid'])
-                ni.state = dbo.STATE_CREATED
+                if ni.state.value not in dbo.ACTIVE_STATES:
+                    inst.add_event2(
+                        'You cannot start an instance with an inactive network '
+                        'interface.', extra={
+                            'networkinterface': ni.uuid,
+                            'state': ni.state.value
+                        })
+                    inst.enqueue_delete_due_error(
+                        'Network interface is inactive')
+                    return
 
+                ni.state = dbo.STATE_CREATED
                 n.create_on_hypervisor()
                 n.ensure_mesh()
                 n.update_dhcp()
