@@ -25,7 +25,8 @@ class Monitor(daemon.Daemon):
                                         'port': config.API_PORT,
                                         'timeout': config.API_TIMEOUT,
                                         'name': daemon.process_name('api'),
-                                        'workers': present_cpus * 4
+                                        'workers': present_cpus * 2 + 1,
+                                        'threads': present_cpus * 2 + 1
                                     }),
                              env_variables=os.environ,
                              check_exit_code=[0, 1, -15])
