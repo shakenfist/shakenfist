@@ -1,3 +1,9 @@
+# Indirect requirements we need to pin.
+# Required by a release that broke us on 18 Feb 2022
+markupsafe==2.0.1           # bsd
+itsdangerous==2.0.1         # bsd
+
+# Our requirements.
 pyyaml>=5.1                 # mit
 pycdlib                     # lgpl
 oslo.concurrency            # apache2
