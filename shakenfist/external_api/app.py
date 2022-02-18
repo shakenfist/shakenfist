@@ -16,6 +16,7 @@ import flask_restful
 
 from shakenfist.config import config
 from shakenfist.daemons import daemon
+from shakenfist import etcd
 from shakenfist.external_api import (
     admin as api_admin,
     auth as api_auth,
@@ -66,7 +67,11 @@ def log_response_info(response):
             'request-id': flask.request.environ.get('FLASK_REQUEST_ID', 'none'),
             'headers': response.headers
         })
-    log.debug('API response sent')
+    if config.EXCESSIVE_ETCD_CACHE_LOGGING:
+        log.with_fields(etcd.get_statistics()).info('API response sent')
+    else:
+        log.debug('API response sent')
+    etcd.reset_statistics()
     return response
 
 
