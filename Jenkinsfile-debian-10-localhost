@@ -113,12 +113,39 @@ pipeline {
         }
       }
     }
+    stage('Wait for API to start answering') {
+      steps {
+        script {
+          timeout(time: 2, unit: 'MINUTES', activity: true) {
+            sh '''  set +e
+
+                    . $WORKSPACE/$BUILD_TAG/ci-environment.sh
+                    count=0
+                    while [ $count -lt 60 ]
+                    do
+
+                      ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                        debian@$primary \
+                        '. /etc/sf/sfrc; sf-client instance list'
+                      if [ $? == 0 ]; then
+                        exit 0
+                      fi
+
+                      count=$(( $count + 1 ))
+                      sleep 5
+                    done
+
+                    exit 1
+              '''
+          }
+        }
+      }
+    }
     stage('Import cached images') {
       steps {
         script {
           timeout(time: 2, unit: 'MINUTES', activity: true) {
-            sh '''  sleep 10
-                    . $WORKSPACE/$BUILD_TAG/ci-environment.sh
+            sh '''  . $WORKSPACE/$BUILD_TAG/ci-environment.sh
                     ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
                         debian@$primary \
                         '. /etc/sf/sfrc; sf-client artifact upload ubuntu-1804 /srv/ci/ubuntu:18.04'
@@ -128,6 +155,24 @@ pipeline {
                     ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
                         debian@$primary \
                         '. /etc/sf/sfrc; sf-client artifact upload cirros /srv/ci/cirros'
+              '''
+          }
+        }
+      }
+    }
+    stage('Create a base level of activity in the cluster') {
+      steps {
+        script {
+          timeout(time: 2, unit: 'MINUTES', activity: true) {
+            sh '''  . $WORKSPACE/$BUILD_TAG/ci-environment.sh
+                    ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                        debian@$primary \
+                        'echo "==== sfrc ===="; cat /etc/sf/sfrc; echo "==== end sfrc ===="'
+                    echo ""
+                    echo ""
+                    ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                        debian@$primary \
+                        '. /etc/sf/sfrc; for i in `seq 100`; do sf-client --async=continue network create background-$i 10.$i.0.0/24; done'
               '''
           }
         }
@@ -216,7 +261,6 @@ pipeline {
                   debian@$primary sudo /srv/shakenfist/venv/bin/clingwrap gather --target /srv/shakenfist/venv/share/clingwrap/shakenfist-ci-failure.cwd --output /tmp/all.zip
               scp -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
                   debian@$primary:/tmp/all.zip artifacts/
-              unzip artifacts/all.zip
 
               echo "=============================="
 
@@ -230,7 +274,7 @@ pipeline {
               rm -rf $WORKSPACE/$BUILD_TAG
           '''
 
-          archiveArtifacts artifacts: 'artifacts/*', fingerprint: true
+          archiveArtifacts artifacts: 'artifacts/all.zip', fingerprint: true
     }
   }
 }

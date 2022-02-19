@@ -261,7 +261,6 @@ pipeline {
                   ubuntu@$primary sudo /srv/shakenfist/venv/bin/clingwrap gather --target /srv/shakenfist/venv/share/clingwrap/shakenfist-ci-failure.cwd --output /tmp/all.zip
               scp -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
                   ubuntu@$primary:/tmp/all.zip artifacts/
-              unzip artifacts/all.zip
 
               echo "=============================="
 
@@ -275,7 +274,7 @@ pipeline {
               rm -rf $WORKSPACE/$BUILD_TAG
           '''
 
-          archiveArtifacts artifacts: 'artifacts/*', fingerprint: true
+          archiveArtifacts artifacts: 'artifacts/all.zip', fingerprint: true
     }
   }
 }
