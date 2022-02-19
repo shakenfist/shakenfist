@@ -91,7 +91,7 @@
     # As recommended on the ansible apt module documentation...
     - name: Install packages only when the apt process is not locked
       apt:
-        name: gnupg
+        name: bash
         state: present
       register: apt_action
       retries: 100
