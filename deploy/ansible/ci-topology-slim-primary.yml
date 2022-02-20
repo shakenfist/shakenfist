@@ -55,7 +55,8 @@
               "node_mesh_ip": "{{hostvars['primary']['mesh_ip']}}",
               "node_mesh_nic": "eth1",
               "primary_node": true,
-              "api_url": "http://sf-primary/api"
+              "api_url": "http://sf-primary/api",
+              "etcd_master": true
             },
             {
               "name": "sf-1",
@@ -63,7 +64,6 @@
               "node_egress_nic": "eth0",
               "node_mesh_ip": "{{hostvars['sf1']['mesh_ip']}}",
               "node_mesh_nic": "eth1",
-              "etcd_master": true,
               "network_node": true,
               "eventlog_node": true,
               "hypervisor": true
@@ -74,7 +74,6 @@
               "node_egress_nic": "eth0",
               "node_mesh_ip": "{{hostvars['sf2']['mesh_ip']}}",
               "node_mesh_nic": "eth1",
-              "etcd_master": true,
               "hypervisor": true
             },
             {
@@ -83,7 +82,6 @@
               "node_egress_nic": "eth0",
               "node_mesh_ip": "{{hostvars['sf3']['mesh_ip']}}",
               "node_mesh_nic": "eth1",
-              "etcd_master": true,
               "hypervisor": true
             },
             {

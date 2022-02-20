@@ -10,11 +10,14 @@
     keyfile_public: "/home/jenkins/id_ci.pub"
 
   tasks:
+    - name: Create the namespace
+      shell: sf-client namespace create "{{identifier}}"
+
     - name: Create a network
       sf_network:
         netblock: "10.0.0.0/24"
-        name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}"
-        namespace: ci
+        name: "rebuild"
+        namespace: "{{identifier}}"
       register: cinetwork
 
     - name: Log network details
@@ -23,7 +26,7 @@
 
     - name: Create an instance
       sf_instance:
-        name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}"
+        name: "{{rebuild}}"
         cpu: 4
         ram: 4096
         disks:
@@ -31,7 +34,7 @@
         networkspecs:
           - network_uuid="{{cinetwork['meta']['uuid']}}",float=True
         ssh_key: "{{ lookup('file', keyfile_public) }}"
-        namespace: ci
+        namespace: "{{identifier}}"
         state: present
       register: imagerebuild
 
@@ -88,7 +91,7 @@
     # As recommended on the ansible apt module documentation...
     - name: Install packages only when the apt process is not locked
       apt:
-        name: gnupg
+        name: bash
         state: present
       register: apt_action
       retries: 100
@@ -289,7 +292,7 @@
 
     - name: Test the snapshot
       sf_instance:
-        name: "{{identifier|truncate(50, True, '---')|replace('_','-')}}-test"
+        name: "test"
         cpu: 4
         ram: 4096
         disks:
@@ -297,7 +300,7 @@
         networkspecs:
           - network_uuid="{{cinetwork['meta']['uuid']}}",float=True
         ssh_key: "{{ lookup('file', keyfile_public) }}"
-        namespace: ci
+        namespace: "{{identifier}}"
         state: present
       register: imagetest
 
