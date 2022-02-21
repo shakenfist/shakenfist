@@ -423,8 +423,10 @@ else
         safe_node=$(echo ${node} | tr "-" "_")
         calc_var_name="GETSF_NODE_MESH_ADDRESS_${safe_node}"
 
-        status "    ...${node} as ${GETSF_SSH_USER}@${!calc_var_name}."
-        ssh -i ${GETSF_SSH_KEY_FILENAME} ${GETSF_SSH_USER}@${!calc_var_name} "sudo whoami"
+        status "    ...${node} ping."
+        ping -c 3 "${!calc_var_name}"
+        status "    ...${node} ssh as ${GETSF_SSH_USER}@${!calc_var_name}."
+        ssh -o StrictHostKeyChecking=no -i ${GETSF_SSH_KEY_FILENAME} ${GETSF_SSH_USER}@${!calc_var_name} "sudo whoami"
     done
     echo
 fi
@@ -557,8 +559,11 @@ if [ "${GETSF_NODES}" == "localhost" ]; then
 else
     for node in ${GETSF_NODES[@]}; do
         status "    ...${node}"
-        scp -i ${GETSF_SSH_KEY_FILENAME} /tmp/sf-per-node-primary ${GETSF_SSH_USER}@${node}:/tmp/sf-per-node
-        ssh -i ${GETSF_SSH_KEY_FILENAME} ${GETSF_SSH_USER}@${node} "sudo /tmp/sf-per-node"
+        safe_node=$(echo ${node} | tr "-" "_")
+        calc_var_name="GETSF_NODE_MESH_ADDRESS_${safe_node}"
+
+        scp -o StrictHostKeyChecking=no -i ${GETSF_SSH_KEY_FILENAME} /tmp/sf-per-node-primary ${GETSF_SSH_USER}@${!calc_var_name}:/tmp/sf-per-node
+        ssh -o StrictHostKeyChecking=no -i ${GETSF_SSH_KEY_FILENAME} ${GETSF_SSH_USER}@${!calc_var_name} "sudo /tmp/sf-per-node"
         echo
     done
     echo
