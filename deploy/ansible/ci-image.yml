@@ -26,7 +26,7 @@
 
     - name: Create an instance
       sf_instance:
-        name: "{{rebuild}}"
+        name: "rebuild"
         cpu: 4
         ram: 4096
         disks:
