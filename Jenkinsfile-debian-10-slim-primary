@@ -226,24 +226,13 @@ pipeline {
       sh '''  set -x
               . /home/jenkins/sf-ci
               . $WORKSPACE/$BUILD_TAG/ci-environment.sh || true
+              mkdir artifacts
 
               echo "=============================="
               ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                  debian@$primary sudo cat /etc/sf/sfrc || true
-
-              echo "=============================="
-              ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                  debian@$primary ps -ef || true | grep sf
-
-              echo "=============================="
-              ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                  debian@$primary sudo cat /etc/sf/shakenfist.json || true
-
-              echo "=============================="
-              # We do not use the locally cached syslog from the log check here,
-              # because if the CI run failed earlier, the log check was skipped.
-              ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                  debian@$primary sudo cat /var/log/syslog || true
+                  debian@$primary sudo /srv/shakenfist/venv/bin/clingwrap gather --target /srv/shakenfist/venv/share/clingwrap/shakenfist-ci-failure.cwd --output /tmp/all.zip
+              scp -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                  debian@$primary:/tmp/all.zip artifacts/
 
               echo "=============================="
 
@@ -256,6 +245,8 @@ pipeline {
 
               rm -rf $WORKSPACE/$BUILD_TAG
           '''
+
+          archiveArtifacts artifacts: 'artifacts/all.zip', fingerprint: true
     }
   }
 }
