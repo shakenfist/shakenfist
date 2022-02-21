@@ -239,6 +239,9 @@ class Monitor(daemon.Daemon):
                     # The domain has likely been deleted.
                     pass
 
+            if not config.NODE_IS_NETWORK_NODE:
+                return
+
             for n in network.Networks([baseobject.active_states_filter]):
                 if not n.provide_nat:
                     continue
