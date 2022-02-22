@@ -269,6 +269,8 @@ class Blob(dbo):
         # Replicate any blob this blob depends on
         if self.depends_on:
             dep_blob = Blob.from_db(self.depends_on)
+            if not dep_blob:
+                raise BlobDependencyMissing(self.depends_on)
             dep_blob.ensure_local(locks)
 
         # Actually replicate this blob
