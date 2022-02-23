@@ -198,6 +198,7 @@ class ArtifactHasNoBlobs(ArtifactException):
     pass
 
 
+# Blobs
 class BlobMissing(ArtifactException):
     pass
 
@@ -211,4 +212,8 @@ class BlobFetchFailed(Exception):
 
 
 class BlobDependencyMissing(Exception):
+    pass
+
+
+class BlobsMustHaveContent(Exception):
     pass

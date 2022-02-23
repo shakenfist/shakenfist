@@ -16,7 +16,8 @@ from shakenfist.config import config
 from shakenfist.constants import LOCK_REFRESH_SECONDS, GiB
 from shakenfist import db
 from shakenfist import etcd
-from shakenfist.exceptions import BlobDeleted, BlobFetchFailed, BlobDependencyMissing
+from shakenfist.exceptions import (BlobDeleted, BlobFetchFailed,
+                                   BlobDependencyMissing, BlobsMustHaveContent)
 from shakenfist import instance
 from shakenfist import logutil
 from shakenfist.metrics import get_minimum_object_version as gmov
@@ -92,6 +93,9 @@ class Blob(dbo):
 
     @classmethod
     def new(cls, blob_uuid, size, modified, fetched_at, depends_on=None):
+        if not size:
+            raise BlobsMustHaveContent('A blob cannot be of zero size')
+
         Blob._db_create(
             blob_uuid,
             {
