@@ -184,6 +184,13 @@
         name: ["grafana"]
         update_cache: yes
 
+    - name: Ensure /etc/ansible exists
+      file:
+        path: /etc/ansible
+        state: directory
+        owner: root
+        group: root
+
     - name: Copy ansible config
       copy:
         src: /etc/ansible/ansible.cfg
