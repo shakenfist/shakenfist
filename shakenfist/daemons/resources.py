@@ -239,6 +239,9 @@ class Monitor(daemon.Daemon):
                     # The domain has likely been deleted.
                     pass
 
+            if not config.NODE_IS_NETWORK_NODE:
+                return
+
             for n in network.Networks([baseobject.active_states_filter]):
                 if not n.provide_nat:
                     continue
@@ -254,15 +257,6 @@ class Monitor(daemon.Daemon):
 
         while not self.exit.is_set():
             try:
-                jobname, _ = etcd.dequeue('%s-metrics' % config.NODE_NAME)
-                if jobname:
-                    if time.time() - last_metrics > 2:
-                        update_metrics()
-                        last_metrics = time.time()
-                    etcd.resolve('%s-metrics' % config.NODE_NAME, jobname)
-                else:
-                    self.exit.wait(0.2)
-
                 if time.time() - last_metrics > config.SCHEDULER_CACHE_TIMEOUT:
                     update_metrics()
                     last_metrics = time.time()
@@ -270,6 +264,8 @@ class Monitor(daemon.Daemon):
                 if time.time() - last_billing > config.USAGE_EVENT_FREQUENCY:
                     emit_billing_statistics()
                     last_billing = time.time()
+
+                self.exit.wait(1)
 
             except Exception as e:
                 util_general.ignore_exception('resource statistics', e)

@@ -233,7 +233,7 @@ class Blob(dbo):
                 self._db_set_attribute('info', info)
 
     def ref_count_inc(self):
-        with self.get_lock_attr('ref_count', 'Increase ref count'):
+        with self.get_lock_attr('ref_count', 'Increase reference count'):
             if self.state.value == self.STATE_DELETED:
                 raise BlobDeleted
             new_count = self.ref_count + 1
@@ -241,7 +241,7 @@ class Blob(dbo):
             return new_count
 
     def ref_count_dec(self):
-        with self.get_lock_attr('ref_count', 'Increase ref count'):
+        with self.get_lock_attr('ref_count', 'Decrease reference count'):
             new_count = self.ref_count - 1
             if new_count < 0:
                 new_count = 0
@@ -258,6 +258,12 @@ class Blob(dbo):
                     if transcoded_blob:
                         transcoded_blob.ref_count_dec()
 
+                depends_on = self.depends_on
+                if depends_on:
+                    dep_blob = Blob.from_db(depends_on)
+                    if dep_blob:
+                        dep_blob.ref_count_dec()
+
             return new_count
 
     def ensure_local(self, locks):
@@ -269,6 +275,8 @@ class Blob(dbo):
         # Replicate any blob this blob depends on
         if self.depends_on:
             dep_blob = Blob.from_db(self.depends_on)
+            if not dep_blob:
+                raise BlobDependencyMissing(self.depends_on)
             dep_blob.ensure_local(locks)
 
         # Actually replicate this blob
@@ -431,6 +439,7 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
             raise BlobDependencyMissing(
                 'Snapshot depends on blob UUID %s, which is missing'
                 % depends_on)
+        dep_blob.ref_count_inc()
 
     # And make the associated blob
     b = Blob.new(blob_uuid, st.st_size, time.time(), time.time(),

@@ -94,14 +94,14 @@ pipeline {
         }
       }
     }
-    stage('Run installer on primary') {
+    stage('Run getsf installer on primary') {
       steps {
         script {
           timeout(time: 20, unit: 'MINUTES', activity: true) {
             sh '''  . $WORKSPACE/$BUILD_TAG/ci-environment.sh
                     ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no \
                         -o UserKnownHostsFile=/dev/null \
-                        ubuntu@$primary sudo /root/sf-deploy.sh
+                        ubuntu@$primary /tmp/getsf-wrapper
                     echo ""
                     echo ""
                     ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no \

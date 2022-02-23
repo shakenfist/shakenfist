@@ -109,12 +109,10 @@ def handle(jobname, workitem):
                     continue
 
                 instance_start(inst, task.network())
-                etcd.enqueue('%s-metrics' % config.NODE_NAME, {})
 
             elif isinstance(task, DeleteInstanceTask):
                 try:
                     instance_delete(inst)
-                    etcd.enqueue('%s-metrics' % config.NODE_NAME, {})
                 except Exception as e:
                     util_general.ignore_exception(
                         'instance %s delete task' % inst, e)

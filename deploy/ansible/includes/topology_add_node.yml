@@ -37,7 +37,7 @@
     groups: primary_node
   when: item.get('primary_node', False)
 
-- name: Add {{item['name']}} as a storage node (if configured, should only be one)
+- name: Add {{item['name']}} as a storage node
   add_host:
     hostname: "{{item['name']}}"
     groups: storage, sf_prometheus_exporters

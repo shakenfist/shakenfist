@@ -90,7 +90,8 @@ def get_interface_addresses(name, namespace=None):
 def get_interface_statistics(name, namespace=None):
     stdout, stderr = process.execute(
         None, 'ip -s -pretty -json link show %s' % name,
-        check_exit_code=[0, 1], namespace=namespace)
+        check_exit_code=[0, 1], namespace=namespace,
+        suppress_command_logging=True)
 
     if not stdout:
         raise exceptions.NoInterfaceStatistics(
