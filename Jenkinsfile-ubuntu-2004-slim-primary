@@ -254,13 +254,31 @@ pipeline {
       sh '''  set -x
               . /home/jenkins/sf-ci
               . $WORKSPACE/$BUILD_TAG/ci-environment.sh || true
-              mkdir artifacts
+              mkdir artifacts bundle
 
               echo "=============================="
-              ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                  ubuntu@$primary sudo /srv/shakenfist/venv/bin/clingwrap gather --target /srv/shakenfist/venv/share/clingwrap/shakenfist-ci-failure.cwd --output /tmp/all.zip
-              scp -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                  ubuntu@$primary:/tmp/all.zip artifacts/
+              for node in $nodes
+              do
+                echo "=== $node ==="
+                safe_node=$(echo $node | tr "-" "_")
+
+                ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                    ubuntu@${!safe_node} sudo /srv/shakenfist/venv/bin/clingwrap gather \
+                    --target /srv/shakenfist/venv/share/clingwrap/shakenfist-ci-failure.cwd --output /tmp/$node.zip
+                scp -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                    ubuntu@${!safe_node}:/tmp/$node.zip bundle/
+
+                mkdir -p bundle/$node
+                unzip -v bundle/$node.zip
+
+                # We ignore the exit code of unzip, as it will return 1 if a warning is
+                # emitted during expansion, even though expansion worked correctly. For
+                # example stripping a leading / from paths.
+                unzip bundle/$node.zip -d bundle/$node/ || true
+                rm bundle/$node.zip
+              done
+
+              zip -r artifacts/bundle.zip bundle/*
 
               echo "=============================="
 
@@ -274,7 +292,7 @@ pipeline {
               rm -rf $WORKSPACE/$BUILD_TAG
           '''
 
-          archiveArtifacts artifacts: 'artifacts/all.zip', fingerprint: true
+          archiveArtifacts artifacts: 'artifacts/bundle.zip', fingerprint: true
     }
   }
 }

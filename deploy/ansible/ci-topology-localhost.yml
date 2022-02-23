@@ -72,30 +72,6 @@
         msg:
           - "Primary: is {{primary['meta']['uuid']}} at {{primary['meta']['network_interfaces'][0]['ipv4']}}, {{primary['meta']['network_interfaces'][0]['floating']}}"
 
-    - name: Ensure we have somewhere to write the build details to
-      file:
-        path: "{{ lookup('env', 'WORKSPACE') }}/{{ lookup('env', 'BUILD_TAG') }}"
-        state: directory
-        mode: "0755"
-
-    - name: Write details of instances to workspace
-      copy:
-        content: |
-          {% for svr in groups.sfall%}
-          export {{svr}}={{hostvars[svr]['ansible_ssh_host']}}
-          {% endfor %}
-
-          export identifier={{identifier}}
-          export source_path={{source_path}}
-        dest: "{{ lookup('env', 'WORKSPACE') }}/{{ lookup('env', 'BUILD_TAG') }}/ci-environment.sh"
-        owner: jenkins
-        group: jenkins
-        mode: u=r,g=r,o=r
-
-    - name: Log environment details path
-      debug:
-        msg: "Environment details written to {{ lookup('env', 'WORKSPACE') }}/{{ lookup('env', 'BUILD_TAG') }}/ci-environment.sh"
-
     - include_tasks: ci-include-common-localhost.yml
 
 - hosts: primary
