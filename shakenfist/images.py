@@ -92,14 +92,18 @@ class ImageFetchHelper(object):
                         % (most_recent_blob.modified, resp.headers.get('Last-Modified')))
                     dirty = True
 
+                response_size = resp.headers.get('Content-Length')
+                if response_size:
+                    response_size = int(response_size)
+
                 if not most_recent_blob.size:
                     self.__artifact.add_event2(
                         'image requires fetch, no Content-Length recorded')
                     dirty = True
-                elif most_recent_blob.size != resp.headers.get('Content-Length'):
+                elif most_recent_blob.size != response_size:
                     self.__artifact.add_event2(
                         'image requires fetch, Content-Length: %s -> %s'
-                        % (most_recent_blob.size, resp.headers.get('Content-Length')))
+                        % (most_recent_blob.size, response_size))
                     dirty = True
 
             if not dirty:
