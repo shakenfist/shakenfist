@@ -266,6 +266,9 @@ class SFConfig(BaseSettings):
     LIBVIRT_GROUP: str = Field(
         'libvirt-qemu', description='Name of the libvirt group'
     )
+    LIBVIRT_LOG_PATH: str = Field(
+        '/var/log/libvirt/qemu', description='Path to libvirt logs'
+    )
 
     ENABLE_EVENTS: bool = Field(
         True, description='Record events about objects in the database. '
