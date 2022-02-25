@@ -48,7 +48,8 @@ class Blob(dbo):
             upgraded, static_values = self.upgrade(static_values)
 
             if upgraded and gmov('blob') == self.current_version:
-                etcd.put(self.object_type, None, self.uuid, static_values)
+                etcd.put(self.object_type, None,
+                         static_values.get('uuid'), static_values)
                 LOG.with_field(
                     self.object_type, static_values['uuid']).info('Online upgrade committed')
 
