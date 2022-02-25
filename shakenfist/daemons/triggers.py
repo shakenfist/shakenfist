@@ -1,4 +1,3 @@
-from functools import partial
 import multiprocessing
 import os
 import re
@@ -6,13 +5,10 @@ import setproctitle
 import signal
 import time
 
-from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist.daemons import daemon
-from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist import logutil
-from shakenfist import instance
 
 
 LOG, _ = logutil.setup(__name__)
@@ -100,15 +96,19 @@ class Monitor(daemon.Daemon):
             extra_instances = list(observers.keys())
             missing_instances = []
 
-            with etcd.ThreadLocalReadOnlyCache():
-                for inst in instance.Instances([
-                        instance.this_node_filter,
-                        partial(baseobject.state_filter, [instance.Instance.STATE_CREATED])]):
-                    if inst.uuid in extra_instances:
-                        extra_instances.remove(inst.uuid)
+            # The goal here is to find all instances running on this node so
+            # that we can monitor them. We used to query etcd for this, but
+            # we needed to do so frequently and it created a lot of etcd load.
+            # Instead, we just use the instance folders to signal that an
+            # instance should be monitored.
+            instance_path = os.path.join(config.STORAGE_PATH, 'instances')
+            if os.path.exists(instance_path):
+                for instance_uuid in os.listdir(instance_path):
+                    if instance_uuid in extra_instances:
+                        extra_instances.remove(instance_uuid)
 
-                    if inst.uuid not in observers:
-                        missing_instances.append(inst.uuid)
+                    if instance_uuid not in observers:
+                        missing_instances.append(instance_uuid)
 
             # Start missing observers
             for instance_uuid in missing_instances:
