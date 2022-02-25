@@ -281,6 +281,7 @@ class Monitor(daemon.Daemon):
                     # the above time check.
                     pathlib.Path(entpath).touch(exist_ok=True)
 
+    def _find_missing_blobs(self):
         # Find blobs which should be on this node but are not.
         missing = []
         with etcd.ThreadLocalReadOnlyCache():
@@ -320,6 +321,7 @@ class Monitor(daemon.Daemon):
 
         # Delay first compaction until system startup load has reduced
         last_compaction = time.time() - random.randint(1, 20*60)
+        last_missing_blob_check = 0
         last_libvirt_log_clean = 0
 
         while not self.exit.is_set():
@@ -329,6 +331,10 @@ class Monitor(daemon.Daemon):
 
             LOG.info('Maintaining blobs')
             self._maintain_blobs()
+
+            if time.time() - last_missing_blob_check > 300:
+                self._find_missing_blobs()
+                last_missing_blob_check = time.time()
 
             # Perform etcd maintenance, if we are an etcd master
             if config.NODE_IS_ETCD_MASTER:
