@@ -169,6 +169,30 @@ class Monitor(daemon.Daemon):
         except libvirt.libvirtError as e:
             LOG.debug('Failed to lookup all domains: %s' % e)
 
+    def _clear_old_libvirt_logs(self):
+        if not os.path.exists(config.LIBVIRT_LOG_PATH):
+            return
+
+        # Collect all valid instance UUIDs (that is, instances that have not
+        # been hard deleted).
+        all_instances = []
+        with etcd.ThreadLocalReadOnlyCache():
+            for i in instance.Instances([]):
+                all_instances.append(i.uuid)
+
+        # Now delete all libvirt log files which look like a SF instance, but
+        # where the instance doesn't exist.
+        for ent in os.listdir(config.LIBVIRT_LOG_PATH):
+            if not ent.startswith('sf:'):
+                continue
+
+            uuid = ent.split(':')[1].split('.')[0]
+            if uuid in all_instances:
+                continue
+
+            LOG.debug('Removing stale libvirt log %s' % ent)
+            os.unlink(os.path.join(config.LIBVIRT_LOG_PATH, ent))
+
     def _maintain_blobs(self):
         # Find orphaned and deleted blobs still on disk
         blob_path = os.path.join(config.STORAGE_PATH, 'blobs')
@@ -257,6 +281,7 @@ class Monitor(daemon.Daemon):
                     # the above time check.
                     pathlib.Path(entpath).touch(exist_ok=True)
 
+    def _find_missing_blobs(self):
         # Find blobs which should be on this node but are not.
         missing = []
         with etcd.ThreadLocalReadOnlyCache():
@@ -296,6 +321,8 @@ class Monitor(daemon.Daemon):
 
         # Delay first compaction until system startup load has reduced
         last_compaction = time.time() - random.randint(1, 20*60)
+        last_missing_blob_check = 0
+        last_libvirt_log_clean = 0
 
         while not self.exit.is_set():
             # Update power state of all instances on this hypervisor
@@ -305,11 +332,20 @@ class Monitor(daemon.Daemon):
             LOG.info('Maintaining blobs')
             self._maintain_blobs()
 
+            if time.time() - last_missing_blob_check > 300:
+                self._find_missing_blobs()
+                last_missing_blob_check = time.time()
+
             # Perform etcd maintenance, if we are an etcd master
             if config.NODE_IS_ETCD_MASTER:
                 if time.time() - last_compaction > 1800:
                     LOG.info('Compacting etcd')
                     self._compact_etcd()
                     last_compaction = time.time()
+
+            # Cleanup libvirt logs, but less frequently
+            if time.time() - last_libvirt_log_clean > 1800:
+                self._clear_old_libvirt_logs()
+                last_libvirt_log_clean = time.time()
 
             self.exit.wait(60)

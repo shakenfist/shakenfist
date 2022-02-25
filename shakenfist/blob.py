@@ -2,6 +2,7 @@
 
 import http
 import magic
+import numbers
 import os
 import random
 import requests
@@ -15,9 +16,11 @@ from shakenfist.config import config
 from shakenfist.constants import LOCK_REFRESH_SECONDS, GiB
 from shakenfist import db
 from shakenfist import etcd
-from shakenfist.exceptions import BlobDeleted, BlobFetchFailed, BlobDependencyMissing
+from shakenfist.exceptions import (BlobDeleted, BlobFetchFailed,
+                                   BlobDependencyMissing, BlobsMustHaveContent)
 from shakenfist import instance
 from shakenfist import logutil
+from shakenfist.metrics import get_minimum_object_version as gmov
 from shakenfist.node import Node, nodes_by_free_disk_descending
 from shakenfist.tasks import FetchBlobTask
 from shakenfist.util import general as util_general
@@ -29,7 +32,9 @@ LOG, _ = logutil.setup(__name__)
 
 class Blob(dbo):
     object_type = 'blob'
-    current_version = 3
+    current_version = 4
+    upgrade_supported = True
+
     state_targets = {
         None: (dbo.STATE_INITIAL),
         dbo.STATE_INITIAL: (dbo.STATE_CREATED, dbo.STATE_ERROR, dbo.STATE_DELETED),
@@ -39,6 +44,14 @@ class Blob(dbo):
     }
 
     def __init__(self, static_values):
+        if static_values['version'] != self.current_version:
+            upgraded, static_values = self.upgrade(static_values)
+
+            if upgraded and gmov('blob') == self.current_version:
+                etcd.put(self.object_type, None, self.uuid, static_values)
+                LOG.with_field(
+                    self.object_type, static_values['uuid']).info('Online upgrade committed')
+
         super(Blob, self).__init__(static_values.get('uuid'),
                                    static_values.get('version'))
 
@@ -48,13 +61,47 @@ class Blob(dbo):
         self.__depends_on = static_values['depends_on']
 
     @classmethod
+    def upgrade(cls, static_values):
+        changed = False
+        starting_version = static_values.get('version')
+
+        if static_values.get('version') == 3:
+            static_values['modified'] = cls.normalize_timestamp(
+                static_values['modified'])
+            static_values['version'] = 4
+            changed = True
+
+        if changed:
+            LOG.with_fields({
+                cls.object_type: static_values['uuid'],
+                'start_version': starting_version,
+                'final_version': static_values.get('version')
+            }).info('Object online upgraded')
+        return changed, static_values
+
+    @classmethod
+    def normalize_timestamp(cls, timestamp):
+        # The timestamp is either a number (int or float, assumed to be epoch
+        # seconds)...
+        if isinstance(timestamp, numbers.Number):
+            return timestamp
+
+        # Or a HTTP last-modified timestamp like "Sun, 09 Jan 2022 23:05:25 GMT"
+        # to be converted to epoch seconds.
+        t = time.strptime(timestamp, '%a, %d %b %Y %H:%M:%S %Z')
+        return time.mktime(t)
+
+    @classmethod
     def new(cls, blob_uuid, size, modified, fetched_at, depends_on=None):
+        if not size:
+            raise BlobsMustHaveContent('A blob cannot be of zero size')
+
         Blob._db_create(
             blob_uuid,
             {
                 'uuid': blob_uuid,
                 'size': size,
-                'modified': modified,
+                'modified': cls.normalize_timestamp(modified),
                 'fetched_at': fetched_at,
                 'depends_on': depends_on,
 

@@ -58,7 +58,7 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
         self.addCleanup(self.config.stop)
 
         self.gmov = mock.patch(
-            'shakenfist.instance.get_minimum_object_version', return_value=6)
+            'shakenfist.instance.gmov', return_value=6)
         self.mock_gmov = self.gmov.start()
         self.addCleanup(self.gmov.stop)
 
@@ -188,7 +188,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
         self.addCleanup(self.put.stop)
 
         self.gmov = mock.patch(
-            'shakenfist.instance.get_minimum_object_version', return_value=6)
+            'shakenfist.instance.gmov', return_value=6)
         self.mock_gmov = self.gmov.start()
         self.addCleanup(self.gmov.stop)
 
@@ -612,7 +612,7 @@ class InstancesTestCase(base.ShakenFistTestCase):
         super(InstancesTestCase, self).setUp()
 
         self.gmov = mock.patch(
-            'shakenfist.instance.get_minimum_object_version', return_value=6)
+            'shakenfist.instance.gmov', return_value=6)
         self.mock_gmov = self.gmov.start()
         self.addCleanup(self.gmov.stop)
 

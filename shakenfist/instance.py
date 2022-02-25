@@ -26,7 +26,7 @@ from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import logutil
-from shakenfist.metrics import get_minimum_object_version
+from shakenfist.metrics import get_minimum_object_version as gmov
 from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist.tasks import DeleteInstanceTask, SnapshotTask
@@ -128,8 +128,7 @@ class Instance(dbo):
         if static_values['version'] != self.current_version:
             upgraded, static_values = self.upgrade(static_values)
 
-            if (upgraded and
-                    get_minimum_object_version('instance') == self.current_version):
+            if upgraded and gmov('instance') == self.current_version:
                 etcd.put(self.object_type, None, self.uuid, static_values)
                 LOG.with_field(
                     self.object_type, static_values['uuid']).info('Online upgrade committed')

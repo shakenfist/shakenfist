@@ -16,7 +16,6 @@ from shakenfist.config import config
 from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist.tasks import QueueTask
-from shakenfist.util import callstack as util_callstack
 from shakenfist.util import random as util_random
 
 
@@ -88,9 +87,7 @@ def reset_statistics():
 
 
 def _record_uncached_read(path):
-    caller = util_callstack.get_caller(-3)
-    caller_path = '%s %s' % (caller, path)
-    local.sf_etcd_statistics[caller_path] += 1
+    local.sf_etcd_statistics[path] += 1
 
 
 class ThreadLocalReadOnlyCache():
