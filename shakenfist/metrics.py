@@ -57,7 +57,8 @@ def get_minimum_object_version(objname):
         for possible_objname in OBJECT_NAMES:
             minimum = inf
             for entry in metrics:
-                ver = entry.get('object_version_%s' % possible_objname)
+                ver = metrics[entry].get(
+                    'object_version_%s' % possible_objname)
                 if ver:
                     minimum = min(minimum, ver)
             VERSION_CACHE[possible_objname] = minimum
