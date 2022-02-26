@@ -356,26 +356,31 @@ class InstancesEndpoint(api_base.Resource):
                 # (thanks OpenStack Kolla), which are special cased here. To not
                 # have an address, you use a detailed netdesc and specify
                 # address=none.
-                if 'address' in netdesc and util_general.noneish(netdesc['address']):
-                    netdesc['address'] = None
-                else:
-                    with db.get_lock('ipmanager', None,  netdesc['network_uuid'],
-                                     ttl=120, op='Network allocate IP'):
-                        eventlog.add_event('network', netdesc['network_uuid'], 'allocate address',
-                                           None, None, inst.uuid)
-                        ipm = IPManager.from_db(netdesc['network_uuid'])
-                        if 'address' not in netdesc or not netdesc['address']:
-                            netdesc['address'] = ipm.get_random_free_address(
-                                inst.unique_label())
-                        else:
-                            if not ipm.reserve(netdesc['address'], inst.unique_label()):
-                                m = 'failed to reserve an IP on network %s' % (
-                                    netdesc['network_uuid'])
-                                inst.enqueue_delete_due_error(m)
-                                return api_base.error(409, 'address %s in use' %
-                                                      netdesc['address'])
+                try:
+                    if 'address' in netdesc and util_general.noneish(netdesc['address']):
+                        netdesc['address'] = None
+                    else:
+                        with db.get_lock('ipmanager', None,  netdesc['network_uuid'],
+                                         ttl=120, op='Network allocate IP'):
+                            eventlog.add_event('network', netdesc['network_uuid'], 'allocate address',
+                                               None, None, inst.uuid)
+                            ipm = IPManager.from_db(netdesc['network_uuid'])
+                            if 'address' not in netdesc or not netdesc['address']:
+                                netdesc['address'] = ipm.get_random_free_address(
+                                    inst.unique_label())
+                            else:
+                                if not ipm.reserve(netdesc['address'], inst.unique_label()):
+                                    m = 'failed to reserve an IP on network %s' % (
+                                        netdesc['network_uuid'])
+                                    inst.enqueue_delete_due_error(m)
+                                    return api_base.error(409, 'address %s in use' %
+                                                          netdesc['address'])
 
-                        ipm.persist()
+                            ipm.persist()
+                except exceptions.CongestedNetwork as e:
+                    inst.enqueue_delete_due_error(
+                        'cannot allocate address: %s' % e)
+                    return api_base.error(507, str(e))
 
                 if 'model' not in netdesc or not netdesc['model']:
                     netdesc['model'] = 'virtio'
@@ -388,15 +393,20 @@ class InstancesEndpoint(api_base.Resource):
                     iface_uuid, netdesc, inst.uuid, order)
                 order += 1
 
-                if 'float' in netdesc and netdesc['float']:
-                    err = api_util.assign_floating_ip(ni)
-                    if err:
-                        inst.enqueue_delete_due_error(
-                            'interface float failed: %s' % err)
-                        return err
+                try:
+                    if 'float' in netdesc and netdesc['float']:
+                        err = api_util.assign_floating_ip(ni)
+                        if err:
+                            inst.enqueue_delete_due_error(
+                                'interface float failed: %s' % err)
+                            return err
 
-                    float_tasks.append(FloatNetworkInterfaceTask(
-                        netdesc['network_uuid'], iface_uuid))
+                        float_tasks.append(FloatNetworkInterfaceTask(
+                            netdesc['network_uuid'], iface_uuid))
+                except exceptions.CongestedNetwork as e:
+                    inst.enqueue_delete_due_error(
+                        'cannot allocate address: %s' % e)
+                    return api_base.error(507, str(e))
 
                 # Include the interface uuid in the network description we
                 # pass through to the instance start task.

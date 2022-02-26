@@ -19,7 +19,7 @@ from shakenfist.config import config
 from shakenfist import db
 from shakenfist import dhcp
 from shakenfist import etcd
-from shakenfist.exceptions import DeadNetwork
+from shakenfist.exceptions import DeadNetwork, CongestedNetwork
 from shakenfist import instance
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
@@ -400,17 +400,20 @@ class Network(dbo):
                 # We don't always need this lock, but acquiring it here means
                 # we don't need to construct two identical ipmanagers one after
                 # the other.
-                with db.get_lock('ipmanager', None, 'floating', ttl=120,
-                                 op='Network deploy NAT'):
-                    ipm = IPManager.from_db('floating')
-                    if not self.floating_gateway:
-                        self.update_floating_gateway(
-                            ipm.get_random_free_address(self.unique_label()))
-                        ipm.persist()
+                try:
+                    with db.get_lock('ipmanager', None, 'floating', ttl=120,
+                                     op='Network deploy NAT'):
+                        ipm = IPManager.from_db('floating')
+                        if not self.floating_gateway:
+                            self.update_floating_gateway(
+                                ipm.get_random_free_address(self.unique_label()))
+                            ipm.persist()
 
-                    subst['floating_router'] = ipm.get_address_at_index(1)
-                    subst['floating_gateway'] = self.floating_gateway
-                    subst['floating_netmask'] = ipm.netmask
+                        subst['floating_router'] = ipm.get_address_at_index(1)
+                        subst['floating_gateway'] = self.floating_gateway
+                        subst['floating_netmask'] = ipm.netmask
+                except CongestedNetwork:
+                    self.error('Unable to allocate floating gateway IP')
 
                 addresses = util_network.get_interface_addresses(
                     subst['egress_veth_inner'], namespace=subst['netns'])

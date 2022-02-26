@@ -3,6 +3,7 @@ from flask_jwt_extended import jwt_required
 
 from shakenfist.daemons import daemon
 from shakenfist import etcd
+from shakenfist import exceptions
 from shakenfist.external_api import (
     base as api_base,
     util as api_util)
@@ -34,9 +35,10 @@ class InterfaceFloatEndpoint(api_base.Resource):
         if err:
             return err
 
-        err = api_util.assign_floating_ip(ni)
-        if err:
-            return err
+        try:
+            api_util.assign_floating_ip(ni)
+        except exceptions.CongestedNetwork as e:
+            return api_base.error(507, str(e))
 
         etcd.enqueue('networknode',
                      FloatNetworkInterfaceTask(n.uuid, interface_uuid))

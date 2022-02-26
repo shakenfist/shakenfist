@@ -120,21 +120,28 @@ class IPManager(object):
         return str(ipaddress.IPv4Address(self.ipblock_obj.network_address + bits))
 
     def get_random_free_address(self, unique_label_tuple):
-        if self.in_use_counter / self.num_addresses < 0.5:
-            while True:
-                addr = self.get_random_address()
-                free = self.reserve(addr, unique_label_tuple)
-                if free:
-                    return str(addr)
+        # Fast path give up for full networks
+        if self.in_use_counter == self.num_addresses:
+            raise exceptions.CongestedNetwork('No free addresses on network')
 
-        else:
-            idx = 1
-            while idx < self.num_addresses:
-                addr = self.get_address_at_index(idx)
-                free = self.reserve(addr, unique_label_tuple)
-                if free:
-                    return str(addr)
+        # Five attempts at using a random address
+        attempts = 0
+        while attempts < 5:
+            attempts += 1
+            addr = self.get_random_address()
+            free = self.reserve(addr, unique_label_tuple)
+            if free:
+                return str(addr)
 
-                idx += 1
+        # Fall back to a linear scan looking for a gap
+        idx = 1
+        while idx < self.num_addresses:
+            addr = self.get_address_at_index(idx)
+            free = self.reserve(addr, unique_label_tuple)
+            if free:
+                return str(addr)
 
+            idx += 1
+
+        # Give up
         raise exceptions.CongestedNetwork('No free addresses on network')
