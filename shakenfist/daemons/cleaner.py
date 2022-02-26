@@ -7,10 +7,8 @@ import random
 import shutil
 import time
 
-from shakenfist.baseobject import (
-    DatabaseBackedObject as dbo,
-    active_states_filter)
-from shakenfist.blob import Blob, Blobs
+from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
@@ -286,6 +284,9 @@ class Monitor(daemon.Daemon):
     def _find_missing_blobs(self):
         # Find blobs which should be on this node but are not.
         n = node.Node.from_db(config.NODE_NAME)
+        if not n:
+            return
+
         for blob_uuid in n.blobs:
             if not os.path.exists(os.path.join(config.STORAGE_PATH, 'blobs', blob_uuid)):
                 b = Blob.from_db(blob_uuid)

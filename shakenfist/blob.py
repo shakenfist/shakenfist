@@ -1,6 +1,5 @@
 # Copyright 2021 Michael Still
 
-from collections import defaultdict
 import http
 import magic
 import numbers
@@ -12,8 +11,7 @@ import urllib3
 
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
-    DatabaseBackedObjectIterator as dbo_iter,
-    active_states_filter)
+    DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist.config import config
 from shakenfist.constants import LOCK_REFRESH_SECONDS, GiB
 from shakenfist import db

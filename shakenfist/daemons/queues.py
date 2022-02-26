@@ -382,9 +382,8 @@ def instance_delete(inst):
         inst.power_off()
 
         # Delete the instance's interfaces
-        with util_general.RecordedOperation('release network addresses', inst):
-            for ni in interfaces:
-                ni.delete()
+        for ni in interfaces:
+            ni.delete()
 
         # Create list of networks used by all other instances
         host_networks = []
@@ -407,12 +406,10 @@ def instance_delete(inst):
                     if n.state.value == dbo.STATE_DELETE_WAIT:
                         # Do not update a network about to be deleted
                         continue
-                    with util_general.RecordedOperation('deallocate ip address', inst):
-                        n.update_dhcp()
+                    n.update_dhcp()
                 else:
                     # Network not used by any other instance therefore delete
-                    with util_general.RecordedOperation('remove network from node', n):
-                        n.delete_on_hypervisor()
+                    n.delete_on_hypervisor()
 
 
 def snapshot(inst, disk, artifact_uuid, blob_uuid, thin=False):

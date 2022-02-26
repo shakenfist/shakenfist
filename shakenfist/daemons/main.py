@@ -75,34 +75,32 @@ def restore_instances():
         else:
             instances.append(inst)
 
-    with util_general.RecordedOperation('restore networks', None):
-        for network_uuid in networks:
-            try:
-                n = network.Network.from_db(network_uuid)
-                if not n.is_dead():
-                    LOG.with_object(n).info('Restoring network')
-                    n.create_on_hypervisor()
-                    n.ensure_mesh()
-            except Exception as e:
-                util_general.ignore_exception(
-                    'restore network %s' % network_uuid, e)
+    for network_uuid in networks:
+        try:
+            n = network.Network.from_db(network_uuid)
+            if not n.is_dead():
+                LOG.with_object(n).info('Restoring network')
+                n.create_on_hypervisor()
+                n.ensure_mesh()
+        except Exception as e:
+            util_general.ignore_exception(
+                'restore network %s' % network_uuid, e)
 
-    with util_general.RecordedOperation('restore instances', None):
-        for inst in instances:
-            try:
-                with inst.get_lock(ttl=120, timeout=120, op='Instance restore'):
-                    started = ['on', 'transition-to-on',
-                               instance.Instance.STATE_INITIAL, 'unknown']
-                    if inst.power_state not in started:
-                        continue
+    for inst in instances:
+        try:
+            with inst.get_lock(ttl=120, timeout=120, op='Instance restore'):
+                started = ['on', 'transition-to-on',
+                           instance.Instance.STATE_INITIAL, 'unknown']
+                if inst.power_state not in started:
+                    continue
 
-                    LOG.with_object(inst).info('Restoring instance')
-                    inst.create_on_hypervisor()
-            except Exception as e:
-                util_general.ignore_exception(
-                    'restore instance %s' % inst, e)
-                inst.etcd.enqueue_delete_due_error(
-                    'exception while restoring instance on daemon restart')
+                LOG.with_object(inst).info('Restoring instance')
+                inst.create_on_hypervisor()
+        except Exception as e:
+            util_general.ignore_exception(
+                'restore instance %s' % inst, e)
+            inst.etcd.enqueue_delete_due_error(
+                'exception while restoring instance on daemon restart')
 
 
 DAEMON_IMPLEMENTATIONS = {
@@ -184,34 +182,34 @@ def main():
             # all we do is create a bridge if it doesn't exist and the wire
             # everything up to it. We can do egress NAT in that state, even if
             # floating IPs don't work.
-            with util_general.RecordedOperation('create physical bridge', None):
-                # No locking as read only
-                ipm = IPManager.from_db('floating')
-                subst['master_float'] = ipm.get_address_at_index(1)
-                subst['netmask'] = ipm.netmask
+            #
+            # No locking as read only
+            ipm = IPManager.from_db('floating')
+            subst['master_float'] = ipm.get_address_at_index(1)
+            subst['netmask'] = ipm.netmask
 
-                # We need to copy the MTU of the interface we are bridging to
-                # or weird networking things happen.
-                mtu = util_network.get_interface_mtu(config.NODE_EGRESS_NIC)
+            # We need to copy the MTU of the interface we are bridging to
+            # or weird networking things happen.
+            mtu = util_network.get_interface_mtu(config.NODE_EGRESS_NIC)
 
-                util_network.create_interface(
-                    subst['egress_bridge'], 'bridge', '', mtu=mtu)
+            util_network.create_interface(
+                subst['egress_bridge'], 'bridge', '', mtu=mtu)
 
-                util_process.execute(None,
-                                     'ip link set %(egress_bridge)s up' % subst)
-                util_process.execute(None,
-                                     'ip addr add %(master_float)s/%(netmask)s '
-                                     'dev %(egress_bridge)s' % subst)
+            util_process.execute(None,
+                                 'ip link set %(egress_bridge)s up' % subst)
+            util_process.execute(None,
+                                 'ip addr add %(master_float)s/%(netmask)s '
+                                 'dev %(egress_bridge)s' % subst)
 
-                util_process.execute(None,
-                                     'iptables -A FORWARD -o %(egress_nic)s '
-                                     '-i %(egress_bridge)s -j ACCEPT' % subst)
-                util_process.execute(None,
-                                     'iptables -A FORWARD -i %(egress_nic)s '
-                                     '-o %(egress_bridge)s -j ACCEPT' % subst)
-                util_process.execute(None,
-                                     'iptables -t nat -A POSTROUTING '
-                                     '-o %(egress_nic)s -j MASQUERADE' % subst)
+            util_process.execute(None,
+                                 'iptables -A FORWARD -o %(egress_nic)s '
+                                 '-i %(egress_bridge)s -j ACCEPT' % subst)
+            util_process.execute(None,
+                                 'iptables -A FORWARD -i %(egress_nic)s '
+                                 '-o %(egress_bridge)s -j ACCEPT' % subst)
+            util_process.execute(None,
+                                 'iptables -t nat -A POSTROUTING '
+                                 '-o %(egress_nic)s -j MASQUERADE' % subst)
 
     def _audit_daemons():
         running_daemons = []

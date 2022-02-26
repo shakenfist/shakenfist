@@ -545,14 +545,13 @@ class Instance(dbo):
         # Create the actual instance. Sometimes on Ubuntu 20.04 we need to wait
         # for port binding to work. Revisiting this is tracked by issue 320 on
         # github.
-        with util_general.RecordedOperation('create domain', self):
-            if not self.power_on():
-                attempts = 0
-                while not self.power_on() and attempts < 5:
-                    self.log.warning(
-                        'Instance required an additional attempt to power on')
-                    time.sleep(5)
-                    attempts += 1
+        if not self.power_on():
+            attempts = 0
+            while not self.power_on() and attempts < 5:
+                self.log.warning(
+                    'Instance required an additional attempt to power on')
+                time.sleep(5)
+                attempts += 1
 
         if self.is_powered_on():
             self.state = self.STATE_CREATED
@@ -572,23 +571,22 @@ class Instance(dbo):
                 if cached_image_path:
                     pathlib.Path(cached_image_path).touch(exist_ok=True)
 
-        with util_general.RecordedOperation('delete domain', self):
-            try:
-                self.power_off()
+        try:
+            self.power_off()
 
-                nvram_path = os.path.join(self.instance_path, 'nvram')
-                if os.path.exists(nvram_path):
-                    os.unlink(nvram_path)
-                if self.nvram_template:
-                    b = blob.Blob.from_db(self.nvram_template)
-                    b.ref_count_dec()
+            nvram_path = os.path.join(self.instance_path, 'nvram')
+            if os.path.exists(nvram_path):
+                os.unlink(nvram_path)
+            if self.nvram_template:
+                b = blob.Blob.from_db(self.nvram_template)
+                b.ref_count_dec()
 
-                inst = self._get_domain()
-                if inst:
-                    inst.undefine()
-            except Exception as e:
-                util_general.ignore_exception(
-                    'instance delete domain %s' % self, e)
+            inst = self._get_domain()
+            if inst:
+                inst.undefine()
+        except Exception as e:
+            util_general.ignore_exception(
+                'instance delete domain %s' % self, e)
 
         with util_general.RecordedOperation('delete disks', self):
             try:
@@ -664,10 +662,8 @@ class Instance(dbo):
 
             # Generate a config drive
             if self.configdrive == 'openstack-disk':
-                with util_general.RecordedOperation('make config drive', self):
-                    self._make_config_drive_openstack_disk(
-                        os.path.join(self.instance_path,
-                                     block_devices['devices'][1]['path']))
+                self._make_config_drive_openstack_disk(
+                    os.path.join(self.instance_path, block_devices['devices'][1]['path']))
 
             # Prepare disks. A this point we have a file for each blob in the image
             # cache at a well known location (the blob uuid with .qcow2 appended).
