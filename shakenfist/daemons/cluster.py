@@ -53,6 +53,17 @@ class Monitor(daemon.Daemon):
     def _cluster_wide_cleanup(self, last_loop_run):
         LOG.info('Running cluster maintenance')
 
+        # Recompute our cache of what blobs are on what nodes every 30 minutes
+        if time.time() - last_loop_run > 1800:
+            per_node = defaultdict(list)
+            with etcd.ThreadLocalReadOnlyCache():
+                for b in blob.Blobs([active_states_filter]):
+                    for node in b.locations:
+                        per_node[node].append(b.uuid)
+
+            for node in Nodes([]):
+                node.blobs = per_node.get(node.uuid, [])
+
         # Cleanup soft deleted objects
         for objtype in OBJECT_NAMES_TO_CLASSES:
             for _, objdata in etcd.get_all(objtype, None):

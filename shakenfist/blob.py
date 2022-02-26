@@ -1,5 +1,6 @@
 # Copyright 2021 Michael Still
 
+from collections import defaultdict
 import http
 import magic
 import numbers
@@ -11,7 +12,8 @@ import urllib3
 
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
-    DatabaseBackedObjectIterator as dbo_iter)
+    DatabaseBackedObjectIterator as dbo_iter,
+    active_states_filter)
 from shakenfist.config import config
 from shakenfist.constants import LOCK_REFRESH_SECONDS, GiB
 from shakenfist import db
@@ -245,6 +247,10 @@ class Blob(dbo):
                 locs.append(config.NODE_NAME)
             self.locations = locs
 
+        # Remove from cached node blob list
+        n = Node.from_db(config.NODE_NAME)
+        n.add_blob(self.uuid)
+
     def drop_node_location(self, node=config.NODE_NAME):
         with self.get_lock_attr('locations', 'Remove node from location'):
             locs = self.locations
@@ -254,6 +260,11 @@ class Blob(dbo):
                 pass
             else:
                 self.locations = locs
+
+        # Remove from cached node blob list
+        n = Node.from_db(node)
+        n.remove_blob(self.uuid)
+
         return locs
 
     def observe(self):
