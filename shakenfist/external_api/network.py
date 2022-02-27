@@ -69,8 +69,6 @@ class NetworkEndpoint(api_base.Resource):
 
         n = network.Network.from_db(network_from_db.uuid)
         if not n:
-            LOG.with_fields({'network_uuid': n.uuid}).warning(
-                'delete_network: network does not exist')
             return api_base.error(404, 'network does not exist')
 
         # If a namespace is specified, ensure the network is in it

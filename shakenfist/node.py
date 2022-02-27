@@ -110,23 +110,11 @@ class Node(dbo):
     def blobs(self):
         return self._db_get_attribute('blobs').get('blobs')
 
-    @blobs.setter
-    def blobs(self, blobs):
-        self._db_set_attribute('blobs', {'blobs': blobs})
-
     def add_blob(self, blob):
-        with self.get_lock_attr('blobs', 'Add blob'):
-            blobs = self.blobs
-            if blob not in blobs:
-                blobs.append(blob)
-                self.blobs = blobs
+        self._add_item_in_attribute_list('blobs', blob)
 
     def remove_blob(self, blob):
-        with self.get_lock_attr('blobs', 'Remove blob'):
-            blobs = self.blobs
-            if blob in blobs:
-                blobs.remove(blobs)
-                self.blobs = blobs
+        self._remove_item_in_attribute_list('blobs', blob)
 
 
 class Nodes(dbo_iter):
