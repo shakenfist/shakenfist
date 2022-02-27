@@ -77,11 +77,7 @@ class NetworkEndpoint(api_base.Resource):
                 return api_base.error(404, 'network not in namespace')
 
         # We only delete unused networks
-        ifaces = list(networkinterface.interfaces_for_network(n))
-        if len(ifaces) > 0:
-            for iface in ifaces:
-                LOG.withFields({'network_interface': iface.uuid,
-                                'state': iface.state}).info('Blocks network delete')
+        if n.networkinterfaces:
             return api_base.error(403, 'you cannot delete an in use network')
 
         # Check if network has already been deleted
@@ -173,12 +169,11 @@ class NetworksEndpoint(api_base.Resource):
         networks_unable = []
         for n in network.Networks([partial(baseobject.namespace_filter, namespace),
                                    baseobject.active_states_filter]):
-            iface_on_net = list(networkinterface.interfaces_for_network(n))
-            if not iface_on_net:
+            if n.networkinterfaces:
                 _delete_network(n)
             else:
                 if clean_wait:
-                    _delete_network(n, [n.uuid for n in iface_on_net])
+                    _delete_network(n, n.networkinterfaces)
                 else:
                     LOG.with_object(n).warning(
                         'Network in use, cannot be deleted by delete-all')
@@ -210,7 +205,10 @@ class NetworkInterfacesEndpoint(api_base.Resource):
     @api_base.requires_network_ownership
     def get(self, network_ref=None, network_from_db=None):
         out = []
-        for ni in networkinterface.interfaces_for_network(network_from_db):
+        for ni_uuid in network_from_db.networkinterfaces:
+            ni = networkinterface.NetworkInterface.from_db(ni_uuid)
+            if not ni:
+                continue
             out.append(ni.external_view())
         return out
 

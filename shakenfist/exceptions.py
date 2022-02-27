@@ -172,6 +172,10 @@ class NoInterfaceStatistics(NetworkException):
     pass
 
 
+class NetworkMissing(NetworkException):
+    pass
+
+
 # NetworkInterface
 class NetworkInterfaceException(Exception):
     pass

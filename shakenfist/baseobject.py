@@ -194,14 +194,20 @@ class DatabaseBackedObject(object):
             items = self._db_get_attribute(listname).get(listname, [])
             if item not in items:
                 items.append(item)
-                self._db_set_attribute(listname, {listname: items})
+                self._db_set_attribute(listname, {
+                    listname: items,
+                    'initialized': True
+                })
 
     def _remove_item_in_attribute_list(self, listname, item):
         with self.get_lock_attr(listname, 'Remove %s' % listname):
             items = self._db_get_attribute(listname).get(listname, [])
             if item in items:
                 items.remove(item)
-                self._db_set_attribute(listname, {listname: items})
+                self._db_set_attribute(listname, {
+                    listname: items,
+                    'initialized': True
+                })
 
     def get_lock(self, subtype=None, ttl=60, relatedobjects=None, log_ctx=None,
                  op=None, timeout=constants.ETCD_ATTEMPT_TIMEOUT):

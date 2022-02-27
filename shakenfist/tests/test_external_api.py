@@ -91,6 +91,9 @@ class FakeNetwork(BaseFakeObject):
     def remove_dhcp(self):
         pass
 
+    def networkinterfaces(self):
+        return []
+
 
 def _encode_key(key):
     return bcrypt.hashpw(key.encode('utf-8'), bcrypt.gensalt())
@@ -1100,8 +1103,6 @@ class ExternalApiNetworkTestCase(base.ShakenFistTestCase):
             self.assertEqual(200, resp.status_code)
             self.auth_token = 'Bearer %s' % resp.get_json()['access_token']
 
-    @mock.patch('shakenfist.network.Network._db_get_attribute',
-                return_value={'value': dbo.STATE_CREATED, 'update_time': 2})
     @mock.patch('shakenfist.ipmanager.IPManager.from_db')
     @mock.patch('shakenfist.network.Network.from_db',
                 return_value=FakeNetwork(
@@ -1119,13 +1120,14 @@ class ExternalApiNetworkTestCase(base.ShakenFistTestCase):
                     name='bob',
                     netblock='10.10.0.0/24'
                 )])
-    @mock.patch('shakenfist.networkinterface.interfaces_for_network', return_value=[])
     @mock.patch('shakenfist.ipmanager.IPManager.from_db',
                 return_value=IPManager('uuid', '10.0.0.0/24'))
     @mock.patch('shakenfist.network.Network.remove_dhcp')
     @mock.patch('shakenfist.network.Network.delete_on_network_node')
     @mock.patch('shakenfist.network.Network.delete_on_hypervisor')
     @mock.patch('shakenfist.network.Network.state')
+    @mock.patch('shakenfist.network.Network.networkinterfaces',
+                new_callable=mock.PropertyMock)
     @mock.patch('shakenfist.etcd.put')
     @mock.patch('shakenfist.etcd.enqueue')
     @mock.patch('shakenfist.db.get_lock')
@@ -1133,16 +1135,16 @@ class ExternalApiNetworkTestCase(base.ShakenFistTestCase):
                                  mock_db_get_lock,
                                  mock_etcd_enqueue,
                                  mock_etcd_put,
+                                 mock_network_interfaces,
                                  mock_network_state,
                                  mock_delete_on_hypervisor,
                                  mock_delete_on_network_node,
                                  mock_remove_dhcp,
                                  mock_get_ipmanager,
-                                 mock_network_interfaces,
                                  mock_db_get_networks,
                                  mock_db_get_network,
-                                 mock_ipmanager_from_db,
-                                 mock_net_attribute):
+                                 mock_ipmanager_from_db):
+        mock_network_interfaces.return_value = []
 
         self.client = external_api.app.test_client()
         resp = self.client.delete('/networks',
@@ -1165,7 +1167,6 @@ class ExternalApiNetworkTestCase(base.ShakenFistTestCase):
                 ))
     @mock.patch('shakenfist.etcd.get_all',
                 return_value=[(None, {'uuid': '30f6da44-look-i-am-uuid'})])
-    @mock.patch('shakenfist.networkinterface.interfaces_for_network', return_value=[])
     @mock.patch('shakenfist.ipmanager.IPManager.from_db',
                 return_value=IPManager('uuid', '10.0.0.0/24'))
     @mock.patch('shakenfist.network.Network.remove_dhcp')
@@ -1176,7 +1177,6 @@ class ExternalApiNetworkTestCase(base.ShakenFistTestCase):
                                                 mock_etcd_put,
                                                 mock_remove_dhcp,
                                                 mock_get_ipmanager,
-                                                mock_network_interfaces,
                                                 mock_db_get_networks,
                                                 mock_db_get_network):
         resp = self.client.delete('/networks',

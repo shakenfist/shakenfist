@@ -205,6 +205,34 @@ class Network(dbo):
     def network_address(self):
         return self.__network_address
 
+    @property
+    def networkinterfaces(self):
+        with self.get_lock_attr('networkinterfaces', 'Get interfaces'):
+            nis_struct = self._db_get_attribute('networkinterfaces')
+
+            if nis_struct.get('initialized', False):
+                nis = nis_struct.get('networkinterfaces', [])
+
+            else:
+                nis = []
+                for ni in networkinterface.NetworkInterfaces(
+                    [baseobject.active_states_filter,
+                     partial(networkinterface.network_filter, self)]):
+                    nis.append(ni.uuid)
+                self._db_set_attribute('networkinterfaces',
+                                       {
+                                           'networkinterfaces': nis,
+                                           'initialized': True
+                                       })
+
+            return nis
+
+    def add_networkinterface(self, ni):
+        self._add_item_in_attribute_list('networkinterfaces', ni)
+
+    def remove_networkinterface(self, ni):
+        self._remove_item_in_attribute_list('networkinterfaces', ni)
+
     # TODO(andy) Create new class to avoid external direct access to DB
     @staticmethod
     def create_floating_network(netblock):
@@ -613,7 +641,8 @@ class Network(dbo):
             added = []
 
             instances = []
-            for ni in networkinterface.interfaces_for_network(self):
+            for ni_uuid in self.networkinterfaces:
+                ni = networkinterface.NetworkInterface.from_db(ni_uuid)
                 if ni.instance_uuid not in instances:
                     instances.append(ni.instance_uuid)
 

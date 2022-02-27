@@ -128,8 +128,7 @@ def handle(jobname, workitem):
             elif isinstance(task, DeleteNetworkWhenClean):
                 # Check if any interfaces remain on network
                 task_network = network.Network.from_db(task.network_uuid())
-                ifaces = networkinterface.interfaces_for_network(task_network)
-                cur_interfaces = {i.uuid: i for i in ifaces}
+                cur_interfaces = task_network.networkinterfaces
 
                 if cur_interfaces:
                     LOG.with_network(task_network).error(

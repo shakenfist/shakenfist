@@ -60,7 +60,11 @@ class DHCP(object):
         t = self._read_template('dhcphosts.tmpl')
 
         instances = []
-        for ni in networkinterface.interfaces_for_network(self.network):
+        for ni_uuid in self.network.networkinterfaces:
+            ni = networkinterface.NetworkInterface.from_db(ni_uuid)
+            if not ni:
+                continue
+
             inst = instance.Instance.from_db(ni.instance_uuid)
             if not inst:
                 continue
