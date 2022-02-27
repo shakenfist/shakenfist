@@ -108,7 +108,11 @@ class Node(dbo):
 
     @property
     def blobs(self):
-        return self._db_get_attribute('blobs').get('blobs')
+        return self._db_get_attribute('blobs').get('blobs', [])
+
+    @blobs.setter
+    def blobs(self, value):
+        self._db_set_attribute('blobs', {'blobs': value})
 
     def add_blob(self, blob):
         self._add_item_in_attribute_list('blobs', blob)

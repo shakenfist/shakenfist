@@ -157,14 +157,13 @@ class Blob(dbo):
     # Values routed to attributes
     @property
     def locations(self):
-        locs = self._db_get_attribute('locations')
-        if not locs:
-            return []
-        return locs.get('locations', [])
+        return self._db_get_attribute('locations').get('locations', [])
 
-    @locations.setter
-    def locations(self, new_locations):
-        self._db_set_attribute('locations', {'locations': new_locations})
+    def add_location(self, location):
+        self._add_item_in_attribute_list('locations', location)
+
+    def remove_location(self, location):
+        self._remove_item_in_attribute_list('locations', location)
 
     @property
     def info(self):
@@ -239,31 +238,17 @@ class Blob(dbo):
 
     # Operations
     def add_node_location(self):
-        with self.get_lock_attr('locations', 'Add node to location'):
-            locs = self.locations
-            if config.NODE_NAME not in locs:
-                locs.append(config.NODE_NAME)
-            self.locations = locs
+        self.add_location(config.NODE_NAME)
 
-        # Remove from cached node blob list
         n = Node.from_db(config.NODE_NAME)
         n.add_blob(self.uuid)
 
     def drop_node_location(self, node=config.NODE_NAME):
-        with self.get_lock_attr('locations', 'Remove node from location'):
-            locs = self.locations
-            try:
-                locs.remove(node)
-            except ValueError:
-                pass
-            else:
-                self.locations = locs
+        self.remove_location(node)
 
         # Remove from cached node blob list
         n = Node.from_db(node)
         n.remove_blob(self.uuid)
-
-        return locs
 
     def observe(self):
         self.add_node_location()
@@ -273,7 +258,7 @@ class Blob(dbo):
         if self.state.value == self.STATE_INITIAL:
             self.state = self.STATE_CREATED
 
-        with self.get_lock_attr('locations', 'Set blob info'):
+        with self.get_lock_attr('info', 'Set blob info'):
             if not self.info:
                 blob_path = os.path.join(
                     config.STORAGE_PATH, 'blobs', self.uuid)

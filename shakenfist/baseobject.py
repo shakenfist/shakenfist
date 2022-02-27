@@ -191,14 +191,14 @@ class DatabaseBackedObject(object):
 
     def _add_item_in_attribute_list(self, listname, item):
         with self.get_lock_attr(listname, 'Add %s' % listname):
-            items = self._db_get_attribute(listname).get(listname)
+            items = self._db_get_attribute(listname).get(listname, [])
             if item not in items:
                 items.append(item)
                 self._db_set_attribute(listname, {listname: items})
 
     def _remove_item_in_attribute_list(self, listname, item):
         with self.get_lock_attr(listname, 'Remove %s' % listname):
-            items = self._db_get_attribute(listname).get(listname)
+            items = self._db_get_attribute(listname).get(listname, [])
             if item in items:
                 items.remove(item)
                 self._db_set_attribute(listname, {listname: items})

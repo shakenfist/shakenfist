@@ -282,8 +282,7 @@ class Instance(dbo):
         for iface_uuid in self.interfaces:
             ni = networkinterface.NetworkInterface.from_db(iface_uuid)
             if not ni:
-                self.log.with_object(ni).error(
-                    'Network interface missing')
+                self.log.with_object(ni).error('Network interface missing')
             else:
                 i['interfaces'].append(ni.external_view())
 
@@ -394,17 +393,23 @@ class Instance(dbo):
     def block_devices(self):
         return self._db_get_attribute('block_devices')
 
+    # NOTE(mikal): this really should use the newer _add_item / _remove_item
+    # stuff, but I can't immediately think of an online upgrade path for this
+    # so skipping for now.
     @property
     def interfaces(self):
         return self._db_get_attribute('interfaces')
 
+    # NOTE(mikal): this really should use the newer _add_item / _remove_item
+    # stuff, but I can't immediately think of an online upgrade path for this
+    # so skipping for now.
     @interfaces.setter
     def interfaces(self, interfaces):
         self._db_set_attribute('interfaces', interfaces)
 
     @property
     def tags(self):
-        # TODO(andy) Move metadata to a new DBO subclass "DBO with metadata"
+        # TODO(andy): Move metadata to a new DBO subclass "DBO with metadata"
         meta = db.get_metadata('instance', self.uuid)
         if not meta:
             # Gracefully handle malformed instances
