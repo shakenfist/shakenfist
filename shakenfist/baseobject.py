@@ -312,11 +312,11 @@ class State(object):
     def __hash__(self):
         return hash(str(self.obj_dict()))
 
-    @ property
+    @property
     def value(self):
         return self.__value
 
-    @ property
+    @property
     def update_time(self):
         return self.__update_time
 
