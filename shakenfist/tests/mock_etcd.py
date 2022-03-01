@@ -16,6 +16,7 @@ from shakenfist import db
 from shakenfist.baseobject import DatabaseBackedObject
 from shakenfist.instance import Instance
 from shakenfist.network import Network
+from shakenfist.networkinterface import NetworkInterface
 from shakenfist.node import Node
 
 
@@ -157,6 +158,16 @@ class MockEtcd():
         db.persist_metadata('namespace', namespace, {})
         db.persist_namespace(namespace, rec)
 
+    @staticmethod
+    def _find_start(obj, state_path, initial, dest):
+        for s in state_path[dest]:
+            if initial == s:
+                return True
+            if MockEtcd._find_start(obj, state_path, initial, s):
+                obj.state = s
+                return True
+        return False
+
     def create_instance(self, name,
                         uuid=None,
                         cpus=1,
@@ -198,15 +209,7 @@ class MockEtcd():
                 for a in allowed:
                     state_path[a].add(initial)
 
-        def find_start(initial, dest):
-            for s in state_path[dest]:
-                if initial == s:
-                    return True
-                if find_start(initial, s):
-                    inst.state = s
-                    return True
-            return False
-        find_start(Instance.STATE_INITIAL, set_state)
+        self._find_start(inst, state_path, Instance.STATE_INITIAL, set_state)
         inst.state = set_state
 
         if place_on_node:
@@ -245,15 +248,45 @@ class MockEtcd():
                 for a in allowed:
                     state_path[a].add(initial)
 
-        def find_start(initial, dest):
-            for s in state_path[dest]:
-                if initial == s:
-                    return True
-                if find_start(initial, s):
-                    network.state = s
-                    return True
-            return False
-        find_start(Network.STATE_INITIAL, set_state)
+        self._find_start(network, state_path, Network.STATE_INITIAL, set_state)
         network.state = set_state
 
         return network
+
+    def generate_netdesc(self,
+                         network_uuid,
+                         address='10.1.2.3',
+                         model='virtio',
+                         mac_address=None):
+        return {
+                'network_uuid': network_uuid,
+                'address': address,
+                'model': model,
+                'macaddr': mac_address,
+        }
+
+    def create_network_interface(self,
+                                 uuid=None,
+                                 netdesc=None,
+                                 instance_uuid=None,
+                                 order=1,
+                                 set_state=Network.STATE_CREATED
+                                 ):
+
+        # Handle default test data
+        if not netdesc:
+            raise Exception('Must set netdesc (use generate_netdesc()')
+
+        net_iface = NetworkInterface.new(uuid, netdesc, instance_uuid, order)
+
+        state_path = defaultdict(set)
+        for initial, allowed in NetworkInterface.state_targets.items():
+            if allowed:
+                for a in allowed:
+                    state_path[a].add(initial)
+
+        self._find_start(net_iface, state_path, NetworkInterface.STATE_INITIAL,
+                         set_state)
+        net_iface.state = set_state
+
+        return net_iface

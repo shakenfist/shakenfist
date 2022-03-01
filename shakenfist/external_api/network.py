@@ -212,7 +212,7 @@ class NetworkInterfacesEndpoint(api_base.Resource):
     @api_base.requires_network_ownership
     def get(self, network_ref=None, network_from_db=None):
         out = []
-        for ni in networkinterface.interfaces_for_network(self.network):
+        for ni in networkinterface.interfaces_for_network(network_from_db):
             out.append(ni.external_view())
         return out
 

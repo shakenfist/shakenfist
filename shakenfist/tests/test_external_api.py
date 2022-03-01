@@ -790,6 +790,24 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(404, resp.status_code)
 
 
+class ExternalApiNetworkInterfaceTestCase(ExternalApiTestCase):
+    def test_get_network_interface(self):
+        net = self.mock_etcd.create_network('barrynet')
+        nd = self.mock_etcd.generate_netdesc(net.uuid)
+        self.mock_etcd.create_network_interface(
+            uuid='88888888-1234-4321-1234-000000000001',
+            netdesc=nd,
+            instance_uuid='9999999-1234-4321-1234-000000000001')
+
+        # Get NetworkInterface
+        resp = self.client.get('/networks/barrynet/interfaces',
+                               headers={'Authorization': self.auth_token})
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual('application/json', resp.content_type)
+        self.assertEqual('88888888-1234-4321-1234-000000000001',
+                         resp.get_json()[0].get('uuid'))
+
+
 class ExternalApiInstanceTestCase(ExternalApiTestCase):
     def setUp(self):
         super(ExternalApiInstanceTestCase, self).setUp()
