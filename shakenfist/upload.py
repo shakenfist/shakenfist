@@ -2,7 +2,10 @@
 
 import time
 
-from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.baseobject import (
+    DatabaseBackedObject as dbo,
+    DatabaseBackedObjectIterator as dbo_iter)
+from shakenfist import etcd
 from shakenfist import logutil
 
 
@@ -55,3 +58,15 @@ class Upload(dbo):
             'node': self.node,
             'created_at': self.created_at
         }
+
+
+class Uploads(dbo_iter):
+    def __iter__(self):
+        for _, u in etcd.get_all('upload', None):
+            u = Upload.from_db(u['uuid'])
+            if not u:
+                continue
+
+            out = self.apply_filters(u)
+            if out:
+                yield out

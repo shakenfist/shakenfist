@@ -174,6 +174,8 @@ class ArtifactUploadEndpoint(api_base.Resource):
             a.add_event('upload', None, None, 'success')
             a.add_index(b.uuid)
             a.state = Artifact.STATE_CREATED
+
+            u.hard_delete()
             return a.external_view()
 
 

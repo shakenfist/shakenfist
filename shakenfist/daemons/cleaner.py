@@ -16,6 +16,7 @@ from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import logutil
 from shakenfist import instance
+from shakenfist import upload
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
 from shakenfist.util import process as util_process
@@ -298,6 +299,21 @@ class Monitor(daemon.Daemon):
                     'blob': blob_uuid}).warning('Blob missing from node')
                 b.drop_node_location(config.NODE_NAME)
 
+    def _remove_stale_uploads(self):
+        # Remove uploads which no longer exist in the database.
+        uploads = []
+        with etcd.ThreadLocalReadOnlyCache():
+            for u in upload.Uploads([]):
+                uploads.append(u.uuid)
+
+        upload_path = os.path.join(config.STORAGE_PATH, 'uploads')
+        os.makedirs(upload_path, exist_ok=True)
+        for upload_uuid in os.listdir(upload_path):
+            if upload_uuid not in uploads:
+                LOG.with_fields({
+                    'upload': upload_uuid}).info('Removing stale upload')
+                os.unlink(os.path.join(upload_path, upload_uuid))
+
     def _compact_etcd(self):
         try:
             # We need to determine what revision to compact to, so we keep a
@@ -322,6 +338,7 @@ class Monitor(daemon.Daemon):
         # Delay first compaction until system startup load has reduced
         last_compaction = time.time() - random.randint(1, 20*60)
         last_missing_blob_check = 0
+        last_stale_upload_check = time.time() + 150
         last_libvirt_log_clean = 0
 
         while not self.exit.is_set():
@@ -335,6 +352,10 @@ class Monitor(daemon.Daemon):
             if time.time() - last_missing_blob_check > 300:
                 self._find_missing_blobs()
                 last_missing_blob_check = time.time()
+
+            if time.time() - last_stale_upload_check > 300:
+                self._remove_stale_uploads()
+                last_stale_upload_check = time.time()
 
             # Perform etcd maintenance, if we are an etcd master
             if config.NODE_IS_ETCD_MASTER:

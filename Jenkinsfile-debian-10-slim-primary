@@ -254,7 +254,9 @@ pipeline {
       sh '''  set -x
               . /home/jenkins/sf-ci
               . $WORKSPACE/$BUILD_TAG/ci-environment.sh || true
-              mkdir artifacts bundle
+
+              rm -rf artifacts bundle
+              mkdir -p artifacts bundle
 
               echo "=============================="
               for node in $nodes
@@ -288,11 +290,15 @@ pipeline {
               else
                 sf-client namespace clean --namespace $BUILD_TAG --confirm
               fi
+          '''
 
+          archiveArtifacts artifacts: "artifacts/bundle.zip", fingerprint: true
+
+      sh '''
               rm -rf $WORKSPACE/$BUILD_TAG
           '''
 
-          archiveArtifacts artifacts: 'artifacts/bundle.zip', fingerprint: true
+
     }
   }
 }

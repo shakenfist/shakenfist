@@ -25,6 +25,7 @@ from shakenfist.node import (
     inactive_states_filter as node_inactive_states_filter,
     nodes_by_free_disk_descending)
 from shakenfist.tasks import FetchBlobTask
+from shakenfist.upload import Uploads
 
 
 LOG, _ = logutil.setup(__name__)
@@ -77,6 +78,14 @@ class Monitor(daemon.Daemon):
                         'network': network_uuid,
                         'vxid record': k
                     }).warning('Cleaning up leaked vxlan')
+
+        # Cleanup old uploads which were never completed
+        for upload in Uploads([]):
+            if time.time() - upload.state.update_time > 7 * 24 * 3600:
+                LOG.with_fields({
+                    'upload': upload.uuid
+                }).warning('Cleaning up stale upload')
+                upload.hard_delete()
 
         # Prune artifacts which might have too many versions
         for a in artifact.Artifacts([]):
