@@ -6,8 +6,10 @@ import os
 import psutil
 import random
 import re
+import time
 from uuid import uuid4
 
+from oslo_concurrency import processutils
 
 from shakenfist import baseobject
 from shakenfist.baseobject import (
@@ -596,15 +598,20 @@ class Network(dbo):
 
         mesh_re = re.compile(r'00:00:00:00:00:00 dst (.*) self permanent')
 
-        stdout, _ = util_process.execute(
-            None, 'bridge fdb show brport %(vx_interface)s' % self.subst_dict(
-            ),
-            suppress_command_logging=True)
+        try:
+            stdout, _ = util_process.execute(
+                None,
+                'bridge fdb show brport %(vx_interface)s' % self.subst_dict(),
+                suppress_command_logging=True)
 
-        for line in stdout.split('\n'):
-            m = mesh_re.match(line)
-            if m:
-                yield m.group(1)
+            for line in stdout.split('\n'):
+                m = mesh_re.match(line)
+                if m:
+                    yield m.group(1)
+
+        except processutils.ProcessExecutionError as e:
+            if time.time() - self.state.update_time > 10:
+                self.log.error('Mesh discovery failure: %s' % e)
 
     def ensure_mesh(self):
         # The floating network does not have a vxlan mesh
