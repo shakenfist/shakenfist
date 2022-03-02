@@ -82,14 +82,17 @@ class ImageFetchHelper(object):
                 most_recent_blob = Blob.from_db(most_recent['blob_uuid'])
                 resp = self._open_connection(url)
 
+                normalized_new_timestamp = Blob.normalize_timestamp(
+                    resp.headers.get('Last-Modified'))
+
                 if not most_recent_blob.modified:
                     self.__artifact.add_event2(
                         'image requires fetch, no Last-Modified recorded')
                     dirty = True
-                elif most_recent_blob.modified != resp.headers.get('Last-Modified'):
+                elif most_recent_blob.modified != normalized_new_timestamp:
                     self.__artifact.add_event2(
                         'image requires fetch, Last-Modified: %s -> %s'
-                        % (most_recent_blob.modified, resp.headers.get('Last-Modified')))
+                        % (most_recent_blob.modified, normalized_new_timestamp))
                     dirty = True
 
                 response_size = resp.headers.get('Content-Length')
