@@ -42,19 +42,19 @@ def extract_hypervisor_devices(domain):
     for child in devices:
         if child.tag == 'disk':
             disk_xml = child.find('target')
-            if disk_xml:
+            if disk_xml is not None:
                 disk_device = disk_xml.attrib.get('dev')
                 out['disk'].append(disk_device)
 
         if child.tag == 'interface':
             mac_xml = child.find('mac')
             mac_address = None
-            if mac_xml:
+            if mac_xml is not None:
                 mac_address = mac_xml.attrib.get('address')
 
             iface_xml = child.find('target')
             hypervisor_interface = None
-            if iface_xml:
+            if iface_xml is not None:
                 hypervisor_interface = iface_xml.attrib.get('dev')
 
             if mac_address and hypervisor_interface:
