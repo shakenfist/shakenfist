@@ -7,15 +7,14 @@ import random
 import shutil
 import time
 
-from shakenfist.baseobject import (
-    DatabaseBackedObject as dbo,
-    active_states_filter)
-from shakenfist.blob import Blob, Blobs
+from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import logutil
 from shakenfist import instance
+from shakenfist import node
 from shakenfist import upload
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
@@ -284,20 +283,17 @@ class Monitor(daemon.Daemon):
 
     def _find_missing_blobs(self):
         # Find blobs which should be on this node but are not.
-        missing = []
-        with etcd.ThreadLocalReadOnlyCache():
-            for b in Blobs([active_states_filter]):
-                if config.NODE_NAME in b.locations:
-                    if not os.path.exists(os.path.join(
-                            config.STORAGE_PATH, 'blobs', b.uuid)):
-                        missing.append(b.uuid)
+        n = node.Node.from_db(config.NODE_NAME)
+        if not n:
+            return
 
-        for blob_uuid in missing:
-            b = Blob.from_db(blob_uuid)
-            if b:
-                LOG.with_fields({
-                    'blob': blob_uuid}).warning('Blob missing from node')
-                b.drop_node_location(config.NODE_NAME)
+        for blob_uuid in n.blobs:
+            if not os.path.exists(os.path.join(config.STORAGE_PATH, 'blobs', blob_uuid)):
+                b = Blob.from_db(blob_uuid)
+                if b:
+                    LOG.with_fields({
+                        'blob': blob_uuid}).warning('Blob missing from node')
+                    b.drop_node_location(config.NODE_NAME)
 
     def _remove_stale_uploads(self):
         # Remove uploads which no longer exist in the database.

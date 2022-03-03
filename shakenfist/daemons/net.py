@@ -41,7 +41,11 @@ class Monitor(daemon.WorkerPoolDaemon):
     def _remove_stray_interfaces(self):
         for n in network.Networks([baseobject.active_states_filter]):
             t = time.time()
-            for ni in networkinterface.interfaces_for_network(n):
+            for ni_uuid in n.networkinterfaces:
+                ni = NetworkInterface.from_db(ni_uuid)
+                if not ni:
+                    continue
+
                 inst = instance.Instance.from_db(ni.instance_uuid)
                 if not inst:
                     ni.delete()
@@ -100,7 +104,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                 # If this network is in state delete_wait, then we should remove
                 # it if it has no interfaces left.
                 if n.state.value == dbo.STATE_DELETE_WAIT:
-                    if not networkinterface.interfaces_for_network(n):
+                    if not n.networkinterfaces:
                         LOG.with_network(n).info(
                             'Removing stray delete_wait network')
                         etcd.enqueue('networknode', DestroyNetworkTask(n.uuid))
@@ -124,7 +128,12 @@ class Monitor(daemon.WorkerPoolDaemon):
                         # If the network node was missing a network, then that implies
                         # that we also need to re-create all of the floating IPs for
                         # that network.
-                        for ni in networkinterface.interfaces_for_network(n):
+                        for ni_uuid in n.networkinterfaces:
+                            ni = networkinterface.NetworkInterface.from_db(
+                                ni_uuid)
+                            if not ni:
+                                continue
+
                             if ni.floating.get('floating_address'):
                                 LOG.with_fields(
                                     {
@@ -206,11 +215,10 @@ class Monitor(daemon.WorkerPoolDaemon):
             return
 
         if isinstance(workitem, DestroyNetworkTask):
-            interfaces = list(networkinterface.interfaces_for_network(n))
-            if interfaces:
+            if n.networkinterfaces:
                 log_ctx.error(
                     'DestroyNetworkTask for network with interfaces: %s',
-                    [i.uuid for i in interfaces])
+                    n.networkinterfaces)
                 return
             try:
                 n.delete_on_network_node()

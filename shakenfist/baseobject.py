@@ -161,7 +161,7 @@ class DatabaseBackedObject(object):
     def _db_set_attribute(self, attribute, value):
         # Some attributes are simply too frequently changed to have much meaning
         # as an event.
-        if (self.object_type, attribute) not in [('node', 'observed')]:
+        if (self.object_type, attribute) not in [('node', 'blobs'), ('node', 'observed')]:
             # Coerce the value into a dictionary.
             if type(value) is State:
                 event_values = value.obj_dict()
@@ -186,8 +186,28 @@ class DatabaseBackedObject(object):
         if self.__in_memory_only and attribute in self.__in_memory_values:
             del self.__in_memory_values[attribute]
         else:
-            etcd.delete('attribute/%s' %
-                        self.object_type, self.__uuid, attribute)
+            etcd.delete(
+                'attribute/%s' % self.object_type, self.__uuid, attribute)
+
+    def _add_item_in_attribute_list(self, listname, item):
+        with self.get_lock_attr(listname, 'Add %s' % listname):
+            items = self._db_get_attribute(listname).get(listname, [])
+            if item not in items:
+                items.append(item)
+                self._db_set_attribute(listname, {
+                    listname: items,
+                    'initialized': True
+                })
+
+    def _remove_item_in_attribute_list(self, listname, item):
+        with self.get_lock_attr(listname, 'Remove %s' % listname):
+            items = self._db_get_attribute(listname).get(listname, [])
+            if item in items:
+                items.remove(item)
+                self._db_set_attribute(listname, {
+                    listname: items,
+                    'initialized': True
+                })
 
     def get_lock(self, subtype=None, ttl=60, relatedobjects=None, log_ctx=None,
                  op=None, timeout=constants.ETCD_ATTEMPT_TIMEOUT):

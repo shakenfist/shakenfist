@@ -12,6 +12,7 @@ from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
+from shakenfist import network
 from shakenfist.tasks import DefloatNetworkInterfaceTask
 from shakenfist.util import network as util_network
 
@@ -71,6 +72,12 @@ class NetworkInterface(dbo):
         ni = NetworkInterface.from_db(interface_uuid)
         ni._db_set_attribute('floating', {'floating_address': None})
         ni.state = NetworkInterface.STATE_INITIAL
+
+        n = network.Network.from_db(netdesc['network_uuid'])
+        if not n:
+            raise exceptions.NetworkMissing(
+                'No such network: %s' % netdesc['network_uuid'])
+        n.add_networkinterface(interface_uuid)
 
         # TODO(andy): Integrate metadata into each object type
         # Initialise metadata
@@ -145,6 +152,12 @@ class NetworkInterface(dbo):
             ipm.release(self.ipv4)
             ipm.persist()
 
+        n = network.Network.from_db(self.network_uuid)
+        if not n:
+            raise exceptions.NetworkMissing(
+                'No such network: %s' % self.network_uuid)
+        n.remove_networkinterface(self.uuid)
+
         self.state = dbo.STATE_DELETED
 
     def hard_delete(self):
@@ -179,8 +192,3 @@ def interfaces_for_instance(instance):
 
     for order in sorted(nis.keys()):
         yield nis[order]
-
-
-def interfaces_for_network(network):
-    return NetworkInterfaces([baseobject.active_states_filter,
-                              partial(network_filter, network)])
