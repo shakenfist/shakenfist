@@ -230,9 +230,19 @@ class Monitor(daemon.Daemon):
                     if domain.name().startswith('sf:'):
                         instance_uuid = domain.name().split(':')[1]
                         inst = instance.Instance.from_db(instance_uuid)
+                        statistics = util_libvirt.extract_statistics(domain)
+
+                        # Add in actual size on disk
+                        for disk in inst.block_devices.get('devices', [{}]):
+                            disk_path = disk.get('path')
+                            disk_device = disk.get('device')
+                            if disk_path and disk_device and os.path.exists(disk_path):
+                                statistics['disk usage'][disk_device][
+                                    'actual bytes on disk'] = os.stat(disk_path).st_size
+
                         if inst:
                             inst.add_event2(
-                                'usage', extra=util_libvirt.extract_statistics(domain),
+                                'usage', extra=statistics,
                                 suppress_event_logging=True)
 
                 except libvirt.libvirtError:
