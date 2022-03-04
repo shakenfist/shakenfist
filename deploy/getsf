@@ -123,7 +123,7 @@ elif [ ${GETSF_RELEASE} == "local" ]; then
     question_start
     echo "What is the path to your client package?"
     echo
-    if [ -z ${GETSF_SERVER_PACKAGE} ]; then
+    if [ -z ${GETSF_CLIENT_PACKAGE} ]; then
         echo -n "(a pathname) >> "
         read GETSF_CLIENT_PACKAGE
         record_answer GETSF_CLIENT_PACKAGE "${GETSF_CLIENT_PACKAGE}"
