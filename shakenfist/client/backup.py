@@ -5,6 +5,7 @@ import io
 import logging
 import tarfile
 
+from shakenfist import config
 from shakenfist import etcd
 
 logging.basicConfig(level=logging.INFO)

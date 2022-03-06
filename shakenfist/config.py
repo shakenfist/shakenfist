@@ -288,6 +288,10 @@ class SFConfig(BaseSettings):
         False, description='Add method name and module line number to log messages'
     )
 
+    # etcd
+    ETCD_HOST: str = Field(
+        'localhost', description='Hostname or IP of the etcd host to query'
+    )
     EXCESSIVE_ETCD_CACHE_LOGGING: bool = Field(
         False, description='Record detailed information about etcd cache performance.'
     )

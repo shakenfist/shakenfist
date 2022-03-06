@@ -738,6 +738,8 @@
   tasks:
     - name: Create an admin namespace called "system" with one key configured
       shell: "{{hostvars['localhost']['utility_path']}}/sf-ctl bootstrap-system-key deploy {{hostvars[groups['primary_node'][0]]['system_key']}}"
+      environment:
+        SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
       run_once: true
 
 - hosts: primary_node
