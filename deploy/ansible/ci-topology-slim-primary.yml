@@ -295,12 +295,12 @@
     - name: Copy server wheel file
       copy:
         src: "{{source_path}}/shakenfist/dist/{{hostvars['localhost']['server_wheel_file']}}"
-        dest: "/tmp/{{hostvars['localhost']['server_wheel_file']}}"
+        dest: "/root/{{hostvars['localhost']['server_wheel_file']}}"
 
     - name: Copy client wheel file
       copy:
         src: "{{source_path}}/client-python/dist/{{hostvars['localhost']['client_wheel_file']}}"
-        dest: "/tmp/{{hostvars['localhost']['client_wheel_file']}}"
+        dest: "/root/{{hostvars['localhost']['client_wheel_file']}}"
 
     # We cannot do this in the shaken fist network configuration because
     # cloud-init will randomly use the mesh interface as the default route
@@ -353,39 +353,6 @@
   become: true
 
   tasks:
-    # As recommended on the ansible apt module documentation...
-    - name: Install modern ansible
-      apt:
-        name: ansible
-        state: latest
-        update_cache: yes
-        autoremove: yes
-      register: apt_action
-      retries: 100
-      until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
-
-    - name: Copy client wheel file
-      copy:
-        src: "{{source_path}}/client-python/dist/{{hostvars['localhost']['client_wheel_file']}}"
-        dest: "/tmp/{{hostvars['localhost']['client_wheel_file']}}"
-
-    # This needs to be in system packages for tox to pick it up correctly, which we
-    # want in order for CI to see unreleased client changes. You wouldn't do this
-    # for a real deployment
-    - name: Install client wheel into system packages
-      shell: |
-        pip3 install /tmp/shakenfist_client*whl
-
-    - name: Make Shaken Fist venv
-      shell: python3 -m venv --system-site-packages /srv/shakenfist/venv
-
-    # We need to install into the shakenfist venv as well so that the ansible modules
-    # are in the right place to be found later. In a normal universe we'd only install
-    # here, but we need the system packages above for tox to work.
-    - name: Install client wheel into shakenfist venv (in addition to system above)
-      shell: |
-        /srv/shakenfist/venv/bin/pip install -U --force-reinstall /tmp/shakenfist_client*whl
-
     - name: Copy ssh key to primary node
       copy:
         src: /home/jenkins/id_ci
@@ -405,10 +372,11 @@
           export GETSF_FLOATING_BLOCK=192.168.230.0/24
           export GETSF_DEPLOY_NAME=bonkerslab
           export GETSF_RELEASE=local
+          export GETSF_LOCAL_SOURCE=static
           export GETSF_WARNING=yes
 
-          export GETSF_SERVER_PACKAGE="/tmp/{{hostvars['localhost']['server_wheel_file']}}"
-          export GETSF_CLIENT_PACKAGE="/tmp/{{hostvars['localhost']['client_wheel_file']}}"
+          export GETSF_SERVER_PACKAGE="/root/{{hostvars['localhost']['server_wheel_file']}}"
+          export GETSF_CLIENT_PACKAGE="/root/{{hostvars['localhost']['client_wheel_file']}}"
 
           export GETSF_NODES="sf-primary sf-1 sf-2 sf-3 sf-4 sf-5"
           export GETSF_SSH_USER="{{base_image_user}}"
