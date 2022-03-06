@@ -129,6 +129,7 @@
           export GETSF_FLOATING_BLOCK=192.168.230.0/24
           export GETSF_DEPLOY_NAME=bonkerslab
           export GETSF_RELEASE=local
+          export GETSF_LOCAL_SOURCE=static
           export GETSF_NODES=localhost
           export GETSF_WARNING=yes
 

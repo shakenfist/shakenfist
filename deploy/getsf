@@ -105,6 +105,54 @@ elif [ ${GETSF_RELEASE} == "local" ]; then
     status "We will use local packages."
 
     question_start
+    echo "Do you want to build packages from a local git repository"
+    echo "or provide paths to pre-built (static) packages?"
+    echo
+    if [ -z ${GETSF_LOCAL_SOURCE} ]; then
+        echo -n "(build, or static) >> "
+        read GETSF_LOCAL_SOURCE
+        record_answer GETSF_LOCAL_SOURCE "${GETSF_LOCAL_SOURCE}"
+    else
+        echo "(build, or static) >> ${GETSF_LOCAL_SOURCE}"
+    fi
+    question_end
+fi
+echo
+
+if [ ${GETSF_LOCAL_SOURCE} == "build" ]; then
+    question_start
+    echo "What is the path to your shakenfist server git checkout?"
+    echo
+    if [ -z ${GETSF_SERVER_REPO} ]; then
+        echo -n "(a pathname) >> "
+        read GETSF_SERVER_REPO
+        record_answer GETSF_SERVER_REPO "${GETSF_SERVER_REPO}"
+    else
+        echo "(a pathname) >> ${GETSF_SERVER_REPO}"
+    fi
+    question_end
+
+    if [ ! -e "${GETSF_SERVER_REPO}/.git" ]; then
+        error "Server git clone does not exist."
+    fi
+
+    question_start
+    echo "What is the path to your shakenfist client git checkout?"
+    echo
+    if [ -z ${GETSF_CLIENT_REPO} ]; then
+        echo -n "(a pathname) >> "
+        read GETSF_CLIENT_REPO
+        record_answer GETSF_CLIENT_REPO "${GETSF_CLIENT_REPO}"
+    else
+        echo "(a pathname) >> ${GETSF_CLIENT_REPO}"
+    fi
+    question_end
+
+    if [ ! -e "${GETSF_CLIENT_REPO}/.git" ]; then
+        error "Server git clone does not exist."
+    fi
+elif [ ${GETSF_LOCAL_SOURCE} == "static" ]; then
+    question_start
     echo "What is the path to your server package?"
     echo
     if [ -z ${GETSF_SERVER_PACKAGE} ]; then
@@ -448,6 +496,45 @@ fi
 question_end
 echo
 
+# Build local wheels if required
+if [ ! -z ${GETSF_SERVER_REPO} ]; then
+    status "Installing package build dependencies"
+    DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 \
+        -o Dpkg::Options::="--force-confold" -y install \
+        python3 python3-pip python3-wheel python3-setuptools \
+        python3-readme-renderer twine
+
+    status "Building server package"
+    cwd=$(pwd)
+    cd ${GETSF_SERVER_REPO}
+    if [ -e dist ]; then
+        rm -rf build dist *.egg-info
+    fi
+    rm -f deploy.tgz doc.tgz
+    tar czf deploy.tgz deploy
+    tar czf docs.tgz docs
+    python3 setup.py sdist bdist_wheel
+    twine check dist/*
+    GETSF_SERVER_PACKAGE=$(pwd)"/"$(ls dist/*.whl)
+    status "Server package is ${GETSF_SERVER_PACKAGE}"
+    cd ${cwd}
+fi
+
+# Assumes we've also built a server package
+if [ ! -z ${GETSF_CLIENT_REPO} ]; then
+    status "Building client package"
+    cwd=$(pwd)
+    cd ${GETSF_CLIENT_REPO}
+    if [ -e dist ]; then
+        rm -rf build dist *.egg-info
+    fi
+    python3 setup.py sdist bdist_wheel
+    twine check dist/*
+    GETSF_CLIENT_PACKAGE=$(pwd)"/"$(ls dist/*.whl)
+    status "Server package is ${GETSF_CLIENT_PACKAGE}"
+    cd ${cwd}
+fi
+
 # Create a script to run on each node
 cat - > /tmp/sf-per-node-primary << PERNODEEOF
 #!/bin/bash
@@ -549,7 +636,11 @@ python3 -mvenv --system-site-packages /srv/shakenfist/venv
 echo
 
 status "Installing server and client packages in venv."
-/srv/shakenfist/venv/bin/pip install -U ${pipextra} ${GETSF_SERVER_PACKAGE} ${GETSF_CLIENT_PACKAGE}
+localized_server_package="/tmp/"$(basename ${GETSF_SERVER_PACKAGE})
+localized_client_package="/tmp/"$(basename ${GETSF_CLIENT_PACKAGE})
+echo "Shakenfist package: \${localized_server_package}"
+echo "Client package: \${localized_client_package}"
+/srv/shakenfist/venv/bin/pip install -U ${pipextra} \${localized_server_package} \${localized_client_package}
 PERNODEEOF
 chmod ugo+rx /tmp/sf-per-node-primary
 
@@ -561,6 +652,11 @@ else
         status "    ...${node}"
         safe_node=$(echo ${node} | tr "-" "_")
         calc_var_name="GETSF_NODE_MESH_ADDRESS_${safe_node}"
+
+        if [ ${GETSF_RELEASE} == "local" ]; then
+            scp -o StrictHostKeyChecking=no -i ${GETSF_SSH_KEY_FILENAME} ${GETSF_SERVER_PACKAGE} ${GETSF_SSH_USER}@${!calc_var_name}:/tmp/
+            scp -o StrictHostKeyChecking=no -i ${GETSF_SSH_KEY_FILENAME} ${GETSF_CLIENT_PACKAGE} ${GETSF_SSH_USER}@${!calc_var_name}:/tmp/
+        fi
 
         scp -o StrictHostKeyChecking=no -i ${GETSF_SSH_KEY_FILENAME} /tmp/sf-per-node-primary ${GETSF_SSH_USER}@${!calc_var_name}:/tmp/sf-per-node
         ssh -o StrictHostKeyChecking=no -i ${GETSF_SSH_KEY_FILENAME} ${GETSF_SSH_USER}@${!calc_var_name} "sudo /tmp/sf-per-node"
