@@ -728,7 +728,7 @@
         state: restarted
         daemon_reload: yes
 
-- hosts: hypervisors
+- hosts: etcd_master
   any_errors_fatal: true
   become: yes
   become_method: sudo
@@ -756,16 +756,6 @@
         journalctl --vacuum-time=2d
         /usr/sbin/logrotate -f /etc/logrotate.conf
       ignore_errors: True
-
-    - name: Clear out old terraform providers
-      file:
-        path: /srv/shakenfist/terraform-provider-shakenfist
-        state: absent
-
-    - name: Make sure we don't have an old provider installed
-      file:
-        path: /usr/local/bin/terraform_install/terraform-provider-shakenfist
-        state: absent
 
     - name: Make /usr/share/ansible/plugins/modules
       file:
