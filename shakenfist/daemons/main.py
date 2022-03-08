@@ -1,10 +1,9 @@
 # Copyright 2019 Michael Still
 
 import faulthandler
-import setproctitle
-import time
 import os
 import psutil
+import setproctitle
 import signal
 import sys
 import time

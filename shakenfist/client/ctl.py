@@ -3,7 +3,6 @@
 import base64
 import bcrypt
 import click
-from etcd3gw.client import Etcd3Client
 import json
 import logging
 import time

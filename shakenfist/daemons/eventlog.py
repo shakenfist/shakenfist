@@ -1,7 +1,6 @@
 from collections import defaultdict
 import time
 
-from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import eventlog
