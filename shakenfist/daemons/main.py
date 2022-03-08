@@ -155,9 +155,6 @@ def main():
     etcd.restart_queues()
 
     def _start_daemon(d):
-        if d == 'eventlog' and not config.NODE_IS_EVENTLOG_NODE:
-            return
-
         pid = os.fork()
         if pid == 0:
             try:
@@ -238,6 +235,9 @@ def main():
                 LOG.warning('%s pid is missing, restarting' % DAEMON_PIDS[d])
                 _start_daemon(DAEMON_PIDS[d])
 
+    if not config.NODE_IS_EVENTLOG_NODE:
+        del DAEMON_IMPLEMENTATIONS['eventlog']
+
     _audit_daemons()
     restore_instances()
 
@@ -280,8 +280,11 @@ def main():
                         LOG.warn('Failed to send SIGTERM to %s: %s' % (pid, e))
 
             if time.time() - shutdown_commenced > 10:
-                LOG.warn('We have taken more than ten seconds to shut down, '
-                         'dumping traces.')
+                LOG.warning('We have taken more than ten seconds to shut down')
+                for pid in DAEMON_PIDS:
+                    LOG.warning('%s daemon still running (pid %d)'
+                                % (DAEMON_PIDS[pid], pid))
+                LOG.warning('Dumping thread traces')
                 emit_trace()
                 shutdown_commenced = time.time()
 
