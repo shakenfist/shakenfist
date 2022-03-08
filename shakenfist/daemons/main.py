@@ -1,11 +1,13 @@
 # Copyright 2019 Michael Still
 
+import faulthandler
 import setproctitle
 import time
 import os
 import psutil
 import signal
 import sys
+import time
 
 from shakenfist.config import config
 from shakenfist.daemons import daemon
@@ -116,6 +118,17 @@ DAEMON_IMPLEMENTATIONS = {
 
 
 DAEMON_PIDS = {}
+
+
+def emit_trace():
+    # We have a bunch of subprocesses here, so we can't just use the default
+    # faulthandler mechanism.
+    faulthandler.dump_traceback
+    for pid in DAEMON_PIDS:
+        os.kill(pid, signal.SIGUSR1)
+
+
+signal.signal(signal.SIGUSR1, emit_trace)
 
 
 def main():
@@ -229,6 +242,7 @@ def main():
     restore_instances()
 
     running = True
+    shutdown_commenced = None
     while True:
         time.sleep(5)
 
@@ -256,6 +270,7 @@ def main():
 
         else:
             if running:
+                shutdown_commenced = time.time()
                 for pid in DAEMON_PIDS:
                     try:
                         os.kill(pid, signal.SIGTERM)
@@ -263,5 +278,11 @@ def main():
                                  % (DAEMON_PIDS.get(pid, 'unknown'), pid))
                     except OSError as e:
                         LOG.warn('Failed to send SIGTERM to %s: %s' % (pid, e))
+
+            if time.time() - shutdown_commenced > 10:
+                LOG.warn('We have taken more than ten seconds to shut down, '
+                         'dumping traces.')
+                emit_trace()
+                shutdown_commenced = time.time()
 
             running = False
