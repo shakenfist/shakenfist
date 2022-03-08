@@ -1,3 +1,4 @@
+import faulthandler
 import logging
 import multiprocessing
 import setproctitle
@@ -53,6 +54,8 @@ class Daemon(object):
 
         self.exit = Event()
         signal.signal(signal.SIGTERM, self.exit_gracefully)
+
+        faulthandler.register(signal.SIGUSR1)
 
     def exit_gracefully(self, sig, _frame):
         if sig == signal.SIGTERM:

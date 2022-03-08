@@ -1,3 +1,5 @@
+SHAKENFIST_ETCD_HOST="{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
+
 SHAKENFIST_NODE_EGRESS_IP="{{node_egress_ip}}"
 SHAKENFIST_NODE_EGRESS_NIC="{{node_egress_nic}}"
 SHAKENFIST_NODE_MESH_IP="{{node_mesh_ip}}"

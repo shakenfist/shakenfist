@@ -431,7 +431,7 @@ class Monitor(daemon.WorkerPoolDaemon):
     def run(self):
         LOG.info('Starting')
 
-        while True:
+        while not self.exit.is_set():
             try:
                 self.reap_workers()
 

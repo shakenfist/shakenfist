@@ -30,9 +30,12 @@ LOCK_PREFIX = '/sflocks'
 
 
 class WrappedEtcdClient(Etcd3Client):
-    def __init__(self, host='localhost', port=2379, protocol='http',
+    def __init__(self, host=None, port=2379, protocol='http',
                  ca_cert=None, cert_key=None, cert_cert=None, timeout=None,
                  api_path='/v3beta/'):
+        if not host:
+            host = config.ETCD_HOST
+
         # Work around https://opendev.org/openstack/etcd3gw/commit/7a1a2b5a672605ae549c73ed18302b7abd9e0e30
         # making things not work for us.
         if api_path == '/v3alpha':
@@ -197,7 +200,8 @@ class ActualLock(Lock):
 
     @retry_etcd_forever
     def get_holder(self):
-        value = WrappedEtcdClient().get(self.key, metadata=True)
+        value = WrappedEtcdClient().get(
+            self.key, metadata=True)
         if value is None or len(value) == 0:
             return None, NotImplementedError
 
@@ -265,7 +269,8 @@ def get_lock(objecttype, subtype, name, ttl=60, timeout=10, log_ctx=LOG,
     acquired on entry and released on exit. Note that the lock acquire process
     will have no timeout.
     """
-    return ActualLock(objecttype, subtype, name, ttl=ttl, client=WrappedEtcdClient(),
+    return ActualLock(objecttype, subtype, name, ttl=ttl,
+                      client=WrappedEtcdClient(),
                       log_ctx=log_ctx, timeout=timeout, op=op)
 
 
@@ -541,7 +546,8 @@ def get_queue_length(queuename):
 def _restart_queue(queuename):
     queue_path = _construct_key('processing', queuename, None)
     with get_lock('queue', None, queuename, op='Restart'):
-        for data, metadata in WrappedEtcdClient().get_prefix(queue_path, sort_order='ascend'):
+        for data, metadata in WrappedEtcdClient().get_prefix(
+                queue_path, sort_order='ascend'):
             jobname = str(metadata['key']).split('/')[-1].rstrip("'")
             workitem = json.loads(data)
             put('queue', queuename, jobname, workitem)
@@ -552,9 +558,11 @@ def _restart_queue(queuename):
 
 
 def get_outstanding_jobs():
-    for data, metadata in WrappedEtcdClient().get_prefix('/sf/processing'):
+    for data, metadata in WrappedEtcdClient().get_prefix(
+            '/sf/processing'):
         yield metadata['key'].decode('utf-8'), json.loads(data, object_hook=decodeTasks)
-    for data, metadata in WrappedEtcdClient().get_prefix('/sf/queued'):
+    for data, metadata in WrappedEtcdClient().get_prefix(
+            '/sf/queued'):
         yield metadata['key'].decode('utf-8'), json.loads(data, object_hook=decodeTasks)
 
 

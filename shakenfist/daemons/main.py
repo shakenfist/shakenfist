@@ -1,11 +1,12 @@
 # Copyright 2019 Michael Still
 
-import setproctitle
-import time
+import faulthandler
 import os
 import psutil
+import setproctitle
 import signal
 import sys
+import time
 
 from shakenfist.config import config
 from shakenfist.daemons import daemon
@@ -118,6 +119,17 @@ DAEMON_IMPLEMENTATIONS = {
 DAEMON_PIDS = {}
 
 
+def emit_trace():
+    # We have a bunch of subprocesses here, so we can't just use the default
+    # faulthandler mechanism.
+    faulthandler.dump_traceback
+    for pid in DAEMON_PIDS:
+        os.kill(pid, signal.SIGUSR1)
+
+
+signal.signal(signal.SIGUSR1, emit_trace)
+
+
 def main():
     global DAEMON_IMPLEMENTATIONS
     global DAEMON_PIDS
@@ -142,9 +154,6 @@ def main():
     etcd.restart_queues()
 
     def _start_daemon(d):
-        if d == 'eventlog' and not config.NODE_IS_EVENTLOG_NODE:
-            return
-
         pid = os.fork()
         if pid == 0:
             try:
@@ -225,10 +234,14 @@ def main():
                 LOG.warning('%s pid is missing, restarting' % DAEMON_PIDS[d])
                 _start_daemon(DAEMON_PIDS[d])
 
+    if not config.NODE_IS_EVENTLOG_NODE:
+        del DAEMON_IMPLEMENTATIONS['eventlog']
+
     _audit_daemons()
     restore_instances()
 
     running = True
+    shutdown_commenced = None
     while True:
         time.sleep(5)
 
@@ -256,6 +269,7 @@ def main():
 
         else:
             if running:
+                shutdown_commenced = time.time()
                 for pid in DAEMON_PIDS:
                     try:
                         os.kill(pid, signal.SIGTERM)
@@ -263,5 +277,14 @@ def main():
                                  % (DAEMON_PIDS.get(pid, 'unknown'), pid))
                     except OSError as e:
                         LOG.warn('Failed to send SIGTERM to %s: %s' % (pid, e))
+
+            if time.time() - shutdown_commenced > 10:
+                LOG.warning('We have taken more than ten seconds to shut down')
+                for pid in DAEMON_PIDS:
+                    LOG.warning('%s daemon still running (pid %d)'
+                                % (DAEMON_PIDS[pid], pid))
+                LOG.warning('Dumping thread traces')
+                emit_trace()
+                shutdown_commenced = time.time()
 
             running = False

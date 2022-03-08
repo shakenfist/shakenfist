@@ -20,10 +20,6 @@ localhost ansible_connection=local
   ansible_python_interpreter='/usr/bin/python3'
 
 [etcd:children]
-  hypervisors
-  network_node
-  eventlog_node
-  etcd_master
-  storage
+  allsf
 
 [etcd_master]

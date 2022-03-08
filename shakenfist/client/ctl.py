@@ -3,13 +3,13 @@
 import base64
 import bcrypt
 import click
-from etcd3gw.client import Etcd3Client
 import json
 import logging
 import time
 
 from shakenfist.config import config
 from shakenfist import db
+from shakenfist import etcd
 from shakenfist.node import Node
 
 
@@ -48,9 +48,7 @@ def bootstrap_system_key(keyname, key):
 
 @click.command()
 def show_etcd_config():
-    value = Etcd3Client(
-        host='localhost', port=2379, protocol='http', api_path='/v3beta/').get(
-            '/sf/config', metadata=True)
+    value = etcd.WrappedEtcd3Client().get('/sf/config', metadata=True)
     if value is None or len(value) == 0:
         click.echo('{}')
     else:
@@ -62,8 +60,7 @@ def show_etcd_config():
 @click.argument('flag')
 @click.argument('value')
 def set_etcd_config(flag, value):
-    client = Etcd3Client(host='localhost', port=2379, protocol='http',
-                         api_path='/v3beta/')
+    client = etcd.WrappedEtcd3Client()
     config = {}
     current_config = client.get('/sf/config', metadata=True)
     if current_config is None or len(current_config) == 0:
