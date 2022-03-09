@@ -1,7 +1,5 @@
 # Ansible galaxy roles
 # - src: andrewrothstein.etcd-cluster
-- src: andrewrothstein.terraform
-- src: andrewrothstein.go
 
 - src: https://github.com/mikalstill/ansible-etcd-cluster
   version: ionice
