@@ -692,11 +692,15 @@ ansible-galaxy install --force -r /srv/shakenfist/venv/share/shakenfist/installe
 echo
 
 status "Creating /root/sf-deploy script"
-password=$(pwgen 16 1)
+if [ -z ${GETSF_ADMIN_PASSWORD} ]; then
+    GETSF_ADMIN_PASSWORD=$(pwgen 16 1)
+    echo "export GETSF_ADMIN_PASSWORD='${GETSF_ADMIN_PASSWORD}'" >> /root/.getsfrc
+fi
+
 cat - > /root/sf-deploy << DEPLOYEOF
 #!/bin/bash
 
-export ADMIN_PASSWORD=${password}
+export ADMIN_PASSWORD=${GETSF_ADMIN_PASSWORD}
 export FLOATING_IP_BLOCK="${GETSF_FLOATING_BLOCK}"
 export DEPLOY_NAME="${GETSF_DEPLOY_NAME}"
 DEPLOYEOF
