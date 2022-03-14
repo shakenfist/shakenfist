@@ -111,12 +111,12 @@
     - name: Copy server wheel file
       copy:
         src: "{{source_path}}/shakenfist/dist/{{hostvars['localhost']['server_wheel_file']}}"
-        dest: "/tmp/{{hostvars['localhost']['server_wheel_file']}}"
+        dest: "/root/{{hostvars['localhost']['server_wheel_file']}}"
 
     - name: Copy client wheel file
       copy:
         src: "{{source_path}}/client-python/dist/{{hostvars['localhost']['client_wheel_file']}}"
-        dest: "/tmp/{{hostvars['localhost']['client_wheel_file']}}"
+        dest: "/root/{{hostvars['localhost']['client_wheel_file']}}"
 
     - name: Create a RAM disk for etcd to make it more reliable in CI
       shell: |
@@ -133,8 +133,8 @@
           export GETSF_NODES=localhost
           export GETSF_WARNING=yes
 
-          export GETSF_SERVER_PACKAGE="/tmp/{{hostvars['localhost']['server_wheel_file']}}"
-          export GETSF_CLIENT_PACKAGE="/tmp/{{hostvars['localhost']['client_wheel_file']}}"
+          export GETSF_SERVER_PACKAGE="/root/{{hostvars['localhost']['server_wheel_file']}}"
+          export GETSF_CLIENT_PACKAGE="/root/{{hostvars['localhost']['client_wheel_file']}}"
 
           sudo --preserve-env /tmp/getsf
         dest: "/tmp/getsf-wrapper"

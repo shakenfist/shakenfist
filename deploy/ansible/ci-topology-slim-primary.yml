@@ -259,33 +259,6 @@
         group: root
         mode: u=r,g=r,o=r
 
-    # As recommended on the ansible apt module documentation...
-    - name: Upgrade packages
-      apt:
-        upgrade: dist
-        update_cache: yes
-        autoremove: yes
-      register: apt_action
-      retries: 100
-      until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
-
-    # TODO(mikal): dial this back once we have things working.
-    - name: Install dependencies
-      apt:
-        name:
-          [
-            git,
-            python3-dev,
-            python3-grpcio,
-            python3-pip,
-            python3-venv,
-            python3-wheel,
-            python3,
-            pwgen,
-            tox,
-          ]
-        state: latest
-
     - name: Copy getsf
       copy:
         src: "{{source_path}}/shakenfist/deploy/getsf"
