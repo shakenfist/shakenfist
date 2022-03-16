@@ -166,6 +166,40 @@
       shell: pip3 install -U tox filelock virtualenv
       when: ansible_distribution == 'Debian'
 
+    - name: Install the Shaken Fist agent
+      shell: pip3 install -U shakenfist-agent
+
+    - name: Add systemd unit for the Shaken Fist agent
+      copy:
+        content: |
+          [Unit]
+          Description=Shaken Fist minimal cloud in guest agent
+          After=network.target remote-fs.target nss-lookup.target
+
+          [Service]
+          Type=simple
+          User=root
+          Group=root
+
+          ExecStart=/bin/sh -c '/usr/local/bin/sf-agent --verbose daemon run'
+
+          Restart=on-failure
+          RestartSec=5
+
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/sf-agent.service
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
+
+    - name: Restart the Shaken Fist agent
+      service:
+        name: sf-agent
+        enabled: yes
+        state: restarted
+        daemon_reload: yes
+
     - name: Install Grafana prerequisites
       apt:
         name: ["apt-transport-https", "software-properties-common"]
