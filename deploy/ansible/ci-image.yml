@@ -202,40 +202,6 @@
         group: root
         mode: u=r,g=r,o=r
 
-    - name: Copy SF installer ansible requirements
-      copy:
-        src: ../../requirements.yml
-        dest: /tmp/ansible-requirements.yml
-        owner: root
-        group: root
-        mode: u=r,g=r,o=r
-
-    - name: Install ansible galaxy roles
-      shell: ansible-galaxy install -r /tmp/ansible-requirements.yml
-
-    - name: Copy SF requirements.txt
-      copy:
-        src: ../../../requirements.txt
-        dest: /tmp/sf-requirements.txt
-        owner: root
-        group: root
-        mode: u=r,g=r,o=r
-
-    - name: Copy SF client requirements.txt
-      copy:
-        src: ../../../../client-python/requirements.txt
-        dest: /tmp/client-requirements.txt
-        owner: root
-        group: root
-        mode: u=r,g=r,o=r
-
-    - name: Make venv and install server wheel
-      shell: |
-        python3 -m venv --system-site-packages /srv/shakenfist/venv
-        /srv/shakenfist/venv/bin/pip install -U pip
-        /srv/shakenfist/venv/bin/pip install -U -r /tmp/sf-requirements.txt
-        /srv/shakenfist/venv/bin/pip install -U -r /tmp/client-requirements.txt
-
     - name: Make a directory for cached images
       file:
         path: /srv/ci
