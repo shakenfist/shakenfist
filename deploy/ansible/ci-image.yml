@@ -110,7 +110,6 @@
     - name: Install packages which CI uses, to make CI runs faster
       apt:
         name:
-          - install
           - ack
           - arping
           - bridge-utils
