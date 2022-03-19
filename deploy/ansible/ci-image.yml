@@ -104,6 +104,44 @@
           - python3-wheel
         state: latest
 
+    # NOTE(mikal): I don't love this, as it increases the risk that we will
+    # miss a package in getsf, but its so slow to install these without
+    # pre-caching that doing this saves an hour off the CI job duration.
+    - name: Install packages which CI uses, to make CI runs faster
+      apt:
+        name:
+          - install
+          - ack
+          - arping
+          - bridge-utils
+          - build-essential
+          - cpu-checker
+          - dnsmasq
+          - dnsutils
+          - hddtemp
+          - libffi-dev
+          - libmagic-dev
+          - libssl-dev
+          - libvirt-daemon-system
+          - libvirt-dev
+          - lm-sensors
+          - net-tools
+          - ovmf
+          - prometheus-node-exporter
+          - pwgen
+          - python3
+          - python3-cffi
+          - python3-dev
+          - python3-grpcio
+          - python3-libvirt
+          - python3-pip
+          - python3-venv
+          - python3-wheel
+          - qemu-kvm
+          - tox
+          - unzip
+        state: latest
+
     - name: Install tox and dependencies via apt on Ubuntu
       apt:
         name:
