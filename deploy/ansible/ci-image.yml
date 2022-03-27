@@ -214,16 +214,20 @@
         mode: u+r
       loop:
         - {
-            url: "https://cloud-images.ubuntu.com/releases/bionic/release/ubuntu-18.04-server-cloudimg-amd64.img",
+            url: "https://download.cirros-cloud.net/0.5.2/cirros-0.5.2-x86_64-disk.img",
+            name: "cirros",
+          }
+        - {
+            url: "https://images.shakenfist.com/ubuntu:18.04/latest.qcow2",
             name: "ubuntu:18.04",
           }
         - {
-            url: "https://cloud-images.ubuntu.com/releases/focal/release/ubuntu-20.04-server-cloudimg-amd64.img",
+            url: "https://images.shakenfist.com/ubuntu:20.04/latest.qcow2",
             name: "ubuntu:20.04",
           }
         - {
-            url: "https://download.cirros-cloud.net/0.5.2/cirros-0.5.2-x86_64-disk.img",
-            name: "cirros",
+            url: "https://images.shakenfist.com/debian:11/latest.qcow2",
+            name: "debian:11",
           }
 
     - name: Try and avoid the disk being corrupt when snapshot
