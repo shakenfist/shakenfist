@@ -7,7 +7,7 @@ from shakenfist.node import Nodes
 
 
 class NodesEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.caller_is_admin
     @marshal_with({
         'name': fields.String(attribute='fqdn'),

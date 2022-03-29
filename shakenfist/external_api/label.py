@@ -20,7 +20,7 @@ def _label_url(label_name):
 
 class LabelEndpoint(api_base.Resource):
 
-    @jwt_required
+    @jwt_required()
     def post(self, label_name=None, blob_uuid=None, max_versions=0):
         b = Blob.from_db(blob_uuid)
         if not b:
@@ -36,7 +36,7 @@ class LabelEndpoint(api_base.Resource):
         a.state = dbo.STATE_CREATED
         return a.external_view()
 
-    @jwt_required
+    @jwt_required()
     def get(self, label_name=None):
         artifacts = list(Artifacts(filters=[
             partial(type_filter, Artifact.TYPE_LABEL),
@@ -47,7 +47,7 @@ class LabelEndpoint(api_base.Resource):
             api_base.error(404, 'label %s not found' % label_name)
         return artifacts[0].external_view()
 
-    @jwt_required
+    @jwt_required()
     def delete(self, label_name=None):
         artifacts = list(Artifacts(filters=[
             partial(type_filter, Artifact.TYPE_LABEL),

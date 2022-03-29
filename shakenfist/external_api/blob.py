@@ -38,7 +38,7 @@ def _read_remote(target, blob_uuid, offset=0):
 
 
 class BlobEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     def get(self, blob_uuid=None):
         b = Blob.from_db(blob_uuid)
         if not b:
@@ -55,7 +55,7 @@ class BlobDataEndpoint(api_base.Resource):
         'offset': fields.Int(missing=0)
     }
 
-    @jwt_required
+    @jwt_required()
     @use_kwargs(get_args, location='query')
     def get(self, blob_uuid=None, offset=0):
         # Ensure the blob exists
@@ -83,7 +83,7 @@ class BlobDataEndpoint(api_base.Resource):
 
 
 class BlobsEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.caller_is_admin
     def get(self, node=None):
         retval = []

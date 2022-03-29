@@ -15,13 +15,13 @@ daemon.set_log_level(LOG, 'api')
 
 
 class UploadCreateEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     def post(self):
         return Upload.new(str(uuid.uuid4()), config.NODE_NAME).external_view()
 
 
 class UploadDataEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_upload_uuid
     @api_base.redirect_upload_request
     def post(self, upload_uuid=None, upload_from_db=None):
@@ -38,7 +38,7 @@ class UploadDataEndpoint(api_base.Resource):
 
 
 class UploadTruncateEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_upload_uuid
     @api_base.redirect_upload_request
     def post(self, upload_uuid=None, offset=None, upload_from_db=None):

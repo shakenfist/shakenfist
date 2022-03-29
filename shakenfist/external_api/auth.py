@@ -49,7 +49,7 @@ class AuthEndpoint(api_base.Resource):
 
 
 class AuthNamespacesEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.caller_is_admin
     def post(self, namespace=None, key_name=None, key=None):
         if not namespace:
@@ -83,7 +83,7 @@ class AuthNamespacesEndpoint(api_base.Resource):
 
         return namespace
 
-    @jwt_required
+    @jwt_required()
     @api_base.caller_is_admin
     def get(self):
         out = []
@@ -93,7 +93,7 @@ class AuthNamespacesEndpoint(api_base.Resource):
 
 
 class AuthNamespaceEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.caller_is_admin
     def delete(self, namespace):
         if not namespace:
@@ -152,7 +152,7 @@ def _namespace_keys_putpost(namespace=None, key_name=None, key=None):
 
 
 class AuthNamespaceKeysEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.caller_is_admin
     @api_base.requires_namespace_exist
     def get(self, namespace=None):
@@ -162,7 +162,7 @@ class AuthNamespaceKeysEndpoint(api_base.Resource):
             out.append(keyname)
         return out
 
-    @jwt_required
+    @jwt_required()
     @api_base.caller_is_admin
     @api_base.requires_namespace_exist
     def post(self, namespace=None, key_name=None, key=None):
@@ -170,7 +170,7 @@ class AuthNamespaceKeysEndpoint(api_base.Resource):
 
 
 class AuthNamespaceKeyEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.caller_is_admin
     @api_base.requires_namespace_exist
     def put(self, namespace=None, key_name=None, key=None):
@@ -180,7 +180,7 @@ class AuthNamespaceKeyEndpoint(api_base.Resource):
 
         return _namespace_keys_putpost(namespace, key_name, key)
 
-    @jwt_required
+    @jwt_required()
     @api_base.caller_is_admin
     @api_base.requires_namespace_exist
     def delete(self, namespace, key_name):
@@ -199,7 +199,7 @@ class AuthNamespaceKeyEndpoint(api_base.Resource):
 
 
 class AuthMetadatasEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.caller_is_admin
     @api_base.requires_namespace_exist
     def get(self, namespace=None):
@@ -208,7 +208,7 @@ class AuthMetadatasEndpoint(api_base.Resource):
             return {}
         return md
 
-    @jwt_required
+    @jwt_required()
     @api_base.caller_is_admin
     @api_base.requires_namespace_exist
     def post(self, namespace=None, key=None, value=None):
@@ -216,13 +216,13 @@ class AuthMetadatasEndpoint(api_base.Resource):
 
 
 class AuthMetadataEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.caller_is_admin
     @api_base.requires_namespace_exist
     def put(self, namespace=None, key=None, value=None):
         return api_util.metadata_putpost('namespace', namespace, key, value)
 
-    @jwt_required
+    @jwt_required()
     @api_base.caller_is_admin
     @api_base.requires_namespace_exist
     def delete(self, namespace=None, key=None, value=None):

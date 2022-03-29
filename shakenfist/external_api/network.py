@@ -52,13 +52,13 @@ def _delete_network(network_from_db, wait_interfaces=None):
 
 
 class NetworkEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     def get(self, network_ref=None, network_from_db=None):
         return network_from_db.external_view()
 
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.requires_namespace_exist
@@ -101,7 +101,7 @@ class NetworksEndpoint(api_base.Resource):
         'name': fields.String,
         'state': fields.String
     })
-    @jwt_required
+    @jwt_required()
     def get(self, all=False):
         with etcd.ThreadLocalReadOnlyCache():
             filters = [partial(baseobject.namespace_filter,
@@ -115,7 +115,7 @@ class NetworksEndpoint(api_base.Resource):
                 retval.append(n.external_view())
             return retval
 
-    @jwt_required
+    @jwt_required()
     @api_base.requires_namespace_exist
     def post(self, netblock=None, provide_dhcp=None, provide_nat=None, name=None,
              namespace=None):
@@ -139,7 +139,7 @@ class NetworksEndpoint(api_base.Resource):
                                 provide_nat)
         return n.external_view()
 
-    @jwt_required
+    @jwt_required()
     @api_base.requires_namespace_exist
     @api_base.redirect_to_network_node
     def delete(self, confirm=False, namespace=None, clean_wait=False):
@@ -190,7 +190,7 @@ class NetworksEndpoint(api_base.Resource):
 
 
 class NetworkEventsEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.redirect_to_eventlog_node
@@ -200,7 +200,7 @@ class NetworkEventsEndpoint(api_base.Resource):
 
 
 class NetworkInterfacesEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     def get(self, network_ref=None, network_from_db=None):
@@ -214,7 +214,7 @@ class NetworkInterfacesEndpoint(api_base.Resource):
 
 
 class NetworkMetadatasEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     def get(self, network_ref=None, network_from_db=None):
@@ -223,7 +223,7 @@ class NetworkMetadatasEndpoint(api_base.Resource):
             return {}
         return md
 
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     def post(self, network_ref=None, key=None, value=None, network_from_db=None):
@@ -231,13 +231,13 @@ class NetworkMetadatasEndpoint(api_base.Resource):
 
 
 class NetworkMetadataEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     def put(self, network_ref=None, key=None, value=None, network_from_db=None):
         return api_util.metadata_putpost('network', network_from_db.uuid, key, value)
 
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     def delete(self, network_ref=None, key=None, network_from_db=None):
@@ -253,7 +253,7 @@ class NetworkMetadataEndpoint(api_base.Resource):
 
 
 class NetworkPingEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.redirect_to_network_node
