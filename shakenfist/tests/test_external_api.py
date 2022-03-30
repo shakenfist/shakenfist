@@ -220,7 +220,8 @@ class AuthTestCase(base.ShakenFistTestCase):
                                 }))
         self.assertEqual(
             {
-                'error': "Bad Authorization header. Expected value 'Bearer <JWT>'",
+                'error': ("Missing 'Bearer' type in 'Authorization' header. Expected "
+                          "'Authorization: Bearer <JWT>'"),
                 'status': 401
             },
             _clean_traceback(resp.get_json()))

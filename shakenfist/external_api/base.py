@@ -359,8 +359,8 @@ def generic_wrapper(func):
                     token = auth.split(' ')[1]
                     dt = decode_token(token)
                     identity = dt.get('identity')
-            except Exception as e:
-                print(e)
+            except Exception:
+                pass
 
             log = LOG.with_fields({
                 'request-id': flask.request.environ.get('FLASK_REQUEST_ID', 'none'),

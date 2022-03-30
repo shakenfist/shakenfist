@@ -19,7 +19,7 @@ daemon.set_log_level(LOG, 'api')
 
 
 class InterfaceEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.redirect_to_network_node
     def get(self, interface_uuid=None):
         ni, _, err = api_util.safe_get_network_interface(interface_uuid)
@@ -29,7 +29,7 @@ class InterfaceEndpoint(api_base.Resource):
 
 
 class InterfaceFloatEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     def post(self, interface_uuid=None):
         ni, n, err = api_util.safe_get_network_interface(interface_uuid)
         if err:
@@ -45,7 +45,7 @@ class InterfaceFloatEndpoint(api_base.Resource):
 
 
 class InterfaceDefloatEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     def post(self, interface_uuid=None):
         ni, n, err = api_util.safe_get_network_interface(interface_uuid)
         if err:

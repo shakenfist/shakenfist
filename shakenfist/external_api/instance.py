@@ -44,13 +44,13 @@ SCHEDULER = None
 
 
 class InstanceEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     def get(self, instance_ref=None, instance_from_db=None):
         return instance_from_db.external_view()
 
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.requires_namespace_exist
@@ -87,7 +87,7 @@ def _artifact_safety_checks(a):
 
 
 class InstancesEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     def get(self, all=False):
         with etcd.ThreadLocalReadOnlyCache():
             filters = [partial(baseobject.namespace_filter,
@@ -101,7 +101,7 @@ class InstancesEndpoint(api_base.Resource):
                 retval.append(i.external_view())
             return retval
 
-    @jwt_required
+    @jwt_required()
     @api_base.requires_namespace_exist
     def post(self, name=None, cpus=None, memory=None, network=None, disk=None,
              ssh_key=None, user_data=None, placed_on=None, namespace=None,
@@ -461,7 +461,7 @@ class InstancesEndpoint(api_base.Resource):
         etcd.enqueue(placement, {'tasks': tasks})
         return inst.external_view()
 
-    @jwt_required
+    @jwt_required()
     @api_base.requires_namespace_exist
     def delete(self, confirm=False, namespace=None):
         """Delete all instances in the namespace."""
@@ -502,7 +502,7 @@ class InstancesEndpoint(api_base.Resource):
 
 
 class InstanceInterfacesEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     def get(self, instance_ref=None, instance_from_db=None):
@@ -516,7 +516,7 @@ class InstanceInterfacesEndpoint(api_base.Resource):
 
 
 class InstanceEventsEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_to_eventlog_node
@@ -526,7 +526,7 @@ class InstanceEventsEndpoint(api_base.Resource):
 
 
 class InstanceRebootSoftEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -538,7 +538,7 @@ class InstanceRebootSoftEndpoint(api_base.Resource):
 
 
 class InstanceRebootHardEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -550,7 +550,7 @@ class InstanceRebootHardEndpoint(api_base.Resource):
 
 
 class InstancePowerOffEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -562,7 +562,7 @@ class InstancePowerOffEndpoint(api_base.Resource):
 
 
 class InstancePowerOnEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -574,7 +574,7 @@ class InstancePowerOnEndpoint(api_base.Resource):
 
 
 class InstancePauseEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -586,7 +586,7 @@ class InstancePauseEndpoint(api_base.Resource):
 
 
 class InstanceUnpauseEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -598,7 +598,7 @@ class InstanceUnpauseEndpoint(api_base.Resource):
 
 
 class InstanceMetadatasEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     def get(self, instance_ref=None, instance_from_db=None):
@@ -607,7 +607,7 @@ class InstanceMetadatasEndpoint(api_base.Resource):
             return {}
         return md
 
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     def post(self, instance_ref=None, key=None, value=None, instance_from_db=None):
@@ -647,7 +647,7 @@ def _validate_instance_metadata(key, value):
 
 
 class InstanceMetadataEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     def put(self, instance_ref=None, key=None, value=None, instance_from_db=None):
@@ -657,7 +657,7 @@ class InstanceMetadataEndpoint(api_base.Resource):
         return api_util.metadata_putpost(
             'instance', instance_from_db.uuid, key, value)
 
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     def delete(self, instance_ref=None, key=None, instance_from_db=None):
@@ -673,7 +673,7 @@ class InstanceMetadataEndpoint(api_base.Resource):
 
 
 class InstanceConsoleDataEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -699,7 +699,7 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
         resp.status_code = 200
         return resp
 
-    @jwt_required
+    @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request

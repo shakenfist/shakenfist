@@ -41,13 +41,13 @@ def arg_is_artifact_uuid(func):
 
 
 class ArtifactEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @arg_is_artifact_uuid
     def get(self, artifact_uuid=None, artifact_from_db=None):
         with etcd.ThreadLocalReadOnlyCache():
             return artifact_from_db.external_view()
 
-    @jwt_required
+    @jwt_required()
     @arg_is_artifact_uuid
     def delete(self, artifact_uuid=None, artifact_from_db=None):
         """Delete an artifact from the cluster
@@ -88,7 +88,7 @@ class ArtifactEndpoint(api_base.Resource):
 
 
 class ArtifactsEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     def get(self, node=None):
         retval = []
         with etcd.ThreadLocalReadOnlyCache():
@@ -103,7 +103,7 @@ class ArtifactsEndpoint(api_base.Resource):
                     retval.append(a.external_view())
         return retval
 
-    @jwt_required
+    @jwt_required()
     def post(self, url=None):
         # The only artifact type you can force the cluster to fetch is an
         # image, so TYPE_IMAGE is assumed here. We ensure that the image exists
@@ -118,7 +118,7 @@ class ArtifactsEndpoint(api_base.Resource):
 
 
 class ArtifactUploadEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     def post(self, artifact_name=None, upload_uuid=None, source_url=None):
         u = Upload.from_db(upload_uuid)
         if not u:
@@ -181,7 +181,7 @@ class ArtifactUploadEndpoint(api_base.Resource):
 
 class ArtifactEventsEndpoint(api_base.Resource):
     # TODO(andy): include artifact ownership
-    @jwt_required
+    @jwt_required()
     @arg_is_artifact_uuid
     @api_base.redirect_to_eventlog_node
     def get(self, artifact_uuid=None, artifact_from_db=None):
@@ -190,7 +190,7 @@ class ArtifactEventsEndpoint(api_base.Resource):
 
 
 class ArtifactVersionsEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @arg_is_artifact_uuid
     def get(self, artifact_uuid=None, artifact_from_db=None):
         retval = []
@@ -201,7 +201,7 @@ class ArtifactVersionsEndpoint(api_base.Resource):
             retval.append(bout)
         return retval
 
-    @jwt_required
+    @jwt_required()
     @arg_is_artifact_uuid
     def post(self, artifact_uuid=None, artifact_from_db=None,
              max_versions=config.ARTIFACT_MAX_VERSIONS_DEFAULT):
@@ -213,7 +213,7 @@ class ArtifactVersionsEndpoint(api_base.Resource):
 
 
 class ArtifactVersionEndpoint(api_base.Resource):
-    @jwt_required
+    @jwt_required()
     @arg_is_artifact_uuid
     def delete(self, artifact_uuid=None, artifact_from_db=None, version_id=0):
         try:
