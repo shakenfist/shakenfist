@@ -31,7 +31,7 @@ function error {
     }
 
 function status {
-    echo -e "${Blue}$1${Color_Off}"
+    echo -e "${Blue}$(date) $1${Color_Off}"
     }
 
 function record_answer {
@@ -91,14 +91,14 @@ else
     echo "(release, pre-release, or local) >> ${GETSF_RELEASE}"
 fi
 question_end
-pipextra=""
+PIP_EXTRA=""
 if [ ${GETSF_RELEASE} == "release" ]; then
     status "We will use released packages."
     GETSF_SERVER_PACKAGE="shakenfist"
     GETSF_CLIENT_PACKAGE="shakenfist-client"
 elif [ ${GETSF_RELEASE} == "pre-release" ]; then
     status "We will use pre-release packages."
-    pipextra="--pre"
+    PIP_EXTRA="--pre"
     GETSF_SERVER_PACKAGE="shakenfist"
     GETSF_CLIENT_PACKAGE="shakenfist-client"
 elif [ ${GETSF_RELEASE} == "local" ]; then
@@ -607,7 +607,7 @@ if [ \${isubuntu} == 1 ]; then
     add-apt-repository --yes --update ppa:ansible/ansible
     eval \${APT_GET} update
     echo
-elif [ \${isdebian} == 1]; then
+elif [ \${isdebian} == 1 ]; then
     status "Adding a PPA to provide a more modern Ansible on Debian."
     if [ \${VERSION_ID} -eq 10 ]; then
         echo "deb http://ppa.launchpad.net/ansible/ansible/ubuntu bionic main" > /etc/apt/sources.list.d/ansible.list
@@ -619,13 +619,8 @@ elif [ \${isdebian} == 1]; then
     echo
 fi
 
-status "Upgrading packages."
-eval \${APT_GET} dist-upgrade
-echo
-
-status "Installing required packages."
-eval \${APT_GET} install ansible git tox build-essential python3-dev python3-wheel \
-    python3-pip python3-venv python3-cffi pwgen cpu-checker
+status "Installing cpu-checker."
+eval \${APT_GET} install cpu-checker
 echo
 
 # Make sure that KVM will work. This check is in the installer, but its
@@ -636,18 +631,6 @@ if [ \$? -ne 0 ]; then
     error "It looks like this machine isn't configured to run virtual machines.\nThis might indicate a BIOS configuration error (whatever your chipset\ncalls VT extensions), not having nested virtualization enabled if this\nis a virtual machine, or really ancient hardware. Please correct the\nproblem and re-run."
 fi
 echo
-
-status "Creating python venv."
-mkdir -p /srv/shakenfist/venv
-python3 -mvenv --system-site-packages /srv/shakenfist/venv
-echo
-
-status "Installing server and client packages in venv."
-localized_server_package="/tmp/"$(basename ${GETSF_SERVER_PACKAGE})
-localized_client_package="/tmp/"$(basename ${GETSF_CLIENT_PACKAGE})
-echo "Shakenfist package: \${localized_server_package}"
-echo "Client package: \${localized_client_package}"
-/srv/shakenfist/venv/bin/pip install -U ${pipextra} \${localized_server_package} \${localized_client_package}
 PERNODEEOF
 chmod ugo+rx /tmp/sf-per-node-primary
 
@@ -679,14 +662,41 @@ else
     echo
 fi
 
+echo
+status "Installing ansible, git, and requirements for the primary venv."
+DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpkg::Options::="--force-confold" -y \
+    install ansible git python3-cffi python3-dev python3-grpcio python3-pip python3-venv python3-wheel
+echo
+
+# We _have_ to have Shaken Fist installed on the primary to boostrap the installer,
+# so we do that separately now.
+echo
+status "Setup primary venv."
+mkdir -p /srv/shakenfist/venv
+python3 -m venv --system-site-packages /srv/shakenfist/venv
+
+if [ ${GETSF_SERVER_PACKAGE} == "shakenfist" ]; then
+    /srv/shakenfist/venv/bin/pip install ${PIP_EXTRA} shakenfist
+else
+    /srv/shakenfist/venv/bin/pip install ${PIP_EXTRA} ${GETSF_SERVER_PACKAGE}
+fi
+
+if [ ${GETSF_CLIENT_PACKAGE} == "shakenfist-client" ]; then
+    /srv/shakenfist/venv/bin/pip install ${PIP_EXTRA} shakenfist-client
+else
+    /srv/shakenfist/venv/bin/pip install ${PIP_EXTRA} ${GETSF_CLIENT_PACKAGE}
+fi
+
 # NOTE(mikal): I don't love how we need to do this, but it seems to be required
 # to make sure CI is using the right version and tox isn't installing one of its
 # own.
 echo
-status "Install client package in system pip as well on the primary node."
-pip3 install -U ${pipextra} ${GETSF_CLIENT_PACKAGE}
+status "Install client package in system pip on the primary node."
+pip3 install -U ${PIP_EXTRA} ${GETSF_CLIENT_PACKAGE}
 echo
 
+# NOTE(mikal): I also don't love how we do this, but it will do until I have time
+# to rework the etcd installation.
 status "Installing ansible-galaxy requirements."
 ansible-galaxy install --force -r /srv/shakenfist/venv/share/shakenfist/installer/requirements.yml
 echo
@@ -704,6 +714,21 @@ export ADMIN_PASSWORD=${GETSF_ADMIN_PASSWORD}
 export FLOATING_IP_BLOCK="${GETSF_FLOATING_BLOCK}"
 export DEPLOY_NAME="${GETSF_DEPLOY_NAME}"
 DEPLOYEOF
+
+if [ ${GETSF_RELEASE} == "local" ]; then
+    localized_server_package="/tmp/"$(basename ${GETSF_SERVER_PACKAGE})
+    localized_client_package="/tmp/"$(basename ${GETSF_CLIENT_PACKAGE})
+    echo "Shakenfist package: ${localized_server_package}"
+    echo "Client package: ${localized_client_package}"
+
+    echo "export SERVER_PACKAGE=${localized_server_package}" >> /root/sf-deploy
+    echo "export CLIENT_PACKAGE=${localized_client_package}" >> /root/sf-deploy
+    echo "export PIP_EXTRA=${PIP_EXTRA}" >> /root/sf-deploy
+else
+    echo "export SERVER_PACKAGE=shakenfist" >> /root/sf-deploy
+    echo "export CLIENT_PACKAGE=shakenfist-client" >> /root/sf-deploy
+    echo "export PIP_EXTRA=${PIP_EXTRA}" >> /root/sf-deploy
+fi
 
 if [ ! -z ${GETSF_SSH_USER} ]; then
     echo "export SSH_USER=\"${GETSF_SSH_USER}\"" >> /root/sf-deploy
@@ -822,17 +847,21 @@ sleep 5
 
 status "Pre-fetching common images."
 . /etc/sf/sfrc
-sf-client artifact cache ubuntu:20.04
-sf-client artifact cache cirros
+
+if [ -z GETSF_SKIP_COMMON_IMAGES ]; then
+    sf-client artifact cache ubuntu:20.04
+    sf-client artifact cache cirros
+fi
 
 question_start
 echo "A default configuration including deployment topology has"
 echo "been written to /root/sf-deploy. There's a lot you can change"
 echo "with this configuration, but your current configuration should"
 echo "be good enough for an initial play."
-echo
-echo "Install completed successfully."
 question_end
+
+echo
+status "Install completed successfully."
 
 # Remove our scary failure message
 trap - EXIT

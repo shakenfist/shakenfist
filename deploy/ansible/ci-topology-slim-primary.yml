@@ -391,6 +391,8 @@
           export GETSF_NODE_MESH_NIC_sf_5="eth1"
           export GETSF_NODE_MESH_ADDRESS_sf_5="{{hostvars['sf5']['mesh_ip']}}"
 
+          export GETSF_SKIP_COMMON_IMAGES=1
+
           sudo --preserve-env /tmp/getsf
         dest: "/tmp/getsf-wrapper"
         mode: ugo+rwx

@@ -136,6 +136,8 @@
           export GETSF_SERVER_PACKAGE="/root/{{hostvars['localhost']['server_wheel_file']}}"
           export GETSF_CLIENT_PACKAGE="/root/{{hostvars['localhost']['client_wheel_file']}}"
 
+          export GETSF_SKIP_COMMON_IMAGES=1
+
           sudo --preserve-env /tmp/getsf
         dest: "/tmp/getsf-wrapper"
         mode: ugo+rwx
