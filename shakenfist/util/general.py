@@ -1,3 +1,5 @@
+import cpuinfo
+import distro
 import json
 import os
 import pathlib
@@ -95,7 +97,15 @@ def get_version():
 
 
 def get_user_agent():
-    return 'Mozilla/5.0 (Ubuntu; Linux x86_64) Shaken Fist/%s' % get_version()
+    architecture = cpuinfo.get_cpu_info()
+    return ('Mozilla/5.0 (%(distribution)s; %(vendor)s %(architecture)s) '
+            'Shaken Fist/%(version)s'
+            % {
+                'distribution': distro.name(pretty=True),
+                'architecture': architecture['arch_string_raw'],
+                'vendor': architecture['vendor_id_raw'],
+                'version': get_version()
+            })
 
 
 def ignore_exception(processname, e):
