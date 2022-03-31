@@ -609,11 +609,7 @@ if [ \${isubuntu} == 1 ]; then
     echo
 elif [ \${isdebian} == 1 ]; then
     status "Adding a PPA to provide a more modern Ansible on Debian."
-    if [ \${VERSION_ID} -eq 10 ]; then
-        echo "deb http://ppa.launchpad.net/ansible/ansible/ubuntu bionic main" > /etc/apt/sources.list.d/ansible.list
-    else
-        echo "deb http://ppa.launchpad.net/ansible/ansible/ubuntu focal main" > /etc/apt/sources.list.d/ansible.list
-    fi
+    echo "deb http://ppa.launchpad.net/ansible/ansible/ubuntu focal main" > /etc/apt/sources.list.d/ansible.list
     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367
     eval \${APT_GET} update
     echo
