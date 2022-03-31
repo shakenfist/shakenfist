@@ -565,16 +565,21 @@ class Instance(dbo):
             self.enqueue_delete_due_error('Instance failed to power on')
 
     def delete(self):
-        # Mark files we used in the image cache as recently used so that they
-        # linger a little for possible future users.
         for disk in self.block_devices.get('devices', []):
             if 'blob_uuid' in disk and disk['blob_uuid']:
+                # Mark files we used in the image cache as recently used so that
+                # they linger a little for possible future users.
                 cached_image_path = util_general.file_permutation_exists(
                     os.path.join(config.STORAGE_PATH,
                                  'image_cache', disk['blob_uuid']),
                     ['iso', 'qcow2'])
                 if cached_image_path:
                     pathlib.Path(cached_image_path).touch(exist_ok=True)
+
+                # Decrement the blob reference count
+                b = blob.Blob.from_db(disk['blob_uuid'])
+                if b:
+                    b.ref_count_dec()
 
         try:
             self.power_off()
@@ -706,6 +711,9 @@ class Instance(dbo):
                         if not cached_image_path:
                             raise exceptions.ImageMissingFromCache(
                                 'Image %s is missing' % disk['blob_uuid'])
+
+                        b = blob.Blob.from_db(disk['blob_uuid'])
+                        b.ref_count_inc()
 
                         with util_general.RecordedOperation('detect cdrom images', self):
                             try:
