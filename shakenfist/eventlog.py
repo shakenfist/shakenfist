@@ -5,7 +5,6 @@ import time
 
 from shakenfist.config import config
 from shakenfist import etcd
-from shakenfist import exceptions
 from shakenfist import logutil
 
 
@@ -72,15 +71,6 @@ class EventLog(object):
         self.objuuid = objuuid
 
     def __enter__(self):
-        start_time = time.time()
-        self.lock = etcd.get_lock('eventsdb', self.objtype, self.objuuid)
-        while not self.lock.acquire():
-            if time.time() - start_time > config.SLOW_LOCK_THRESHOLD:
-                raise exceptions.LockException(
-                    'Cannot acquire lock %s, timed out after %.02f seconds'
-                    % (self.lock.name, time.time() - start_time))
-            time.sleep(0.2)
-
         self.dbpath = os.path.join(config.STORAGE_PATH, 'events', self.objtype,
                                    self.objuuid)
         if not os.path.exists(self.dbpath):
@@ -94,7 +84,6 @@ class EventLog(object):
         if self.con:
             self.con.close()
             self.con = None
-        self.lock.release()
 
     def _bootstrap(self):
         if not os.path.exists(self.dbpath):
