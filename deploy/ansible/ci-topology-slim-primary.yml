@@ -301,9 +301,15 @@
     - name: Enable networking (Debian)
       shell: |
         ifup --ignore-errors eth0
-        ifdown eth1
-        sleep 1
-        ifup eth1
+
+        orig=$(ip -o link | grep {{mesh_mac}} | cut -f 2 -d ":")
+        if [ ${orig} != "eth1" ]; then
+          ip link set down ${orig}
+          ip link set ${orig} name eth1
+        fi
+
+        ifup --ignore-errors eth1
+
         systemctl restart networking
       when: ansible_distribution == 'Debian'
 
