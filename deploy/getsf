@@ -601,24 +601,6 @@ status "Updating package list."
 eval \${APT_GET} update
 echo
 
-if [ \${isubuntu} == 1 ]; then
-    status "Adding a PPA to provide a more modern Ansible on Ubuntu."
-    eval \${APT_GET} install software-properties-common
-    add-apt-repository --yes --update ppa:ansible/ansible
-    eval \${APT_GET} update
-    echo
-elif [ \${isdebian} == 1 ]; then
-    status "Adding a PPA to provide a more modern Ansible on Debian."
-    if [ \${VERSION_ID} -eq 10 ]; then
-        echo "deb http://ppa.launchpad.net/ansible/ansible/ubuntu bionic main" > /etc/apt/sources.list.d/ansible.list
-    else
-        echo "deb http://ppa.launchpad.net/ansible/ansible/ubuntu focal main" > /etc/apt/sources.list.d/ansible.list
-    fi
-    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367
-    eval \${APT_GET} update
-    echo
-fi
-
 status "Installing cpu-checker."
 eval \${APT_GET} install cpu-checker
 echo
@@ -663,9 +645,14 @@ else
 fi
 
 echo
-status "Installing ansible, git, and requirements for the primary venv."
+status "Installing git, and requirements for the primary venv."
 DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpkg::Options::="--force-confold" -y \
-    install ansible git python3-cffi python3-dev python3-grpcio python3-pip python3-venv python3-wheel
+    install git python3-cffi python3-dev python3-grpcio python3-pip python3-venv python3-wheel
+echo
+
+echo
+status "Install ansible from pip"
+pip3 install ansible
 echo
 
 # We _have_ to have Shaken Fist installed on the primary to boostrap the installer,
