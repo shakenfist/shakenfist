@@ -1,6 +1,7 @@
 import hashlib
 import os
 import pathlib
+import re
 import requests
 import shutil
 import time
@@ -13,7 +14,6 @@ from shakenfist.config import config
 from shakenfist.constants import (QCOW2_CLUSTER_SIZE, LOCK_REFRESH_SECONDS,
                                   TRANSCODE_DESCRIPTION)
 from shakenfist import exceptions
-from shakenfist import image_resolver
 from shakenfist import logutil
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
@@ -21,6 +21,83 @@ from shakenfist.util import process as util_process
 
 
 LOG, _ = logutil.setup(__name__)
+
+
+VALID_SF_IMAGES = ['centos', 'debian', 'ubuntu']
+
+
+def _resolve_image(url):
+    # Short cut URLs do not have subdirectories
+    if url.find('/') != -1:
+        return url, None, None
+
+    if url.startswith('cirros'):
+        # cirros is a special case as we can't rebuild the images yet
+        return _resolve_cirros(url)
+
+    for valid in VALID_SF_IMAGES:
+        if url.startswith(valid):
+            return ('%s/%s/latest.qcow2' % (config.IMAGE_DOWNLOAD_URL, url),
+                    None, None)
+
+    return url, None, None
+
+
+def _resolve_cirros(name):
+    # Name is assumed to be in the form cirros or cirros:0.4.0
+    if name == 'cirros':
+        resp = requests.get(config.LISTING_URL_CIRROS,
+                            allow_redirects=True,
+                            headers={'User-Agent': util_general.get_user_agent()})
+        if resp.status_code != 200:
+            raise exceptions.HTTPError(
+                'Failed to fetch %s, status code %d'
+                % (config.LISTING_URL_CIRROS, resp.status_code))
+
+        versions = []
+        dir_re = re.compile(r'.*<a href="([0-9]+\.[0-9]+\.[0-9]+)/">.*/</a>.*')
+        for line in resp.text.split('\n'):
+            m = dir_re.match(line)
+            if m:
+                versions.append(m.group(1))
+        LOG.with_field('versions', versions).info('Found cirros versions')
+        vernum = versions[-1]
+    else:
+        try:
+            _, vernum = name.split(':')
+        except Exception:
+            raise exceptions.VersionSpecificationError(
+                'Cannot parse version: %s' % name)
+
+    url = config.DOWNLOAD_URL_CIRROS % {'vernum': vernum}
+
+    checksum_url = config.CHECKSUM_URL_CIRROS % {'vernum': vernum}
+    checksums = _fetch_remote_checksum(checksum_url)
+    checksum = checksums.get(os.path.basename(url))
+    LOG.with_fields({
+        'name': name,
+        'url': url,
+        'checksum': checksum
+    }).info('Image resolved')
+
+    if checksum:
+        return url, checksum, 'md5'
+    else:
+        return url, None, None
+
+
+def _fetch_remote_checksum(checksum_url):
+    resp = requests.get(checksum_url,
+                        headers={'User-Agent': util_general.get_user_agent()})
+    if resp.status_code != 200:
+        return {}
+
+    checksums = {}
+    for line in resp.text.split('\n'):
+        elems = line.split()
+        if len(elems) == 2:
+            checksums[elems[1]] = elems[0]
+    return checksums
 
 
 class ImageFetchHelper(object):
@@ -67,7 +144,7 @@ class ImageFetchHelper(object):
         # NOTE(mikal): it is assumed the caller holds a lock on the artifact, and passes
         # it in.
 
-        url, checksum, checksum_type = image_resolver.resolve(self.url)
+        url, checksum, checksum_type = _resolve_image(self.url)
 
         # If this is a request for a URL, do we have the most recent version
         # somewhere in the cluster?
