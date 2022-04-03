@@ -86,7 +86,7 @@ pipeline {
                     . /home/jenkins/sf-ci
                     ansible-playbook -i /home/jenkins/hosts \
                         --extra-vars "identifier=$BUILD_TAG source_path=$SOURCE_PATH \
-                        base_image=label:sfci-debian-10 \
+                        base_image=label:sfci-debian-11 \
                         base_image_user=debian" \
                         deploy/ansible/ci-topology-slim-primary.yml
               '''
