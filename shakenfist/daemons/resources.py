@@ -181,11 +181,18 @@ def _get_stats():
             'network_queue_waiting': network_queue_waiting,
         })
 
+    if config.NODE_IS_EVENTLOG_NODE:
+        queued = len(list(etcd.get_all('event', None, limit=10000)))
+        retval.update({
+            'events_waiting': queued,
+        })
+
     # What object versions do we support?
     for obj in OBJECT_NAMES_TO_CLASSES:
         retval['object_version_%s' % obj] = \
             OBJECT_NAMES_TO_CLASSES[obj].current_version
 
+    LOG.with_fields(retval).debug('Updated node metrics')
     return retval
 
 
