@@ -204,6 +204,8 @@ class Artifact(dbo):
         if not index_data:
             self.log.withField('index', index).warn('Cannot find index in DB')
             return
+
+        self.add_event2('Deleted index %d from artifact' % index)
         self._db_delete_attribute('index_%012d' % index)
         b = blob.Blob.from_db(index_data['blob_uuid'])
         if b:
@@ -213,14 +215,25 @@ class Artifact(dbo):
         self.state = self.STATE_DELETED
 
     def resolve_to_blob(self):
-        blob_uuid = self.most_recent_index.get('blob_uuid')
+        mri = self.most_recent_index
+
+        blob_uuid = mri.get('blob_uuid')
         if not blob_uuid:
+            self.log.with_fields('most_recent_index', mri).error(
+                'Failed to resolve blob: no uuid')
             return
+
         b = blob.Blob.from_db(blob_uuid)
         if not b:
+            self.log.with_fields('most_recent_index', mri).error(
+                'Failed to resolve blob: blob missing')
             return
+
         if b.state == blob.Blob.STATE_DELETED:
+            self.log.with_fields('most_recent_index', mri).error(
+                'Failed to resolve blob: blob deleted')
             return
+
         return blob_uuid
 
 
