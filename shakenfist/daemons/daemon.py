@@ -20,7 +20,7 @@ DAEMON_NAMES = {
     'net': 'sf-net',
     'queues': 'sf-queues',
     'resources': 'sf-resources',
-    'triggers': 'sf-triggers',
+    'sidechannel': 'sf-sidechannel',
 }
 
 

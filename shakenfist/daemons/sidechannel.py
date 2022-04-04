@@ -1,6 +1,5 @@
 import multiprocessing
 import os
-import re
 import select
 import setproctitle
 import signal
@@ -49,13 +48,7 @@ class SFSocketAgent(protocol.SocketAgent):
 class Monitor(daemon.Daemon):
     def monitor(self, instance_uuid):
         setproctitle.setproctitle(
-            '%s-%s' % (daemon.process_name('triggers'), instance_uuid))
-        regexps = {
-            'login prompt': re.compile('.* login: .*'),
-            'user-data script start': re.compile('.*Starting.*Execute cloud user/final scripts.*'),
-            'user-data script end': re.compile('.*Finished.*Execute cloud user/final scripts.*'),
-            'cloud-init complete': re.compile('.*Reached target.*Cloud-init target.*')
-        }
+            '%s-%s' % (daemon.process_name('sidechannel'), instance_uuid))
 
         inst = instance.Instance.from_db(instance_uuid)
         log_ctx = LOG.with_instance(instance_uuid)
@@ -65,23 +58,8 @@ class Monitor(daemon.Daemon):
         console_path = os.path.join(inst.instance_path, 'console.log')
         while not os.path.exists(console_path):
             time.sleep(1)
-        console_fd = os.open(console_path, os.O_RDONLY | os.O_NONBLOCK)
+        inst.add_event2('detected console log')
 
-        log_ctx = LOG.with_instance(instance_uuid)
-        eventlog.add_event('instance', instance_uuid, 'trigger monitor',
-                           'detected console log', None, None)
-
-        # Sometimes the trigger process is slow to start, so rewind 4KB to ensure
-        # that the last few log lines are not missed. (4KB since Cloud-Init can be
-        # noisy after the login prompt.)
-        os.lseek(console_fd, max(0, os.fstat(
-            console_fd).st_size - 4096), os.SEEK_SET)
-
-        # Record how long the console file is, because we need to detect truncations
-        # and re-open.
-        previous_size = os.stat(console_path).st_size
-
-        # If we have any side channels, open those as well.
         sc_clients = {}
         sc_connected = {}
 
@@ -107,78 +85,44 @@ class Monitor(daemon.Daemon):
 
         build_side_channel_sockets()
 
-        buffer = ''
         while True:
-            # Detect file truncations, and die if we see one. We will be restarted
-            # by the monitor process.
-            if not os.path.exists(console_path):
-                return
-
-            try:
-                size = os.stat(console_path).st_size
-                if size < previous_size:
-                    return
-            except FileNotFoundError:
-                return
-            previous_size = size
-
-            readable = [console_fd]
+            readable = []
             for sc in sc_clients.values():
                 readable.append(sc.input_fileno)
             readable, _, exceptional = select.select(readable, [], readable, 1)
 
             for fd in readable:
-                if fd == console_fd:
-                    d = os.read(fd, 102400).decode('utf-8', errors='ignore')
-                    if d:
-                        buffer += d
-                        lines = buffer.split('\n')
-                        buffer = lines[-1]
+                chan = None
+                for sc in sc_clients:
+                    if fd == sc_clients[sc].input_fileno:
+                        chan = sc
 
-                        for line in lines:
-                            if line:
-                                for trigger in regexps:
-                                    m = regexps[trigger].match(line)
-                                    if m:
-                                        log_ctx.with_field('trigger', trigger,
-                                                           ).info('Trigger matched')
-                                        inst.add_event(
-                                            'trigger', None, None, trigger)
-                else:
-                    chan = None
-                    for sc in sc_clients:
-                        if fd == sc_clients[sc].input_fileno:
-                            chan = sc
+                if chan:
+                    try:
+                        for packet in sc_clients[chan].find_packets():
+                            try:
+                                if not sc_connected.get(chan, False):
+                                    inst.add_event2(
+                                        'side channel %s connected' % chan)
+                                    sc_connected[chan] = True
 
-                    if chan:
-                        try:
-                            for packet in sc_clients[chan].find_packets():
-                                try:
-                                    if not sc_connected.get(chan, False):
-                                        inst.add_event2(
-                                            'side channel %s connected' % chan)
-                                        sc_connected[chan] = True
+                                sc_clients[chan].dispatch_packet(
+                                    packet)
+                            except protocol.UnknownCommand:
+                                log_ctx.with_field('sidechannel', chan).info(
+                                    'Ignored side channel packet: %s' % packet)
 
-                                    sc_clients[chan].dispatch_packet(
-                                        packet)
-                                except protocol.UnknownCommand:
-                                    log_ctx.with_field('sidechannel', chan).info(
-                                        'Ignored side channel packet: %s' % packet)
-
-                        except (BrokenPipeError,
-                                ConnectionRefusedError,
-                                ConnectionResetError,
-                                FileNotFoundError):
-                            del sc_clients[chan]
+                    except (BrokenPipeError,
+                            ConnectionRefusedError,
+                            ConnectionResetError,
+                            FileNotFoundError):
+                        del sc_clients[chan]
 
             for fd in exceptional:
                 for sc_name in sc_clients:
                     if fd == sc_clients[sc_name].input_fileno:
                         sc_clients[sc_name].close()
                         del sc_clients[sc_name]
-
-                if fd == console_fd:
-                    return
 
             build_side_channel_sockets()
 
@@ -205,10 +149,8 @@ class Monitor(daemon.Daemon):
                 if not monitors[instance_uuid].is_alive():
                     # Reap process
                     monitors[instance_uuid].join(1)
-                    LOG.with_instance(instance_uuid
-                                      ).info('Trigger observer has terminated')
-                    eventlog.add_event(
-                        'instance', instance_uuid, 'trigger monitor', 'crashed', None, None)
+                    eventlog.add_event2(
+                        'instance', instance_uuid, 'sidechannel monitor crashed')
                     del monitors[instance_uuid]
 
             # Audit desired monitors
@@ -233,15 +175,13 @@ class Monitor(daemon.Daemon):
             for instance_uuid in missing_instances:
                 p = multiprocessing.Process(
                     target=self.monitor, args=(instance_uuid,),
-                    name='%s-%s' % (daemon.process_name('triggers'),
+                    name='%s-%s' % (daemon.process_name('sidechannel'),
                                     instance_uuid))
                 p.start()
 
                 monitors[instance_uuid] = p
-                LOG.with_instance(instance_uuid).info(
-                    'Started trigger observer')
-                eventlog.add_event(
-                    'instance', instance_uuid, 'trigger monitor', 'started', None, None)
+                eventlog.add_event2(
+                    'instance', instance_uuid, 'sidechannel monitor started')
 
             # Cleanup extra monitors
             for instance_uuid in extra_instances:
@@ -253,10 +193,8 @@ class Monitor(daemon.Daemon):
                     pass
 
                 del monitors[instance_uuid]
-                LOG.with_instance(instance_uuid).info(
-                    'Finished trigger observer')
-                eventlog.add_event(
-                    'instance', instance_uuid, 'trigger monitor', 'finished', None, None)
+                eventlog.add_event2(
+                    'instance', instance_uuid, 'sidechannel monitor finished')
 
             self.exit.wait(1)
 
