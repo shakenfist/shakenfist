@@ -146,39 +146,9 @@ class SFConfig(BaseSettings):
         description='A URL listing all Cirros releases'
     )
 
-    DOWNLOAD_URL_DEBIAN: AnyHttpUrl = Field(
-        (
-            'https://cloud.debian.org/images/cloud/OpenStack/current-%(vernum)s/'
-            'debian-%(vernum)s-openstack-amd64.qcow2'
-        ),
-        description='Default download mirror for Debian images'
-    )
-    CHECKSUM_URL_DEBIAN: AnyHttpUrl = Field(
-        (
-            'https://cloud.debian.org/images/cloud/OpenStack/'
-            'current-%(vernum)s/MD5SUMS'
-        ),
-        description='Default checksum URL for Debian images'
-    )
-
-    DOWNLOAD_URL_UBUNTU: AnyHttpUrl = Field(
-        (
-            'https://cloud-images.ubuntu.com/%(vername)s/current/'
-            '%(vername)s-server-cloudimg-amd64.img'
-        ),
-        description='Default download mirror for Ubuntu image'
-    )
-    CHECKSUM_URL_UBUNTU: AnyHttpUrl = Field(
-        (
-            'https://cloud-images.ubuntu.com/%(vername)s/current/MD5SUMS'
-        ),
-        description='Default checksum URL for Debian images'
-    )
-    LISTING_URL_UBUNTU: AnyHttpUrl = Field(
-        (
-            'https://cloud-images.ubuntu.com'
-        ),
-        description='A URL listing all Ubuntu releases'
+    IMAGE_DOWNLOAD_URL: AnyHttpUrl = Field(
+        'https://images.shakenfist.com',
+        description='Default download server for Shaken Fist images'
     )
 
     MAX_IMAGE_TRANSFER_SECONDS: int = Field(
