@@ -26,6 +26,8 @@ class SFSocketAgent(protocol.SocketAgent):
 
         self.add_command('is-system-running-response',
                          self.is_system_running_response)
+        self.add_command('gather-facts-response',
+                         self.gather_facts_response)
 
     def is_system_running(self):
         self.send_packet({'command': 'is-system-running'})
@@ -35,6 +37,7 @@ class SFSocketAgent(protocol.SocketAgent):
         if ready:
             if self.is_system_running in self.poll_tasks:
                 self.poll_tasks.remove(self.is_system_running)
+                self.gather_facts()
 
         if self.instance_ready != ready:
             if ready:
@@ -43,6 +46,12 @@ class SFSocketAgent(protocol.SocketAgent):
                 self.instance.add_event2(
                     'instance not ready (%s)' % packet.get('message', 'none'))
             self.instance_ready = ready
+
+    def gather_facts(self):
+        self.send_packet({'command': 'gather-facts'})
+
+    def gather_facts_response(self, packet):
+        self.instance.add_event2('facts gathered', extra=packet.get('result'))
 
 
 class Monitor(daemon.Daemon):
