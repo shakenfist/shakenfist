@@ -41,6 +41,11 @@ function record_answer {
     echo "export ${varname}='${value}'" >> /root/.getsfrc
 }
 
+# We must run as root to do the things we do.
+if [ $(whoami) != "root" ]; then
+    error "You need to run this script as root."
+fi
+
 # Load previous answers
 status "Checking for previous answers."
 if [ -e /root/.getsfrc ]; then
