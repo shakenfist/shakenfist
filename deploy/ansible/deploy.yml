@@ -98,6 +98,7 @@
     - name: Install non-hypervisor dependencies
       apt:
         name:
+          - apparmor
           - arping
           - bridge-utils
           - build-essential
