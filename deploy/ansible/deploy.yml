@@ -123,6 +123,7 @@
           - python3-wheel
           - pwgen
           - qemu-kvm
+          - qemu-utils
           - rsyslog
           - tox
           - unzip
