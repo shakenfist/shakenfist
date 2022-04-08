@@ -123,6 +123,7 @@
           - python3-wheel
           - pwgen
           - qemu-kvm
+          - rsyslog
           - tox
           - unzip
         state: latest
