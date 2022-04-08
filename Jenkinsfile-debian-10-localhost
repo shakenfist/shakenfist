@@ -120,10 +120,12 @@ pipeline {
             sh '''  set +e
 
                     . $WORKSPACE/$BUILD_TAG/ci-environment.sh
+                    ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                        debian@$primary 'sudo chmod ugo+r /etc/sf/sfrc /etc/sf/shakenfist.json /var/log/syslog'
+
                     count=0
                     while [ $count -lt 60 ]
                     do
-
                       ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
                         debian@$primary \
                         '. /etc/sf/sfrc; sf-client instance list'
@@ -188,7 +190,7 @@ pipeline {
                         $source_path/shakenfist \
                         debian@$primary:shakenfist
                     ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                        debian@$primary "cd shakenfist/deploy; SHAKENFIST_CI_CONCURRENCY=2 tox -epy3"
+                        debian@$primary "cd shakenfist/deploy; . /etc/sf/sfrc; SHAKENFIST_CI_CONCURRENCY=2 tox -epy3"
               '''
           }
         }

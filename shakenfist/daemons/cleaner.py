@@ -202,29 +202,32 @@ class Monitor(daemon.Daemon):
 
         for ent in os.listdir(blob_path):
             entpath = os.path.join(blob_path, ent)
-            st = os.stat(entpath)
+            try:
+                st = os.stat(entpath)
 
-            # If we've had this file for more than two cleaner delays...
-            if time.time() - st.st_mtime > config.CLEANER_DELAY * 2:
-                if ent.endswith('.partial'):
-                    # ... and its a stale partial transfer
-                    LOG.with_fields({
-                        'blob': ent}).warning(
+                # If we've had this file for more than two cleaner delays...
+                if time.time() - st.st_mtime > config.CLEANER_DELAY * 2:
+                    if ent.endswith('.partial'):
+                        # ... and its a stale partial transfer
+                        LOG.with_fields({'blob': ent}).warning(
                             'Deleting stale partial transfer')
-                    os.unlink(entpath)
-
-                else:
-                    b = Blob.from_db(ent)
-                    if (not b or b.state.value == Blob.STATE_DELETED
-                            or config.NODE_NAME not in b.locations):
-                        LOG.with_fields({
-                            'blob': ent}).warning('Deleting orphaned blob')
                         os.unlink(entpath)
-                        cached = util_general.file_permutation_exists(
-                            os.path.join(cache_path, ent),
-                            ['iso', 'qcow2'])
-                        if cached:
-                            os.unlink(cached)
+
+                    else:
+                        b = Blob.from_db(ent)
+                        if (not b or b.state.value == Blob.STATE_DELETED
+                                or config.NODE_NAME not in b.locations):
+                            LOG.with_fields({
+                                'blob': ent}).warning('Deleting orphaned blob')
+                            os.unlink(entpath)
+                            cached = util_general.file_permutation_exists(
+                                os.path.join(cache_path, ent),
+                                ['iso', 'qcow2'])
+                            if cached:
+                                os.unlink(cached)
+            except FileNotFoundError:
+                LOG.debug('File %s disappeared while maintaining blobs'
+                          % entpath)
 
         # Find transcoded blobs in the image cache which are no longer in use
         for ent in os.listdir(cache_path):
