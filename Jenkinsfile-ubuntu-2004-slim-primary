@@ -154,7 +154,6 @@ pipeline {
                     count=0
                     while [ $count -lt 60 ]
                     do
-
                       ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
                         ubuntu@$primary \
                         '. /etc/sf/sfrc; sf-client instance list'
