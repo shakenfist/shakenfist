@@ -1,15 +1,15 @@
 from shakenfist_ci import base
 
 
-class TestCirros(base.BaseNamespacedTestCase):
+class TestBoot(base.BaseNamespacedTestCase):
     """Make sure instances boot under various configurations."""
 
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'cirros'
-        super(TestCirros, self).__init__(*args, **kwargs)
+        super(TestBoot, self).__init__(*args, **kwargs)
 
     def setUp(self):
-        super(TestCirros, self).setUp()
+        super(TestBoot, self).setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net' % self.namespace)
         self._await_networks_ready([self.net['uuid']])
@@ -67,8 +67,8 @@ class TestCirros(base.BaseNamespacedTestCase):
             'test-boot-large-disk', 1, 1024, None,
             [
                 {
-                    'size': 300,
-                    'base': 'sf://upload/system/debian:11',
+                    'size': 30,
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
             ], None, None, side_channels=['sf-agent'])

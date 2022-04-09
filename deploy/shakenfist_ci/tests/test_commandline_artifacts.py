@@ -128,9 +128,13 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         self.assertIn('artifact_uuid', snap1['vda'])
         snap_uuid = snap1['vda']['artifact_uuid']
 
+        # Ensure the snapshot is ready
+        self._await_artifacts_ready([snap_uuid])
+
         # Check the blobs information for the first version
         show_info = json.loads(self._exec_client(
             '--json artifact show %s' % snap_uuid))
+        self.assertEqual('created', show_info['state'])
         self.assertIn('blobs', show_info)
         self.assertEqual(1, len(show_info['blobs']))
         self.assertIn('1', show_info['blobs'])

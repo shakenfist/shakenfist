@@ -396,6 +396,9 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self.assertIsNotNone(snap1)
         self.assertEqual(1, snap1['vda']['artifact_index'])
 
+        # Ensure the snapshot is ready
+        self._await_artifacts_ready([snap1['vda']['artifact_uuid']])
+
         # Wait until the blob uuid specified above is the one used for the
         # current snapshot
         start_time = time.time()

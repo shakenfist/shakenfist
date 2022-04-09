@@ -1,4 +1,5 @@
 from shakenfist_client import apiclient
+import time
 
 from shakenfist_ci import base
 
@@ -29,26 +30,37 @@ class TestConsoleLog(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, base.load_userdata('console_scribbler'),
+            side_channels=['sf-agent'])
 
         # Wait for our test instance to boot
         self.assertIsNotNone(inst['uuid'])
         self._await_instance_ready(inst['uuid'])
+        time.sleep(30)
 
         # Get 1000 bytes of console log
-        c = self.test_client.get_console_data(inst['uuid'], 1000)
-        self.assertGreaterEqual(len(c), 1000)
+        c = self.test_client.get_console_data(inst['uuid'], 1000, decode=None)
+        if len(c) < 1000:
+            self.fail(
+                'Console response was not 1000 characters (%d instead):\n\n%s'
+                % (len(c), c))
 
         # Get 2000 bytes of console log
-        c = self.test_client.get_console_data(inst['uuid'], 2000)
-        self.assertGreaterEqual(len(c), 2000)
+        c = self.test_client.get_console_data(inst['uuid'], 2000, decode=None)
+        if len(c) < 2000:
+            self.fail(
+                'Console response was not 2000 characters (%d instead):\n\n%s'
+                % (len(c), c))
 
         # Get the default amount of the console log
-        c = self.test_client.get_console_data(inst['uuid'])
-        self.assertGreaterEqual(len(c), 10240)
+        c = self.test_client.get_console_data(inst['uuid'], decode=None)
+        if len(c) < 10240:
+            self.fail(
+                'Console response was not 10240 characters (%d instead):\n\n%s'
+                % (len(c), c))
 
         # Get all of the console log
-        c = self.test_client.get_console_data(inst['uuid'], -1)
+        c = self.test_client.get_console_data(inst['uuid'], -1, decode=None)
         self.assertGreaterEqual(len(c), 11000)
 
         # Check we handle non-numbers reasonably

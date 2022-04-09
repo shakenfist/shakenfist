@@ -1,0 +1,7 @@
+#cloud-config
+
+runcmd:
+  - |
+    for i in $(seq 100); do
+        echo "fhdjkhfdsjhgjkdsfhkgsdjfkghjkdfshgjkhsdfjkghjksdfhgjkhsdfjkgjksd" > /dev/console
+    done

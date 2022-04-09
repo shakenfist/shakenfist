@@ -696,7 +696,7 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
 
         resp = flask.Response(
             instance_from_db.get_console_data(parsed_length),
-            mimetype='text/plain')
+            mimetype='applicaton/octet-stream')
         resp.status_code = 200
         return resp
 
