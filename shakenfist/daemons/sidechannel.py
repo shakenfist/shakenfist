@@ -20,7 +20,7 @@ class SFSocketAgent(protocol.SocketAgent):
     def __init__(self, inst, path, logger=None):
         super(SFSocketAgent, self).__init__(path, logger=logger)
         self.instance = inst
-        self.instance_ready = False
+        self.instance_ready = None
 
         self.poll_tasks.append(self.is_system_running)
 
