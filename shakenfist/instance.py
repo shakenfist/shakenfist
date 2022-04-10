@@ -976,7 +976,7 @@ class Instance(dbo):
                 if not b:
                     raise exceptions.NVRAMTemplateMissing(
                         'Blob %s does not exist' % self.nvram_template)
-                b.ensure_local([])
+                b.ensure_local([], instance_object=self)
                 b.ref_count_inc()
                 shutil.copyfile(
                     blob.Blob.filepath(b.uuid), os.path.join(self.instance_path, 'nvram'))

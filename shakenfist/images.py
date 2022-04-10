@@ -196,7 +196,8 @@ class ImageFetchHelper(object):
             b = self._blob_get(lock, url)
         else:
             self.log.info('Fetching image from the internet')
-            b = self._http_get_inner(lock, url, checksum, checksum_type)
+            b = self._http_get_inner(lock, url, checksum, checksum_type,
+                                     instance_object=self.instance)
             # Ref count increased here since it is known here whether the blob
             # will be used from within the cluster or newly created.
             b.ref_count_inc()
@@ -240,7 +241,7 @@ class ImageFetchHelper(object):
             remote_blob = Blob.from_db(cached_remotely)
             if not remote_blob:
                 raise exceptions.BlobMissing(cached_remotely)
-            remote_blob.ensure_local([lock])
+            remote_blob.ensure_local([lock], instance_object=self.instance)
 
             cache_path = os.path.join(
                 config.STORAGE_PATH, 'image_cache', b.uuid + '.qcow2')
@@ -310,10 +311,11 @@ class ImageFetchHelper(object):
         if not b:
             raise exceptions.BlobMissing(blob_uuid)
 
-        b.ensure_local([lock])
+        b.ensure_local([lock], instance_object=self.instance)
         return b
 
-    def _http_get_inner(self, lock, url, checksum, checksum_type):
+    def _http_get_inner(self, lock, url, checksum, checksum_type,
+                        instance_object=None):
         """Fetch image if not downloaded and return image path."""
 
         with util_general.RecordedOperation('fetch image', self.instance):
@@ -322,7 +324,8 @@ class ImageFetchHelper(object):
             self.log.with_object(self.__artifact).with_fields({
                 'blob': blob_uuid,
                 'url': url}).info('Commencing HTTP fetch to blob')
-            b = blob.http_fetch(resp, blob_uuid, [lock], self.log)
+            b = blob.http_fetch(url, resp, blob_uuid, [lock], self.log,
+                                instance_object=instance_object)
 
             # Ensure checksum is correct
             if not verify_checksum(
