@@ -308,7 +308,7 @@ class Blob(dbo):
 
             return new_count
 
-    def ensure_local(self, locks):
+    def ensure_local(self, locks, instance_object=None):
         if self.state.value != self.STATE_CREATED:
             self.log.warning(
                 'Blob not in created state, replication cancelled')
@@ -319,7 +319,7 @@ class Blob(dbo):
             dep_blob = Blob.from_db(self.depends_on)
             if not dep_blob:
                 raise BlobDependencyMissing(self.depends_on)
-            dep_blob.ensure_local(locks)
+            dep_blob.ensure_local(locks, instance_object=instance_object)
 
         # Actually replicate this blob
         with self.get_lock(config.NODE_NAME) as blob_lock:
@@ -371,6 +371,10 @@ class Blob(dbo):
                             percentage = (total_bytes_received /
                                           int(self.size) * 100.0)
                             if (percentage - previous_percentage) > 10.0:
+                                if instance_object:
+                                    instance_object.add_event2(
+                                        'Fetching required blob %s, %d%% complete'
+                                        % (self.uuid, percentage))
                                 self.log.with_fields({
                                     'bytes_fetched': total_bytes_received,
                                     'size': int(self.size)
@@ -387,6 +391,9 @@ class Blob(dbo):
                     except urllib3.exceptions.NewConnectionError as e:
                         connection_failures += 1
                         if connection_failures > 2:
+                            if instance_object:
+                                instance_object.add_event2(
+                                    'Transfer of blob %s failed' % self.uuid)
                             self.log.error(
                                 'HTTP connection repeatedly failed: %s' % e)
                             raise e
@@ -408,6 +415,9 @@ class Blob(dbo):
                 raise BlobFetchFailed('Did not fetch enough data')
 
             os.rename(blob_path + '.partial', blob_path)
+            if instance_object:
+                instance_object.add_event2(
+                    'Fetching required blob %s, complete' % self.uuid)
             self.log.with_fields({
                 'bytes_fetched': total_bytes_received,
                 'size': int(self.size)
@@ -492,7 +502,7 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
     return b
 
 
-def http_fetch(resp, blob_uuid, locks, logs):
+def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
     ensure_blob_path()
 
     fetched = 0
@@ -513,7 +523,12 @@ def http_fetch(resp, blob_uuid, locks, logs):
             if total_size:
                 percentage = fetched / total_size * 100.0
                 if (percentage - previous_percentage) > 10.0:
-                    logs.with_field('bytes_fetched', fetched).info(
+                    if instance_object:
+                        instance_object.add_event2(
+                            'Fetching required HTTP resource %s into blob %s, %d%% complete'
+                            % (url, blob_uuid, percentage))
+
+                    logs.with_field('bytes_fetched', fetched).debug(
                         'Fetch %.02f percent complete' % percentage)
                     previous_percentage = percentage
 
@@ -521,6 +536,10 @@ def http_fetch(resp, blob_uuid, locks, logs):
                 db.refresh_locks(locks)
                 last_refresh = time.time()
 
+    if instance_object:
+        instance_object.add_event2(
+            'Fetching required HTTP resource %s into blob %s, complete'
+            % (url, blob_uuid))
     logs.with_field('bytes_fetched', fetched).info('Fetch complete')
 
     # We really should verify the checksum here before we commit the blob to the
