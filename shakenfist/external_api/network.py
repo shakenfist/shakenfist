@@ -43,11 +43,9 @@ def _delete_network(network_from_db, wait_interfaces=None):
 
     if wait_interfaces:
         n.state = network.Network.STATE_DELETE_WAIT
-        n.add_event('api', 'delete-wait')
         etcd.enqueue(config.NODE_NAME,
                      {'tasks': [DeleteNetworkWhenClean(n.uuid, wait_interfaces)]})
     else:
-        n.add_event('api', 'delete')
         etcd.enqueue('networknode', DestroyNetworkTask(n.uuid))
 
 

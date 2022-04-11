@@ -686,9 +686,10 @@ class Network(dbo):
                 added.append(n)
 
             if removed:
-                self.add_event('remove mesh elements', ' '.join(removed))
+                self.add_event2('remove mesh elements',
+                                extra={'removed': removed})
             if added:
-                self.add_event('add mesh elements', ' '.join(added))
+                self.add_event2('add mesh elements', extra={'added': added})
 
     def _add_mesh_element(self, n):
         self.add_event2('adding new mesh element', extra={'ip': n})

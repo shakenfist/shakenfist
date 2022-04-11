@@ -48,9 +48,6 @@ class BaseFakeObject(object):
     def unique_label(self):
         return ('instance', self.uuid)
 
-    def add_event(self, operation, phase, duration=None, msg=None):
-        pass
-
     def delete(self):
         pass
 
