@@ -74,6 +74,7 @@ class Artifact(dbo):
         if artifact_type == cls.TYPE_IMAGE and source_url.startswith(BLOB_URL):
             static_values['in_memory_only'] = True
             a = Artifact(static_values)
+            a.log.with_fields(static_values).info('Artifact is in-memory only')
         else:
             Artifact._db_create(artifact_uuid, static_values)
             a = Artifact.from_db(artifact_uuid)

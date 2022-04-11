@@ -277,11 +277,14 @@ class ImageFetchHelper(object):
                         'Transcoding %s -> %s' % (blob_path, cache_path))
                     util_image.create_qcow2([lock], blob_path, cache_path)
 
-            # Now create the cache of the transcode output
+            # Now create the cache of the transcode output, we exec 'cp' here
+            # because it might take a long time and we therefore want a lock
+            # refresher to be running.
             transcode_blob_uuid = str(uuid.uuid4())
             transcode_blob_path = os.path.join(
                 config.STORAGE_PATH, 'blobs', transcode_blob_uuid)
-            shutil.copyfile(cache_path, transcode_blob_path)
+            util_process.execute(
+                [lock], 'cp %s %s' % (cache_path, transcode_blob_path))
             st = os.stat(transcode_blob_path)
 
             transcode_blob = Blob.new(
