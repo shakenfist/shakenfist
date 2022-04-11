@@ -73,8 +73,7 @@ class TestDiskSpecifications(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 },
                 {
-                    'base': ('http://archive.ubuntu.com/ubuntu/dists/focal/main/'
-                             'installer-amd64/current/legacy-images/netboot/mini.iso')
+                    'base': ('https://sfcbr.shakenfist.com/focal-mini.iso')
                 }
             ], None, None)
 
