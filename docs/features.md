@@ -59,6 +59,33 @@ The following operations are exposed on blobs by the REST API:
 | --- | --- | --- |
 | list blobs | `blob list` | `get_blobs()` |
 
+## Events
+
+Shaken Fist has an event logging system for the main object types. So for example, instead of reading through log files to find all the state changes that an instance went through, you can simply ask for a list of the events for that instance. This also means that the instance owner can see those logs without having to be given access to your log files.
+
+The following object types currently record events: artifacts; blobs; instances; networks; networkinterfaces; nodes; and uploads. In general, events are exposed in the API as operations on the object they relate to. So for example there is a `instance events` command, which calls the `get_instance_events()` API client call. Those various calls are documented by their object type.
+
+<!-- document common event format once it has been finalized -->
+
+# Instances
+
+Instances are the primary reason that you'd run Shaken Fist, so there's a lot to cover in their implementation. Obviously instances can be created, deleted, listed, and shown. Additionally, you can list the network interfaces on an instance, track and change metadata on a given instance (a simple key value store similar to OpenStack tags), request the current serial console output; and see events related to the instance. Instances can also have their power state managed: soft (ACPI) reboots; hard (power cycle) reboots; powered off; powered on; and paused.
+
+When creating an instance you can configure:
+* the name of the instance
+* how many vCPUs the instance has
+* how much memory the instance has
+* what network connections the instance has, including floating IP attachments and the network interface model to use
+* what disks the instance has, their size, type, and bus
+* what ssh key cloud-init should set up, if your instance includes cloud-init
+* other arbitrary user data which will be passed to cloud-init, if installed
+* the namespace of the instance
+* what video card the instance has, including the model and amount of video memory
+* whether BIOS boot or UEFI boot is used
+* whether secure boot is enabled, including a NVRAM template if required
+* what configuration drive type is used, with a default of OpenStack style
+* key and value metadata
+
 # Other features
 
 Shaken Fist supports the follow other features that are not directly related to an object type:
