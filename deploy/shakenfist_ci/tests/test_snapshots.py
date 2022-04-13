@@ -184,6 +184,9 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                 break
             time.sleep(5)
 
+        snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
+        self.assertEqual(snap1['vdc']['blob_uuid'],
+                         snapshots[-1].get('blob_uuid'))
         self.assertEqual(2, len(snapshots))
 
         snap2 = self.test_client.snapshot_instance(inst['uuid'], all=True)
