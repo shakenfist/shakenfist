@@ -990,7 +990,7 @@ class Instance(dbo):
                 b.ensure_local([], instance_object=self)
                 b.ref_count_inc()
                 shutil.copyfile(
-                    blob.Blob.filepath(b.uuid), os.path.join(self.instance_path, 'nvram'))
+                    b.filepath(), os.path.join(self.instance_path, 'nvram'))
                 nvram_template_attribute = ''
 
         # Convert side channels into extra devices. Side channels are implemented
@@ -1208,6 +1208,7 @@ class Instance(dbo):
         self.log.with_field('devices', disks).info('Devices for snapshot')
 
         out = {}
+        tasks = []
         for disk in disks:
             if disk['snapshot_ignores']:
                 continue
@@ -1223,36 +1224,37 @@ class Instance(dbo):
                 '%s%s/%s' % (artifact.INSTANCE_URL, self.uuid, disk['device']),
                 max_versions)
 
-            blob_uuid = str(uuid4())
-            entry = a.add_index(blob_uuid)
+            b = blob.Blob.new(str(uuid4()))
+            b.ref_count_inc()
+            entry = a.add_index(b.uuid)
 
             out[disk['device']] = {
                 'source_url': a.source_url,
                 'artifact_uuid': a.uuid,
                 'artifact_index': entry['index'],
-                'blob_uuid': blob_uuid
+                'blob_uuid': b.uuid
             }
 
             if disk['type'] == 'nvram':
                 # These are small and don't use qemu-img to capture, so just
                 # do them now.
                 blob.ensure_blob_path()
-                dest_path = blob.Blob.filepath(blob_uuid)
+                b = blob.Blob.new(b.uuid)
+                dest_path = b.filepath()
                 shutil.copyfile(disk['path'], dest_path)
 
                 st = os.stat(dest_path)
-                b = blob.Blob.new(blob_uuid, st.st_size,
-                                  time.time(), time.time())
+                b.set_immutable_attributes(
+                    st.st_size, time.time(), time.time())
                 b.observe()
                 a.state = artifact.Artifact.STATE_CREATED
 
             else:
-                etcd.enqueue(config.NODE_NAME, {
-                    'tasks': [SnapshotTask(self.uuid, disk, a.uuid, blob_uuid,
-                                           thin=thin)],
-                })
+                tasks.append(SnapshotTask(self.uuid, disk, a.uuid, b.uuid,
+                                          thin=thin))
 
-        self.add_event2('snapshot', extra=out)
+        etcd.enqueue(config.NODE_NAME, {'tasks': tasks})
+        self.add_event2('snapshot requested', extra=out)
         return out
 
 

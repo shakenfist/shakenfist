@@ -45,7 +45,9 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         start_time = time.time()
         while time.time() - start_time < 300:
             snapshots = self.test_client.get_instance_snapshots(inst1['uuid'])
-            if snapshots and snapshots[-1].get('blob_uuid') == snap1['vda']['blob_uuid']:
+            if (snapshots and
+                    snapshots[-1].get('blob_uuid') == snap1['vda']['blob_uuid'] and
+                    snapshots[-1].get('state') == 'created'):
                 break
             time.sleep(5)
 
@@ -175,38 +177,41 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         snap1 = self.test_client.snapshot_instance(inst['uuid'], all=True)
         self.assertIsNotNone(snap1)
 
-        # Wait until the blob uuid specified above is the one used for the
-        # current snapshot
         start_time = time.time()
-        while time.time() - start_time < 600:
-            snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
-            if snapshots and snapshots[-1].get('blob_uuid') == snap1['vdc']['blob_uuid']:
-                break
-            time.sleep(5)
-
         snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
-        self.assertEqual(snap1['vdc']['blob_uuid'],
-                         snapshots[-1].get('blob_uuid'))
+        while len(snapshots) < 2:
+            time.sleep(20)
+            if time.time() - start_time > 300:
+                raise base.TimeoutException('Label never appeared')
+
+            snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
         self.assertEqual(2, len(snapshots))
 
+        blob_uuids = []
+        for s in snapshots:
+            blob_uuids.append(s['blob_uuid'])
+        self.assertTrue(snap1['vda']['blob_uuid'] in blob_uuids)
+        self.assertTrue(snap1['vdc']['blob_uuid'] in blob_uuids)
+
+        # Take a second set of snapshots
         snap2 = self.test_client.snapshot_instance(inst['uuid'], all=True)
         self.assertIsNotNone(snap2)
 
-        # Wait until the blob uuid specified above is the one used for the
-        # current snapshot
         start_time = time.time()
-        while time.time() - start_time < 300:
-            snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
-            if snapshots and snapshots[-1].get('blob_uuid') == snap2['vdc']['blob_uuid']:
-                break
-            time.sleep(5)
+        snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
+        while len(snapshots) < 4:
+            time.sleep(20)
+            if time.time() - start_time > 300:
+                raise base.TimeoutException('Label never appeared')
 
+            snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
         self.assertEqual(4, len(snapshots))
 
-        for snap in snapshots:
-            self.assertIn(snap['source_url'].split('/')[-1], ['vda', 'vdc'])
-            self.assertTrue(snap['source_url'].startswith(
-                'sf://instance/%s' % inst['uuid']))
+        blob_uuids = []
+        for s in snapshots:
+            blob_uuids.append(s['blob_uuid'])
+        self.assertTrue(snap2['vda']['blob_uuid'] in blob_uuids)
+        self.assertTrue(snap2['vdc']['blob_uuid'] in blob_uuids)
 
         self.test_client.delete_instance(inst['uuid'])
 
@@ -407,7 +412,9 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         start_time = time.time()
         while time.time() - start_time < 300:
             snapshots = self.test_client.get_instance_snapshots(inst1['uuid'])
-            if snapshots and snapshots[-1].get('blob_uuid') == snap1['vda']['blob_uuid']:
+            if (snapshots and
+                    snapshots[-1].get('blob_uuid') == snap1['vda']['blob_uuid'] and
+                    snapshots[-1].get('state') == 'created'):
                 break
             time.sleep(5)
 

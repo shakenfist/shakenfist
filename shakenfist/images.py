@@ -228,11 +228,10 @@ class ImageFetchHelper(object):
             return
 
         elif mimetype in ['application/x-cd-image', 'application/x-iso9660-image']:
-            blob_path = os.path.join(config.STORAGE_PATH, 'blobs', b.uuid)
             cache_path = os.path.join(
                 config.STORAGE_PATH, 'image_cache', b.uuid + '.iso')
             if not os.path.exists(cache_path):
-                util_general.link(blob_path, cache_path)
+                util_general.link(b.filepath(), cache_path)
 
         elif cached_remotely:
             remote_blob = Blob.from_db(cached_remotely)
@@ -242,14 +241,11 @@ class ImageFetchHelper(object):
 
             cache_path = os.path.join(
                 config.STORAGE_PATH, 'image_cache', b.uuid + '.qcow2')
-            remote_blob_path = os.path.join(
-                config.STORAGE_PATH, 'blobs', remote_blob.uuid)
             if not os.path.exists(cache_path):
-                util_general.link(remote_blob_path, cache_path)
+                util_general.link(remote_blob.filepath(), cache_path)
 
         else:
-            blob_path = os.path.join(config.STORAGE_PATH, 'blobs', b.uuid)
-
+            blob_path = b.filepath()
             if mimetype == 'application/gzip':
                 cache_path = os.path.join(
                     config.STORAGE_PATH, 'image_cache', b.uuid)
@@ -278,14 +274,15 @@ class ImageFetchHelper(object):
             # because it might take a long time and we therefore want a lock
             # refresher to be running.
             transcode_blob_uuid = str(uuid.uuid4())
-            transcode_blob_path = os.path.join(
-                config.STORAGE_PATH, 'blobs', transcode_blob_uuid)
+            transcode_blob = Blob.new(transcode_blob_uuid)
+            transcode_blob.ref_count_inc()
+            transcode_blob_path = transcode_blob.filepath()
             util_process.execute(
                 [lock], 'cp %s %s' % (cache_path, transcode_blob_path))
             st = os.stat(transcode_blob_path)
 
-            transcode_blob = Blob.new(
-                transcode_blob_uuid, st.st_size, time.time(), time.time())
+            transcode_blob.set_immutable_attributes(
+                st.st_size, time.time(), time.time())
             transcode_blob.state = Blob.STATE_CREATED
             transcode_blob.observe()
             transcode_blob.request_replication()
@@ -294,7 +291,6 @@ class ImageFetchHelper(object):
                 'Recorded transcode')
 
             b.add_transcode(TRANSCODE_DESCRIPTION, transcode_blob_uuid)
-            transcode_blob.ref_count_inc()
 
         shutil.chown(cache_path, config.LIBVIRT_USER,
                      config.LIBVIRT_GROUP)
@@ -328,9 +324,7 @@ class ImageFetchHelper(object):
                                 instance_object=instance_object)
 
             # Ensure checksum is correct
-            if not verify_checksum(
-                    os.path.join(config.STORAGE_PATH, 'blobs', b.uuid),
-                    checksum, checksum_type):
+            if not verify_checksum(b.filepath(), checksum, checksum_type):
                 self.instance.add_event2('fetched image had bad checksum')
                 self.artifact.add_event2('fetched image had bad checksum')
                 raise exceptions.BadCheckSum('url=%s' % url)

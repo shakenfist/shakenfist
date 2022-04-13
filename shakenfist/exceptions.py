@@ -219,5 +219,5 @@ class BlobDependencyMissing(Exception):
     pass
 
 
-class BlobsMustHaveContent(Exception):
+class BlobsAlreadyConfigured(Exception):
     pass
