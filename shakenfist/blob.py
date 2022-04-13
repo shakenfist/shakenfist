@@ -17,7 +17,7 @@ from shakenfist.constants import LOCK_REFRESH_SECONDS, GiB
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist.exceptions import (BlobDeleted, BlobFetchFailed,
-                                   BlobDependencyMissing, BlobsMustHaveContent)
+                                   BlobDependencyMissing, BlobsAlreadyConfigured)
 from shakenfist import instance
 from shakenfist import logutil
 from shakenfist.metrics import get_minimum_object_version as gmov
@@ -30,9 +30,15 @@ from shakenfist.util import image as util_image
 LOG, _ = logutil.setup(__name__)
 
 
+# Caution! The blob object stores some otherwise immutable values as attributes
+# because we don't know them at the time we create the blob. That is, they're
+# empty briefly, and then populated later. Thus, don't assume that is ok to
+# change the size, modification or fetch time, or dependency chain of a blob post
+# creation. The lack of write properties for these values is deliberate!
+
 class Blob(dbo):
     object_type = 'blob'
-    current_version = 4
+    current_version = 5
     upgrade_supported = True
 
     state_targets = {
@@ -56,11 +62,6 @@ class Blob(dbo):
         super(Blob, self).__init__(static_values.get('uuid'),
                                    static_values.get('version'))
 
-        self.__size = static_values['size']
-        self.__modified = static_values['modified']
-        self.__fetched_at = static_values['fetched_at']
-        self.__depends_on = static_values['depends_on']
-
     @classmethod
     def upgrade(cls, static_values):
         changed = False
@@ -70,6 +71,23 @@ class Blob(dbo):
             static_values['modified'] = cls.normalize_timestamp(
                 static_values['modified'])
             static_values['version'] = 4
+            changed = True
+
+        if static_values.get('version') == 4:
+            immutable_attributes = {
+                'size': static_values['size'],
+                'modified': static_values['modified'],
+                'fetched_at': static_values['fetched_at'],
+                'depends_on': static_values['depends_on']
+            }
+            etcd.put('attribute/%s' % cls.object_type, static_values['uuid'],
+                     'immutable_attributes', immutable_attributes)
+
+            del static_values['size']
+            del static_values['modified']
+            del static_values['fetched_at']
+            del static_values['depends_on']
+            static_values['version'] = 5
             changed = True
 
         if changed:
@@ -93,19 +111,11 @@ class Blob(dbo):
         return time.mktime(t)
 
     @classmethod
-    def new(cls, blob_uuid, size, modified, fetched_at, depends_on=None):
-        if not size:
-            raise BlobsMustHaveContent('A blob cannot be of zero size')
-
+    def new(cls, blob_uuid):
         Blob._db_create(
             blob_uuid,
             {
                 'uuid': blob_uuid,
-                'size': size,
-                'modified': cls.normalize_timestamp(modified),
-                'fetched_at': fetched_at,
-                'depends_on': depends_on,
-
                 'version': cls.current_version
             }
         )
@@ -137,22 +147,36 @@ class Blob(dbo):
         out.update(self.info)
         return out
 
-    # Static values
+    # Static values, but stored in the "immutable attributes" attribute because
+    # we don't always know them at creation time
     @property
     def size(self):
-        return self.__size
+        return self._db_get_attribute('immutable_attributes').get('size')
 
     @property
     def modified(self):
-        return self.__modified
+        return self._db_get_attribute('immutable_attributes').get('modified')
 
     @property
     def fetched_at(self):
-        return self.__fetched_at
+        return self._db_get_attribute('immutable_attributes').get('fetched_at')
 
     @property
     def depends_on(self):
-        return self.__depends_on
+        return self._db_get_attribute('immutable_attributes').get('depends_on')
+
+    def set_immutable_attributes(self, size, modified, fetched_at, depends_on=None):
+        if self._db_get_attribute('immutable_attributes') != {}:
+            raise BlobsAlreadyConfigured(
+                'immutable attributes already set for blob')
+
+        immutable_attributes = {
+            'size': size,
+            'modified': modified,
+            'fetched_at': fetched_at,
+            'depends_on': depends_on
+        }
+        self._db_set_attribute('immutable_attributes', immutable_attributes)
 
     # Values routed to attributes
     @property
@@ -260,8 +284,7 @@ class Blob(dbo):
 
         with self.get_lock_attr('info', 'Set blob info'):
             if not self.info:
-                blob_path = os.path.join(
-                    config.STORAGE_PATH, 'blobs', self.uuid)
+                blob_path = self.filepath()
 
                 # We put a bunch of information from "qemu-img info" into the
                 # blob because its helpful. However, there are some values we
@@ -323,10 +346,8 @@ class Blob(dbo):
 
         # Actually replicate this blob
         with self.get_lock(config.NODE_NAME) as blob_lock:
-            blob_dir = os.path.join(config.STORAGE_PATH, 'blobs')
-            blob_path = os.path.join(blob_dir, self.uuid)
-            os.makedirs(blob_dir, exist_ok=True)
-
+            ensure_blob_path()
+            blob_path = self.filepath()
             if os.path.exists(blob_path):
                 self.observe()
                 return
@@ -460,9 +481,8 @@ class Blob(dbo):
                     self.log.with_field('node', n).info(
                         'Instructed to replicate blob')
 
-    @staticmethod
-    def filepath(blob_uuid):
-        return os.path.join(config.STORAGE_PATH, 'blobs', blob_uuid)
+    def filepath(self):
+        return os.path.join(config.STORAGE_PATH, 'blobs', self.uuid)
 
 
 def ensure_blob_path():
@@ -470,33 +490,37 @@ def ensure_blob_path():
     os.makedirs(blobs_path, exist_ok=True)
 
 
-def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
+def snapshot_disk(disk, blob_uuid, instance_object, thin=False):
+    b = Blob.from_db(blob_uuid)
     if not os.path.exists(disk['path']):
+        b.state = Blob.STATE_ERROR
+        b.error = 'Disk missing: %s' % disk['path']
         return
     ensure_blob_path()
-    dest_path = Blob.filepath(blob_uuid)
+
+    instance_object.add_event2('creating snapshot with blob uuid %s' % b.uuid)
+    b.add_event2('blob is a snapshot of instance %s' % instance_object.uuid)
+    dest_path = b.filepath()
 
     # Actually make the snapshot
-    depends_on = None
-    with util_general.RecordedOperation('snapshot %s' % disk['device'], related_object):
-        depends_on = util_image.snapshot(
-            None, disk['path'], dest_path, thin=thin)
-        st = os.stat(dest_path)
+    depends_on = util_image.snapshot(None, disk['path'], dest_path, thin=thin)
+    st = os.stat(dest_path)
 
     # Check that the dependency (if any) actually exists. This test can fail when
     # the blob used to start an instance has been deleted already.
     if depends_on:
         dep_blob = Blob.from_db(depends_on)
         if not dep_blob or dep_blob.state.value != Blob.STATE_CREATED:
-            raise BlobDependencyMissing(
-                'Snapshot depends on blob UUID %s, which is missing'
-                % depends_on)
+            b.state = Blob.STATE_ERROR
+            b.error = 'Snapshot depends on blob %s which is missing' % depends_on
+            return
         dep_blob.ref_count_inc()
 
     # And make the associated blob
-    b = Blob.new(blob_uuid, st.st_size, time.time(), time.time(),
-                 depends_on=depends_on)
+    b.set_immutable_attributes(st.st_size, time.time(), time.time(),
+                               depends_on=depends_on)
     b.state = Blob.STATE_CREATED
+    instance_object.add_event2('created snapshot with blob uuid %s' % b.uuid)
     b.observe()
     b.request_replication()
     return b
@@ -504,6 +528,7 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
 
 def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
     ensure_blob_path()
+    b = Blob.new(blob_uuid)
 
     fetched = 0
     if resp.headers.get('Content-Length'):
@@ -513,7 +538,7 @@ def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
 
     previous_percentage = 0.0
     last_refresh = 0
-    dest_path = Blob.filepath(blob_uuid)
+    dest_path = b.filepath()
 
     with open(dest_path, 'wb') as f:
         for chunk in resp.iter_content(chunk_size=8192):
@@ -526,7 +551,7 @@ def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
                     if instance_object:
                         instance_object.add_event2(
                             'Fetching required HTTP resource %s into blob %s, %d%% complete'
-                            % (url, blob_uuid, percentage))
+                            % (url, b.uuid, percentage))
 
                     logs.with_field('bytes_fetched', fetched).debug(
                         'Fetch %.02f percent complete' % percentage)
@@ -539,7 +564,7 @@ def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
     if instance_object:
         instance_object.add_event2(
             'Fetching required HTTP resource %s into blob %s, complete'
-            % (url, blob_uuid))
+            % (url, b.uuid))
     logs.with_field('bytes_fetched', fetched).info('Fetch complete')
 
     # We really should verify the checksum here before we commit the blob to the
@@ -549,8 +574,8 @@ def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
     if not total_size:
         total_size = fetched
 
-    b = Blob.new(blob_uuid, total_size, resp.headers.get('Last-Modified'),
-                 time.time())
+    b.set_immutable_attributes(total_size, resp.headers.get('Last-Modified'),
+                               time.time())
     b.state = Blob.STATE_CREATED
     b.observe()
     b.request_replication()

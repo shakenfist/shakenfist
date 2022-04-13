@@ -8,7 +8,7 @@ import shutil
 import time
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.blob import Blob
+from shakenfist import blob
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
@@ -192,8 +192,8 @@ class Monitor(daemon.Daemon):
 
     def _maintain_blobs(self):
         # Find orphaned and deleted blobs still on disk
+        blob.ensure_blob_path()
         blob_path = os.path.join(config.STORAGE_PATH, 'blobs')
-        os.makedirs(blob_path, exist_ok=True)
         cache_path = os.path.join(config.STORAGE_PATH, 'image_cache')
         os.makedirs(cache_path, exist_ok=True)
 
@@ -211,8 +211,8 @@ class Monitor(daemon.Daemon):
                         os.unlink(entpath)
 
                     else:
-                        b = Blob.from_db(ent)
-                        if (not b or b.state.value == Blob.STATE_DELETED
+                        b = blob.Blob.from_db(ent)
+                        if (not b or b.state.value == blob.Blob.STATE_DELETED
                                 or config.NODE_NAME not in b.locations):
                             LOG.with_fields({
                                 'blob': ent}).warning('Deleting orphaned blob')
@@ -223,8 +223,8 @@ class Monitor(daemon.Daemon):
                             if cached:
                                 os.unlink(cached)
             except FileNotFoundError:
-                LOG.debug('File %s disappeared while maintaining blobs'
-                          % entpath)
+                LOG.debug(
+                    'File %s disappeared while maintaining blobs' % entpath)
 
         # Find transcoded blobs in the image cache which are no longer in use
         for ent in os.listdir(cache_path):
@@ -245,7 +245,7 @@ class Monitor(daemon.Daemon):
             # If we haven't seen this file in use for more than two cleaner delays...
             if time.time() - st.st_mtime > config.CLEANER_DELAY * 2:
                 blob_uuid = ent.split('.')[0]
-                b = Blob.from_db(blob_uuid)
+                b = blob.Blob.from_db(blob_uuid)
                 if not b:
                     LOG.with_fields({
                         'blob': ent}).warning('Deleting orphaned image cache entry')
@@ -289,7 +289,7 @@ class Monitor(daemon.Daemon):
 
         for blob_uuid in n.blobs:
             if not os.path.exists(os.path.join(config.STORAGE_PATH, 'blobs', blob_uuid)):
-                b = Blob.from_db(blob_uuid)
+                b = blob.Blob.from_db(blob_uuid)
                 if b:
                     LOG.with_fields({
                         'blob': blob_uuid}).warning('Blob missing from node')

@@ -7,7 +7,7 @@ from webargs import fields
 from webargs.flaskparser import use_kwargs
 
 from shakenfist import baseobject
-from shakenfist.blob import Blob, Blobs
+from shakenfist import blob
 from shakenfist.config import config
 from shakenfist import etcd
 from shakenfist.external_api import base as api_base
@@ -40,7 +40,7 @@ def _read_remote(target, blob_uuid, offset=0):
 class BlobEndpoint(api_base.Resource):
     @jwt_required()
     def get(self, blob_uuid=None):
-        b = Blob.from_db(blob_uuid)
+        b = blob.Blob.from_db(blob_uuid)
         if not b:
             return api_base.error(404, 'blob not found')
 
@@ -59,13 +59,13 @@ class BlobDataEndpoint(api_base.Resource):
     @use_kwargs(get_args, location='query')
     def get(self, blob_uuid=None, offset=0):
         # Ensure the blob exists
-        b = Blob.from_db(blob_uuid)
+        b = blob.Blob.from_db(blob_uuid)
         if not b:
             return api_base.error(404, 'blob not found')
 
         # Fast path if we have the blob locally
-        os.makedirs(os.path.join(config.STORAGE_PATH, 'blobs'), exist_ok=True)
-        blob_path = os.path.join(config.STORAGE_PATH, 'blobs', blob_uuid)
+        blob.ensure_blob_path()
+        blob_path = b.filepath()
         if os.path.exists(blob_path):
             return flask.Response(
                 flask.stream_with_context(_read_file(blob_path, offset)),
@@ -89,7 +89,7 @@ class BlobsEndpoint(api_base.Resource):
         retval = []
 
         with etcd.ThreadLocalReadOnlyCache():
-            for b in Blobs(filters=[baseobject.active_states_filter]):
+            for b in blob.Blobs(filters=[baseobject.active_states_filter]):
                 if node and node in b.locations:
                     retval.append(b.external_view())
                 else:

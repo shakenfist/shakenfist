@@ -151,19 +151,19 @@ class ArtifactUploadEndpoint(api_base.Resource):
         with a.get_lock(ttl=(12 * constants.LOCK_REFRESH_SECONDS),
                         timeout=config.MAX_IMAGE_TRANSFER_SECONDS):
             blob_uuid = str(uuid.uuid4())
-            blob_dir = os.path.join(config.STORAGE_PATH, 'blobs')
-            blob_path = os.path.join(blob_dir, blob_uuid)
+            b = Blob.new(blob_uuid)
 
             upload_dir = os.path.join(config.STORAGE_PATH, 'uploads')
             upload_path = os.path.join(upload_dir, u.uuid)
 
             # NOTE(mikal): we can't use os.rename() here because these paths
             # might be on different filesystems.
+            blob_path = b.filepath()
             shutil.move(upload_path, blob_path)
             st = os.stat(blob_path)
-            b = Blob.new(
-                blob_uuid, st.st_size,
-                time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime()),
+            b.set_immutable_attributes(
+                st.st_size, time.strftime(
+                    '%a, %d %b %Y %H:%M:%S GMT', time.gmtime()),
                 time.time())
             b.state = Blob.STATE_CREATED
             b.ref_count_inc()
