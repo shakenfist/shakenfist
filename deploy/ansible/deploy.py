@@ -22,6 +22,8 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
         'SERVER_PACKAGE', 'shakenfist')
     variables['client_package'] = os.environ.get(
         'CLIENT_PACKAGE', 'shakenfist-client')
+    variables['agent_package'] = os.environ.get(
+        'AGENT_PACKAGE', 'shakenfist-agent')
     variables['pip_extra'] = os.environ.get('PIP_EXTRA', '')
 
     variables['topology'] = os.environ.get('TOPOLOGY')

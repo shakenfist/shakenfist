@@ -82,3 +82,23 @@
 
 - debug:
     msg: "Client wheel file: {{client_wheel_file}}"
+
+- name: Build Shaken Fist agent wheel
+  shell: |
+    rm dist/*
+    python3 setup.py sdist bdist_wheel
+  args:
+    chdir: "{{source_path}}/agent-python"
+
+- name: Determine wheel filename
+  shell: ls dist | egrep "shakenfist_agent.*\.whl"
+  args:
+    chdir: "{{source_path}}/agent-python"
+  register: agent_wheel_file_complex
+
+- name: Extract the wheel filename
+  set_fact:
+    agent_wheel_file: "{{agent_wheel_file_complex.stdout}}"
+
+- debug:
+    msg: "Agent wheel file: {{agent_wheel_file}}"

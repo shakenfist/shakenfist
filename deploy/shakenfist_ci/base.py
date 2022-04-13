@@ -6,7 +6,6 @@ import logging
 import os
 import random
 import re
-from socket import error as socket_error
 import string
 import sys
 import testtools
@@ -76,7 +75,7 @@ class BaseTestCase(testtools.TestCase):
         sys.stderr.write(
             '----------------------- start %s console -----------------------\n'
             % instance_uuid)
-        for line in self.system_client.get_console_data(instance_uuid, -1).split('\n'):
+        for line in self.system_client.get_console_data(instance_uuid, -1).split('\n')[-20:]:
             sys.stderr.write('Instance console: %s\n' % line)
         sys.stderr.write(
             '----------------------- end %s console -----------------------\n'
@@ -124,13 +123,9 @@ class BaseTestCase(testtools.TestCase):
         return self._await_instance_event(
             instance_uuid, 'detected poweroff', after=after)
 
-    def _await_login_prompt(self, instance_uuid, after=None):
+    def _await_instance_ready(self, instance_uuid, after=None):
         return self._await_instance_event(
-            instance_uuid, 'trigger', 'login prompt', after)
-
-    def _await_cloud_init_complete(self, instance_uuid, after=None):
-        return self._await_instance_event(
-            instance_uuid, 'trigger', 'cloud-init complete', after)
+            instance_uuid, None, 'instance is ready', after)
 
     def _await_instance_event(
             self, instance_uuid, operation, message=None, after=None):
@@ -155,9 +150,9 @@ class BaseTestCase(testtools.TestCase):
                 'Instance %s was not created in a reasonable time (%s)'
                 % (instance_uuid, i))
 
-        # Once created, we shouldn't need more than another 2 minutes for boot.
+        # Once created, we shouldn't need more than another 5 minutes for boot.
         start_time = time.time()
-        while time.time() - start_time < 2 * 60:
+        while time.time() - start_time < 5 * 60:
             for event in self.system_client.get_instance_events(instance_uuid):
                 if after and event['timestamp'] <= after:
                     continue
@@ -168,19 +163,10 @@ class BaseTestCase(testtools.TestCase):
 
             time.sleep(5)
 
-            # If this is a login prompt, then try mashing the console keyboard
-            if message == 'login prompt':
-                try:
-                    s = telnetlib.Telnet(i['node'], i['console_port'], 30)
-                    s.write('\n'.encode('ascii'))
-                    s.close()
-                except socket_error:
-                    pass
-
         self._log_console(instance_uuid)
         self._log_instance_events(instance_uuid)
         raise TimeoutException(
-            'After time %s, instance %s had no event "%s:%s" (waited 10 mins)' % (
+            'After time %s, instance %s had no event "%s:%s"' % (
                 after, instance_uuid, operation, message))
 
     def _await_image_download_success(self, image_uuid, after=None):
@@ -412,9 +398,9 @@ class TestDistroBoots(BaseNamespacedTestCase):
                     'base': base_image,
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
-        self._await_login_prompt(inst['uuid'])
+        self._await_instance_ready(inst['uuid'])
 
         ip = self.test_client.get_instance_interfaces(inst['uuid'])[0]['ipv4']
         self._test_ping(inst['uuid'], self.net['uuid'], ip, 0)

@@ -30,7 +30,7 @@ class TestDisks(base.BaseNamespacedTestCase):
                     'type': 'disk',
                     'bus': 'nvme'
                 }
-            ], None, base.load_userdata('bootok'))
+            ], None, base.load_userdata('bootok'), side_channels=['sf-agent'])
 
         self.assertInstanceConsoleAfterBoot(inst['uuid'], 'System booted ok')
 

@@ -42,10 +42,11 @@ echo 'Floating IPs work!' > /var/www/html/index.html
                 }
             ],
             None,
-            str(base64.b64encode(ud.encode('utf-8')), 'utf-8'))
+            str(base64.b64encode(ud.encode('utf-8')), 'utf-8'),
+            side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst['uuid'])
-        self._await_cloud_init_complete(inst['uuid'])
+        self._await_instance_ready(inst['uuid'])
 
         # Wait for boot and cloud-init
         time.sleep(120)

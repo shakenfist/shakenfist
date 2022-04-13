@@ -130,11 +130,11 @@
           - unzip
         state: latest
 
-    - name: Crete python venv and install Shaken Fist packages
+    - name: Create python venv and install Shaken Fist packages
       shell: |
         mkdir -p /srv/shakenfist/venv
         python3 -mvenv --system-site-packages /srv/shakenfist/venv
-        /srv/shakenfist/venv/bin/pip install {{pip_extra}} {{server_package}} {{client_package}}
+        /srv/shakenfist/venv/bin/pip install {{pip_extra}} {{agent_package}} {{server_package}} {{client_package}}
 
 - hosts: hypervisors, network_node, eventlog_node
   any_errors_fatal: true

@@ -57,7 +57,7 @@ fi
 printenv | grep GETSF || true
 
 # Cleanup dangling temporary scripts
-rm -f /tmp/sf-per-node-primary /tmp/sf-per-node
+rm -f /tmp/sf-per-node-primary /tmp/sf-per-node /tmp/shakenfist*.whl
 
 # Warn people
 question_start
@@ -101,11 +101,13 @@ if [ ${GETSF_RELEASE} == "release" ]; then
     status "We will use released packages."
     GETSF_SERVER_PACKAGE="shakenfist"
     GETSF_CLIENT_PACKAGE="shakenfist-client"
+    GETSF_AGENT_PACKAGE="shakenfist-agent"
 elif [ ${GETSF_RELEASE} == "pre-release" ]; then
     status "We will use pre-release packages."
     PIP_EXTRA="--pre"
     GETSF_SERVER_PACKAGE="shakenfist"
     GETSF_CLIENT_PACKAGE="shakenfist-client"
+    GETSF_AGENT_PACKAGE="shakenfist-agent"
 elif [ ${GETSF_RELEASE} == "local" ]; then
     status "We will use local packages."
 
@@ -154,7 +156,23 @@ if [ ${GETSF_LOCAL_SOURCE} == "build" ]; then
     question_end
 
     if [ ! -e "${GETSF_CLIENT_REPO}/.git" ]; then
-        error "Server git clone does not exist."
+        error "Client git clone does not exist."
+    fi
+
+    question_start
+    echo "What is the path to your shakenfist agent git checkout?"
+    echo
+    if [ -z ${GETSF_AGENT_REPO} ]; then
+        echo -n "(a pathname) >> "
+        read GETSF_AGENT_REPO
+        record_answer GETSF_AGENT_REPO "${GETSF_AGENT_REPO}"
+    else
+        echo "(a pathname) >> ${GETSF_AGENT_REPO}"
+    fi
+    question_end
+
+    if [ ! -e "${GETSF_AGENT_REPO}/.git" ]; then
+        error "Agent git clone does not exist."
     fi
 elif [ ${GETSF_LOCAL_SOURCE} == "static" ]; then
     question_start
@@ -187,6 +205,22 @@ elif [ ${GETSF_LOCAL_SOURCE} == "static" ]; then
 
     if [ ! -e ${GETSF_CLIENT_PACKAGE} ]; then
         error "Client package file does not exist."
+    fi
+
+    question_start
+    echo "What is the path to your agent package?"
+    echo
+    if [ -z ${GETSF_AGENT_PACKAGE} ]; then
+        echo -n "(a pathname) >> "
+        read GETSF_AGENT_PACKAGE
+        record_answer GETSF_AGENT_PACKAGE "${GETSF_AGENT_PACKAGE}"
+    else
+        echo "(a pathname) >> ${GETSF_AGENT_PACKAGE}"
+    fi
+    question_end
+
+    if [ ! -e ${GETSF_AGENT_PACKAGE} ]; then
+        error "Agent package file does not exist."
     fi
 else
     error "Could not parse response."
@@ -272,9 +306,9 @@ else
     question_end
 
     status "Determining node roles."
-    status "Nodes in a Shaken Fist cluster have various roles. We need to determine"
-    status "which roles to apply to each of your nodes. We'll therefore walk you"
-    status "through a series of questions about those now."
+    echo "Nodes in a Shaken Fist cluster have various roles. We need to determine"
+    echo "which roles to apply to each of your nodes. We'll therefore walk you"
+    echo "through a series of questions about those now."
     echo
 
     question_start
@@ -508,7 +542,7 @@ if [ ! -z ${GETSF_SERVER_REPO} ]; then
     DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 \
         -o Dpkg::Options::="--force-confold" -y install \
         python3 python3-pip python3-wheel python3-setuptools \
-        python3-readme-renderer twine
+        python3-readme-renderer twine git
 
     echo
     status "Building server package"
@@ -522,6 +556,8 @@ if [ ! -z ${GETSF_SERVER_REPO} ]; then
     tar czf docs.tgz docs
     python3 setup.py sdist bdist_wheel
     twine check dist/*
+    cp dist/*.whl /tmp/
+
     GETSF_SERVER_PACKAGE=$(pwd)"/"$(ls dist/*.whl)
 
     echo
@@ -540,10 +576,32 @@ if [ ! -z ${GETSF_CLIENT_REPO} ]; then
     fi
     python3 setup.py sdist bdist_wheel
     twine check dist/*
+    cp dist/*.whl /tmp/
+
     GETSF_CLIENT_PACKAGE=$(pwd)"/"$(ls dist/*.whl)
 
     echo
-    status "Server package is ${GETSF_CLIENT_PACKAGE}"
+    status "Client package is ${GETSF_CLIENT_PACKAGE}"
+    cd ${cwd}
+fi
+
+# Assumes we've also built a server package
+if [ ! -z ${GETSF_AGENT_REPO} ]; then
+    echo
+    status "Building agent package"
+    cwd=$(pwd)
+    cd ${GETSF_AGENT_REPO}
+    if [ -e dist ]; then
+        rm -rf build dist *.egg-info
+    fi
+    python3 setup.py sdist bdist_wheel
+    twine check dist/*
+    cp dist/*.whl /tmp/
+
+    GETSF_AGENT_PACKAGE=$(pwd)"/"$(ls dist/*.whl)
+
+    echo
+    status "Agent package is ${GETSF_AGENT_PACKAGE}"
     cd ${cwd}
 fi
 
@@ -561,7 +619,7 @@ function error {
     }
 
 function status {
-    echo -e "\${Blue}\$1\${Color_Off}"
+    echo -e "\${Blue}\$(date) \$1\${Color_Off}"
     }
 
 # We must run as root to do the things we do.
@@ -602,8 +660,6 @@ echo
 
 # Install required packages
 APT_GET="DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpkg::Options::=\"--force-confold\" -y"
-status "Updating package list."
-eval \${APT_GET} update
 echo
 
 status "Installing cpu-checker."
@@ -629,9 +685,13 @@ if [ "${GETSF_NODES}" == "localhost" ]; then
     if [ ! -e "/tmp/"$(basename ${GETSF_CLIENT_PACKAGE}) ]; then
         cp ${GETSF_CLIENT_PACKAGE} "/tmp/"$(basename ${GETSF_CLIENT_PACKAGE})
     fi
+    if [ ! -e "/tmp/"$(basename ${GETSF_AGENT_PACKAGE}) ]; then
+        cp ${GETSF_AGENT_PACKAGE} "/tmp/"$(basename ${GETSF_AGENT_PACKAGE})
+    fi
     
     /tmp/sf-per-node-primary
 else
+    # TODO(mikal): Could I replace this with an ansible play so it runs in parallel?
     for node in ${GETSF_NODES[@]}; do
         status "    ...${node}"
         safe_node=$(echo ${node} | tr "-" "_")
@@ -640,6 +700,7 @@ else
         if [ ${GETSF_RELEASE} == "local" ]; then
             scp -o StrictHostKeyChecking=no -i ${GETSF_SSH_KEY_FILENAME} ${GETSF_SERVER_PACKAGE} ${GETSF_SSH_USER}@${!calc_var_name}:/tmp/
             scp -o StrictHostKeyChecking=no -i ${GETSF_SSH_KEY_FILENAME} ${GETSF_CLIENT_PACKAGE} ${GETSF_SSH_USER}@${!calc_var_name}:/tmp/
+            scp -o StrictHostKeyChecking=no -i ${GETSF_SSH_KEY_FILENAME} ${GETSF_AGENT_PACKAGE} ${GETSF_SSH_USER}@${!calc_var_name}:/tmp/
         fi
 
         scp -o StrictHostKeyChecking=no -i ${GETSF_SSH_KEY_FILENAME} /tmp/sf-per-node-primary ${GETSF_SSH_USER}@${!calc_var_name}:/tmp/sf-per-node
@@ -710,15 +771,19 @@ DEPLOYEOF
 if [ ${GETSF_RELEASE} == "local" ]; then
     localized_server_package="/tmp/"$(basename ${GETSF_SERVER_PACKAGE})
     localized_client_package="/tmp/"$(basename ${GETSF_CLIENT_PACKAGE})
+    localized_agent_package="/tmp/"$(basename ${GETSF_AGENT_PACKAGE})
     echo "Shakenfist package: ${localized_server_package}"
     echo "Client package: ${localized_client_package}"
+    echo "Agent package: ${localized_agent_package}"
 
     echo "export SERVER_PACKAGE=${localized_server_package}" >> /root/sf-deploy
     echo "export CLIENT_PACKAGE=${localized_client_package}" >> /root/sf-deploy
+    echo "export AGENT_PACKAGE=${localized_agent_package}" >> /root/sf-deploy
     echo "export PIP_EXTRA=${PIP_EXTRA}" >> /root/sf-deploy
 else
     echo "export SERVER_PACKAGE=shakenfist" >> /root/sf-deploy
     echo "export CLIENT_PACKAGE=shakenfist-client" >> /root/sf-deploy
+    echo "export AGENT_PACKAGE=shakenfist-agent" >> /root/sf-deploy
     echo "export PIP_EXTRA=${PIP_EXTRA}" >> /root/sf-deploy
 fi
 

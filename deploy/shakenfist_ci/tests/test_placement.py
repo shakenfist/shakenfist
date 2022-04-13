@@ -33,7 +33,8 @@ class TestPlacement(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/ubuntu-1804',
                     'type': 'disk'
                 }
-            ], None, None, force_placement='sf-nosuchnode')
+            ], None, None, force_placement='sf-nosuchnode',
+            side_channels=['sf-agent'])
 
     def test_local_placement_works(self):
         # Create an instance, force it to be on the name node as us.
@@ -51,12 +52,13 @@ class TestPlacement(base.BaseNamespacedTestCase):
                         'base': 'sf://upload/system/ubuntu-1804',
                         'type': 'disk'
                     }
-                ], None, None, force_placement=socket.getfqdn())
+                ], None, None, force_placement=socket.getfqdn(),
+                side_channels=['sf-agent'])
         except apiclient.ResourceNotFoundException as e:
             self.skip('Target node does not exist. %s' % e)
             return
 
-        self._await_login_prompt(inst['uuid'])
+        self._await_instance_ready(inst['uuid'])
 
         # NOTE(mikal): Ubuntu 18.04 has a bug where DHCP doesn't always work in the
         # cloud image. This is ok though, because we should be using the config drive
@@ -87,12 +89,12 @@ class TestPlacement(base.BaseNamespacedTestCase):
                         'base': 'sf://upload/system/ubuntu-1804',
                         'type': 'disk'
                     }
-                ], None, None, force_placement='sf-2')
+                ], None, None, force_placement='sf-2', side_channels=['sf-agent'])
         except apiclient.ResourceNotFoundException as e:
             self.skip('Target node does not exist. %s' % e)
             return
 
-        self._await_login_prompt(inst['uuid'])
+        self._await_instance_ready(inst['uuid'])
 
         # NOTE(mikal): Ubuntu 18.04 has a bug where DHCP doesn't always work in the
         # cloud image. This is ok though, because we should be using the config drive

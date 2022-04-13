@@ -33,7 +33,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/ubuntu-2004',
                     'type': 'disk'
                 }
-            ], None, base.load_userdata('bootok'))
+            ], None, base.load_userdata('bootok'), side_channels=['sf-agent'])
         LOG.info('Started test instance %s', inst['uuid'])
 
         # We need to start a second instance on the same node / network so that
@@ -48,10 +48,10 @@ class TestStateChanges(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, force_placement=inst['node'])
+            ], None, None, force_placement=inst['node'], side_channels=['sf-agent'])
         LOG.info('Started keep network alive instance')
 
         # Wait for our test instance to boot

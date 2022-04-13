@@ -46,6 +46,7 @@ class Monitor(daemon.Daemon):
 
                 instance_uuid = domain.name().split(':')[1]
                 log_ctx = LOG.with_instance(instance_uuid)
+                log_ctx.debug('Instance is running')
 
                 inst = instance.Instance.from_db(instance_uuid)
                 if not inst:

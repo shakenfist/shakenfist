@@ -8,17 +8,17 @@ class TestDiskSpecifications(base.BaseNamespacedTestCase):
 
     def test_default(self):
         inst = self.test_client.create_instance(
-            'cirros', 1, 1024, None,
+            'test-default-disk', 1, 1024, None,
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst['uuid'])
-        self._await_login_prompt(inst['uuid'])
+        self._await_instance_ready(inst['uuid'])
 
         console = base.LoggingSocket(self.test_client, inst)
         out = console.execute('df -h')
@@ -27,18 +27,18 @@ class TestDiskSpecifications(base.BaseNamespacedTestCase):
 
     def test_ide(self):
         inst = self.test_client.create_instance(
-            'cirros', 1, 1024, None,
+            'test-ide-disk', 1, 1024, None,
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk',
                     'bus': 'ide'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst['uuid'])
-        self._await_login_prompt(inst['uuid'])
+        self._await_instance_ready(inst['uuid'])
 
         console = base.LoggingSocket(self.test_client, inst)
         out = console.execute('df -h')
@@ -47,24 +47,24 @@ class TestDiskSpecifications(base.BaseNamespacedTestCase):
 
     def test_old_style_disk_size(self):
         inst = self.test_client.create_instance(
-            'cirros', 1, 1024, None,
+            'test-old-style-disk', 1, 1024, None,
             [
                 {
                     'size': '8',
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
         self.assertIsNotNone(inst['uuid'])
-        self._await_login_prompt(inst['uuid'])
+        self._await_instance_ready(inst['uuid'])
 
     def test_complex(self):
         inst = self.test_client.create_instance(
-            'cirros', 1, 1024, None,
+            'test-complex-disk', 1, 1024, None,
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk',
                     'bus': 'ide'
                 },
@@ -75,10 +75,10 @@ class TestDiskSpecifications(base.BaseNamespacedTestCase):
                 {
                     'base': ('https://sfcbr.shakenfist.com/focal-mini.iso')
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst['uuid'])
-        self._await_login_prompt(inst['uuid'])
+        self._await_instance_ready(inst['uuid'])
 
         console = base.LoggingSocket(self.test_client, inst)
 

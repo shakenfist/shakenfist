@@ -77,7 +77,7 @@ def _safe_int_cast(i):
 
 class Instance(dbo):
     object_type = 'instance'
-    current_version = 6
+    current_version = 7
     upgrade_supported = True
 
     # docs/development/state_machine.md has a description of these states.
@@ -179,6 +179,11 @@ class Instance(dbo):
             static_values['version'] = 6
             changed = True
 
+        if static_values.get('version') == 6:
+            static_values['side_channels'] = []
+            static_values['version'] = 7
+            changed = True
+
         if changed:
             LOG.with_fields({
                 cls.object_type: static_values['uuid'],
@@ -214,6 +219,7 @@ class Instance(dbo):
             'nvram_template': nvram_template,
             'secure_boot': secure_boot,
             'machine_type': machine_type,
+            'side_channels': side_channels,
 
             'version': cls.current_version
         }
@@ -245,6 +251,7 @@ class Instance(dbo):
             'nvram_template': self.nvram_template,
             'secure_boot': self.secure_boot,
             'machine_type': self.machine_type,
+            'side_channels': self.side_channels,
 
             'version': self.version,
             'error_message': self.error,
@@ -357,6 +364,10 @@ class Instance(dbo):
     @property
     def machine_type(self):
         return self.__machine_type
+
+    @property
+    def side_channels(self):
+        return self.__side_channels
 
     @property
     def instance_path(self):
@@ -982,6 +993,20 @@ class Instance(dbo):
                     blob.Blob.filepath(b.uuid), os.path.join(self.instance_path, 'nvram'))
                 nvram_template_attribute = ''
 
+        # Convert side channels into extra devices. Side channels are implemented
+        # as virtio-serial domain sockets on the hypervisor, and serial posts on
+        # the guest.
+        extradevices = []
+        side_channels = self.side_channels
+        if side_channels:
+            for channel in side_channels:
+                extradevices.append("<channel type='unix'>")
+                extradevices.append(
+                    "  <source mode='bind' path='%s/sc-%s'/>" % (self.instance_path, channel))
+                extradevices.append(
+                    "  <target type='virtio' name='%s' state='connected'/>" % channel)
+                extradevices.append("</channel>")
+
         # NOTE(mikal): the database stores memory allocations in MB, but the
         # domain XML takes them in KB. That wouldn't be worth a comment here if
         # I hadn't spent _ages_ finding a bug related to it.
@@ -1002,7 +1027,8 @@ class Instance(dbo):
             secure_boot=self.secure_boot,
             nvram_template_attribute=nvram_template_attribute,
             extracommands=block_devices.get('extracommands', []),
-            machine_type=self.machine_type
+            machine_type=self.machine_type,
+            extradevices=extradevices
         )
 
         # Libvirt re-writes the domain XML once loaded, so we store the XML

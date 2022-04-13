@@ -18,7 +18,7 @@ class TestSystemNamespace(base.BaseTestCase):
         self.assertIn(net['uuid'], nets)
 
         inst = self.system_client.create_instance(
-            'cirros', 1, 1024,
+            'test-system-ns', 1, 1024,
             [
                 {
                     'network_uuid': net['uuid']
@@ -27,10 +27,10 @@ class TestSystemNamespace(base.BaseTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst['uuid'])
         self.assertIsNotNone(inst['node'])

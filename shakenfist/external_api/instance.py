@@ -106,7 +106,7 @@ class InstancesEndpoint(api_base.Resource):
     def post(self, name=None, cpus=None, memory=None, network=None, disk=None,
              ssh_key=None, user_data=None, placed_on=None, namespace=None,
              video=None, uefi=False, configdrive=None, metadata=None,
-             nvram_template=None, secure_boot=False):
+             nvram_template=None, secure_boot=False, side_channels=None):
         global SCHEDULER
 
         instance_uuid = str(uuid.uuid4())
@@ -329,7 +329,8 @@ class InstancesEndpoint(api_base.Resource):
             requested_placement=placed_on,
             nvram_template=nvram_template,
             secure_boot=secure_boot,
-            machine_type=machine_type
+            machine_type=machine_type,
+            side_channels=side_channels
         )
 
         # Initialise metadata
@@ -695,7 +696,7 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
 
         resp = flask.Response(
             instance_from_db.get_console_data(parsed_length),
-            mimetype='text/plain')
+            mimetype='applicaton/octet-stream')
         resp.status_code = 200
         return resp
 

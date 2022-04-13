@@ -16,7 +16,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
 
     def test_single_disk_snapshots(self):
         inst1 = self.test_client.create_instance(
-            'cirros', 1, 1024,
+            'test-snapshots', 1, 1024,
             [
                 {
                     'network_uuid': self.net['uuid']
@@ -25,15 +25,15 @@ class TestSnapshots(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst1['uuid'])
         self.assertIsNotNone(inst1['node'])
 
-        self._await_login_prompt(inst1['uuid'])
+        self._await_instance_ready(inst1['uuid'])
 
         # Take a snapshot
         snap1 = self.test_client.snapshot_instance(inst1['uuid'])
@@ -90,11 +90,11 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                     'base': 'sf://blob/%s' % snap2['vda']['blob_uuid'],
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst2['uuid'])
         self.assertIsNotNone(inst2['node'])
-        self._await_login_prompt(inst2['uuid'])
+        self._await_instance_ready(inst2['uuid'])
 
         # Now attempt to boot the snapshot via snapshot uuid
         inst3 = self.test_client.create_instance(
@@ -110,11 +110,11 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                     'base': 'sf://snapshot/%s' % snap2['vda']['artifact_uuid'],
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst3['uuid'])
         self.assertIsNotNone(inst3['node'])
-        self._await_login_prompt(inst3['uuid'])
+        self._await_instance_ready(inst3['uuid'])
 
         # Test deleting snapshot versions
         versions = self.test_client.get_artifact_versions(snapshot_uuid)
@@ -145,7 +145,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
 
     def test_multiple_disk_snapshots(self):
         inst = self.test_client.create_instance(
-            'cirros', 1, 1024,
+            'test-multi-snapshots', 1, 1024,
             [
                 {
                     'network_uuid': self.net['uuid']
@@ -154,7 +154,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 },
                 {
@@ -163,14 +163,14 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                 },
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'cdrom'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst['uuid'])
         self.assertIsNotNone(inst['node'])
-        self._await_login_prompt(inst['uuid'])
+        self._await_instance_ready(inst['uuid'])
 
         snap1 = self.test_client.snapshot_instance(inst['uuid'], all=True)
         self.assertIsNotNone(snap1)
@@ -178,7 +178,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         # Wait until the blob uuid specified above is the one used for the
         # current snapshot
         start_time = time.time()
-        while time.time() - start_time < 300:
+        while time.time() - start_time < 450:
             snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
             if snapshots and snapshots[-1].get('blob_uuid') == snap1['vdc']['blob_uuid']:
                 break
@@ -209,7 +209,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
 
     def test_labels(self):
         inst1 = self.test_client.create_instance(
-            'cirros', 1, 1024,
+            'test-labels', 1, 1024,
             [
                 {
                     'network_uuid': self.net['uuid']
@@ -218,15 +218,15 @@ class TestSnapshots(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst1['uuid'])
         self.assertIsNotNone(inst1['node'])
 
-        self._await_login_prompt(inst1['uuid'])
+        self._await_instance_ready(inst1['uuid'])
 
         # Take a snapshot
         snap = self.test_client.snapshot_instance(
@@ -247,18 +247,18 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                     'base': 'label:testlabel',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst2['uuid'])
         self.assertIsNotNone(inst2['node'])
-        self._await_login_prompt(inst2['uuid'])
+        self._await_instance_ready(inst2['uuid'])
 
         self.test_client.delete_instance(inst1['uuid'])
         self.test_client.delete_instance(inst2['uuid'])
 
     def test_labels_with_deleted_snapshot(self):
         inst1 = self.test_client.create_instance(
-            'cirros', 1, 1024,
+            'test-deleted-snapshot', 1, 1024,
             [
                 {
                     'network_uuid': self.net['uuid']
@@ -267,15 +267,15 @@ class TestSnapshots(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst1['uuid'])
         self.assertIsNotNone(inst1['node'])
 
-        self._await_login_prompt(inst1['uuid'])
+        self._await_instance_ready(inst1['uuid'])
 
         # Take a snapshot
         snap = self.test_client.snapshot_instance(
@@ -306,7 +306,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
 
     def test_specific_device_snapshots(self):
         inst = self.test_client.create_instance(
-            'cirros', 1, 1024,
+            'test-device-snapshots', 1, 1024,
             [
                 {
                     'network_uuid': self.net['uuid']
@@ -315,7 +315,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 },
                 {
@@ -324,14 +324,14 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                 },
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/cirros',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None)
+            ], None, None, side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst['uuid'])
         self.assertIsNotNone(inst['node'])
-        self._await_login_prompt(inst['uuid'])
+        self._await_instance_ready(inst['uuid'])
 
         snap1 = self.test_client.snapshot_instance(inst['uuid'], device='vdc')
         self.assertIsNotNone(snap1)
@@ -383,18 +383,21 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/ubuntu-2004',
                     'type': 'disk'
                 }
-            ], None, base.load_userdata('writedata'))
+            ], None, base.load_userdata('writedata'), side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst1['uuid'])
         self.assertIsNotNone(inst1['node'])
 
-        self._await_login_prompt(inst1['uuid'])
+        self._await_instance_ready(inst1['uuid'])
         self.assertInstanceConsoleAfterBoot(inst1['uuid'], 'System booted ok')
 
         # Take a snapshot
         snap1 = self.test_client.snapshot_instance(inst1['uuid'], thin=True)
         self.assertIsNotNone(snap1)
         self.assertEqual(1, snap1['vda']['artifact_index'])
+
+        # Ensure the snapshot is ready
+        self._await_artifacts_ready([snap1['vda']['artifact_uuid']])
 
         # Wait until the blob uuid specified above is the one used for the
         # current snapshot
@@ -441,12 +444,12 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                     'base': 'sf://blob/%s' % inst1['disks'][0]['blob_uuid'],
                     'type': 'disk'
                 }
-            ], None, base.load_userdata('writedata'))
+            ], None, base.load_userdata('writedata'), side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst2['uuid'])
         self.assertIsNotNone(inst2['node'])
 
-        self._await_login_prompt(inst2['uuid'])
+        self._await_instance_ready(inst2['uuid'])
         self.assertInstanceConsoleAfterBoot(inst2['uuid'], 'System booted ok')
 
         # Cleanup
