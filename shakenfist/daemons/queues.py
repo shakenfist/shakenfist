@@ -215,20 +215,20 @@ def image_fetch(url, inst):
         # TODO(andy): Wait up to 15 mins for another queue process to download
         # the required image. This will be changed to queue on a
         # "waiting_image_fetch" queue but this works now.
-        images.ImageFetchHelper(inst, url).get_image()
+        images.ImageFetchHelper(inst, a).get_image()
         a.add_event2('artifact fetch complete')
 
-    except (exceptions.HTTPError, requests.exceptions.RequestException) as e:
-        LOG.with_field('image', url).info('Failed to fetch image')
-
+    except (exceptions.HTTPError, requests.exceptions.RequestException,
+            requests.exceptions.ConnectionError) as e:
         # Clean common problems to store in events
         msg = str(e)
         if msg.find('Name or service not known'):
             msg = 'DNS error'
         if msg.find('No address associated with hostname'):
             msg = 'DNS error'
-        a.add_event2('artifact fetch failed: %s' % msg)
 
+        a.state = Artifact.STATE_ERROR
+        a.error = msg
         raise exceptions.ImageFetchTaskFailedException(
             'Failed to fetch image: %s Exception: %s' % (url, e))
 

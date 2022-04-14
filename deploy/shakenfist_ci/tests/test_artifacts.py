@@ -40,7 +40,16 @@ class TestImages(base.BaseNamespacedTestCase):
         url = ('http://nosuch.shakenfist.com/centos/6/images/'
                'CentOS-6-x86_64-GenericCloud-1604.qcow2.xz')
         img = self.system_client.cache_artifact(url)
-        self._await_image_download_error(img['uuid'], after=time.time())
+
+        start_time = time.time()
+        while time.time() - start_time < 7 * 60:
+            img = self.system_client.get_artifact(img['uuid'])
+            if img['state'] == 'error':
+                return
+            time.sleep(5)
+
+        self.fail('Image was not placed into an error state after seven minutes: %s'
+                  % img['uuid'])
 
     def test_instance_invalid_image(self):
         # Start our test instance
