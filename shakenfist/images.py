@@ -101,18 +101,15 @@ def _fetch_remote_checksum(checksum_url):
 
 
 class ImageFetchHelper(object):
-    def __init__(self, inst, url):
+    def __init__(self, inst, artifact):
         self.instance = inst
-        self.url = url
-
-        self.__artifact = Artifact.from_url(Artifact.TYPE_IMAGE, self.url)
-        self.log = LOG.with_fields(
-            {'url': self.url, 'artifact': self.__artifact.uuid})
+        self.artifact = artifact
+        self.log = LOG.with_field('artifact', self.artifact.uuid)
 
     def get_image(self):
         fetched_blobs = []
-        with self.__artifact.get_lock(ttl=(12 * LOCK_REFRESH_SECONDS),
-                                      timeout=config.MAX_IMAGE_TRANSFER_SECONDS) as lock:
+        with self.artifact.get_lock(ttl=(12 * LOCK_REFRESH_SECONDS),
+                                    timeout=config.MAX_IMAGE_TRANSFER_SECONDS) as lock:
             # Transfer the requested image, in its original format, from either
             # within the cluster (if we have it cached), or from the source. This
             # means that even if we have a cached post transcode version of the image
@@ -144,12 +141,12 @@ class ImageFetchHelper(object):
         # NOTE(mikal): it is assumed the caller holds a lock on the artifact, and passes
         # it in.
 
-        url, checksum, checksum_type = _resolve_image(self.url)
+        url, checksum, checksum_type = _resolve_image(self.artifact.source_url)
 
         # If this is a request for a URL, do we have the most recent version
         # somewhere in the cluster?
         if not url.startswith(BLOB_URL):
-            most_recent = self.__artifact.most_recent_index
+            most_recent = self.artifact.most_recent_index
             dirty = False
 
             if most_recent.get('index', 0) == 0:
@@ -163,11 +160,11 @@ class ImageFetchHelper(object):
                     resp.headers.get('Last-Modified'))
 
                 if not most_recent_blob.modified:
-                    self.__artifact.add_event2(
+                    self.artifact.add_event2(
                         'image requires fetch, no Last-Modified recorded')
                     dirty = True
                 elif most_recent_blob.modified != normalized_new_timestamp:
-                    self.__artifact.add_event2(
+                    self.artifact.add_event2(
                         'image requires fetch, Last-Modified: %s -> %s'
                         % (most_recent_blob.modified, normalized_new_timestamp))
                     dirty = True
@@ -177,11 +174,11 @@ class ImageFetchHelper(object):
                     response_size = int(response_size)
 
                 if not most_recent_blob.size:
-                    self.__artifact.add_event2(
+                    self.artifact.add_event2(
                         'image requires fetch, no Content-Length recorded')
                     dirty = True
                 elif most_recent_blob.size != response_size:
-                    self.__artifact.add_event2(
+                    self.artifact.add_event2(
                         'image requires fetch, Content-Length: %s -> %s'
                         % (most_recent_blob.size, response_size))
                     dirty = True
@@ -209,8 +206,8 @@ class ImageFetchHelper(object):
         # it in lock.
 
         # If this blob uuid is not the most recent index for the artifact, set that
-        if self.__artifact.most_recent_index.get('blob_uuid') != b.uuid:
-            self.__artifact.add_index(b.uuid)
+        if self.artifact.most_recent_index.get('blob_uuid') != b.uuid:
+            self.artifact.add_index(b.uuid)
 
         # Transcode if required, placing the transcoded file in a well known location.
         # Note that even if we cache the transcoded version as another blob, the
@@ -303,7 +300,7 @@ class ImageFetchHelper(object):
                      config.LIBVIRT_GROUP)
         self.log.with_fields(util_general.stat_log_fields(cache_path)).info(
             'Cache file %s created' % cache_path)
-        self.__artifact.state = Artifact.STATE_CREATED
+        self.artifact.state = Artifact.STATE_CREATED
 
     def _blob_get(self, lock, url):
         """Fetch a blob from the cluster."""
@@ -324,7 +321,7 @@ class ImageFetchHelper(object):
         with util_general.RecordedOperation('fetch image', self.instance):
             resp = self._open_connection(url)
             blob_uuid = str(uuid.uuid4())
-            self.log.with_object(self.__artifact).with_fields({
+            self.log.with_object(self.artifact).with_fields({
                 'blob': blob_uuid,
                 'url': url}).info('Commencing HTTP fetch to blob')
             b = blob.http_fetch(url, resp, blob_uuid, [lock], self.log,
@@ -335,7 +332,7 @@ class ImageFetchHelper(object):
                     os.path.join(config.STORAGE_PATH, 'blobs', b.uuid),
                     checksum, checksum_type):
                 self.instance.add_event2('fetched image had bad checksum')
-                self.__artifact.add_event2('fetched image had bad checksum')
+                self.artifact.add_event2('fetched image had bad checksum')
                 raise exceptions.BadCheckSum('url=%s' % url)
 
             # Only persist values after the file has been verified.

@@ -172,10 +172,6 @@ class BaseTestCase(testtools.TestCase):
     def _await_image_download_success(self, image_uuid, after=None):
         return self._await_image_event(image_uuid, 'fetch', 'success', after)
 
-    def _await_image_download_error(self, image_uuid, after=None):
-        return self._await_image_event(
-            image_uuid, 'fetch', 'DNS error', after)
-
     def _await_image_event(
             self, image_uuid, operation, message=None, after=None):
         start_time = time.time()

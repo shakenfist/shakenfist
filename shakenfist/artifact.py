@@ -85,14 +85,15 @@ class Artifact(dbo):
 
     @staticmethod
     def from_url(artifact_type, url, max_versions=0):
-        artifacts = list(Artifacts([partial(url_filter, url),
-                                    partial(type_filter, artifact_type),
-                                    not_dead_states_filter]))
-        if len(artifacts) == 0:
-            return Artifact.new(artifact_type, url, max_versions)
-        if len(artifacts) == 1:
-            return artifacts[0]
-        raise exceptions.TooManyMatches()
+        with etcd.get_lock('artifact_from_url', None, url):
+            artifacts = list(Artifacts([partial(url_filter, url),
+                                        partial(type_filter, artifact_type),
+                                        not_dead_states_filter]))
+            if len(artifacts) == 0:
+                return Artifact.new(artifact_type, url, max_versions)
+            if len(artifacts) == 1:
+                return artifacts[0]
+            raise exceptions.TooManyMatches()
 
     # Static values
     @property

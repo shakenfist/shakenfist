@@ -10,7 +10,6 @@ from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import etcd
-from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist.ipmanager import IPManager
@@ -195,14 +194,10 @@ class Monitor(daemon.WorkerPoolDaemon):
         #
         if isinstance(workitem, RemoveDHCPNetworkTask):
             n.remove_dhcp()
-            eventlog.add_event('network', workitem.network_uuid(),
-                               'network node', 'remove dhcp', None, None)
             return
 
         if isinstance(workitem, RemoveNATNetworkTask):
             n.remove_nat()
-            eventlog.add_event('network', workitem.network_uuid(),
-                               'network node', 'remove nat', None, None)
             return
 
         #
@@ -222,8 +217,6 @@ class Monitor(daemon.WorkerPoolDaemon):
                 return
             try:
                 n.delete_on_network_node()
-                eventlog.add_event('network', workitem.network_uuid(),
-                                   'network node', 'destroy', None, None)
             except exceptions.DeadNetwork as e:
                 log_ctx.with_field('exception', e).warning(
                     'DestroyNetworkTask on dead network')
@@ -241,8 +234,6 @@ class Monitor(daemon.WorkerPoolDaemon):
             try:
                 n.create_on_network_node()
                 n.ensure_mesh()
-                eventlog.add_event('network', workitem.network_uuid(),
-                                   'network node', 'deploy', None, None)
             except exceptions.DeadNetwork as e:
                 log_ctx.with_field('exception', e).warning(
                     'DeployNetworkTask on dead network')
@@ -251,8 +242,6 @@ class Monitor(daemon.WorkerPoolDaemon):
             try:
                 n.create_on_network_node()
                 n.ensure_mesh()
-                eventlog.add_event('network', workitem.network_uuid(),
-                                   'network node', 'update dhcp', None, None)
             except exceptions.DeadNetwork as e:
                 log_ctx.with_field('exception', e).warning(
                     'UpdateDHCPNetworkTask on dead network')

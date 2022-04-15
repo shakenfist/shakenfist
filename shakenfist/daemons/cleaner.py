@@ -77,12 +77,10 @@ class Monitor(daemon.Daemon):
                     if attempts > 5:
                         # Sometimes we just can't delete the VM. Try the big
                         # hammer instead.
-                        log_ctx.warning(
-                            'Attempting alternate delete method for instance')
                         self._delete_instance_files(instance_uuid)
                         util_process.execute(
                             None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
-                        inst.add_event('enforced delete', 'complete')
+                        inst.add_event2('enforced delete via alternate method')
                     else:
                         inst.delete()
 
@@ -134,7 +132,6 @@ class Monitor(daemon.Daemon):
                         if time.time() - db_state.update_time < 300:
                             continue
 
-                        log_ctx.info('Detected stray instance')
                         self._delete_instance_files(instance_uuid)
                         try:
                             domain = conn.lookupByName(domain_name)
@@ -145,7 +142,7 @@ class Monitor(daemon.Daemon):
                             util_process.execute(
                                 None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
 
-                        inst.add_event('deleted stray', 'complete')
+                        inst.add_event2('deleted stray instance')
                         if db_state.value != dbo.STATE_DELETED:
                             inst.state.value = dbo.STATE_DELETED
                         continue
@@ -156,16 +153,15 @@ class Monitor(daemon.Daemon):
                     if not os.path.exists(inst.instance_path):
                         # If we're inactive and our files aren't on disk,
                         # we have a problem.
-                        log_ctx.info('Detected error state for instance')
+                        inst.add_event2('instance files missing')
                         if inst.state.value in [dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED]:
                             inst.state.value = dbo.STATE_DELETED
                         else:
                             inst.state = inst.state.value + '-error'
 
                     elif not db_power or db_power['power_state'] != 'off':
-                        log_ctx.info('Detected power off for instance')
                         inst.update_power_state('off')
-                        inst.add_event('detected poweroff', 'complete')
+                        inst.add_event2('detected poweroff')
 
         except libvirt.libvirtError as e:
             LOG.debug('Failed to lookup all domains: %s' % e)

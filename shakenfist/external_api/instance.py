@@ -363,12 +363,12 @@ class InstancesEndpoint(api_base.Resource):
                     else:
                         with db.get_lock('ipmanager', None,  netdesc['network_uuid'],
                                          ttl=120, op='Network allocate IP'):
-                            eventlog.add_event('network', netdesc['network_uuid'], 'allocate address',
-                                               None, None, inst.uuid)
                             ipm = IPManager.from_db(netdesc['network_uuid'])
                             if 'address' not in netdesc or not netdesc['address']:
                                 netdesc['address'] = ipm.get_random_free_address(
                                     inst.unique_label())
+                                inst.add_event2(
+                                    'allocated ip address', extra=netdesc)
                             else:
                                 if not ipm.reserve(netdesc['address'], inst.unique_label()):
                                     m = 'failed to reserve an IP on network %s' % (
@@ -432,14 +432,13 @@ class InstancesEndpoint(api_base.Resource):
                 placement = placed_on
 
         except exceptions.LowResourceException as e:
-            inst.add_event('schedule', 'failed', None,
-                           'Insufficient resources: ' + str(e))
+            inst.add_event2(
+                'schedule failed, insufficient resources: %s' % str(e))
             inst.enqueue_delete_due_error('scheduling failed')
             return api_base.error(507, str(e), suppress_traceback=True)
 
         except exceptions.CandidateNodeNotFoundException as e:
-            inst.add_event('schedule', 'failed', None,
-                           'Candidate node not found: ' + str(e))
+            inst.add_event2('schedule failed, node not found: %s' % str(e))
             inst.enqueue_delete_due_error('scheduling failed')
             return api_base.error(404, 'node not found: %s' % e, suppress_traceback=True)
 
@@ -534,7 +533,7 @@ class InstanceRebootSoftEndpoint(api_base.Resource):
     @api_base.requires_instance_active
     def post(self, instance_ref=None, instance_from_db=None):
         with instance_from_db.get_lock(op='Instance reboot soft'):
-            instance_from_db.add_event('api', 'soft reboot')
+            instance_from_db.add_event2('soft reboot')
             return instance_from_db.reboot(hard=False)
 
 
@@ -546,7 +545,7 @@ class InstanceRebootHardEndpoint(api_base.Resource):
     @api_base.requires_instance_active
     def post(self, instance_ref=None, instance_from_db=None):
         with instance_from_db.get_lock(op='Instance reboot hard'):
-            instance_from_db.add_event('api', 'hard reboot')
+            instance_from_db.add_event2('hard reboot')
             return instance_from_db.reboot(hard=True)
 
 
@@ -558,7 +557,7 @@ class InstancePowerOffEndpoint(api_base.Resource):
     @api_base.requires_instance_active
     def post(self, instance_ref=None, instance_from_db=None):
         with instance_from_db.get_lock(op='Instance power off'):
-            instance_from_db.add_event('api', 'poweroff')
+            instance_from_db.add_event2('poweroff')
             return instance_from_db.power_off()
 
 
@@ -570,7 +569,7 @@ class InstancePowerOnEndpoint(api_base.Resource):
     @api_base.requires_instance_active
     def post(self, instance_ref=None, instance_from_db=None):
         with instance_from_db.get_lock(op='Instance power on'):
-            instance_from_db.add_event('api', 'poweron')
+            instance_from_db.add_event2('poweron')
             return instance_from_db.power_on()
 
 
@@ -582,7 +581,7 @@ class InstancePauseEndpoint(api_base.Resource):
     @api_base.requires_instance_active
     def post(self, instance_ref=None, instance_from_db=None):
         with instance_from_db.get_lock(op='Instance pause'):
-            instance_from_db.add_event('api', 'pause')
+            instance_from_db.add_event2('pause')
             return instance_from_db.pause()
 
 
@@ -594,7 +593,7 @@ class InstanceUnpauseEndpoint(api_base.Resource):
     @api_base.requires_instance_active
     def post(self, instance_ref=None, instance_from_db=None):
         with instance_from_db.get_lock(op='Instance unpause'):
-            instance_from_db.add_event('api', 'unpause')
+            instance_from_db.add_event2('unpause')
             return instance_from_db.unpause()
 
 

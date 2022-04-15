@@ -7,7 +7,6 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
-from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist import images
 from shakenfist import instance
@@ -69,18 +68,6 @@ def handle(jobname, workitem):
                 log_i = log
 
             log_i.with_field('task_name', task.name()).info('Starting task')
-
-            # TODO(andy) Should network events also come through here eventually?
-            # Then this can be generalised to record events on networks/instances
-
-            # TODO(andy) This event should be recorded when it is recorded as
-            # dequeued in the DB. Currently it's reporting action on the item
-            # and calling it 'dequeue'.
-
-            if inst:
-                # TODO(andy) move to QueueTask
-                eventlog.add_event('instance', inst.uuid, task.pretty_task_name(),
-                                   'dequeued', None, 'Work item %s' % jobname)
 
             if isinstance(task, FetchImageTask):
                 image_fetch(task.url(), inst)
@@ -220,10 +207,6 @@ def handle(jobname, workitem):
 
     finally:
         etcd.resolve(config.NODE_NAME, jobname)
-        if inst:
-            inst.add_event('tasks complete', 'dequeued',
-                           msg='Work item %s' % jobname)
-        log.info('Completed workitem')
 
 
 def image_fetch(url, inst):
@@ -232,20 +215,20 @@ def image_fetch(url, inst):
         # TODO(andy): Wait up to 15 mins for another queue process to download
         # the required image. This will be changed to queue on a
         # "waiting_image_fetch" queue but this works now.
-        images.ImageFetchHelper(inst, url).get_image()
-        a.add_event('fetch', None, None, 'success')
+        images.ImageFetchHelper(inst, a).get_image()
+        a.add_event2('artifact fetch complete')
 
-    except (exceptions.HTTPError, requests.exceptions.RequestException) as e:
-        LOG.with_field('image', url).info('Failed to fetch image')
-
+    except (exceptions.HTTPError, requests.exceptions.RequestException,
+            requests.exceptions.ConnectionError) as e:
         # Clean common problems to store in events
         msg = str(e)
         if msg.find('Name or service not known'):
             msg = 'DNS error'
         if msg.find('No address associated with hostname'):
             msg = 'DNS error'
-        a.add_event('fetch', None, None, msg)
 
+        a.state = Artifact.STATE_ERROR
+        a.error = msg
         raise exceptions.ImageFetchTaskFailedException(
             'Failed to fetch image: %s Exception: %s' % (url, e))
 
@@ -260,8 +243,7 @@ def instance_preflight(inst, netdescs):
         return None
 
     except exceptions.LowResourceException as e:
-        inst.add_event('schedule', 'retry', None,
-                       'insufficient resources: ' + str(e))
+        inst.add_event2('schedule failed, insufficient resources: ' + str(e))
 
     # Unsuccessful placement, check if reached placement attempt limit
     db_placement = inst.placement
@@ -280,14 +262,12 @@ def instance_preflight(inst, netdescs):
                 if node != config.NODE_NAME:
                     candidates.append(node)
 
-        candidates = s.place_instance(inst, netdescs,
-                                      candidates=candidates)
+        candidates = s.place_instance(inst, netdescs, candidates=candidates)
         inst.place_instance(candidates[0])
         return candidates[0]
 
     except exceptions.LowResourceException as e:
-        inst.add_event('schedule', 'failed', None,
-                       'insufficient resources: ' + str(e))
+        inst.add_event2('schedule failed, insufficient resources: ' + str(e))
         # This raise implies delete above
         raise exceptions.AbortInstanceStartException(
             'Unable to find suitable node')
@@ -362,8 +342,6 @@ def instance_delete(inst):
         # in a transition state.
         if not inst.state.value.endswith('-error'):
             inst.state = dbo.STATE_DELETE_WAIT
-        eventlog.add_event('instance', inst.uuid,
-                           'queued', 'delete', None, None)
 
         # Create list of networks used by instance. We cannot use the
         # interfaces cached in the instance here, because the instance

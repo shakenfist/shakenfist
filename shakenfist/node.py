@@ -61,7 +61,6 @@ class Node(dbo):
         })
         n = Node.from_db(name)
         n.state = cls.STATE_CREATED
-        n.add_event('db record creation', None)
         return n
 
     @classmethod
