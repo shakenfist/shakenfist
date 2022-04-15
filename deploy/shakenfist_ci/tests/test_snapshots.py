@@ -178,7 +178,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         # Wait until the blob uuid specified above is the one used for the
         # current snapshot
         start_time = time.time()
-        while time.time() - start_time < 450:
+        while time.time() - start_time < 600:
             snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
             if snapshots and snapshots[-1].get('blob_uuid') == snap1['vdc']['blob_uuid']:
                 break
