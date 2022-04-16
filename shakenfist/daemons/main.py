@@ -11,6 +11,7 @@ import time
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.daemons import external_api as external_api_daemon
+from shakenfist.daemons import checksum as checksum_daemon
 from shakenfist.daemons import cleaner as cleaner_daemon
 from shakenfist.daemons import cluster as cluster_daemon
 from shakenfist.daemons import eventlog as eventlog_daemon
@@ -106,6 +107,7 @@ def restore_instances():
 
 DAEMON_IMPLEMENTATIONS = {
     'api': external_api_daemon,
+    'checksum': checksum_daemon,
     'cleaner': cleaner_daemon,
     'cluster': cluster_daemon,
     'eventlog': eventlog_daemon,

@@ -190,6 +190,31 @@ class Blob(dbo):
         self._remove_item_in_attribute_list('locations', location)
 
     @property
+    def checksums(self):
+        return self._db_get_attribute('checksums')
+
+    def update_checksum(self, hash):
+        with self.get_lock_attr('checksums', op='update checksums'):
+            c = self.checksums
+            if 'sha512' not in c:
+                c['sha512'] = hash
+            else:
+                if c['sha512'] != hash:
+                    # TODO(mikal): we should probably remove this replica of the
+                    # blob unless its the only one we have.
+                    self.add_event2('blob failed checksum validation',
+                                    extra={
+                                        'stored_hash': c['sha512'],
+                                        'node_hash': hash})
+
+            if 'nodes' not in c:
+                c['nodes'] = {config.NODE_NAME: time.time()}
+            else:
+                c['nodes'][config.NODE_NAME] = time.time()
+
+            self._db_set_attribute('checksums', c)
+
+    @property
     def info(self):
         return self._db_get_attribute('info')
 
