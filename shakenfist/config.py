@@ -176,7 +176,7 @@ class SFConfig(BaseSettings):
         60, description='How frequently to collect usage events.'
     )
 
-    # Other options
+    # Blob options
     BLOB_REPLICATION_FACTOR: int = Field(
         2, description='How many copies of each blob we like to have.'
     )
@@ -186,6 +186,13 @@ class SFConfig(BaseSettings):
     MAX_CONCURRENT_BLOB_TRANSFERS: int = Field(
         20, description='How many concurrent blob transfers we can have queued.'
     )
+    BLOB_TRANSCODE_MAXIMUM_IDLE_TIME: int = Field(
+        24 * 3600,
+        description=('How long we keep a unused cached transcode of a blob '
+                     'before reaping.')
+    )
+
+    # Other options
     ZONE: str = Field(
         'shakenfist', description='What nova called an availability zone'
     )
