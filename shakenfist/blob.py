@@ -191,6 +191,10 @@ class Blob(dbo):
             transcoded[style] = blob_uuid
             self._db_set_attribute('transcoded', transcoded)
 
+    def remove_transcodes(self):
+        with self.get_lock(op='Remove trancoded versions'):
+            self._db_set_attribute('transcoded', {})
+
     @property
     def last_used(self):
         last_used = self._db_get_attribute('last_used')
