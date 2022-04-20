@@ -6,7 +6,6 @@ import signal
 from threading import Event
 
 from shakenfist.config import config
-from shakenfist import etcd
 from shakenfist import logutil
 from shakenfist.util import libvirt as util_libvirt
 
@@ -86,11 +85,16 @@ class WorkerPoolDaemon(Daemon):
         self.workers.append(p)
         return p.pid
 
-    def dequeue_work_item(self, queue_name, processing_callback):
-        if len(self.workers) > self.present_cpus / 2:
+    def dequeue_work_items(self, queue, processing_callback):
+        max = (self.present_cpus / 2) - len(self.workers)
+        if max < 0:
             return False
 
-        jobname, workitem = etcd.dequeue(queue_name)
-        if not workitem:
-            return False
-        self.start_workitem(processing_callback, (jobname, workitem), 'worker')
+        found_work = False
+        for jobname, workitem in queue.get_workitems(max=max):
+            queue.mark_workitem_as_processing(jobname, workitem)
+            self.start_workitem(processing_callback,
+                                (jobname, workitem), 'worker')
+            found_work = True
+
+        return found_work

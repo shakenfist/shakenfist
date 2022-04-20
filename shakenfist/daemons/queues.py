@@ -1,5 +1,6 @@
 import requests
 import setproctitle
+import time
 
 from shakenfist.artifact import Artifact
 from shakenfist import blob
@@ -25,6 +26,7 @@ from shakenfist.tasks import (QueueTask,
                               FetchBlobTask)
 from shakenfist import network
 from shakenfist import networkinterface
+from shakenfist import queue
 from shakenfist import scheduler
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
@@ -409,19 +411,20 @@ class Monitor(daemon.WorkerPoolDaemon):
     def run(self):
         LOG.info('Starting')
 
-        while not self.exit.is_set():
-            try:
-                self.reap_workers()
+        with queue.Queue(config.NODE_NAME) as q:
+            while not self.exit.is_set():
+                try:
+                    self.reap_workers()
 
-                if not self.exit.is_set():
-                    if not self.dequeue_work_item(config.NODE_NAME, handle):
+                    if not self.exit.is_set():
+                        if not self.dequeue_work_items(q, handle):
+                            time.sleep(0.2)
+                    elif len(self.workers) > 0:
+                        LOG.info('Waiting for %d workers to finish'
+                                 % len(self.workers))
                         self.exit.wait(0.2)
-                elif len(self.workers) > 0:
-                    LOG.info('Waiting for %d workers to finish'
-                             % len(self.workers))
-                    self.exit.wait(0.2)
-                else:
-                    return
+                    else:
+                        return
 
-            except Exception as e:
-                util_general.ignore_exception('queue worker', e)
+                except Exception as e:
+                    util_general.ignore_exception('queue worker', e)

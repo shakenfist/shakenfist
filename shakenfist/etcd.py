@@ -177,7 +177,7 @@ class ActualLock(Lock):
             raise exceptions.ForbiddenWhileUsingReadOnlyCache(
                 'You cannot lock while using a read only cache')
 
-        self.path = _construct_key(objecttype, subtype, name)
+        self.path = construct_key(objecttype, subtype, name)
         super(ActualLock, self).__init__(self.path, ttl=ttl, client=client)
 
         self.objecttype = objecttype
@@ -323,7 +323,7 @@ def get_existing_locks():
     return key_val
 
 
-def _construct_key(objecttype, subtype, name):
+def construct_key(objecttype, subtype, name):
     if subtype and name:
         return '/sf/%s/%s/%s' % (objecttype, subtype, name)
     if name:
@@ -348,7 +348,7 @@ def put(objecttype, subtype, name, data, ttl=None):
         raise exceptions.ForbiddenWhileUsingReadOnlyCache(
             'You cannot change data while using a read only cache')
 
-    path = _construct_key(objecttype, subtype, name)
+    path = construct_key(objecttype, subtype, name)
     encoded = json.dumps(data, indent=4, sort_keys=True,
                          cls=JSONEncoderCustomTypes)
     WrappedEtcdClient().put(path, encoded, lease=None)
@@ -360,7 +360,7 @@ def create(objecttype, subtype, name, data, ttl=None):
         raise exceptions.ForbiddenWhileUsingReadOnlyCache(
             'You cannot change data while using a read only cache')
 
-    path = _construct_key(objecttype, subtype, name)
+    path = construct_key(objecttype, subtype, name)
     encoded = json.dumps(data, indent=4, sort_keys=True,
                          cls=JSONEncoderCustomTypes)
     return WrappedEtcdClient().create(path, encoded, lease=None)
@@ -368,7 +368,7 @@ def create(objecttype, subtype, name, data, ttl=None):
 
 @retry_etcd_forever
 def get(objecttype, subtype, name):
-    path = _construct_key(objecttype, subtype, name)
+    path = construct_key(objecttype, subtype, name)
 
     cache = read_only_cache()
     if cache:
@@ -383,7 +383,7 @@ def get(objecttype, subtype, name):
 
 @retry_etcd_forever
 def get_all(objecttype, subtype, prefix=None, sort_order=None, limit=0):
-    path = _construct_key(objecttype, subtype, prefix)
+    path = construct_key(objecttype, subtype, prefix)
 
     cache = read_only_cache()
     if cache:
@@ -398,7 +398,7 @@ def get_all(objecttype, subtype, prefix=None, sort_order=None, limit=0):
 
 @retry_etcd_forever
 def get_all_dict(objecttype, subtype=None, sort_order=None, limit=0):
-    path = _construct_key(objecttype, subtype, None)
+    path = construct_key(objecttype, subtype, None)
     key_val = {}
 
     cache = read_only_cache()
@@ -420,7 +420,7 @@ def delete(objecttype, subtype, name):
         raise exceptions.ForbiddenWhileUsingReadOnlyCache(
             'You cannot change data while using a read only cache')
 
-    path = _construct_key(objecttype, subtype, name)
+    path = construct_key(objecttype, subtype, name)
     WrappedEtcdClient().delete(path)
 
 
@@ -430,7 +430,7 @@ def delete_all(objecttype, subtype):
         raise exceptions.ForbiddenWhileUsingReadOnlyCache(
             'You cannot change data while using a read only cache')
 
-    path = _construct_key(objecttype, subtype, None)
+    path = construct_key(objecttype, subtype, None)
     WrappedEtcdClient().delete_prefix(path)
 
 
@@ -491,7 +491,7 @@ def dequeue(queuename):
             'You cannot consume queue work items while using a read only cache')
 
     try:
-        queue_path = _construct_key('queue', queuename, None)
+        queue_path = construct_key('queue', queuename, None)
         client = WrappedEtcdClient()
 
         # We only hold the lock if there is anything in the queue
@@ -544,7 +544,7 @@ def get_queue_length(queuename):
 
 @retry_etcd_forever
 def _restart_queue(queuename):
-    queue_path = _construct_key('processing', queuename, None)
+    queue_path = construct_key('processing', queuename, None)
     with get_lock('queue', None, queuename, op='Restart'):
         for data, metadata in WrappedEtcdClient().get_prefix(
                 queue_path, sort_order='ascend'):

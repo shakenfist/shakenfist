@@ -17,6 +17,7 @@ from shakenfist import logutil
 from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist.networkinterface import NetworkInterface
+from shakenfist import queue
 from shakenfist.tasks import (
     DeployNetworkTask,
     DestroyNetworkTask,
@@ -287,24 +288,25 @@ class Monitor(daemon.WorkerPoolDaemon):
             n.add_floating_ip(ni.floating.get('floating_address'), ni.ipv4)
 
     def _process_network_node_workitems(self):
-        while not self.exit.is_set():
-            jobname, workitem = etcd.dequeue('networknode')
-            if not workitem:
-                return
-            else:
-                try:
-                    log_ctx = LOG.with_field('workitem', workitem)
-                    if NetworkTask.__subclasscheck__(type(workitem)):
-                        self._process_network_workitem(log_ctx, workitem)
-                    elif NetworkInterfaceTask.__subclasscheck__(type(workitem)):
-                        self._process_networkinterface_workitem(
-                            log_ctx, workitem)
-                    else:
-                        raise exceptions.UnknownTaskException(
-                            'Network workitem was not decoded: %s' % workitem)
+        with queue.Queue('networknode') as q:
+            while not self.exit.is_set():
+                for jobname, workitem in q.get_workitems():
+                    try:
+                        q.mark_workitem_as_processing(jobname, workitem)
+                        log_ctx = LOG.with_field('workitem', workitem)
+                        if NetworkTask.__subclasscheck__(type(workitem)):
+                            self._process_network_workitem(log_ctx, workitem)
+                        elif NetworkInterfaceTask.__subclasscheck__(type(workitem)):
+                            self._process_networkinterface_workitem(
+                                log_ctx, workitem)
+                        else:
+                            raise exceptions.UnknownTaskException(
+                                'Network workitem was not decoded: %s' % workitem)
 
-                finally:
-                    etcd.resolve('networknode', jobname)
+                    finally:
+                        q.mark_workitem_as_completed(jobname, workitem)
+
+                time.sleep(0.2)
 
     def _reap_leaked_floating_ips(self):
         # Block until the network node queue is idle to avoid races

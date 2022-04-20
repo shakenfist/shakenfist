@@ -323,6 +323,7 @@ class Monitor(daemon.Daemon):
             _, kv = c.get('/sf/compact')
             c.compact(kv.mod_revision, physical=True)
             c.defragment()
+            c.close()
             LOG.info('Compacted etcd')
 
         except Exception as e:

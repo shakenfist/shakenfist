@@ -11,6 +11,7 @@ from shakenfist.config import config
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist.node import Node
+from shakenfist import queue
 
 
 logging.basicConfig(level=logging.INFO)
@@ -88,6 +89,16 @@ def set_etcd_config(flag, value):
 
 
 @click.command()
+@click.argument('queuename')
+def watch_queue(queuename):
+    with queue.Queue(queuename) as q:
+        while True:
+            for jobname, _ in q.get_workitems():
+                LOG.info('Would process %s' % jobname)
+            time.sleep(0.2)
+
+
+@click.command()
 def stop():
     click.echo('Gracefully stopping Shaken Fist on this node...')
     n = Node.from_db(config.NODE_NAME)
@@ -104,4 +115,5 @@ def stop():
 cli.add_command(bootstrap_system_key)
 cli.add_command(show_etcd_config)
 cli.add_command(set_etcd_config)
+cli.add_command(watch_queue)
 cli.add_command(stop)
