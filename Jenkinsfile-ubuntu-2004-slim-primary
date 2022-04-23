@@ -266,6 +266,13 @@ pipeline {
                   echo "vxlans leaked!"
                   exit 1
                 fi
+
+                # Ensure grpc isn't misconfigured, or being used after a fork
+                if [ `grep -c "Fork support is only compatible with the epoll1 and poll polling strategies" $WORKSPACE_TMP/syslog` -gt 0 ]
+                then
+                  echo "grpc called after a fork!"
+                  exit 1
+                fi
           '''
       }
     }
