@@ -5,19 +5,12 @@ import os
 import psutil
 import setproctitle
 import signal
-import sys
+import subprocess
 import time
 
 from shakenfist.config import config
 from shakenfist.daemons import daemon
-from shakenfist.daemons import external_api as external_api_daemon
-from shakenfist.daemons import cleaner as cleaner_daemon
-from shakenfist.daemons import cluster as cluster_daemon
-from shakenfist.daemons import eventlog as eventlog_daemon
-from shakenfist.daemons import queues as queues_daemon
-from shakenfist.daemons import net as net_daemon
-from shakenfist.daemons import resources as resource_daemon
-from shakenfist.daemons import sidechannel as sidechannel_daemon
+from shakenfist.daemons import shim
 from shakenfist import etcd
 from shakenfist import instance
 from shakenfist.ipmanager import IPManager
@@ -104,35 +97,22 @@ def restore_instances():
                 'exception while restoring instance on daemon restart')
 
 
-DAEMON_IMPLEMENTATIONS = {
-    'api': external_api_daemon,
-    'cleaner': cleaner_daemon,
-    'cluster': cluster_daemon,
-    'eventlog': eventlog_daemon,
-    'net': net_daemon,
-    'queues': queues_daemon,
-    'resources': resource_daemon,
-    'sidechannel': sidechannel_daemon
-}
-
-
-DAEMON_PIDS = {}
+DAEMON_PROCS = {}
 
 
 def emit_trace():
     # We have a bunch of subprocesses here, so we can't just use the default
     # faulthandler mechanism.
     faulthandler.dump_traceback
-    for pid in DAEMON_PIDS:
-        os.kill(pid, signal.SIGUSR1)
+    for proc in DAEMON_PROCS:
+        os.kill(DAEMON_PROCS[proc].pid, signal.SIGUSR1)
 
 
 signal.signal(signal.SIGUSR1, emit_trace)
 
 
 def main():
-    global DAEMON_IMPLEMENTATIONS
-    global DAEMON_PIDS
+    global DAEMON_PROCS
 
     LOG.info('Starting...')
     setproctitle.setproctitle(
@@ -154,17 +134,9 @@ def main():
     etcd.restart_queues()
 
     def _start_daemon(d):
-        pid = os.fork()
-        if pid == 0:
-            try:
-                DAEMON_IMPLEMENTATIONS[d].Monitor(d).run()
-                sys.exit(0)
-            except Exception as e:
-                util_general.ignore_exception('daemon creation', e)
-                sys.exit(1)
-
-        DAEMON_PIDS[pid] = d
-        LOG.with_field('pid', pid).info('Started %s' % d)
+        DAEMON_PROCS[d] = subprocess.Popen(
+            ['/srv/shakenfist/venv/bin/sf-daemon-shim', d])
+        LOG.with_field('pid', DAEMON_PROCS[d].pid).info('Started %s' % d)
 
     # Resource usage publisher, we need this early because scheduling decisions
     # might happen quite early on.
@@ -222,20 +194,21 @@ def main():
 
     def _audit_daemons():
         running_daemons = []
-        for pid in DAEMON_PIDS:
-            running_daemons.append(DAEMON_PIDS[pid])
+        for proc in DAEMON_PROCS:
+            running_daemons.append(proc)
 
-        for d in DAEMON_IMPLEMENTATIONS:
+        for d in shim.DAEMON_IMPLEMENTATIONS:
             if d not in running_daemons:
                 _start_daemon(d)
 
-        for d in list(DAEMON_PIDS):
-            if not psutil.pid_exists(d):
-                LOG.warning('%s pid is missing, restarting' % DAEMON_PIDS[d])
-                _start_daemon(DAEMON_PIDS[d])
+        for proc in list(DAEMON_PROCS):
+            if not psutil.pid_exists(DAEMON_PROCS[proc].pid):
+                LOG.warning('%s pid is missing, restarting' % DAEMON_PROCS[d])
+                del DAEMON_PROCS[d]
+                _start_daemon(DAEMON_PROCS[d])
 
     if not config.NODE_IS_EVENTLOG_NODE:
-        del DAEMON_IMPLEMENTATIONS['eventlog']
+        del shim.DAEMON_IMPLEMENTATIONS['eventlog']
 
     _audit_daemons()
     restore_instances()
@@ -246,13 +219,15 @@ def main():
         time.sleep(5)
 
         try:
-            wpid, _ = os.waitpid(-1, os.WNOHANG)
-            while wpid != 0:
-                LOG.warning('%s exited (pid %d)'
-                            % (DAEMON_PIDS.get(wpid, 'unknown'), wpid))
-                if wpid in DAEMON_PIDS:
-                    del DAEMON_PIDS[wpid]
-                wpid, _ = os.waitpid(-1, os.WNOHANG)
+            dead = []
+            for proc in DAEMON_PROCS:
+                if DAEMON_PROCS[proc].poll():
+                    dead.append(proc)
+
+            for d in dead:
+                LOG.with_field('pid', DAEMON_PROCS[d].pid).warning(
+                    '%s is dead, restarting' % proc)
+                del DAEMON_PROCS[d]
 
         except ChildProcessError:
             # We get this if there are no child processes
@@ -263,26 +238,27 @@ def main():
             _audit_daemons()
             Node.observe_this_node()
 
-        elif len(DAEMON_PIDS) == 0:
+        elif len(DAEMON_PROCS) == 0:
             n.state = Node.STATE_STOPPED
             return
 
         else:
             if running:
                 shutdown_commenced = time.time()
-                for pid in DAEMON_PIDS:
+                for proc in DAEMON_PROCS:
                     try:
-                        os.kill(pid, signal.SIGTERM)
+                        os.kill(DAEMON_PROCS[proc].pid, signal.SIGTERM)
                         LOG.info('Sent SIGTERM to %s (pid %s)'
-                                 % (DAEMON_PIDS.get(pid, 'unknown'), pid))
+                                 % (proc, DAEMON_PROCS[proc].pid))
                     except OSError as e:
-                        LOG.warn('Failed to send SIGTERM to %s: %s' % (pid, e))
+                        LOG.warn('Failed to send SIGTERM to %s: %s'
+                                 % (proc, e))
 
             if time.time() - shutdown_commenced > 10:
                 LOG.warning('We have taken more than ten seconds to shut down')
-                for pid in DAEMON_PIDS:
+                for proc in DAEMON_PROCS:
                     LOG.warning('%s daemon still running (pid %d)'
-                                % (DAEMON_PIDS[pid], pid))
+                                % (proc, DAEMON_PROCS[proc].pid))
                 LOG.warning('Dumping thread traces')
                 emit_trace()
                 shutdown_commenced = time.time()
