@@ -37,25 +37,20 @@ def add_event(object_type, object_uuid, operation, phase, duration, message,
                 'message': message
             }).info('Added event')
 
-    if config.NODE_MESH_IP == config.EVENTLOG_NODE_IP:
-        with EventLog(object_type, object_uuid) as eventdb:
-            eventdb.write_event(timestamp, config.NODE_NAME, operation, phase,
-                                duration, message, extra=extra)
-    else:
-        # We use the old eventlog mechanism as a queueing system to get the logs
-        # to the eventlog node.
-        etcd.put('event/%s' % object_type, object_uuid, timestamp,
-                 {
-                     'timestamp': timestamp,
-                     'object_type': object_type,
-                     'object_uuid': object_uuid,
-                     'fqdn': config.NODE_NAME,
-                     'operation': operation,
-                     'phase': phase,
-                     'duration': duration,
-                     'message': message,
-                     'extra': extra
-                 })
+    # We use the old eventlog mechanism as a queueing system to get the logs
+    # to the eventlog node.
+    etcd.put('event/%s' % object_type, object_uuid, timestamp,
+             {
+                 'timestamp': timestamp,
+                 'object_type': object_type,
+                 'object_uuid': object_uuid,
+                 'fqdn': config.NODE_NAME,
+                 'operation': operation,
+                 'phase': phase,
+                 'duration': duration,
+                 'message': message,
+                 'extra': extra
+             })
 
 
 # Shim to track what hasn't been converted to the new style yet
