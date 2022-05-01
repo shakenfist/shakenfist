@@ -539,6 +539,7 @@ echo
 if [ ! -z ${GETSF_SERVER_REPO} ]; then
     echo
     status "Installing package build dependencies"
+    apt-get update
     DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 \
         -o Dpkg::Options::="--force-confold" -y install \
         python3 python3-pip python3-wheel python3-setuptools \
@@ -756,6 +757,7 @@ echo
 
 status "Creating /root/sf-deploy script"
 if [ -z ${GETSF_ADMIN_PASSWORD} ]; then
+    apt-get install pwgen
     GETSF_ADMIN_PASSWORD=$(pwgen 16 1)
     echo "export GETSF_ADMIN_PASSWORD='${GETSF_ADMIN_PASSWORD}'" >> /root/.getsfrc
 fi
