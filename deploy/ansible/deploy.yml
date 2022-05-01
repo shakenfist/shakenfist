@@ -136,6 +136,99 @@
         python3 -mvenv --system-site-packages /srv/shakenfist/venv
         /srv/shakenfist/venv/bin/pip install {{pip_extra}} {{agent_package}} {{server_package}} {{client_package}}
 
+- hosts: etcd_master
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - name: Create an etcd group
+      group:
+        name: etcd
+        state: present
+
+    - name: Add an etcd user
+      user:
+        name: etcd
+        group: etcd
+
+    - name: Download etcd release
+      get_url:
+        url: "https://github.com/etcd-io/etcd/releases/download/v3.5.4/etcd-v3.5.4-linux-amd64.tar.gz"
+        dest: /tmp/etcd.tgz
+    
+    - name: Extract etcd
+      shell:
+        cmd: tar xvzf etcd.tgz --strip 1
+        chdir: /tmp/
+
+    - name: Install etcd components
+      shell: mv "/tmp/{{item}}" /usr/local/bin; chmod ugo+rx "/usr/local/bin/{{item}}"
+      with_items:
+        - etcd
+        - etcdctl
+        - etcdutl
+
+    - name: Fix permissions of /var/lib/etcd
+      file:
+        path: /var/lib/etcd
+        state: directory
+        owner: etcd
+
+    - name: Configure etcd
+      copy:
+        content: |
+          ETCD_NAME="{{ansible_fqdn}}"
+          ETCD_DATA_DIR="/var/lib/etcd/shakenfist.etcd"
+          ETCD_LISTEN_CLIENT_URLS="http://{{node_mesh_ip}}:2379,http://127.0.0.1:2379"
+          ETCD_ENABLE_V2=False
+
+          ETCD_LISTEN_PEER_URLS="http://{{node_mesh_ip}}:2380"
+          ETCD_ADVERTISE_CLIENT_URLS="http://{{node_mesh_ip}}:2379"
+          ETCD_INITIAL_ADVERTISE_PEER_URLS="http://{{node_mesh_ip}}:2380"
+          ETCD_INITIAL_CLUSTER="{{ansible_fqdn}}=http://{{node_mesh_ip}}:2380"
+          ETCD_INITIAL_CLUSTER_STATE="new"
+          ETCD_INITIAL_CLUSTER_TOKEN="d8bf8cc6-5158-11e6-8f13-3b32f4935bde"
+        dest: /etc/etcd.conf
+        owner: root
+        mode: u=rw,g=r,o=r
+
+    - name: Create a systemd unit for etcd
+      copy:
+        content: |
+          [Unit]
+          Description=etcd server
+          After=network.target
+
+          [Service]
+          Type=notify
+          User=etcd
+          WorkingDirectory=/var/lib/etcd/
+          EnvironmentFile=-/etc/etcd/etcd.conf
+          # set GOMAXPROCS to number of processors
+          ExecStart=/bin/bash -c "GOMAXPROCS=$(nproc) ionice -c2 -n0 /usr/local/bin/etcd --log-level debug"
+          Restart=on-failure
+          LimitNOFILE=65536
+
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/etcd.service
+        owner: root
+        mode: u=rw,g=r,o=r
+
+    - name: Restart etcd
+      service:
+        name: etcd
+        enabled: yes
+        state: restarted
+        daemon_reload: yes
+
+    - name: Pause while etcd settles
+      pause:
+        minutes: 1
+
 - hosts: hypervisors, network_node, eventlog_node
   any_errors_fatal: true
   become: yes
@@ -360,18 +453,6 @@
         enabled: yes
         state: restarted
       when: hostvars[groups['primary_node'][0]]['node_mesh_ip'] != node_mesh_ip
-
-# Install etcd
-- hosts: etcd
-  roles:
-    - role: andrewrothstein.etcd-cluster
-      vars:
-        etcd_secure: False
-        etcd_cluster_name: shakenfist
-        etcd_enable_v2: False
-        etcd_master_group_name: etcd_master
-        etcd_iface_public: "{{node_mesh_nic}}"
-        etcd_iface_cluster: "{{node_mesh_nic}}"
 
 - hosts: allsf
   any_errors_fatal: true

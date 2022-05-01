@@ -748,12 +748,6 @@ status "Install client package in system pip on the primary node."
 pip3 install -U ${PIP_EXTRA} ${GETSF_CLIENT_PACKAGE}
 echo
 
-# NOTE(mikal): I also don't love how we do this, but it will do until I have time
-# to rework the etcd installation.
-status "Installing ansible-galaxy requirements."
-ansible-galaxy install --force -r /srv/shakenfist/venv/share/shakenfist/installer/requirements.yml
-echo
-
 status "Creating /root/sf-deploy script"
 if [ -z ${GETSF_ADMIN_PASSWORD} ]; then
     GETSF_ADMIN_PASSWORD=$(pwgen 16 1)

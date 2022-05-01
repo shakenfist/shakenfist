@@ -1,6 +1,0 @@
-# Ansible galaxy roles
-# - src: andrewrothstein.etcd-cluster
-
-- src: https://github.com/mikalstill/ansible-etcd-cluster
-  version: ionice
-  name: andrewrothstein.etcd-cluster
