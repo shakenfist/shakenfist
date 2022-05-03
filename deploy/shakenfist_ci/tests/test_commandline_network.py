@@ -47,7 +47,7 @@ class TestNetworkCommandLine(base.BaseNamespacedTestCase):
         self.assertRegexpMatches(
             self._exec_client('network list'), '.*192.168.1.0/24.*')
         out = json.loads(self._exec_client('--json network list'))
-        net_uuid = out['networks'][0]['uuid']
+        net_uuid = out[0]['uuid']
         self.assertRegexpMatches(
             self._exec_client('--simple network list'),
             '.*%s,.*' % net_uuid)
