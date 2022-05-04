@@ -33,7 +33,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                             eventdb.write_event(
                                 v['timestamp'], v['fqdn'], v['operation'], v['phase'],
                                 v['duration'], v['message'], extra=v.get('extra'))
-                            etcd.WrappedEtcdClient().delete(k)
+                            # etcd.WrappedEtcdClient().delete(k)
                     except Exception as e:
                         util_general.ignore_exception(
                             'failed to write event for %s %s' % (objtype, objuuid), e)
@@ -74,6 +74,8 @@ class Monitor(daemon.WorkerPoolDaemon):
                     backlog = False
                 else:
                     time.sleep(1)
+
+            LOG.info('Finished batch processing queued events')
 
             # And now just idle processing callbacks as needed
             while not self.exit.is_set():
