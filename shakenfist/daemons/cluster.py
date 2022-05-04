@@ -250,6 +250,24 @@ class Monitor(daemon.Daemon):
             b.request_replication(allow_excess=excess)
             current_fetches[blob_uuid].append('unknown')
 
+        # Find transcodes of not recently used blobs and reap them
+        old_transcodes = []
+        with etcd.ThreadLocalReadOnlyCache():
+            for b in blob.Blobs([active_states_filter]):
+                if not b.transcoded:
+                    continue
+
+                if time.time() - b.last_used > config.BLOB_TRANSCODE_MAXIMUM_IDLE_TIME:
+                    old_transcodes.append((b.uuid, b.transcoded))
+
+        for blob_uuid, transcodes in old_transcodes:
+            b = blob.Blob.from_db(blob_uuid)
+            b.remove_transcodes()
+
+            for transcode in transcodes:
+                tb = blob.Blob.from_db(transcodes[transcode])
+                tb.ref_count_dec()
+
         # Node management
         for n in Nodes([node_inactive_states_filter]):
             age = time.time() - n.last_seen
