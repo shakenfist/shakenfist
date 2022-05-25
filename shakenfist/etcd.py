@@ -15,7 +15,7 @@ from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist import exceptions
 from shakenfist import logutil
-from shakenfist.tasks import QueueTask
+from shakenfist.tasks import QueueTask, FetchBlobTask
 from shakenfist.util import random as util_random
 
 
@@ -564,6 +564,33 @@ def get_outstanding_jobs():
     for data, metadata in WrappedEtcdClient().get_prefix(
             '/sf/queued'):
         yield metadata['key'].decode('utf-8'), json.loads(data, object_hook=decodeTasks)
+
+
+def get_current_blob_transfers(absent_nodes=[]):
+    current_fetches = defaultdict(list)
+    for workname, workitem in get_outstanding_jobs():
+        # A workname looks like: /sf/queue/sf-3/jobname
+        _, _, phase, node, _ = workname.split('/')
+        if node == 'networknode':
+            continue
+
+        for task in workitem:
+            if isinstance(task, FetchBlobTask):
+                if node in absent_nodes:
+                    LOG.with_fields({
+                        'blob': task.blob_uuid,
+                        'node': node,
+                        'phase': phase
+                    }).warning('Node is absent, ignoring fetch')
+                else:
+                    LOG.with_fields({
+                        'blob': task.blob_uuid,
+                        'node': node,
+                        'phase': phase
+                    }).info('Node is fetching blob')
+                    current_fetches[task.blob_uuid].append(node)
+
+    return current_fetches
 
 
 def restart_queues():
