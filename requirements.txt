@@ -1,3 +1,8 @@
+# Pinned dependancies of our requirements, locked because of compatability issues
+protobuf<4.0.0              # google license: https://github.com/protocolbuffers/protobuf/blob/main/LICENSE
+                            # Version 4.21 and greater requires that a different version of protoc be used
+                            # than that which etcd3 uses.
+
 # Our requirements.
 pyyaml>=5.1                 # mit
 pycdlib                     # lgpl
