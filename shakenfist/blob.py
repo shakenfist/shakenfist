@@ -21,7 +21,8 @@ from shakenfist.exceptions import (BlobDeleted, BlobFetchFailed,
 from shakenfist import instance
 from shakenfist import logutil
 from shakenfist.metrics import get_minimum_object_version as gmov
-from shakenfist.node import Node, nodes_by_free_disk_descending
+from shakenfist.node import (Node, Nodes, nodes_by_free_disk_descending,
+                             inactive_states_filter as node_inactive_states_filter)
 from shakenfist.tasks import FetchBlobTask
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
@@ -326,99 +327,110 @@ class Blob(dbo):
             dep_blob.ensure_local(locks, instance_object=instance_object)
 
         # Actually replicate this blob
-        with self.get_lock(config.NODE_NAME) as blob_lock:
-            blob_dir = os.path.join(config.STORAGE_PATH, 'blobs')
-            blob_path = os.path.join(blob_dir, self.uuid)
-            os.makedirs(blob_dir, exist_ok=True)
+        blob_dir = os.path.join(config.STORAGE_PATH, 'blobs')
+        blob_path = os.path.join(blob_dir, self.uuid)
+        os.makedirs(blob_dir, exist_ok=True)
 
-            if os.path.exists(blob_path):
-                self.observe()
-                return
+        # If the blob exists already, we're done
+        if os.path.exists(blob_path):
+            self.observe()
+            return
 
-            with open(blob_path + '.partial', 'wb') as f:
-                done = False
-                last_refresh = 0
-                refreshable_locks = locks.copy()
-                refreshable_locks.append(blob_lock)
+        partial_path = blob_path + '.partial'
+        while os.path.exists(partial_path):
+            st = os.stat(partial_path)
+            self.log.with_field('partial file age', st.st_mtime).info(
+                'Waiting for existing download to complete')
+            time.sleep(10)
 
-                total_bytes_received = 0
-                previous_percentage = 0
-                connection_failures = 0
+        # If the blob exists after waiting for another partial transfer,
+        # we're done
+        if os.path.exists(blob_path):
+            self.observe()
+            return
 
-                while not done:
-                    locations = self.locations
-                    random.shuffle(locations)
-                    blob_source = locations[0]
-                    bytes_in_attempt = 0
+        with open(partial_path, 'wb') as f:
+            done = False
+            last_refresh = 0
 
-                    try:
-                        admin_token = util_general.get_api_token(
-                            'http://%s:%d' % (blob_source, config.API_PORT))
-                        url = ('http://%s:%d/blobs/%s/data?offset=%d'
-                               % (blob_source, config.API_PORT, self.uuid,
-                                  total_bytes_received))
-                        r = requests.request(
-                            'GET', url, stream=True,
-                            headers={'Authorization': admin_token,
-                                     'User-Agent': util_general.get_user_agent()})
-                        connection_failures = 0
+            total_bytes_received = 0
+            previous_percentage = 0
+            connection_failures = 0
 
-                        for chunk in r.iter_content(chunk_size=8192):
-                            f.write(chunk)
-                            total_bytes_received += len(chunk)
-                            bytes_in_attempt += len(chunk)
+            while not done:
+                locations = self.locations
+                random.shuffle(locations)
+                blob_source = locations[0]
+                bytes_in_attempt = 0
 
-                            if time.time() - last_refresh > LOCK_REFRESH_SECONDS:
-                                db.refresh_locks(refreshable_locks)
-                                last_refresh = time.time()
+                try:
+                    admin_token = util_general.get_api_token(
+                        'http://%s:%d' % (blob_source, config.API_PORT))
+                    url = ('http://%s:%d/blobs/%s/data?offset=%d'
+                           % (blob_source, config.API_PORT, self.uuid,
+                              total_bytes_received))
+                    r = requests.request(
+                        'GET', url, stream=True,
+                        headers={'Authorization': admin_token,
+                                 'User-Agent': util_general.get_user_agent()})
+                    connection_failures = 0
 
-                            percentage = (total_bytes_received /
-                                          int(self.size) * 100.0)
-                            if (percentage - previous_percentage) > 10.0:
-                                if instance_object:
-                                    instance_object.add_event2(
-                                        'Fetching required blob %s, %d%% complete'
-                                        % (self.uuid, percentage))
-                                self.log.with_fields({
-                                    'bytes_fetched': total_bytes_received,
-                                    'size': int(self.size)
-                                }).debug('Fetch %.02f percent complete' % percentage)
-                                previous_percentage = percentage
+                    for chunk in r.iter_content(chunk_size=8192):
+                        f.write(chunk)
+                        total_bytes_received += len(chunk)
+                        bytes_in_attempt += len(chunk)
 
-                        done = True
-                        self.log.with_fields({
-                            'bytes_fetched': total_bytes_received,
-                            'size': int(self.size),
-                            'done': done
-                        }).info('HTTP request ran out of chunks')
+                        if time.time() - last_refresh > LOCK_REFRESH_SECONDS:
+                            db.refresh_locks(locks)
+                            last_refresh = time.time()
 
-                    except urllib3.exceptions.NewConnectionError as e:
-                        connection_failures += 1
-                        if connection_failures > 2:
+                        percentage = (total_bytes_received /
+                                      int(self.size) * 100.0)
+                        if (percentage - previous_percentage) > 10.0:
                             if instance_object:
                                 instance_object.add_event2(
-                                    'Transfer of blob %s failed' % self.uuid)
-                            self.log.error(
-                                'HTTP connection repeatedly failed: %s' % e)
-                            raise e
+                                    'Fetching required blob %s, %d%% complete'
+                                    % (self.uuid, percentage))
+                            self.log.with_fields({
+                                'bytes_fetched': total_bytes_received,
+                                'size': int(self.size)
+                            }).debug('Fetch %.02f percent complete' % percentage)
+                            previous_percentage = percentage
 
-                    except (http.client.IncompleteRead,
-                            urllib3.exceptions.ProtocolError,
-                            requests.exceptions.ChunkedEncodingError) as e:
-                        # An API error (or timeout) occurred. Retry unless we got nothing.
-                        if bytes_in_attempt > 0:
-                            self.log.info('HTTP connection dropped, retrying')
-                        else:
-                            self.log.error('HTTP connection dropped without '
-                                           'transferring data: %s' % e)
-                            raise e
+                    done = True
+                    self.log.with_fields({
+                        'bytes_fetched': total_bytes_received,
+                        'size': int(self.size),
+                        'done': done
+                    }).info('HTTP request ran out of chunks')
+
+                except urllib3.exceptions.NewConnectionError as e:
+                    connection_failures += 1
+                    if connection_failures > 2:
+                        if instance_object:
+                            instance_object.add_event2(
+                                'Transfer of blob %s failed' % self.uuid)
+                        self.log.error(
+                            'HTTP connection repeatedly failed: %s' % e)
+                        raise e
+
+                except (http.client.IncompleteRead,
+                        urllib3.exceptions.ProtocolError,
+                        requests.exceptions.ChunkedEncodingError) as e:
+                    # An API error (or timeout) occurred. Retry unless we got nothing.
+                    if bytes_in_attempt > 0:
+                        self.log.info('HTTP connection dropped, retrying')
+                    else:
+                        self.log.error('HTTP connection dropped without '
+                                       'transferring data: %s' % e)
+                        raise e
 
             if total_bytes_received != int(self.size):
-                if os.path.exists(blob_path + '.partial'):
-                    os.unlink(blob_path + '.partial')
+                if os.path.exists(partial_path):
+                    os.unlink(partial_path)
                 raise BlobFetchFailed('Did not fetch enough data')
 
-            os.rename(blob_path + '.partial', blob_path)
+            os.rename(partial_path, blob_path)
             if instance_object:
                 instance_object.add_event2(
                     'Fetching required blob %s, complete' % self.uuid)
@@ -430,6 +442,18 @@ class Blob(dbo):
             return total_bytes_received
 
     def request_replication(self, allow_excess=0):
+        absent_nodes = []
+        for n in Nodes([node_inactive_states_filter]):
+            LOG.with_fields({
+                'node': n.fqdn}).info('Node is absent for blob replication')
+            absent_nodes.append(n.fqdn)
+        LOG.info('Found %d inactive nodes' % len(absent_nodes))
+
+        # We take current transfers into account when replicating, to avoid
+        # over replicating very large blobs
+        current_transfers = etcd.get_current_blob_transfers(
+            absent_nodes=absent_nodes).get(self.uuid, 0)
+
         with self.get_lock_attr('locations', 'Request replication'):
             locations = self.locations
 
@@ -440,9 +464,12 @@ class Blob(dbo):
                     locations.remove(node_name)
 
             replica_count = len(locations)
-            targets = config.BLOB_REPLICATION_FACTOR + allow_excess - replica_count
-            self.log.info('Desired replica count is %d, we have %d, excess of %d requested'
-                          % (config.BLOB_REPLICATION_FACTOR, replica_count, allow_excess))
+            targets = (config.BLOB_REPLICATION_FACTOR + current_transfers +
+                       allow_excess - replica_count)
+            self.log.info('Desired replica count is %d, we have %d, and %d inflight, '
+                          'excess of %d requested, target is therefore %d new copies'
+                          % (config.BLOB_REPLICATION_FACTOR, replica_count,
+                             current_transfers, allow_excess, targets))
             if targets > 0:
                 blob_size_gb = int(int(self.size) / GiB)
                 nodes = nodes_by_free_disk_descending(

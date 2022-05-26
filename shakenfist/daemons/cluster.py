@@ -24,7 +24,6 @@ from shakenfist.node import (
     active_states_filter as node_active_states_filter,
     inactive_states_filter as node_inactive_states_filter,
     nodes_by_free_disk_descending)
-from shakenfist.tasks import FetchBlobTask
 from shakenfist.upload import Uploads
 
 
@@ -119,28 +118,10 @@ class Monitor(daemon.Daemon):
             absent_nodes.append(n.fqdn)
         LOG.info('Found %d inactive nodes' % len(absent_nodes))
 
-        current_fetches = defaultdict(list)
-        for workname, workitem in etcd.get_outstanding_jobs():
-            # A workname looks like: /sf/queue/sf-3/jobname
-            _, _, phase, node, _ = workname.split('/')
-            if node == 'networknode':
-                continue
-
-            for task in workitem:
-                if isinstance(task, FetchBlobTask):
-                    if node in absent_nodes:
-                        LOG.with_fields({
-                            'blob': task.blob_uuid,
-                            'node': node,
-                            'phase': phase
-                        }).warning('Node is absent, ignoring fetch')
-                    else:
-                        LOG.with_fields({
-                            'blob': task.blob_uuid,
-                            'node': node,
-                            'phase': phase
-                        }).info('Node is fetching blob')
-                        current_fetches[task.blob_uuid].append(node)
+        # We count fetches currently requested (or under way) as having completed
+        # in order to stop over-replication for large blobs.
+        current_fetches = etcd.get_current_blob_transfers(
+            absent_nodes=absent_nodes)
 
         in_use_blobs = []
         with etcd.ThreadLocalReadOnlyCache():
@@ -152,7 +133,7 @@ class Monitor(daemon.Daemon):
                 # work completes
                 if b.uuid in current_fetches:
                     LOG.with_fields({
-                        'blob': task.blob_uuid
+                        'blob': b.blob_uuid
                     }).info('Blob has current fetches, ignoring')
                     continue
 
