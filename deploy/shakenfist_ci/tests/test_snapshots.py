@@ -175,14 +175,11 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         snap1 = self.test_client.snapshot_instance(inst['uuid'], all=True)
         self.assertIsNotNone(snap1)
 
-        # Wait until the blob uuid specified above is the one used for the
-        # current snapshot
-        start_time = time.time()
-        while time.time() - start_time < 600:
-            snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
-            if snapshots and snapshots[-1].get('blob_uuid') == snap1['vdc']['blob_uuid']:
-                break
-            time.sleep(5)
+        # Wait until all blob uuids in the returned snapshot are created
+        waiting_for = []
+        for device in snap1:
+            waiting_for.append(snap1[device]['blob_uuid'])
+        self._await_blobs_ready(waiting_for)
 
         snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
         self.assertEqual(snap1['vdc']['blob_uuid'],
@@ -192,15 +189,13 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         snap2 = self.test_client.snapshot_instance(inst['uuid'], all=True)
         self.assertIsNotNone(snap2)
 
-        # Wait until the blob uuid specified above is the one used for the
-        # current snapshot
-        start_time = time.time()
-        while time.time() - start_time < 300:
-            snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
-            if snapshots and snapshots[-1].get('blob_uuid') == snap2['vdc']['blob_uuid']:
-                break
-            time.sleep(5)
+        # Wait until all blob uuids in the returned snapshot are created
+        waiting_for = []
+        for device in snap2:
+            waiting_for.append(snap2[device]['blob_uuid'])
+        self._await_blobs_ready(waiting_for)
 
+        snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
         self.assertEqual(4, len(snapshots))
 
         for snap in snapshots:

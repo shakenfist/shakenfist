@@ -203,10 +203,18 @@ class BaseTestCase(testtools.TestCase):
 
         while waiting_for:
             for idx, item in copy.copy(waiting_for):
-                n = callback(item)
-                if n.get('state') in ['created', 'deleted', 'error']:
-                    waiting_for.remove((idx, item))
-                    results[idx] = n
+                try:
+                    n = callback(item)
+                    if n.get('state') in ['created', 'deleted', 'error']:
+                        waiting_for.remove((idx, item))
+                        results[idx] = n
+
+                except apiclient.ResourceNotFoundException:
+                    # Its likely this exception can be removed once PR #1314 (or
+                    # equivalent) is merged. The issue right now is that blobs
+                    # aren't created in the database until they're ready on disk,
+                    # which means they initially 404 here.
+                    pass
 
             if waiting_for:
                 time.sleep(5)
@@ -237,6 +245,10 @@ class BaseTestCase(testtools.TestCase):
     def _await_artifacts_ready(self, artifact_uuids):
         return self._await_objects_ready(
             self.system_client.get_artifact, artifact_uuids)
+
+    def _await_blobs_ready(self, blob_uuids):
+        return self._await_objects_ready(
+            self.system_client.get_blob, blob_uuids)
 
     def _test_ping(self, instance_uuid, network_uuid, ip, expected, attempts=1):
         packet_loss_re = re.compile(r'.* ([0-9\.]+)% packet loss.*')
