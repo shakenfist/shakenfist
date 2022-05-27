@@ -182,8 +182,10 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self._await_blobs_ready(waiting_for)
 
         snapshots = self.test_client.get_instance_snapshots(inst['uuid'])
-        self.assertEqual(snap1['vdc']['blob_uuid'],
-                         snapshots[-1].get('blob_uuid'))
+        snapshot_blob_uuids = []
+        for s in snapshots:
+            snapshot_blob_uuids.append(s['blob_uuid'])
+        self.assertTrue(snap1['vdc']['blob_uuid'] in snapshot_blob_uuids)
         self.assertEqual(2, len(snapshots))
 
         snap2 = self.test_client.snapshot_instance(inst['uuid'], all=True)
