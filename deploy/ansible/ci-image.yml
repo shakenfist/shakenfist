@@ -230,6 +230,9 @@
             name: "debian:11",
           }
 
+    - name: Cleanup cloud-init
+      shell: cloud-init clean
+
     - name: Try and avoid the disk being corrupt when snapshot
       shell: |
         sleep 5
