@@ -390,14 +390,21 @@ def instance_delete(inst):
 
 
 def snapshot(inst, disk, artifact_uuid, blob_uuid, thin=False):
+    a = Artifact.from_db(artifact_uuid)
+    if a.state.value == Artifact.STATE_DELETED:
+        # The artifact was deleted before the queued blob creation occurred
+        return
+
     try:
         b = blob.snapshot_disk(disk, blob_uuid, thin=thin)
     except exceptions.BlobDependencyMissing:
-        pass
+        return
 
-    a = Artifact.from_db(artifact_uuid)
-
-    if b.state.value == blob.Blob.STATE_DELETED:
+    if a.state.value == Artifact.STATE_DELETED:
+        # The artifact was deleted while we were creating the blob, just delete
+        # the blob too.
+        b.state = blob.Blob.STATE_DELETED
+    elif b.state.value == blob.Blob.STATE_DELETED:
         # The blob was deleted while it was being created
         a.state = Artifact.STATE_ERROR
     else:
