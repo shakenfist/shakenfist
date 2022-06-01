@@ -1,4 +1,5 @@
 import json
+from oslo_concurrency import lockutils
 import os
 import sqlite3
 import time
@@ -69,6 +70,9 @@ class EventLog(object):
     def __init__(self, objtype, objuuid):
         self.objtype = objtype
         self.objuuid = objuuid
+        self.lock = lockutils.external_lock(
+            '%s/%s-lock' % (self.objtype, self.objuuid),
+            lock_path='/srv/shakenfist/events')
 
     def __enter__(self):
         self.dbpath = os.path.join(config.STORAGE_PATH, 'events', self.objtype,
@@ -86,35 +90,37 @@ class EventLog(object):
             self.con = None
 
     def _bootstrap(self):
-        if not os.path.exists(self.dbpath):
-            LOG.with_field(self.objtype, self.objuuid).info(
-                'Creating event log')
+        with self.lock:
+            if not os.path.exists(self.dbpath):
+                LOG.with_field(self.objtype, self.objuuid).info(
+                    'Creating event log')
 
-        self.con = sqlite3.connect(self.dbpath)
-        self.con.row_factory = sqlite3.Row
-        cur = self.con.cursor()
+            self.con = sqlite3.connect(self.dbpath)
+            self.con.row_factory = sqlite3.Row
+            cur = self.con.cursor()
 
-        # Check if we already have a version table with data
-        cur.execute("SELECT count(name) FROM sqlite_master WHERE "
-                    "type='table' AND name='version'")
-        if cur.fetchone()['count(name)'] == 0:
-            # We do not have a version table, skip to the latest version
-            self.con.execute(CREATE_EVENT_TABLE)
-            self.con.execute(CREATE_VERSION_TABLE)
-            self.con.execute('INSERT INTO version VALUES (?)', (VERSION, ))
-            self.con.commit()
-
-        else:
-            # Upgrade
-            cur.execute('SELECT * FROM version;')
-            ver = cur.fetchone()['version']
-
-            if ver == 1:
-                ver = 2
-                self.con.execute('ALTER TABLE events ADD COLUMN extra text')
-                self.con.execute(
-                    'UPDATE TABLE version SET version = ?', (ver,))
+            # Check if we already have a version table with data
+            cur.execute("SELECT count(name) FROM sqlite_master WHERE "
+                        "type='table' AND name='version'")
+            if cur.fetchone()['count(name)'] == 0:
+                # We do not have a version table, skip to the latest version
+                self.con.execute(CREATE_EVENT_TABLE)
+                self.con.execute(CREATE_VERSION_TABLE)
+                self.con.execute('INSERT INTO version VALUES (?)', (VERSION, ))
                 self.con.commit()
+
+            else:
+                # Upgrade
+                cur.execute('SELECT * FROM version;')
+                ver = cur.fetchone()['version']
+
+                if ver == 1:
+                    ver = 2
+                    self.con.execute(
+                        'ALTER TABLE events ADD COLUMN extra text')
+                    self.con.execute(
+                        'UPDATE TABLE version SET version = ?', (ver,))
+                    self.con.commit()
 
     def write_event(self, timestamp, fqdn, operation, phase, duration, message,
                     extra=None):
