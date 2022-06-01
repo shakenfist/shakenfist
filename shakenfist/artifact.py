@@ -216,6 +216,11 @@ class Artifact(dbo):
     def delete(self):
         self.state = self.STATE_DELETED
 
+        for blob_index in self.get_all_indexes():
+            b = blob.Blob.from_db(blob_index['blob_uuid'])
+            if b:
+                b.ref_count_dec()
+
     def resolve_to_blob(self):
         mri = self.most_recent_index
 
