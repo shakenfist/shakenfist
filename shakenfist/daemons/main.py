@@ -105,7 +105,10 @@ def emit_trace():
     # faulthandler mechanism.
     faulthandler.dump_traceback
     for proc in DAEMON_PROCS:
-        os.kill(DAEMON_PROCS[proc].pid, signal.SIGUSR1)
+        try:
+            os.kill(DAEMON_PROCS[proc].pid, signal.SIGUSR1)
+        except ProcessLookupError:
+            pass
 
 
 signal.signal(signal.SIGUSR1, emit_trace)
