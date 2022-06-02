@@ -71,8 +71,8 @@ class EventLog(object):
         self.objtype = objtype
         self.objuuid = objuuid
         self.lock = lockutils.external_lock(
-            '%s/%s-lock' % (self.objtype, self.objuuid),
-            lock_path='/srv/shakenfist/events')
+            '%s.lock' % self.objuuid,
+            lock_path='/srv/shakenfist/events/%s' % self.objtype)
 
     def __enter__(self):
         self.dbpath = os.path.join(config.STORAGE_PATH, 'events', self.objtype,
