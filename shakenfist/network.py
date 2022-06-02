@@ -692,20 +692,32 @@ class Network(dbo):
                 self.add_event2('add mesh elements', extra={'added': added})
 
     def _add_mesh_element(self, n):
-        self.add_event2('adding new mesh element', extra={'ip': n})
         subst = self.subst_dict()
         subst['node'] = n
-        util_process.execute(None,
-                             'bridge fdb append to 00:00:00:00:00:00 '
-                             'dst %(node)s dev %(vx_interface)s' % subst)
+
+        try:
+            util_process.execute(None,
+                                 'bridge fdb append to 00:00:00:00:00:00 '
+                                 'dst %(node)s dev %(vx_interface)s' % subst)
+            self.add_event2('added new mesh element', extra={'ip': n})
+        except processutils.ProcessExecutionError as e:
+            self.log.with_fields({
+                'node': n,
+                'error': e}).info('Failed to add mesh element')
 
     def _remove_mesh_element(self, n):
-        self.add_event2('removing excess mesh element', extra={'ip': n})
         subst = self.subst_dict()
         subst['node'] = n
-        util_process.execute(None,
-                             'bridge fdb del to 00:00:00:00:00:00 dst %(node)s '
-                             'dev %(vx_interface)s' % subst)
+
+        try:
+            util_process.execute(None,
+                                 'bridge fdb del to 00:00:00:00:00:00 dst %(node)s '
+                                 'dev %(vx_interface)s' % subst)
+            self.add_event2('removed excess mesh element', extra={'ip': n})
+        except processutils.ProcessExecutionError as e:
+            self.log.with_fields({
+                'node': n,
+                'error': e}).info('Failed to remove mesh element')
 
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.
