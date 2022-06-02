@@ -404,12 +404,12 @@ def snapshot(inst, disk, artifact_uuid, blob_uuid, thin=False):
         # The artifact was deleted while we were creating the blob, just delete
         # the blob too.
         b.state = blob.Blob.STATE_DELETED
-    elif b.state.value == blob.Blob.STATE_DELETED:
-        # The blob was deleted while it was being created
-        a.state = Artifact.STATE_ERROR
-    else:
+
+    try:
         b.ref_count_inc()
         a.state = Artifact.STATE_CREATED
+    except exceptions.BlobDeleted:
+        a.state = Artifact.STATE_ERROR
 
 
 class Monitor(daemon.WorkerPoolDaemon):
