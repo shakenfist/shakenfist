@@ -6,11 +6,11 @@ import signal
 from shakenfist_agent import protocol
 import time
 
-from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import eventlog
 from shakenfist import instance
 from shakenfist import logutil
+from shakenfist.util import libvirt as util_libvirt
 
 
 LOG, _ = logutil.setup(__name__)
@@ -169,16 +169,16 @@ class Monitor(daemon.Daemon):
             # The goal here is to find all instances running on this node so
             # that we can monitor them. We used to query etcd for this, but
             # we needed to do so frequently and it created a lot of etcd load.
-            # Instead, we just use the instance folders to signal that an
-            # instance should be monitored.
-            instance_path = os.path.join(config.STORAGE_PATH, 'instances')
-            if os.path.exists(instance_path):
-                for instance_uuid in os.listdir(instance_path):
-                    if instance_uuid in extra_instances:
-                        extra_instances.remove(instance_uuid)
-
-                    if instance_uuid not in monitors:
-                        missing_instances.append(instance_uuid)
+            # We also can't use the existence of instance folders (which once
+            # seemed like a good idea at the time), because some instances might
+            # also be powered off. Instead, we ask libvirt what domains are
+            # running.
+            for domain in util_libvirt.sf_domains():
+                instance_uuid = domain.name().split(':')[1]
+                if instance_uuid in extra_instances:
+                    extra_instances.remove(instance_uuid)
+                if instance_uuid not in monitors:
+                    missing_instances.append(instance_uuid)
 
             # Start missing monitors
             for instance_uuid in missing_instances:

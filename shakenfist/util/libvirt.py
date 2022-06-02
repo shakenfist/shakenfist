@@ -14,6 +14,24 @@ def get_libvirt():
     return LIBVIRT
 
 
+def sf_domains():
+    libvirt = get_libvirt()
+    conn = libvirt.open('qemu:///system')
+
+    # Active VMs have an ID. Active means running in libvirt
+    # land.
+    for domain_id in conn.listDomainsID():
+        try:
+            domain = conn.lookupByID(domain_id)
+            if not domain.name().startswith('sf:'):
+                continue
+
+            yield domain
+
+        except libvirt.libvirtError:
+            pass
+
+
 def extract_power_state(libvirt, domain):
     state, _ = domain.state()
     if state == libvirt.VIR_DOMAIN_SHUTOFF:
