@@ -39,11 +39,7 @@ class Monitor(daemon.Daemon):
 
             # Active VMs have an ID. Active means running in libvirt
             # land.
-            for domain_id in conn.listDomainsID():
-                domain = conn.lookupByID(domain_id)
-                if not domain.name().startswith('sf:'):
-                    continue
-
+            for domain in util_libvirt.sf_domains():
                 instance_uuid = domain.name().split(':')[1]
                 log_ctx = LOG.with_instance(instance_uuid)
                 log_ctx.debug('Instance is running')
