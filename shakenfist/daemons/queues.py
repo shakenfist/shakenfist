@@ -409,7 +409,8 @@ def snapshot(inst, disk, artifact_uuid, blob_uuid, thin=False):
         b.ref_count_inc()
         a.state = Artifact.STATE_CREATED
     except exceptions.BlobDeleted:
-        a.state = Artifact.STATE_ERROR
+        if a.state.value != Artifact.STATE_DELETED:
+            a.state = Artifact.STATE_ERROR
 
 
 class Monitor(daemon.WorkerPoolDaemon):
