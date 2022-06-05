@@ -411,6 +411,8 @@ def snapshot(inst, disk, artifact_uuid, blob_uuid, thin=False):
     except exceptions.BlobDeleted:
         if a.state.value != Artifact.STATE_DELETED:
             a.state = Artifact.STATE_ERROR
+    except exceptions.InvalidStateException:
+        b.ref_count_dec()
 
 
 class Monitor(daemon.WorkerPoolDaemon):
