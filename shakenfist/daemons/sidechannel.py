@@ -149,6 +149,7 @@ class Monitor(daemon.Daemon):
 
     def run(self):
         LOG.info('Starting')
+        libvirt = util_libvirt.get_libvirt()
         monitors = {}
 
         while not self.exit.is_set():
@@ -174,6 +175,12 @@ class Monitor(daemon.Daemon):
             # also be powered off. Instead, we ask libvirt what domains are
             # running.
             for domain in util_libvirt.sf_domains():
+                state = util_libvirt.extract_power_state(libvirt, domain)
+                if state in ['off', 'crashed', 'paused']:
+                    # If the domain isn't running, it shouldn't have a
+                    # side channel monitor.
+                    continue
+
                 instance_uuid = domain.name().split(':')[1]
                 if instance_uuid in extra_instances:
                     extra_instances.remove(instance_uuid)
