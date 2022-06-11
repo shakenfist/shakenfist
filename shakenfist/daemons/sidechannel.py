@@ -21,37 +21,56 @@ class SFSocketAgent(protocol.SocketAgent):
         super(SFSocketAgent, self).__init__(path, logger=logger)
         self.instance = inst
         self.instance_ready = None
+        self.system_boot_time = 0
 
         self.poll_tasks.append(self.is_system_running)
 
+        self.add_command('agent-start', self.agent_start)
+        self.add_command('agent-stop', self.agent_start)
         self.add_command('is-system-running-response',
                          self.is_system_running_response)
         self.add_command('gather-facts-response',
                          self.gather_facts_response)
+
+    def _record_system_boot_time(self, sbt):
+        if sbt != self.system_boot_time:
+            if self.system_boot_time != 0:
+                self.instance.add_event2('reboot detected')
+            self.system_boot_time = sbt
+            self.instance.agent_system_boot_time = sbt
+
+    def agent_start(self, packet):
+        self.instance.agent_state = 'not ready (agent start)'
+        self.instance.agent_start_time = time.time()
+        sbt = packet.get('system_boot_time', 0)
+        self._record_system_boot_time(sbt)
+
+    def agent_stop(self, _packet):
+        self.instance.agent_state = 'stopped'
 
     def is_system_running(self):
         self.send_packet({'command': 'is-system-running'})
 
     def is_system_running_response(self, packet):
         ready = packet.get('result', 'False')
-        if ready:
-            if self.is_system_running in self.poll_tasks:
-                self.poll_tasks.remove(self.is_system_running)
-                self.gather_facts()
+        sbt = packet.get('system_boot_time', 0)
+        self._record_system_boot_time(sbt)
 
         if self.instance_ready != ready:
             if ready:
-                self.instance.add_event2('instance is ready')
+                self.instance.agent_state = 'ready'
+                self.gather_facts()
             else:
-                self.instance.add_event2(
-                    'instance not ready (%s)' % packet.get('message', 'none'))
+                self.instance.agent_state = \
+                    'not ready (%s)' % packet.get('message', 'none')
             self.instance_ready = ready
 
     def gather_facts(self):
         self.send_packet({'command': 'gather-facts'})
 
     def gather_facts_response(self, packet):
-        self.instance.add_event2('facts gathered', extra=packet.get('result'))
+        self.instance.add_event2('received system facts')
+        self.instance.agent_facts = packet.get('result', {})
 
 
 class Monitor(daemon.Daemon):

@@ -30,9 +30,11 @@ class TestDisks(base.BaseNamespacedTestCase):
                     'type': 'disk',
                     'bus': 'nvme'
                 }
-            ], None, base.load_userdata('bootok'), side_channels=['sf-agent'])
+            ], None, None, side_channels=['sf-agent'])
 
-        self.assertInstanceConsoleAfterBoot(inst['uuid'], 'System booted ok')
+        self._await_instance_ready(inst['uuid'])
+        inst = self.test_client.get_instance(inst['uuid'])
+        self.assertNotIn(inst['agent_system_boot_time'], [None, 0])
 
         self.test_client.delete_instance(inst['uuid'])
         inst_uuids = []

@@ -252,6 +252,9 @@ class Instance(dbo):
             'secure_boot': self.secure_boot,
             'machine_type': self.machine_type,
             'side_channels': self.side_channels,
+            'agent_state': self.agent_state.value,
+            'agent_start_time': self.agent_start_time,
+            'agent_system_boot_time': self.agent_system_boot_time,
 
             'version': self.version,
             'error_message': self.error,
@@ -426,6 +429,58 @@ class Instance(dbo):
             # Gracefully handle malformed instances
             return None
         return meta.get(self.METADATA_KEY_TAGS, None)
+
+    @property
+    def agent_state(self):
+        db_data = self._db_get_attribute('agent_state')
+        if not db_data:
+            return baseobject.State(None, 0)
+        return baseobject.State(**db_data)
+
+    @agent_state.setter
+    def agent_state(self, new_value):
+        orig = self.agent_state
+        if orig.value == new_value:
+            return
+
+        new_state = baseobject.State(new_value, time.time())
+        self._db_set_attribute('agent_state', new_state)
+
+    @property
+    def agent_start_time(self):
+        db_data = self._db_get_attribute('agent_attributes')
+        return db_data.get('start_time')
+
+    @agent_start_time.setter
+    def agent_start_time(self, new_value):
+        with self.get_lock_attr('agent_attributes', 'Update agent attributes'):
+            db_data = self._db_get_attribute('agent_attributes')
+            db_data['start_time'] = new_value
+            self._db_set_attribute('agent_attributes', db_data)
+
+    @property
+    def agent_system_boot_time(self):
+        db_data = self._db_get_attribute('agent_attributes')
+        return db_data.get('system_boot_time')
+
+    @agent_system_boot_time.setter
+    def agent_system_boot_time(self, new_value):
+        with self.get_lock_attr('agent_attributes', 'Update agent attributes'):
+            db_data = self._db_get_attribute('agent_attributes')
+            db_data['system_boot_time'] = new_value
+            self._db_set_attribute('agent_attributes', db_data)
+
+    @property
+    def agent_facts(self):
+        db_data = self._db_get_attribute('agent_attributes')
+        return db_data.get('facts')
+
+    @agent_facts.setter
+    def agent_facts(self, new_value):
+        with self.get_lock_attr('agent_attributes', 'Update agent facts'):
+            db_data = self._db_get_attribute('agent_attributes')
+            db_data['facts'] = new_value
+            self._db_set_attribute('agent_attributes', db_data)
 
     # Implementation
     def _initialize_block_devices(self):
@@ -1126,9 +1181,10 @@ class Instance(dbo):
         inst = self._get_domain()
         if not hard:
             inst.reboot(flags=libvirt.VIR_DOMAIN_REBOOT_ACPI_POWER_BTN)
+            self.add_event2('soft reboot')
         else:
             inst.reset()
-        self.add_event2('reboot')
+            self.add_event2('hard reboot')
 
     def pause(self):
         libvirt = util_libvirt.get_libvirt()

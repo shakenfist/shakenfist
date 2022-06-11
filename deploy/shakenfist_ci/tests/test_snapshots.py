@@ -450,7 +450,8 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self.assertIsNotNone(inst2['node'])
 
         self._await_instance_ready(inst2['uuid'])
-        self.assertInstanceConsoleAfterBoot(inst2['uuid'], 'System booted ok')
+        inst2 = self.test_client.get_instance(inst2['uuid'])
+        self.assertNotIn(inst2['agent_system_boot_time'], [None, 0])
 
         # Cleanup
         self.test_client.delete_instance(inst1['uuid'])

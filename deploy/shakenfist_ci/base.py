@@ -123,9 +123,36 @@ class BaseTestCase(testtools.TestCase):
         return self._await_instance_event(
             instance_uuid, 'detected poweroff', after=after)
 
-    def _await_instance_ready(self, instance_uuid, after=None):
-        return self._await_instance_event(
-            instance_uuid, None, 'instance is ready', after)
+    def _await_instance_ready(self, instance_uuid):
+        self._await_agent_state(instance_uuid, ready=True)
+
+    def _await_instance_not_ready(self, instance_uuid):
+        self._await_agent_state(instance_uuid, ready=False)
+
+    def _await_agent_state(self, instance_uuid, ready=True):
+        # Wait up to 5 minutes for the instance to be created and enter
+        # the desired agent running state
+        if ready:
+            desired = 'ready'
+        else:
+            desired = 'not ready'
+
+        start_time = time.time()
+        while time.time() - start_time < 5 * 60 * NETWORK_PATIENCE_FACTOR:
+            i = self.system_client.get_instance(instance_uuid)
+            if i['state'] == 'error':
+                raise StartException(
+                    'Instance %s failed to start (marked as error state)'
+                    % instance_uuid)
+
+            if i['agent_state'] and i['agent_state'].startswith(desired):
+                return
+            time.sleep(5)
+
+        raise TimeoutException(
+            'Instance %s failed to start and enter the agent %s state '
+            'in five minutes. Agent state is %s.'
+            % (instance_uuid, desired, i['agent_state']))
 
     def _await_instance_event(
             self, instance_uuid, operation, message=None, after=None):
