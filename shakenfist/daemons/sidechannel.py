@@ -16,6 +16,10 @@ from shakenfist.util import libvirt as util_libvirt
 LOG, _ = logutil.setup(__name__)
 
 
+class ConnectionIdle(Exception):
+    pass
+
+
 class SFSocketAgent(protocol.SocketAgent):
     def __init__(self, inst, path, logger=None):
         super(SFSocketAgent, self).__init__(path, logger=logger)
@@ -31,6 +35,17 @@ class SFSocketAgent(protocol.SocketAgent):
                          self.is_system_running_response)
         self.add_command('gather-facts-response',
                          self.gather_facts_response)
+
+    def poll(self):
+        if time.time() - self.last_data > 15:
+            self.log.debug('Not receiving traffic, aborting.')
+            if self.system_boot_time != 0:
+                self.instance.add_event2(
+                    'agent has gone silent, restarting channel')
+            self.close()
+            raise ConnectionIdle()
+
+        super(SFSocketAgent, self).poll()
 
     def _record_system_boot_time(self, sbt):
         if sbt != self.system_boot_time:
@@ -162,7 +177,8 @@ class Monitor(daemon.Daemon):
                         except (BrokenPipeError,
                                 ConnectionRefusedError,
                                 ConnectionResetError,
-                                FileNotFoundError):
+                                FileNotFoundError,
+                                ConnectionIdle):
                             if sc in sc_clients:
                                 del sc_clients[sc]
 

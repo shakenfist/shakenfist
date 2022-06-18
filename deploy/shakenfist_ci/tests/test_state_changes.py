@@ -59,17 +59,16 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         self.assertIsNotNone(inst['uuid'])
 
         self._await_instance_ready(inst['uuid'])
-        inst = self.test_client.get_instance(inst['uuid'])
-        last_boot = inst['agent_system_boot_time']
-        self.assertNotIn(last_boot, [None, 0])
 
         # We need to refetch the instance to get a complete view of its state.
         # It is also now safe to fetch the instance IP.
         inst = self.test_client.get_instance(inst['uuid'])
+        last_boot = inst['agent_system_boot_time']
+        self.assertNotIn(last_boot, [None, 0])
         ip = self.test_client.get_instance_interfaces(inst['uuid'])[0]['ipv4']
 
         # The network can be slow to start and may not be available after the
-        # instance "login prompt" event. We are willing to forgive a few fails
+        # instance "system ready" event. We are willing to forgive a few fails
         # while the network starts.
         LOG.info('  ping test...')
         self._test_ping(inst['uuid'], self.net['uuid'], ip, 0, 10)
