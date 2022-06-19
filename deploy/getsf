@@ -549,6 +549,7 @@ if [ ! -z ${GETSF_SERVER_REPO} ]; then
     status "Building server package"
     cwd=$(pwd)
     cd ${GETSF_SERVER_REPO}
+    git config --global --add safe.directory ${GETSF_SERVER_REPO}
     if [ -e dist ]; then
         rm -rf build dist *.egg-info
     fi
@@ -572,6 +573,7 @@ if [ ! -z ${GETSF_CLIENT_REPO} ]; then
     status "Building client package"
     cwd=$(pwd)
     cd ${GETSF_CLIENT_REPO}
+    git config --global --add safe.directory ${GETSF_CLIENT_REPO}
     if [ -e dist ]; then
         rm -rf build dist *.egg-info
     fi
@@ -592,6 +594,7 @@ if [ ! -z ${GETSF_AGENT_REPO} ]; then
     status "Building agent package"
     cwd=$(pwd)
     cd ${GETSF_AGENT_REPO}
+    git config --global --add safe.directory ${GETSF_AGENT_REPO}
     if [ -e dist ]; then
         rm -rf build dist *.egg-info
     fi
