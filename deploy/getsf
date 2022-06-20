@@ -269,7 +269,7 @@ fi
 question_end
 
 if [ "${GETSF_NODES}" == "localhost" ]; then
-    default_nic=$(ip route | grep default | sed -e 's/.* dev //' -e 's/ $//' -e 's/ proto static//')
+    default_nic=$(ip route show to default | grep -Eo "dev\s*[[:alnum:]]+" | sed 's/dev\s//g')
     default_ip=$(ip address show dev ${default_nic} | grep inet | head -1 | sed -e 's/ *inet //' -e 's|/.*||')
     status "We will use ${default_nic} and ${default_ip} for network traffic."
 
