@@ -308,7 +308,7 @@ else
     echo
     echo "Of the nodes you entered above, which are storage nodes?"
     echo
-    if [ -z "${GETSF_NODE_STORAGE}" ]; then
+    if [ ! "${GETSF_NODE_STORAGE+x}" ]; then
         echo -n "(a space separated list of nodes from the previous list) >> "
         read GETSF_NODE_STORAGE
         record_answer GETSF_NODE_STORAGE "${GETSF_NODE_STORAGE}"

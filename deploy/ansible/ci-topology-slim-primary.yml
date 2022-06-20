@@ -29,6 +29,11 @@
   tasks:
     - include_tasks: ci-include-common-primary.yml
 
+    - name: Create a RAM disk for etcd to make it more reliable in CI
+      shell: |
+        mkdir -p /var/lib/etcd
+        mount -t tmpfs -o rw,size=2G tmpfs /var/lib/etcd
+
     - name: Copy getsf
       copy:
         src: "{{source_path}}/shakenfist/deploy/getsf"
@@ -92,14 +97,3 @@
           sudo --preserve-env /tmp/getsf
         dest: "/tmp/getsf-wrapper"
         mode: ugo+rwx
-
-- hosts: sf-1, sf-2, sf-3
-  gather_facts: yes
-  connection: ssh
-  become: true
-
-  tasks:
-    - name: Create a RAM disk for etcd to make it more reliable in CI
-      shell: |
-        mkdir -p /var/lib/etcd
-        mount -t tmpfs -o rw,size=2G tmpfs /var/lib/etcd
