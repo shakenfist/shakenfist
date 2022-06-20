@@ -101,7 +101,7 @@ pipeline {
             sh '''  . $WORKSPACE/$BUILD_TAG/ci-environment.sh
                     ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no \
                         -o UserKnownHostsFile=/dev/null \
-                        debian@$primary sudo /root/sf-deploy.sh
+                        debian@$primary sudo /tmp/getsf-wrapper
                     echo ""
                     echo ""
                     ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no \

@@ -29,85 +29,69 @@
   tasks:
     - include_tasks: ci-include-common-primary.yml
 
-    - name: Copy install configuration to primary node
+    - name: Copy getsf
+      copy:
+        src: "{{source_path}}/shakenfist/deploy/getsf"
+        dest: "/tmp/getsf"
+        mode: ugo+rwx
+
+    - name: Write a simple getsf wrapper
       copy:
         content: |
-          #!/bin/bash
-          ansible-galaxy install -r /srv/shakenfist/venv/share/shakenfist/installer/requirements.yml
+          export GETSF_FLOATING_BLOCK=192.168.230.0/24
+          export GETSF_DEPLOY_NAME=bonkerslab
+          export GETSF_RELEASE=local
+          export GETSF_LOCAL_SOURCE=static
+          export GETSF_WARNING=yes
 
-          export ADMIN_PASSWORD=foobar
-          export FLOATING_IP_BLOCK="10.10.10.0/24"
-          export DEPLOY_NAME="metalci"
-          export SSH_USER="{{base_image_user}}"
-          export SSH_KEY_FILENAME="/root/.ssh/id_rsa"
-          export HTTP_PROXY="http://192.168.1.50:3128"
-          export INCLUDE_TRACEBACKS=1
+          export GETSF_SERVER_PACKAGE="/tmp/{{hostvars['localhost']['server_wheel_file']}}"
+          export GETSF_CLIENT_PACKAGE="/tmp/{{hostvars['localhost']['client_wheel_file']}}"
 
-          export KSM_ENABLED=0
+          export GETSF_NODES="sf-primary sf-1 sf-2 sf-3 sf-4 sf-5"
+          export GETSF_SSH_USER="{{base_image_user}}"
+          export GETSF_SSH_KEY_FILENAME="/root/.ssh/id_rsa"
+          export GETSF_NODE_PRIMARY="sf-primary"
+          export GETSF_NODE_NETWORK="sf-1"
+          export GETSF_NODE_EVENTLOG="sf-primary"
+          export GETSF_NODE_ETCD_MASTER="sf-primary"
+          export GETSF_NODE_STORAGE=""
+          export GETSF_NODE_HYPERVISOR="sf-1 sf-2 sf-3 sf-4 sf-5"
 
-          # Topology
-          read -r -d '' TOPOLOGY <<'EOF'
-          [
-            {
-              "name": "sf-primary",
-              "node_egress_ip": "{{hostvars['primary']['egress_ip']}}",
-              "node_egress_nic": "eth0",
-              "node_mesh_ip": "{{hostvars['primary']['mesh_ip']}}",
-              "node_mesh_nic": "eth1",
-              "primary_node": true,
-              "api_url": "http://sf-primary/api",
-              "etcd_master": true
-            },
-            {
-              "name": "sf-1",
-              "node_egress_ip": "{{hostvars['sf1']['egress_ip']}}",
-              "node_egress_nic": "eth0",
-              "node_mesh_ip": "{{hostvars['sf1']['mesh_ip']}}",
-              "node_mesh_nic": "eth1",
-              "network_node": true,
-              "hypervisor": true
-            },
-            {
-              "name": "sf-2",
-              "node_egress_ip": "{{hostvars['sf2']['egress_ip']}}",
-              "node_egress_nic": "eth0",
-              "node_mesh_ip": "{{hostvars['sf2']['mesh_ip']}}",
-              "node_mesh_nic": "eth1",
-              "hypervisor": true
-            },
-            {
-              "name": "sf-3",
-              "node_egress_ip": "{{hostvars['sf3']['egress_ip']}}",
-              "node_egress_nic": "eth0",
-              "node_mesh_ip": "{{hostvars['sf3']['mesh_ip']}}",
-              "node_mesh_nic": "eth1",
-              "hypervisor": true
-            },
-            {
-              "name": "sf-4",
-              "node_egress_ip": "{{hostvars['sf4']['egress_ip']}}",
-              "node_egress_nic": "eth0",
-              "node_mesh_ip": "{{hostvars['sf4']['mesh_ip']}}",
-              "node_mesh_nic": "eth1",
-              "hypervisor": true
-            },
-            {
-              "name": "sf-5",
-              "node_egress_ip": "{{hostvars['sf5']['egress_ip']}}",
-              "node_egress_nic": "eth0",
-              "node_mesh_ip": "{{hostvars['sf5']['mesh_ip']}}",
-              "node_mesh_nic": "eth1",
-              "hypervisor": true
-            },
-          ]
-          EOF
-          export TOPOLOGY
+          export GETSF_NODE_EGRESS_NIC_sf_primary="eth0"
+          export GETSF_NODE_EGRESS_ADDRESS_sf_primary="{{hostvars['primary']['egress_ip']}}"
+          export GETSF_NODE_MESH_NIC_sf_primary="eth1"
+          export GETSF_NODE_MESH_ADDRESS_sf_primary="{{hostvars['primary']['mesh_ip']}}"
 
-          /srv/shakenfist/venv/share/shakenfist/installer/install
-        dest: "/root/sf-deploy.sh"
-        owner: root
-        group: root
-        mode: u=rx
+          export GETSF_NODE_EGRESS_NIC_sf_1="eth0"
+          export GETSF_NODE_EGRESS_ADDRESS_sf_1="{{hostvars['sf1']['egress_ip']}}"
+          export GETSF_NODE_MESH_NIC_sf_1="eth1"
+          export GETSF_NODE_MESH_ADDRESS_sf_1="{{hostvars['sf1']['mesh_ip']}}"
+
+          export GETSF_NODE_EGRESS_NIC_sf_2="eth0"
+          export GETSF_NODE_EGRESS_ADDRESS_sf_2="{{hostvars['sf2']['egress_ip']}}"
+          export GETSF_NODE_MESH_NIC_sf_2="eth1"
+          export GETSF_NODE_MESH_ADDRESS_sf_2="{{hostvars['sf2']['mesh_ip']}}"
+
+          export GETSF_NODE_EGRESS_NIC_sf_3="eth0"
+          export GETSF_NODE_EGRESS_ADDRESS_sf_3="{{hostvars['sf3']['egress_ip']}}"
+          export GETSF_NODE_MESH_NIC_sf_3="eth1"
+          export GETSF_NODE_MESH_ADDRESS_sf_3="{{hostvars['sf3']['mesh_ip']}}"
+
+          export GETSF_NODE_EGRESS_NIC_sf_4="eth0"
+          export GETSF_NODE_EGRESS_ADDRESS_sf_4="{{hostvars['sf4']['egress_ip']}}"
+          export GETSF_NODE_MESH_NIC_sf_4="eth1"
+          export GETSF_NODE_MESH_ADDRESS_sf_4="{{hostvars['sf4']['mesh_ip']}}"
+
+          export GETSF_NODE_EGRESS_NIC_sf_5="eth0"
+          export GETSF_NODE_EGRESS_ADDRESS_sf_5="{{hostvars['sf5']['egress_ip']}}"
+          export GETSF_NODE_MESH_NIC_sf_5="eth1"
+          export GETSF_NODE_MESH_ADDRESS_sf_5="{{hostvars['sf5']['mesh_ip']}}"
+
+          export GETSF_SKIP_COMMON_IMAGES=1
+
+          sudo --preserve-env /tmp/getsf
+        dest: "/tmp/getsf-wrapper"
+        mode: ugo+rwx
 
 - hosts: sf-1, sf-2, sf-3
   gather_facts: yes
