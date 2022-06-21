@@ -14,7 +14,7 @@ pycdlib                     # lgpl
 oslo.concurrency            # apache2
 jinja2<3.0,>=2.10.1         # bsd
 setproctitle                # bsd
-click>=8.0.0                # bsd
+click<8.0.0                 # bsd
 prettytable                 # bsd
 tox                         # mit
 flake8                      # mit
