@@ -1,6 +1,3 @@
-# NOTE(mikal): this topology is different from the others as it now uses getsf
-# to perform the localhost install.
-
 - hosts: localhost
   gather_facts: yes
   connection: ssh
@@ -11,7 +8,70 @@
     base_image_user: "ubuntu"
 
   tasks:
-    - include_tasks: ci-include-singlenode-localhost.yml
+    - name: Create the namespace
+      shell: sf-client namespace create "{{identifier}}"
+
+    - name: Create a network for outgoing traffic
+      sf_network:
+        netblock: "10.0.0.0/24"
+        name: "public"
+        namespace: "{{identifier}}"
+      register: publicnetwork
+
+    - name: Log network details
+      debug:
+        msg:
+          - "Public network is {{publicnetwork['meta']['uuid']}}"
+
+    - name: Setup cloud-config to add a password to CI nodes for debugging
+      set_fact:
+        userdata_decoded: |
+          #cloud-config
+          ssh_pwauth: True
+          chpasswd: { expire: False }
+
+          users:
+            - name: ciuser
+              lock-passwd: False
+              sudo: [ "ALL=(ALL) NOPASSWD:ALL" ]
+              shell: /bin/bash
+              # This password hash is generated with mkpasswd --method=SHA-512 --rounds=4096
+              passwd: "$6$rounds=4096$jBqTFFRr$75ehRH5AtiUxWMlFf1Ji.szp1NCjut2WiiD./QHsfWbCfKKjX1bs6MtBcWedlqKwcBKEPP/oLinTbH6gwcwUA1"
+
+    - name: Encode user data
+      set_fact:
+        userdata_encoded: "{{ userdata_decoded | b64encode }}"
+
+    - name: Create a primary instance
+      sf_instance:
+        name: "primary"
+        cpu: 12
+        ram: 32768
+        disks:
+          - "100@{{base_image}}"
+        networkspecs:
+          - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
+        ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
+        namespace: "{{identifier}}"
+        user_data: "{{userdata_encoded}}"
+        state: present
+      register: primary
+
+    - name: Add primary node to ansible
+      add_host:
+        hostname: primary
+        egress_ip: "{{primary['meta']['network_interfaces'][0]['ipv4']}}"
+        ansible_ssh_host: "{{primary['meta']['network_interfaces'][0]['floating']}}"
+        ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
+        ansible_ssh_user: "{{base_image_user}}"
+        ansible_ssh_private_key_file: "/home/jenkins/id_ci"
+        groups: sfall
+
+    - name: Log instance details
+      debug:
+        msg:
+          - "Primary: is {{primary['meta']['uuid']}} at {{primary['meta']['network_interfaces'][0]['ipv4']}}, {{primary['meta']['network_interfaces'][0]['floating']}}"
+
     - include_tasks: ci-include-common-localhost.yml
 
 - hosts: primary
@@ -51,12 +111,12 @@
     - name: Copy server wheel file
       copy:
         src: "{{source_path}}/shakenfist/dist/{{hostvars['localhost']['server_wheel_file']}}"
-        dest: "/tmp/{{hostvars['localhost']['server_wheel_file']}}"
+        dest: "/root/{{hostvars['localhost']['server_wheel_file']}}"
 
     - name: Copy client wheel file
       copy:
         src: "{{source_path}}/client-python/dist/{{hostvars['localhost']['client_wheel_file']}}"
-        dest: "/tmp/{{hostvars['localhost']['client_wheel_file']}}"
+        dest: "/root/{{hostvars['localhost']['client_wheel_file']}}"
 
     - name: Create a RAM disk for etcd to make it more reliable in CI
       shell: |
@@ -66,14 +126,17 @@
     - name: Write a simple getsf wrapper
       copy:
         content: |
-          export GETSF_FLOATING_BLOCK=192.168.10.0/24
+          export GETSF_FLOATING_BLOCK=192.168.230.0/24
           export GETSF_DEPLOY_NAME=bonkerslab
           export GETSF_RELEASE=local
+          export GETSF_LOCAL_SOURCE=static
           export GETSF_NODES=localhost
           export GETSF_WARNING=yes
 
-          export GETSF_SERVER_PACKAGE="/tmp/{{hostvars['localhost']['server_wheel_file']}}"
-          export GETSF_CLIENT_PACKAGE="/tmp/{{hostvars['localhost']['client_wheel_file']}}"
+          export GETSF_SERVER_PACKAGE="/root/{{hostvars['localhost']['server_wheel_file']}}"
+          export GETSF_CLIENT_PACKAGE="/root/{{hostvars['localhost']['client_wheel_file']}}"
+
+          export GETSF_SKIP_COMMON_IMAGES=1
 
           sudo --preserve-env /tmp/getsf
         dest: "/tmp/getsf-wrapper"

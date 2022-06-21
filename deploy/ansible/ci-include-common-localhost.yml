@@ -7,12 +7,13 @@
 - name: Write details of instances to workspace
   copy:
     content: |
-      {% for svr in groups.sfall%}
-      export {{svr}}={{hostvars[svr]['ansible_ssh_host']}}
+      {% for svr in groups.sfall %}
+      export {{ svr | replace('-', '_') }}={{hostvars[svr]['ansible_ssh_host']}}
       {% endfor %}
 
       export identifier={{identifier}}
       export source_path={{source_path}}
+      export nodes="{{ groups.sfall | join(' ') | replace('-', '_') }}"
     dest: "{{ lookup('env', 'WORKSPACE') }}/{{ lookup('env', 'BUILD_TAG') }}/ci-environment.sh"
     owner: jenkins
     group: jenkins

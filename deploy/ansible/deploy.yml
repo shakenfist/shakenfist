@@ -94,11 +94,14 @@
     - name: Install non-hypervisor dependencies
       apt:
         name:
+          - apparmor
           - arping
           - bridge-utils
+          - build-essential
           - cpu-checker
           - dnsmasq
           - dnsutils
+          - git
           - hddtemp
           - libmagic-dev
           - libssl-dev
@@ -109,11 +112,25 @@
           - net-tools
           - ovmf
           - prometheus-node-exporter
+          - python3-cffi
+          - python3-dev
           - python3-libvirt
+          - python3-pip
           - python3-venv
+          - python3-wheel
+          - pwgen
           - qemu-kvm
+          - qemu-utils
+          - rsyslog
+          - tox
           - unzip
         state: latest
+
+    - name: Create python venv and install Shaken Fist packages
+      shell: |
+        mkdir -p /srv/shakenfist/venv
+        python3 -mvenv --system-site-packages /srv/shakenfist/venv
+        /srv/shakenfist/venv/bin/pip install {{pip_extra}} {{server_package}} {{client_package}}
 
 - hosts: hypervisors, network_node
   any_errors_fatal: true
