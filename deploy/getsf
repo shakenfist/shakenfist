@@ -31,7 +31,7 @@ function error {
     }
 
 function status {
-    echo -e "${Blue}$1${Color_Off}"
+    echo -e "${Blue}$(date) $1${Color_Off}"
     }
 
 function record_answer {
@@ -40,6 +40,11 @@ function record_answer {
 
     echo "export ${varname}='${value}'" >> /root/.getsfrc
 }
+
+# We must run as root to do the things we do.
+if [ $(whoami) != "root" ]; then
+    error "You need to run this script as root."
+fi
 
 # Load previous answers
 status "Checking for previous answers."
@@ -52,7 +57,7 @@ fi
 printenv | grep GETSF || true
 
 # Cleanup dangling temporary scripts
-rm -f /tmp/sf-per-node-primary /tmp/sf-per-node
+rm -f /tmp/sf-per-node-primary /tmp/sf-per-node /tmp/shakenfist*.whl
 
 # Warn people
 question_start
@@ -91,19 +96,67 @@ else
     echo "(release, pre-release, or local) >> ${GETSF_RELEASE}"
 fi
 question_end
-pipextra=""
+PIP_EXTRA=""
 if [ ${GETSF_RELEASE} == "release" ]; then
     status "We will use released packages."
     GETSF_SERVER_PACKAGE="shakenfist"
     GETSF_CLIENT_PACKAGE="shakenfist-client"
 elif [ ${GETSF_RELEASE} == "pre-release" ]; then
     status "We will use pre-release packages."
-    pipextra="--pre"
+    PIP_EXTRA="--pre"
     GETSF_SERVER_PACKAGE="shakenfist"
     GETSF_CLIENT_PACKAGE="shakenfist-client"
 elif [ ${GETSF_RELEASE} == "local" ]; then
     status "We will use local packages."
 
+    question_start
+    echo "Do you want to build packages from a local git repository"
+    echo "or provide paths to pre-built (static) packages?"
+    echo
+    if [ -z ${GETSF_LOCAL_SOURCE} ]; then
+        echo -n "(build, or static) >> "
+        read GETSF_LOCAL_SOURCE
+        record_answer GETSF_LOCAL_SOURCE "${GETSF_LOCAL_SOURCE}"
+    else
+        echo "(build, or static) >> ${GETSF_LOCAL_SOURCE}"
+    fi
+    question_end
+fi
+echo
+
+if [ ${GETSF_LOCAL_SOURCE} == "build" ]; then
+    question_start
+    echo "What is the path to your shakenfist server git checkout?"
+    echo
+    if [ -z ${GETSF_SERVER_REPO} ]; then
+        echo -n "(a pathname) >> "
+        read GETSF_SERVER_REPO
+        record_answer GETSF_SERVER_REPO "${GETSF_SERVER_REPO}"
+    else
+        echo "(a pathname) >> ${GETSF_SERVER_REPO}"
+    fi
+    question_end
+
+    if [ ! -e "${GETSF_SERVER_REPO}/.git" ]; then
+        error "Server git clone does not exist."
+    fi
+
+    question_start
+    echo "What is the path to your shakenfist client git checkout?"
+    echo
+    if [ -z ${GETSF_CLIENT_REPO} ]; then
+        echo -n "(a pathname) >> "
+        read GETSF_CLIENT_REPO
+        record_answer GETSF_CLIENT_REPO "${GETSF_CLIENT_REPO}"
+    else
+        echo "(a pathname) >> ${GETSF_CLIENT_REPO}"
+    fi
+    question_end
+
+    if [ ! -e "${GETSF_CLIENT_REPO}/.git" ]; then
+        error "Client git clone does not exist."
+    fi
+elif [ ${GETSF_LOCAL_SOURCE} == "static" ]; then
     question_start
     echo "What is the path to your server package?"
     echo
@@ -123,7 +176,7 @@ elif [ ${GETSF_RELEASE} == "local" ]; then
     question_start
     echo "What is the path to your client package?"
     echo
-    if [ -z ${GETSF_SERVER_PACKAGE} ]; then
+    if [ -z ${GETSF_CLIENT_PACKAGE} ]; then
         echo -n "(a pathname) >> "
         read GETSF_CLIENT_PACKAGE
         record_answer GETSF_CLIENT_PACKAGE "${GETSF_CLIENT_PACKAGE}"
@@ -219,9 +272,9 @@ else
     question_end
 
     status "Determining node roles."
-    status "Nodes in a Shaken Fist cluster have various roles. We need to determine"
-    status "which roles to apply to each of your nodes. We'll therefore walk you"
-    status "through a series of questions about those now."
+    echo "Nodes in a Shaken Fist cluster have various roles. We need to determine"
+    echo "which roles to apply to each of your nodes. We'll therefore walk you"
+    echo "through a series of questions about those now."
     echo
 
     question_start
@@ -274,6 +327,26 @@ else
     question_end
 
     question_start
+    echo "Each cluster also has exactly one event log node. This node hosts the"
+    echo "database of events experienced by various Shaken Fist objects. This data"
+    echo "is useful for debugging, and would also likely be how you would implement"
+    echo "a billing system for Shaken Fist. These databases can become quite large."
+    echo
+    echo "A common choice is to configure the primary node as the eventlog"
+    echo "node as well."
+    echo
+    echo "Of the nodes you entered above, which is the event log node?"
+    echo
+    if [ -z ${GETSF_NODE_EVENTLOG} ]; then
+        echo -n "(a node name from the previous list) >> "
+        read GETSF_NODE_EVENTLOG
+        record_answer GETSF_NODE_EVENTLOG "${GETSF_NODE_EVENTLOG}"
+    else
+        echo "(a node name from the previous list) >> ${GETSF_NODE_EVENTLOG}"
+    fi
+    question_end
+
+    question_start
     echo "Each cluster also needs etcd masters. etcd is where we store the"
     echo "state of the cluster. etcd has very specific latency requirements"
     echo "from both disk and network. So you shouldn't select nodes with"
@@ -308,7 +381,7 @@ else
     echo
     echo "Of the nodes you entered above, which are storage nodes?"
     echo
-    if [ -z "${GETSF_NODE_STORAGE}" ]; then
+    if [ ! "${GETSF_NODE_STORAGE+x}" ]; then
         echo -n "(a space separated list of nodes from the previous list) >> "
         read GETSF_NODE_STORAGE
         record_answer GETSF_NODE_STORAGE "${GETSF_NODE_STORAGE}"
@@ -403,8 +476,10 @@ else
         safe_node=$(echo ${node} | tr "-" "_")
         calc_var_name="GETSF_NODE_MESH_ADDRESS_${safe_node}"
 
-        status "    ...${node} as ${GETSF_SSH_USER}@${!calc_var_name}."
-        ssh -i ${GETSF_SSH_KEY_FILENAME} ${GETSF_SSH_USER}@${!calc_var_name} "sudo whoami"
+        status "    ...${node} ping."
+        ping -c 3 "${!calc_var_name}"
+        status "    ...${node} ssh as ${GETSF_SSH_USER}@${!calc_var_name}."
+        ssh -o StrictHostKeyChecking=no -i ${GETSF_SSH_KEY_FILENAME} ${GETSF_SSH_USER}@${!calc_var_name} "sudo whoami"
     done
     echo
 fi
@@ -426,6 +501,57 @@ fi
 question_end
 echo
 
+# Build local wheels if required
+if [ ! -z ${GETSF_SERVER_REPO} ]; then
+    echo
+    status "Installing package build dependencies"
+    apt-get update
+    DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 \
+        -o Dpkg::Options::="--force-confold" -y install \
+        python3 python3-pip python3-wheel python3-setuptools \
+        python3-readme-renderer twine git
+
+    echo
+    status "Building server package"
+    cwd=$(pwd)
+    cd ${GETSF_SERVER_REPO}
+    if [ -e dist ]; then
+        rm -rf build dist *.egg-info
+    fi
+    rm -f deploy.tgz doc.tgz
+    tar czf deploy.tgz deploy
+    tar czf docs.tgz docs
+    python3 setup.py sdist bdist_wheel
+    twine check dist/*
+    cp dist/*.whl /tmp/
+
+    GETSF_SERVER_PACKAGE=$(pwd)"/"$(ls dist/*.whl)
+
+    echo
+    status "Server package is ${GETSF_SERVER_PACKAGE}"
+    cd ${cwd}
+fi
+
+# Assumes we've also built a server package
+if [ ! -z ${GETSF_CLIENT_REPO} ]; then
+    echo
+    status "Building client package"
+    cwd=$(pwd)
+    cd ${GETSF_CLIENT_REPO}
+    if [ -e dist ]; then
+        rm -rf build dist *.egg-info
+    fi
+    python3 setup.py sdist bdist_wheel
+    twine check dist/*
+    cp dist/*.whl /tmp/
+
+    GETSF_CLIENT_PACKAGE=$(pwd)"/"$(ls dist/*.whl)
+
+    echo
+    status "Client package is ${GETSF_CLIENT_PACKAGE}"
+    cd ${cwd}
+fi
+
 # Create a script to run on each node
 cat - > /tmp/sf-per-node-primary << PERNODEEOF
 #!/bin/bash
@@ -440,7 +566,7 @@ function error {
     }
 
 function status {
-    echo -e "\${Blue}\$1\${Color_Off}"
+    echo -e "\${Blue}\$(date) \$1\${Color_Off}"
     }
 
 # We must run as root to do the things we do.
@@ -481,35 +607,10 @@ echo
 
 # Install required packages
 APT_GET="DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpkg::Options::=\"--force-confold\" -y"
-status "Updating package list."
-eval \${APT_GET} update
 echo
 
-if [ \${isubuntu} == 1 ]; then
-    status "Adding a PPA to provide a more modern Ansible on Ubuntu."
-    eval \${APT_GET} install software-properties-common
-    add-apt-repository --yes --update ppa:ansible/ansible
-    eval \${APT_GET} update
-    echo
-elif [ \${isdebian} == 1]; then
-    status "Adding a PPA to provide a more modern Ansible on Debian."
-    if [ \${VERSION_ID} -eq 10 ]; then
-        echo "deb http://ppa.launchpad.net/ansible/ansible/ubuntu bionic main" > /etc/apt/sources.list.d/ansible.list
-    else
-        echo "deb http://ppa.launchpad.net/ansible/ansible/ubuntu focal main" > /etc/apt/sources.list.d/ansible.list
-    fi
-    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367
-    eval \${APT_GET} update
-    echo
-fi
-
-status "Upgrading packages."
-eval \${APT_GET} dist-upgrade
-echo
-
-status "Installing required packages."
-eval \${APT_GET} install ansible git tox build-essential python3-dev python3-wheel \
-    python3-pip python3-venv pwgen cpu-checker
+status "Installing cpu-checker."
+eval \${APT_GET} install cpu-checker
 echo
 
 # Make sure that KVM will work. This check is in the installer, but its
@@ -520,50 +621,111 @@ if [ \$? -ne 0 ]; then
     error "It looks like this machine isn't configured to run virtual machines.\nThis might indicate a BIOS configuration error (whatever your chipset\ncalls VT extensions), not having nested virtualization enabled if this\nis a virtual machine, or really ancient hardware. Please correct the\nproblem and re-run."
 fi
 echo
-
-status "Creating python venv."
-mkdir -p /srv/shakenfist/venv
-python3 -mvenv --system-site-packages /srv/shakenfist/venv
-echo
-
-status "Installing server and client packages in venv."
-/srv/shakenfist/venv/bin/pip install -U ${pipextra} ${GETSF_SERVER_PACKAGE} ${GETSF_CLIENT_PACKAGE}
 PERNODEEOF
 chmod ugo+rx /tmp/sf-per-node-primary
 
 # Now run that script all over the place
 if [ "${GETSF_NODES}" == "localhost" ]; then
+    if [ ! -e "/tmp/"$(basename ${GETSF_SERVER_PACKAGE}) ]; then
+        cp ${GETSF_SERVER_PACKAGE} "/tmp/"$(basename ${GETSF_SERVER_PACKAGE})
+    fi
+    if [ ! -e "/tmp/"$(basename ${GETSF_CLIENT_PACKAGE}) ]; then
+        cp ${GETSF_CLIENT_PACKAGE} "/tmp/"$(basename ${GETSF_CLIENT_PACKAGE})
+    fi
+    
     /tmp/sf-per-node-primary
 else
+    # TODO(mikal): Could I replace this with an ansible play so it runs in parallel?
     for node in ${GETSF_NODES[@]}; do
         status "    ...${node}"
-        scp -i ${GETSF_SSH_KEY_FILENAME} /tmp/sf-per-node-primary ${GETSF_SSH_USER}@${node}:/tmp/sf-per-node
-        ssh -i ${GETSF_SSH_KEY_FILENAME} ${GETSF_SSH_USER}@${node} "sudo /tmp/sf-per-node"
+        safe_node=$(echo ${node} | tr "-" "_")
+        calc_var_name="GETSF_NODE_MESH_ADDRESS_${safe_node}"
+
+        if [ ${GETSF_RELEASE} == "local" ]; then
+            scp -o StrictHostKeyChecking=no -i ${GETSF_SSH_KEY_FILENAME} ${GETSF_SERVER_PACKAGE} ${GETSF_SSH_USER}@${!calc_var_name}:/tmp/
+            scp -o StrictHostKeyChecking=no -i ${GETSF_SSH_KEY_FILENAME} ${GETSF_CLIENT_PACKAGE} ${GETSF_SSH_USER}@${!calc_var_name}:/tmp/
+        fi
+
+        scp -o StrictHostKeyChecking=no -i ${GETSF_SSH_KEY_FILENAME} /tmp/sf-per-node-primary ${GETSF_SSH_USER}@${!calc_var_name}:/tmp/sf-per-node
+        ssh -o StrictHostKeyChecking=no -i ${GETSF_SSH_KEY_FILENAME} ${GETSF_SSH_USER}@${!calc_var_name} "sudo /tmp/sf-per-node"
         echo
     done
     echo
 fi
 
+echo
+status "Installing git, and requirements for the primary venv."
+DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpkg::Options::="--force-confold" -y \
+    install git python3-cffi python3-dev python3-grpcio python3-pip python3-venv python3-wheel
+echo
+
+echo
+status "Install ansible from pip"
+pip3 install ansible
+echo
+
+# We _have_ to have Shaken Fist installed on the primary to boostrap the installer,
+# so we do that separately now.
+echo
+status "Setup primary venv."
+mkdir -p /srv/shakenfist/venv
+python3 -m venv --system-site-packages /srv/shakenfist/venv
+
+if [ ${GETSF_SERVER_PACKAGE} == "shakenfist" ]; then
+    /srv/shakenfist/venv/bin/pip install ${PIP_EXTRA} shakenfist
+else
+    /srv/shakenfist/venv/bin/pip install ${PIP_EXTRA} ${GETSF_SERVER_PACKAGE}
+fi
+
+if [ ${GETSF_CLIENT_PACKAGE} == "shakenfist-client" ]; then
+    /srv/shakenfist/venv/bin/pip install ${PIP_EXTRA} shakenfist-client
+else
+    /srv/shakenfist/venv/bin/pip install ${PIP_EXTRA} ${GETSF_CLIENT_PACKAGE}
+fi
+
 # NOTE(mikal): I don't love how we need to do this, but it seems to be required
 # to make sure CI is using the right version and tox isn't installing one of its
 # own.
-status "Install client package in system pip as well on the primary node."
-pip3 install -U ${pipextra} ${GETSF_CLIENT_PACKAGE}
+echo
+status "Install client package in system pip on the primary node."
+pip3 install -U ${PIP_EXTRA} ${GETSF_CLIENT_PACKAGE}
 echo
 
+# NOTE(mikal): I also don't love how we do this, but it will do until I have time
+# to rework the etcd installation.
 status "Installing ansible-galaxy requirements."
 ansible-galaxy install --force -r /srv/shakenfist/venv/share/shakenfist/installer/requirements.yml
 echo
 
 status "Creating /root/sf-deploy script"
-password=$(pwgen 16 1)
+if [ -z ${GETSF_ADMIN_PASSWORD} ]; then
+    apt-get install pwgen
+    GETSF_ADMIN_PASSWORD=$(pwgen 16 1)
+    echo "export GETSF_ADMIN_PASSWORD='${GETSF_ADMIN_PASSWORD}'" >> /root/.getsfrc
+fi
+
 cat - > /root/sf-deploy << DEPLOYEOF
 #!/bin/bash
 
-export ADMIN_PASSWORD=${password}
+export ADMIN_PASSWORD=${GETSF_ADMIN_PASSWORD}
 export FLOATING_IP_BLOCK="${GETSF_FLOATING_BLOCK}"
 export DEPLOY_NAME="${GETSF_DEPLOY_NAME}"
 DEPLOYEOF
+
+if [ ${GETSF_RELEASE} == "local" ]; then
+    localized_server_package="/tmp/"$(basename ${GETSF_SERVER_PACKAGE})
+    localized_client_package="/tmp/"$(basename ${GETSF_CLIENT_PACKAGE})
+    echo "Shakenfist package: ${localized_server_package}"
+    echo "Client package: ${localized_client_package}"
+
+    echo "export SERVER_PACKAGE=${localized_server_package}" >> /root/sf-deploy
+    echo "export CLIENT_PACKAGE=${localized_client_package}" >> /root/sf-deploy
+    echo "export PIP_EXTRA=${PIP_EXTRA}" >> /root/sf-deploy
+else
+    echo "export SERVER_PACKAGE=shakenfist" >> /root/sf-deploy
+    echo "export CLIENT_PACKAGE=shakenfist-client" >> /root/sf-deploy
+    echo "export PIP_EXTRA=${PIP_EXTRA}" >> /root/sf-deploy
+fi
 
 if [ ! -z ${GETSF_SSH_USER} ]; then
     echo "export SSH_USER=\"${GETSF_SSH_USER}\"" >> /root/sf-deploy
@@ -600,6 +762,7 @@ for node in ${GETSF_NODES[@]}; do
         api_stanza='"api_url": "http://127.0.0.1:13000"'
         api_comma=','
         network_node="true"
+        eventlog_node="true"
         etcd_master_node="true"
         hypervisor_node="true"
         storage_node="false"
@@ -618,6 +781,12 @@ for node in ${GETSF_NODES[@]}; do
             network_node="true"
         else
             network_node="false"
+        fi
+
+        if [ $(echo "${GETSF_NODE_EVENTLOG}" | grep -c ${node}) -gt 0 ]; then
+            eventlog_node="true"
+        else
+            eventlog_node="false"
         fi
 
         if [ $(echo "${GETSF_NODE_ETCD_MASTER}" | grep -c ${node}) -gt 0 ]; then
@@ -648,6 +817,7 @@ for node in ${GETSF_NODES[@]}; do
     "node_mesh_ip": "${!calc_mesh_address}",
     "primary_node": ${primary_node},
     "network_node": ${network_node},
+    "eventlog_node": ${eventlog_node},
     "etcd_master": ${etcd_master_node},
     "hypervisor": ${hypervisor_node},
     "storage": ${storage_node}${api_comma}
@@ -674,17 +844,21 @@ sleep 5
 
 status "Pre-fetching common images."
 . /etc/sf/sfrc
-sf-client artifact cache ubuntu:20.04
-sf-client artifact cache cirros
+
+if [ -z GETSF_SKIP_COMMON_IMAGES ]; then
+    sf-client artifact cache ubuntu:20.04
+    sf-client artifact cache cirros
+fi
 
 question_start
 echo "A default configuration including deployment topology has"
 echo "been written to /root/sf-deploy. There's a lot you can change"
 echo "with this configuration, but your current configuration should"
 echo "be good enough for an initial play."
-echo
-echo "Install completed successfully."
 question_end
+
+echo
+status "Install completed successfully."
 
 # Remove our scary failure message
 trap - EXIT
