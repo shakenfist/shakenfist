@@ -1,5 +1,4 @@
 import logging
-import time
 
 from shakenfist_ci import base
 
@@ -16,7 +15,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
     def setUp(self):
         super(TestStateChanges, self).setUp()
         self.net = self.test_client.allocate_network(
-            '192.168.242.0/24', True, True, '%s-net-one' % self.namespace)
+            '192.168.242.0/24', True, True, self.namespace)
         self._await_networks_ready([self.net['uuid']])
 
     def test_lifecycle_events(self):
@@ -77,8 +76,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         LOG.info('Instance Soft reboot')
         self.test_client.delete_console_data(inst['uuid'])
         self.test_client.reboot_instance(inst['uuid'])
-        time.sleep(60)
-
+        self._await_instance_not_ready(inst['uuid'])
         self._await_instance_ready(inst['uuid'])
         inst = self.test_client.get_instance(inst['uuid'])
         this_boot = inst['agent_system_boot_time']
@@ -86,15 +84,13 @@ class TestStateChanges(base.BaseNamespacedTestCase):
             this_boot, [None, 0, last_boot],
             'Instance %s failed soft reboot' % inst['uuid'])
         last_boot = this_boot
-
         self._test_ping(inst['uuid'], self.net['uuid'], ip, 0, 10)
 
         # Hard reboot
         LOG.info('Instance Hard reboot')
         self.test_client.delete_console_data(inst['uuid'])
         self.test_client.reboot_instance(inst['uuid'], hard=True)
-        time.sleep(60)
-
+        self._await_instance_not_ready(inst['uuid'])
         self._await_instance_ready(inst['uuid'])
         inst = self.test_client.get_instance(inst['uuid'])
         this_boot = inst['agent_system_boot_time']
@@ -109,7 +105,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         self.test_client.power_off_instance(inst['uuid'])
         # Once the API returns the libvirt has powered off the instance or an
         # error has occurred (which CI will catch).
-        time.sleep(60)
+        self._await_instance_not_ready(inst['uuid'])
         LOG.info('  ping test...')
         self._test_ping(inst['uuid'], self.net['uuid'], ip, 100)
 
@@ -117,15 +113,12 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         LOG.info('Instance Power on')
         self.test_client.delete_console_data(inst['uuid'])
         self.test_client.power_on_instance(inst['uuid'])
-        time.sleep(60)
-
         self._await_instance_ready(inst['uuid'])
         inst = self.test_client.get_instance(inst['uuid'])
         this_boot = inst['agent_system_boot_time']
         self.assertNotIn(this_boot, [None, 0, this_boot],
                          'Instance %s failed power cycle' % inst['uuid'])
         last_boot = this_boot
-
         self._test_ping(inst['uuid'], self.net['uuid'], ip, 0, 10)
 
         # Pause
@@ -141,6 +134,18 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         # the instance is un-paused.
         LOG.info('  ping test...')
         self._test_ping(inst['uuid'], self.net['uuid'], ip, 0, 10)
+
+
+class TestDetectReboot(base.BaseNamespacedTestCase):
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'detectreboot'
+        super(TestDetectReboot, self).__init__(*args, **kwargs)
+
+    def setUp(self):
+        super(TestDetectReboot, self).setUp()
+        self.net = self.test_client.allocate_network(
+            '192.168.242.0/24', True, True, self.namespace)
+        self._await_networks_ready([self.net['uuid']])
 
     def test_agent_detects_reboot(self):
         # Start our test instance
@@ -171,8 +176,9 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         # Hard reboot
         LOG.info('Instance Hard reboot')
         self.test_client.reboot_instance(inst['uuid'], hard=True)
+        self._await_instance_not_ready(inst['uuid'])
+        self._await_instance_ready(inst['uuid'])
 
-        time.sleep(60)
         inst = self.test_client.get_instance(inst['uuid'])
         if first_boot == inst['agent_system_boot_time']:
             raise Exception(
