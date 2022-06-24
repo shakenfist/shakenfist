@@ -26,6 +26,7 @@ class SFSocketAgent(protocol.SocketAgent):
         self.instance = inst
         self.instance_ready = None
         self.system_boot_time = 0
+        self.last_response = time.time()
 
         self.poll_tasks.append(self.is_system_running)
 
@@ -37,15 +38,26 @@ class SFSocketAgent(protocol.SocketAgent):
                          self.gather_facts_response)
 
     def poll(self):
-        if time.time() - self.last_data > 15:
+        if time.time() - self.last_response > 15:
+            self.instance.agent_state = 'not ready (unresponsive)'
             self.log.debug('Not receiving traffic, aborting.')
             if self.system_boot_time != 0:
                 self.instance.add_event2(
                     'agent has gone silent, restarting channel')
-            self.close()
+
+            # Attempt to close, but the OS might already think its closed
+            try:
+                self.close()
+            except OSError:
+                pass
+
             raise ConnectionIdle()
 
         super(SFSocketAgent, self).poll()
+
+    def dispatch_packet(self, packet):
+        self.last_response = time.time()
+        super(SFSocketAgent, self).dispatch_packet(packet)
 
     def _record_system_boot_time(self, sbt):
         if sbt != self.system_boot_time:
@@ -61,7 +73,7 @@ class SFSocketAgent(protocol.SocketAgent):
         self._record_system_boot_time(sbt)
 
     def agent_stop(self, _packet):
-        self.instance.agent_state = 'stopped'
+        self.instance.agent_state = 'not ready (stopped)'
 
     def is_system_running(self):
         self.send_packet({'command': 'is-system-running'})
@@ -71,14 +83,18 @@ class SFSocketAgent(protocol.SocketAgent):
         sbt = packet.get('system_boot_time', 0)
         self._record_system_boot_time(sbt)
 
-        if self.instance_ready != ready:
-            if ready:
-                self.instance.agent_state = 'ready'
+        if ready:
+            new_state = 'ready'
+        else:
+            new_state = 'not ready (%s)' % packet.get('message', 'none')
+
+        # We cache the agent state to reduce database load, and then
+        # trigger facts gathering when we transition into the 'ready' state.
+        if self.instance_ready != new_state:
+            self.instance.agent_state = new_state
+            self.instance_ready = new_state
+            if new_state == 'ready':
                 self.gather_facts()
-            else:
-                self.instance.agent_state = \
-                    'not ready (%s)' % packet.get('message', 'none')
-            self.instance_ready = ready
 
     def gather_facts(self):
         self.send_packet({'command': 'gather-facts'})
@@ -146,19 +162,20 @@ class Monitor(daemon.Daemon):
                             try:
                                 if not sc_connected.get(chan, False):
                                     inst.add_event2(
-                                        'side channel %s connected' % chan)
+                                        'sidechannel %s connected' % chan)
                                     sc_connected[chan] = True
 
                                 sc_clients[chan].dispatch_packet(
                                     packet)
                             except protocol.UnknownCommand:
                                 log_ctx.with_field('sidechannel', chan).info(
-                                    'Ignored side channel packet: %s' % packet)
+                                    'Ignored sidechannel packet: %s' % packet)
 
                     except (BrokenPipeError,
                             ConnectionRefusedError,
                             ConnectionResetError,
-                            FileNotFoundError):
+                            FileNotFoundError,
+                            OSError):
                         del sc_clients[chan]
 
             for fd in exceptional:
@@ -213,7 +230,7 @@ class Monitor(daemon.Daemon):
                 state = util_libvirt.extract_power_state(libvirt, domain)
                 if state in ['off', 'crashed', 'paused']:
                     # If the domain isn't running, it shouldn't have a
-                    # side channel monitor.
+                    # sidechannel monitor.
                     continue
 
                 instance_uuid = domain.name().split(':')[1]

@@ -1,4 +1,5 @@
 import logging
+import time
 
 from shakenfist_ci import base
 
@@ -105,7 +106,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         self.test_client.power_off_instance(inst['uuid'])
         # Once the API returns the libvirt has powered off the instance or an
         # error has occurred (which CI will catch).
-        self._await_instance_not_ready(inst['uuid'])
+        time.sleep(5)
         LOG.info('  ping test...')
         self._test_ping(inst['uuid'], self.net['uuid'], ip, 100)
 
@@ -113,10 +114,11 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         LOG.info('Instance Power on')
         self.test_client.delete_console_data(inst['uuid'])
         self.test_client.power_on_instance(inst['uuid'])
+        self._await_instance_not_ready(inst['uuid'])
         self._await_instance_ready(inst['uuid'])
         inst = self.test_client.get_instance(inst['uuid'])
         this_boot = inst['agent_system_boot_time']
-        self.assertNotIn(this_boot, [None, 0, this_boot],
+        self.assertNotIn(this_boot, [None, 0, last_boot],
                          'Instance %s failed power cycle' % inst['uuid'])
         last_boot = this_boot
         self._test_ping(inst['uuid'], self.net['uuid'], ip, 0, 10)
