@@ -533,7 +533,6 @@ class InstanceRebootSoftEndpoint(api_base.Resource):
     @api_base.requires_instance_active
     def post(self, instance_ref=None, instance_from_db=None):
         with instance_from_db.get_lock(op='Instance reboot soft'):
-            instance_from_db.add_event2('soft reboot')
             return instance_from_db.reboot(hard=False)
 
 
@@ -545,7 +544,6 @@ class InstanceRebootHardEndpoint(api_base.Resource):
     @api_base.requires_instance_active
     def post(self, instance_ref=None, instance_from_db=None):
         with instance_from_db.get_lock(op='Instance reboot hard'):
-            instance_from_db.add_event2('hard reboot')
             return instance_from_db.reboot(hard=True)
 
 
@@ -557,7 +555,6 @@ class InstancePowerOffEndpoint(api_base.Resource):
     @api_base.requires_instance_active
     def post(self, instance_ref=None, instance_from_db=None):
         with instance_from_db.get_lock(op='Instance power off'):
-            instance_from_db.add_event2('poweroff')
             return instance_from_db.power_off()
 
 
@@ -569,7 +566,6 @@ class InstancePowerOnEndpoint(api_base.Resource):
     @api_base.requires_instance_active
     def post(self, instance_ref=None, instance_from_db=None):
         with instance_from_db.get_lock(op='Instance power on'):
-            instance_from_db.add_event2('poweron')
             return instance_from_db.power_on()
 
 
@@ -581,7 +577,6 @@ class InstancePauseEndpoint(api_base.Resource):
     @api_base.requires_instance_active
     def post(self, instance_ref=None, instance_from_db=None):
         with instance_from_db.get_lock(op='Instance pause'):
-            instance_from_db.add_event2('pause')
             return instance_from_db.pause()
 
 
@@ -593,7 +588,6 @@ class InstanceUnpauseEndpoint(api_base.Resource):
     @api_base.requires_instance_active
     def post(self, instance_ref=None, instance_from_db=None):
         with instance_from_db.get_lock(op='Instance unpause'):
-            instance_from_db.add_event2('unpause')
             return instance_from_db.unpause()
 
 
