@@ -86,7 +86,12 @@ class SFSocketAgent(protocol.SocketAgent):
         if ready:
             new_state = 'ready'
         else:
-            new_state = 'not ready (%s)' % packet.get('message', 'none')
+            # Special case the degraded state here, as the system is in fact
+            # as ready as it is ever going to be, but isn't entirely happy.
+            if packet.get('message', 'none') == 'degraded':
+                new_state = 'ready (degraded)'
+            else:
+                new_state = 'not ready (%s)' % packet.get('message', 'none')
 
         # We cache the agent state to reduce database load, and then
         # trigger facts gathering when we transition into the 'ready' state.
