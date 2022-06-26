@@ -1,23 +1,20 @@
 from shakenfist_ci import base
 
 
-class TestDisks(base.BaseNamespacedTestCase):
-    """Make sure instances boot under various configurations."""
-
+class TestNVMeDisks(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
-        kwargs['namespace_prefix'] = 'disks'
-        super(TestDisks, self).__init__(*args, **kwargs)
+        kwargs['namespace_prefix'] = 'nvme-disks'
+        super(TestNVMeDisks, self).__init__(*args, **kwargs)
 
     def setUp(self):
-        super(TestDisks, self).setUp()
+        super(TestNVMeDisks, self).setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, self.namespace)
         self._await_networks_ready([self.net['uuid']])
 
-    def test_boot_nvme(self):
-        self.skip('This test is flakey in CI for reasons I do not understand.')
+    def test_disk(self):
         inst = self.test_client.create_instance(
-            'test-cirros-boot-nvme', 1, 1024,
+            'test-boot-nvme', 1, 1024,
             [
                 {
                     'network_uuid': self.net['uuid']
@@ -26,7 +23,7 @@ class TestDisks(base.BaseNamespacedTestCase):
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/ubuntu-2004',
+                    'base': 'sf://upload/system/debian-11',
                     'type': 'disk',
                     'bus': 'nvme'
                 }
