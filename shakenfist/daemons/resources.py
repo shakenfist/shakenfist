@@ -244,6 +244,12 @@ class Monitor(daemon.Daemon):
                             disk_path = disk.get('path')
                             disk_device = disk.get('device')
                             if disk_path and disk_device and os.path.exists(disk_path):
+                                # Because nvme disks don't exist as full libvirt
+                                # disks, they are missing from the statistics
+                                # results.
+                                if disk_device not in statistics['disk usage']:
+                                    statistics['disk usage'][disk_device] = {}
+
                                 statistics['disk usage'][disk_device][
                                     'actual bytes on disk'] = os.stat(disk_path).st_size
 
