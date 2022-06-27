@@ -126,7 +126,9 @@ elif [ ${GETSF_RELEASE} == "local" ]; then
 fi
 echo
 
-if [ ${GETSF_LOCAL_SOURCE} == "build" ]; then
+if [ -z ${GETSF_LOCAL_SOURCE} ]; then
+    status "no local install source required."
+elif [ ${GETSF_LOCAL_SOURCE} == "build" ]; then
     question_start
     echo "What is the path to your shakenfist server git checkout?"
     echo
@@ -223,7 +225,7 @@ elif [ ${GETSF_LOCAL_SOURCE} == "static" ]; then
         error "Agent package file does not exist."
     fi
 else
-    error "Could not parse response."
+    error "Could not parse local source configuration."
 fi
 echo
 
