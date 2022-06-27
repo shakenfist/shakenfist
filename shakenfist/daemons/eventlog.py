@@ -1,4 +1,5 @@
 from collections import defaultdict
+import etcd3gw
 import time
 
 from shakenfist.daemons import daemon
@@ -37,6 +38,12 @@ class Monitor(daemon.WorkerPoolDaemon):
 
                 if not results:
                     time.sleep(1)
+
+            except etcd3gw.exceptions.Etcd3Exception as e:
+                util_general.ignore_exception('eventlog daemon', e)
+                LOG.warning('too many etcd requests, event processing sleeping '
+                            'for five minutes')
+                time.sleep(300)
 
             except Exception as e:
                 util_general.ignore_exception('eventlog daemon', e)
