@@ -1,20 +1,20 @@
 from shakenfist_ci import base
 
 
-class TestNVMeDisks(base.BaseNamespacedTestCase):
+class TestDiskBusBase(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
-        kwargs['namespace_prefix'] = 'nvme-disks'
-        super(TestNVMeDisks, self).__init__(*args, **kwargs)
+        kwargs['namespace_prefix'] = '%s-disks' % self.bus
+        super(TestDiskBusBase, self).__init__(*args, **kwargs)
 
     def setUp(self):
-        super(TestNVMeDisks, self).setUp()
+        super(TestDiskBusBase, self).setUp()
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, self.namespace)
         self._await_networks_ready([self.net['uuid']])
 
     def test_disk(self):
         inst = self.test_client.create_instance(
-            'test-boot-nvme', 1, 1024,
+            'test-boot-%s' % self.bus, 2, 2048,
             [
                 {
                     'network_uuid': self.net['uuid']
@@ -25,7 +25,7 @@ class TestNVMeDisks(base.BaseNamespacedTestCase):
                     'size': 8,
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk',
-                    'bus': 'nvme'
+                    'bus': self.bus
                 }
             ], None, None, side_channels=['sf-agent'])
 
@@ -38,3 +38,21 @@ class TestNVMeDisks(base.BaseNamespacedTestCase):
         for i in self.test_client.get_instances():
             inst_uuids.append(i['uuid'])
         self.assertNotIn(inst['uuid'], inst_uuids)
+
+
+class TestNVMeDisks(TestDiskBusBase):
+    def __init__(self, *args, **kwargs):
+        self.bus = 'nvme'
+        super(TestNVMeDisks, self).__init__(*args, **kwargs)
+
+
+class TestSATADisks(TestDiskBusBase):
+    def __init__(self, *args, **kwargs):
+        self.bus = 'sata'
+        super(TestSATADisks, self).__init__(*args, **kwargs)
+
+
+class TestIDEDisks(TestDiskBusBase):
+    def __init__(self, *args, **kwargs):
+        self.bus = 'ide'
+        super(TestIDEDisks, self).__init__(*args, **kwargs)
