@@ -178,16 +178,16 @@ pipeline {
             sh '''  . $WORKSPACE/$BUILD_TAG/ci-environment.sh
                     ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
                         debian@$primary \
-                        '. /etc/sf/sfrc; sf-client artifact upload ubuntu-1804 /srv/ci/ubuntu:18.04'
+                        '. /etc/sf/sfrc; sf-client artifact upload ubuntu-1804 /srv/ci/ubuntu:18.04 --shared'
                     ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
                         debian@$primary \
-                        '. /etc/sf/sfrc; sf-client artifact upload ubuntu-2004 /srv/ci/ubuntu:20.04'
+                        '. /etc/sf/sfrc; sf-client artifact upload ubuntu-2004 /srv/ci/ubuntu:20.04 --shared'
                     ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
                         debian@$primary \
-                        '. /etc/sf/sfrc; sf-client artifact upload debian-11 /srv/ci/debian:11'
+                        '. /etc/sf/sfrc; sf-client artifact upload debian-11 /srv/ci/debian:11 --shared'
                     ssh -i /home/jenkins/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
                         debian@$primary \
-                        '. /etc/sf/sfrc; sf-client artifact upload cirros /srv/ci/cirros'
+                        '. /etc/sf/sfrc; sf-client artifact upload cirros /srv/ci/cirros --shared'
               '''
           }
         }

@@ -9,11 +9,12 @@ from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist import blob
+from shakenfist.config import config
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import logutil
-from shakenfist.config import config
+from shakenfist.metrics import get_minimum_object_version as gmov
 
 
 LOG, _ = logutil.setup(__name__)
@@ -28,7 +29,7 @@ UPLOAD_URL = 'sf://upload/'
 
 class Artifact(dbo):
     object_type = 'artifact'
-    current_version = 2
+    current_version = 3
     state_targets = {
         None: (dbo.STATE_INITIAL),
         dbo.STATE_INITIAL: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR),
@@ -47,15 +48,46 @@ class Artifact(dbo):
     TYPE_IMAGE = 'image'
 
     def __init__(self, static_values):
+        if static_values['version'] != self.current_version:
+            upgraded, static_values = self.upgrade(static_values)
+
+            if upgraded and gmov('artifact') == self.current_version:
+                etcd.put(self.object_type, None,
+                         static_values.get('uuid'), static_values)
+                LOG.with_field(
+                    self.object_type, static_values['uuid']).info('Online upgrade committed')
+
         super(Artifact, self).__init__(static_values.get('uuid'),
                                        static_values.get('version'),
                                        static_values.get('in_memory_only', False))
 
         self.__artifact_type = static_values['artifact_type']
         self.__source_url = static_values['source_url']
+        self.__namespace = static_values.get('namespace')
 
     @classmethod
-    def new(cls, artifact_type, source_url, max_versions=0):
+    def upgrade(cls, static_values):
+        changed = False
+        starting_version = static_values.get('version')
+
+        if static_values.get('version') == 2:
+            static_values['namespace'] = 'sharedwithall'
+            static_values['version'] = 3
+            changed = True
+
+        if changed:
+            LOG.with_fields({
+                cls.object_type: static_values['uuid'],
+                'start_version': starting_version,
+                'final_version': static_values.get('version')
+            }).info('Object online upgraded')
+        return changed, static_values
+
+    @classmethod
+    def new(cls, artifact_type, source_url, max_versions=0, namespace=None):
+        if namespace is None:
+            raise exceptions.ArtifactHasNoNamespace()
+
         artifact_uuid = str(uuid4())
         if not max_versions:
             max_versions = config.ARTIFACT_MAX_VERSIONS_DEFAULT
@@ -64,6 +96,7 @@ class Artifact(dbo):
             'uuid': artifact_uuid,
             'artifact_type': artifact_type,
             'source_url': source_url,
+            'namespace': namespace,
 
             'version': cls.current_version
         }
@@ -84,13 +117,15 @@ class Artifact(dbo):
         return a
 
     @staticmethod
-    def from_url(artifact_type, url, max_versions=0):
+    def from_url(artifact_type, url, max_versions=0, namespace=None):
         with etcd.get_lock('artifact_from_url', None, url):
             artifacts = list(Artifacts([partial(url_filter, url),
                                         partial(type_filter, artifact_type),
-                                        not_dead_states_filter]))
+                                        not_dead_states_filter,
+                                        partial(namespace_filter, namespace)]))
             if len(artifacts) == 0:
-                return Artifact.new(artifact_type, url, max_versions)
+                return Artifact.new(artifact_type, url, max_versions=max_versions,
+                                    namespace=namespace)
             if len(artifacts) == 1:
                 return artifacts[0]
             raise exceptions.TooManyMatches()
@@ -103,6 +138,10 @@ class Artifact(dbo):
     @property
     def source_url(self):
         return self.__source_url
+
+    @property
+    def namespace(self):
+        return self.__namespace
 
     @property
     def max_versions(self):
@@ -134,6 +173,7 @@ class Artifact(dbo):
             'source_url': self.source_url,
             'version': self.version,
             'max_versions': self.max_versions,
+            'namespace': self.namespace
         }
 
     def external_view(self):
@@ -276,3 +316,11 @@ not_dead_states_filter = partial(
         Artifact.STATE_CREATING,
         Artifact.STATE_CREATED,
     ])
+
+
+def namespace_filter(namespace, o):
+    if namespace == 'system':
+        return True
+    if o.namespace == 'sharedwithall':
+        return True
+    return o.namespace == namespace

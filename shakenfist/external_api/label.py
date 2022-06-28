@@ -19,7 +19,6 @@ def _label_url(label_name):
 
 
 class LabelEndpoint(api_base.Resource):
-
     @jwt_required()
     def post(self, label_name=None, blob_uuid=None, max_versions=0):
         b = Blob.from_db(blob_uuid)
@@ -31,7 +30,7 @@ class LabelEndpoint(api_base.Resource):
             return api_base.error(400, 'blob has been deleted')
 
         a = Artifact.from_url(Artifact.TYPE_LABEL, _label_url(label_name),
-                              max_versions)
+                              max_versions, namespace=get_jwt_identity()[0])
         a.add_index(blob_uuid)
         a.state = dbo.STATE_CREATED
         return a.external_view()

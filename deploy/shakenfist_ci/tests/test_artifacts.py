@@ -1,5 +1,7 @@
 import time
 
+from shakenfist_client import apiclient
+
 from shakenfist_ci import base
 
 
@@ -97,11 +99,11 @@ class TestImages(base.BaseNamespacedTestCase):
         # Use a URL not used by other tests in order to control the ref count
         url = ('https://sfcbr.shakenfist.com/gw-basic-again.qcow2')
 
-        img = self.system_client.cache_artifact(url)
+        img = self.test_client.cache_artifact(url)
 
         # Get all artifacts once to make sure we get added to the list
         image_urls = []
-        for image in self.system_client.get_artifacts():
+        for image in self.test_client.get_artifacts():
             image_urls.append(image['source_url'])
         self.assertIn(url, image_urls)
 
@@ -208,3 +210,33 @@ class TestImages(base.BaseNamespacedTestCase):
             lbl = self.test_client.update_label(label_name, blob_uuid)
             self.assertEqual(expected_versions, len(lbl.get('blobs')))
             self.assertIn(3, lbl['blobs'])
+
+
+class TestSharedImages(base.BaseNamespacedTestCase):
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'sharedimages'
+        super(TestSharedImages, self).__init__(*args, **kwargs)
+
+    def test_sharing(self):
+        url = ('https://sfcbr.shakenfist.com/gw-basic-shared.qcow2')
+
+        # Cache a non-shared version of the image
+        self.system_client.cache_artifact(url)
+
+        image_urls = []
+        for image in self.test_client.get_artifacts():
+            image_urls.append(image['source_url'])
+        self.assertNotIn(url, image_urls)
+
+        # Cache a shared version of the image
+        self.system_client.cache_artifact(url, shared=True)
+
+        image_urls = []
+        for image in self.test_client.get_artifacts():
+            image_urls.append(image['source_url'])
+        self.assertIn(url, image_urls)
+
+        # Try to cache a shared version when not admin
+        self.assertRaises(
+            apiclient.UnauthorizedException,
+            self.test_client.cache_artifact, url, shared=True)

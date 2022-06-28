@@ -202,6 +202,10 @@ class ArtifactHasNoBlobs(ArtifactException):
     pass
 
 
+class ArtifactHasNoNamespace(ArtifactException):
+    pass
+
+
 # Blobs
 class BlobMissing(ArtifactException):
     pass

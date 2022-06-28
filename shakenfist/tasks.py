@@ -196,27 +196,32 @@ class DefloatNetworkInterfaceTask(NetworkInterfaceTask):
 
 
 class ImageTask(QueueTask):
-    def __init__(self, url):
+    def __init__(self, url, namespace=None):
         super(ImageTask, self).__init__()
         self._url = url
+        self._namespace = namespace
 
         if not isinstance(url, str):
             raise NoURLImageFetchTaskException
 
     def obj_dict(self):
         return {**super(ImageTask, self).obj_dict(),
-                'url': self._url}
+                'url': self._url,
+                'namespace': self._namespace}
 
     # Data methods
     def url(self):
         return self._url
 
+    def namespace(self):
+        return self._namespace
+
 
 class FetchImageTask(ImageTask):
     _name = 'image_fetch'
 
-    def __init__(self, url, instance_uuid=None):
-        super(FetchImageTask, self).__init__(url)
+    def __init__(self, url, namespace=None, instance_uuid=None):
+        super(FetchImageTask, self).__init__(url, namespace=namespace)
         self._instance_uuid = instance_uuid
 
     def obj_dict(self):

@@ -1,5 +1,6 @@
 import flask
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from functools import partial
 import json
 import os
 import requests
@@ -7,7 +8,7 @@ import shutil
 import time
 import uuid
 
-from shakenfist.artifact import Artifact, Artifacts, UPLOAD_URL
+from shakenfist.artifact import Artifact, Artifacts, UPLOAD_URL, namespace_filter
 from shakenfist.blob import Blob
 from shakenfist import baseobject
 from shakenfist import constants
@@ -40,34 +41,57 @@ def arg_is_artifact_uuid(func):
     return wrapper
 
 
+def requires_artifact_ownership(func):
+    # Requires that @arg_is_artifact_uuid has already run
+    def wrapper(*args, **kwargs):
+        if not kwargs.get('artifact_from_db'):
+            LOG.with_field('artifact', kwargs['artifact_uuid']).info(
+                'Artifact not found, kwarg missing')
+            return api_base.error(404, 'artifact not found')
+
+        a = kwargs['artifact_from_db']
+        if get_jwt_identity()[0] not in [a.namespace, 'system']:
+            LOG.with_object(a).info(
+                'Artifact not found, ownership test in decorator')
+            return api_base.error(404, 'artifact not found')
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
+def requires_artifact_access(func):
+    # Requires that @arg_is_artifact_uuid has already run
+    def wrapper(*args, **kwargs):
+        if not kwargs.get('artifact_from_db'):
+            LOG.with_field('artifact', kwargs['artifact_uuid']).info(
+                'Artifact not found, kwarg missing')
+            return api_base.error(404, 'artifact not found')
+
+        a = kwargs['artifact_from_db']
+        if (a.namespace != 'sharedwithall' and
+                get_jwt_identity()[0] not in [a.namespace, 'system']):
+            LOG.with_object(a).info(
+                'Artifact not found, ownership test in decorator')
+            return api_base.error(404, 'artifact not found')
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
 class ArtifactEndpoint(api_base.Resource):
     @jwt_required()
     @arg_is_artifact_uuid
+    @requires_artifact_access
     def get(self, artifact_uuid=None, artifact_from_db=None):
         with etcd.ThreadLocalReadOnlyCache():
             return artifact_from_db.external_view()
 
     @jwt_required()
     @arg_is_artifact_uuid
+    @requires_artifact_ownership
     def delete(self, artifact_uuid=None, artifact_from_db=None):
-        """Delete an artifact from the cluster
-
-        Artifacts can only be deleted from the system if they are not in use.
-        The actual deletion of the on-disk files is left to the cleaner daemon.
-
-        It is acknowledged that there is a potential race condition between the
-        check that an artifact is not in use and the marking of the artifact as
-        deleted. This is only caused by a user simultaneously deleting an
-        artifact and attempting to start a VM using it. It is recommended that
-        the user does not do that.
-        """
-        # TODO(andy): Enforce namespace permissions when snapshots have namespaces
-        # TODO(mikal): this should all be refactored to be in the object
-
         if artifact_from_db.state.value == Artifact.STATE_DELETED:
-            # Already deleted, nothing to do.
             return
-
         artifact_from_db.delete()
 
 
@@ -76,7 +100,8 @@ class ArtifactsEndpoint(api_base.Resource):
     def get(self, node=None):
         retval = []
         with etcd.ThreadLocalReadOnlyCache():
-            for a in Artifacts(filters=[baseobject.active_states_filter]):
+            for a in Artifacts(filters=[baseobject.active_states_filter,
+                                        partial(namespace_filter, get_jwt_identity()[0])]):
                 if node:
                     idx = a.most_recent_index
                     if 'blob_uuid' in idx:
@@ -88,22 +113,38 @@ class ArtifactsEndpoint(api_base.Resource):
         return retval
 
     @jwt_required()
-    def post(self, url=None):
+    @api_base.requires_namespace_exist
+    def post(self, url=None, shared=False, namespace=None):
         # The only artifact type you can force the cluster to fetch is an
         # image, so TYPE_IMAGE is assumed here. We ensure that the image exists
         # in the database in an initial state here so that it will show up in
         # image list requests. The image is fetched by the queued job later.
-        a = Artifact.from_url(Artifact.TYPE_IMAGE, url)
+        if not namespace:
+            namespace = get_jwt_identity()[0]
+
+        # If accessing a foreign namespace, we need to be an admin
+        if get_jwt_identity()[0] not in [namespace, 'system']:
+            return api_base.error(404, 'namespace not found')
+
+        # Only admin can create shared artifacts
+        if shared:
+            if get_jwt_identity()[0] != 'system':
+                return api_base.error(
+                    403, 'only the system namespace can create shared artifacts')
+            namespace = 'sharedwithall'
+        a = Artifact.from_url(Artifact.TYPE_IMAGE, url, namespace=namespace)
 
         etcd.enqueue(config.NODE_NAME, {
-            'tasks': [FetchImageTask(url)],
+            'tasks': [FetchImageTask(url, namespace=namespace)],
         })
         return a.external_view()
 
 
 class ArtifactUploadEndpoint(api_base.Resource):
     @jwt_required()
-    def post(self, artifact_name=None, upload_uuid=None, source_url=None):
+    @api_base.requires_namespace_exist
+    def post(self, artifact_name=None, upload_uuid=None, source_url=None,
+             shared=False, namespace=None):
         u = Upload.from_db(upload_uuid)
         if not u:
             return api_base.error(404, 'upload not found')
@@ -130,7 +171,23 @@ class ArtifactUploadEndpoint(api_base.Resource):
         if not source_url:
             source_url = ('%s%s/%s'
                           % (UPLOAD_URL, get_jwt_identity()[0], artifact_name))
-        a = Artifact.from_url(Artifact.TYPE_IMAGE, source_url)
+
+        if not namespace:
+            namespace = get_jwt_identity()[0]
+
+        # If accessing a foreign namespace, we need to be an admin
+        if get_jwt_identity()[0] not in [namespace, 'system']:
+            return api_base.error(404, 'namespace not found')
+
+        # Only admin can create shared artifacts
+        if shared:
+            if get_jwt_identity()[0] != 'system':
+                return api_base.error(
+                    403, 'only the system namespace can create shared artifacts')
+            namespace = 'sharedwithall'
+
+        a = Artifact.from_url(Artifact.TYPE_IMAGE, source_url,
+                              namespace=namespace)
 
         with a.get_lock(ttl=(12 * constants.LOCK_REFRESH_SECONDS),
                         timeout=config.MAX_IMAGE_TRANSFER_SECONDS):
@@ -154,7 +211,6 @@ class ArtifactUploadEndpoint(api_base.Resource):
             b.observe()
             b.request_replication()
 
-            a.state = Artifact.STATE_CREATED
             a.add_event2('upload complete')
             a.add_index(b.uuid)
             a.state = Artifact.STATE_CREATED
@@ -164,9 +220,9 @@ class ArtifactUploadEndpoint(api_base.Resource):
 
 
 class ArtifactEventsEndpoint(api_base.Resource):
-    # TODO(andy): include artifact ownership
     @jwt_required()
     @arg_is_artifact_uuid
+    @requires_artifact_access
     @api_base.redirect_to_eventlog_node
     def get(self, artifact_uuid=None, artifact_from_db=None):
         with eventlog.EventLog('artifact', artifact_uuid) as eventdb:
@@ -176,6 +232,7 @@ class ArtifactEventsEndpoint(api_base.Resource):
 class ArtifactVersionsEndpoint(api_base.Resource):
     @jwt_required()
     @arg_is_artifact_uuid
+    @requires_artifact_access
     def get(self, artifact_uuid=None, artifact_from_db=None):
         retval = []
         for idx in artifact_from_db.get_all_indexes():
@@ -187,6 +244,7 @@ class ArtifactVersionsEndpoint(api_base.Resource):
 
     @jwt_required()
     @arg_is_artifact_uuid
+    @requires_artifact_ownership
     def post(self, artifact_uuid=None, artifact_from_db=None,
              max_versions=config.ARTIFACT_MAX_VERSIONS_DEFAULT):
         try:
@@ -199,6 +257,7 @@ class ArtifactVersionsEndpoint(api_base.Resource):
 class ArtifactVersionEndpoint(api_base.Resource):
     @jwt_required()
     @arg_is_artifact_uuid
+    @requires_artifact_ownership
     def delete(self, artifact_uuid=None, artifact_from_db=None, version_id=0):
         try:
             ver_index = int(version_id)
