@@ -94,9 +94,17 @@ class Monitor(daemon.Daemon):
                     else:
                         inst.state = inst.state.value + '-error'
 
+        except libvirt.libvirtError as e:
+            LOG.debug('Failed to lookup running domains: %s' % e)
+
+        try:
             # Inactive VMs just have a name, and are powered off
             # in our state system.
+            all_libvirt_uuids = []
             for domain_name in conn.listDefinedDomains():
+                domain = conn.lookupByName(domain_name)
+                all_libvirt_uuids.append(domain.UUIDString())
+
                 if not domain_name.startswith('sf:'):
                     continue
 
@@ -111,7 +119,6 @@ class Monitor(daemon.Daemon):
                         log_ctx.warning('Removing unknown inactive instance')
                         self._delete_instance_files(instance_uuid)
                         try:
-                            domain = conn.lookupByName(domain_name)
                             # TODO(mikal): work out if we can pass
                             # VIR_DOMAIN_UNDEFINE_NVRAM with virDomainUndefineFlags()
                             domain.undefine()
@@ -130,7 +137,6 @@ class Monitor(daemon.Daemon):
 
                         self._delete_instance_files(instance_uuid)
                         try:
-                            domain = conn.lookupByName(domain_name)
                             # TODO(mikal): work out if we can pass
                             # VIR_DOMAIN_UNDEFINE_NVRAM with virDomainUndefineFlags()
                             domain.undefine()
@@ -161,6 +167,28 @@ class Monitor(daemon.Daemon):
 
         except libvirt.libvirtError as e:
             LOG.debug('Failed to lookup all domains: %s' % e)
+
+        # libvirt on Debian 11 fails to clean up apparmor profiles for VMs
+        # which are no longer running, so we do that here. Note that this list
+        # of UUIDs is _libvirt_ UUIDs, not SF UUIDs and includes _all_ VMs
+        # defined on the hypervisor.
+        libvirt_profile_path = '/etc/apparmor.d/libvirt'
+        if os.path.exists(libvirt_profile_path):
+            for ent in os.listdir(libvirt_profile_path):
+                if not ent.startswith('libvirt-'):
+                    continue
+                if len(ent) not in [44, 50]:
+                    continue
+
+                entpath = os.path.join(libvirt_profile_path, ent)
+                st = os.stat(entpath)
+                if time.time() - st.st_mtime < config.CLEANER_DELAY * 2:
+                    continue
+
+                u = ent.replace('libvirt-', '').replace('.files', '')
+                if u not in all_libvirt_uuids:
+                    shutil.rmtree(entpath)
+                    LOG.info('Removed old libvirt apparmor path %s' % entpath)
 
     def _clear_old_libvirt_logs(self):
         if not os.path.exists(config.LIBVIRT_LOG_PATH):
