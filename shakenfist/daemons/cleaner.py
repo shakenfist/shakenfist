@@ -187,7 +187,10 @@ class Monitor(daemon.Daemon):
 
                 u = ent.replace('libvirt-', '').replace('.files', '')
                 if u not in all_libvirt_uuids:
-                    shutil.rmtree(entpath)
+                    if os.path.isdir(entpath):
+                        shutil.rmtree(entpath)
+                    else:
+                        os.unlink(entpath)
                     LOG.info('Removed old libvirt apparmor path %s' % entpath)
 
     def _clear_old_libvirt_logs(self):
