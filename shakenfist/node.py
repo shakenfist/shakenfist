@@ -84,7 +84,7 @@ class Node(dbo):
             'ip': self.ip,
             'state': self.state.value,
             'lastseen': self.last_seen,
-            'release': self.installed_version
+            'version': self.installed_version
         }
 
     # Static values
