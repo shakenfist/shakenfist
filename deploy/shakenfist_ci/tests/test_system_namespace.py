@@ -50,5 +50,5 @@ class TestSystemNamespace(base.BaseTestCase):
         self.system_client.delete_network(net['uuid'])
 
         self.assertRaises(
-            apiclient.ResourceCannotBeDeletedException,
+            apiclient.UnauthorizedException,
             self.system_client.delete_namespace, None)

@@ -757,7 +757,8 @@ class Instance(dbo):
                             artifact.BLOB_URL, disk['blob_uuid'])
                     elif disk.get('base') and not util_general.noneish(disk.get('base')):
                         a = artifact.Artifact.from_url(
-                            artifact.Artifact.TYPE_IMAGE, disk['base'])
+                            artifact.Artifact.TYPE_IMAGE, disk['base'],
+                            namespace=self.namespace)
                         mri = a.most_recent_index
 
                         if 'blob_uuid' not in mri:
@@ -1277,7 +1278,7 @@ class Instance(dbo):
             a = artifact.Artifact.from_url(
                 artifact.Artifact.TYPE_SNAPSHOT,
                 '%s%s/%s' % (artifact.INSTANCE_URL, self.uuid, disk['device']),
-                max_versions)
+                max_versions, namespace=self.namespace)
 
             blob_uuid = str(uuid4())
             entry = a.add_index(blob_uuid)

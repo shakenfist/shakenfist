@@ -43,6 +43,8 @@ The following operations are exposed on artifacts by the REST API:
 | delete a version | `artifact delete-version` | `delete_artifact_version()` |
 | set the maximum number of versions | `artifact max-versions` | `set_artifact_max_versions()` |
 
+Note that artifacts exist in namespaces (since v0.6). This means that your artifacts are private to your namespace, and can't be seen or used by other namespaces. There are two exceptions -- the "system" administrative namespace can see all artifacts, and the "system" namespace can create artifacts visible to all other namespaces -- this is done with the shared flag on the relevant command line or API calls, and uses a "sharedwithall" namespace in the database.
+
 ## Blobs
 
 Each version of an artifact is an object called a blob. Blobs are stored on Shaken Fist nodes, and are automatically replicated around the cluster as required. By default we store at least two copies of each blob, although this is configurable. Its possible we'll store a lot more copies than that, because we only reap excess copies when we start to run low on disk. This is because these blobs are often used during the startup of instances, so having a local cache of popular blobs can significantly improve instance start up times.
@@ -67,7 +69,13 @@ The following object types currently record events: artifacts; blobs; instances;
 
 <!-- document common event format once it has been finalized -->
 
-# Instances
+## Networks
+
+<!-- document networks here -->
+
+Note that networks exist in namespaces. This means that your networks are private to your namespace, and can't be seen or used by other namespaces. There is one exception -- the "system" administrative namespace can see all networks.
+
+## Instances
 
 Instances are the primary reason that you'd run Shaken Fist, so there's a lot to cover in their implementation. Obviously instances can be created, deleted, listed, and shown. Additionally, you can list the network interfaces on an instance, track and change metadata on a given instance (a simple key value store similar to OpenStack tags), request the current serial console output; and see events related to the instance. Instances can also have their power state managed: soft (ACPI) reboots; hard (power cycle) reboots; powered off; powered on; and paused.
 
@@ -85,6 +93,8 @@ When creating an instance you can configure:
 * whether secure boot is enabled, including a NVRAM template if required
 * what configuration drive type is used, with a default of OpenStack style
 * key and value metadata
+
+Note that instances exist in namespaces. This means that your instances are private to your namespace, and can't be seen or used by other namespaces. There is one exception -- the "system" administrative namespace can see all instances.
 
 # Other features
 

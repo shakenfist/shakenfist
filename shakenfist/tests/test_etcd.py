@@ -168,11 +168,12 @@ class TaskEncodingETCDtestCase(base.ShakenFistTestCase):
     @mock.patch('etcd3gw.Etcd3Client.put')
     def test_put_FetchImageTask(self, mock_put):
         etcd.put('objecttype', 'subtype', 'name',
-                 tasks.FetchImageTask('http://server/image'))
+                 tasks.FetchImageTask('http://server/image', namespace='foo'))
 
         path = '/sf/objecttype/subtype/name'
         encoded = '''{
     "instance_uuid": null,
+    "namespace": "foo",
     "task": "image_fetch",
     "url": "http://server/image",
     "version": 1
@@ -181,11 +182,13 @@ class TaskEncodingETCDtestCase(base.ShakenFistTestCase):
 
         etcd.put('objecttype', 'subtype', 'name',
                  tasks.FetchImageTask('http://server/image',
+                                      namespace='foo',
                                       instance_uuid='fake_uuid'))
 
         path = '/sf/objecttype/subtype/name'
         encoded = '''{
     "instance_uuid": "fake_uuid",
+    "namespace": "foo",
     "task": "image_fetch",
     "url": "http://server/image",
     "version": 1
@@ -399,6 +402,7 @@ class TaskDequeueTestCase(base.ShakenFistTestCase):
             "tasks": [
                         {
                             "instance_uuid": "fake_uuid",
+                            "namespace": "foo",
                             "task": "image_fetch",
                             "url": "http://whoknows",
                             "version": 1
@@ -417,7 +421,8 @@ class TaskDequeueTestCase(base.ShakenFistTestCase):
         jobname, workitem = etcd.dequeue('node01')
         self.assertEqual('1631269187.890441', jobname)
         expected = [
-            tasks.FetchImageTask('http://whoknows', 'fake_uuid'),
+            tasks.FetchImageTask('http://whoknows', namespace='foo',
+                                 instance_uuid='fake_uuid'),
         ]
         self.assertCountEqual(expected, workitem['tasks'])
         self.assertSequenceEqual(expected, workitem['tasks'])

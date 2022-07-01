@@ -83,6 +83,9 @@ def _artifact_safety_checks(a):
     if a.state.value != Artifact.STATE_CREATED:
         return api_base.error(
             404, 'artifact not ready (state=%s)' % a.state.value)
+    if (get_jwt_identity()[0] != 'system' and
+            a.namespace not in [get_jwt_identity()[0], 'sharedwithall']):
+        return api_base.error(404, 'artifact not found')
     return
 
 
@@ -172,7 +175,9 @@ class InstancesEndpoint(api_base.Resource):
             elif disk_base.startswith('label:'):
                 label = disk_base[len('label:'):]
                 a = Artifact.from_url(
-                    Artifact.TYPE_LABEL, '%s%s/%s' % (LABEL_URL, get_jwt_identity()[0], label))
+                    Artifact.TYPE_LABEL,
+                    '%s%s/%s' % (LABEL_URL, get_jwt_identity()[0], label),
+                    namespace=namespace)
                 err = _artifact_safety_checks(a)
                 if err:
                     return err
@@ -195,9 +200,11 @@ class InstancesEndpoint(api_base.Resource):
 
             elif disk_base.startswith(UPLOAD_URL) or disk_base.startswith(LABEL_URL):
                 if disk_base.startswith(UPLOAD_URL):
-                    a = Artifact.from_url(Artifact.TYPE_IMAGE, disk_base)
+                    a = Artifact.from_url(Artifact.TYPE_IMAGE, disk_base,
+                                          namespace=namespace)
                 else:
-                    a = Artifact.from_url(Artifact.TYPE_LABEL, disk_base)
+                    a = Artifact.from_url(Artifact.TYPE_LABEL, disk_base,
+                                          namespace=namespace)
                 err = _artifact_safety_checks(a)
                 if err:
                     return err
@@ -214,7 +221,8 @@ class InstancesEndpoint(api_base.Resource):
                 # We ensure that the image exists in the database in an initial state
                 # here so that it will show up in image list requests. The image is
                 # fetched by the queued job later.
-                Artifact.from_url(Artifact.TYPE_IMAGE, disk_base)
+                Artifact.from_url(Artifact.TYPE_IMAGE, disk_base,
+                                  namespace=namespace)
 
             transformed_disk.append(d)
 
@@ -227,7 +235,8 @@ class InstancesEndpoint(api_base.Resource):
             if nvram_template.startswith('label:'):
                 label = nvram_template[len('label:'):]
                 url = '%s%s/%s' % (LABEL_URL, get_jwt_identity()[0], label)
-                a = Artifact.from_url(Artifact.TYPE_LABEL, url)
+                a = Artifact.from_url(
+                    Artifact.TYPE_LABEL, url, namespace=namespace)
                 err = _artifact_safety_checks(a)
                 if err:
                     return err
@@ -451,9 +460,12 @@ class InstancesEndpoint(api_base.Resource):
             disk_base = disk.get('base')
             if disk.get('blob_uuid'):
                 tasks.append(FetchImageTask(
-                    '%s%s' % (BLOB_URL, disk['blob_uuid']), inst.uuid))
+                    '%s%s' % (BLOB_URL, disk['blob_uuid']),
+                    namespace=namespace, instance_uuid=inst.uuid))
             elif not util_general.noneish(disk_base):
-                tasks.append(FetchImageTask(disk['base'], inst.uuid))
+                tasks.append(FetchImageTask(
+                    disk['base'],
+                    namespace=namespace, instance_uuid=inst.uuid))
         tasks.append(StartInstanceTask(inst.uuid, network))
         tasks.extend(float_tasks)
 

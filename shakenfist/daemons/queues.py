@@ -70,7 +70,10 @@ def handle(jobname, workitem):
             log_i.with_field('task_name', task.name()).info('Starting task')
 
             if isinstance(task, FetchImageTask):
-                image_fetch(task.url(), inst)
+                n = task.namespace()
+                if not n:
+                    n = 'sharedwithall'
+                image_fetch(task.url(), n, inst)
 
             elif isinstance(task, PreflightInstanceTask):
                 if (inst.state.value == dbo.STATE_DELETED or
@@ -209,8 +212,8 @@ def handle(jobname, workitem):
         etcd.resolve(config.NODE_NAME, jobname)
 
 
-def image_fetch(url, inst):
-    a = Artifact.from_url(Artifact.TYPE_IMAGE, url)
+def image_fetch(url, namespace, inst):
+    a = Artifact.from_url(Artifact.TYPE_IMAGE, url, namespace=namespace)
     try:
         # TODO(andy): Wait up to 15 mins for another queue process to download
         # the required image. This will be changed to queue on a
