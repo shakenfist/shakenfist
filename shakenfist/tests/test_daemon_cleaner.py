@@ -42,6 +42,9 @@ class FakeLibvirtConnection(object):
     def lookupByName(self, name):
         return FakeLibvirtDomain(name, FakeLibvirt.VIR_DOMAIN_RUNNING)
 
+    def close(self):
+        pass
+
 
 class FakeLibvirtDomain(object):
     def __init__(self, name, state):

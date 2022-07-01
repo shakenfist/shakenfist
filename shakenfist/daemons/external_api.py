@@ -15,10 +15,7 @@ class Monitor(daemon.Daemon):
     def run(self):
         LOG.info('Starting')
 
-        libvirt = util_libvirt.get_libvirt()
-        conn = libvirt.open('qemu:///system')
-        present_cpus, _, _ = conn.getCPUMap()
-
+        present_cpus = util_libvirt.get_cpu_count()
         os.makedirs('/var/run/sf', exist_ok=True)
         util_process.execute(None, (config.API_COMMAND_LINE
                                     % {

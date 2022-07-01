@@ -657,9 +657,10 @@ class Instance(dbo):
                 b = blob.Blob.from_db(self.nvram_template)
                 b.ref_count_dec()
 
-            inst = self._get_domain()
-            if inst:
-                inst.undefine()
+            with util_libvirt.LibvirtConnection() as lc:
+                inst = lc.get_domain_from_sf_uuid(self.uuid)
+                if inst:
+                    inst.undefine()
         except Exception as e:
             util_general.ignore_exception(
                 'instance delete domain %s' % self, e)
@@ -1095,113 +1096,121 @@ class Instance(dbo):
 
         return x
 
-    def _get_domain(self):
-        libvirt = util_libvirt.get_libvirt()
-        conn = libvirt.open('qemu:///system')
-        try:
-            return conn.lookupByName('sf:' + self.uuid)
-
-        except libvirt.libvirtError:
-            return None
-
     def is_powered_on(self):
-        inst = self._get_domain()
-        if not inst:
-            return 'off'
+        with util_libvirt.LibvirtConnection() as lc:
+            inst = lc.get_domain_from_sf_uuid(self.uuid)
+            if not inst:
+                return 'off'
 
-        libvirt = util_libvirt.get_libvirt()
-        return util_libvirt.extract_power_state(libvirt, inst)
+            return lc.extract_power_state(inst)
 
     def power_on(self):
-        libvirt = util_libvirt.get_libvirt()
-        inst = self._get_domain()
-        if not inst:
-            conn = libvirt.open('qemu:///system')
-            inst = conn.defineXML(self._create_domain_xml())
+        with util_libvirt.LibvirtConnection() as lc:
+            inst = lc.get_domain_from_sf_uuid(self.uuid)
             if not inst:
-                self.enqueue_delete_due_error(
-                    'power on failed to create domain')
-                raise exceptions.NoDomainException()
+                inst = lc.define_xml(self._create_domain_xml())
+                if not inst:
+                    self.enqueue_delete_due_error(
+                        'power on failed to create domain')
+                    raise exceptions.NoDomainException()
 
-        try:
-            inst.create()
-        except libvirt.libvirtError as e:
-            if str(e).startswith('Requested operation is not valid: '
-                                 'domain is already running'):
-                pass
-            elif str(e).find('Failed to find an available port: '
-                             'Address already in use') != -1:
-                self.log.warning('Instance ports clash: %s', e)
+            try:
+                inst.create()
+            except lc.libvirt.libvirtError as e:
+                if str(e).startswith('Requested operation is not valid: '
+                                     'domain is already running'):
+                    pass
+                elif str(e).find('Failed to find an available port: '
+                                 'Address already in use') != -1:
+                    self.log.warning('Instance ports clash: %s', e)
 
-                # Free those ports and pick some new ones
-                ports = self.ports
-                self._free_console_port(ports['console_port'])
-                self._free_console_port(ports['vdi_port'])
+                    # Free those ports and pick some new ones
+                    ports = self.ports
+                    self._free_console_port(ports['console_port'])
+                    self._free_console_port(ports['vdi_port'])
 
-                # We need to delete the nvram file before we can undefine
-                # the domain. This will be recreated by libvirt on the next
-                # attempt.
-                nvram_path = os.path.join(self.instance_path, 'nvram')
-                if os.path.exists(nvram_path):
-                    os.unlink(nvram_path)
+                    # We need to delete the nvram file before we can undefine
+                    # the domain. This will be recreated by libvirt on the next
+                    # attempt.
+                    nvram_path = os.path.join(self.instance_path, 'nvram')
+                    if os.path.exists(nvram_path):
+                        os.unlink(nvram_path)
 
-                inst.undefine()
+                    inst.undefine()
 
-                self.ports = None
-                self.allocate_instance_ports()
-                return False
-            else:
-                self.add_event2('instance start error',
-                                extra={'message': str(e)})
-                return False
+                    self.ports = None
+                    self.allocate_instance_ports()
+                    return False
+                else:
+                    self.add_event2('instance start error',
+                                    extra={'message': str(e)})
+                    return False
 
-        inst.setAutostart(1)
-        self.update_power_state(
-            util_libvirt.extract_power_state(libvirt, inst))
-        self.add_event2('poweron')
-        return True
+            inst.setAutostart(1)
+            self.update_power_state(lc.extract_power_state(inst))
+            self.add_event2('poweron')
+            return True
 
     def power_off(self):
-        libvirt = util_libvirt.get_libvirt()
-        inst = self._get_domain()
-        if not inst:
-            return
+        with util_libvirt.LibvirtConnection() as lc:
+            inst = lc.get_domain_from_sf_uuid(self.uuid)
+            if not inst:
+                return
 
-        try:
-            inst.destroy()
-        except libvirt.libvirtError as e:
-            if not str(e).startswith('Requested operation is not valid: '
-                                     'domain is not running'):
-                self.log.error('Failed to delete domain: %s', e)
+            try:
+                inst.destroy()
+            except lc.libvirt.libvirtError as e:
+                if not str(e).startswith('Requested operation is not valid: '
+                                         'domain is not running'):
+                    self.log.error('Failed to delete domain: %s', e)
 
-        self.update_power_state('off')
-        self.add_event2('poweroff')
+            self.update_power_state('off')
+            self.add_event2('poweroff')
 
     def reboot(self, hard=False):
-        libvirt = util_libvirt.get_libvirt()
-        inst = self._get_domain()
-        if not hard:
-            inst.reboot(flags=libvirt.VIR_DOMAIN_REBOOT_ACPI_POWER_BTN)
-            self.add_event2('soft reboot')
-        else:
-            inst.reset()
-            self.add_event2('hard reboot')
+        with util_libvirt.LibvirtConnection() as lc:
+            inst = lc.get_domain_from_sf_uuid(self.uuid)
+            if not inst:
+                # Not returning a libvirt domain here indicates that the instance
+                # is "powered off" (destroyed in libvirt speak). It doesn't make
+                # sense to reboot a powered off machine
+                raise exceptions.InvalidLifecycleState(
+                    'you cannot reboot a powered off instance')
+
+            if not hard:
+                inst.reboot(flags=lc.libvirt.VIR_DOMAIN_REBOOT_ACPI_POWER_BTN)
+                self.add_event2('soft reboot')
+            else:
+                inst.reset()
+                self.add_event2('hard reboot')
 
     def pause(self):
-        libvirt = util_libvirt.get_libvirt()
-        inst = self._get_domain()
-        inst.suspend()
-        self.update_power_state(
-            util_libvirt.extract_power_state(libvirt, inst))
-        self.add_event2('pause')
+        with util_libvirt.LibvirtConnection() as lc:
+            inst = lc.get_domain_from_sf_uuid(self.uuid)
+            if not inst:
+                # Not returning a libvirt domain here indicates that the instance
+                # is "powered off" (destroyed in libvirt speak). It doesn't make
+                # sense to reboot a powered off machine
+                raise exceptions.InvalidLifecycleState(
+                    'you cannot pause a powered off instance')
+
+            inst.suspend()
+            self.update_power_state(lc.extract_power_state(inst))
+            self.add_event2('pause')
 
     def unpause(self):
-        libvirt = util_libvirt.get_libvirt()
-        inst = self._get_domain()
-        inst.resume()
-        self.update_power_state(
-            util_libvirt.extract_power_state(libvirt, inst))
-        self.add_event2('unpause')
+        with util_libvirt.LibvirtConnection() as lc:
+            inst = lc.get_domain_from_sf_uuid(self.uuid)
+            if not inst:
+                # Not returning a libvirt domain here indicates that the instance
+                # is "powered off" (destroyed in libvirt speak). It doesn't make
+                # sense to reboot a powered off machine
+                raise exceptions.InvalidLifecycleState(
+                    'you cannot unpause a powered off instance')
+
+            inst.resume()
+            self.update_power_state(lc.extract_power_state(inst))
+            self.add_event2('unpause')
 
     def get_console_data(self, length):
         console_path = os.path.join(self.instance_path, 'console.log')
