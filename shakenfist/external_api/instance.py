@@ -544,8 +544,11 @@ class InstanceRebootSoftEndpoint(api_base.Resource):
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
     def post(self, instance_ref=None, instance_from_db=None):
-        with instance_from_db.get_lock(op='Instance reboot soft'):
-            return instance_from_db.reboot(hard=False)
+        try:
+            with instance_from_db.get_lock(op='Instance reboot soft'):
+                return instance_from_db.reboot(hard=False)
+        except exceptions.InvalidLifecycleState as e:
+            return api_base.error(409, e)
 
 
 class InstanceRebootHardEndpoint(api_base.Resource):
@@ -555,8 +558,11 @@ class InstanceRebootHardEndpoint(api_base.Resource):
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
     def post(self, instance_ref=None, instance_from_db=None):
-        with instance_from_db.get_lock(op='Instance reboot hard'):
-            return instance_from_db.reboot(hard=True)
+        try:
+            with instance_from_db.get_lock(op='Instance reboot hard'):
+                return instance_from_db.reboot(hard=True)
+        except exceptions.InvalidLifecycleState as e:
+            return api_base.error(409, e)
 
 
 class InstancePowerOffEndpoint(api_base.Resource):
@@ -566,8 +572,11 @@ class InstancePowerOffEndpoint(api_base.Resource):
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
     def post(self, instance_ref=None, instance_from_db=None):
-        with instance_from_db.get_lock(op='Instance power off'):
-            return instance_from_db.power_off()
+        try:
+            with instance_from_db.get_lock(op='Instance power off'):
+                return instance_from_db.power_off()
+        except exceptions.InvalidLifecycleState as e:
+            return api_base.error(409, e)
 
 
 class InstancePowerOnEndpoint(api_base.Resource):
@@ -577,8 +586,11 @@ class InstancePowerOnEndpoint(api_base.Resource):
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
     def post(self, instance_ref=None, instance_from_db=None):
-        with instance_from_db.get_lock(op='Instance power on'):
-            return instance_from_db.power_on()
+        try:
+            with instance_from_db.get_lock(op='Instance power on'):
+                return instance_from_db.power_on()
+        except exceptions.InvalidLifecycleState as e:
+            return api_base.error(409, e)
 
 
 class InstancePauseEndpoint(api_base.Resource):
@@ -588,8 +600,11 @@ class InstancePauseEndpoint(api_base.Resource):
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
     def post(self, instance_ref=None, instance_from_db=None):
-        with instance_from_db.get_lock(op='Instance pause'):
-            return instance_from_db.pause()
+        try:
+            with instance_from_db.get_lock(op='Instance pause'):
+                return instance_from_db.pause()
+        except exceptions.InvalidLifecycleState as e:
+            return api_base.error(409, e)
 
 
 class InstanceUnpauseEndpoint(api_base.Resource):
@@ -599,8 +614,11 @@ class InstanceUnpauseEndpoint(api_base.Resource):
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
     def post(self, instance_ref=None, instance_from_db=None):
-        with instance_from_db.get_lock(op='Instance unpause'):
-            return instance_from_db.unpause()
+        try:
+            with instance_from_db.get_lock(op='Instance unpause'):
+                return instance_from_db.unpause()
+        except exceptions.InvalidLifecycleState as e:
+            return api_base.error(409, e)
 
 
 class InstanceMetadatasEndpoint(api_base.Resource):

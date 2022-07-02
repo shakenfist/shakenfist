@@ -67,10 +67,7 @@ class WorkerPoolDaemon(Daemon):
     def __init__(self, name):
         super(WorkerPoolDaemon, self).__init__(name)
         self.workers = []
-
-        libvirt = util_libvirt.get_libvirt()
-        conn = libvirt.open('qemu:///system')
-        self.present_cpus, _, _ = conn.getCPUMap()
+        self.present_cpus = util_libvirt.get_cpu_count()
 
     def reap_workers(self):
         for w in list(self.workers):

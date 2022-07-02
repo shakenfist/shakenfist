@@ -206,70 +206,70 @@ class Monitor(daemon.Daemon):
 
     def run(self):
         LOG.info('Starting')
-        libvirt = util_libvirt.get_libvirt()
         monitors = {}
 
         while not self.exit.is_set():
-            # Cleanup terminated monitors
-            all_monitors = list(monitors.keys())
-            for instance_uuid in all_monitors:
-                if not monitors[instance_uuid].is_alive():
-                    # Reap process
-                    monitors[instance_uuid].join(1)
+            with util_libvirt.LibvirtConnection() as lc:
+                # Cleanup terminated monitors
+                all_monitors = list(monitors.keys())
+                for instance_uuid in all_monitors:
+                    if not monitors[instance_uuid].is_alive():
+                        # Reap process
+                        monitors[instance_uuid].join(1)
+                        eventlog.add_event2(
+                            'instance', instance_uuid, 'sidechannel monitor crashed')
+                        del monitors[instance_uuid]
+
+                # Audit desired monitors
+                extra_instances = list(monitors.keys())
+                missing_instances = []
+
+                # The goal here is to find all instances running on this node so
+                # that we can monitor them. We used to query etcd for this, but
+                # we needed to do so frequently and it created a lot of etcd load.
+                # We also can't use the existence of instance folders (which once
+                # seemed like a good idea at the time), because some instances might
+                # also be powered off. Instead, we ask libvirt what domains are
+                # running.
+                for domain in lc.get_sf_domains():
+                    state = lc.extract_power_state(domain)
+                    if state in ['off', 'crashed', 'paused']:
+                        # If the domain isn't running, it shouldn't have a
+                        # sidechannel monitor.
+                        continue
+
+                    instance_uuid = domain.name().split(':')[1]
+                    if instance_uuid in extra_instances:
+                        extra_instances.remove(instance_uuid)
+                    if instance_uuid not in monitors:
+                        missing_instances.append(instance_uuid)
+
+                # Start missing monitors
+                for instance_uuid in missing_instances:
+                    p = multiprocessing.Process(
+                        target=self.monitor, args=(instance_uuid,),
+                        name='%s-%s' % (daemon.process_name('sidechannel'),
+                                        instance_uuid))
+                    p.start()
+
+                    monitors[instance_uuid] = p
                     eventlog.add_event2(
-                        'instance', instance_uuid, 'sidechannel monitor crashed')
+                        'instance', instance_uuid, 'sidechannel monitor started')
+
+                # Cleanup extra monitors
+                for instance_uuid in extra_instances:
+                    p = monitors[instance_uuid]
+                    try:
+                        os.kill(p.pid, signal.SIGKILL)
+                        monitors[instance_uuid].join(1)
+                    except Exception:
+                        pass
+
                     del monitors[instance_uuid]
+                    eventlog.add_event2(
+                        'instance', instance_uuid, 'sidechannel monitor finished')
 
-            # Audit desired monitors
-            extra_instances = list(monitors.keys())
-            missing_instances = []
-
-            # The goal here is to find all instances running on this node so
-            # that we can monitor them. We used to query etcd for this, but
-            # we needed to do so frequently and it created a lot of etcd load.
-            # We also can't use the existence of instance folders (which once
-            # seemed like a good idea at the time), because some instances might
-            # also be powered off. Instead, we ask libvirt what domains are
-            # running.
-            for domain in util_libvirt.sf_domains():
-                state = util_libvirt.extract_power_state(libvirt, domain)
-                if state in ['off', 'crashed', 'paused']:
-                    # If the domain isn't running, it shouldn't have a
-                    # sidechannel monitor.
-                    continue
-
-                instance_uuid = domain.name().split(':')[1]
-                if instance_uuid in extra_instances:
-                    extra_instances.remove(instance_uuid)
-                if instance_uuid not in monitors:
-                    missing_instances.append(instance_uuid)
-
-            # Start missing monitors
-            for instance_uuid in missing_instances:
-                p = multiprocessing.Process(
-                    target=self.monitor, args=(instance_uuid,),
-                    name='%s-%s' % (daemon.process_name('sidechannel'),
-                                    instance_uuid))
-                p.start()
-
-                monitors[instance_uuid] = p
-                eventlog.add_event2(
-                    'instance', instance_uuid, 'sidechannel monitor started')
-
-            # Cleanup extra monitors
-            for instance_uuid in extra_instances:
-                p = monitors[instance_uuid]
-                try:
-                    os.kill(p.pid, signal.SIGKILL)
-                    monitors[instance_uuid].join(1)
-                except Exception:
-                    pass
-
-                del monitors[instance_uuid]
-                eventlog.add_event2(
-                    'instance', instance_uuid, 'sidechannel monitor finished')
-
-            self.exit.wait(1)
+                self.exit.wait(1)
 
         for instance_uuid in monitors:
             os.kill(monitors[instance_uuid].pid, signal.SIGKILL)

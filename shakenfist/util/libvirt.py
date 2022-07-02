@@ -14,39 +14,80 @@ def get_libvirt():
     return LIBVIRT
 
 
-def sf_domains():
-    libvirt = get_libvirt()
-    conn = libvirt.open('qemu:///system')
+def get_cpu_count():
+    with LibvirtConnection() as lc:
+        present_cpus, _, _ = lc.get_cpu_map()
 
-    # Active VMs have an ID. Active means running in libvirt
-    # land.
-    for domain_id in conn.listDomainsID():
+    return present_cpus
+
+
+class LibvirtConnection():
+    def __init__(self):
+        self.libvirt = None
+        self.conn = None
+
+    def __enter__(self):
+        self.libvirt = get_libvirt()
+        self.conn = self.libvirt.open('qemu:///system')
+        return self
+
+    def __exit__(self, *args):
+        if self.conn:
+            self.conn.close()
+            self.conn = None
+
+    def get_domain_from_sf_uuid(self, u):
         try:
-            domain = conn.lookupByID(domain_id)
-            if not domain.name().startswith('sf:'):
-                continue
+            return self.conn.lookupByName('sf:' + u)
+        except self.libvirt.libvirtError:
+            return None
 
-            yield domain
+    def extract_power_state(self, domain):
+        state, _ = domain.state()
+        if state == self.libvirt.VIR_DOMAIN_SHUTOFF:
+            return 'off'
 
-        except libvirt.libvirtError:
-            pass
+        if state == self.libvirt.VIR_DOMAIN_CRASHED:
+            return 'crashed'
 
+        if state in [self.libvirt.VIR_DOMAIN_PAUSED,
+                     self.libvirt.VIR_DOMAIN_PMSUSPENDED]:
+            return 'paused'
 
-def extract_power_state(libvirt, domain):
-    state, _ = domain.state()
-    if state == libvirt.VIR_DOMAIN_SHUTOFF:
-        return 'off'
+        # Covers all "running states": BLOCKED, NOSTATE,
+        # RUNNING, SHUTDOWN
+        return 'on'
 
-    if state == libvirt.VIR_DOMAIN_CRASHED:
-        return 'crashed'
+    def define_xml(self, xml):
+        return self.conn.defineXML(xml)
 
-    if state in [libvirt.VIR_DOMAIN_PAUSED,
-                 libvirt.VIR_DOMAIN_PMSUSPENDED]:
-        return 'paused'
+    def get_sf_domains(self):
+        # Active VMs have an ID. Active means running in libvirt
+        # land.
+        for domain_id in self.conn.listDomainsID():
+            try:
+                domain = self.conn.lookupByID(domain_id)
+                if not domain.name().startswith('sf:'):
+                    continue
 
-    # Covers all "running states": BLOCKED, NOSTATE,
-    # RUNNING, SHUTDOWN
-    return 'on'
+                yield domain
+
+            except self.libvirt.libvirtError:
+                pass
+
+    def get_all_domains(self):
+        for name in self.conn.listDefinedDomains():
+            yield self.conn.lookupByName(name)
+
+    def get_cpu_map(self):
+        return self.conn.getCPUMap()
+
+    def get_max_vcpus(self):
+        return self.conn.getMaxVcpus(None)
+
+    def get_memory_stats(self):
+        return self.conn.getMemoryStats(
+            self.libvirt.VIR_NODE_MEMORY_STATS_ALL_CELLS)
 
 
 def extract_hypervisor_devices(domain):

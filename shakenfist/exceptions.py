@@ -45,6 +45,10 @@ class NVRAMTemplateMissing(InstanceException):
     pass
 
 
+class InvalidLifecycleState(InstanceException):
+    pass
+
+
 # Scheduler
 class SchedulerException(Exception):
     pass
