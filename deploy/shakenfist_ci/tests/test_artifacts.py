@@ -240,3 +240,22 @@ class TestSharedImages(base.BaseNamespacedTestCase):
         self.assertRaises(
             apiclient.UnauthorizedException,
             self.test_client.cache_artifact, url, shared=True)
+
+
+class TestTypoedLabel(base.BaseNamespacedTestCase):
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'sharedimages'
+        super(TestTypoedLabel, self).__init__(*args, **kwargs)
+
+    def test_typo_is_error(self):
+        self.assertRaises(apiclient.ResourceNotFoundException,
+                          self.test_client.create_instance,
+                          'typoedlabel', 1, 1024, None,
+                          [
+                                {
+                                    'size': 20,
+                                    'base': 'label:doesnotexist',
+                                    'type': 'disk'
+                                }
+                          ],
+                          None, None, side_channels=['sf-agent'])
