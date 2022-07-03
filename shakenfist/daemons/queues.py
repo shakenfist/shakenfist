@@ -213,7 +213,8 @@ def handle(jobname, workitem):
 
 
 def image_fetch(url, namespace, inst):
-    a = Artifact.from_url(Artifact.TYPE_IMAGE, url, namespace=namespace)
+    a = Artifact.from_url(Artifact.TYPE_IMAGE, url, namespace=namespace,
+                          create_if_new=True)
     try:
         # TODO(andy): Wait up to 15 mins for another queue process to download
         # the required image. This will be changed to queue on a

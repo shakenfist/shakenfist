@@ -117,15 +117,17 @@ class Artifact(dbo):
         return a
 
     @staticmethod
-    def from_url(artifact_type, url, max_versions=0, namespace=None):
+    def from_url(artifact_type, url, max_versions=0, namespace=None, create_if_new=False):
         with etcd.get_lock('artifact_from_url', None, url):
             artifacts = list(Artifacts([partial(url_filter, url),
                                         partial(type_filter, artifact_type),
                                         not_dead_states_filter,
                                         partial(namespace_filter, namespace)]))
             if len(artifacts) == 0:
-                return Artifact.new(artifact_type, url, max_versions=max_versions,
-                                    namespace=namespace)
+                if create_if_new:
+                    return Artifact.new(artifact_type, url, max_versions=max_versions,
+                                        namespace=namespace)
+                return None
             if len(artifacts) == 1:
                 return artifacts[0]
             raise exceptions.TooManyMatches()

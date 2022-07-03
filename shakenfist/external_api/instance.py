@@ -222,7 +222,7 @@ class InstancesEndpoint(api_base.Resource):
                 # here so that it will show up in image list requests. The image is
                 # fetched by the queued job later.
                 Artifact.from_url(Artifact.TYPE_IMAGE, disk_base,
-                                  namespace=namespace)
+                                  namespace=namespace, create_if_new=True)
 
             transformed_disk.append(d)
 

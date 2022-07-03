@@ -132,7 +132,8 @@ class ArtifactsEndpoint(api_base.Resource):
                 return api_base.error(
                     403, 'only the system namespace can create shared artifacts')
             namespace = 'sharedwithall'
-        a = Artifact.from_url(Artifact.TYPE_IMAGE, url, namespace=namespace)
+        a = Artifact.from_url(Artifact.TYPE_IMAGE, url, namespace=namespace,
+                              create_if_new=True)
 
         etcd.enqueue(config.NODE_NAME, {
             'tasks': [FetchImageTask(url, namespace=namespace)],
@@ -187,7 +188,7 @@ class ArtifactUploadEndpoint(api_base.Resource):
             namespace = 'sharedwithall'
 
         a = Artifact.from_url(Artifact.TYPE_IMAGE, source_url,
-                              namespace=namespace)
+                              namespace=namespace, create_if_new=True)
 
         with a.get_lock(ttl=(12 * constants.LOCK_REFRESH_SECONDS),
                         timeout=config.MAX_IMAGE_TRANSFER_SECONDS):

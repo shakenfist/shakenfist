@@ -395,7 +395,7 @@ class BaseNamespacedTestCase(BaseTestCase):
             for net in non_blocking_client.get_networks():
                 try:
                     non_blocking_client.delete_network(net['uuid'])
-                except apiclient.ResourceCannotBeDeletedException:
+                except apiclient.ResourceStateConflictException:
                     pass
 
             time.sleep(5)
