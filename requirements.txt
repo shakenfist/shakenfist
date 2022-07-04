@@ -13,10 +13,6 @@ oslo.concurrency            # apache2
 jinja2                      # bsd
 setproctitle                # bsd
 click>=8.0.0                # bsd
-prettytable                 # bsd
-tox                         # mit
-flake8                      # mit
-testtools                   # mit
 Werkzeug                    # bsd
 flask                       # bsd
 flask_restful               # bsd
