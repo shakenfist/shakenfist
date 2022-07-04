@@ -3,6 +3,9 @@ protobuf<4.0.0              # google license: https://github.com/protocolbuffers
                             # Version 4.21 and greater requires that a different version of protoc be used
                             # than that which etcd3 uses.
 
+fixtures<4.0.1              # apache2
+                            # Version 4.0.1 fails to build with "AttributeError: install_layout"
+
 # Our requirements.
 pyyaml>=5.1                 # mit
 pycdlib                     # lgpl
