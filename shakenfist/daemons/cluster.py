@@ -74,7 +74,7 @@ class Monitor(daemon.Daemon):
                         obj.hard_delete()
                 except exceptions.BadObjectVersion:
                     LOG.with_fields({
-                        objtype: obj.uuid
+                        objtype: objdata['uuid']
                     }).warning('Could not load object for hard delete, bad version')
 
         # Cleanup vxids which specify a missing network

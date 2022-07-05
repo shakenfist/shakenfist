@@ -30,6 +30,8 @@ UPLOAD_URL = 'sf://upload/'
 class Artifact(dbo):
     object_type = 'artifact'
     current_version = 3
+    upgrade_supported = True
+
     state_targets = {
         None: (dbo.STATE_INITIAL),
         dbo.STATE_INITIAL: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR),
