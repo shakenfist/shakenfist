@@ -62,6 +62,16 @@ class LibvirtConnection():
         return self.conn.defineXML(xml)
 
     def get_sf_domains(self):
+        for domain in self.get_all_domains():
+            try:
+                if not domain.name().startswith('sf:'):
+                    continue
+                yield domain
+
+            except self.libvirt.libvirtError:
+                pass
+
+    def get_all_domains(self):
         # Active VMs have an ID. Active means running in libvirt
         # land.
         for domain_id in self.conn.listDomainsID():
@@ -74,10 +84,6 @@ class LibvirtConnection():
 
             except self.libvirt.libvirtError:
                 pass
-
-    def get_all_domains(self):
-        for name in self.conn.listDefinedDomains():
-            yield self.conn.lookupByName(name)
 
     def get_cpu_map(self):
         return self.conn.getCPUMap()
