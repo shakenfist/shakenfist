@@ -24,9 +24,6 @@ class FakeLibvirtConnection(object):
     def listDomainsID(self):
         return ['id1', 'id2', 'id3', 'id4', 'id5', 'id6']
 
-    def listDefinedDomains(self):
-        return ['sf:foo', 'sf:bar', 'docker', 'sf:crashed', 'sf:nofiles']
-
     def lookupByID(self, id):
         args = {
             'id1': ('sf:running', FakeLibvirt.VIR_DOMAIN_RUNNING),
@@ -169,9 +166,5 @@ class CleanerTestCase(base.ShakenFistTestCase):
                 ('attribute/instance', 'paused',
                  'power_state', {'power_state': 'paused'}),
                 ('attribute/instance', 'suspended',
-                 'power_state', {'power_state': 'paused'}),
-                ('attribute/instance', 'foo',
-                 'power_state', {'power_state': 'off'}),
-                ('attribute/instance', 'bar',
-                 'power_state', {'power_state': 'off'})
+                 'power_state', {'power_state': 'paused'})
             ], result)
