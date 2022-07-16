@@ -30,13 +30,15 @@ class Artifact(dbo):
     object_type = 'artifact'
     current_version = 6
 
-    # docs/developer_guide/state_machine.md has a description of these states.
+    # Artifacts are special in that they can return from ERROR or DELETED to the
+    # CREATED state. This is because you can correct an artifact error by forcing
+    # another download.
     state_targets = {
         None: (dbo.STATE_INITIAL),
         dbo.STATE_INITIAL: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR),
         dbo.STATE_CREATED: (dbo.STATE_DELETED, dbo.STATE_ERROR),
-        dbo.STATE_ERROR: (dbo.STATE_DELETED, dbo.STATE_ERROR),
-        dbo.STATE_DELETED: (),
+        dbo.STATE_ERROR: (dbo.STATE_DELETED, dbo.STATE_ERROR, dbo.STATE_CREATED),
+        dbo.STATE_DELETED: (dbo.STATE_CREATED),
     }
 
     ACTIVE_STATES = {dbo.STATE_INITIAL, dbo.STATE_CREATED, dbo.STATE_ERROR}
@@ -122,7 +124,6 @@ class Artifact(dbo):
         artifacts = list(Artifacts([
             partial(url_filter, url),
             partial(type_filter, artifact_type),
-            not_dead_states_filter,
             partial(namespace_or_shared_filter, namespace)]))
 
         if len(artifacts) == 0:
@@ -133,6 +134,7 @@ class Artifact(dbo):
                                     max_versions=max_versions,
                                     namespace=namespace)
             return None
+
         if len(artifacts) == 1:
             return artifacts[0]
 
@@ -382,14 +384,6 @@ def instance_snapshot_filter(instance_uuid, a):
     if a.artifact_type != Artifact.TYPE_SNAPSHOT:
         return False
     return a.source_url.startswith(f'{INSTANCE_URL}{instance_uuid}')
-
-
-not_dead_states_filter = partial(
-    baseobject.state_filter, [
-        Artifact.STATE_INITIAL,
-        Artifact.STATE_CREATING,
-        Artifact.STATE_CREATED,
-    ])
 
 
 def namespace_exact_filter(namespace, o):
