@@ -68,7 +68,7 @@ def requires_artifact_access(func):
             return api_base.error(404, 'artifact not found')
 
         a = kwargs['artifact_from_db']
-        if (a.namespace != 'sharedwithall' and
+        if (a.namespace != Artifact.SHARED_WITH_ALL and
                 get_jwt_identity()[0] not in [a.namespace, 'system']):
             LOG.with_object(a).info(
                 'Artifact not found, ownership test in decorator')
@@ -131,7 +131,7 @@ class ArtifactsEndpoint(api_base.Resource):
             if get_jwt_identity()[0] != 'system':
                 return api_base.error(
                     403, 'only the system namespace can create shared artifacts')
-            namespace = 'sharedwithall'
+            namespace = Artifact.SHARED_WITH_ALL
         a = Artifact.from_url(Artifact.TYPE_IMAGE, url, namespace=namespace,
                               create_if_new=True)
 
@@ -185,7 +185,7 @@ class ArtifactUploadEndpoint(api_base.Resource):
             if get_jwt_identity()[0] != 'system':
                 return api_base.error(
                     403, 'only the system namespace can create shared artifacts')
-            namespace = 'sharedwithall'
+            namespace = Artifact.SHARED_WITH_ALL
 
         a = Artifact.from_url(Artifact.TYPE_IMAGE, source_url,
                               namespace=namespace, create_if_new=True)

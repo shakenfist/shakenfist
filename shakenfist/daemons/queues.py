@@ -72,7 +72,7 @@ def handle(jobname, workitem):
             if isinstance(task, FetchImageTask):
                 n = task.namespace()
                 if not n:
-                    n = 'sharedwithall'
+                    n = Artifact.SHARED_WITH_ALL
                 image_fetch(task.url(), n, inst)
 
             elif isinstance(task, PreflightInstanceTask):

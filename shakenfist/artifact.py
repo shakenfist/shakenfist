@@ -29,6 +29,7 @@ UPLOAD_URL = 'sf://upload/'
 
 class Artifact(dbo):
     object_type = 'artifact'
+    SHARED_WITH_ALL = 'sharedwithall'
     current_version = 3
     upgrade_supported = True
 
@@ -73,7 +74,7 @@ class Artifact(dbo):
         starting_version = static_values.get('version')
 
         if static_values.get('version') == 2:
-            static_values['namespace'] = 'sharedwithall'
+            static_values['namespace'] = cls.SHARED_WITH_ALL
             static_values['version'] = 3
             changed = True
 
@@ -325,6 +326,6 @@ not_dead_states_filter = partial(
 def namespace_filter(namespace, o):
     if namespace == 'system':
         return True
-    if o.namespace == 'sharedwithall':
+    if o.namespace == Artifact.SHARED_WITH_ALL:
         return True
     return o.namespace == namespace
