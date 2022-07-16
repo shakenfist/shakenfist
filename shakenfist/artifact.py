@@ -33,12 +33,15 @@ class Artifact(dbo):
     current_version = 3
     upgrade_supported = True
 
+    # Artifacts are special in that they can return from ERROR or DELETED to the
+    # CREATED state. This is because you can correct an artifact error by forcing
+    # another download.
     state_targets = {
         None: (dbo.STATE_INITIAL),
         dbo.STATE_INITIAL: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR),
         dbo.STATE_CREATED: (dbo.STATE_DELETED, dbo.STATE_ERROR),
-        dbo.STATE_ERROR: (dbo.STATE_DELETED, dbo.STATE_ERROR),
-        dbo.STATE_DELETED: (),
+        dbo.STATE_ERROR: (dbo.STATE_DELETED, dbo.STATE_ERROR, dbo.STATE_CREATED),
+        dbo.STATE_DELETED: (dbo.STATE_CREATED),
     }
 
     ACTIVE_STATES = set([dbo.STATE_INITIAL,
@@ -124,7 +127,6 @@ class Artifact(dbo):
         with etcd.get_lock('artifact_from_url', None, url):
             artifacts = list(Artifacts([partial(url_filter, url),
                                         partial(type_filter, artifact_type),
-                                        not_dead_states_filter,
                                         partial(namespace_filter, namespace)]))
             if len(artifacts) == 0:
                 if create_if_new:
@@ -313,14 +315,6 @@ def instance_snapshot_filter(instance_uuid, a):
     if a.artifact_type != Artifact.TYPE_SNAPSHOT:
         return False
     return a.source_url.startswith('%s%s' % (INSTANCE_URL, instance_uuid))
-
-
-not_dead_states_filter = partial(
-    baseobject.state_filter, [
-        Artifact.STATE_INITIAL,
-        Artifact.STATE_CREATING,
-        Artifact.STATE_CREATED,
-    ])
 
 
 def namespace_filter(namespace, o):

@@ -101,8 +101,7 @@ class ArtifactsEndpoint(api_base.Resource):
     def get(self, node=None):
         retval = []
         with etcd.ThreadLocalReadOnlyCache():
-            for a in Artifacts(filters=[baseobject.active_states_filter,
-                                        partial(namespace_filter, get_jwt_identity()[0])]):
+            for a in Artifacts(filters=[partial(namespace_filter, get_jwt_identity()[0])]):
                 if node:
                     idx = a.most_recent_index
                     if 'blob_uuid' in idx:
@@ -133,6 +132,7 @@ class ArtifactsEndpoint(api_base.Resource):
                 return api_base.error(
                     403, 'only the system namespace can create shared artifacts')
             namespace = Artifact.SHARED_WITH_ALL
+
         a = Artifact.from_url(Artifact.TYPE_IMAGE, url, namespace=namespace,
                               create_if_new=True)
 
