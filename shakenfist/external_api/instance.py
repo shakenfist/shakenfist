@@ -84,7 +84,7 @@ def _artifact_safety_checks(a):
         return api_base.error(
             404, 'artifact not ready (state=%s)' % a.state.value)
     if (get_jwt_identity()[0] != 'system' and
-            a.namespace not in [get_jwt_identity()[0], 'sharedwithall']):
+            a.namespace not in [get_jwt_identity()[0], Artifact.SHARED_WITH_ALL]):
         return api_base.error(404, 'artifact not found')
     return
 
