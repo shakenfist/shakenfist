@@ -93,6 +93,7 @@ class ArtifactEndpoint(api_base.Resource):
         if artifact_from_db.state.value == Artifact.STATE_DELETED:
             return
         artifact_from_db.delete()
+        return artifact_from_db.external_view()
 
 
 class ArtifactsEndpoint(api_base.Resource):
@@ -271,6 +272,6 @@ class ArtifactVersionEndpoint(api_base.Resource):
                 artifact_from_db.del_index(idx['index'])
                 if len(indexes) == 1:
                     artifact_from_db.state = Artifact.STATE_DELETED
-                return
+                return artifact_from_db.external_view()
 
         return api_base.error(404, 'artifact index not found')

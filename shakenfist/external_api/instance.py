@@ -74,7 +74,7 @@ class InstanceEndpoint(api_base.Resource):
         instance_from_db.enqueue_delete_remote(node)
 
         # Return UUID in case API call was made using object name
-        return {'uuid': instance_from_db.uuid}
+        return instance_from_db.external_view()
 
 
 def _artifact_safety_checks(a):
