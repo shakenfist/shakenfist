@@ -62,3 +62,5 @@ class LabelEndpoint(api_base.Resource):
             for blob_index in a.get_all_indexes():
                 b = Blob.from_db(blob_index['blob_uuid'])
                 b.ref_count_dec()
+
+        return a.external_view()
