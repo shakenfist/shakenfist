@@ -65,27 +65,20 @@ class NetworkEndpoint(api_base.Resource):
         if network_ref == 'floating':
             return api_base.error(403, 'you cannot delete the floating network')
 
-        n = network.Network.from_db(network_from_db.uuid)
-        if not n:
-            return api_base.error(404, 'network does not exist')
-
         # If a namespace is specified, ensure the network is in it
         if namespace:
             if network_from_db.namespace != namespace:
                 return api_base.error(404, 'network not in namespace')
 
-        # We only delete unused networks
-        if n.networkinterfaces:
-            return api_base.error(403, 'you cannot delete an in use network')
-
         # Check if network has already been deleted
         if network_from_db.state.value in dbo.STATE_DELETED:
             return
 
-        _delete_network(network_from_db)
+        _delete_network(
+            network_from_db, wait_interfaces=network_from_db.networkinterfaces)
 
         # Return UUID in case API call was made using object name
-        return {'uuid': network_from_db.uuid}
+        return network_from_db.external_view()
 
 
 class NetworksEndpoint(api_base.Resource):

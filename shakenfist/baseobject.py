@@ -24,7 +24,7 @@ class DatabaseBackedObject(object):
     STATE_CREATING = 'creating'
     STATE_CREATED = 'created'
     STATE_DELETED = 'deleted'
-    STATE_DELETE_WAIT = 'delete_wait'
+    STATE_DELETE_WAIT = 'delete-wait'
     STATE_ERROR = 'error'
 
     ACTIVE_STATES = set([STATE_INITIAL,
