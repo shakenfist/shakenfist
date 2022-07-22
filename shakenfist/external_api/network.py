@@ -158,8 +158,7 @@ class NetworksEndpoint(api_base.Resource):
 
         networks_del = []
         networks_unable = []
-        for n in network.Networks([partial(baseobject.namespace_filter, namespace),
-                                   baseobject.active_states_filter]):
+        for n in network.Networks([partial(baseobject.namespace_filter, namespace)]):
             if n.networkinterfaces:
                 _delete_network(n)
             else:

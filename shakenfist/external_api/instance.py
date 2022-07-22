@@ -495,8 +495,7 @@ class InstancesEndpoint(api_base.Resource):
 
         waiting_for = []
         tasks_by_node = defaultdict(list)
-        for inst in instance.Instances([partial(baseobject.namespace_filter, namespace),
-                                        instance.active_states_filter]):
+        for inst in instance.Instances([partial(baseobject.namespace_filter, namespace)]):
             # If this instance is not on a node, just do the DB cleanup locally
             db_placement = inst.placement
             if not db_placement.get('node'):
