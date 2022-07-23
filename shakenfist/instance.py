@@ -1241,6 +1241,9 @@ class Instance(dbo):
     def enqueue_delete_due_error(self, error_msg):
         # Error needs to be set immediately so that API clients get
         # correct information. The VM and network tear down can be delayed.
+        if self.state.value == self.STATE_DELETED:
+            return
+
         try:
             self.state = '%s-error' % self.state.value
         except Exception:
