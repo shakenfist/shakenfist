@@ -141,6 +141,33 @@ class ArtifactsEndpoint(api_base.Resource):
         })
         return a.external_view()
 
+    @jwt_required()
+    @api_base.requires_namespace_exist
+    def delete(self, confirm=False, namespace=None):
+        """Delete all artifacts in the namespace."""
+
+        if confirm is not True:
+            return api_base.error(400, 'parameter confirm is not set true')
+
+        if get_jwt_identity()[0] == 'system':
+            if not isinstance(namespace, str):
+                # A client using a system key must specify the namespace. This
+                # ensures that deleting all artifacts in the cluster (by
+                # specifying namespace='system') is a deliberate act.
+                return api_base.error(400, 'system user must specify parameter namespace')
+
+        else:
+            if namespace and namespace != get_jwt_identity()[0]:
+                return api_base.error(401, 'you cannot delete other namespaces')
+            namespace = get_jwt_identity()[0]
+
+        deleted = []
+        for a in Artifacts([partial(namespace_filter, namespace)]):
+            a.delete()
+            deleted.append(a.uuid)
+
+        return deleted
+
 
 class ArtifactUploadEndpoint(api_base.Resource):
     @jwt_required()

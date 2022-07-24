@@ -231,10 +231,19 @@ def image_fetch(url, namespace, inst):
         if msg.find('No address associated with hostname'):
             msg = 'DNS error'
 
-        a.state = Artifact.STATE_ERROR
-        a.error = msg
-        raise exceptions.ImageFetchTaskFailedException(
-            'Failed to fetch image: %s Exception: %s' % (url, e))
+        # If the artifact has never successfully downloaded, then we are
+        # clearly in an error state. However, if we already have a copy of the
+        # artifact and the serving web site is experiencing a transient error
+        # we should not mark the entire artifact as in error.
+        if (a.state.value in [Artifact.STATE_INITIAL, Artifact.STATE_CREATING] or
+                msg != 'DNS error'):
+            a.state = Artifact.STATE_ERROR
+            a.error = msg
+            raise exceptions.ImageFetchTaskFailedException(
+                'Failed to fetch image: %s Exception: %s' % (url, e))
+        else:
+            a.add_event2('Updating image failed, using already cached version',
+                         extra={'message': msg})
 
 
 def instance_preflight(inst, netdescs):
