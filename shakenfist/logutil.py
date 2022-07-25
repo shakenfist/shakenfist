@@ -1,7 +1,7 @@
 import copy
-import flask
 import logging
 from logging import handlers as logging_handlers
+import importlib
 import os
 from pylogrus import TextFormatter
 from pylogrus.base import PyLogrusBase
@@ -9,6 +9,10 @@ import setproctitle
 
 from shakenfist.config import config
 from shakenfist.util import callstack as util_callstack
+
+
+FLASK = None
+FLASK_ATTEMPTED = False
 
 
 # These classes are extensions of the work in https://github.com/vmig/pylogrus
@@ -83,6 +87,8 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
         :param prefix: Prefix of log message
         :type prefix: str | None
         """
+        global FLASK, FLASK_ATTEMPTED
+
         self._logger = logger
 
         self._extra = self._normalize(extra)
@@ -90,7 +96,16 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
 
         # Attempt to lookup a request id for a flask request
         try:
-            self._extra['request-id'] = flask.request.environ.get('FLASK_REQUEST_ID')
+            if not FLASK_ATTEMPTED:
+                try:
+                    FLASK = importlib.import_module('flask')
+                except Exception:
+                    pass
+                FLASK_ATTEMPTED = True
+
+            if FLASK:
+                self._extra['request-id'] = FLASK.request.environ.get(
+                    'FLASK_REQUEST_ID')
         except RuntimeError:
             pass
 
