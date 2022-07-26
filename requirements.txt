@@ -10,7 +10,7 @@ fixtures<4.0.1              # apache2
 pyyaml>=5.1                 # mit
 pycdlib                     # lgpl
 oslo.concurrency            # apache2
-jinja2                      # bsd
+jinja2>=3.1.2               # bsd
 setproctitle                # bsd
 click>=8.0.0                # bsd
 Werkzeug                    # bsd

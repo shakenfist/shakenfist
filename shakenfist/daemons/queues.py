@@ -130,8 +130,8 @@ def handle(jobname, workitem):
                                          set(cur_interfaces))
                 if remain_interfaces:
                     # Queue task on a node with a remaining instance
-                    first_iface = cur_interfaces[remain_interfaces[0]]
-                    inst = instance.Instance.from_db(first_iface.instance_uuid)
+                    inst = instance.Instance.from_db(
+                        remain_interfaces[0].instance_uuid)
                     etcd.enqueue(inst.placement['node'],
                                  {'tasks': [
                                      DeleteNetworkWhenClean(task.network_uuid(),
