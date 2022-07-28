@@ -6,14 +6,12 @@ name: Python application
 on:
   push:
     branches:
-      - master
       - develop
-      - v*-devel
+      - v*-releases
   pull_request:
     branches:
-      - master
       - develop
-      - v*-devel
+      - v*-releases
 
 jobs:
   lint:
