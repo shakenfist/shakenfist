@@ -598,3 +598,7 @@ class Blobs(dbo_iter):
             out = self.apply_filters(b)
             if out:
                 yield out
+
+
+def placement_filter(node, b):
+    return node in b.locations
