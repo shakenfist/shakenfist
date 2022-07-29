@@ -119,6 +119,9 @@ class Node(dbo):
     def remove_blob(self, blob):
         self._remove_item_in_attribute_list('blobs', blob)
 
+    def delete(self):
+        self.state == self.STATE_DELETED
+
 
 class Nodes(dbo_iter):
     def __iter__(self):
