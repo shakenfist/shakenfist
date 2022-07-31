@@ -625,7 +625,7 @@ class Network(dbo):
 
         except processutils.ProcessExecutionError as e:
             if time.time() - self.state.update_time > 10:
-                self.log.error('Mesh discovery failure: %s' % e)
+                self.log.warning('Mesh discovery failure: %s' % e)
 
     def ensure_mesh(self):
         # The floating network does not have a vxlan mesh
