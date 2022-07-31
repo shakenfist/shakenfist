@@ -220,30 +220,35 @@ class Monitor(daemon.Daemon):
 
         def emit_billing_statistics():
             with util_libvirt.LibvirtConnection() as lc:
-                for domain in lc.get_sf_domains():
-                    if domain.name().startswith('sf:'):
-                        instance_uuid = domain.name().split(':')[1]
-                        inst = instance.Instance.from_db(instance_uuid)
-                        statistics = util_libvirt.extract_statistics(domain)
+                try:
+                    for domain in lc.get_sf_domains():
+                        if domain.name().startswith('sf:'):
+                            instance_uuid = domain.name().split(':')[1]
+                            inst = instance.Instance.from_db(instance_uuid)
+                            statistics = util_libvirt.extract_statistics(
+                                domain)
 
-                        # Add in actual size on disk
-                        for disk in inst.block_devices.get('devices', [{}]):
-                            disk_path = disk.get('path')
-                            disk_device = disk.get('device')
-                            if disk_path and disk_device and os.path.exists(disk_path):
-                                # Because nvme disks don't exist as full libvirt
-                                # disks, they are missing from the statistics
-                                # results.
-                                if disk_device not in statistics['disk usage']:
-                                    statistics['disk usage'][disk_device] = {}
+                            # Add in actual size on disk
+                            for disk in inst.block_devices.get('devices', [{}]):
+                                disk_path = disk.get('path')
+                                disk_device = disk.get('device')
+                                if disk_path and disk_device and os.path.exists(disk_path):
+                                    # Because nvme disks don't exist as full libvirt
+                                    # disks, they are missing from the statistics
+                                    # results.
+                                    if disk_device not in statistics['disk usage']:
+                                        statistics['disk usage'][disk_device] = {}
 
-                                statistics['disk usage'][disk_device][
-                                    'actual bytes on disk'] = os.stat(disk_path).st_size
+                                    statistics['disk usage'][disk_device][
+                                        'actual bytes on disk'] = os.stat(disk_path).st_size
 
-                        if inst:
-                            inst.add_event2(
-                                'usage', extra=statistics,
-                                suppress_event_logging=True)
+                            if inst:
+                                inst.add_event2(
+                                    'usage', extra=statistics,
+                                    suppress_event_logging=True)
+
+                except lc.libvirt.libvirtError as e:
+                    self.log.warning('Ignoring libvirt error: %s' % e)
 
             if not config.NODE_IS_NETWORK_NODE:
                 return
