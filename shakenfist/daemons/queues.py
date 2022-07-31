@@ -121,7 +121,7 @@ def handle(jobname, workitem):
                 cur_interfaces = task_network.networkinterfaces
 
                 if cur_interfaces:
-                    LOG.with_network(task_network).error(
+                    LOG.with_network(task_network).warning(
                         'During DeleteNetworkWhenClean new interfaces have '
                         'connected to network: %s', cur_interfaces)
 
