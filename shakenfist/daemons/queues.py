@@ -121,25 +121,28 @@ def handle(jobname, workitem):
                 cur_interfaces = task_network.networkinterfaces
 
                 if cur_interfaces:
-                    LOG.with_network(task_network).error(
+                    LOG.with_network(task_network).warning(
                         'During DeleteNetworkWhenClean new interfaces have '
                         'connected to network: %s', cur_interfaces)
 
                 # Only check those present at delete task initiation time.
                 remain_interfaces = list(set(task.wait_interfaces()) &
                                          set(cur_interfaces))
-                if remain_interfaces:
+                while remain_interfaces:
                     # Queue task on a node with a remaining instance
-                    inst = instance.Instance.from_db(
-                        remain_interfaces[0].instance_uuid)
-                    etcd.enqueue(inst.placement['node'],
-                                 {'tasks': [
-                                     DeleteNetworkWhenClean(task.network_uuid(),
-                                                            remain_interfaces)
-                                 ]},
-                                 delay=60)
+                    iface = networkinterface.NetworkInterface.from_db(
+                        remain_interfaces.pop(0))
+                    if iface:
+                        inst = instance.Instance.from_db(iface.instance_uuid)
+                        etcd.enqueue(inst.placement['node'],
+                                     {'tasks': [
+                                         DeleteNetworkWhenClean(task.network_uuid(),
+                                                                remain_interfaces)
+                                     ]},
+                                     delay=60)
+                        break
 
-                else:
+                if remain_interfaces:
                     # All original instances deleted, safe to delete network
                     etcd.enqueue('networknode',
                                  DestroyNetworkTask(task.network_uuid()))
