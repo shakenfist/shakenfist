@@ -1,22 +1,21 @@
 from collections import defaultdict
-import json
-import os
-import psutil
-import re
-import threading
-import time
-
 from etcd3gw.client import Etcd3Client
 from etcd3gw.exceptions import InternalServerError
 from etcd3gw.lock import Lock
 from etcd3gw.utils import _encode, _increment_last_byte
+import json
+import os
+import psutil
+import re
+from shakenfist_utilities import random as util_random
+import threading
+import time
 
 from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist.tasks import QueueTask, FetchBlobTask
-from shakenfist.util import random as util_random
 
 
 ####################################################################
@@ -143,7 +142,7 @@ class ThreadLocalReadOnlyCache():
             self._cache_prefix(prefix)
         for key in self.cache.copy().keys():
             if key.startswith(prefix):
-                yield(key, self.cache[key])
+                yield (key, self.cache[key])
 
 
 def retry_etcd_forever(func):

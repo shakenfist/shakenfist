@@ -39,8 +39,8 @@ class RecordedOperation():
         object_type, object_uuid = self.unique_label()
         if object_uuid:
             if object_type:
-                eventlog.add_event2(object_type, object_uuid,
-                                    '%s complete' % self.operation, duration)
+                eventlog.add_event(object_type, object_uuid,
+                                   '%s complete' % self.operation, duration)
             else:
                 LOG.with_fields({
                     'label': self.object,

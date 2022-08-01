@@ -243,7 +243,7 @@ class ArtifactUploadEndpoint(api_base.Resource):
             b.observe()
             b.request_replication()
 
-            a.add_event2('upload complete')
+            a.add_event('upload complete')
             a.add_index(b.uuid)
             a.state = Artifact.STATE_CREATED
 

@@ -58,10 +58,9 @@ class DatabaseBackedObject(object):
     def unique_label(self):
         return (self.object_type, self.__uuid)
 
-    # Shim to track what hasn't been converted to the new style yet
-    def add_event2(self, message, duration=None, extra=None, suppress_event_logging=False):
+    def add_event(self, message, duration=None, extra=None, suppress_event_logging=False):
         if not self.__in_memory_only:
-            eventlog.add_event2(
+            eventlog.add_event(
                 self.object_type, self.__uuid, message, duration=duration,
                 extra=extra, suppress_event_logging=suppress_event_logging)
 
@@ -109,8 +108,8 @@ class DatabaseBackedObject(object):
     def _db_create(cls, object_uuid, metadata):
         metadata['uuid'] = object_uuid
         etcd.create(cls.object_type, None, object_uuid, metadata)
-        eventlog.add_event2(cls.object_type, object_uuid, 'db record created',
-                            extra=metadata)
+        eventlog.add_event(cls.object_type, object_uuid, 'db record created',
+                           extra=metadata)
 
     @classmethod
     def _db_get(cls, object_uuid):
@@ -161,7 +160,7 @@ class DatabaseBackedObject(object):
             # Add the attribute we're setting to the event so we're not confused
             # later.
             event_values['attribute'] = attribute
-            self.add_event2('set attribute', extra=event_values)
+            self.add_event('set attribute', extra=event_values)
 
         if self.__in_memory_only:
             self.__in_memory_values[attribute] = json.dumps(
@@ -271,7 +270,7 @@ class DatabaseBackedObject(object):
         etcd.delete(self.object_type, None, self.uuid)
         etcd.delete_all('attribute/%s' % self.object_type, self.uuid)
         db.delete_metadata(self.object_type, self.uuid)
-        self.add_event2('hard deleted object')
+        self.add_event('hard deleted object')
 
 
 class DatabaseBackedObjectIterator(object):

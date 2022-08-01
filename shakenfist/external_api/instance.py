@@ -376,7 +376,7 @@ class InstancesEndpoint(api_base.Resource):
                             if 'address' not in netdesc or not netdesc['address']:
                                 netdesc['address'] = ipm.get_random_free_address(
                                     inst.unique_label())
-                                inst.add_event2(
+                                inst.add_event(
                                     'allocated ip address', extra=netdesc)
                             else:
                                 if not ipm.reserve(netdesc['address'], inst.unique_label()):
@@ -441,13 +441,13 @@ class InstancesEndpoint(api_base.Resource):
                 placement = placed_on
 
         except exceptions.LowResourceException as e:
-            inst.add_event2(
+            inst.add_event(
                 'schedule failed, insufficient resources: %s' % str(e))
             inst.enqueue_delete_due_error('scheduling failed')
             return api_base.error(507, str(e), suppress_traceback=True)
 
         except exceptions.CandidateNodeNotFoundException as e:
-            inst.add_event2('schedule failed, node not found: %s' % str(e))
+            inst.add_event('schedule failed, node not found: %s' % str(e))
             inst.enqueue_delete_due_error('scheduling failed')
             return api_base.error(404, 'node not found: %s' % e, suppress_traceback=True)
 

@@ -75,7 +75,7 @@ class Monitor(daemon.Daemon):
                             self._delete_instance_files(instance_uuid)
                             util_process.execute(
                                 None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
-                            inst.add_event2(
+                            inst.add_event(
                                 'enforced delete via alternate method')
                         else:
                             inst.delete()
@@ -145,7 +145,7 @@ class Monitor(daemon.Daemon):
                                 util_process.execute(
                                     None, 'virsh undefine --nvram "sf:%s"' % instance_uuid)
 
-                            inst.add_event2('deleted stray instance')
+                            inst.add_event('deleted stray instance')
                             if db_state.value != dbo.STATE_DELETED:
                                 inst.state.value = dbo.STATE_DELETED
                             continue
@@ -156,7 +156,7 @@ class Monitor(daemon.Daemon):
                         if not os.path.exists(inst.instance_path):
                             # If we're inactive and our files aren't on disk,
                             # we have a problem.
-                            inst.add_event2('instance files missing')
+                            inst.add_event('instance files missing')
                             if inst.state.value in [dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED]:
                                 inst.state.value = dbo.STATE_DELETED
                             else:
@@ -164,7 +164,7 @@ class Monitor(daemon.Daemon):
 
                         elif not db_power or db_power['power_state'] != 'off':
                             inst.update_power_state('off')
-                            inst.add_event2('detected poweroff')
+                            inst.add_event('detected poweroff')
 
             except lc.libvirt.libvirtError as e:
                 LOG.debug('Failed to lookup all domains: %s' % e)

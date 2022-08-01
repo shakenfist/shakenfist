@@ -28,8 +28,8 @@ class Monitor(daemon.WorkerPoolDaemon):
                         with eventlog.EventLog(objtype, objuuid) as eventdb:
                             for k, v in results[(objtype, objuuid)]:
                                 eventdb.write_event(
-                                    v['timestamp'], v['fqdn'], v['operation'], v['phase'],
-                                    v['duration'], v['message'], extra=v.get('extra'))
+                                    v['timestamp'], v['fqdn'], v['duration'],
+                                    v['message'], extra=v.get('extra'))
                                 etcd.WrappedEtcdClient().delete(k)
                     except Exception as e:
                         util_general.ignore_exception(

@@ -160,11 +160,11 @@ class ImageFetchHelper(object):
                     resp.headers.get('Last-Modified'))
 
                 if not most_recent_blob.modified:
-                    self.artifact.add_event2(
+                    self.artifact.add_event(
                         'image requires fetch, no Last-Modified recorded')
                     dirty = True
                 elif most_recent_blob.modified != normalized_new_timestamp:
-                    self.artifact.add_event2(
+                    self.artifact.add_event(
                         'image requires fetch, Last-Modified: %s -> %s'
                         % (most_recent_blob.modified, normalized_new_timestamp))
                     dirty = True
@@ -174,11 +174,11 @@ class ImageFetchHelper(object):
                     response_size = int(response_size)
 
                 if not most_recent_blob.size:
-                    self.artifact.add_event2(
+                    self.artifact.add_event(
                         'image requires fetch, no Content-Length recorded')
                     dirty = True
                 elif most_recent_blob.size != response_size:
-                    self.artifact.add_event2(
+                    self.artifact.add_event(
                         'image requires fetch, Content-Length: %s -> %s'
                         % (most_recent_blob.size, response_size))
                     dirty = True
@@ -331,8 +331,8 @@ class ImageFetchHelper(object):
             if not verify_checksum(
                     os.path.join(config.STORAGE_PATH, 'blobs', b.uuid),
                     checksum, checksum_type):
-                self.instance.add_event2('fetched image had bad checksum')
-                self.artifact.add_event2('fetched image had bad checksum')
+                self.instance.add_event('fetched image had bad checksum')
+                self.artifact.add_event('fetched image had bad checksum')
                 raise exceptions.BadCheckSum('url=%s' % url)
 
             # Only persist values after the file has been verified.

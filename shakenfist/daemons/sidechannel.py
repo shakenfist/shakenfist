@@ -42,7 +42,7 @@ class SFSocketAgent(protocol.SocketAgent):
             self.instance.agent_state = 'not ready (unresponsive)'
             self.log.debug('Not receiving traffic, aborting.')
             if self.system_boot_time != 0:
-                self.instance.add_event2(
+                self.instance.add_event(
                     'agent has gone silent, restarting channel')
 
             # Attempt to close, but the OS might already think its closed
@@ -62,7 +62,7 @@ class SFSocketAgent(protocol.SocketAgent):
     def _record_system_boot_time(self, sbt):
         if sbt != self.system_boot_time:
             if self.system_boot_time != 0:
-                self.instance.add_event2('reboot detected')
+                self.instance.add_event('reboot detected')
             self.system_boot_time = sbt
             self.instance.agent_system_boot_time = sbt
 
@@ -105,7 +105,7 @@ class SFSocketAgent(protocol.SocketAgent):
         self.send_packet({'command': 'gather-facts'})
 
     def gather_facts_response(self, packet):
-        self.instance.add_event2('received system facts')
+        self.instance.add_event('received system facts')
         self.instance.agent_facts = packet.get('result', {})
 
 
@@ -122,7 +122,7 @@ class Monitor(daemon.Daemon):
         console_path = os.path.join(inst.instance_path, 'console.log')
         while not os.path.exists(console_path):
             time.sleep(1)
-        inst.add_event2('detected console log')
+        inst.add_event('detected console log')
 
         sc_clients = {}
         sc_connected = {}
@@ -166,7 +166,7 @@ class Monitor(daemon.Daemon):
                         for packet in sc_clients[chan].find_packets():
                             try:
                                 if not sc_connected.get(chan, False):
-                                    inst.add_event2(
+                                    inst.add_event(
                                         'sidechannel %s connected' % chan)
                                     sc_connected[chan] = True
 
@@ -216,7 +216,7 @@ class Monitor(daemon.Daemon):
                     if not monitors[instance_uuid].is_alive():
                         # Reap process
                         monitors[instance_uuid].join(1)
-                        eventlog.add_event2(
+                        eventlog.add_event(
                             'instance', instance_uuid, 'sidechannel monitor crashed')
                         del monitors[instance_uuid]
 
@@ -253,7 +253,7 @@ class Monitor(daemon.Daemon):
                     p.start()
 
                     monitors[instance_uuid] = p
-                    eventlog.add_event2(
+                    eventlog.add_event(
                         'instance', instance_uuid, 'sidechannel monitor started')
 
                 # Cleanup extra monitors
@@ -266,7 +266,7 @@ class Monitor(daemon.Daemon):
                         pass
 
                     del monitors[instance_uuid]
-                    eventlog.add_event2(
+                    eventlog.add_event(
                         'instance', instance_uuid, 'sidechannel monitor finished')
 
                 self.exit.wait(1)

@@ -687,10 +687,10 @@ class Network(dbo):
                 added.append(n)
 
             if removed:
-                self.add_event2('remove mesh elements',
-                                extra={'removed': removed})
+                self.add_event('remove mesh elements',
+                               extra={'removed': removed})
             if added:
-                self.add_event2('add mesh elements', extra={'added': added})
+                self.add_event('add mesh elements', extra={'added': added})
 
     def _add_mesh_element(self, n):
         subst = self.subst_dict()
@@ -700,7 +700,7 @@ class Network(dbo):
             util_process.execute(None,
                                  'bridge fdb append to 00:00:00:00:00:00 '
                                  'dst %(node)s dev %(vx_interface)s' % subst)
-            self.add_event2('added new mesh element', extra={'ip': n})
+            self.add_event('added new mesh element', extra={'ip': n})
         except processutils.ProcessExecutionError as e:
             self.log.with_fields({
                 'node': n,
@@ -714,7 +714,7 @@ class Network(dbo):
             util_process.execute(None,
                                  'bridge fdb del to 00:00:00:00:00:00 dst %(node)s '
                                  'dev %(vx_interface)s' % subst)
-            self.add_event2('removed excess mesh element', extra={'ip': n})
+            self.add_event('removed excess mesh element', extra={'ip': n})
         except processutils.ProcessExecutionError as e:
             self.log.with_fields({
                 'node': n,
@@ -723,8 +723,8 @@ class Network(dbo):
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.
     def add_floating_ip(self, floating_address, inner_address):
-        self.add_event2('adding floating ip %s -> %s'
-                        % (floating_address, inner_address))
+        self.add_event('adding floating ip %s -> %s'
+                       % (floating_address, inner_address))
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
         subst['floating_address_as_hex'] = '%08x' % int(
@@ -750,8 +750,8 @@ class Network(dbo):
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.
     def remove_floating_ip(self, floating_address, inner_address):
-        self.add_event2('removing floating ip %s -> %s'
-                        % (floating_address, inner_address))
+        self.add_event('removing floating ip %s -> %s'
+                       % (floating_address, inner_address))
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
         subst['floating_address_as_hex'] = '%08x' % int(

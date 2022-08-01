@@ -388,7 +388,7 @@ class Blob(dbo):
                                       int(self.size) * 100.0)
                         if (percentage - previous_percentage) > 10.0:
                             if instance_object:
-                                instance_object.add_event2(
+                                instance_object.add_event(
                                     'Fetching required blob %s, %d%% complete'
                                     % (self.uuid, percentage))
                             self.log.with_fields({
@@ -408,7 +408,7 @@ class Blob(dbo):
                     connection_failures += 1
                     if connection_failures > 2:
                         if instance_object:
-                            instance_object.add_event2(
+                            instance_object.add_event(
                                 'Transfer of blob %s failed' % self.uuid)
                         self.log.error(
                             'HTTP connection repeatedly failed: %s' % e)
@@ -432,7 +432,7 @@ class Blob(dbo):
 
             os.rename(partial_path, blob_path)
             if instance_object:
-                instance_object.add_event2(
+                instance_object.add_event(
                     'Fetching required blob %s, complete' % self.uuid)
             self.log.with_fields({
                 'bytes_fetched': total_bytes_received,
@@ -555,7 +555,7 @@ def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
                 percentage = fetched / total_size * 100.0
                 if (percentage - previous_percentage) > 10.0:
                     if instance_object:
-                        instance_object.add_event2(
+                        instance_object.add_event(
                             'Fetching required HTTP resource %s into blob %s, %d%% complete'
                             % (url, blob_uuid, percentage))
 
@@ -568,7 +568,7 @@ def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
                 last_refresh = time.time()
 
     if instance_object:
-        instance_object.add_event2(
+        instance_object.add_event(
             'Fetching required HTTP resource %s into blob %s, complete'
             % (url, blob_uuid))
     logs.with_field('bytes_fetched', fetched).info('Fetch complete')

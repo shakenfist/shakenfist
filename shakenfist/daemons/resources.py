@@ -243,7 +243,7 @@ class Monitor(daemon.Daemon):
                                         'actual bytes on disk'] = os.stat(disk_path).st_size
 
                             if inst:
-                                inst.add_event2(
+                                inst.add_event(
                                     'usage', extra=statistics,
                                     suppress_event_logging=True)
 
@@ -259,7 +259,7 @@ class Monitor(daemon.Daemon):
 
                 interface = 'egr-%06x-o' % n.vxid
                 try:
-                    n.add_event2(
+                    n.add_event(
                         'usage', extra=util_network.get_interface_statistics(interface),
                         suppress_event_logging=True)
                 except exceptions.NoInterfaceStatistics as e:

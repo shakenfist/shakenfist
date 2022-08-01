@@ -627,7 +627,7 @@ class Instance(dbo):
         if self.is_powered_on():
             self.state = self.STATE_CREATED
         else:
-            self.add_event2('instance failed to power on')
+            self.add_event('instance failed to power on')
             self.enqueue_delete_due_error('Instance failed to power on')
 
     def delete(self):
@@ -1142,13 +1142,13 @@ class Instance(dbo):
                     self.allocate_instance_ports()
                     return False
                 else:
-                    self.add_event2('instance start error',
-                                    extra={'message': str(e)})
+                    self.add_event('instance start error',
+                                   extra={'message': str(e)})
                     return False
 
             inst.setAutostart(1)
             self.update_power_state(lc.extract_power_state(inst))
-            self.add_event2('poweron')
+            self.add_event('poweron')
             return True
 
     def power_off(self):
@@ -1165,7 +1165,7 @@ class Instance(dbo):
                     self.log.error('Failed to delete domain: %s', e)
 
             self.update_power_state('off')
-            self.add_event2('poweroff')
+            self.add_event('poweroff')
 
     def reboot(self, hard=False):
         with util_libvirt.LibvirtConnection() as lc:
@@ -1179,10 +1179,10 @@ class Instance(dbo):
 
             if not hard:
                 inst.reboot(flags=lc.libvirt.VIR_DOMAIN_REBOOT_ACPI_POWER_BTN)
-                self.add_event2('soft reboot')
+                self.add_event('soft reboot')
             else:
                 inst.reset()
-                self.add_event2('hard reboot')
+                self.add_event('hard reboot')
 
     def pause(self):
         with util_libvirt.LibvirtConnection() as lc:
@@ -1196,7 +1196,7 @@ class Instance(dbo):
 
             inst.suspend()
             self.update_power_state(lc.extract_power_state(inst))
-            self.add_event2('pause')
+            self.add_event('pause')
 
     def unpause(self):
         with util_libvirt.LibvirtConnection() as lc:
@@ -1210,7 +1210,7 @@ class Instance(dbo):
 
             inst.resume()
             self.update_power_state(lc.extract_power_state(inst))
-            self.add_event2('unpause')
+            self.add_event('unpause')
 
     def get_console_data(self, length):
         console_path = os.path.join(self.instance_path, 'console.log')
@@ -1231,7 +1231,7 @@ class Instance(dbo):
         if not os.path.exists(console_path):
             return
         os.truncate(console_path, 0)
-        self.add_event2('console log cleared')
+        self.add_event('console log cleared')
 
     def enqueue_delete_remote(self, node):
         etcd.enqueue(node, {
@@ -1321,7 +1321,7 @@ class Instance(dbo):
                                            thin=thin)],
                 })
 
-        self.add_event2('snapshot', extra=out)
+        self.add_event('snapshot', extra=out)
         return out
 
 
