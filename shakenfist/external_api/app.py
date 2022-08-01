@@ -169,6 +169,7 @@ api.add_resource(api_network.NetworkPingEndpoint,
                  '/networks/<network_ref>/ping/<address>')
 
 api.add_resource(api_node.NodesEndpoint, '/nodes')
+api.add_resource(api_node.NodeEndpoint, '/nodes/<node>')
 
 api.add_resource(api_upload.UploadCreateEndpoint, '/upload')
 api.add_resource(api_upload.UploadDataEndpoint, '/upload/<upload_uuid>')
