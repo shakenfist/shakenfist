@@ -1,7 +1,7 @@
-coverage            # apache2
-testtools           # mit
-mock                # bsd
-stestr              # apache2
-flake8              # mit
-tox                 # mit
-testtools           # mit
+coverage==6.4.2
+testtools==2.5.0
+mock==4.0.3
+stestr==3.2.1
+flake8==4.0.1
+tox==3.25.1
+testtools==2.5.0
