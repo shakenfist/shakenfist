@@ -35,45 +35,6 @@ class SFPyLogrus(logging.Logger, PyLogrusBase):
     def with_fields(self, fields=None):
         return SFCustomAdapter(self, fields)
 
-    def with_field(self, key, value):
-        return SFCustomAdapter(self, {key: value})
-
-    #
-    # Convenience methods
-    #
-    def with_object(self, obj):
-        if not obj:
-            return SFCustomAdapter(self, {})
-        try:
-            label, value = obj.unique_label()
-        except Exception as e:
-            raise Exception('Bad object - no unique_label() function: %s' % e)
-        return SFCustomAdapter(self, {label: value})
-
-    #
-    # Use labelled convenience methods when ID is a string (not object)
-    # Note: the helper method still handles objects
-    #
-    def with_instance(self, inst):
-        if not isinstance(inst, str):
-            inst = inst.uuid
-        return SFCustomAdapter(self, {'instance': inst})
-
-    def with_network(self, n):
-        if not isinstance(n, str):
-            n = n.uuid
-        return SFCustomAdapter(self, {'network': n})
-
-    def with_networkinterface(self, ni):
-        if not isinstance(ni, str):
-            ni = ni.uuid
-        return SFCustomAdapter(self, {'networkinterface': ni})
-
-    def with_image(self, i):
-        if not isinstance(i, str):
-            i = i.unique_ref
-        return SFCustomAdapter(self, {'image': i})
-
 
 class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
 
@@ -136,11 +97,6 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
         extra.update(fields)
         return SFCustomAdapter(self._logger, extra, self._prefix)
 
-    def with_field(self, key, value):
-        extra = copy.deepcopy(self._extra)
-        extra.update(self._normalize({key: value}))
-        return SFCustomAdapter(self._logger, extra, self._prefix)
-
     def with_prefix(self, prefix=None):
         return self if prefix is None else SFCustomAdapter(self._logger, self._extra, prefix)
 
@@ -152,58 +108,6 @@ class SFCustomAdapter(logging.LoggerAdapter, PyLogrusBase):
             self._extra['method'] = util_callstack.get_caller(-5)
 
         return msg, kwargs
-
-    #
-    # Convenience methods
-    #
-    def with_object(self, obj):
-        extra = copy.deepcopy(self._extra)
-        if obj:
-            try:
-                label, value = obj.unique_label()
-            except Exception as e:
-                raise Exception(
-                    'Bad object - no unique_label() function: %s' % e)
-            extra.update({label: value})
-        return SFCustomAdapter(self._logger, extra, self._prefix)
-
-    def with_objects(self, objs):
-        retval = self
-        for obj in objs:
-            retval = retval.with_object(obj)
-        return retval
-
-    #
-    # Use labelled convenience methods when ID is a string (not object)
-    # Note: the helper method still handles objects
-    #
-    def with_instance(self, inst):
-        extra = copy.deepcopy(self._extra)
-        if not isinstance(inst, str):
-            inst = inst.uuid
-        extra.update({'instance': inst})
-        return SFCustomAdapter(self._logger, extra, self._prefix)
-
-    def with_network(self, inst):
-        extra = copy.deepcopy(self._extra)
-        if not isinstance(inst, str):
-            inst = inst.uuid
-        extra.update({'network': inst})
-        return SFCustomAdapter(self._logger, extra, self._prefix)
-
-    def with_networkinterface(self, inst):
-        extra = copy.deepcopy(self._extra)
-        if not isinstance(inst, str):
-            inst = inst.uuid
-        extra.update({'networkinterface': inst})
-        return SFCustomAdapter(self._logger, extra, self._prefix)
-
-    def with_image(self, inst):
-        extra = copy.deepcopy(self._extra)
-        if not isinstance(inst, str):
-            inst = inst.unique_ref
-        extra.update({'image': inst})
-        return SFCustomAdapter(self._logger, extra, self._prefix)
 
 
 def setup(name):

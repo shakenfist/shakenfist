@@ -40,7 +40,7 @@ class Monitor(daemon.Daemon):
                 # land.
                 for domain in lc.get_sf_domains():
                     instance_uuid = domain.name().split(':')[1]
-                    log_ctx = LOG.with_instance(instance_uuid)
+                    log_ctx = LOG.with_fields({'instance': instance_uuid})
                     log_ctx.debug('Instance is running')
 
                     inst = instance.Instance.from_db(instance_uuid)
@@ -80,7 +80,7 @@ class Monitor(daemon.Daemon):
                         else:
                             inst.delete()
 
-                        log_ctx.with_field('attempt', attempts).warning(
+                        log_ctx.with_fields({'attempt': attempts}).warning(
                             'Deleting stray instance')
                         continue
 
@@ -110,7 +110,7 @@ class Monitor(daemon.Daemon):
 
                     if domain_name not in seen:
                         instance_uuid = domain_name.split(':')[1]
-                        log_ctx = LOG.with_instance(instance_uuid)
+                        log_ctx = LOG.with_fields({'instance': instance_uuid})
                         inst = instance.Instance.from_db(instance_uuid)
 
                         if not inst:

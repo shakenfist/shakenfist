@@ -48,14 +48,18 @@ class Monitor(daemon.WorkerPoolDaemon):
                 inst = instance.Instance.from_db(ni.instance_uuid)
                 if not inst:
                     ni.delete()
-                    LOG.with_object(ni).with_field('instance', ni.instance_uuid).info(
+                    LOG.with_fields({
+                        'networkinterface': ni,
+                        'instance': ni.instance_uuid}).info(
                         'Deleted stray network interface for missing instance')
                 else:
                     s = inst.state
                     if (s.update_time + 30 < t and
                             s.value in [dbo.STATE_DELETED, dbo.STATE_ERROR, 'unknown']):
                         ni.delete()
-                        LOG.with_object(ni).with_field('instance', ni.instance_uuid).info(
+                        LOG.with_fields({
+                            'networkinterface': ni,
+                            'instance': ni.instance_uuid}).info(
                             'Deleted stray network interface')
 
     def _maintain_networks(self):
@@ -83,9 +87,10 @@ class Monitor(daemon.WorkerPoolDaemon):
                 for iface_uuid in ifaces:
                     ni = networkinterface.NetworkInterface.from_db(iface_uuid)
                     if not ni:
-                        LOG.with_instance(
-                            inst).with_networkinterface(
-                            iface_uuid).error('Network interface does not exist')
+                        LOG.with_fields({
+                            'instance': inst,
+                            'networkinterface': iface_uuid}).error(
+                                'Network interface does not exist')
                     elif ni.network_uuid not in host_networks:
                         host_networks.append(ni.network_uuid)
         else:
@@ -104,7 +109,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                 # it if it has no interfaces left.
                 if n.state.value == dbo.STATE_DELETE_WAIT:
                     if not n.networkinterfaces:
-                        LOG.with_network(n).info(
+                        LOG.with_fields({'network': n}).info(
                             'Removing stray delete_wait network')
                         etcd.enqueue('networknode', DestroyNetworkTask(n.uuid))
 
@@ -120,7 +125,7 @@ class Monitor(daemon.WorkerPoolDaemon):
 
                 if not n.is_okay():
                     if config.NODE_IS_NETWORK_NODE:
-                        LOG.with_network(n).info(
+                        LOG.with_fields({'network': n}).info(
                             'Recreating not okay network on network node')
                         n.create_on_network_node()
 
@@ -143,7 +148,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                                 n.add_floating_ip(ni.floating.get(
                                     'floating_address'), ni.ipv4)
                     else:
-                        LOG.with_network(n).info(
+                        LOG.with_fields({'network': n}).info(
                             'Recreating not okay network on hypervisor')
                         n.create_on_hypervisor()
 
@@ -153,7 +158,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                 LOG.warning(
                     'Failed to acquire lock while maintaining networks: %s' % e)
             except exceptions.DeadNetwork as e:
-                LOG.with_field('exception', e).info(
+                LOG.with_fields({'exception': e}).info(
                     'maintain_network attempted on dead network')
             except processutils.ProcessExecutionError as e:
                 LOG.error('Network maintenance failure: %s', e)
@@ -174,11 +179,11 @@ class Monitor(daemon.WorkerPoolDaemon):
         # Warn of extra vxlans which have been present for more than five minutes
         for vxid in EXTRA_VLANS_HISTORY:
             if time.time() - EXTRA_VLANS_HISTORY[vxid] > 5 * 60:
-                LOG.with_field('vxid', vxid).warning(
+                LOG.with_fields({'vxid': vxid}).warning(
                     'Extra vxlan present!')
 
     def _process_network_workitem(self, log_ctx, workitem):
-        log_ctx = log_ctx.with_network(workitem.network_uuid())
+        log_ctx = log_ctx.with_fields({'network': workitem.network_uuid()})
         n = network.Network.from_db(workitem.network_uuid())
         if not n:
             log_ctx.warning('Received work item for non-existent network')
@@ -218,7 +223,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             try:
                 n.delete_on_network_node()
             except exceptions.DeadNetwork as e:
-                log_ctx.with_field('exception', e).warning(
+                log_ctx.with_fields({'exception': e}).warning(
                     'DestroyNetworkTask on dead network')
 
         #
@@ -235,7 +240,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                 n.create_on_network_node()
                 n.ensure_mesh()
             except exceptions.DeadNetwork as e:
-                log_ctx.with_field('exception', e).warning(
+                log_ctx.with_fields({'exception': e}).warning(
                     'DeployNetworkTask on dead network')
 
         elif isinstance(workitem, UpdateDHCPNetworkTask):
@@ -243,11 +248,12 @@ class Monitor(daemon.WorkerPoolDaemon):
                 n.create_on_network_node()
                 n.ensure_mesh()
             except exceptions.DeadNetwork as e:
-                log_ctx.with_field('exception', e).warning(
+                log_ctx.with_fields({'exception': e}).warning(
                     'UpdateDHCPNetworkTask on dead network')
 
     def _process_networkinterface_workitem(self, log_ctx, workitem):
-        log_ctx = log_ctx.with_networkinterface(workitem.interface_uuid())
+        log_ctx = log_ctx.with_fields({
+            'networkinterface': workitem.interface_uuid()})
         n = network.Network.from_db(workitem.network_uuid())
         if not n:
             log_ctx.warning('Received work item for non-existent network')
@@ -293,7 +299,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                 return
             else:
                 try:
-                    log_ctx = LOG.with_field('workitem', workitem)
+                    log_ctx = LOG.with_fields({'workitem': workitem})
                     if NetworkTask.__subclasscheck__(type(workitem)):
                         self._process_network_workitem(log_ctx, workitem)
                     elif NetworkInterfaceTask.__subclasscheck__(type(workitem)):

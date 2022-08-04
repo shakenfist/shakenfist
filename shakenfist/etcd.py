@@ -182,7 +182,7 @@ class ActualLock(Lock):
         self.objecttype = objecttype
         self.objectname = name
         self.timeout = min(timeout, 1000000000)
-        self.log_ctx = log_ctx.with_field('lock', self.path)
+        self.log_ctx = log_ctx.with_fields({'lock': self.path})
         self.operation = op
 
         # We override the UUID of the lock with something more helpful to debugging
@@ -220,8 +220,8 @@ class ActualLock(Lock):
             if res:
                 duration = time.time() - start_time
                 if duration > threshold:
-                    self.log_ctx.with_field('duration', duration
-                                            ).info('Acquiring a lock was slow')
+                    self.log_ctx.with_fields({
+                        'duration': duration}).info('Acquiring a lock was slow')
                 return self
 
             duration = time.time() - start_time
@@ -279,13 +279,13 @@ def refresh_lock(lock, log_ctx=LOG):
             'You cannot hold locks while using a read only cache')
 
     if not lock.is_acquired():
-        log_ctx.with_field('lock', lock.name).info(
+        log_ctx.with_fields({'lock': lock.name}).info(
             'Attempt to refresh an expired lock')
         raise exceptions.LockException(
             'The lock on %s has expired.' % lock.path)
 
     lock.refresh()
-    log_ctx.with_field('lock', lock.name).debug('Refreshed lock')
+    log_ctx.with_fields({'lock': lock.name}).debug('Refreshed lock')
 
 
 @retry_etcd_forever

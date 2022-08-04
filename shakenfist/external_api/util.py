@@ -64,7 +64,8 @@ def safe_get_network_interface(interface_uuid):
 
     i = Instance.from_db(ni.instance_uuid)
     if get_jwt_identity()[0] not in [i.namespace, 'system']:
-        log.with_object(i).info('Instance not found, failed ownership test')
+        log.with_fields({'instance': i}).info(
+            'Instance not found, failed ownership test')
         return None, None, api_base.error(404, 'interface not found')
 
     return ni, n, None

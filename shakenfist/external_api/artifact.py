@@ -35,7 +35,7 @@ def arg_is_artifact_uuid(func):
             kwargs['artifact_from_db'] = Artifact.from_db(
                 kwargs['artifact_uuid'])
         if not kwargs.get('artifact_from_db'):
-            LOG.with_field('artifact', kwargs['artifact_uuid']).info(
+            LOG.with_fields({'artifact': kwargs['artifact_uuid']}).info(
                 'Artifact not found')
             return api_base.error(404, 'artifact not found')
 
@@ -47,13 +47,13 @@ def requires_artifact_ownership(func):
     # Requires that @arg_is_artifact_uuid has already run
     def wrapper(*args, **kwargs):
         if not kwargs.get('artifact_from_db'):
-            LOG.with_field('artifact', kwargs['artifact_uuid']).info(
+            LOG.with_fields({'artifact': kwargs['artifact_uuid']}).info(
                 'Artifact not found, kwarg missing')
             return api_base.error(404, 'artifact not found')
 
         a = kwargs['artifact_from_db']
         if get_jwt_identity()[0] not in [a.namespace, 'system']:
-            LOG.with_object(a).info(
+            LOG.with_fields({'artifact': a}).info(
                 'Artifact not found, ownership test in decorator')
             return api_base.error(404, 'artifact not found')
 
@@ -65,7 +65,7 @@ def requires_artifact_access(func):
     # Requires that @arg_is_artifact_uuid has already run
     def wrapper(*args, **kwargs):
         if not kwargs.get('artifact_from_db'):
-            LOG.with_field('artifact', kwargs['artifact_uuid']).info(
+            LOG.with_fields({'artifact': kwargs['artifact_uuid']}).info(
                 'Artifact not found, kwarg missing')
             return api_base.error(404, 'artifact not found')
 

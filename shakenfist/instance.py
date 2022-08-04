@@ -131,8 +131,8 @@ class Instance(dbo):
             if upgraded and gmov('instance') == self.current_version:
                 etcd.put(self.object_type, None,
                          static_values.get('uuid'), static_values)
-                LOG.with_field(
-                    self.object_type, static_values['uuid']).info('Online upgrade committed')
+                LOG.with_fields({self.object_type: static_values['uuid']}).info(
+                    'Online upgrade committed')
 
         super(Instance, self).__init__(static_values.get('uuid'),
                                        static_values.get('version'))
@@ -292,7 +292,8 @@ class Instance(dbo):
         for iface_uuid in self.interfaces:
             ni = networkinterface.NetworkInterface.from_db(iface_uuid)
             if not ni:
-                self.log.with_object(ni).error('Network interface missing')
+                self.log.with_fields({'networkinterface': ni}).error(
+                    'Network interface missing')
             else:
                 i['interfaces'].append(ni.external_view())
 
@@ -704,7 +705,7 @@ class Instance(dbo):
                 if allocatedPort:
                     return port
             except socket.error:
-                LOG.with_field('instance', self.uuid).info(
+                LOG.with_fields({'instance': self.uuid}).info(
                     'Collided with in use port %d, selecting another' % port)
                 consumed.append(port)
             finally:
@@ -1274,7 +1275,7 @@ class Instance(dbo):
             disks = new_disks
         elif not all:
             disks = [disks[0]]
-        self.log.with_field('devices', disks).info('Devices for snapshot')
+        self.log.with_fields({'devices': disks}).info('Devices for snapshot')
 
         out = {}
         for disk in disks:

@@ -244,7 +244,7 @@ class InstancesEndpoint(api_base.Resource):
                 blob_uuid = a.resolve_to_blob()
                 if not blob_uuid:
                     return api_base.error(404, 'Could not resolve label %s to a blob' % label)
-                LOG.with_field('instance', instance_uuid).with_fields({
+                LOG.with_fields({'instance': instance_uuid}).with_fields({
                     'original_template': original_template,
                     'label': label,
                     'source_url': url,
@@ -255,7 +255,7 @@ class InstancesEndpoint(api_base.Resource):
 
             elif nvram_template.startswith(BLOB_URL):
                 nvram_template = nvram_template[len(BLOB_URL):]
-                LOG.with_field('instance', instance_uuid).with_fields({
+                LOG.with_fields({'instance': instance_uuid}).with_fields({
                     'original_template': original_template,
                     'blob': nvram_template
                 }).info('NVRAM template URL converted')
@@ -396,8 +396,10 @@ class InstancesEndpoint(api_base.Resource):
                     netdesc['model'] = 'virtio'
 
                 iface_uuid = str(uuid.uuid4())
-                LOG.with_object(inst).with_object(n).withFields({
-                    'networkinterface': iface_uuid
+                LOG.with_fields({
+                    'networkinterface': iface_uuid,
+                    'instance': inst,
+                    'network': n
                 }).info('Interface allocated')
                 ni = NetworkInterface.new(
                     iface_uuid, netdesc, inst.uuid, order)

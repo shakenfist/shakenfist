@@ -36,7 +36,7 @@ LOG, _ = logutil.setup(__name__)
 def handle(jobname, workitem):
     libvirt = util_libvirt.get_libvirt()
 
-    log = LOG.with_field('workitem', jobname)
+    log = LOG.with_fields({'workitem': jobname})
     log.info('Processing workitem')
 
     setproctitle.setproctitle(
@@ -63,11 +63,11 @@ def handle(jobname, workitem):
                 inst = instance.Instance.from_db(task.instance_uuid())
 
             if inst:
-                log_i = log.with_instance(inst)
+                log_i = log.with_fields({'instance': inst})
             else:
                 log_i = log
 
-            log_i.with_field('task_name', task.name()).info('Starting task')
+            log_i.with_fields({'task_name': task.name()}).info('Starting task')
 
             if isinstance(task, FetchImageTask):
                 n = task.namespace()
@@ -121,7 +121,7 @@ def handle(jobname, workitem):
                 cur_interfaces = task_network.networkinterfaces
 
                 if cur_interfaces:
-                    LOG.with_network(task_network).warning(
+                    LOG.with_fields({'network': task_network}).warning(
                         'During DeleteNetworkWhenClean new interfaces have '
                         'connected to network: %s', cur_interfaces)
 
@@ -171,15 +171,16 @@ def handle(jobname, workitem):
                     }).info('Cannot replicate blob, insufficient space')
 
                 else:
-                    log.with_object(b).info('Replicating blob')
+                    log.with_fields({'blob': b}).info('Replicating blob')
                     size = b.ensure_local([])
-                    log.with_object(b).with_fields({
+                    log.with_fields({
+                        'blob': b,
                         'transferred': size,
                         'expected': b.size
                     }).info('Replicating blob complete')
 
             else:
-                log_i.with_field('task', task).error(
+                log_i.with_fields({'task': task}).error(
                     'Unhandled task - dropped')
 
             log_i.info('Task complete')

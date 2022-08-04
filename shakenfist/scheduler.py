@@ -47,7 +47,7 @@ class Scheduler(object):
         # This UUID doesn't really mean much, except as a way of tracing the
         # behaviour of a single instance of the scheduler object in logs.
         self.__uuid = str(uuid.uuid4())
-        self.log = LOG.with_field('scheduler_instance', self.__uuid)
+        self.log = LOG.with_fields({'scheduler_instance': self.__uuid})
 
         self.metrics = {}
         self.metrics_updated = 0
@@ -182,7 +182,7 @@ class Scheduler(object):
 
     def place_instance(self, inst, network, candidates=None):
         with util_general.RecordedOperation('schedule', inst):
-            log_ctx = self.log.with_object(inst)
+            log_ctx = self.log.with_fields({'instance': inst})
 
             # Refresh metrics if its too old, or there are no nodes.
             diff = time.time() - self.metrics_updated

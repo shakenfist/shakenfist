@@ -263,7 +263,7 @@ class Monitor(daemon.Daemon):
                         'usage', extra=util_network.get_interface_statistics(interface),
                         suppress_event_logging=True)
                 except exceptions.NoInterfaceStatistics as e:
-                    LOG.with_field('network', n).info(
+                    LOG.with_fields({'network': n}).info(
                         'Failed to collect network usage: %s' % e)
 
         while not self.exit.is_set():

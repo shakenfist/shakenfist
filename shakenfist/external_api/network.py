@@ -165,7 +165,7 @@ class NetworksEndpoint(api_base.Resource):
                 if clean_wait:
                     _delete_network(n, n.networkinterfaces)
                 else:
-                    LOG.with_object(n).warning(
+                    LOG.with_fields({'network': n}).warning(
                         'Network in use, cannot be deleted by delete-all')
                     networks_unable.append(n.uuid)
                     continue

@@ -115,7 +115,7 @@ class Monitor(daemon.Daemon):
             '%s-%s' % (daemon.process_name('sidechannel'), instance_uuid))
 
         inst = instance.Instance.from_db(instance_uuid)
-        log_ctx = LOG.with_instance(instance_uuid)
+        log_ctx = LOG.with_fields({'instance': instance_uuid})
         if inst.state.value == instance.Instance.STATE_DELETED:
             return
 
@@ -173,7 +173,7 @@ class Monitor(daemon.Daemon):
                                 sc_clients[chan].dispatch_packet(
                                     packet)
                             except protocol.UnknownCommand:
-                                log_ctx.with_field('sidechannel', chan).info(
+                                log_ctx.with_fields({'sidechannel': chan}).info(
                                     'Ignored sidechannel packet: %s' % packet)
 
                     except (BrokenPipeError,

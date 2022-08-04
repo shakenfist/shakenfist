@@ -81,7 +81,7 @@ def arg_is_instance_ref(func):
                 return error(400, str(e))
 
             if not inst:
-                LOG.with_field('instance', kwargs.get('instance_ref')).info(
+                LOG.with_fields({'instance': kwargs.get('instance_ref')}).info(
                     'Instance not found, missing or deleted')
                 return error(404, 'instance not found')
 
@@ -131,13 +131,13 @@ def requires_instance_ownership(func):
     # Requires that @arg_is_instance_ref has already run
     def wrapper(*args, **kwargs):
         if not kwargs.get('instance_from_db'):
-            LOG.with_field('instance', kwargs['instance_ref']).info(
+            LOG.with_fields({'instance': kwargs['instance_ref']}).info(
                 'Instance not found, kwarg missing')
             return error(404, 'instance not found')
 
         i = kwargs['instance_from_db']
         if get_jwt_identity()[0] not in [i.namespace, 'system']:
-            LOG.with_instance(i).info(
+            LOG.with_fields({'instance': i}).info(
                 'Instance not found, ownership test in decorator')
             return error(404, 'instance not found')
 
@@ -149,13 +149,13 @@ def requires_instance_active(func):
     # Requires that @arg_is_instance_ref has already run
     def wrapper(*args, **kwargs):
         if not kwargs.get('instance_from_db'):
-            LOG.with_field('instance', kwargs['instance_ref']).info(
+            LOG.with_fields({'instance': kwargs['instance_ref']}).info(
                 'Instance not found, kwarg missing')
             return error(404, 'instance not found')
 
         i = kwargs['instance_from_db']
         if i.state.value != Instance.STATE_CREATED:
-            LOG.with_instance(i).info(
+            LOG.with_fields({'instance': i}).info(
                 'Instance not ready (%s)' % i.state.value)
             return error(406, 'instance %s is not ready (%s)' % (i.uuid, i.state.value))
 
@@ -174,7 +174,7 @@ def arg_is_network_ref(func):
                 return error(400, str(e))
 
             if not n:
-                LOG.with_field('network', kwargs.get('network_ref')).info(
+                LOG.with_fields({'network': kwargs.get('network_ref')}).info(
                     'Network not found, missing or deleted')
                 return error(404, 'network not found')
 
@@ -212,7 +212,7 @@ def redirect_to_network_node(func):
 def requires_network_ownership(func):
     # Requires that @arg_is_network_ref has already run
     def wrapper(*args, **kwargs):
-        log = LOG.with_field('network', kwargs['network_ref'])
+        log = LOG.with_fields({'network': kwargs['network_ref']})
 
         if not kwargs.get('network_from_db'):
             log.info('Network not found, kwarg missing')
@@ -229,7 +229,7 @@ def requires_network_ownership(func):
 def requires_network_active(func):
     # Requires that @arg_is_network_ref has already run
     def wrapper(*args, **kwargs):
-        log = LOG.with_field('network', kwargs['network_ref'])
+        log = LOG.with_fields({'network': kwargs['network_ref']})
 
         if not kwargs.get('network_from_db'):
             log.info('Network not found, kwarg missing')
@@ -250,7 +250,7 @@ def requires_namespace_exist(func):
     def wrapper(*args, **kwargs):
         if kwargs.get('namespace'):
             if not db.get_namespace(kwargs['namespace']):
-                LOG.with_field('namespace', kwargs['namespace']).warning(
+                LOG.with_fields({'namespace': kwargs['namespace']}).warning(
                     'Attempt to use non-existent namespace')
                 return error(404, 'namespace not found')
 
@@ -265,7 +265,7 @@ def arg_is_upload_uuid(func):
             kwargs['upload_from_db'] = Upload.from_db(
                 kwargs['upload_uuid'])
         if not kwargs.get('upload_from_db'):
-            LOG.with_field('upload', kwargs['upload_uuid']).info(
+            LOG.with_fields({'upload': kwargs['upload_uuid']}).info(
                 'Upload not found, genuinely missing')
             return error(404, 'upload not found')
 

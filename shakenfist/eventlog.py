@@ -81,7 +81,7 @@ class EventLog(object):
     def _bootstrap(self):
         with self.lock:
             if not os.path.exists(self.dbpath):
-                LOG.with_field(self.objtype, self.objuuid).info(
+                LOG.with_fields({self.objtype: self.objuuid}).info(
                     'Creating event log')
 
             self.con = sqlite3.connect(self.dbpath)
@@ -156,4 +156,4 @@ class EventLog(object):
         if os.path.exists(self.dbpath):
             os.unlink(self.dbpath)
 
-        LOG.with_field(self.objtype, self.objuuid).info('Removed event log')
+        LOG.with_fields({self.objtype: self.objuuid}).info('Removed event log')

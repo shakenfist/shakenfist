@@ -42,7 +42,7 @@ class DatabaseBackedObject(object):
         if self.__in_memory_only:
             self.__in_memory_values = {}
 
-        self.log = LOG.with_object(self)
+        self.log = LOG.with_fields({self.object_type: self.__uuid})
 
     @property
     def uuid(self):

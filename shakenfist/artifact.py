@@ -56,8 +56,9 @@ class Artifact(dbo):
             if upgraded and gmov('artifact') == self.current_version:
                 etcd.put(self.object_type, None,
                          static_values.get('uuid'), static_values)
-                LOG.with_field(
-                    self.object_type, static_values['uuid']).info('Online upgrade committed')
+                LOG.with_fields({
+                    self.object_type: static_values['uuid']}).info(
+                        'Online upgrade committed')
 
         super(Artifact, self).__init__(static_values.get('uuid'),
                                        static_values.get('version'),

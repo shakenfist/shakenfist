@@ -51,8 +51,9 @@ class Blob(dbo):
             if upgraded and gmov('blob') == self.current_version:
                 etcd.put(self.object_type, None,
                          static_values.get('uuid'), static_values)
-                LOG.with_field(
-                    self.object_type, static_values['uuid']).info('Online upgrade committed')
+                LOG.with_fields({
+                    self.object_type: static_values['uuid']}).info(
+                        'Online upgrade committed')
 
         super(Blob, self).__init__(static_values.get('uuid'),
                                    static_values.get('version'))
@@ -339,7 +340,8 @@ class Blob(dbo):
         partial_path = blob_path + '.partial'
         while os.path.exists(partial_path):
             st = os.stat(partial_path)
-            self.log.with_field('partial file age', st.st_mtime).info(
+            self.log.with_fields({
+                'partial file age': st.st_mtime}).info(
                 'Waiting for existing download to complete')
             time.sleep(10)
 
@@ -481,14 +483,14 @@ class Blob(dbo):
                     if n in nodes:
                         nodes.remove(n)
 
-                self.log.with_field('nodes', nodes).debug(
+                self.log.with_fields({'nodes': nodes}).debug(
                     'Considered for blob replication')
 
                 for n in nodes[:targets]:
                     etcd.enqueue(n, {
                         'tasks': [FetchBlobTask(self.uuid)]
                     })
-                    self.log.with_field('node', n).info(
+                    self.log.with_fields({'node': n}).info(
                         'Instructed to replicate blob')
 
     @staticmethod
@@ -559,7 +561,7 @@ def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
                             'Fetching required HTTP resource %s into blob %s, %d%% complete'
                             % (url, blob_uuid, percentage))
 
-                    logs.with_field('bytes_fetched', fetched).debug(
+                    logs.with_fields({'bytes_fetched': fetched}).debug(
                         'Fetch %.02f percent complete' % percentage)
                     previous_percentage = percentage
 
@@ -571,7 +573,7 @@ def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
         instance_object.add_event(
             'Fetching required HTTP resource %s into blob %s, complete'
             % (url, blob_uuid))
-    logs.with_field('bytes_fetched', fetched).info('Fetch complete')
+    logs.with_fields({'bytes_fetched': fetched}).info('Fetch complete')
 
     # We really should verify the checksum here before we commit the blob to the
     # database.
