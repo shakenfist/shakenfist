@@ -2,6 +2,7 @@ import multiprocessing
 import os
 import select
 import setproctitle
+from shakenfist_utilities import logs
 import signal
 from shakenfist_agent import protocol
 import time
@@ -9,11 +10,10 @@ import time
 from shakenfist.daemons import daemon
 from shakenfist import eventlog
 from shakenfist import instance
-from shakenfist import logutil
 from shakenfist.util import libvirt as util_libvirt
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 class ConnectionIdle(Exception):

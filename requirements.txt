@@ -23,7 +23,6 @@ etcd3gw                     # apache2
 flask-jwt-extended          # mit
 bcrypt                      # apache2
 gunicorn                    # mit
-pylogrus                    # mit
 pydantic                    # mit
 python-magic                # mit
 flask-request-id-middleware # mit

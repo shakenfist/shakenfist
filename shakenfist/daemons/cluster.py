@@ -5,6 +5,7 @@
 
 from collections import defaultdict
 import setproctitle
+from shakenfist_utilities import logs
 import time
 
 from shakenfist import artifact
@@ -17,7 +18,6 @@ from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
-from shakenfist import logutil
 from shakenfist import network
 from shakenfist.node import (
     Node, Nodes,
@@ -27,7 +27,7 @@ from shakenfist.node import (
 from shakenfist.upload import Uploads
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 class Monitor(daemon.Daemon):

@@ -1,5 +1,6 @@
 
 from flask_jwt_extended import jwt_required
+from shakenfist_utilities import logs
 
 from shakenfist.daemons import daemon
 from shakenfist import etcd
@@ -7,14 +8,13 @@ from shakenfist import exceptions
 from shakenfist.external_api import (
     base as api_base,
     util as api_util)
-from shakenfist import logutil
 from shakenfist import network
 from shakenfist.tasks import (
     DefloatNetworkInterfaceTask,
     FloatNetworkInterfaceTask)
 
 
-LOG, HANDLER = logutil.setup(__name__)
+LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 

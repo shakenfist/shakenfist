@@ -1,17 +1,17 @@
 from functools import partial
 import json
 import time
+from shakenfist_utilities import logs
 
 from shakenfist import constants
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist import exceptions
-from shakenfist import logutil
 from shakenfist.util import general as util_general
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 class DatabaseBackedObject(object):

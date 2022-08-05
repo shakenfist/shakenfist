@@ -3,6 +3,7 @@ from functools import partial
 import flask
 from flask_jwt_extended import jwt_required, get_jwt_identity
 import re
+from shakenfist_utilities import logs
 import uuid
 
 from shakenfist.artifact import (
@@ -20,7 +21,6 @@ from shakenfist.external_api import (
     util as api_util)
 from shakenfist import instance
 from shakenfist.ipmanager import IPManager
-from shakenfist import logutil
 from shakenfist import network as sfnet  # Unfortunate, but we have an API arg
 # called network too.
 from shakenfist.networkinterface import NetworkInterface
@@ -36,7 +36,7 @@ from shakenfist.tasks import (
 from shakenfist.util import general as util_general
 
 
-LOG, HANDLER = logutil.setup(__name__)
+LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 

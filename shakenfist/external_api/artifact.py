@@ -4,6 +4,7 @@ from functools import partial
 import json
 import os
 import requests
+from shakenfist_utilities import logs
 import shutil
 import time
 import uuid
@@ -19,13 +20,12 @@ from shakenfist import eventlog
 from shakenfist.external_api import base as api_base
 from shakenfist.config import config
 from shakenfist import etcd
-from shakenfist import logutil
 from shakenfist.tasks import FetchImageTask
 from shakenfist.upload import Upload
 from shakenfist.util import general as util_general
 
 
-LOG, HANDLER = logutil.setup(__name__)
+LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 

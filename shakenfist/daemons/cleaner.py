@@ -4,6 +4,7 @@ import json
 import os
 import pathlib
 import random
+from shakenfist_utilities import logs
 import shutil
 import time
 
@@ -12,7 +13,6 @@ from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
-from shakenfist import logutil
 from shakenfist import instance
 from shakenfist import node
 from shakenfist import upload
@@ -21,7 +21,7 @@ from shakenfist.util import libvirt as util_libvirt
 from shakenfist.util import process as util_process
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 class Monitor(daemon.Daemon):

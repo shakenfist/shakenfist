@@ -2,6 +2,7 @@
 
 from collections import defaultdict
 from functools import partial
+from shakenfist_utilities import logs
 from uuid import uuid4
 
 from shakenfist import baseobject
@@ -13,11 +14,10 @@ from shakenfist.config import config
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
-from shakenfist import logutil
 from shakenfist.metrics import get_minimum_object_version as gmov
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 BLOB_URL = 'sf://blob/'

@@ -9,6 +9,7 @@ import os
 import pathlib
 import pycdlib
 import random
+from shakenfist_utilities import logs
 import shutil
 import socket
 import time
@@ -25,7 +26,6 @@ from shakenfist import constants
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
-from shakenfist import logutil
 from shakenfist.metrics import get_minimum_object_version as gmov
 from shakenfist import network
 from shakenfist import networkinterface
@@ -35,7 +35,7 @@ from shakenfist.util import image as util_image
 from shakenfist.util import libvirt as util_libvirt
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 def _get_defaulted_disk_bus(disk):

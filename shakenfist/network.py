@@ -6,6 +6,7 @@ import os
 import psutil
 import random
 import re
+from shakenfist_utilities import logs
 import time
 from uuid import uuid4
 
@@ -22,7 +23,6 @@ from shakenfist import etcd
 from shakenfist.exceptions import DeadNetwork, CongestedNetwork
 from shakenfist import instance
 from shakenfist.ipmanager import IPManager
-from shakenfist import logutil
 from shakenfist import networkinterface
 from shakenfist.node import Node, Nodes, active_states_filter as active_nodes
 from shakenfist.tasks import (
@@ -35,7 +35,7 @@ from shakenfist.util import network as util_network
 from shakenfist.util import process as util_process
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 class Network(dbo):

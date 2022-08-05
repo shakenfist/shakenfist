@@ -1,16 +1,16 @@
 import multiprocessing
 from oslo_concurrency import processutils
 import psutil
+from shakenfist_utilities import logs
 import time
 
 # To avoid circular imports, util modules should only import a limited
-# set of shakenfist modules, mainly exceptions, logutils, and specific
+# set of shakenfist modules, mainly exceptions, and specific
 # other util modules.
 from shakenfist import db
-from shakenfist import logutil
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 def _lock_refresher(locks):

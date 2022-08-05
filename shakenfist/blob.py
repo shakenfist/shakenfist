@@ -6,6 +6,7 @@ import numbers
 import os
 import random
 import requests
+from shakenfist_utilities import logs
 import time
 import urllib3
 
@@ -19,7 +20,6 @@ from shakenfist import etcd
 from shakenfist.exceptions import (BlobDeleted, BlobFetchFailed,
                                    BlobDependencyMissing, BlobsMustHaveContent)
 from shakenfist import instance
-from shakenfist import logutil
 from shakenfist.metrics import get_minimum_object_version as gmov
 from shakenfist.node import (Node, Nodes, nodes_by_free_disk_descending,
                              inactive_states_filter as node_inactive_states_filter)
@@ -28,7 +28,7 @@ from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 class Blob(dbo):

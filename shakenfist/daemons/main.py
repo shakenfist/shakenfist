@@ -4,6 +4,7 @@ import faulthandler
 import os
 import psutil
 import setproctitle
+from shakenfist_utilities import logs
 import signal
 import subprocess
 import time
@@ -14,7 +15,6 @@ from shakenfist.daemons import shim
 from shakenfist import etcd
 from shakenfist import instance
 from shakenfist.ipmanager import IPManager
-from shakenfist import logutil
 from shakenfist import network
 from shakenfist.networkinterface import interfaces_for_instance
 from shakenfist.node import Node
@@ -23,7 +23,7 @@ from shakenfist.util import process as util_process
 from shakenfist.util import network as util_network
 
 
-LOG, HANDLER = logutil.setup('main')
+LOG, HANDLER = logs.setup('main')
 
 
 def restore_instances():

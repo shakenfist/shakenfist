@@ -2,6 +2,7 @@ import base64
 import bcrypt
 from flask_jwt_extended import create_access_token
 from flask_jwt_extended import jwt_required
+from shakenfist_utilities import logs
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist import db
@@ -10,11 +11,10 @@ from shakenfist.external_api import (
     base as api_base,
     util as api_util)
 from shakenfist import instance
-from shakenfist import logutil
 from shakenfist import network
 
 
-LOG, HANDLER = logutil.setup(__name__)
+LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 

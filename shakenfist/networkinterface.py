@@ -1,6 +1,7 @@
 # Copyright 2020 Michael Still
 
 from functools import partial
+from shakenfist_utilities import logs
 from uuid import uuid4
 
 from shakenfist import baseobject
@@ -11,13 +12,12 @@ from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist.ipmanager import IPManager
-from shakenfist import logutil
 from shakenfist import network
 from shakenfist.tasks import DefloatNetworkInterfaceTask
 from shakenfist.util import network as util_network
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 class NetworkInterface(dbo):

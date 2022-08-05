@@ -1,5 +1,6 @@
 from collections import defaultdict
 from functools import partial
+from shakenfist_utilities import logs
 import time
 
 from shakenfist import baseobject
@@ -9,11 +10,10 @@ from shakenfist.baseobject import (
 from shakenfist.config import config
 from shakenfist.constants import GiB
 from shakenfist import etcd
-from shakenfist import logutil
 from shakenfist.util import general as util_general
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 class Node(dbo):

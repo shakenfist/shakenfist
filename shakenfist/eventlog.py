@@ -1,15 +1,15 @@
 import json
 from oslo_concurrency import lockutils
 import os
+from shakenfist_utilities import logs
 import sqlite3
 import time
 
 from shakenfist.config import config
 from shakenfist import etcd
-from shakenfist import logutil
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 VERSION = 2

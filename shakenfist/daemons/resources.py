@@ -1,5 +1,6 @@
 import os
 import psutil
+from shakenfist_utilities import logs
 import time
 
 from prometheus_client import Gauge
@@ -11,7 +12,6 @@ from shakenfist.daemons import daemon
 from shakenfist.config import config
 from shakenfist import etcd
 from shakenfist import exceptions
-from shakenfist import logutil
 from shakenfist import instance
 from shakenfist import network
 from shakenfist.util import general as util_general
@@ -19,7 +19,7 @@ from shakenfist.util import libvirt as util_libvirt
 from shakenfist.util import network as util_network
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 def _get_stats():

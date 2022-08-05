@@ -1,5 +1,6 @@
 from functools import partial
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from shakenfist_utilities import logs
 
 from shakenfist.artifact import Artifact, Artifacts, LABEL_URL, type_filter, url_filter
 from shakenfist.baseobject import active_states_filter, DatabaseBackedObject as dbo
@@ -7,10 +8,9 @@ from shakenfist.blob import Blob
 from shakenfist.daemons import daemon
 from shakenfist.exceptions import BlobDeleted
 from shakenfist.external_api import base as api_base
-from shakenfist import logutil
 
 
-LOG, HANDLER = logutil.setup(__name__)
+LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 

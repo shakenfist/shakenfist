@@ -261,9 +261,6 @@ class SFConfig(BaseSettings):
     LOGLEVEL_RESOURCES: str = 'info'
     LOGLEVEL_SIDECHANNEL: str = 'info'
     LOGLEVEL_QUEUES: str = 'info'
-    LOG_METHOD_TRACE: bool = Field(
-        False, description='Add method name and module line number to log messages'
-    )
 
     # etcd
     ETCD_HOST: str = Field(

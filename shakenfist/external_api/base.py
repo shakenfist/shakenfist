@@ -8,6 +8,7 @@ from flask_jwt_extended import decode_token, get_jwt_identity
 import json
 from jwt.exceptions import DecodeError, PyJWTError
 import requests
+from shakenfist_utilities import logs
 import sys
 import traceback
 
@@ -18,13 +19,12 @@ from shakenfist import db
 from shakenfist import exceptions
 from shakenfist.etcd import ThreadLocalReadOnlyCache
 from shakenfist.instance import Instance
-from shakenfist import logutil
 from shakenfist import network
 from shakenfist.upload import Upload
 from shakenfist.util import general as util_general
 
 
-LOG, HANDLER = logutil.setup(__name__)
+LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 TESTING = False

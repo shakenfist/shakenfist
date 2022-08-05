@@ -1,13 +1,13 @@
 import ipaddress
 import random
+from shakenfist_utilities import logs
 import time
 
 from shakenfist import db
 from shakenfist import exceptions
-from shakenfist import logutil
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 # NOTE(mikal): IPManager should _always_ return addresses as strings,

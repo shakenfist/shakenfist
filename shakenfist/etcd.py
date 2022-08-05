@@ -7,14 +7,13 @@ import json
 import os
 import psutil
 import re
-from shakenfist_utilities import random as util_random
+from shakenfist_utilities import (logs, random as util_random)
 import threading
 import time
 
 from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist import exceptions
-from shakenfist import logutil
 from shakenfist.tasks import QueueTask, FetchBlobTask
 
 
@@ -24,7 +23,7 @@ from shakenfist.tasks import QueueTask, FetchBlobTask
 ####################################################################
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 LOCK_PREFIX = '/sflocks'
 
 

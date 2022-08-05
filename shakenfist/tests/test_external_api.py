@@ -823,7 +823,6 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
 
         class FakeConfig(BaseSettings):
             API_ASYNC_WAIT: int = 1
-            LOG_METHOD_TRACE: int = 1
 
         fake_config = FakeConfig()
 
@@ -1070,7 +1069,6 @@ class ExternalApiNetworkTestCase(base.ShakenFistTestCase):
             NODE_NAME='seriously',
             NODE_EGRESS_IP='127.0.0.1',
             NETWORK_NODE_IP='127.0.0.1',
-            LOG_METHOD_TRACE=1,
             NODE_EGRESS_NIC='eth0',
             NODE_MESH_NIC='eth1',
             NODE_IS_NETWORK_NODE=True

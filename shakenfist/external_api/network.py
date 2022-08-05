@@ -2,6 +2,7 @@ from functools import partial
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_restful import fields, marshal_with
 import ipaddress
+from shakenfist_utilities import logs
 
 from shakenfist.config import config
 from shakenfist.external_api import (
@@ -14,14 +15,13 @@ from shakenfist import db
 from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist.ipmanager import IPManager
-from shakenfist import logutil
 from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist.util import process as util_process
 from shakenfist.tasks import DestroyNetworkTask, DeleteNetworkWhenClean
 
 
-LOG, HANDLER = logutil.setup(__name__)
+LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 

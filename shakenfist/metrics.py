@@ -1,14 +1,14 @@
 from math import inf
+from shakenfist_utilities import logs
 import time
 
 from shakenfist import etcd
 from shakenfist import exceptions
-from shakenfist import logutil
 from shakenfist.node import (
     Nodes, active_states_filter as node_active_states_filter)
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 def get_node_metrics(filters):

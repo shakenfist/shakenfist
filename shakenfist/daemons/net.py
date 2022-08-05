@@ -1,8 +1,8 @@
 from collections import defaultdict
 import itertools
-import time
-
 from oslo_concurrency import processutils
+from shakenfist_utilities import logs
+import time
 
 from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
@@ -13,7 +13,6 @@ from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist.ipmanager import IPManager
-from shakenfist import logutil
 from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist.networkinterface import NetworkInterface
@@ -31,7 +30,7 @@ from shakenfist.util import general as util_general
 from shakenfist.util import network as util_network
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 EXTRA_VLANS_HISTORY = {}
 

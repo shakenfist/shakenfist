@@ -3,6 +3,7 @@
 from collections import defaultdict
 import math
 import random
+from shakenfist_utilities import logs
 import time
 import uuid
 
@@ -10,7 +11,6 @@ from shakenfist.config import config
 from shakenfist.constants import GiB
 from shakenfist import exceptions
 from shakenfist import instance
-from shakenfist import logutil
 from shakenfist.metrics import get_active_node_metrics
 from shakenfist import networkinterface
 from shakenfist.node import (
@@ -18,7 +18,7 @@ from shakenfist.node import (
 from shakenfist.util import general as util_general
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 # Lookup of the FQDN (called a UUID by the node object) is expensive,

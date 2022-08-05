@@ -13,6 +13,7 @@ import flask
 from flask_jwt_extended import JWTManager
 from flask_request_id import RequestID
 import flask_restful
+from shakenfist_utilities import logs
 
 from shakenfist.config import config
 from shakenfist.daemons import daemon
@@ -30,10 +31,9 @@ from shakenfist.external_api import (
     node as api_node,
     snapshot as api_snapshot,
     upload as api_upload)
-from shakenfist import logutil
 
 
-LOG, HANDLER = logutil.setup(__name__)
+LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 

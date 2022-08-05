@@ -1,14 +1,14 @@
 from collections import defaultdict
+from shakenfist_utilities import logs
 import time
 
 from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import eventlog
-from shakenfist import logutil
 from shakenfist.util import general as util_general
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 class Monitor(daemon.WorkerPoolDaemon):

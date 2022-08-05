@@ -3,6 +3,7 @@ import os
 import pathlib
 import re
 import requests
+from shakenfist_utilities import logs
 import shutil
 import time
 import uuid
@@ -14,13 +15,12 @@ from shakenfist.config import config
 from shakenfist.constants import (QCOW2_CLUSTER_SIZE, LOCK_REFRESH_SECONDS,
                                   TRANSCODE_DESCRIPTION)
 from shakenfist import exceptions
-from shakenfist import logutil
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
 from shakenfist.util import process as util_process
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 VALID_SF_IMAGES = ['centos', 'debian', 'ubuntu']

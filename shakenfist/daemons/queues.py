@@ -1,5 +1,6 @@
 import requests
 import setproctitle
+from shakenfist_utilities import logs
 
 from shakenfist.artifact import Artifact
 from shakenfist import blob
@@ -10,7 +11,6 @@ from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import images
 from shakenfist import instance
-from shakenfist import logutil
 from shakenfist.tasks import (QueueTask,
                               DeleteInstanceTask,
                               FetchImageTask,
@@ -30,7 +30,7 @@ from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 def handle(jobname, workitem):

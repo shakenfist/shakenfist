@@ -1,16 +1,16 @@
 from flask_jwt_extended import get_jwt_identity
+from shakenfist_utilities import logs
 
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist import db
 from shakenfist.instance import Instance
 from shakenfist.ipmanager import IPManager
-from shakenfist import logutil
 from shakenfist import network
 from shakenfist.networkinterface import NetworkInterface
 
 
-LOG, HANDLER = logutil.setup(__name__)
+LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 

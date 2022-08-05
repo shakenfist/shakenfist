@@ -1,16 +1,16 @@
 import flask
 from flask_jwt_extended import jwt_required
 import os
+from shakenfist_utilities import logs
 import uuid
 
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist.config import config
-from shakenfist import logutil
 from shakenfist.upload import Upload
 
 
-LOG, HANDLER = logutil.setup(__name__)
+LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 
