@@ -353,7 +353,11 @@ def instance_delete(inst):
         # There are two delete state flows:
         #   - error transition states (preflight-error etc) to error
         #   - created to deleted
-        #
+
+        # If the instance is deleted already, we're done here.
+        if inst.state.value == dbo.STATE_DELETED:
+            return
+
         # We don't need delete_wait for the error states as they're already
         # in a transition state.
         if not inst.state.value.endswith('-error'):
