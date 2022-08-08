@@ -49,11 +49,6 @@ class SFConfig(BaseSettings):
         description='How long we wait for an async operation to complete '
                     'before returning to the user'
     )
-    INCLUDE_TRACEBACKS: bool = Field(
-        False,
-        description='If tracebacks should be included where relevant in API '
-                    'responses. Do not enable for untrusted clients!'
-    )
     PROMETHEUS_METRICS_PORT: int = Field(
         13001,
         description='Where to expose internal metrics. Do not allow '

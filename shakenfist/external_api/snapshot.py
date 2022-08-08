@@ -1,6 +1,6 @@
 from flask_jwt_extended import jwt_required
 from functools import partial
-from shakenfist_utilities import logs
+from shakenfist_utilities import api as sf_api, logs
 
 from shakenfist import artifact
 from shakenfist.artifact import Artifacts
@@ -13,7 +13,7 @@ LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 
-class InstanceSnapshotEndpoint(api_base.Resource):
+class InstanceSnapshotEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership

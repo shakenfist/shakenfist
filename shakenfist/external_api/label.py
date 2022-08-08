@@ -1,13 +1,12 @@
 from functools import partial
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from shakenfist_utilities import logs
+from shakenfist_utilities import api as sf_api, logs
 
 from shakenfist.artifact import Artifact, Artifacts, LABEL_URL, type_filter, url_filter
 from shakenfist.baseobject import active_states_filter, DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
 from shakenfist.daemons import daemon
 from shakenfist.exceptions import BlobDeleted
-from shakenfist.external_api import base as api_base
 
 
 LOG, HANDLER = logs.setup(__name__)
@@ -18,16 +17,16 @@ def _label_url(label_name):
     return '%s%s/%s' % (LABEL_URL, get_jwt_identity()[0], label_name)
 
 
-class LabelEndpoint(api_base.Resource):
+class LabelEndpoint(sf_api.Resource):
     @jwt_required()
     def post(self, label_name=None, blob_uuid=None, max_versions=0):
         b = Blob.from_db(blob_uuid)
         if not b:
-            return api_base.error(404, 'blob not found')
+            return sf_api.error(404, 'blob not found')
         try:
             b.ref_count_inc()
         except BlobDeleted:
-            return api_base.error(400, 'blob has been deleted')
+            return sf_api.error(400, 'blob has been deleted')
 
         a = Artifact.from_url(Artifact.TYPE_LABEL, _label_url(label_name),
                               max_versions, namespace=get_jwt_identity()[0],
@@ -44,7 +43,7 @@ class LabelEndpoint(api_base.Resource):
             active_states_filter
         ]))
         if len(artifacts) == 0:
-            api_base.error(404, 'label %s not found' % label_name)
+            sf_api.error(404, 'label %s not found' % label_name)
         return artifacts[0].external_view()
 
     @jwt_required()
@@ -55,7 +54,7 @@ class LabelEndpoint(api_base.Resource):
             active_states_filter
         ]))
         if len(artifacts) == 0:
-            api_base.error(404, 'label %s not found' % label_name)
+            sf_api.error(404, 'label %s not found' % label_name)
 
         for a in artifacts:
             a.state = dbo.STATE_DELETED

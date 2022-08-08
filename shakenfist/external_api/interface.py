@@ -1,6 +1,6 @@
 
 from flask_jwt_extended import jwt_required
-from shakenfist_utilities import logs
+from shakenfist_utilities import api as sf_api, logs
 
 from shakenfist.daemons import daemon
 from shakenfist import etcd
@@ -18,7 +18,7 @@ LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 
-class InterfaceEndpoint(api_base.Resource):
+class InterfaceEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.redirect_to_network_node
     def get(self, interface_uuid=None):
@@ -28,7 +28,7 @@ class InterfaceEndpoint(api_base.Resource):
         return ni.external_view()
 
 
-class InterfaceFloatEndpoint(api_base.Resource):
+class InterfaceFloatEndpoint(sf_api.Resource):
     @jwt_required()
     def post(self, interface_uuid=None):
         ni, n, err = api_util.safe_get_network_interface(interface_uuid)
@@ -38,13 +38,13 @@ class InterfaceFloatEndpoint(api_base.Resource):
         try:
             api_util.assign_floating_ip(ni)
         except exceptions.CongestedNetwork as e:
-            return api_base.error(507, str(e))
+            return sf_api.error(507, str(e))
 
         etcd.enqueue('networknode',
                      FloatNetworkInterfaceTask(n.uuid, interface_uuid))
 
 
-class InterfaceDefloatEndpoint(api_base.Resource):
+class InterfaceDefloatEndpoint(sf_api.Resource):
     @jwt_required()
     def post(self, interface_uuid=None):
         ni, n, err = api_util.safe_get_network_interface(interface_uuid)
@@ -53,7 +53,7 @@ class InterfaceDefloatEndpoint(api_base.Resource):
 
         float_net = network.Network.from_db('floating')
         if not float_net:
-            return api_base.error(404, 'floating network not found')
+            return sf_api.error(404, 'floating network not found')
 
         # Address is freed as part of the job, so code is "unbalanced" compared
         # to above for reasons.

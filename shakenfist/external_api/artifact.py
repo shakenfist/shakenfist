@@ -4,7 +4,7 @@ from functools import partial
 import json
 import os
 import requests
-from shakenfist_utilities import logs
+from shakenfist_utilities import api as sf_api, logs
 import shutil
 import time
 import uuid
@@ -37,7 +37,7 @@ def arg_is_artifact_uuid(func):
         if not kwargs.get('artifact_from_db'):
             LOG.with_fields({'artifact': kwargs['artifact_uuid']}).info(
                 'Artifact not found')
-            return api_base.error(404, 'artifact not found')
+            return sf_api.error(404, 'artifact not found')
 
         return func(*args, **kwargs)
     return wrapper
@@ -49,13 +49,13 @@ def requires_artifact_ownership(func):
         if not kwargs.get('artifact_from_db'):
             LOG.with_fields({'artifact': kwargs['artifact_uuid']}).info(
                 'Artifact not found, kwarg missing')
-            return api_base.error(404, 'artifact not found')
+            return sf_api.error(404, 'artifact not found')
 
         a = kwargs['artifact_from_db']
         if get_jwt_identity()[0] not in [a.namespace, 'system']:
             LOG.with_fields({'artifact': a}).info(
                 'Artifact not found, ownership test in decorator')
-            return api_base.error(404, 'artifact not found')
+            return sf_api.error(404, 'artifact not found')
 
         return func(*args, **kwargs)
     return wrapper
@@ -67,19 +67,19 @@ def requires_artifact_access(func):
         if not kwargs.get('artifact_from_db'):
             LOG.with_fields({'artifact': kwargs['artifact_uuid']}).info(
                 'Artifact not found, kwarg missing')
-            return api_base.error(404, 'artifact not found')
+            return sf_api.error(404, 'artifact not found')
 
         a = kwargs['artifact_from_db']
         if (a.shared and get_jwt_identity()[0] not in [a.namespace, 'system']):
             LOG.with_object(a).info(
                 'Artifact not found, ownership test in decorator')
-            return api_base.error(404, 'artifact not found')
+            return sf_api.error(404, 'artifact not found')
 
         return func(*args, **kwargs)
     return wrapper
 
 
-class ArtifactEndpoint(api_base.Resource):
+class ArtifactEndpoint(sf_api.Resource):
     @jwt_required()
     @arg_is_artifact_uuid
     @requires_artifact_access
@@ -97,7 +97,7 @@ class ArtifactEndpoint(api_base.Resource):
         return artifact_from_db.external_view()
 
 
-class ArtifactsEndpoint(api_base.Resource):
+class ArtifactsEndpoint(sf_api.Resource):
     @jwt_required()
     def get(self, node=None):
         retval = []
@@ -127,7 +127,7 @@ class ArtifactsEndpoint(api_base.Resource):
 
         # If accessing a foreign namespace, we need to be an admin
         if get_jwt_identity()[0] not in [namespace, 'system']:
-            return api_base.error(404, 'namespace not found')
+            return sf_api.error(404, 'namespace not found')
 
         a = Artifact.from_url(Artifact.TYPE_IMAGE, url, namespace=namespace,
                               create_if_new=True)
@@ -135,7 +135,7 @@ class ArtifactsEndpoint(api_base.Resource):
         # Only admin can create shared artifacts
         if shared:
             if get_jwt_identity()[0] != 'system':
-                return api_base.error(
+                return sf_api.error(
                     403, 'only the system namespace can create shared artifacts')
             a.shared = True
 
@@ -150,18 +150,18 @@ class ArtifactsEndpoint(api_base.Resource):
         """Delete all artifacts in the namespace."""
 
         if confirm is not True:
-            return api_base.error(400, 'parameter confirm is not set true')
+            return sf_api.error(400, 'parameter confirm is not set true')
 
         if get_jwt_identity()[0] == 'system':
             if not isinstance(namespace, str):
                 # A client using a system key must specify the namespace. This
                 # ensures that deleting all artifacts in the cluster (by
                 # specifying namespace='system') is a deliberate act.
-                return api_base.error(400, 'system user must specify parameter namespace')
+                return sf_api.error(400, 'system user must specify parameter namespace')
 
         else:
             if namespace and namespace != get_jwt_identity()[0]:
-                return api_base.error(401, 'you cannot delete other namespaces')
+                return sf_api.error(401, 'you cannot delete other namespaces')
             namespace = get_jwt_identity()[0]
 
         deleted = []
@@ -172,14 +172,14 @@ class ArtifactsEndpoint(api_base.Resource):
         return deleted
 
 
-class ArtifactUploadEndpoint(api_base.Resource):
+class ArtifactUploadEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.requires_namespace_exist
     def post(self, artifact_name=None, upload_uuid=None, source_url=None,
              shared=False, namespace=None):
         u = Upload.from_db(upload_uuid)
         if not u:
-            return api_base.error(404, 'upload not found')
+            return sf_api.error(404, 'upload not found')
 
         if u.node != config.NODE_NAME:
             url = 'http://%s:%d%s' % (u.node, config.API_PORT,
@@ -189,7 +189,7 @@ class ArtifactUploadEndpoint(api_base.Resource):
                 namespace=get_jwt_identity()[0])
             r = requests.request(
                 flask.request.environ['REQUEST_METHOD'], url,
-                data=json.dumps(api_base.flask_get_post_body()),
+                data=json.dumps(sf_api.flask_get_post_body()),
                 headers={'Authorization': api_token,
                          'User-Agent': util_general.get_user_agent()})
 
@@ -209,7 +209,7 @@ class ArtifactUploadEndpoint(api_base.Resource):
 
         # If accessing a foreign namespace, we need to be an admin
         if get_jwt_identity()[0] not in [namespace, 'system']:
-            return api_base.error(404, 'namespace not found')
+            return sf_api.error(404, 'namespace not found')
 
         a = Artifact.from_url(Artifact.TYPE_IMAGE, source_url,
                               namespace=namespace, create_if_new=True)
@@ -217,7 +217,7 @@ class ArtifactUploadEndpoint(api_base.Resource):
         # Only admin can create shared artifacts
         if shared:
             if get_jwt_identity()[0] != 'system':
-                return api_base.error(
+                return sf_api.error(
                     403, 'only the system namespace can create shared artifacts')
             a.shared = True
 
@@ -251,7 +251,7 @@ class ArtifactUploadEndpoint(api_base.Resource):
             return a.external_view()
 
 
-class ArtifactEventsEndpoint(api_base.Resource):
+class ArtifactEventsEndpoint(sf_api.Resource):
     @jwt_required()
     @arg_is_artifact_uuid
     @requires_artifact_access
@@ -261,7 +261,7 @@ class ArtifactEventsEndpoint(api_base.Resource):
             return list(eventdb.read_events())
 
 
-class ArtifactVersionsEndpoint(api_base.Resource):
+class ArtifactVersionsEndpoint(sf_api.Resource):
     @jwt_required()
     @arg_is_artifact_uuid
     @requires_artifact_access
@@ -282,11 +282,11 @@ class ArtifactVersionsEndpoint(api_base.Resource):
         try:
             mv = int(max_versions)
         except ValueError:
-            return api_base.error(400, 'max version is not an integer')
+            return sf_api.error(400, 'max version is not an integer')
         artifact_from_db.max_versions = mv
 
 
-class ArtifactVersionEndpoint(api_base.Resource):
+class ArtifactVersionEndpoint(sf_api.Resource):
     @jwt_required()
     @arg_is_artifact_uuid
     @requires_artifact_ownership
@@ -294,7 +294,7 @@ class ArtifactVersionEndpoint(api_base.Resource):
         try:
             ver_index = int(version_id)
         except ValueError:
-            return api_base.error(400, 'version index is not an integer')
+            return sf_api.error(400, 'version index is not an integer')
 
         indexes = list(artifact_from_db.get_all_indexes())
         for idx in indexes:
@@ -307,24 +307,24 @@ class ArtifactVersionEndpoint(api_base.Resource):
         return api_base.error(404, 'artifact index not found')
 
 
-class ArtifactShareEndpoint(api_base.Resource):
+class ArtifactShareEndpoint(sf_api.Resource):
     @jwt_required()
     @arg_is_artifact_uuid
     @requires_artifact_ownership
     def post(self, artifact_uuid=None, artifact_from_db=None):
         if artifact_from_db.namespace != 'system':
-            return api_base.error(
+            return sf_api.error(
                 403, 'only artifacts in the system namespace can be shared')
         artifact_from_db.shared = True
         return artifact_from_db.external_view()
 
 
-class ArtifactUnshareEndpoint(api_base.Resource):
+class ArtifactUnshareEndpoint(sf_api.Resource):
     @jwt_required()
     @arg_is_artifact_uuid
     @requires_artifact_ownership
     def post(self, artifact_uuid=None, artifact_from_db=None):
         if not artifact_from_db.shared:
-            return api_base.error(403, 'artifact not shared')
+            return sf_api.error(403, 'artifact not shared')
         artifact_from_db.shared = False
         return artifact_from_db.external_view()

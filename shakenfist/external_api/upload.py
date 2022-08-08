@@ -1,7 +1,7 @@
 import flask
 from flask_jwt_extended import jwt_required
 import os
-from shakenfist_utilities import logs
+from shakenfist_utilities import api as sf_api, logs
 import uuid
 
 from shakenfist.daemons import daemon
@@ -14,13 +14,13 @@ LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 
-class UploadCreateEndpoint(api_base.Resource):
+class UploadCreateEndpoint(sf_api.Resource):
     @jwt_required()
     def post(self):
         return Upload.new(str(uuid.uuid4()), config.NODE_NAME).external_view()
 
 
-class UploadDataEndpoint(api_base.Resource):
+class UploadDataEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_upload_uuid
     @api_base.redirect_upload_request
@@ -37,7 +37,7 @@ class UploadDataEndpoint(api_base.Resource):
         return st.st_size
 
 
-class UploadTruncateEndpoint(api_base.Resource):
+class UploadTruncateEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_upload_uuid
     @api_base.redirect_upload_request
