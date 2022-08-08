@@ -122,10 +122,11 @@ class Artifact(dbo):
     @staticmethod
     def from_url(artifact_type, url, max_versions=0, namespace=None, create_if_new=False):
         with etcd.get_lock('artifact_from_url', None, url):
-            artifacts = list(Artifacts([partial(url_filter, url),
-                                        partial(type_filter, artifact_type),
-                                        not_dead_states_filter,
-                                        partial(namespace_filter, namespace)]))
+            artifacts = list(Artifacts([
+                partial(url_filter, url),
+                partial(type_filter, artifact_type),
+                not_dead_states_filter,
+                partial(namespace_or_shared_filter, namespace)]))
             if len(artifacts) == 0:
                 if create_if_new:
                     return Artifact.new(artifact_type, url, max_versions=max_versions,
@@ -323,7 +324,11 @@ not_dead_states_filter = partial(
     ])
 
 
-def namespace_filter(namespace, o):
+def namespace_exact_filter(namespace, o):
+    return o.namespace == namespace
+
+
+def namespace_or_shared_filter(namespace, o):
     if namespace == 'system':
         return True
     if o.namespace == Artifact.SHARED_WITH_ALL:

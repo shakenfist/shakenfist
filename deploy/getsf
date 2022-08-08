@@ -913,8 +913,8 @@ status "Pre-fetching common images."
 . /etc/sf/sfrc
 
 if [ -z GETSF_SKIP_COMMON_IMAGES ]; then
-    sf-client artifact cache ubuntu:20.04
-    sf-client artifact cache cirros
+    sf-client artifact cache ubuntu:20.04 --shared
+    sf-client artifact cache cirros --shared
 fi
 
 question_start

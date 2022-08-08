@@ -8,7 +8,9 @@ import shutil
 import time
 import uuid
 
-from shakenfist.artifact import Artifact, Artifacts, UPLOAD_URL, namespace_filter
+from shakenfist.artifact import (
+    Artifact, Artifacts, UPLOAD_URL, namespace_exact_filter,
+    namespace_or_shared_filter)
 from shakenfist.blob import Blob
 from shakenfist import baseobject
 from shakenfist import constants
@@ -101,8 +103,9 @@ class ArtifactsEndpoint(api_base.Resource):
     def get(self, node=None):
         retval = []
         with etcd.ThreadLocalReadOnlyCache():
-            for a in Artifacts(filters=[baseobject.active_states_filter,
-                                        partial(namespace_filter, get_jwt_identity()[0])]):
+            for a in Artifacts(filters=[
+                    baseobject.active_states_filter,
+                    partial(namespace_or_shared_filter, get_jwt_identity()[0])]):
                 if node:
                     idx = a.most_recent_index
                     if 'blob_uuid' in idx:
@@ -162,7 +165,7 @@ class ArtifactsEndpoint(api_base.Resource):
             namespace = get_jwt_identity()[0]
 
         deleted = []
-        for a in Artifacts([partial(namespace_filter, namespace)]):
+        for a in Artifacts([partial(namespace_exact_filter, namespace)]):
             a.delete()
             deleted.append(a.uuid)
 
