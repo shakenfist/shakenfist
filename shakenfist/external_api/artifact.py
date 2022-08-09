@@ -8,7 +8,9 @@ import shutil
 import time
 import uuid
 
-from shakenfist.artifact import Artifact, Artifacts, UPLOAD_URL, namespace_filter
+from shakenfist.artifact import (
+    Artifact, Artifacts, UPLOAD_URL, namespace_exact_filter,
+    namespace_or_shared_filter)
 from shakenfist.blob import Blob
 from shakenfist import baseobject
 from shakenfist import constants
@@ -101,8 +103,9 @@ class ArtifactsEndpoint(api_base.Resource):
     def get(self, node=None):
         retval = []
         with etcd.ThreadLocalReadOnlyCache():
-            for a in Artifacts(filters=[baseobject.active_states_filter,
-                                        partial(namespace_filter, get_jwt_identity()[0])]):
+            for a in Artifacts(filters=[
+                    baseobject.active_states_filter,
+                    partial(namespace_or_shared_filter, get_jwt_identity()[0])]):
                 if node:
                     idx = a.most_recent_index
                     if 'blob_uuid' in idx:
@@ -162,7 +165,7 @@ class ArtifactsEndpoint(api_base.Resource):
             namespace = get_jwt_identity()[0]
 
         deleted = []
-        for a in Artifacts([partial(namespace_filter, namespace)]):
+        for a in Artifacts([partial(namespace_exact_filter, namespace)]):
             a.delete()
             deleted.append(a.uuid)
 
@@ -302,3 +305,26 @@ class ArtifactVersionEndpoint(api_base.Resource):
                 return artifact_from_db.external_view()
 
         return api_base.error(404, 'artifact index not found')
+
+
+class ArtifactShareEndpoint(api_base.Resource):
+    @jwt_required()
+    @arg_is_artifact_uuid
+    @requires_artifact_ownership
+    def post(self, artifact_uuid=None, artifact_from_db=None):
+        if artifact_from_db.namespace != 'system':
+            return api_base.error(
+                403, 'only artifacts in the system namespace can be shared')
+        artifact_from_db.shared = True
+        return artifact_from_db.external_view()
+
+
+class ArtifactUnshareEndpoint(api_base.Resource):
+    @jwt_required()
+    @arg_is_artifact_uuid
+    @requires_artifact_ownership
+    def post(self, artifact_uuid=None, artifact_from_db=None):
+        if not artifact_from_db.shared:
+            return api_base.error(403, 'artifact not shared')
+        artifact_from_db.shared = False
+        return artifact_from_db.external_view()

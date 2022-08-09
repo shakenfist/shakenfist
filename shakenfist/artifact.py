@@ -29,8 +29,7 @@ UPLOAD_URL = 'sf://upload/'
 
 class Artifact(dbo):
     object_type = 'artifact'
-    SHARED_WITH_ALL = 'sharedwithall'
-    current_version = 3
+    current_version = 4
     upgrade_supported = True
 
     state_targets = {
@@ -74,8 +73,17 @@ class Artifact(dbo):
         starting_version = static_values.get('version')
 
         if static_values.get('version') == 2:
-            static_values['namespace'] = cls.SHARED_WITH_ALL
+            static_values['namespace'] = 'sharedwithall'
             static_values['version'] = 3
+            changed = True
+
+        if static_values.get('version') == 3:
+            if static_values['namespace'] == 'sharedwithall':
+                static_values['namespace'] = 'system'
+                etcd.put('attribute/artifact',
+                         static_values['uuid'], 'shared', {'shared': True})
+
+            static_values['version'] = 4
             changed = True
 
         if changed:
@@ -122,10 +130,11 @@ class Artifact(dbo):
     @staticmethod
     def from_url(artifact_type, url, max_versions=0, namespace=None, create_if_new=False):
         with etcd.get_lock('artifact_from_url', None, url):
-            artifacts = list(Artifacts([partial(url_filter, url),
-                                        partial(type_filter, artifact_type),
-                                        not_dead_states_filter,
-                                        partial(namespace_filter, namespace)]))
+            artifacts = list(Artifacts([
+                partial(url_filter, url),
+                partial(type_filter, artifact_type),
+                not_dead_states_filter,
+                partial(namespace_or_shared_filter, namespace)]))
             if len(artifacts) == 0:
                 if create_if_new:
                     return Artifact.new(artifact_type, url, max_versions=max_versions,
@@ -170,6 +179,17 @@ class Artifact(dbo):
             return {'index': 0}
         return indices[sorted(indices)[-1]]
 
+    @property
+    def shared(self):
+        db_data = self._db_get_attribute('shared')
+        if not db_data:
+            return False
+        return db_data.get('shared', False)
+
+    @shared.setter
+    def shared(self, value):
+        self._db_set_attribute('shared', {'shared': value})
+
     def external_view_without_index(self):
         return {
             'uuid': self.uuid,
@@ -178,7 +198,8 @@ class Artifact(dbo):
             'source_url': self.source_url,
             'version': self.version,
             'max_versions': self.max_versions,
-            'namespace': self.namespace
+            'namespace': self.namespace,
+            'shared': self.shared
         }
 
     def external_view(self):
@@ -323,9 +344,13 @@ not_dead_states_filter = partial(
     ])
 
 
-def namespace_filter(namespace, o):
+def namespace_exact_filter(namespace, o):
+    return o.namespace == namespace
+
+
+def namespace_or_shared_filter(namespace, o):
     if namespace == 'system':
         return True
-    if o.namespace == Artifact.SHARED_WITH_ALL:
+    if o.shared:
         return True
     return o.namespace == namespace
