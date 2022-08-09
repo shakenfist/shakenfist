@@ -152,6 +152,10 @@ api.add_resource(api_artifact.ArtifactVersionsEndpoint,
                  '/artifacts/<artifact_uuid>/versions')
 api.add_resource(api_artifact.ArtifactVersionEndpoint,
                  '/artifacts/<artifact_uuid>/versions/<version_id>')
+api.add_resource(api_artifact.ArtifactShareEndpoint,
+                 '/artifacts/<artifact_uuid>/share')
+api.add_resource(api_artifact.ArtifactUnshareEndpoint,
+                 '/artifacts/<artifact_uuid>/unshare')
 
 api.add_resource(api_label.LabelEndpoint, '/label/<label_name>')
 

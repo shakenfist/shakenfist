@@ -305,3 +305,26 @@ class ArtifactVersionEndpoint(api_base.Resource):
                 return artifact_from_db.external_view()
 
         return api_base.error(404, 'artifact index not found')
+
+
+class ArtifactShareEndpoint(api_base.Resource):
+    @jwt_required()
+    @arg_is_artifact_uuid
+    @requires_artifact_ownership
+    def post(self, artifact_uuid=None, artifact_from_db=None):
+        if artifact_from_db.namespace != 'system':
+            return api_base.error(
+                403, 'only artifacts in the system namespace can be shared')
+        artifact_from_db.shared = True
+        return artifact_from_db.external_view()
+
+
+class ArtifactUnshareEndpoint(api_base.Resource):
+    @jwt_required()
+    @arg_is_artifact_uuid
+    @requires_artifact_ownership
+    def post(self, artifact_uuid=None, artifact_from_db=None):
+        if not artifact_from_db.shared:
+            return api_base.error(403, 'artifact not shared')
+        artifact_from_db.shared = False
+        return artifact_from_db.external_view()
