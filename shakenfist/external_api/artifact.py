@@ -70,8 +70,7 @@ def requires_artifact_access(func):
             return api_base.error(404, 'artifact not found')
 
         a = kwargs['artifact_from_db']
-        if (a.namespace != Artifact.SHARED_WITH_ALL and
-                get_jwt_identity()[0] not in [a.namespace, 'system']):
+        if (a.shared and get_jwt_identity()[0] not in [a.namespace, 'system']):
             LOG.with_object(a).info(
                 'Artifact not found, ownership test in decorator')
             return api_base.error(404, 'artifact not found')
@@ -130,14 +129,15 @@ class ArtifactsEndpoint(api_base.Resource):
         if get_jwt_identity()[0] not in [namespace, 'system']:
             return api_base.error(404, 'namespace not found')
 
+        a = Artifact.from_url(Artifact.TYPE_IMAGE, url, namespace=namespace,
+                              create_if_new=True)
+
         # Only admin can create shared artifacts
         if shared:
             if get_jwt_identity()[0] != 'system':
                 return api_base.error(
                     403, 'only the system namespace can create shared artifacts')
-            namespace = Artifact.SHARED_WITH_ALL
-        a = Artifact.from_url(Artifact.TYPE_IMAGE, url, namespace=namespace,
-                              create_if_new=True)
+            a.shared = True
 
         etcd.enqueue(config.NODE_NAME, {
             'tasks': [FetchImageTask(url, namespace=namespace)],
@@ -211,15 +211,15 @@ class ArtifactUploadEndpoint(api_base.Resource):
         if get_jwt_identity()[0] not in [namespace, 'system']:
             return api_base.error(404, 'namespace not found')
 
+        a = Artifact.from_url(Artifact.TYPE_IMAGE, source_url,
+                              namespace=namespace, create_if_new=True)
+
         # Only admin can create shared artifacts
         if shared:
             if get_jwt_identity()[0] != 'system':
                 return api_base.error(
                     403, 'only the system namespace can create shared artifacts')
-            namespace = Artifact.SHARED_WITH_ALL
-
-        a = Artifact.from_url(Artifact.TYPE_IMAGE, source_url,
-                              namespace=namespace, create_if_new=True)
+            a.shared = True
 
         with a.get_lock(ttl=(12 * constants.LOCK_REFRESH_SECONDS),
                         timeout=config.MAX_IMAGE_TRANSFER_SECONDS):
