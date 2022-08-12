@@ -156,6 +156,8 @@ api.add_resource(api_artifact.ArtifactShareEndpoint,
                  '/artifacts/<artifact_uuid>/share')
 api.add_resource(api_artifact.ArtifactUnshareEndpoint,
                  '/artifacts/<artifact_uuid>/unshare')
+api.add_resource(api_instance.ArtifactEventsEndpoint,
+                 '/artifacts/<artifact_uuid>/events')
 
 api.add_resource(api_label.LabelEndpoint, '/label/<label_name>')
 

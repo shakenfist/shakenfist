@@ -328,3 +328,13 @@ class ArtifactUnshareEndpoint(api_base.Resource):
             return api_base.error(403, 'artifact not shared')
         artifact_from_db.shared = False
         return artifact_from_db.external_view()
+
+
+class ArtifactEventsEndpoint(api_base.Resource):
+    @jwt_required()
+    @arg_is_artifact_uuid
+    @requires_artifact_ownership
+    @api_base.redirect_to_eventlog_node
+    def get(self, artifact_uuid=None, artifact_from_db=None):
+        with eventlog.EventLog('artifact', artifact_from_db.uuid) as eventdb:
+            return list(eventdb.read_events())
