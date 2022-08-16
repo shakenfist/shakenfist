@@ -534,6 +534,7 @@ class Network(dbo):
 
     def hard_delete(self):
         etcd.delete('vxlan', None, self.vxid)
+        etcd.delete('ipmanager', None, self.uuid)
         super(Network, self).hard_delete()
 
     def is_dnsmasq_running(self):
