@@ -89,6 +89,17 @@ class Monitor(daemon.Daemon):
                         'vxid record': k
                     }).warning('Cleaning up leaked vxlan')
 
+        # Cleanup ipmanagers whose network is absent
+        for k, objdata in etcd.get_all('ipmanager', None):
+            network_uuid = objdata.get('uuid')
+            if network_uuid:
+                n = network.Network.from_db(network_uuid)
+                if not n:
+                    etcd.WrappedEtcdClient().delete(k)
+                    LOG.with_fields({
+                        'ipmanager': network_uuid
+                    }).warning('Cleaning up leaked ipmanager')
+
         # Cleanup old uploads which were never completed
         for upload in Uploads([]):
             if time.time() - upload.state.update_time > 7 * 24 * 3600:
