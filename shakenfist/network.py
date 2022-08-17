@@ -19,7 +19,7 @@ from shakenfist.config import config
 from shakenfist import db
 from shakenfist import dhcp
 from shakenfist import etcd
-from shakenfist.exceptions import DeadNetwork, CongestedNetwork
+from shakenfist.exceptions import DeadNetwork, CongestedNetwork, IPManagerNotFound
 from shakenfist import instance
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
@@ -66,13 +66,16 @@ class Network(dbo):
         self.mesh_nic = static_values.get(
             'mesh_nic', config.NODE_MESH_NIC)
 
-        ipm = IPManager.from_db(self.uuid)
-        self.__ipblock = ipm.network_address
-        self.__router = ipm.get_address_at_index(1)
-        self.__dhcp_start = ipm.get_address_at_index(2)
-        self.__netmask = ipm.netmask
-        self.__broadcast = ipm.broadcast_address
-        self.__network_address = ipm.network_address
+        try:
+            ipm = IPManager.from_db(self.uuid)
+            self.__ipblock = ipm.network_address
+            self.__router = ipm.get_address_at_index(1)
+            self.__dhcp_start = ipm.get_address_at_index(2)
+            self.__netmask = ipm.netmask
+            self.__broadcast = ipm.broadcast_address
+            self.__network_address = ipm.network_address
+        except IPManagerNotFound:
+            self.log.warning('IPManager missing for this network')
 
     @staticmethod
     def allocate_vxid(net_id):
