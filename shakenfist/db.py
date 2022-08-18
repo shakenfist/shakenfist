@@ -4,6 +4,7 @@ import uuid
 
 from shakenfist import constants
 from shakenfist import etcd
+from shakenfist import exceptions
 from shakenfist import logutil
 
 
@@ -43,7 +44,8 @@ def get_existing_locks():
 def get_ipmanager(network_uuid):
     ipm = etcd.get('ipmanager', None, network_uuid)
     if not ipm:
-        raise Exception('IP Manager not found for network %s' % network_uuid)
+        raise exceptions.IPManagerNotFound(
+            'IP Manager not found for network %s' % network_uuid)
     return ipm
 
 
