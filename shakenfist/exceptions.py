@@ -180,6 +180,10 @@ class NetworkMissing(NetworkException):
     pass
 
 
+class IPManagerNotFound(NetworkException):
+    pass
+
+
 # NetworkInterface
 class NetworkInterfaceException(Exception):
     pass

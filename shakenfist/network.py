@@ -19,10 +19,11 @@ from shakenfist.config import config
 from shakenfist import db
 from shakenfist import dhcp
 from shakenfist import etcd
-from shakenfist.exceptions import DeadNetwork, CongestedNetwork
+from shakenfist.exceptions import DeadNetwork, CongestedNetwork, IPManagerNotFound
 from shakenfist import instance
 from shakenfist.ipmanager import IPManager
 from shakenfist import logutil
+from shakenfist.metrics import get_minimum_object_version as gmov
 from shakenfist import networkinterface
 from shakenfist.node import Node, Nodes, active_states_filter as active_nodes
 from shakenfist.tasks import (
@@ -40,7 +41,9 @@ LOG, _ = logutil.setup(__name__)
 
 class Network(dbo):
     object_type = 'network'
-    current_version = 2
+    current_version = 3
+    upgrade_supported = True
+
     state_targets = {
         None: (dbo.STATE_INITIAL, ),
         dbo.STATE_INITIAL: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR),
@@ -51,6 +54,16 @@ class Network(dbo):
     }
 
     def __init__(self, static_values):
+        if static_values['version'] != self.current_version:
+            upgraded, static_values = self.upgrade(static_values)
+
+            if upgraded and gmov('network') == self.current_version:
+                etcd.put(self.object_type, None,
+                         static_values.get('uuid'), static_values)
+                etcd.delete('ipmanager', None, static_values.get('uuid'))
+                LOG.with_field(
+                    self.object_type, static_values['uuid']).info('Online upgrade committed')
+
         super(Network, self).__init__(static_values.get('uuid'),
                                       static_values.get('version'))
 
@@ -73,6 +86,29 @@ class Network(dbo):
         self.__netmask = ipm.netmask
         self.__broadcast = ipm.broadcast_address
         self.__network_address = ipm.network_address
+
+    @classmethod
+    def upgrade(cls, static_values):
+        changed = False
+        starting_version = static_values.get('version')
+
+        if static_values.get('version') == 2:
+            ipm = etcd.get('ipmanager', None, static_values['uuid'])
+            if not ipm:
+                raise IPManagerNotFound(
+                    'IP Manager not found for network %s' % static_values['uuid'])
+            etcd.put(
+                'attribute/artifact', static_values['uuid'], 'ipmanager', ipm)
+            static_values['version'] = 3
+            changed = True
+
+        if changed:
+            LOG.with_fields({
+                cls.object_type: static_values['uuid'],
+                'start_version': starting_version,
+                'final_version': static_values.get('version')
+            }).info('Object online upgraded')
+        return changed, static_values
 
     @staticmethod
     def allocate_vxid(net_id):
@@ -232,6 +268,14 @@ class Network(dbo):
 
     def remove_networkinterface(self, ni):
         self._remove_item_in_attribute_list('networkinterfaces', ni)
+
+    @property
+    def ipmanager(self):
+        return self._db_get_attribute('ipmanager')
+
+    @ipmanager.setter
+    def ipmanager(self, ipmanager):
+        self._db_set_attribute('ports', ports)
 
     # TODO(andy) Create new class to avoid external direct access to DB
     @staticmethod
