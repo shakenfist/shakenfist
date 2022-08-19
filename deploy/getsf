@@ -668,6 +668,9 @@ echo
 APT_GET="DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpkg::Options::=\"--force-confold\" -y"
 echo
 
+status "Updating apt database."
+eval \${APT_GET} update
+
 status "Installing cpu-checker."
 eval \${APT_GET} install cpu-checker
 echo
@@ -685,16 +688,21 @@ chmod ugo+rx /tmp/sf-per-node-primary
 
 # Now run that script all over the place
 if [ "${GETSF_NODES}" == "localhost" ]; then
-    if [ ! -e "/tmp/"$(basename ${GETSF_SERVER_PACKAGE}) ]; then
-        cp ${GETSF_SERVER_PACKAGE} "/tmp/"$(basename ${GETSF_SERVER_PACKAGE})
-    fi
-    if [ ! -e "/tmp/"$(basename ${GETSF_CLIENT_PACKAGE}) ]; then
-        cp ${GETSF_CLIENT_PACKAGE} "/tmp/"$(basename ${GETSF_CLIENT_PACKAGE})
-    fi
-    if [ ! -e "/tmp/"$(basename ${GETSF_AGENT_PACKAGE}) ]; then
-        cp ${GETSF_AGENT_PACKAGE} "/tmp/"$(basename ${GETSF_AGENT_PACKAGE})
+    status "    ...localhost"
+    if [ ${GETSF_RELEASE} == "local" ]; then
+        status "        ...copying local packages"
+        if [ ! -e "/tmp/"$(basename ${GETSF_SERVER_PACKAGE}) ]; then
+            cp ${GETSF_SERVER_PACKAGE} "/tmp/"$(basename ${GETSF_SERVER_PACKAGE})
+        fi
+        if [ ! -e "/tmp/"$(basename ${GETSF_CLIENT_PACKAGE}) ]; then
+            cp ${GETSF_CLIENT_PACKAGE} "/tmp/"$(basename ${GETSF_CLIENT_PACKAGE})
+        fi
+        if [ ! -e "/tmp/"$(basename ${GETSF_AGENT_PACKAGE}) ]; then
+            cp ${GETSF_AGENT_PACKAGE} "/tmp/"$(basename ${GETSF_AGENT_PACKAGE})
+        fi
     fi
     
+    status "        ...bootstrapping"
     /tmp/sf-per-node-primary
 else
     # TODO(mikal): Could I replace this with an ansible play so it runs in parallel?
@@ -704,11 +712,13 @@ else
         calc_var_name="GETSF_NODE_MESH_ADDRESS_${safe_node}"
 
         if [ ${GETSF_RELEASE} == "local" ]; then
+            status "        ...copying local packages"
             scp -o StrictHostKeyChecking=no -i ${GETSF_SSH_KEY_FILENAME} ${GETSF_SERVER_PACKAGE} ${GETSF_SSH_USER}@${!calc_var_name}:/tmp/
             scp -o StrictHostKeyChecking=no -i ${GETSF_SSH_KEY_FILENAME} ${GETSF_CLIENT_PACKAGE} ${GETSF_SSH_USER}@${!calc_var_name}:/tmp/
             scp -o StrictHostKeyChecking=no -i ${GETSF_SSH_KEY_FILENAME} ${GETSF_AGENT_PACKAGE} ${GETSF_SSH_USER}@${!calc_var_name}:/tmp/
         fi
 
+        status "        ...bootstrapping"
         scp -o StrictHostKeyChecking=no -i ${GETSF_SSH_KEY_FILENAME} /tmp/sf-per-node-primary ${GETSF_SSH_USER}@${!calc_var_name}:/tmp/sf-per-node
         ssh -o StrictHostKeyChecking=no -i ${GETSF_SSH_KEY_FILENAME} ${GETSF_SSH_USER}@${!calc_var_name} "sudo /tmp/sf-per-node"
         echo
