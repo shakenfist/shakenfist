@@ -150,7 +150,8 @@ class DatabaseBackedObject(object):
     def _db_set_attribute(self, attribute, value):
         # Some attributes are simply too frequently changed to have much meaning
         # as an event.
-        if (self.object_type, attribute) not in [('node', 'blobs'), ('node', 'observed')]:
+        if (self.object_type, attribute) not in [
+                ('node', 'blobs'), ('node', 'observed'), ('subnet', 'allocations')]:
             # Coerce the value into a dictionary.
             if type(value) is State:
                 event_values = value.obj_dict()

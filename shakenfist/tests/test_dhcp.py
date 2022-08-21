@@ -7,10 +7,11 @@ import testtools
 from pydantic import AnyHttpUrl, IPvAnyAddress
 
 from shakenfist.config import BaseSettings
-from shakenfist.ipmanager import IPManager
 from shakenfist import dhcp
 from shakenfist.instance import Instance
+from shakenfist.subnet import Subnet
 from shakenfist.networkinterface import NetworkInterface
+from shakenfist.tests.mock_etcd import MockEtcd
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -18,8 +19,8 @@ TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 class FakeNetwork(object):
     def __init__(self):
         self.uuid = 'notauuid'
-        self.ipmanager = IPManager('uuid', '10.0.0.0/8')
-        self.router = self.ipmanager.get_address_at_index(1)
+        self.subnet = Subnet.new('subnetuuid', 'uuid', '10.0.0.0/8')
+        self.router = self.subnet.get_address_at_index(1)
         self.dhcp_start = '10.0.0.2'
         self.netmask = '255.0.0.0'
         self.broadcast = '10.255.255.255'
@@ -81,6 +82,13 @@ class DHCPTestCase(testtools.TestCase):
                                    fake_read_template)
         self.mock_template = self.template.start()
         self.addCleanup(self.template.stop)
+
+        self.add_event = mock.patch('shakenfist.eventlog.add_event')
+        self.mock_template = self.add_event.start()
+        self.addCleanup(self.add_event.stop)
+
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
 
     def test_init(self):
         d = dhcp.DHCP(FakeNetwork(), 'eth0')

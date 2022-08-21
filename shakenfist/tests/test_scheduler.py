@@ -1,12 +1,12 @@
 import mock
 import time
 
+from shakenfist.config import SFConfig
 from shakenfist.constants import GiB
 from shakenfist import exceptions
 from shakenfist import scheduler
 from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
-from shakenfist.config import SFConfig
 
 
 fake_config = SFConfig(

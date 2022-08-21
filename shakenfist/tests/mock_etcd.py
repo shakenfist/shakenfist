@@ -88,12 +88,10 @@ class MockEtcd():
 
     def create(self, path, encoded, lease=None):
         self.db[path] = encoded
-        print('MockEtcd.create() %s: %s' % (path, encoded))
         return True
 
     def get(self, path, metadata=False, sort_order=None, sort_target=None):
         d = self.db.get(path)
-        print('MockEtcd.get() retrieving data for key %s: %s' % (path, d))
         if not d:
             return None
         return [[d]]
@@ -107,7 +105,6 @@ class MockEtcd():
 
     def put(self, path, encoded, lease=None):
         self.db[path] = encoded
-        print('MockEtcd.put() %s: %s' % (path, encoded))
 
     #
     # DB operations - Utilising SF DB functionality
@@ -218,7 +215,7 @@ class MockEtcd():
         return inst
 
     def create_network(self, name,
-                       uuid=None,
+                       network_uuid=None,
                        namespace='unittest',
                        netblock='10.9.8.0/24',
                        provide_dhcp=False,
@@ -228,15 +225,15 @@ class MockEtcd():
                        set_state=Network.STATE_CREATED,
                        ):
 
-        if not uuid:
-            uuid = self.next_uuid()
+        if not network_uuid:
+            network_uuid = self.next_uuid()
 
         network = Network.new(name=name,
                               namespace=namespace,
                               netblock=netblock,
                               provide_dhcp=provide_dhcp,
                               provide_nat=provide_nat,
-                              network_uuid=uuid,
+                              network_uuid=network_uuid,
                               vxid=vxid,
                               )
 
@@ -259,10 +256,10 @@ class MockEtcd():
                          model='virtio',
                          mac_address=None):
         return {
-                'network_uuid': network_uuid,
-                'address': address,
-                'model': model,
-                'macaddr': mac_address,
+            'network_uuid': network_uuid,
+            'address': address,
+            'model': model,
+            'macaddr': mac_address,
         }
 
     def create_network_interface(self,

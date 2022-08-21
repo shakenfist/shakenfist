@@ -6,6 +6,7 @@ from shakenfist import exceptions
 from shakenfist import network
 from shakenfist.config import SFConfig
 from shakenfist.tests import base
+from shakenfist.tests.mock_etcd import MockEtcd
 
 
 class NetworkTestCase(base.ShakenFistTestCase):
@@ -13,14 +14,9 @@ class NetworkTestCase(base.ShakenFistTestCase):
         super(NetworkTestCase, self).setUp()
 
         self.ipmanager_get = mock.patch(
-            'shakenfist.ipmanager.IPManager.from_db')
+            'shakenfist.subnet.Subnet.from_db')
         self.mock_ipmanager_get = self.ipmanager_get.start()
         self.addCleanup(self.ipmanager_get.stop)
-
-        self.ipmanager_persist = mock.patch(
-            'shakenfist.db.persist_ipmanager')
-        self.mock_ipmanager_persist = self.ipmanager_persist.start()
-        self.addCleanup(self.ipmanager_persist.stop)
 
         self.etcd_client = mock.patch('etcd3.client')
         self.mock_etcd_client = self.etcd_client.start()
@@ -29,6 +25,9 @@ class NetworkTestCase(base.ShakenFistTestCase):
         self.etcd_lock = mock.patch('shakenfist.etcd.ActualLock')
         self.mock_etcd_lock = self.etcd_lock.start()
         self.addCleanup(self.etcd_lock.stop)
+
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
 
 
 class NetworkGeneralTestCase(NetworkTestCase):
@@ -43,7 +42,8 @@ class NetworkGeneralTestCase(NetworkTestCase):
             'egress_nic': 'eth0',
             'mesh_nic': 'eth0',
             'mesh_nic': 'eth0',
-            'netblock': '192.168.1.0/24'
+            'netblock': '192.168.1.0/24',
+            'version': 3
         })
 
     def test_str(self):
@@ -56,7 +56,8 @@ class NetworkGeneralTestCase(NetworkTestCase):
             'provide_nat': True,
             'egress_nic': 'eth0',
             'mesh_nic': 'eth0',
-            'netblock': '192.168.1.0/24'
+            'netblock': '192.168.1.0/24',
+            'version': 3
         })
         self.assertEqual('network(notauuid)', str(n))
 
@@ -86,7 +87,8 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
             'provide_nat': True,
             'egress_nic': 'eth0',
             'mesh_nic': 'eth0',
-            'netblock': '192.168.1.0/24'
+            'netblock': '192.168.1.0/24',
+            'version': 3
         })
         self.assertTrue(n.is_okay())
 
@@ -102,7 +104,8 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
             'provide_nat': True,
             'egress_nic': 'eth0',
             'mesh_nic': 'eth0',
-            'netblock': '192.168.1.0/24'
+            'netblock': '192.168.1.0/24',
+            'version': 3
         })
         self.assertFalse(n.is_okay())
 
@@ -122,7 +125,8 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
             'provide_nat': True,
             'egress_nic': 'eth0',
             'mesh_nic': 'eth0',
-            'netblock': '192.168.1.0/24'
+            'netblock': '192.168.1.0/24',
+            'version': 3
         })
         self.assertFalse(n.is_okay())
 
@@ -154,7 +158,8 @@ class NetworkNetNodeTestCase(NetworkTestCase):
             'provide_nat': True,
             'egress_nic': 'eth0',
             'mesh_nic': 'eth0',
-            'netblock': '192.168.1.0/24'
+            'netblock': '192.168.1.0/24',
+            'version': 3
         })
         self.assertTrue(n.is_okay())
 
@@ -170,7 +175,8 @@ class NetworkNetNodeTestCase(NetworkTestCase):
             'provide_nat': True,
             'egress_nic': 'eth0',
             'mesh_nic': 'eth0',
-            'netblock': '192.168.1.0/24'
+            'netblock': '192.168.1.0/24',
+            'version': 3
         })
         self.assertFalse(n.is_okay())
 
@@ -186,7 +192,8 @@ class NetworkNetNodeTestCase(NetworkTestCase):
             'provide_nat': False,
             'egress_nic': 'eth0',
             'mesh_nic': 'eth0',
-            'netblock': '192.168.1.0/24'
+            'netblock': '192.168.1.0/24',
+            'version': 3
         })
         self.assertFalse(n.is_okay())
 
@@ -202,7 +209,8 @@ class NetworkNetNodeTestCase(NetworkTestCase):
             'provide_nat': False,
             'egress_nic': 'eth0',
             'mesh_nic': 'eth0',
-            'netblock': '192.168.1.0/24'
+            'netblock': '192.168.1.0/24',
+            'version': 3
         })
         self.assertTrue(n.is_okay())
 
@@ -234,7 +242,8 @@ class NetworkNetNodeTestCase(NetworkTestCase):
             'provide_nat': True,
             'egress_nic': 'eth0',
             'mesh_nic': 'eth0',
-            'netblock': '192.168.1.0/24'
+            'netblock': '192.168.1.0/24',
+            'version': 3
         })
         self.assertTrue(n.is_created())
 
@@ -262,7 +271,8 @@ class NetworkNetNodeTestCase(NetworkTestCase):
             'provide_nat': True,
             'egress_nic': 'eth0',
             'mesh_nic': 'eth0',
-            'netblock': '192.168.1.0/24'
+            'netblock': '192.168.1.0/24',
+            'version': 3
         })
         self.assertFalse(n.is_created())
 
@@ -278,7 +288,8 @@ class NetworkNetNodeTestCase(NetworkTestCase):
             'provide_nat': True,
             'egress_nic': 'eth0',
             'mesh_nic': 'eth0',
-            'netblock': '192.168.1.0/24'
+            'netblock': '192.168.1.0/24',
+            'version': 3
         })
         self.assertFalse(n.is_created())
 
@@ -306,7 +317,8 @@ class NetworkNetNodeTestCase(NetworkTestCase):
             'provide_nat': True,
             'egress_nic': 'eth0',
             'mesh_nic': 'eth0',
-            'netblock': '192.168.1.0/24'
+            'netblock': '192.168.1.0/24',
+            'version': 3
         })
         with testtools.ExpectedException(exceptions.InvalidStateException):
             n.state = network.Network.STATE_INITIAL

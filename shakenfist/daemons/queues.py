@@ -386,6 +386,9 @@ def instance_delete(inst):
 
         # Delete the instance's interfaces
         for ni in interfaces:
+            n = network.Network.from_db(ni.network_uuid)
+            if n:
+                n.release_address(ni.ipv4)
             ni.delete()
 
         # Create list of networks used by all other instances
