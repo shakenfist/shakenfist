@@ -3,6 +3,7 @@ import os
 import pathlib
 import re
 import requests
+from shakenfist_utilities import logs
 import shutil
 import time
 import uuid
@@ -14,13 +15,12 @@ from shakenfist.config import config
 from shakenfist.constants import (QCOW2_CLUSTER_SIZE, LOCK_REFRESH_SECONDS,
                                   TRANSCODE_DESCRIPTION)
 from shakenfist import exceptions
-from shakenfist import logutil
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
 from shakenfist.util import process as util_process
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 VALID_SF_IMAGES = ['centos', 'debian', 'ubuntu']
@@ -60,7 +60,7 @@ def _resolve_cirros(name):
             m = dir_re.match(line)
             if m:
                 versions.append(m.group(1))
-        LOG.with_field('versions', versions).info('Found cirros versions')
+        LOG.with_fields({'versions': versions}).info('Found cirros versions')
         vernum = versions[-1]
     else:
         try:
@@ -104,7 +104,7 @@ class ImageFetchHelper(object):
     def __init__(self, inst, artifact):
         self.instance = inst
         self.artifact = artifact
-        self.log = LOG.with_field('artifact', self.artifact.uuid)
+        self.log = LOG.with_fields({'artifact': self.artifact.uuid})
 
     def get_image(self):
         fetched_blobs = []
@@ -160,11 +160,11 @@ class ImageFetchHelper(object):
                     resp.headers.get('Last-Modified'))
 
                 if not most_recent_blob.modified:
-                    self.artifact.add_event2(
+                    self.artifact.add_event(
                         'image requires fetch, no Last-Modified recorded')
                     dirty = True
                 elif most_recent_blob.modified != normalized_new_timestamp:
-                    self.artifact.add_event2(
+                    self.artifact.add_event(
                         'image requires fetch, Last-Modified: %s -> %s'
                         % (most_recent_blob.modified, normalized_new_timestamp))
                     dirty = True
@@ -174,11 +174,11 @@ class ImageFetchHelper(object):
                     response_size = int(response_size)
 
                 if not most_recent_blob.size:
-                    self.artifact.add_event2(
+                    self.artifact.add_event(
                         'image requires fetch, no Content-Length recorded')
                     dirty = True
                 elif most_recent_blob.size != response_size:
-                    self.artifact.add_event2(
+                    self.artifact.add_event(
                         'image requires fetch, Content-Length: %s -> %s'
                         % (most_recent_blob.size, response_size))
                     dirty = True
@@ -270,7 +270,7 @@ class ImageFetchHelper(object):
                 util_general.link(blob_path, cache_path)
             else:
                 with util_general.RecordedOperation('transcode image', self.instance):
-                    self.log.with_object(b).info(
+                    self.log.with_fields({'blob': b}).info(
                         'Transcoding %s -> %s' % (blob_path, cache_path))
                     util_image.create_qcow2([lock], blob_path, cache_path)
 
@@ -289,8 +289,9 @@ class ImageFetchHelper(object):
             transcode_blob.state = Blob.STATE_CREATED
             transcode_blob.observe()
             transcode_blob.request_replication()
-            self.log.with_object(b).with_field(
-                'transcode_blob_uuid', transcode_blob_uuid).info(
+            self.log.with_fields({
+                'blob': b,
+                'transcode_blob_uuid': transcode_blob_uuid}).info(
                 'Recorded transcode')
 
             b.add_transcode(TRANSCODE_DESCRIPTION, transcode_blob_uuid)
@@ -321,7 +322,8 @@ class ImageFetchHelper(object):
         with util_general.RecordedOperation('fetch image', self.instance):
             resp = self._open_connection(url)
             blob_uuid = str(uuid.uuid4())
-            self.log.with_object(self.artifact).with_fields({
+            self.log.with_fields({
+                'artifact': self.artifact,
                 'blob': blob_uuid,
                 'url': url}).info('Commencing HTTP fetch to blob')
             b = blob.http_fetch(url, resp, blob_uuid, [lock], self.log,
@@ -331,8 +333,8 @@ class ImageFetchHelper(object):
             if not verify_checksum(
                     os.path.join(config.STORAGE_PATH, 'blobs', b.uuid),
                     checksum, checksum_type):
-                self.instance.add_event2('fetched image had bad checksum')
-                self.artifact.add_event2('fetched image had bad checksum')
+                self.instance.add_event('fetched image had bad checksum')
+                self.artifact.add_event('fetched image had bad checksum')
                 raise exceptions.BadCheckSum('url=%s' % url)
 
             # Only persist values after the file has been verified.
@@ -357,7 +359,7 @@ class ImageFetchHelper(object):
 
 
 def verify_checksum(image_name, checksum, checksum_type):
-    log = LOG.with_field('image', image_name)
+    log = LOG.with_fields({'image': image_name})
 
     if not checksum:
         log.info('No checksum comparison available')
@@ -373,10 +375,12 @@ def verify_checksum(image_name, checksum, checksum_type):
             for byte_block in iter(lambda: f.read(4096), b''):
                 md5_hash.update(byte_block)
         calc = md5_hash.hexdigest()
-        log.with_field('calc', calc).debug('Calc from image download')
 
         correct = calc == checksum
-        log.with_field('correct', correct).info('Image checksum verification')
+        log.with_fields({
+            'calculated': calc,
+            'correct': correct,
+            'equal': correct}).info('Image checksum verification')
         return correct
 
     else:

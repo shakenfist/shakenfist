@@ -1,13 +1,13 @@
 import ipaddress
 import random
+from shakenfist_utilities import logs
 import time
 
 from shakenfist import db
 from shakenfist import exceptions
-from shakenfist import logutil
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 # NOTE(mikal): IPManager should _always_ return addresses as strings,
@@ -18,7 +18,7 @@ class IPManager(object):
         self.uuid = uuid
         self.ipblock = ipblock
         self.ipblock_obj = ipaddress.ip_network(ipblock, strict=False)
-        self.log = LOG.with_field('ipmanager', self.uuid)
+        self.log = LOG.with_fields({'ipmanager': self.uuid})
 
         self.netmask = self.ipblock_obj.netmask
         self.broadcast_address = str(self.ipblock_obj.broadcast_address)

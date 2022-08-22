@@ -1,14 +1,14 @@
 from math import inf
+from shakenfist_utilities import logs
 import time
 
 from shakenfist import etcd
 from shakenfist import exceptions
-from shakenfist import logutil
 from shakenfist.node import (
     Nodes, active_states_filter as node_active_states_filter)
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 def get_node_metrics(filters):
@@ -20,12 +20,12 @@ def get_node_metrics(filters):
             if new_metrics:
                 new_metrics = new_metrics.get('metrics', {})
             else:
-                n.add_event2('empty metrics from database for node')
+                n.add_event('empty metrics from database for node')
                 new_metrics = {}
             metrics[n.uuid] = new_metrics
 
         except exceptions.ReadException:
-            n.add_event2('refreshing metrics for node failed')
+            n.add_event('refreshing metrics for node failed')
 
     return metrics
 

@@ -6,6 +6,7 @@ import pathlib
 from pbr.version import VersionInfo
 import requests
 import secrets
+from shakenfist_utilities import logs
 import stat
 import string
 import sys
@@ -15,14 +16,13 @@ import uuid
 
 
 # To avoid circular imports, util modules should only import a limited
-# set of shakenfist modules, mainly exceptions, logutils, and specific
+# set of shakenfist modules, mainly exceptions, and specific
 # other util modules.
 from shakenfist import db
 from shakenfist import eventlog
-from shakenfist import logutil
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 class RecordedOperation():
@@ -39,8 +39,8 @@ class RecordedOperation():
         object_type, object_uuid = self.unique_label()
         if object_uuid:
             if object_type:
-                eventlog.add_event2(object_type, object_uuid,
-                                    '%s complete' % self.operation, duration)
+                eventlog.add_event(object_type, object_uuid,
+                                   '%s complete' % self.operation, duration)
             else:
                 LOG.with_fields({
                     'label': self.object,

@@ -49,11 +49,6 @@ class SFConfig(BaseSettings):
         description='How long we wait for an async operation to complete '
                     'before returning to the user'
     )
-    INCLUDE_TRACEBACKS: bool = Field(
-        False,
-        description='If tracebacks should be included where relevant in API '
-                    'responses. Do not enable for untrusted clients!'
-    )
     PROMETHEUS_METRICS_PORT: int = Field(
         13001,
         description='Where to expose internal metrics. Do not allow '
@@ -261,9 +256,6 @@ class SFConfig(BaseSettings):
     LOGLEVEL_RESOURCES: str = 'info'
     LOGLEVEL_SIDECHANNEL: str = 'info'
     LOGLEVEL_QUEUES: str = 'info'
-    LOG_METHOD_TRACE: bool = Field(
-        False, description='Add method name and module line number to log messages'
-    )
 
     # etcd
     ETCD_HOST: str = Field(

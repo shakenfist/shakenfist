@@ -2,17 +2,17 @@ import json
 import os
 import random
 import re
+from shakenfist_utilities import logs
 
 # To avoid circular imports, util modules should only import a limited
-# set of shakenfist modules, mainly exceptions, logutils, and specific
+# set of shakenfist modules, mainly exceptions, and specific
 # other util modules.
 from shakenfist.config import config
 from shakenfist import exceptions
-from shakenfist import logutil
 from shakenfist.util import process
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 def _clean_ip_json(data):

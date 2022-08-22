@@ -1,22 +1,20 @@
 from collections import defaultdict
-import json
-import os
-import psutil
-import re
-import threading
-import time
-
 from etcd3gw.client import Etcd3Client
 from etcd3gw.exceptions import InternalServerError
 from etcd3gw.lock import Lock
 from etcd3gw.utils import _encode, _increment_last_byte
+import json
+import os
+import psutil
+import re
+from shakenfist_utilities import (logs, random as util_random)
+import threading
+import time
 
 from shakenfist import baseobject
 from shakenfist.config import config
 from shakenfist import exceptions
-from shakenfist import logutil
 from shakenfist.tasks import QueueTask, FetchBlobTask
-from shakenfist.util import random as util_random
 
 
 ####################################################################
@@ -25,7 +23,7 @@ from shakenfist.util import random as util_random
 ####################################################################
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 LOCK_PREFIX = '/sflocks'
 
 
@@ -143,7 +141,7 @@ class ThreadLocalReadOnlyCache():
             self._cache_prefix(prefix)
         for key in self.cache.copy().keys():
             if key.startswith(prefix):
-                yield(key, self.cache[key])
+                yield (key, self.cache[key])
 
 
 def retry_etcd_forever(func):
@@ -183,7 +181,7 @@ class ActualLock(Lock):
         self.objecttype = objecttype
         self.objectname = name
         self.timeout = min(timeout, 1000000000)
-        self.log_ctx = log_ctx.with_field('lock', self.path)
+        self.log_ctx = log_ctx.with_fields({'lock': self.path})
         self.operation = op
 
         # We override the UUID of the lock with something more helpful to debugging
@@ -221,8 +219,8 @@ class ActualLock(Lock):
             if res:
                 duration = time.time() - start_time
                 if duration > threshold:
-                    self.log_ctx.with_field('duration', duration
-                                            ).info('Acquiring a lock was slow')
+                    self.log_ctx.with_fields({
+                        'duration': duration}).info('Acquiring a lock was slow')
                 return self
 
             duration = time.time() - start_time
@@ -280,13 +278,13 @@ def refresh_lock(lock, log_ctx=LOG):
             'You cannot hold locks while using a read only cache')
 
     if not lock.is_acquired():
-        log_ctx.with_field('lock', lock.name).info(
+        log_ctx.with_fields({'lock': lock.name}).info(
             'Attempt to refresh an expired lock')
         raise exceptions.LockException(
             'The lock on %s has expired.' % lock.path)
 
     lock.refresh()
-    log_ctx.with_field('lock', lock.name).debug('Refreshed lock')
+    log_ctx.with_fields({'lock': lock.name}).debug('Refreshed lock')
 
 
 @retry_etcd_forever

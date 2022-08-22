@@ -13,6 +13,7 @@ import flask
 from flask_jwt_extended import JWTManager
 from flask_request_id import RequestID
 import flask_restful
+from shakenfist_utilities import api as sf_api, logs
 
 from shakenfist.config import config
 from shakenfist.daemons import daemon
@@ -20,7 +21,6 @@ from shakenfist import etcd
 from shakenfist.external_api import (
     admin as api_admin,
     auth as api_auth,
-    base as api_base,
     blob as api_blob,
     artifact as api_artifact,
     interface as api_interface,
@@ -30,10 +30,9 @@ from shakenfist.external_api import (
     node as api_node,
     snapshot as api_snapshot,
     upload as api_upload)
-from shakenfist import logutil
 
 
-LOG, HANDLER = logutil.setup(__name__)
+LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 
@@ -75,7 +74,7 @@ def log_response_info(response):
     return response
 
 
-class Root(api_base.Resource):
+class Root(sf_api.Resource):
     def get(self):
         resp = flask.Response(
             'Shaken Fist REST API service',

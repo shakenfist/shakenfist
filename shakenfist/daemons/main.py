@@ -4,6 +4,7 @@ import faulthandler
 import os
 import psutil
 import setproctitle
+from shakenfist_utilities import logs
 import signal
 import subprocess
 import time
@@ -14,7 +15,6 @@ from shakenfist.daemons import shim
 from shakenfist import etcd
 from shakenfist import instance
 from shakenfist.ipmanager import IPManager
-from shakenfist import logutil
 from shakenfist import network
 from shakenfist.networkinterface import interfaces_for_instance
 from shakenfist.node import Node
@@ -23,7 +23,7 @@ from shakenfist.util import process as util_process
 from shakenfist.util import network as util_network
 
 
-LOG, HANDLER = logutil.setup('main')
+LOG, HANDLER = logs.setup('main')
 
 
 def restore_instances():
@@ -73,7 +73,7 @@ def restore_instances():
         try:
             n = network.Network.from_db(network_uuid)
             if not n.is_dead():
-                LOG.with_object(n).info('Restoring network')
+                LOG.with_fields({'network': n}).info('Restoring network')
                 n.create_on_hypervisor()
                 n.ensure_mesh()
         except Exception as e:
@@ -88,7 +88,7 @@ def restore_instances():
                 if inst.power_state not in started:
                     continue
 
-                LOG.with_object(inst).info('Restoring instance')
+                LOG.with_fields({'instance': inst}).info('Restoring instance')
                 inst.create_on_hypervisor()
         except Exception as e:
             util_general.ignore_exception(
@@ -139,7 +139,7 @@ def main():
     def _start_daemon(d):
         DAEMON_PROCS[d] = subprocess.Popen(
             ['/srv/shakenfist/venv/bin/sf-daemon-shim', d])
-        LOG.with_field('pid', DAEMON_PROCS[d].pid).info('Started %s' % d)
+        LOG.with_fields({'pid': DAEMON_PROCS[d].pid}).info('Started %s' % d)
 
     # Resource usage publisher, we need this early because scheduling decisions
     # might happen quite early on.
@@ -228,7 +228,7 @@ def main():
                     dead.append(proc)
 
             for d in dead:
-                LOG.with_field('pid', DAEMON_PROCS[d].pid).warning(
+                LOG.with_fields({'pid': DAEMON_PROCS[d].pid}).warning(
                     '%s is dead, restarting' % proc)
                 del DAEMON_PROCS[d]
 

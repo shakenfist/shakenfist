@@ -3,6 +3,7 @@ from functools import partial
 import flask
 from flask_jwt_extended import jwt_required, get_jwt_identity
 import re
+from shakenfist_utilities import api as sf_api, logs
 import uuid
 
 from shakenfist.artifact import (
@@ -20,7 +21,6 @@ from shakenfist.external_api import (
     util as api_util)
 from shakenfist import instance
 from shakenfist.ipmanager import IPManager
-from shakenfist import logutil
 from shakenfist import network as sfnet  # Unfortunate, but we have an API arg
 # called network too.
 from shakenfist.networkinterface import NetworkInterface
@@ -36,14 +36,14 @@ from shakenfist.tasks import (
 from shakenfist.util import general as util_general
 
 
-LOG, HANDLER = logutil.setup(__name__)
+LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 
 SCHEDULER = None
 
 
-class InstanceEndpoint(api_base.Resource):
+class InstanceEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -57,12 +57,12 @@ class InstanceEndpoint(api_base.Resource):
     def delete(self, instance_ref=None, instance_from_db=None, namespace=None):
         # Check if instance has already been deleted
         if instance_from_db.state.value == dbo.STATE_DELETED:
-            return api_base.error(404, 'instance not found')
+            return sf_api.error(404, 'instance not found')
 
         # If a namespace is specified, ensure the instance is in it
         if namespace:
             if instance_from_db.namespace != namespace:
-                return api_base.error(404, 'instance not in namespace')
+                return sf_api.error(404, 'instance not in namespace')
 
         # If this instance is not on a node, just do the DB cleanup locally
         placement = instance_from_db.placement
@@ -79,17 +79,17 @@ class InstanceEndpoint(api_base.Resource):
 
 def _artifact_safety_checks(a):
     if not a:
-        return api_base.error(404, 'artifact not found')
+        return sf_api.error(404, 'artifact not found')
     if a.state.value != Artifact.STATE_CREATED:
-        return api_base.error(
+        return sf_api.error(
             404, 'artifact not ready (state=%s)' % a.state.value)
     if get_jwt_identity()[0] != 'system':
         if not a.shared and a.namespace != get_jwt_identity()[0]:
-            return api_base.error(404, 'artifact not found')
+            return sf_api.error(404, 'artifact not found')
     return
 
 
-class InstancesEndpoint(api_base.Resource):
+class InstancesEndpoint(sf_api.Resource):
     @jwt_required()
     def get(self, all=False):
         with etcd.ThreadLocalReadOnlyCache():
@@ -128,18 +128,18 @@ class InstancesEndpoint(api_base.Resource):
 
         # If accessing a foreign namespace, we need to be an admin
         if get_jwt_identity()[0] not in [namespace, 'system']:
-            return api_base.error(404, 'namespace not found')
+            return sf_api.error(404, 'namespace not found')
 
         # Check that the instance name is safe for use as a DNS host name
         if name != re.sub(r'([^a-zA-Z0-9\-])', '', name) or len(name) > 63:
-            return api_base.error(
+            return sf_api.error(
                 400, ('instance name %s is not useable as a DNS and Linux host name. '
                       'That is, less than 63 characters and in the character set: '
                       'a-z, A-Z, 0-9, or hyphen (-).' % name))
 
         # Secure boot requires UEFI
         if secure_boot and not uefi:
-            return api_base.error(400, 'secure boot requires UEFI be enabled')
+            return sf_api.error(400, 'secure boot requires UEFI be enabled')
 
         if secure_boot:
             machine_type = 'q35'
@@ -148,24 +148,24 @@ class InstancesEndpoint(api_base.Resource):
         if placed_on:
             n = Node.from_db(placed_on)
             if not n:
-                return api_base.error(404, 'Specified node does not exist')
+                return sf_api.error(404, 'Specified node does not exist')
             if n.state.value != Node.STATE_CREATED:
-                return api_base.error(404, 'Specified node not ready')
+                return sf_api.error(404, 'Specified node not ready')
 
         # Make sure we've been given a valid configdrive option
         if not configdrive:
             configdrive = 'openstack-disk'
         elif configdrive not in ['openstack-disk', 'none']:
-            return api_base.error(400, 'invalid config drive type: "%s"' % configdrive)
+            return sf_api.error(400, 'invalid config drive type: "%s"' % configdrive)
 
         # Sanity check and lookup blobs for disks where relevant
         if not disk:
-            return api_base.error(400, 'instance must specify at least one disk')
+            return sf_api.error(400, 'instance must specify at least one disk')
 
         transformed_disk = []
         for d in disk:
             if not isinstance(d, dict):
-                return api_base.error(400, 'disk specification should contain JSON objects')
+                return sf_api.error(400, 'disk specification should contain JSON objects')
 
             # Convert internal shorthand forms into specific blobs
             disk_base = d.get('base')
@@ -184,7 +184,7 @@ class InstancesEndpoint(api_base.Resource):
 
                 blob_uuid = a.resolve_to_blob()
                 if not blob_uuid:
-                    return api_base.error(404, 'Could not resolve label %s to a blob' % label)
+                    return sf_api.error(404, 'Could not resolve label %s to a blob' % label)
                 d['blob_uuid'] = blob_uuid
 
             elif disk_base.startswith(SNAPSHOT_URL):
@@ -195,7 +195,7 @@ class InstancesEndpoint(api_base.Resource):
 
                 blob_uuid = a.resolve_to_blob()
                 if not blob_uuid:
-                    return api_base.error(404, 'Could not resolve snapshot to a blob')
+                    return sf_api.error(404, 'Could not resolve snapshot to a blob')
                 d['blob_uuid'] = blob_uuid
 
             elif disk_base.startswith(UPLOAD_URL) or disk_base.startswith(LABEL_URL):
@@ -211,7 +211,7 @@ class InstancesEndpoint(api_base.Resource):
 
                 blob_uuid = a.resolve_to_blob()
                 if not blob_uuid:
-                    return api_base.error(404, 'Could not resolve artifact to a blob')
+                    return sf_api.error(404, 'Could not resolve artifact to a blob')
                 d['blob_uuid'] = blob_uuid
 
             elif disk_base.startswith(BLOB_URL):
@@ -243,8 +243,8 @@ class InstancesEndpoint(api_base.Resource):
 
                 blob_uuid = a.resolve_to_blob()
                 if not blob_uuid:
-                    return api_base.error(404, 'Could not resolve label %s to a blob' % label)
-                LOG.with_field('instance', instance_uuid).with_fields({
+                    return sf_api.error(404, 'Could not resolve label %s to a blob' % label)
+                LOG.with_fields({'instance': instance_uuid}).with_fields({
                     'original_template': original_template,
                     'label': label,
                     'source_url': url,
@@ -255,7 +255,7 @@ class InstancesEndpoint(api_base.Resource):
 
             elif nvram_template.startswith(BLOB_URL):
                 nvram_template = nvram_template[len(BLOB_URL):]
-                LOG.with_field('instance', instance_uuid).with_fields({
+                LOG.with_fields({'instance': instance_uuid}).with_fields({
                     'original_template': original_template,
                     'blob': nvram_template
                 }).info('NVRAM template URL converted')
@@ -266,17 +266,17 @@ class InstancesEndpoint(api_base.Resource):
         if machine_type == 'q35':
             for d in disk:
                 if d.get('bus') == 'ide':
-                    return api_base.error(
+                    return sf_api.error(
                         400, 'secure boot machine type does not support IDE')
 
         if network:
             for netdesc in network:
                 if not isinstance(netdesc, dict):
-                    return api_base.error(
+                    return sf_api.error(
                         400, 'network specification should contain JSON objects')
 
                 if 'network_uuid' not in netdesc:
-                    return api_base.error(
+                    return sf_api.error(
                         400, 'network specification is missing network_uuid')
 
                 # Allow network to be specified by name or UUID (and error early
@@ -284,10 +284,10 @@ class InstancesEndpoint(api_base.Resource):
                 try:
                     n = sfnet.Network.from_db_by_ref(netdesc['network_uuid'])
                 except exceptions.MultipleObjects as e:
-                    return api_base.error(400, str(e))
+                    return sf_api.error(400, str(e))
 
                 if not n:
-                    return api_base.error(
+                    return sf_api.error(
                         404, 'network %s not found' % netdesc['network_uuid'])
                 netdesc['network_uuid'] = n.uuid
 
@@ -296,27 +296,29 @@ class InstancesEndpoint(api_base.Resource):
                     # for that virtual network, unless it is equivalent to "none".
                     ipm = IPManager.from_db(n.uuid)
                     if not ipm.is_in_range(netdesc['address']):
-                        return api_base.error(400,
-                                              'network specification requests an address outside the '
-                                              'range of the network')
+                        return sf_api.error(
+                            400,
+                            'network specification requests an address outside the '
+                            'range of the network')
 
                 if n.state.value != sfnet.Network.STATE_CREATED:
-                    return api_base.error(406, 'network %s is not ready (%s)' % (n.uuid, n.state.value))
+                    return sf_api.error(
+                        406, 'network %s is not ready (%s)' % (n.uuid, n.state.value))
                 if n.namespace != namespace:
-                    return api_base.error(404, 'network %s does not exist' % n.uuid)
+                    return sf_api.error(404, 'network %s does not exist' % n.uuid)
 
         if not video:
             video = {'model': 'cirrus', 'memory': 16384}
         else:
             if 'model' not in video:
-                return api_base.error(400, 'video specification requires "model"')
+                return sf_api.error(400, 'video specification requires "model"')
             if 'memory' not in video:
-                return api_base.error(400, 'video specification requires "memory"')
+                return sf_api.error(400, 'video specification requires "memory"')
 
         # Validate metadata before instance creation
         if metadata:
             if not isinstance(metadata, dict):
-                return api_base.error(400, 'metadata must be a dictionary')
+                return sf_api.error(400, 'metadata must be a dictionary')
             for k, v in metadata.items():
                 err = _validate_instance_metadata(k, v)
                 if err:
@@ -359,7 +361,7 @@ class InstancesEndpoint(api_base.Resource):
                     m = 'missing network %s during IP allocation phase' % (
                         netdesc['network_uuid'])
                     inst.enqueue_delete_due_error(m)
-                    return api_base.error(
+                    return sf_api.error(
                         404, 'network %s not found' % netdesc['network_uuid'])
 
                 # NOTE(mikal): we now support interfaces with no address on them
@@ -376,28 +378,30 @@ class InstancesEndpoint(api_base.Resource):
                             if 'address' not in netdesc or not netdesc['address']:
                                 netdesc['address'] = ipm.get_random_free_address(
                                     inst.unique_label())
-                                inst.add_event2(
+                                inst.add_event(
                                     'allocated ip address', extra=netdesc)
                             else:
                                 if not ipm.reserve(netdesc['address'], inst.unique_label()):
                                     m = 'failed to reserve an IP on network %s' % (
                                         netdesc['network_uuid'])
                                     inst.enqueue_delete_due_error(m)
-                                    return api_base.error(409, 'address %s in use' %
-                                                          netdesc['address'])
+                                    return sf_api.error(
+                                        409, 'address %s in use' % netdesc['address'])
 
                             ipm.persist()
                 except exceptions.CongestedNetwork as e:
                     inst.enqueue_delete_due_error(
                         'cannot allocate address: %s' % e)
-                    return api_base.error(507, str(e))
+                    return sf_api.error(507, str(e))
 
                 if 'model' not in netdesc or not netdesc['model']:
                     netdesc['model'] = 'virtio'
 
                 iface_uuid = str(uuid.uuid4())
-                LOG.with_object(inst).with_object(n).withFields({
-                    'networkinterface': iface_uuid
+                LOG.with_fields({
+                    'networkinterface': iface_uuid,
+                    'instance': inst,
+                    'network': n
                 }).info('Interface allocated')
                 ni = NetworkInterface.new(
                     iface_uuid, netdesc, inst.uuid, order)
@@ -416,7 +420,7 @@ class InstancesEndpoint(api_base.Resource):
                 except exceptions.CongestedNetwork as e:
                     inst.enqueue_delete_due_error(
                         'cannot allocate address: %s' % e)
-                    return api_base.error(507, str(e))
+                    return sf_api.error(507, str(e))
 
                 # Include the interface uuid in the network description we
                 # pass through to the instance start task.
@@ -441,15 +445,15 @@ class InstancesEndpoint(api_base.Resource):
                 placement = placed_on
 
         except exceptions.LowResourceException as e:
-            inst.add_event2(
+            inst.add_event(
                 'schedule failed, insufficient resources: %s' % str(e))
             inst.enqueue_delete_due_error('scheduling failed')
-            return api_base.error(507, str(e), suppress_traceback=True)
+            return sf_api.error(507, str(e), suppress_traceback=True)
 
         except exceptions.CandidateNodeNotFoundException as e:
-            inst.add_event2('schedule failed, node not found: %s' % str(e))
+            inst.add_event('schedule failed, node not found: %s' % str(e))
             inst.enqueue_delete_due_error('scheduling failed')
-            return api_base.error(404, 'node not found: %s' % e, suppress_traceback=True)
+            return sf_api.error(404, 'node not found: %s' % e, suppress_traceback=True)
 
         # Record placement
         inst.place_instance(placement)
@@ -479,18 +483,18 @@ class InstancesEndpoint(api_base.Resource):
         """Delete all instances in the namespace."""
 
         if confirm is not True:
-            return api_base.error(400, 'parameter confirm is not set true')
+            return sf_api.error(400, 'parameter confirm is not set true')
 
         if get_jwt_identity()[0] == 'system':
             if not isinstance(namespace, str):
                 # A client using a system key must specify the namespace. This
                 # ensures that deleting all instances in the cluster (by
                 # specifying namespace='system') is a deliberate act.
-                return api_base.error(400, 'system user must specify parameter namespace')
+                return sf_api.error(400, 'system user must specify parameter namespace')
 
         else:
             if namespace and namespace != get_jwt_identity()[0]:
-                return api_base.error(401, 'you cannot delete other namespaces')
+                return sf_api.error(401, 'you cannot delete other namespaces')
             namespace = get_jwt_identity()[0]
 
         waiting_for = []
@@ -512,7 +516,7 @@ class InstancesEndpoint(api_base.Resource):
         return waiting_for
 
 
-class InstanceInterfacesEndpoint(api_base.Resource):
+class InstanceInterfacesEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -526,7 +530,7 @@ class InstanceInterfacesEndpoint(api_base.Resource):
         return out
 
 
-class InstanceEventsEndpoint(api_base.Resource):
+class InstanceEventsEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -536,7 +540,7 @@ class InstanceEventsEndpoint(api_base.Resource):
             return list(eventdb.read_events())
 
 
-class InstanceRebootSoftEndpoint(api_base.Resource):
+class InstanceRebootSoftEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -547,10 +551,10 @@ class InstanceRebootSoftEndpoint(api_base.Resource):
             with instance_from_db.get_lock(op='Instance reboot soft'):
                 return instance_from_db.reboot(hard=False)
         except exceptions.InvalidLifecycleState as e:
-            return api_base.error(409, e)
+            return sf_api.error(409, e)
 
 
-class InstanceRebootHardEndpoint(api_base.Resource):
+class InstanceRebootHardEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -561,10 +565,10 @@ class InstanceRebootHardEndpoint(api_base.Resource):
             with instance_from_db.get_lock(op='Instance reboot hard'):
                 return instance_from_db.reboot(hard=True)
         except exceptions.InvalidLifecycleState as e:
-            return api_base.error(409, e)
+            return sf_api.error(409, e)
 
 
-class InstancePowerOffEndpoint(api_base.Resource):
+class InstancePowerOffEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -575,10 +579,10 @@ class InstancePowerOffEndpoint(api_base.Resource):
             with instance_from_db.get_lock(op='Instance power off'):
                 return instance_from_db.power_off()
         except exceptions.InvalidLifecycleState as e:
-            return api_base.error(409, e)
+            return sf_api.error(409, e)
 
 
-class InstancePowerOnEndpoint(api_base.Resource):
+class InstancePowerOnEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -589,10 +593,10 @@ class InstancePowerOnEndpoint(api_base.Resource):
             with instance_from_db.get_lock(op='Instance power on'):
                 return instance_from_db.power_on()
         except exceptions.InvalidLifecycleState as e:
-            return api_base.error(409, e)
+            return sf_api.error(409, e)
 
 
-class InstancePauseEndpoint(api_base.Resource):
+class InstancePauseEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -603,10 +607,10 @@ class InstancePauseEndpoint(api_base.Resource):
             with instance_from_db.get_lock(op='Instance pause'):
                 return instance_from_db.pause()
         except exceptions.InvalidLifecycleState as e:
-            return api_base.error(409, e)
+            return sf_api.error(409, e)
 
 
-class InstanceUnpauseEndpoint(api_base.Resource):
+class InstanceUnpauseEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -617,10 +621,10 @@ class InstanceUnpauseEndpoint(api_base.Resource):
             with instance_from_db.get_lock(op='Instance unpause'):
                 return instance_from_db.unpause()
         except exceptions.InvalidLifecycleState as e:
-            return api_base.error(409, e)
+            return sf_api.error(409, e)
 
 
-class InstanceMetadatasEndpoint(api_base.Resource):
+class InstanceMetadatasEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -644,32 +648,32 @@ def _validate_instance_metadata(key, value):
     # Reserved key "tags" should be validated to avoid unexpected failures
     if key == instance.Instance.METADATA_KEY_TAGS:
         if not isinstance(value, list):
-            return api_base.error(400, 'value for "tags" key should be a JSON list')
+            return sf_api.error(400, 'value for "tags" key should be a JSON list')
 
     # Reserved key "affinity" should be validated to avoid unexpected
     # failures during instance creation.
     elif key == instance.Instance.METADATA_KEY_AFFINITY:
         if not isinstance(value, dict):
-            return api_base.error(
+            return sf_api.error(
                 400, 'value for "affinity" key should be a valid JSON dictionary')
 
         for key_type, dv in value.items():
             if key_type not in ('cpu', 'disk', 'instance'):
-                return api_base.error(
+                return sf_api.error(
                     400, 'can only set affinity for cpu, disk or instance')
 
             if not isinstance(dv, dict):
-                return api_base.error(
+                return sf_api.error(
                     400, 'value for affinity key should be a dictionary')
             for v in dv.values():
                 try:
                     int(v)
                 except ValueError:
-                    return api_base.error(
+                    return sf_api.error(
                         400, 'affinity dictionary values should be integers')
 
 
-class InstanceMetadataEndpoint(api_base.Resource):
+class InstanceMetadataEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -685,17 +689,17 @@ class InstanceMetadataEndpoint(api_base.Resource):
     @api_base.requires_instance_ownership
     def delete(self, instance_ref=None, key=None, instance_from_db=None):
         if not key:
-            return api_base.error(400, 'no key specified')
+            return sf_api.error(400, 'no key specified')
 
         with instance_from_db.get_lock(op='Instance metadata delete'):
             md = db.get_metadata('instance', instance_from_db.uuid)
             if md is None or key not in md:
-                return api_base.error(404, 'key not found')
+                return sf_api.error(404, 'key not found')
             del md[key]
             db.persist_metadata('instance', instance_from_db.uuid, md)
 
 
-class InstanceConsoleDataEndpoint(api_base.Resource):
+class InstanceConsoleDataEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -712,9 +716,9 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
                 pass
 
             # This is done this way so that there is no active traceback for
-            # the api_base.error call, otherwise it would be logged.
+            # the sf_api.error call, otherwise it would be logged.
             if parsed_length is None:
-                return api_base.error(400, 'length is not an integer')
+                return sf_api.error(400, 'length is not an integer')
 
         resp = flask.Response(
             instance_from_db.get_console_data(parsed_length),

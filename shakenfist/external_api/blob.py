@@ -3,6 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 import os
 import random
 import requests
+from shakenfist_utilities import api as sf_api
 from webargs import fields
 from webargs.flaskparser import use_kwargs
 
@@ -10,7 +11,6 @@ from shakenfist import baseobject
 from shakenfist.blob import Blob, Blobs
 from shakenfist.config import config
 from shakenfist import etcd
-from shakenfist.external_api import base as api_base
 from shakenfist.util import general as util_general
 
 
@@ -37,17 +37,17 @@ def _read_remote(target, blob_uuid, offset=0):
         yield chunk
 
 
-class BlobEndpoint(api_base.Resource):
+class BlobEndpoint(sf_api.Resource):
     @jwt_required()
     def get(self, blob_uuid=None):
         b = Blob.from_db(blob_uuid)
         if not b:
-            return api_base.error(404, 'blob not found')
+            return sf_api.error(404, 'blob not found')
 
         return b.external_view()
 
 
-class BlobDataEndpoint(api_base.Resource):
+class BlobDataEndpoint(sf_api.Resource):
     # NOTE(mikal): note that arguments from URL routes (blob_uuid for example),
     # are not included in the webargs schema because webargs doesn't appear to
     # know how to find them.
@@ -61,7 +61,7 @@ class BlobDataEndpoint(api_base.Resource):
         # Ensure the blob exists
         b = Blob.from_db(blob_uuid)
         if not b:
-            return api_base.error(404, 'blob not found')
+            return sf_api.error(404, 'blob not found')
 
         # Fast path if we have the blob locally
         os.makedirs(os.path.join(config.STORAGE_PATH, 'blobs'), exist_ok=True)
@@ -74,7 +74,7 @@ class BlobDataEndpoint(api_base.Resource):
         # Otherwise find a node which has the blob and proxy.
         locations = b.locations
         if not locations:
-            return api_base.error(404, 'blob missing')
+            return sf_api.error(404, 'blob missing')
 
         random.shuffle(locations)
         return flask.Response(flask.stream_with_context(
@@ -82,9 +82,9 @@ class BlobDataEndpoint(api_base.Resource):
             mimetype='text/plain', status=200)
 
 
-class BlobsEndpoint(api_base.Resource):
+class BlobsEndpoint(sf_api.Resource):
     @jwt_required()
-    @api_base.caller_is_admin
+    @sf_api.caller_is_admin
     def get(self, node=None):
         retval = []
 

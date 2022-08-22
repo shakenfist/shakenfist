@@ -1,13 +1,13 @@
 # Copyright 2020 Michael Still
 
+from shakenfist_utilities import logs
 import uuid
 
 from shakenfist import constants
 from shakenfist import etcd
-from shakenfist import logutil
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 #####################################################################
 # Locks

@@ -3,6 +3,7 @@
 from collections import defaultdict
 import math
 import random
+from shakenfist_utilities import logs
 import time
 import uuid
 
@@ -10,7 +11,6 @@ from shakenfist.config import config
 from shakenfist.constants import GiB
 from shakenfist import exceptions
 from shakenfist import instance
-from shakenfist import logutil
 from shakenfist.metrics import get_active_node_metrics
 from shakenfist import networkinterface
 from shakenfist.node import (
@@ -18,7 +18,7 @@ from shakenfist.node import (
 from shakenfist.util import general as util_general
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 # Lookup of the FQDN (called a UUID by the node object) is expensive,
@@ -47,7 +47,7 @@ class Scheduler(object):
         # This UUID doesn't really mean much, except as a way of tracing the
         # behaviour of a single instance of the scheduler object in logs.
         self.__uuid = str(uuid.uuid4())
-        self.log = LOG.with_field('scheduler_instance', self.__uuid)
+        self.log = LOG.with_fields({'scheduler_instance': self.__uuid})
 
         self.metrics = {}
         self.metrics_updated = 0
@@ -182,7 +182,7 @@ class Scheduler(object):
 
     def place_instance(self, inst, network, candidates=None):
         with util_general.RecordedOperation('schedule', inst):
-            log_ctx = self.log.with_object(inst)
+            log_ctx = self.log.with_fields({'instance': inst})
 
             # Refresh metrics if its too old, or there are no nodes.
             diff = time.time() - self.metrics_updated
@@ -195,8 +195,8 @@ class Scheduler(object):
                               len(self.metrics))
 
             if candidates:
-                inst.add_event2('schedule forced candidates',
-                                extra={'candidates': candidates})
+                inst.add_event('schedule forced candidates',
+                               extra={'candidates': candidates})
                 for n in candidates:
                     if n not in self.metrics:
                         raise exceptions.CandidateNodeNotFoundException(n)
@@ -204,15 +204,15 @@ class Scheduler(object):
                 candidates = []
                 for n in self.metrics.keys():
                     candidates.append(n)
-            inst.add_event2('schedule initial candidates',
-                            extra={'candidates': candidates})
+            inst.add_event('schedule initial candidates',
+                           extra={'candidates': candidates})
 
             # Ensure all specified nodes are hypervisors
             for n in list(candidates):
                 if not self.metrics[n].get('is_hypervisor', False):
                     candidates.remove(n)
-            inst.add_event2('schedule are hypervisors',
-                            extra={'candidates': candidates})
+            inst.add_event('schedule are hypervisors',
+                           extra={'candidates': candidates})
 
             if not candidates:
                 raise exceptions.LowResourceException('No nodes with metrics')
@@ -222,8 +222,8 @@ class Scheduler(object):
                 max_cpu = self.metrics[n].get('cpu_max_per_instance', 0)
                 if inst.cpus > max_cpu:
                     candidates.remove(n)
-            inst.add_event2('schedule have enough actual cpu',
-                            extra={'candidates': candidates})
+            inst.add_event('schedule have enough actual cpu',
+                           extra={'candidates': candidates})
             if not candidates:
                 raise exceptions.LowResourceException(
                     'Requested vCPUs exceeds vCPU limit')
@@ -232,8 +232,8 @@ class Scheduler(object):
             for n in list(candidates):
                 if not self._has_sufficient_cpu(log_ctx, inst.cpus, n):
                     candidates.remove(n)
-            inst.add_event2('schedule have enough idle cpu',
-                            extra={'candidates': candidates})
+            inst.add_event('schedule have enough idle cpu',
+                           extra={'candidates': candidates})
             if not candidates:
                 raise exceptions.LowResourceException(
                     'No nodes with enough idle CPU')
@@ -242,8 +242,8 @@ class Scheduler(object):
             for n in list(candidates):
                 if not self._has_sufficient_ram(log_ctx, inst.memory, n):
                     candidates.remove(n)
-            inst.add_event2('schedule have enough idle ram',
-                            extra={'candidates': candidates})
+            inst.add_event('schedule have enough idle ram',
+                           extra={'candidates': candidates})
             if not candidates:
                 raise exceptions.LowResourceException(
                     'No nodes with enough idle RAM')
@@ -252,8 +252,8 @@ class Scheduler(object):
             for n in list(candidates):
                 if not self._has_sufficient_disk(log_ctx, inst, n):
                     candidates.remove(n)
-            inst.add_event2('schedule have enough idle disk',
-                            extra={'candidates': candidates})
+            inst.add_event('schedule have enough idle disk',
+                           extra={'candidates': candidates})
             if not candidates:
                 raise exceptions.LowResourceException(
                     'No nodes with enough disk space')
@@ -272,8 +272,8 @@ class Scheduler(object):
                             if n:
                                 pseudo_load[n] += int(val)
 
-                inst.add_event2('schedule pseudo load',
-                                extra=dict(pseudo_load))
+                inst.add_event('schedule pseudo load',
+                               extra=dict(pseudo_load))
 
             # Order candidates by current CPU load
             by_load = defaultdict(list)
@@ -284,11 +284,11 @@ class Scheduler(object):
 
             lowest_load = sorted(by_load)[0]
             candidates = by_load[lowest_load]
-            inst.add_event2('schedule have lowest cpu load',
-                            extra={'candidates': candidates})
+            inst.add_event('schedule have lowest cpu load',
+                           extra={'candidates': candidates})
 
             # Return a shuffled list of options
             random.shuffle(candidates)
-            inst.add_event2('schedule final candidates',
-                            extra={'candidates': candidates})
+            inst.add_event('schedule final candidates',
+                           extra={'candidates': candidates})
             return candidates

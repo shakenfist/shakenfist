@@ -1,15 +1,15 @@
 # Copyright 2021 Michael Still
 
+from shakenfist_utilities import logs
 import time
 
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist import etcd
-from shakenfist import logutil
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 class Upload(dbo):

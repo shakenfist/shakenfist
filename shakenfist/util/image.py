@@ -1,18 +1,18 @@
 import os
 import re
+from shakenfist_utilities import logs
 import shutil
 
 # To avoid circular imports, util modules should only import a limited
-# set of shakenfist modules, mainly exceptions, logutils, and specific
+# set of shakenfist modules, mainly exceptions, and specific
 # other util modules.
 from shakenfist.config import config
 from shakenfist import constants
 from shakenfist import exceptions
-from shakenfist import logutil
 from shakenfist.util import process as util_process
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 VALUE_WITH_BRACKETS_RE = re.compile(r'.* \(([0-9]+) bytes\)')
@@ -150,7 +150,7 @@ def snapshot(locks, source, destination, thin=False):
         # around, especially if a user downloads them. This means we need to make
         # the snapshot in the image cache directory and then move it to the right
         # place or qemu-img gets confused.
-        LOG.with_field('source', source).debug('Producing thin snapshot')
+        LOG.with_fields({'source': source}).debug('Producing thin snapshot')
         backing_path, backing_uuid_with_extension = os.path.split(backing_file)
         backing_uuid = backing_uuid_with_extension.split('.')[0]
 

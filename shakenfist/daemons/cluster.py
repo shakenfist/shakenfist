@@ -5,6 +5,7 @@
 
 from collections import defaultdict
 import setproctitle
+from shakenfist_utilities import logs
 import time
 
 from shakenfist import artifact
@@ -17,7 +18,6 @@ from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
-from shakenfist import logutil
 from shakenfist import network
 from shakenfist.node import (
     Node, Nodes,
@@ -27,7 +27,7 @@ from shakenfist.node import (
 from shakenfist.upload import Uploads
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 class Monitor(daemon.Daemon):
@@ -267,7 +267,8 @@ class Monitor(daemon.Daemon):
             # Find nodes which have returned from being missing
             if age < config.NODE_CHECKIN_MAXIMUM:
                 n.state = Node.STATE_CREATED
-                LOG.with_object(n).info('Node returned from being missing')
+                LOG.with_fields({'node': n}).info(
+                    'Node returned from being missing')
 
             # Find nodes which have been offline for a long time, unless
             # this machine has been asleep for a long time (think developer
@@ -276,7 +277,9 @@ class Monitor(daemon.Daemon):
                     and age > config.NODE_CHECKIN_MAXIMUM * 10):
                 n.state = Node.STATE_ERROR
                 for i in instance.healthy_instances_on_node(n):
-                    LOG.with_object(i).with_object(n).info(
+                    LOG.with_fields({
+                        'instance': i,
+                        'node': n}).info(
                         'Node in error state, erroring instance')
                     # Note, this queue job is just in case the node comes
                     # back.

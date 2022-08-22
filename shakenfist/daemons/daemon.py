@@ -2,12 +2,12 @@ import faulthandler
 import logging
 import multiprocessing
 import setproctitle
+from shakenfist_utilities import logs
 import signal
 from threading import Event
 
 from shakenfist.config import config
 from shakenfist import etcd
-from shakenfist import logutil
 from shakenfist.util import libvirt as util_libvirt
 
 
@@ -49,7 +49,7 @@ def set_log_level(log, name):
 class Daemon(object):
     def __init__(self, name):
         setproctitle.setproctitle(process_name(name))
-        self.log, _ = logutil.setup(name)
+        self.log, _ = logs.setup(name)
         set_log_level(self.log, name)
 
         self.exit = Event()

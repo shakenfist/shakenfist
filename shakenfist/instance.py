@@ -9,6 +9,7 @@ import os
 import pathlib
 import pycdlib
 import random
+from shakenfist_utilities import logs
 import shutil
 import socket
 import time
@@ -25,7 +26,6 @@ from shakenfist import constants
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
-from shakenfist import logutil
 from shakenfist.metrics import get_minimum_object_version as gmov
 from shakenfist import network
 from shakenfist import networkinterface
@@ -35,7 +35,7 @@ from shakenfist.util import image as util_image
 from shakenfist.util import libvirt as util_libvirt
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 def _get_defaulted_disk_bus(disk):
@@ -131,8 +131,8 @@ class Instance(dbo):
             if upgraded and gmov('instance') == self.current_version:
                 etcd.put(self.object_type, None,
                          static_values.get('uuid'), static_values)
-                LOG.with_field(
-                    self.object_type, static_values['uuid']).info('Online upgrade committed')
+                LOG.with_fields({self.object_type: static_values['uuid']}).info(
+                    'Online upgrade committed')
 
         super(Instance, self).__init__(static_values.get('uuid'),
                                        static_values.get('version'))
@@ -292,7 +292,8 @@ class Instance(dbo):
         for iface_uuid in self.interfaces:
             ni = networkinterface.NetworkInterface.from_db(iface_uuid)
             if not ni:
-                self.log.with_object(ni).error('Network interface missing')
+                self.log.with_fields({'networkinterface': ni}).error(
+                    'Network interface missing')
             else:
                 i['interfaces'].append(ni.external_view())
 
@@ -627,7 +628,7 @@ class Instance(dbo):
         if self.is_powered_on():
             self.state = self.STATE_CREATED
         else:
-            self.add_event2('instance failed to power on')
+            self.add_event('instance failed to power on')
             self.enqueue_delete_due_error('Instance failed to power on')
 
     def delete(self):
@@ -704,7 +705,7 @@ class Instance(dbo):
                 if allocatedPort:
                     return port
             except socket.error:
-                LOG.with_field('instance', self.uuid).info(
+                LOG.with_fields({'instance': self.uuid}).info(
                     'Collided with in use port %d, selecting another' % port)
                 consumed.append(port)
             finally:
@@ -1142,13 +1143,13 @@ class Instance(dbo):
                     self.allocate_instance_ports()
                     return False
                 else:
-                    self.add_event2('instance start error',
-                                    extra={'message': str(e)})
+                    self.add_event('instance start error',
+                                   extra={'message': str(e)})
                     return False
 
             inst.setAutostart(1)
             self.update_power_state(lc.extract_power_state(inst))
-            self.add_event2('poweron')
+            self.add_event('poweron')
             return True
 
     def power_off(self):
@@ -1165,7 +1166,7 @@ class Instance(dbo):
                     self.log.error('Failed to delete domain: %s', e)
 
             self.update_power_state('off')
-            self.add_event2('poweroff')
+            self.add_event('poweroff')
 
     def reboot(self, hard=False):
         with util_libvirt.LibvirtConnection() as lc:
@@ -1179,10 +1180,10 @@ class Instance(dbo):
 
             if not hard:
                 inst.reboot(flags=lc.libvirt.VIR_DOMAIN_REBOOT_ACPI_POWER_BTN)
-                self.add_event2('soft reboot')
+                self.add_event('soft reboot')
             else:
                 inst.reset()
-                self.add_event2('hard reboot')
+                self.add_event('hard reboot')
 
     def pause(self):
         with util_libvirt.LibvirtConnection() as lc:
@@ -1196,7 +1197,7 @@ class Instance(dbo):
 
             inst.suspend()
             self.update_power_state(lc.extract_power_state(inst))
-            self.add_event2('pause')
+            self.add_event('pause')
 
     def unpause(self):
         with util_libvirt.LibvirtConnection() as lc:
@@ -1210,7 +1211,7 @@ class Instance(dbo):
 
             inst.resume()
             self.update_power_state(lc.extract_power_state(inst))
-            self.add_event2('unpause')
+            self.add_event('unpause')
 
     def get_console_data(self, length):
         console_path = os.path.join(self.instance_path, 'console.log')
@@ -1231,7 +1232,7 @@ class Instance(dbo):
         if not os.path.exists(console_path):
             return
         os.truncate(console_path, 0)
-        self.add_event2('console log cleared')
+        self.add_event('console log cleared')
 
     def enqueue_delete_remote(self, node):
         etcd.enqueue(node, {
@@ -1274,7 +1275,7 @@ class Instance(dbo):
             disks = new_disks
         elif not all:
             disks = [disks[0]]
-        self.log.with_field('devices', disks).info('Devices for snapshot')
+        self.log.with_fields({'devices': disks}).info('Devices for snapshot')
 
         out = {}
         for disk in disks:
@@ -1321,7 +1322,7 @@ class Instance(dbo):
                                            thin=thin)],
                 })
 
-        self.add_event2('snapshot', extra=out)
+        self.add_event('snapshot', extra=out)
         return out
 
 

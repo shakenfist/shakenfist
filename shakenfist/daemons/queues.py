@@ -1,5 +1,6 @@
 import requests
 import setproctitle
+from shakenfist_utilities import logs
 
 from shakenfist.artifact import Artifact
 from shakenfist import blob
@@ -10,7 +11,6 @@ from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import images
 from shakenfist import instance
-from shakenfist import logutil
 from shakenfist.tasks import (QueueTask,
                               DeleteInstanceTask,
                               FetchImageTask,
@@ -30,13 +30,13 @@ from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 def handle(jobname, workitem):
     libvirt = util_libvirt.get_libvirt()
 
-    log = LOG.with_field('workitem', jobname)
+    log = LOG.with_fields({'workitem': jobname})
     log.info('Processing workitem')
 
     setproctitle.setproctitle(
@@ -63,11 +63,11 @@ def handle(jobname, workitem):
                 inst = instance.Instance.from_db(task.instance_uuid())
 
             if inst:
-                log_i = log.with_instance(inst)
+                log_i = log.with_fields({'instance': inst})
             else:
                 log_i = log
 
-            log_i.with_field('task_name', task.name()).info('Starting task')
+            log_i.with_fields({'task_name': task.name()}).info('Starting task')
 
             if isinstance(task, FetchImageTask):
                 n = task.namespace()
@@ -121,7 +121,7 @@ def handle(jobname, workitem):
                 cur_interfaces = task_network.networkinterfaces
 
                 if cur_interfaces:
-                    LOG.with_network(task_network).warning(
+                    LOG.with_fields({'network': task_network}).warning(
                         'During DeleteNetworkWhenClean new interfaces have '
                         'connected to network: %s', cur_interfaces)
 
@@ -171,15 +171,16 @@ def handle(jobname, workitem):
                     }).info('Cannot replicate blob, insufficient space')
 
                 else:
-                    log.with_object(b).info('Replicating blob')
+                    log.with_fields({'blob': b}).info('Replicating blob')
                     size = b.ensure_local([])
-                    log.with_object(b).with_fields({
+                    log.with_fields({
+                        'blob': b,
                         'transferred': size,
                         'expected': b.size
                     }).info('Replicating blob complete')
 
             else:
-                log_i.with_field('task', task).error(
+                log_i.with_fields({'task': task}).error(
                     'Unhandled task - dropped')
 
             log_i.info('Task complete')
@@ -223,7 +224,7 @@ def image_fetch(url, namespace, inst):
         # the required image. This will be changed to queue on a
         # "waiting_image_fetch" queue but this works now.
         images.ImageFetchHelper(inst, a).get_image()
-        a.add_event2('artifact fetch complete')
+        a.add_event('artifact fetch complete')
 
     except (exceptions.HTTPError, requests.exceptions.RequestException,
             requests.exceptions.ConnectionError) as e:
@@ -245,8 +246,8 @@ def image_fetch(url, namespace, inst):
             raise exceptions.ImageFetchTaskFailedException(
                 'Failed to fetch image: %s Exception: %s' % (url, e))
         else:
-            a.add_event2('Updating image failed, using already cached version',
-                         extra={'message': msg})
+            a.add_event('Updating image failed, using already cached version',
+                        extra={'message': msg})
 
 
 def instance_preflight(inst, netdescs):
@@ -259,7 +260,7 @@ def instance_preflight(inst, netdescs):
         return None
 
     except exceptions.LowResourceException as e:
-        inst.add_event2('schedule failed, insufficient resources: ' + str(e))
+        inst.add_event('schedule failed, insufficient resources: ' + str(e))
 
     # Unsuccessful placement, check if reached placement attempt limit
     db_placement = inst.placement
@@ -283,7 +284,7 @@ def instance_preflight(inst, netdescs):
         return candidates[0]
 
     except exceptions.LowResourceException as e:
-        inst.add_event2('schedule failed, insufficient resources: ' + str(e))
+        inst.add_event('schedule failed, insufficient resources: ' + str(e))
         # This raise implies delete above
         raise exceptions.AbortInstanceStartException(
             'Unable to find suitable node')
@@ -291,10 +292,10 @@ def instance_preflight(inst, netdescs):
 
 def instance_start(inst, netdescs):
     if inst.state.value.endswith('-error'):
-        inst.add_event2('You cannot start an instance in an error state.')
+        inst.add_event('You cannot start an instance in an error state.')
         return
     if inst.state.value in (dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED):
-        inst.add_event2('You cannot start an instance which has been deleted.')
+        inst.add_event('You cannot start an instance which has been deleted.')
         return
 
     with inst.get_lock(ttl=900, op='Instance start') as lock:
@@ -319,7 +320,7 @@ def instance_start(inst, netdescs):
                 ni = networkinterface.NetworkInterface.from_db(
                     netdesc['iface_uuid'])
                 if ni.state.value not in dbo.ACTIVE_STATES:
-                    inst.add_event2(
+                    inst.add_event(
                         'You cannot start an instance with an inactive network '
                         'interface.', extra={
                             'networkinterface': ni.uuid,

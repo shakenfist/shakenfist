@@ -1,5 +1,6 @@
 from flask_jwt_extended import jwt_required
 from functools import partial
+from shakenfist_utilities import api as sf_api, logs
 
 from shakenfist import artifact
 from shakenfist.artifact import Artifacts
@@ -7,13 +8,12 @@ from shakenfist import blob
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
-from shakenfist import logutil
 
-LOG, HANDLER = logutil.setup(__name__)
+LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 
-class InstanceSnapshotEndpoint(api_base.Resource):
+class InstanceSnapshotEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership

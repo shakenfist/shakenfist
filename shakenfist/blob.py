@@ -6,6 +6,7 @@ import numbers
 import os
 import random
 import requests
+from shakenfist_utilities import logs
 import time
 import urllib3
 
@@ -19,7 +20,6 @@ from shakenfist import etcd
 from shakenfist.exceptions import (BlobDeleted, BlobFetchFailed,
                                    BlobDependencyMissing, BlobsMustHaveContent)
 from shakenfist import instance
-from shakenfist import logutil
 from shakenfist.metrics import get_minimum_object_version as gmov
 from shakenfist.node import (Node, Nodes, nodes_by_free_disk_descending,
                              inactive_states_filter as node_inactive_states_filter)
@@ -28,7 +28,7 @@ from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 class Blob(dbo):
@@ -51,8 +51,9 @@ class Blob(dbo):
             if upgraded and gmov('blob') == self.current_version:
                 etcd.put(self.object_type, None,
                          static_values.get('uuid'), static_values)
-                LOG.with_field(
-                    self.object_type, static_values['uuid']).info('Online upgrade committed')
+                LOG.with_fields({
+                    self.object_type: static_values['uuid']}).info(
+                        'Online upgrade committed')
 
         super(Blob, self).__init__(static_values.get('uuid'),
                                    static_values.get('version'))
@@ -339,7 +340,8 @@ class Blob(dbo):
         partial_path = blob_path + '.partial'
         while os.path.exists(partial_path):
             st = os.stat(partial_path)
-            self.log.with_field('partial file age', st.st_mtime).info(
+            self.log.with_fields({
+                'partial file age': st.st_mtime}).info(
                 'Waiting for existing download to complete')
             time.sleep(10)
 
@@ -388,7 +390,7 @@ class Blob(dbo):
                                       int(self.size) * 100.0)
                         if (percentage - previous_percentage) > 10.0:
                             if instance_object:
-                                instance_object.add_event2(
+                                instance_object.add_event(
                                     'Fetching required blob %s, %d%% complete'
                                     % (self.uuid, percentage))
                             self.log.with_fields({
@@ -408,7 +410,7 @@ class Blob(dbo):
                     connection_failures += 1
                     if connection_failures > 2:
                         if instance_object:
-                            instance_object.add_event2(
+                            instance_object.add_event(
                                 'Transfer of blob %s failed' % self.uuid)
                         self.log.error(
                             'HTTP connection repeatedly failed: %s' % e)
@@ -432,7 +434,7 @@ class Blob(dbo):
 
             os.rename(partial_path, blob_path)
             if instance_object:
-                instance_object.add_event2(
+                instance_object.add_event(
                     'Fetching required blob %s, complete' % self.uuid)
             self.log.with_fields({
                 'bytes_fetched': total_bytes_received,
@@ -481,14 +483,14 @@ class Blob(dbo):
                     if n in nodes:
                         nodes.remove(n)
 
-                self.log.with_field('nodes', nodes).debug(
+                self.log.with_fields({'nodes': nodes}).debug(
                     'Considered for blob replication')
 
                 for n in nodes[:targets]:
                     etcd.enqueue(n, {
                         'tasks': [FetchBlobTask(self.uuid)]
                     })
-                    self.log.with_field('node', n).info(
+                    self.log.with_fields({'node': n}).info(
                         'Instructed to replicate blob')
 
     @staticmethod
@@ -555,11 +557,11 @@ def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
                 percentage = fetched / total_size * 100.0
                 if (percentage - previous_percentage) > 10.0:
                     if instance_object:
-                        instance_object.add_event2(
+                        instance_object.add_event(
                             'Fetching required HTTP resource %s into blob %s, %d%% complete'
                             % (url, blob_uuid, percentage))
 
-                    logs.with_field('bytes_fetched', fetched).debug(
+                    logs.with_fields({'bytes_fetched': fetched}).debug(
                         'Fetch %.02f percent complete' % percentage)
                     previous_percentage = percentage
 
@@ -568,10 +570,10 @@ def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
                 last_refresh = time.time()
 
     if instance_object:
-        instance_object.add_event2(
+        instance_object.add_event(
             'Fetching required HTTP resource %s into blob %s, complete'
             % (url, blob_uuid))
-    logs.with_field('bytes_fetched', fetched).info('Fetch complete')
+    logs.with_fields({'bytes_fetched': fetched}).info('Fetch complete')
 
     # We really should verify the checksum here before we commit the blob to the
     # database.

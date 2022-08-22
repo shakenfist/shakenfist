@@ -1,14 +1,14 @@
 import json
 import mock
+from shakenfist_utilities import logs
 
 from shakenfist import etcd
 from shakenfist import exceptions
-from shakenfist import logutil
 from shakenfist import tasks
 from shakenfist.config import BaseSettings
 from shakenfist.tests import base
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 class FakeConfig(BaseSettings):

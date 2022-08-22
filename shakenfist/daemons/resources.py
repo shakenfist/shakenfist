@@ -1,5 +1,6 @@
 import os
 import psutil
+from shakenfist_utilities import logs
 import time
 
 from prometheus_client import Gauge
@@ -11,7 +12,6 @@ from shakenfist.daemons import daemon
 from shakenfist.config import config
 from shakenfist import etcd
 from shakenfist import exceptions
-from shakenfist import logutil
 from shakenfist import instance
 from shakenfist import network
 from shakenfist.util import general as util_general
@@ -19,7 +19,7 @@ from shakenfist.util import libvirt as util_libvirt
 from shakenfist.util import network as util_network
 
 
-LOG, _ = logutil.setup(__name__)
+LOG, _ = logs.setup(__name__)
 
 
 def _get_stats():
@@ -243,7 +243,7 @@ class Monitor(daemon.Daemon):
                                         'actual bytes on disk'] = os.stat(disk_path).st_size
 
                             if inst:
-                                inst.add_event2(
+                                inst.add_event(
                                     'usage', extra=statistics,
                                     suppress_event_logging=True)
 
@@ -259,11 +259,11 @@ class Monitor(daemon.Daemon):
 
                 interface = 'egr-%06x-o' % n.vxid
                 try:
-                    n.add_event2(
+                    n.add_event(
                         'usage', extra=util_network.get_interface_statistics(interface),
                         suppress_event_logging=True)
                 except exceptions.NoInterfaceStatistics as e:
-                    LOG.with_field('network', n).info(
+                    LOG.with_fields({'network': n}).info(
                         'Failed to collect network usage: %s' % e)
 
         while not self.exit.is_set():
