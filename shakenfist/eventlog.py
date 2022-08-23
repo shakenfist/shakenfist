@@ -108,7 +108,7 @@ class EventLog(object):
                     self.con.execute(
                         'ALTER TABLE events ADD COLUMN extra text')
                     self.con.execute(
-                        'UPDATE TABLE version SET version = ?', (ver,))
+                        'UPDATE version SET version = ?', (ver,))
                     self.con.commit()
 
     def write_event(self, timestamp, fqdn, duration, message, extra=None):
