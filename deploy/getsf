@@ -738,11 +738,13 @@ pip3 install ansible
 echo
 
 # We _have_ to have Shaken Fist installed on the primary to boostrap the installer,
-# so we do that separately now.
+# so we do that separately now. That primary venv needs a modern pip on Debian 10
+# for bcrypt installation to work.
 echo
 status "Setup primary venv."
 mkdir -p /srv/shakenfist/venv
 python3 -m venv --system-site-packages /srv/shakenfist/venv
+/srv/shakenfist/venv/bin/pip install -U pip
 
 if [ ${GETSF_SERVER_PACKAGE} == "shakenfist" ]; then
     /srv/shakenfist/venv/bin/pip install ${PIP_EXTRA} shakenfist

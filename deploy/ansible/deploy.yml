@@ -134,6 +134,7 @@
       shell: |
         mkdir -p /srv/shakenfist/venv
         python3 -mvenv --system-site-packages /srv/shakenfist/venv
+        /srv/shakenfist/venv/bin/pip install -U pip
         /srv/shakenfist/venv/bin/pip install {{pip_extra}} {{agent_package}} {{server_package}} {{client_package}}
 
 - hosts: hypervisors, network_node, eventlog_node
