@@ -65,10 +65,7 @@ class Monitor(daemon.Daemon):
                         if time.time() - db_state.update_time < 300:
                             continue
 
-                        inst.enforced_deletes_increment()
-                        attempts = inst._db_get_attribute(
-                            'enforced_deletes')['count']
-
+                        attempts = inst.enforced_deletes_increment()
                         if attempts > 5:
                             # Sometimes we just can't delete the VM. Try the big
                             # hammer instead.

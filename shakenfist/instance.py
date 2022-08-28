@@ -577,6 +577,7 @@ class Instance(dbo):
             enforced_deletes = self.enforced_deletes
             enforced_deletes['count'] = enforced_deletes.get('count', 0) + 1
             self._db_set_attribute('enforced_deletes', enforced_deletes)
+            return enforced_deletes['count']
 
     def update_power_state(self, state):
         with self.get_lock_attr('power_state', 'Instance power state update'):

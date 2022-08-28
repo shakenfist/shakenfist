@@ -39,7 +39,7 @@ class DatabaseBackedObjectTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_set_attribute')
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get_attribute',
                 side_effect=[
-                    None,
+                    {},
                     {'message': 'bad error'},
                     {'value': DatabaseBackedObject.STATE_INITIAL, 'update_time': 4},
                     {'value': DatabaseBackedObject.STATE_ERROR, 'update_time': 4},

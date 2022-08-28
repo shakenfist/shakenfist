@@ -150,7 +150,8 @@ class Network(dbo):
     # Static values
     @property
     def floating_gateway(self):
-        return self._db_get_attribute('routing').get('floating_gateway')
+        fg = self._db_get_attribute('routing', {'floating_gateway': None})
+        return fg['floating_gateway']
 
     @property
     def routing(self):
@@ -208,11 +209,11 @@ class Network(dbo):
     @property
     def networkinterfaces(self):
         with self.get_lock_attr('networkinterfaces', 'Get interfaces'):
-            nis_struct = self._db_get_attribute('networkinterfaces')
+            nis_struct = self._db_get_attribute(
+                'networkinterfaces', {'initialized': False})
 
-            if nis_struct.get('initialized', False):
+            if nis_struct['initialized']:
                 nis = nis_struct.get('networkinterfaces', [])
-
             else:
                 nis = []
                 for ni in networkinterface.NetworkInterfaces(
