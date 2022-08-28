@@ -439,7 +439,6 @@ class Network(dbo):
 
                         subst['floating_router'] = ipm.get_address_at_index(1)
                         subst['floating_gateway'] = self.floating_gateway
-                        subst['floating_netmask'] = ipm.netmask
                 except CongestedNetwork:
                     self.error('Unable to allocate floating gateway IP')
 
@@ -448,7 +447,7 @@ class Network(dbo):
                 if not subst['floating_gateway'] in list(addresses):
                     util_process.execute(
                         None,
-                        'ip addr add %(floating_gateway)s/%(floating_netmask)s '
+                        'ip addr add %(floating_gateway)s/32 '
                         'dev %(egress_veth_inner)s' % subst,
                         namespace=self.uuid)
                     util_process.execute(
