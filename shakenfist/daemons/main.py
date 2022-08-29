@@ -148,11 +148,7 @@ def main():
     # If I am the network node, I need some setup
     if config.NODE_IS_NETWORK_NODE:
         # Bootstrap the floating network in the Networks table
-        floating_network = network.Network.from_db('floating')
-        if not floating_network:
-            floating_network = network.Network.create_floating_network(
-                config.FLOATING_NETWORK)
-
+        network.floating_network()
         subst = {
             'egress_bridge': util_network.get_safe_interface_name(
                 'egr-br-%s' % config.NODE_EGRESS_NIC),

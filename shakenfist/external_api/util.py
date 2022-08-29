@@ -31,10 +31,6 @@ def metadata_putpost(meta_type, owner, key, value):
 
 
 def assign_floating_ip(ni):
-    float_net = network.Network.from_db('floating')
-    if not float_net:
-        return sf_api.error(404, 'floating network not found')
-
     # Address is allocated and added to the record here, so the job has it later.
     with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Interface float'):
         ipm = IPManager.from_db('floating')

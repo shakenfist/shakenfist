@@ -8,7 +8,6 @@ from shakenfist import exceptions
 from shakenfist.external_api import (
     base as api_base,
     util as api_util)
-from shakenfist import network
 from shakenfist.tasks import (
     DefloatNetworkInterfaceTask,
     FloatNetworkInterfaceTask)
@@ -50,10 +49,6 @@ class InterfaceDefloatEndpoint(sf_api.Resource):
         ni, n, err = api_util.safe_get_network_interface(interface_uuid)
         if err:
             return err
-
-        float_net = network.Network.from_db('floating')
-        if not float_net:
-            return sf_api.error(404, 'floating network not found')
 
         # Address is freed as part of the job, so code is "unbalanced" compared
         # to above for reasons.
