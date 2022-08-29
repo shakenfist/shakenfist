@@ -236,7 +236,7 @@ class MockEtcd():
                               netblock=netblock,
                               provide_dhcp=provide_dhcp,
                               provide_nat=provide_nat,
-                              uuid=uuid,
+                              network_uuid=uuid,
                               vxid=vxid,
                               )
 

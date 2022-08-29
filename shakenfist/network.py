@@ -83,20 +83,20 @@ class Network(dbo):
 
     @classmethod
     def new(cls, name, namespace, netblock, provide_dhcp=False,
-            provide_nat=False, uuid=None, vxid=None):
+            provide_nat=False, network_uuid=None, vxid=None):
 
-        if not uuid:
+        if not network_uuid:
             # uuid should only be specified in testing
-            uuid = str(uuid4())
+            network_uuid = str(uuid4())
 
         if not vxid:
-            vxid = Network.allocate_vxid(uuid)
+            vxid = Network.allocate_vxid(network_uuid)
 
         # Pre-create the IPManager
-        IPManager.new(uuid, netblock)
+        IPManager.new(network_uuid, netblock)
 
         Network._db_create(
-            uuid,
+            network_uuid,
             {
                 'vxid': vxid,
                 'name': name,
@@ -108,15 +108,15 @@ class Network(dbo):
             }
         )
 
-        n = Network.from_db(uuid)
+        n = Network.from_db(network_uuid)
         n.state = Network.STATE_INITIAL
 
         # Networks should immediately appear on the network node
-        etcd.enqueue('networknode', DeployNetworkTask(uuid))
+        etcd.enqueue('networknode', DeployNetworkTask(network_uuid))
 
         # TODO(andy): Integrate metadata into each object type
         # Initialise metadata
-        db.persist_metadata('network', uuid, {})
+        db.persist_metadata('network', network_uuid, {})
 
         return n
 
@@ -233,18 +233,6 @@ class Network(dbo):
 
     def remove_networkinterface(self, ni):
         self._remove_item_in_attribute_list('networkinterfaces', ni)
-
-    # TODO(andy) Create new class to avoid external direct access to DB
-    @staticmethod
-    def create_floating_network(netblock):
-        fnet = Network.new(uuid='floating',
-                           vxid=0,
-                           netblock=netblock,
-                           provide_dhcp=False,
-                           provide_nat=False,
-                           namespace=None,
-                           name='floating')
-        return fnet
 
     def update_floating_gateway(self, gateway):
         with self.get_lock_attr('routing', 'Update floating gateway'):
@@ -778,3 +766,16 @@ class Networks(dbo_iter):
 # Convenience helpers
 def networks_in_namespace(namespace):
     return Networks([partial(baseobject.namespace_filter, namespace)])
+
+
+def floating_network():
+    floating_network = Network.from_db('floating')
+    if not floating_network:
+        Network.new(network_uuid='floating',
+                    vxid=0,
+                    netblock=config.FLOATING_NETWORK,
+                    provide_dhcp=False,
+                    provide_nat=False,
+                    namespace=None,
+                    name='floating')
+    return floating_network
