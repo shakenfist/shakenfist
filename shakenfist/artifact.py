@@ -182,9 +182,7 @@ class Artifact(dbo):
 
     @property
     def shared(self):
-        db_data = self._db_get_attribute('shared')
-        if not db_data:
-            return False
+        db_data = self._db_get_attribute('shared', {'shared': False})
         return db_data.get('shared', False)
 
     @shared.setter
@@ -246,8 +244,9 @@ class Artifact(dbo):
 
     def add_index(self, blob_uuid):
         with self.get_lock_attr('index', 'Artifact index creation'):
-            highest_index = self._db_get_attribute('highest_index')
-            index = highest_index.get('index', 0) + 1
+            highest_index = self._db_get_attribute(
+                'highest_index', {'index': 0})
+            index = highest_index['index'] + 1
             self._db_set_attribute('highest_index', {'index': index})
 
             entry = {

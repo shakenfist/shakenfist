@@ -125,14 +125,16 @@ class DatabaseBackedObject(object):
 
     # We need to force in memory values through JSON because some values require
     # a serializer to run to work when we read them.
-    def _db_get_attribute(self, attribute):
+    def _db_get_attribute(self, attribute, default=None):
         if self.__in_memory_only:
             retval = json.loads(self.__in_memory_values.get(attribute, 'null'))
         else:
             retval = etcd.get('attribute/%s' % self.object_type,
                               self.__uuid, attribute)
         if not retval:
-            return {}
+            if not default:
+                return {}
+            return default
         return retval
 
     def _db_get_attributes(self, attribute_prefix):
@@ -251,9 +253,7 @@ class DatabaseBackedObject(object):
 
     @property
     def error(self):
-        db_data = self._db_get_attribute('error')
-        if not db_data:
-            return None
+        db_data = self._db_get_attribute('error', {'message': None})
         return db_data.get('message')
 
     @error.setter

@@ -159,7 +159,8 @@ class Blob(dbo):
     # Values routed to attributes
     @property
     def locations(self):
-        return self._db_get_attribute('locations').get('locations', [])
+        locs = self._db_get_attribute('locations', {'locations': []})
+        return locs['locations']
 
     def add_location(self, location):
         self._add_item_in_attribute_list('locations', location)
@@ -174,17 +175,12 @@ class Blob(dbo):
     @property
     def ref_count(self):
         """Counts artifact references to the blob"""
-        count = self._db_get_attribute('ref_count')
-        if not count:
-            return 0
-        return int(count.get('ref_count', 0))
+        count = self._db_get_attribute('ref_count', {'ref_count': 0})
+        return int(count['ref_count'])
 
     @property
     def transcoded(self):
-        transcoded = self._db_get_attribute('transcoded')
-        if not transcoded:
-            return {}
-        return transcoded
+        return self._db_get_attribute('transcoded')
 
     def add_transcode(self, style, blob_uuid):
         self.record_usage()
@@ -199,9 +195,7 @@ class Blob(dbo):
 
     @property
     def last_used(self):
-        last_used = self._db_get_attribute('last_used')
-        if not last_used:
-            return None
+        last_used = self._db_get_attribute('last_used', {'last_used': None})
         return last_used['last_used']
 
     def record_usage(self):
@@ -462,7 +456,9 @@ class Blob(dbo):
             # Filter out absent locations
             for node_name in self.locations:
                 n = Node.from_db(node_name)
-                if n.state.value != Node.STATE_CREATED:
+                if not n:
+                    locations.remove(node_name)
+                elif n.state.value != Node.STATE_CREATED:
                     locations.remove(node_name)
 
             replica_count = len(locations)
