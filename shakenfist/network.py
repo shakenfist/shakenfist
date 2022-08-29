@@ -752,6 +752,17 @@ class Network(dbo):
                                  'ip link del flt-%(floating_address_as_hex)s-o'
                                  % subst)
 
+    # Proxy to IPManager
+    def _get_ipmanager(self):
+        return IPManager.from_db(self.uuid)
+
+    def reserve(self, address, unique_label_tuple):
+        ipm = self._get_ipmanager()
+        retval = ipm.reserve(address, unique_label_tuple=unique_label_tuple)
+        if retval:
+            ipm.persist()
+        return retval
+
 
 class Networks(dbo_iter):
     def __iter__(self):
