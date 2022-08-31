@@ -11,7 +11,6 @@ from shakenfist.baseobject import (
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
-from shakenfist.ipmanager import IPManager
 from shakenfist import network
 from shakenfist.tasks import DefloatNetworkInterfaceTask
 from shakenfist.util import network as util_network
@@ -146,16 +145,13 @@ class NetworkInterface(dbo):
                 'networknode',
                 DefloatNetworkInterfaceTask(self.network_uuid, self.uuid))
 
-        with db.get_lock('ipmanager', None, self.network_uuid,
-                         ttl=120, op='Release fixed IP'):
-            ipm = IPManager.from_db(self.network_uuid)
-            ipm.release(self.ipv4)
-            ipm.persist()
-
         n = network.Network.from_db(self.network_uuid)
         if not n:
             raise exceptions.NetworkMissing(
                 'No such network: %s' % self.network_uuid)
+        with db.get_lock('ipmanager', None, self.network_uuid,
+                         ttl=120, op='Release fixed IP'):
+            n.release(self.ipv4)
         n.remove_networkinterface(self.uuid)
 
         self.state = dbo.STATE_DELETED

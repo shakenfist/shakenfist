@@ -275,9 +275,8 @@ class Monitor(daemon.WorkerPoolDaemon):
             n.remove_floating_ip(ni.floating.get('floating_address'), ni.ipv4)
 
             with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Instance defloat'):
-                ipm = IPManager.from_db('floating')
-                ipm.release(ni.floating.get('floating_address'))
-                ipm.persist()
+                fn = network.floating_network()
+                fn.release(ni.floating.get('floating_address'))
 
             ni.floating = None
 

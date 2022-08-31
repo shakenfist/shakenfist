@@ -109,10 +109,11 @@ class IPManager(object):
 
     def release(self, address):
         if self.is_free(address):
-            return
+            return False
 
         del self.in_use[address]
         self.in_use_counter -= 1
+        return True
 
     def get_random_address(self):
         bits = random.getrandbits(

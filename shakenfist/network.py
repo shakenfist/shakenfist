@@ -499,9 +499,8 @@ class Network(dbo):
             if self.floating_gateway:
                 with db.get_lock('ipmanager', None, 'floating', ttl=120,
                                  op='Network delete'):
-                    ipm = IPManager.from_db('floating')
-                    ipm.release(self.floating_gateway)
-                    ipm.persist()
+                    fn = floating_network()
+                    fn.release(self.floating_gateway)
                     self.update_floating_gateway(None)
 
             self.state = self.STATE_DELETED
@@ -587,9 +586,8 @@ class Network(dbo):
             if self.floating_gateway:
                 with db.get_lock('ipmanager', None, 'floating', ttl=120,
                                  op='Remove NAT'):
-                    ipm = IPManager.from_db('floating')
-                    ipm.release(self.floating_gateway)
-                    ipm.persist()
+                    fn = floating_network()
+                    fn.release(self.floating_gateway)
                     self.update_floating_gateway(None)
 
         else:
@@ -762,6 +760,11 @@ class Network(dbo):
         if retval:
             ipm.persist()
         return retval
+
+    def release(self, address):
+        ipm = self._get_ipmanager()
+        if ipm.release(address):
+            ipm.persist()
 
 
 class Networks(dbo_iter):
