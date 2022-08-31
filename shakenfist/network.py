@@ -766,6 +766,10 @@ class Network(dbo):
         if ipm.release(address):
             ipm.persist()
 
+    def get_address_at_index(self, idx):
+        ipm = self._get_ipmanager()
+        return ipm.get_address_at_index(idx)
+
 
 class Networks(dbo_iter):
     def __iter__(self):
