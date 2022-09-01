@@ -1,3 +1,4 @@
 prettytable                 # bsd
 oslo.concurrency            # apache2
 shakenfist-client           # apache2
+setuptools>=65.3.0          # mit
