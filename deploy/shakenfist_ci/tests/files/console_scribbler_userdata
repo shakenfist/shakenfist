@@ -2,6 +2,6 @@
 
 runcmd:
   - |
-    for i in $(seq 100); do
+    for i in $(seq 200); do
         echo "fhdjkhfdsjhgjkdsfhkgsdjfkghjkdfshgjkhsdfjkghjksdfhgjkhsdfjkgjksd" > /dev/console
     done
