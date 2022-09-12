@@ -292,18 +292,18 @@ class Artifact(dbo):
 
         blob_uuid = mri.get('blob_uuid')
         if not blob_uuid:
-            self.log.with_fields('most_recent_index', mri).error(
+            self.log.with_fields({'most_recent_index': mri}).error(
                 'Failed to resolve blob: no uuid')
             return
 
         b = blob.Blob.from_db(blob_uuid)
         if not b:
-            self.log.with_fields('most_recent_index', mri).error(
+            self.log.with_fields({'most_recent_index': mri}).error(
                 'Failed to resolve blob: blob missing')
             return
 
         if b.state == blob.Blob.STATE_DELETED:
-            self.log.with_fields('most_recent_index', mri).error(
+            self.log.with_fields({'most_recent_index': mri}).error(
                 'Failed to resolve blob: blob deleted')
             return
 
