@@ -50,7 +50,9 @@ class TestSnapshots(base.BaseNamespacedTestCase):
             time.sleep(5)
 
         self.assertEqual(1, len(snapshots))
-        self.assertEqual('created', snapshots[0]['state'])
+        self.assertEqual(
+            'created', snapshots[0]['state'],
+            'snapshot %s is not in a created state' % snapshots[0]['uuid'])
 
         # Check blob exists and has correct reference count
         snapshot_uuid = snapshots[-1]['uuid']
