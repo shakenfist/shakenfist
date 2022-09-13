@@ -2,6 +2,9 @@ autocancelConsecutiveBuilds()
 
 pipeline {
   agent any
+  options {
+    timeout(time: 2, unit: 'HOURS')
+  }
 
   stages {
     stage('Build infra') {
@@ -254,7 +257,7 @@ pipeline {
                 fi
 
                 # Ensure nothing died
-                if [ `grep -c "died" $WORKSPACE_TMP/syslog` -gt 0 ]
+                if [ `grep -c " died " $WORKSPACE_TMP/syslog` -gt 0 ]
                 then
                   echo "A process died!"
                   exit 1
