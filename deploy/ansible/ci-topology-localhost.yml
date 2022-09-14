@@ -3,7 +3,7 @@
   connection: ssh
   vars:
     identifier: unknown
-    source_path: "/home/jenkins/src/shakenfist/"
+    source_path: "/srv/github/src/shakenfist/"
     base_image: "https://sfcbr.shakenfist.com/static/ubuntu2004-ci-template.qcow2"
     base_image_user: "ubuntu"
 
@@ -49,7 +49,7 @@
         ansible_ssh_host: "{{primary['meta']['network_interfaces'][0]['ipv4']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
-        ansible_ssh_private_key_file: "/home/jenkins/id_ci"
+        ansible_ssh_private_key_file: "/srv/github/id_ci"
         groups: sfall
 
     - name: Log instance details
@@ -63,7 +63,7 @@
   gather_facts: yes
   become: true
   vars:
-    source_path: "/home/jenkins/src/shakenfist/"
+    source_path: "/srv/github/src/shakenfist/"
 
   tasks:
     - name: Disable logrotate

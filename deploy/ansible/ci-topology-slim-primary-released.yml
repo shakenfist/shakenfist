@@ -3,7 +3,7 @@
   connection: ssh
   vars:
     identifier: unknown
-    source_path: "/home/jenkins/src/shakenfist/"
+    source_path: "/srv/github/src/shakenfist/"
     base_image: "https://sfcbr.shakenfist.com/static/ubuntu2004-ci-template.qcow2"
     base_image_user: "ubuntu"
 
@@ -50,7 +50,7 @@
         networkspecs:
           - network_uuid="{{identifier}}"
           - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
-        ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
+        ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
         user_data: "{{userdata_encoded}}"
         state: present
@@ -65,7 +65,7 @@
         ansible_ssh_host: "{{primary['meta']['network_interfaces'][0]['ipv4']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
-        ansible_ssh_private_key_file: "/home/jenkins/id_ci"
+        ansible_ssh_private_key_file: "/srv/github/id_ci"
         groups: sfall
 
     - name: Create sf-1
@@ -78,7 +78,7 @@
         networkspecs:
           - network_uuid="{{identifier}}"
           - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
-        ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
+        ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
         user_data: "{{userdata_encoded}}"
         state: present
@@ -93,7 +93,7 @@
         ansible_ssh_host: "{{sf1['meta']['network_interfaces'][0]['ipv4']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
-        ansible_ssh_private_key_file: "/home/jenkins/id_ci"
+        ansible_ssh_private_key_file: "/srv/github/id_ci"
         groups: hypervisors, sfall
 
     - name: Create sf-2
@@ -106,7 +106,7 @@
         networkspecs:
           - network_uuid="{{identifier}}"
           - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
-        ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
+        ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
         user_data: "{{userdata_encoded}}"
         state: present
@@ -121,7 +121,7 @@
         ansible_ssh_host: "{{sf2['meta']['network_interfaces'][0]['ipv4']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
-        ansible_ssh_private_key_file: "/home/jenkins/id_ci"
+        ansible_ssh_private_key_file: "/srv/github/id_ci"
         groups: hypervisors, sfall
 
     - name: Create sf-3
@@ -134,7 +134,7 @@
         networkspecs:
           - network_uuid="{{identifier}}"
           - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
-        ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
+        ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
         user_data: "{{userdata_encoded}}"
         state: present
@@ -149,7 +149,7 @@
         ansible_ssh_host: "{{sf3['meta']['network_interfaces'][0]['ipv4']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
-        ansible_ssh_private_key_file: "/home/jenkins/id_ci"
+        ansible_ssh_private_key_file: "/srv/github/id_ci"
         groups: hypervisors, sfall
 
     - name: Create sf-4
@@ -162,7 +162,7 @@
         networkspecs:
           - network_uuid="{{identifier}}"
           - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
-        ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
+        ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
         user_data: "{{userdata_encoded}}"
         state: present
@@ -177,7 +177,7 @@
         ansible_ssh_host: "{{sf4['meta']['network_interfaces'][0]['ipv4']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
-        ansible_ssh_private_key_file: "/home/jenkins/id_ci"
+        ansible_ssh_private_key_file: "/srv/github/id_ci"
         groups: hypervisors, sfall
 
     - name: Create sf-5
@@ -190,7 +190,7 @@
         networkspecs:
           - network_uuid="{{identifier}}"
           - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
-        ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
+        ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
         user_data: "{{userdata_encoded}}"
         state: present
@@ -205,7 +205,7 @@
         ansible_ssh_host: "{{sf5['meta']['network_interfaces'][0]['ipv4']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
-        ansible_ssh_private_key_file: "/home/jenkins/id_ci"
+        ansible_ssh_private_key_file: "/srv/github/id_ci"
         groups: hypervisors, sfall
 
     - name: Log instance details
@@ -224,7 +224,7 @@
   gather_facts: yes
   become: true
   vars:
-    source_path: "/home/jenkins/src/shakenfist/"
+    source_path: "/srv/github/src/shakenfist/"
 
   tasks:
     - name: Disable logrotate
@@ -313,7 +313,7 @@
   tasks:
     - name: Copy ssh key to primary node
       copy:
-        src: /home/jenkins/id_ci
+        src: /srv/github/id_ci
         dest: /root/.ssh/id_rsa
         owner: root
         group: root
