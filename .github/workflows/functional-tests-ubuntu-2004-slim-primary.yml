@@ -1,0 +1,211 @@
+name: Test ubuntu-2004-slim-primary
+
+on:
+  push:
+    branches:
+      - develop
+      - v*-releases
+  pull_request:
+    branches:
+      - develop
+      - v*-releases
+
+jobs:
+  ubuntu-2004-slim-primary:
+    runs-on: self-hosted
+    timeout-minutes: 120
+
+    # NOTE(mikal): git repos are checked out to /srv/github/_work/{org}/{repo}
+    # which is available as GITHUB_WORKSPACE. You can find other environment
+    # variables at https://docs.github.com/en/actions/learn-github-actions/environment-variables
+
+    steps:
+      - name: Remove previous unfinished runs
+        uses: n1hility/cancel-previous-runs@v2
+        with: 
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set environment variables
+        run: |
+          echo "SF_HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
+          echo "SF_PRIMARY_REPO=$( echo ${{ github.repository }} | cut -f 2 -d '/' )" >> $GITHUB_ENV
+          echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
+
+      - name: Checkout shakenfist
+        uses: actions/checkout@v3
+        with:
+          path: shakenfist
+          fetch-depth: 0
+
+      - name: Determine if there is any dependency between the repositories
+        run: |
+          python3 ${GITHUB_WORKSPACE}/shakenfist/tools/clone_with_depends.py
+
+      - name: Build infrastructure
+        run: |
+          cd ${GITHUB_WORKSPACE}/shakenfist
+          ansible-playbook -i /home/debian/ansible-hosts \
+              --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
+              base_image=sf://label/system/sfci-ubuntu-2004 base_image_user=ubuntu" \
+              deploy/ansible/ci-topology-slim-primary.yml
+
+      - name: Run getsf installer on primary
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ubuntu@$primary /tmp/getsf-wrapper
+          echo ""
+          echo ""
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ubuntu@$primary \
+              'sudo rm /etc/apache2/sites-enabled/*; sudo a2ensite sf-example.conf; sudo apachectl graceful'
+
+      - name: Wait for API to start answering
+        run: |
+          set +e
+
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              ubuntu@$primary 'sudo chmod ugo+r /etc/sf/sfrc /etc/sf/shakenfist.json /var/log/syslog'
+
+          count=0
+          while [ $count -lt 60 ]
+          do
+            ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              ubuntu@$primary '. /etc/sf/sfrc; sf-client instance list'
+            if [ $? == 0 ]; then
+              exit 0
+            fi
+
+            count=$(( $count + 1 ))
+            sleep 5
+          done
+
+          exit 1
+
+      - name: Import cached images
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              ubuntu@$primary \
+              '. /etc/sf/sfrc; sf-client artifact upload ubuntu-1804 /srv/ci/ubuntu:18.04 --shared'
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              ubuntu@$primary \
+              '. /etc/sf/sfrc; sf-client artifact upload ubuntu-2004 /srv/ci/ubuntu:20.04 --shared'
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              ubuntu@$primary \
+              '. /etc/sf/sfrc; sf-client artifact upload debian-11 /srv/ci/debian:11 --shared'
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              ubuntu@$primary \
+              '. /etc/sf/sfrc; sf-client artifact upload cirros /srv/ci/cirros --shared'
+
+      - name: Create a base level of activity in the cluster
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              ubuntu@$primary \
+              'echo "==== sfrc ===="; cat /etc/sf/sfrc; echo "==== end sfrc ===="'
+          echo ""
+          echo ""
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              ubuntu@$primary \
+              '. /etc/sf/sfrc; for i in `seq 100`; do sf-client --async=continue network create background-$i 10.$i.0.0/24 > /dev/null; echo -n "."; done'
+          echo ""
+
+      - name: Run functional tests
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              $source_path/shakenfist \
+              ubuntu@$primary:shakenfist
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              ubuntu@$primary "cd shakenfist/deploy; . /etc/sf/sfrc; SHAKENFIST_CI_CONCURRENCY=5 tox -epy3"
+
+      - name: Check logs
+        if: ${{ ! cancelled() }}
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ubuntu@$primary:/var/log/syslog \
+              ${GITHUB_WORKSPACE}/syslog
+
+          # Ensure we don't have any tracebacks
+          if [ `grep -c "Traceback (most recent call last):" ${GITHUB_WORKSPACE}/syslog` -gt 0 ]
+          then
+            echo "We have tracebacks in the logs!"
+            exit 1
+          fi
+
+          # Ensure we didn't log any errors -- note the inclusion of the start
+          # of the process name here to avoid errors from things like prometheus
+          # node exporter.
+          if [ `grep -c "ERROR sf" ${GITHUB_WORKSPACE}/syslog` -gt 0 ]
+          then
+            echo "Errors were logged!"
+            exit 1
+          fi
+
+          # Ensure nothing died
+          if [ `grep -c " died" ${GITHUB_WORKSPACE}/syslog` -gt 0 ]
+          then
+            echo "A process died!"
+            exit 1
+          fi
+
+          # Ensure no leaked vxlans
+          if [ `grep -c "Extra vxlan present" ${GITHUB_WORKSPACE}/syslog` -gt 0 ]
+          then
+            echo "vxlans leaked!"
+            exit 1
+          fi
+
+          # Ensure grpc isn't misconfigured, or being used after a fork
+          if [ `grep -c "Fork support is only compatible with the epoll1 and poll polling strategies" ${GITHUB_WORKSPACE}/syslog` -gt 0 ]
+          then
+            echo "grpc called after a fork!"
+            exit 1
+          fi
+
+      - name: Gather logs
+        if: ${{ ! cancelled() }}
+        run: |
+          set -x
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+
+          cd ${GITHUB_WORKSPACE}
+          rm -rf artifacts bundle
+          mkdir -p artifacts bundle
+
+          echo "=============================="
+          for node in $nodes
+          do
+            echo "=== $node ==="
+            safe_node=$(echo $node | tr "-" "_")
+
+            ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                ubuntu@${!safe_node} sudo /srv/shakenfist/venv/bin/clingwrap gather \
+                --target /srv/shakenfist/venv/share/clingwrap/shakenfist-ci-failure.cwd --output /tmp/$node.zip
+            scp -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                ubuntu@${!safe_node}:/tmp/$node.zip bundle/
+
+            mkdir -p bundle/$node
+
+            # We ignore the exit code of unzip, as it will return 1 if a warning is
+            # emitted during expansion, even though expansion worked correctly. For
+            # example stripping a leading / from paths.
+            unzip -q bundle/$node.zip -d bundle/$node/ || true
+            rm bundle/$node.zip
+          done
+
+          zip -rq artifacts/bundle.zip bundle/*
+
+      - uses: actions/upload-artifact@v3
+        if: ${{ ! cancelled() }}
+        with:
+          name: bundle.zip
+          retention-days: 14
+          path: ${{ github.workspace }}/artifacts/bundle.zip
