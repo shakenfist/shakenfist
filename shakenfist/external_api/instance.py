@@ -77,13 +77,22 @@ class InstanceEndpoint(sf_api.Resource):
         return instance_from_db.external_view()
 
 
-def _artifact_safety_checks(a):
+def _artifact_safety_checks(a, instance_uuid=None):
+    log = LOG
+    if a:
+        log = log.with_fields({'artifact': a})
+    if instance_uuid:
+        log = log.with_fields({'instance': instance_uuid})
+
     if not a:
+        log.info('Artifact not found')
         return sf_api.error(404, 'artifact not found')
     if a.state.value != Artifact.STATE_CREATED:
+        log.info('Artifact not in ready state')
         return sf_api.error(
             404, 'artifact not ready (state=%s)' % a.state.value)
     if get_jwt_identity()[0] != 'system':
+        log.info('Artifact not owned by requestor and not shared')
         if not a.shared and a.namespace != get_jwt_identity()[0]:
             return sf_api.error(404, 'artifact not found')
     return
@@ -178,7 +187,7 @@ class InstancesEndpoint(sf_api.Resource):
                     Artifact.TYPE_LABEL,
                     '%s%s/%s' % (LABEL_URL, get_jwt_identity()[0], label),
                     namespace=namespace)
-                err = _artifact_safety_checks(a)
+                err = _artifact_safety_checks(a, instance_uuid=instance_uuid)
                 if err:
                     return err
 
@@ -189,7 +198,7 @@ class InstancesEndpoint(sf_api.Resource):
 
             elif disk_base.startswith(SNAPSHOT_URL):
                 a = Artifact.from_db(disk_base[len(SNAPSHOT_URL):])
-                err = _artifact_safety_checks(a)
+                err = _artifact_safety_checks(a, instance_uuid=instance_uuid)
                 if err:
                     return err
 
@@ -205,7 +214,7 @@ class InstancesEndpoint(sf_api.Resource):
                 else:
                     a = Artifact.from_url(Artifact.TYPE_LABEL, disk_base,
                                           namespace=namespace)
-                err = _artifact_safety_checks(a)
+                err = _artifact_safety_checks(a, instance_uuid=instance_uuid)
                 if err:
                     return err
 
@@ -237,7 +246,7 @@ class InstancesEndpoint(sf_api.Resource):
                 url = '%s%s/%s' % (LABEL_URL, get_jwt_identity()[0], label)
                 a = Artifact.from_url(
                     Artifact.TYPE_LABEL, url, namespace=namespace)
-                err = _artifact_safety_checks(a)
+                err = _artifact_safety_checks(a, instance_uuid=instance_uuid)
                 if err:
                     return err
 
