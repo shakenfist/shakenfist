@@ -18,7 +18,8 @@ from shakenfist.constants import LOCK_REFRESH_SECONDS, GiB
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist.exceptions import (BlobDeleted, BlobFetchFailed,
-                                   BlobDependencyMissing, BlobsMustHaveContent)
+                                   BlobDependencyMissing, BlobsMustHaveContent,
+                                   BlobAlreadyBeingTransferred)
 from shakenfist import instance
 from shakenfist.metrics import get_minimum_object_version as gmov
 from shakenfist.node import (Node, Nodes, nodes_by_free_disk_descending,
@@ -308,7 +309,8 @@ class Blob(dbo):
 
             return new_count
 
-    def ensure_local(self, locks, instance_object=None):
+    def ensure_local(self, locks, instance_object=None,
+                     wait_for_other_transfers=True):
         if self.state.value != self.STATE_CREATED:
             self.log.warning(
                 'Blob not in created state, replication cancelled')
@@ -341,6 +343,9 @@ class Blob(dbo):
                     'five minutes. Removing and re-attempting.')
                 os.unlink(partial_path)
             else:
+                if not wait_for_other_transfers:
+                    raise BlobAlreadyBeingTransferred()
+
                 self.log.with_fields({
                     'partial file age': time.time() - st.st_mtime}).info(
                     'Waiting for existing download to complete')

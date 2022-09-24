@@ -172,7 +172,7 @@ def handle(jobname, workitem):
 
                 else:
                     log.with_fields({'blob': b}).info('Replicating blob')
-                    size = b.ensure_local([])
+                    size = b.ensure_local([], wait_for_other_transfers=False)
                     log.with_fields({
                         'blob': b,
                         'transferred': size,
@@ -184,6 +184,11 @@ def handle(jobname, workitem):
                     'Unhandled task - dropped')
 
             log_i.info('Task complete')
+
+    except exceptions.BlobAlreadyBeingTransferred:
+        # Re-enqueue this job to run in a minute
+        log.info('Deferring job as blob is already being transferred')
+        etcd.enqueue(config.NODE_NAME, workitem, delay=60)
 
     except exceptions.ImageFetchTaskFailedException as e:
         # Usually caused by external issue and not an application error
