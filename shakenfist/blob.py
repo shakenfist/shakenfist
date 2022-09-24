@@ -335,7 +335,7 @@ class Blob(dbo):
         while os.path.exists(partial_path):
             st = os.stat(partial_path)
             self.log.with_fields({
-                'partial file age': st.st_mtime}).info(
+                'partial file age': time.time() - st.st_mtime}).info(
                 'Waiting for existing download to complete')
             time.sleep(10)
 
