@@ -334,10 +334,17 @@ class Blob(dbo):
         partial_path = blob_path + '.partial'
         while os.path.exists(partial_path):
             st = os.stat(partial_path)
-            self.log.with_fields({
-                'partial file age': time.time() - st.st_mtime}).info(
-                'Waiting for existing download to complete')
-            time.sleep(10)
+            if time.time() - st.st_mtime > 300:
+                self.log.with_fields({
+                    'partial file age': time.time() - st.st_mtime}).warning(
+                    'No activity on previous partial download in more than '
+                    'five minutes. Removing and re-attempting.')
+                os.unlink(partial_path)
+            else:
+                self.log.with_fields({
+                    'partial file age': time.time() - st.st_mtime}).info(
+                    'Waiting for existing download to complete')
+                time.sleep(10)
 
         # If the blob exists after waiting for another partial transfer,
         # we're done
