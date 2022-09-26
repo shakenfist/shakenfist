@@ -499,9 +499,8 @@ class Network(dbo):
             if self.floating_gateway:
                 with db.get_lock('ipmanager', None, 'floating', ttl=120,
                                  op='Network delete'):
-                    ipm = IPManager.from_db('floating')
-                    ipm.release(self.floating_gateway)
-                    ipm.persist()
+                    fn = floating_network()
+                    fn.release(self.floating_gateway)
                     self.update_floating_gateway(None)
 
             self.state = self.STATE_DELETED
@@ -587,9 +586,8 @@ class Network(dbo):
             if self.floating_gateway:
                 with db.get_lock('ipmanager', None, 'floating', ttl=120,
                                  op='Remove NAT'):
-                    ipm = IPManager.from_db('floating')
-                    ipm.release(self.floating_gateway)
-                    ipm.persist()
+                    fn = floating_network()
+                    fn.release(self.floating_gateway)
                     self.update_floating_gateway(None)
 
         else:
@@ -751,6 +749,26 @@ class Network(dbo):
             util_process.execute(None,
                                  'ip link del flt-%(floating_address_as_hex)s-o'
                                  % subst)
+
+    # Proxy to IPManager
+    def _get_ipmanager(self):
+        return IPManager.from_db(self.uuid)
+
+    def reserve(self, address, unique_label_tuple):
+        ipm = self._get_ipmanager()
+        retval = ipm.reserve(address, unique_label_tuple=unique_label_tuple)
+        if retval:
+            ipm.persist()
+        return retval
+
+    def release(self, address):
+        ipm = self._get_ipmanager()
+        if ipm.release(address):
+            ipm.persist()
+
+    def get_address_at_index(self, idx):
+        ipm = self._get_ipmanager()
+        return ipm.get_address_at_index(idx)
 
 
 class Networks(dbo_iter):

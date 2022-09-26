@@ -14,7 +14,6 @@ from shakenfist.daemons import daemon
 from shakenfist.daemons import shim
 from shakenfist import etcd
 from shakenfist import instance
-from shakenfist.ipmanager import IPManager
 from shakenfist import network
 from shakenfist.networkinterface import interfaces_for_instance
 from shakenfist.node import Node
@@ -173,9 +172,9 @@ def main():
             # floating IPs don't work.
             #
             # No locking as read only
-            ipm = IPManager.from_db('floating')
-            subst['master_float'] = ipm.get_address_at_index(1)
-            subst['netmask'] = ipm.netmask
+            fn = network.floating_network()
+            subst['master_float'] = fn.get_address_at_index(1)
+            subst['netmask'] = fn.netmask
 
             # We need to copy the MTU of the interface we are bridging to
             # or weird networking things happen.

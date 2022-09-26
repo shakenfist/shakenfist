@@ -275,9 +275,8 @@ class Monitor(daemon.WorkerPoolDaemon):
             n.remove_floating_ip(ni.floating.get('floating_address'), ni.ipv4)
 
             with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Instance defloat'):
-                ipm = IPManager.from_db('floating')
-                ipm.release(ni.floating.get('floating_address'))
-                ipm.persist()
+                fn = network.floating_network()
+                fn.release(ni.floating.get('floating_address'))
 
             ni.floating = None
 
@@ -321,6 +320,7 @@ class Monitor(daemon.WorkerPoolDaemon):
         # Ensure we haven't leaked any floating IPs (because we used to)
         with db.get_lock('ipmanager', None, 'floating', ttl=120,
                          op='Cleanup leaks'):
+            floating_network = network.floating_network()
             floating_ipm = IPManager.from_db('floating')
 
             # Collect floating gateways and floating IPs, while ensuring that
@@ -355,8 +355,8 @@ class Monitor(daemon.WorkerPoolDaemon):
             LOG.info('Found floating addresses: %s' % floating_addresses)
 
             floating_reserved = [
-                floating_ipm.get_address_at_index(0),
-                floating_ipm.get_address_at_index(1),
+                floating_network.get_address_at_index(0),
+                floating_network.get_address_at_index(1),
                 floating_ipm.broadcast_address,
                 floating_ipm.network_address
             ]

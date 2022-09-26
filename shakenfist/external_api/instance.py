@@ -367,9 +367,9 @@ class InstancesEndpoint(sf_api.Resource):
             for netdesc in network:
                 n = sfnet.Network.from_db(netdesc['network_uuid'])
                 if not n:
-                    m = 'missing network %s during IP allocation phase' % (
-                        netdesc['network_uuid'])
-                    inst.enqueue_delete_due_error(m)
+                    inst.enqueue_delete_due_error(
+                        'missing network %s during IP allocation phase'
+                        % netdesc['network_uuid'])
                     return sf_api.error(
                         404, 'network %s not found' % netdesc['network_uuid'])
 
@@ -390,10 +390,10 @@ class InstancesEndpoint(sf_api.Resource):
                                 inst.add_event(
                                     'allocated ip address', extra=netdesc)
                             else:
-                                if not ipm.reserve(netdesc['address'], inst.unique_label()):
-                                    m = 'failed to reserve an IP on network %s' % (
-                                        netdesc['network_uuid'])
-                                    inst.enqueue_delete_due_error(m)
+                                if not n.reserve(netdesc['address'], inst.unique_label()):
+                                    inst.enqueue_delete_due_error(
+                                        'failed to reserve an IP on network %s'
+                                        % netdesc['network_uuid'])
                                     return sf_api.error(
                                         409, 'address %s in use' % netdesc['address'])
 
