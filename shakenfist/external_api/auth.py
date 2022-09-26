@@ -31,7 +31,9 @@ class AuthEndpoint(sf_api.Resource):
 
         ns = db.get_namespace(namespace)
         if not ns:
-            return sf_api.error(401, 'unauthorized')
+            LOG.with_fields({'namespace': namespace}).info(
+                'Namespace not found during auth request')
+            return sf_api.error(404, 'namespace not found during auth request')
         service_key = ns.get('service_key')
         if service_key and key == service_key:
             return {
@@ -45,6 +47,8 @@ class AuthEndpoint(sf_api.Resource):
                     'access_token': create_access_token(identity=[namespace, key_name])
                 }
 
+        LOG.with_fields({'namespace': namespace}).info(
+            'Key not found during auth request')
         return sf_api.error(401, 'unauthorized')
 
 

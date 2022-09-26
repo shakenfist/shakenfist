@@ -229,3 +229,7 @@ class BlobDependencyMissing(Exception):
 
 class BlobsMustHaveContent(Exception):
     pass
+
+
+class BlobAlreadyBeingTransferred(Exception):
+    pass

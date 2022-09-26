@@ -58,6 +58,17 @@ class Scheduler(object):
         self.metrics = get_active_node_metrics()
         self.metrics_updated = time.time()
 
+    def _has_reasonable_queue_state(self, log_ctx, node):
+        waiting = self.metrics[node].get('node_queue_waiting', 0)
+        if waiting > 20:
+            log_ctx.with_fields({
+                'node': node,
+                'node_queue_waiting': waiting
+            }).debug('Excluding node with many queued jobs')
+            return False
+
+        return True
+
     def _has_sufficient_cpu(self, log_ctx, cpus, node):
         hard_max_cpus = (self.metrics[node].get(
             'cpu_max', 0) * config.CPU_OVERCOMMIT_RATIO)
@@ -216,6 +227,13 @@ class Scheduler(object):
 
             if not candidates:
                 raise exceptions.LowResourceException('No nodes with metrics')
+
+            # Don't use nodes which aren't keeping up with queue jobs
+            for n in list(candidates):
+                if not self._has_reasonable_queue_state(log_ctx, n):
+                    candidates.remove(n)
+            inst.add_event('schedule have reasonable queue state',
+                           extra={'candidates': candidates})
 
             # Can we host that many vCPUs?
             for n in list(candidates):

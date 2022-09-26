@@ -136,6 +136,15 @@ def main():
     Node.observe_this_node()
     etcd.restart_queues()
 
+    # Remove any stray partial blob transfers
+    blob_path = os.path.join(config.STORAGE_PATH, 'blobs')
+    if os.path.exists(blob_path):
+        for ent in os.listdir(blob_path):
+            if ent.endswith('.partial'):
+                LOG.with_fields({'blob': ent.split('.')[0]}).warning(
+                    'Removing stale partial blob transfer')
+                os.unlink(os.path.join(blob_path, ent))
+
     def _start_daemon(d):
         DAEMON_PROCS[d] = subprocess.Popen(
             ['/srv/shakenfist/venv/bin/sf-daemon-shim', d])
