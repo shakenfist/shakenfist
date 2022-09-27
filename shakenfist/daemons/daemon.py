@@ -21,6 +21,7 @@ DAEMON_NAMES = {
     'queues': 'sf-queues',
     'resources': 'sf-resources',
     'sidechannel': 'sf-sidechannel',
+    'transfers': 'sf-transfers'
 }
 
 
@@ -66,21 +67,22 @@ class Daemon(object):
 class WorkerPoolDaemon(Daemon):
     def __init__(self, name):
         super(WorkerPoolDaemon, self).__init__(name)
-        self.workers = []
+        self.workers = {}
         self.present_cpus = util_libvirt.get_cpu_count()
 
     def reap_workers(self):
-        for w in list(self.workers):
-            if not w.is_alive():
-                w.join(1)
-                self.workers.remove(w)
+        for workname in list(self.workers.keys()):
+            p = self.workers[workname]
+            if not p.is_alive():
+                p.join(1)
+                del self.workers[workname]
 
     def start_workitem(self, processing_callback, args, name):
         p = multiprocessing.Process(
             target=processing_callback, args=args,
             name='%s-%s' % (process_name('queues'), name))
         p.start()
-        self.workers.append(p)
+        self.workers[name] = p
         return p.pid
 
     def dequeue_work_item(self, queue_name, processing_callback):

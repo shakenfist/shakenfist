@@ -1,14 +1,12 @@
 # Copyright 2021 Michael Still
 
-import http
 import magic
 import numbers
 import os
 import random
-import requests
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs, random as sf_random
+import socket
 import time
-import urllib3
 
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
@@ -358,80 +356,37 @@ class Blob(dbo):
             return
 
         with open(partial_path, 'wb') as f:
-            done = False
-            last_refresh = 0
-
             total_bytes_received = 0
-            previous_percentage = 0
-            connection_failures = 0
 
-            while not done:
-                locations = self.locations
-                random.shuffle(locations)
-                blob_source = locations[0]
-                bytes_in_attempt = 0
+            # NOTE(mikal): this port allocaiton scheme isn't great as it doesn't
+            # handle a port being in use already on the remote node. We should
+            # probably have a retry thing here.
+            locations = self.locations
+            random.shuffle(locations)
+            port = random.randint(14000, 24000)
+            name = sf_random.random_id()
+            token = sf_random.random_id()
+            data = {
+                'port': port,
+                'requestor': config.NODE_MESH_IP,
+                'blob_uuid': self.uuid,
+                'token': token
+            }
 
-                try:
-                    admin_token = util_general.get_api_token(
-                        'http://%s:%d' % (blob_source, config.API_PORT))
-                    url = ('http://%s:%d/blobs/%s/data?offset=%d'
-                           % (blob_source, config.API_PORT, self.uuid,
-                              total_bytes_received))
-                    r = requests.request(
-                        'GET', url, stream=True,
-                        headers={'Authorization': admin_token,
-                                 'User-Agent': util_general.get_user_agent()})
-                    connection_failures = 0
+            etcd.put('transfer', locations[0], name, data)
+            self.log.with_fields(data).info('Created transfer request')
+            time.sleep(10)
 
-                    for chunk in r.iter_content(chunk_size=8192):
-                        f.write(chunk)
-                        total_bytes_received += len(chunk)
-                        bytes_in_attempt += len(chunk)
+            client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            client.connect((locations[0], port))
+            client.send(token.encode('utf-8'))
 
-                        if time.time() - last_refresh > LOCK_REFRESH_SECONDS:
-                            db.refresh_locks(locks)
-                            last_refresh = time.time()
-
-                        percentage = (total_bytes_received /
-                                      int(self.size) * 100.0)
-                        if (percentage - previous_percentage) > 10.0:
-                            if instance_object:
-                                instance_object.add_event(
-                                    'Fetching required blob %s, %d%% complete'
-                                    % (self.uuid, percentage))
-                            self.log.with_fields({
-                                'bytes_fetched': total_bytes_received,
-                                'size': int(self.size)
-                            }).debug('Fetch %.02f percent complete' % percentage)
-                            previous_percentage = percentage
-
-                    done = True
-                    self.log.with_fields({
-                        'bytes_fetched': total_bytes_received,
-                        'size': int(self.size),
-                        'done': done
-                    }).info('HTTP request ran out of chunks')
-
-                except urllib3.exceptions.NewConnectionError as e:
-                    connection_failures += 1
-                    if connection_failures > 2:
-                        if instance_object:
-                            instance_object.add_event(
-                                'Transfer of blob %s failed' % self.uuid)
-                        self.log.error(
-                            'HTTP connection repeatedly failed: %s' % e)
-                        raise e
-
-                except (http.client.IncompleteRead,
-                        urllib3.exceptions.ProtocolError,
-                        requests.exceptions.ChunkedEncodingError) as e:
-                    # An API error (or timeout) occurred. Retry unless we got nothing.
-                    if bytes_in_attempt > 0:
-                        self.log.info('HTTP connection dropped, retrying')
-                    else:
-                        self.log.error('HTTP connection dropped without '
-                                       'transferring data: %s' % e)
-                        raise e
+            with open(partial_path, 'wb') as f:
+                d = client.recv(8000)
+                while d:
+                    f.write(d)
+                    total_bytes_received += len(d)
+                    d = client.recv(8000)
 
             if total_bytes_received != int(self.size):
                 if os.path.exists(partial_path):

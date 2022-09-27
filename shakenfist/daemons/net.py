@@ -413,8 +413,8 @@ class Monitor(daemon.WorkerPoolDaemon):
 
                 if not self.exit.is_set():
                     worker_pids = []
-                    for w in self.workers:
-                        worker_pids.append(w.pid)
+                    for workername in self.workers:
+                        worker_pids.append(self.workers[workername].pid)
 
                     if config.NODE_IS_NETWORK_NODE and network_worker not in worker_pids:
                         network_worker = self.start_workitem(
