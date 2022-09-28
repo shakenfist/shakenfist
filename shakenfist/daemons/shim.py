@@ -11,6 +11,7 @@ from shakenfist.daemons import queues as queues_daemon
 from shakenfist.daemons import net as net_daemon
 from shakenfist.daemons import resources as resource_daemon
 from shakenfist.daemons import sidechannel as sidechannel_daemon
+from shakenfist.daemons import transfers as transfers_daemon
 
 
 DAEMON_IMPLEMENTATIONS = {
@@ -21,7 +22,8 @@ DAEMON_IMPLEMENTATIONS = {
     'net': net_daemon,
     'queues': queues_daemon,
     'resources': resource_daemon,
-    'sidechannel': sidechannel_daemon
+    'sidechannel': sidechannel_daemon,
+    'transfers': transfers_daemon
 }
 
 
