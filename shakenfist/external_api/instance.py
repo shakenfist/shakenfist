@@ -92,8 +92,8 @@ def _artifact_safety_checks(a, instance_uuid=None):
         return sf_api.error(
             404, 'artifact not ready (state=%s)' % a.state.value)
     if get_jwt_identity()[0] != 'system':
-        log.info('Artifact not owned by requestor and not shared')
         if not a.shared and a.namespace != get_jwt_identity()[0]:
+            log.info('Artifact not owned by requestor and not shared')
             return sf_api.error(404, 'artifact not found')
     return
 
