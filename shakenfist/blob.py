@@ -357,6 +357,8 @@ class Blob(dbo):
 
         with open(partial_path, 'wb') as f:
             total_bytes_received = 0
+            last_refresh = 0
+            previous_percentage = 0
 
             # NOTE(mikal): this port allocaiton scheme isn't great as it doesn't
             # handle a port being in use already on the remote node. We should
@@ -386,6 +388,24 @@ class Blob(dbo):
                 while d:
                     f.write(d)
                     total_bytes_received += len(d)
+
+                    if time.time() - last_refresh > LOCK_REFRESH_SECONDS:
+                        db.refresh_locks(locks)
+                        last_refresh = time.time()
+
+                    percentage = (total_bytes_received /
+                                  int(self.size) * 100.0)
+                    if (percentage - previous_percentage) > 10.0:
+                        if instance_object:
+                            instance_object.add_event(
+                                'Fetching required blob %s, %d%% complete'
+                                % (self.uuid, percentage))
+                        self.log.with_fields({
+                            'bytes_fetched': total_bytes_received,
+                            'size': int(self.size)
+                        }).debug('Fetch %.02f percent complete' % percentage)
+                        previous_percentage = percentage
+
                     d = client.recv(8000)
 
             if total_bytes_received != int(self.size):
