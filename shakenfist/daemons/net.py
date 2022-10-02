@@ -312,10 +312,10 @@ class Monitor(daemon.WorkerPoolDaemon):
 
     def _reap_leaked_floating_ips(self):
         # Block until the network node queue is idle to avoid races
-        processing, waiting = etcd.get_queue_length('networknode')
+        processing, waiting, _ = etcd.get_queue_length('networknode')
         while processing + waiting > 0:
             self.exit.wait(60)
-            processing, waiting = etcd.get_queue_length('networknode')
+            processing, waiting, _ = etcd.get_queue_length('networknode')
 
         # Ensure we haven't leaked any floating IPs (because we used to)
         with db.get_lock('ipmanager', None, 'floating', ttl=120,

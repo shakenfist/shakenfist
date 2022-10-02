@@ -149,8 +149,9 @@ def _get_stats():
                 pass
 
         # Queue health statistics
-        node_queue_processing, node_queue_waiting = etcd.get_queue_length(
-            config.NODE_NAME)
+        with etcd.ThreadLocalReadOnlyCache():
+            node_queue_processing, node_queue_waiting, node_queue_deferred = \
+                etcd.get_queue_length(config.NODE_NAME)
 
         retval.update({
             'cpu_total_instance_vcpus': total_instance_vcpus,
@@ -161,11 +162,12 @@ def _get_stats():
             'instances_active': total_active_instances,
             'node_queue_processing': node_queue_processing,
             'node_queue_waiting': node_queue_waiting,
+            'node_queue_deferred': node_queue_deferred
         })
 
         if config.NODE_IS_NETWORK_NODE:
-            network_queue_processing, network_queue_waiting = etcd.get_queue_length(
-                'networknode')
+            network_queue_processing, network_queue_waiting, node_queue_deferred = \
+                etcd.get_queue_length('networknode')
 
             retval.update({
                 'network_queue_processing': network_queue_processing,
