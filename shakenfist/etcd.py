@@ -535,9 +535,16 @@ def resolve(queuename, jobname):
 
 
 def get_queue_length(queuename):
-    queued = len(list(get_all('queue', queuename)))
+    queued = 0
+    deferred = 0
+    for name, _ in get_all('queue', queuename):
+        if float(name.split('/')[-1].split('-')[0]) > time.time():
+            deferred += 1
+        else:
+            queued += 1
+
     processing = len(list(get_all('processing', queuename)))
-    return processing, queued
+    return processing, queued, deferred
 
 
 @retry_etcd_forever
