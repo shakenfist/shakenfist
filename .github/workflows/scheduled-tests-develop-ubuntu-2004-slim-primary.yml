@@ -1,4 +1,4 @@
-name: Scheduled retest develop-ubuntu-2004-slim-primary
+name: Retest develop-ubuntu-2004-slim-primary
 
 on:
   workflow_dispatch:
