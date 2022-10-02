@@ -1,4 +1,4 @@
-name: Scheduled retest v06-debian-10-localhost
+name: Retest v06-debian-10-localhost
 
 on:
   workflow_dispatch:
