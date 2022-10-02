@@ -1,4 +1,4 @@
-name: Scheduled retest develop-debian-11-slim-primary
+name: Retest develop-debian-11-slim-primary
 
 on:
   workflow_dispatch:

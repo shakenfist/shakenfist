@@ -1,4 +1,4 @@
-name: Scheduled retest v05-ubuntu-2004-slim-primary
+name: Retest v05-ubuntu-2004-slim-primary
 
 on:
   workflow_dispatch:
