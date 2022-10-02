@@ -8,21 +8,6 @@
     base_image_user: "ubuntu"
 
   tasks:
-    - name: Create the namespace
-      shell: sf-client namespace create "{{identifier}}"
-
-    - name: Create a network for outgoing traffic
-      sf_network:
-        netblock: "10.0.0.0/24"
-        name: "public"
-        namespace: "{{identifier}}"
-      register: publicnetwork
-
-    - name: Log network details
-      debug:
-        msg:
-          - "Public network is {{publicnetwork['meta']['uuid']}}"
-
     - name: Setup cloud-config to add a password to CI nodes for debugging
       set_fact:
         userdata_decoded: |
@@ -50,7 +35,7 @@
         disks:
           - "100@{{base_image}}"
         networkspecs:
-          - network_uuid="{{publicnetwork['meta']['uuid']}}",float=True
+          - network_uuid="{{identifier}}"
         ssh_key: "{{ lookup('file', '/home/jenkins/id_ci.pub') }}"
         namespace: "{{identifier}}"
         user_data: "{{userdata_encoded}}"
@@ -61,7 +46,7 @@
       add_host:
         hostname: primary
         egress_ip: "{{primary['meta']['network_interfaces'][0]['ipv4']}}"
-        ansible_ssh_host: "{{primary['meta']['network_interfaces'][0]['floating']}}"
+        ansible_ssh_host: "{{primary['meta']['network_interfaces'][0]['ipv4']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/home/jenkins/id_ci"
@@ -70,7 +55,7 @@
     - name: Log instance details
       debug:
         msg:
-          - "Primary: is {{primary['meta']['uuid']}} at {{primary['meta']['network_interfaces'][0]['ipv4']}}, {{primary['meta']['network_interfaces'][0]['floating']}}"
+          - "Primary: is {{primary['meta']['uuid']}} at {{primary['meta']['network_interfaces'][0]['ipv4']}}"
 
     - include_tasks: ci-include-common-localhost.yml
 
