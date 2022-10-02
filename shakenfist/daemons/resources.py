@@ -259,9 +259,10 @@ class Monitor(daemon.Daemon):
 
                 interface = 'egr-%06x-o' % n.vxid
                 try:
+                    usage = util_network.get_interface_statistics(interface)
+                    usage['subnets'] = n.subnets
                     n.add_event(
-                        'usage', extra=util_network.get_interface_statistics(interface),
-                        suppress_event_logging=True)
+                        'usage', extra=usage, suppress_event_logging=True)
                 except exceptions.NoInterfaceStatistics as e:
                     LOG.with_fields({'network': n}).info(
                         'Failed to collect network usage: %s' % e)

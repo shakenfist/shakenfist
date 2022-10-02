@@ -21,10 +21,11 @@ from shakenfist import db
 from shakenfist import dhcp
 from shakenfist import etcd
 from shakenfist.exceptions import DeadNetwork, CongestedNetwork
+from shakenfist.metrics import get_minimum_object_version as gmov
 from shakenfist import instance
-from shakenfist.ipmanager import IPManager
 from shakenfist import networkinterface
 from shakenfist.node import Node, Nodes, active_states_filter as active_nodes
+from shakenfist.subnet import Subnet
 from shakenfist.tasks import (
     DeployNetworkTask,
     HypervisorDestroyNetworkTask,
@@ -40,7 +41,9 @@ LOG, _ = logs.setup(__name__)
 
 class Network(dbo):
     object_type = 'network'
-    current_version = 2
+    current_version = 3
+    upgrade_supported = True
+
     state_targets = {
         None: (dbo.STATE_INITIAL, ),
         dbo.STATE_INITIAL: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR),
@@ -51,6 +54,16 @@ class Network(dbo):
     }
 
     def __init__(self, static_values):
+        if static_values['version'] != self.current_version:
+            upgraded, static_values = self.upgrade(static_values)
+
+            if upgraded and gmov('blob') == self.current_version:
+                etcd.put(self.object_type, None,
+                         static_values.get('uuid'), static_values)
+                etcd.delete('ipmanager', None, static_values['uuid'])
+                LOG.with_field(
+                    self.object_type, static_values['uuid']).info('Online upgrade committed')
+
         super(Network, self).__init__(static_values.get('uuid'),
                                       static_values.get('version'))
 
@@ -66,13 +79,52 @@ class Network(dbo):
         self.mesh_nic = static_values.get(
             'mesh_nic', config.NODE_MESH_NIC)
 
-        ipm = IPManager.from_db(self.uuid)
-        self.__ipblock = ipm.network_address
-        self.__router = ipm.get_address_at_index(1)
-        self.__dhcp_start = ipm.get_address_at_index(2)
-        self.__netmask = ipm.netmask
-        self.__broadcast = ipm.broadcast_address
-        self.__network_address = ipm.network_address
+        # There is currently an assumption that there is a 1:1 mapping between
+        # networks and subnets. This should change in the future.
+        if not self.subnets:
+            subnet_uuid = str(uuid4())
+            s = Subnet.new(subnet_uuid, self.uuid, self.__netblock)
+            self._db_set_attribute('subnets', {'subnets': [subnet_uuid]})
+        else:
+            s = Subnet.from_db(self.subnets[0])
+
+        self.__ipblock = s.network_address
+        self.__router = s.get_address_at_index(1)
+        self.__dhcp_start = s.get_address_at_index(2)
+        self.__netmask = s.netmask
+        self.__broadcast = s.broadcast_address
+        self.__network_address = s.network_address
+
+    @classmethod
+    def upgrade(cls, static_values):
+        changed = False
+        starting_version = static_values.get('version')
+
+        if static_values.get('version') == 2:
+            ipm = etcd.get('ipmanager', None, static_values['uuid'])
+            if ipm:
+                subnet_uuid = str(uuid4())
+                s = Subnet.new(subnet_uuid, ipm['uuid'], ipm['ipblock'])
+                for addr in ipm['ipmanager.v3']['in_use']:
+                    s.reserve(addr, ipm['ipmanager.v3']['in_use'][addr]['user'],
+                              when=ipm['ipmanager.v3']['in_use'][addr]['when'])
+
+                etcd.put(
+                    'attribute/network', static_values['uuid'], 'subnets',
+                    {
+                        'subnets': [subnet_uuid]
+                    })
+
+            static_values['version'] = 3
+            changed = True
+
+        if changed:
+            LOG.with_fields({
+                cls.object_type: static_values['uuid'],
+                'start_version': starting_version,
+                'final_version': static_values.get('version')
+            }).info('Object online upgraded')
+        return changed, static_values
 
     @staticmethod
     def allocate_vxid(net_id):
@@ -92,8 +144,14 @@ class Network(dbo):
         if not vxid:
             vxid = Network.allocate_vxid(network_uuid)
 
-        # Pre-create the IPManager
-        IPManager.new(network_uuid, netblock)
+        # Create the subnet
+        subnet_uuid = str(uuid4())
+        Subnet.new(subnet_uuid, network_uuid, netblock)
+        etcd.put(
+            'attribute/network', network_uuid, 'subnets',
+            {
+                'subnets': [subnet_uuid]
+            })
 
         Network._db_create(
             network_uuid,
@@ -136,7 +194,7 @@ class Network(dbo):
             'version': self.version
         }
 
-        for attrname in ['routing']:
+        for attrname in ['routing', 'subnets']:
             d = self._db_get_attribute(attrname)
             for key in d:
                 # We skip keys with no value
@@ -414,21 +472,18 @@ class Network(dbo):
                     None, 'ip link set %(egress_veth_inner)s netns %(netns)s' % subst)
 
             if self.provide_nat:
-                # We don't always need this lock, but acquiring it here means
-                # we don't need to construct two identical ipmanagers one after
-                # the other.
                 try:
-                    with db.get_lock('ipmanager', None, 'floating', ttl=120,
-                                     op='Network deploy NAT'):
-                        ipm = IPManager.from_db('floating')
-                        if not self.floating_gateway:
-                            self.update_floating_gateway(
-                                ipm.get_random_free_address(self.unique_label()))
-                            ipm.persist()
+                    floating_subnet = Subnet.from_db(
+                        floating_network().subnets[0])
 
-                        subst['floating_router'] = ipm.get_address_at_index(1)
-                        subst['floating_gateway'] = self.floating_gateway
-                        subst['floating_netmask'] = ipm.netmask
+                    if not self.floating_gateway:
+                        self.update_floating_gateway(
+                            self.get_random_free_address(self.unique_label()))
+
+                    subst['floating_router'] = floating_subnet.get_address_at_index(
+                        1)
+                    subst['floating_gateway'] = self.floating_gateway
+                    subst['floating_netmask'] = floating_subnet.netmask
                 except CongestedNetwork:
                     self.error('Unable to allocate floating gateway IP')
 
@@ -497,11 +552,8 @@ class Network(dbo):
                 util_process.execute(None, 'ip netns del %s' % self.uuid)
 
             if self.floating_gateway:
-                with db.get_lock('ipmanager', None, 'floating', ttl=120,
-                                 op='Network delete'):
-                    fn = floating_network()
-                    fn.release(self.floating_gateway)
-                    self.update_floating_gateway(None)
+                floating_network().release_address(self.floating_gateway)
+                self.update_floating_gateway(None)
 
             self.state = self.STATE_DELETED
 
@@ -517,12 +569,17 @@ class Network(dbo):
         self.remove_dhcp()
         self.remove_nat()
 
-        ipm = IPManager.from_db(self.uuid)
-        ipm.delete()
+        for subnet_uuid in self.subnets:
+            s = Subnet.from_db(subnet_uuid)
+            if s:
+                s.delete()
 
     def hard_delete(self):
         etcd.delete('vxlan', None, self.vxid)
         etcd.delete('ipmanager', None, self.uuid)
+        for subnet_uuid in self.subnets:
+            etcd.delete('subnet', None, subnet_uuid)
+
         super(Network, self).hard_delete()
 
     def is_dnsmasq_running(self):
@@ -584,11 +641,8 @@ class Network(dbo):
     def remove_nat(self):
         if config.NODE_IS_NETWORK_NODE:
             if self.floating_gateway:
-                with db.get_lock('ipmanager', None, 'floating', ttl=120,
-                                 op='Remove NAT'):
-                    fn = floating_network()
-                    fn.release(self.floating_gateway)
-                    self.update_floating_gateway(None)
+                floating_network().release_address(self.floating_gateway)
+                self.update_floating_gateway(None)
 
         else:
             etcd.enqueue('networknode', RemoveNATNetworkTask(self.uuid))
@@ -750,25 +804,36 @@ class Network(dbo):
                                  'ip link del flt-%(floating_address_as_hex)s-o'
                                  % subst)
 
-    # Proxy to IPManager
-    def _get_ipmanager(self):
-        return IPManager.from_db(self.uuid)
+    # NOTE(mikal): these are broken out separately because they're written to
+    # make it easier for a network to have more than one subnet later.
+    @property
+    def subnets(self):
+        s = self._db_get_attribute('subnets')
+        if not s:
+            return []
+        return s.get('subnets', [])
 
-    def reserve(self, address, unique_label_tuple):
-        ipm = self._get_ipmanager()
-        retval = ipm.reserve(address, unique_label_tuple=unique_label_tuple)
-        if retval:
-            ipm.persist()
-        return retval
+    def get_random_free_address(self, unique_label_tuple):
+        for subnet_uuid in self.subnets:
+            s = Subnet.from_db(subnet_uuid)
+            if not s:
+                continue
 
-    def release(self, address):
-        ipm = self._get_ipmanager()
-        if ipm.release(address):
-            ipm.persist()
+            try:
+                return s.get_random_free_address(unique_label_tuple)
+            except CongestedNetwork:
+                pass
 
-    def get_address_at_index(self, idx):
-        ipm = self._get_ipmanager()
-        return ipm.get_address_at_index(idx)
+        raise CongestedNetwork('Unable to allocate address')
+
+    def release_address(self, address):
+        for subnet_uuid in self.subnets:
+            s = Subnet.from_db(subnet_uuid)
+            if not s:
+                continue
+
+            if s.release(address):
+                return
 
 
 class Networks(dbo_iter):

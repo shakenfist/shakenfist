@@ -20,12 +20,12 @@ from shakenfist.external_api import (
     base as api_base,
     util as api_util)
 from shakenfist import instance
-from shakenfist.ipmanager import IPManager
 from shakenfist import network as sfnet  # Unfortunate, but we have an API arg
 # called network too.
 from shakenfist.networkinterface import NetworkInterface
 from shakenfist.node import Node
 from shakenfist import scheduler
+from shakenfist import subnet
 from shakenfist.tasks import (
     DeleteInstanceTask,
     FetchImageTask,
@@ -303,8 +303,8 @@ class InstancesEndpoint(sf_api.Resource):
                 if netdesc.get('address') and not util_general.noneish(netdesc.get('address')):
                     # The requested address must be within the ip range specified
                     # for that virtual network, unless it is equivalent to "none".
-                    ipm = IPManager.from_db(n.uuid)
-                    if not ipm.is_in_range(netdesc['address']):
+                    s = subnet.Subnet.from_db(n.subnets[0])
+                    if not s.is_in_range(netdesc['address']):
                         return sf_api.error(
                             400,
                             'network specification requests an address outside the '
@@ -381,23 +381,19 @@ class InstancesEndpoint(sf_api.Resource):
                     if 'address' in netdesc and util_general.noneish(netdesc['address']):
                         netdesc['address'] = None
                     else:
-                        with db.get_lock('ipmanager', None,  netdesc['network_uuid'],
-                                         ttl=120, op='Network allocate IP'):
-                            ipm = IPManager.from_db(netdesc['network_uuid'])
-                            if 'address' not in netdesc or not netdesc['address']:
-                                netdesc['address'] = ipm.get_random_free_address(
-                                    inst.unique_label())
-                                inst.add_event(
-                                    'allocated ip address', extra=netdesc)
-                            else:
-                                if not n.reserve(netdesc['address'], inst.unique_label()):
-                                    inst.enqueue_delete_due_error(
-                                        'failed to reserve an IP on network %s'
-                                        % netdesc['network_uuid'])
-                                    return sf_api.error(
-                                        409, 'address %s in use' % netdesc['address'])
-
-                            ipm.persist()
+                        s = subnet.Subnet.from_db(n.subnets[0])
+                        if 'address' not in netdesc or not netdesc['address']:
+                            netdesc['address'] = s.get_random_free_address(
+                                inst.unique_label())
+                            inst.add_event(
+                                'allocated ip address', extra=netdesc)
+                        else:
+                            if not s.reserve(netdesc['address'], inst.unique_label()):
+                                m = 'failed to reserve an IP on network %s' % (
+                                    netdesc['network_uuid'])
+                                inst.enqueue_delete_due_error(m)
+                                return sf_api.error(
+                                    409, 'address %s in use' % netdesc['address'])
                 except exceptions.CongestedNetwork as e:
                     inst.enqueue_delete_due_error(
                         'cannot allocate address: %s' % e)

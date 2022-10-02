@@ -8,14 +8,13 @@ from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
-from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
-from shakenfist.ipmanager import IPManager
 from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist.networkinterface import NetworkInterface
+from shakenfist import subnet
 from shakenfist.tasks import (
     DeployNetworkTask,
     DestroyNetworkTask,
@@ -46,6 +45,7 @@ class Monitor(daemon.WorkerPoolDaemon):
 
                 inst = instance.Instance.from_db(ni.instance_uuid)
                 if not inst:
+                    n.release_address(ni.ipv4)
                     ni.delete()
                     LOG.with_fields({
                         'networkinterface': ni,
@@ -55,6 +55,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                     s = inst.state
                     if (s.update_time + 30 < t and
                             s.value in [dbo.STATE_DELETED, dbo.STATE_ERROR, 'unknown']):
+                        n.release_address(ni.ipv4)
                         ni.delete()
                         LOG.with_fields({
                             'networkinterface': ni,
@@ -273,11 +274,8 @@ class Monitor(daemon.WorkerPoolDaemon):
 
         if isinstance(workitem, DefloatNetworkInterfaceTask):
             n.remove_floating_ip(ni.floating.get('floating_address'), ni.ipv4)
-
-            with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Instance defloat'):
-                fn = network.floating_network()
-                fn.release(ni.floating.get('floating_address'))
-
+            network.floating_network().release_address(
+                ni.floating.get('floating_address'))
             ni.floating = None
 
         # Tasks that should not operate on a dead network
@@ -318,68 +316,66 @@ class Monitor(daemon.WorkerPoolDaemon):
             processing, waiting = etcd.get_queue_length('networknode')
 
         # Ensure we haven't leaked any floating IPs (because we used to)
-        with db.get_lock('ipmanager', None, 'floating', ttl=120,
-                         op='Cleanup leaks'):
-            floating_network = network.floating_network()
-            floating_ipm = IPManager.from_db('floating')
+        float_net = network.floating_network()
+        float_subnet = subnet.Subnet.from_db(float_net.subnets[0])
 
-            # Collect floating gateways and floating IPs, while ensuring that
-            # they are correctly reserved on the floating network as well
-            floating_gateways = []
-            for n in network.Networks([baseobject.active_states_filter]):
-                fg = n.floating_gateway
-                if fg:
-                    floating_gateways.append(fg)
-                    if floating_ipm.is_free(fg):
-                        floating_ipm.reserve(fg, n.unique_label())
-                        floating_ipm.persist()
-                        LOG.with_fields({
-                            'network': n.uuid,
-                            'address': fg
-                        }).error('Floating gateway not reserved correctly')
+        # Collect floating gateways and floating IPs, while ensuring that
+        # they are correctly reserved on the floating network as well
+        floating_gateways = []
+        for n in network.Networks([baseobject.active_states_filter]):
+            fg = n.floating_gateway
+            if fg:
+                floating_gateways.append(fg)
+                if float_subnet.is_free(fg):
+                    float_subnet.reserve(fg, n.unique_label())
+                    LOG.with_fields({
+                        'network': n.uuid,
+                        'address': fg
+                    }).error('Floating gateway not reserved correctly')
 
-            LOG.info('Found floating gateways: %s' % floating_gateways)
+        LOG.debug('Found floating gateways: %s' % floating_gateways)
 
-            floating_addresses = []
-            for ni in networkinterface.NetworkInterfaces([baseobject.active_states_filter]):
-                fa = ni.floating.get('floating_address')
-                if fa:
-                    floating_addresses.append(fa)
-                    if floating_ipm.is_free(fa):
-                        floating_ipm.reserve(fa, ni.unique_label())
-                        floating_ipm.persist()
-                        LOG.with_fields({
-                            'networkinterface': ni.uuid,
-                            'address': fa
-                        }).error('Floating address not reserved correctly')
-            LOG.info('Found floating addresses: %s' % floating_addresses)
+        floating_addresses = []
+        for ni in networkinterface.NetworkInterfaces([baseobject.active_states_filter]):
+            fa = ni.floating.get('floating_address')
+            if fa:
+                floating_addresses.append(fa)
+                if float_subnet.is_free(fa):
+                    float_subnet.reserve(fa, ni.unique_label())
+                    LOG.with_fields({
+                        'networkinterface': ni.uuid,
+                        'address': fa
+                    }).error('Floating address not reserved correctly')
+        LOG.debug('Found floating addresses: %s' % floating_addresses)
 
-            floating_reserved = [
-                floating_network.get_address_at_index(0),
-                floating_network.get_address_at_index(1),
-                floating_ipm.broadcast_address,
-                floating_ipm.network_address
-            ]
-            LOG.info('Found floating reservations: %s' % floating_reserved)
+        floating_reserved = [
+            float_subnet.get_address_at_index(0),
+            float_subnet.get_address_at_index(1),
+            float_subnet.broadcast_address,
+            float_subnet.network_address
+        ]
+        LOG.debug('Found floating reservations: %s' % floating_reserved)
 
-            # Now the reverse check. Test if there are any reserved IPs which
-            # are not actually in use. Free any we find.
-            leaks = []
-            for ip in floating_ipm.in_use:
-                if ip not in itertools.chain(floating_gateways,
-                                             floating_addresses,
-                                             floating_reserved):
-                    LOG.error('Floating IP %s has leaked.' % ip)
+        # Now the reverse check. Test if there are any reserved IPs which
+        # are not actually in use. Free any we find.
+        leaks = []
+        for ip in float_subnet.allocations['addresses']:
+            if ip not in itertools.chain(floating_gateways,
+                                         floating_addresses,
+                                         floating_reserved):
+                # This IP needs to have been allocated more than 300 seconds
+                # ago to ensure that the network setup isn't still queueud.
+                alloc_age = (time.time() -
+                             float_subnet.allocations['addresses'][ip]['when'])
+                if alloc_age > 10 and alloc_age < 300:
+                    LOG.error(
+                        'Floating IP %s has leaked, but is too new to be released.' % ip)
+                else:
+                    leaks.append(ip)
 
-                    # This IP needs to have been allocated more than 300 seconds
-                    # ago to ensure that the network setup isn't still queueud.
-                    if time.time() - floating_ipm.in_use[ip]['when'] > 300:
-                        leaks.append(ip)
-
-            for ip in leaks:
-                LOG.error('Leaked floating IP %s has been released.' % ip)
-                floating_ipm.release(ip)
-            floating_ipm.persist()
+        for ip in leaks:
+            LOG.error('Leaked floating IP %s has been released.' % ip)
+            float_subnet.release(ip)
 
     def _validate_mtus(self):
         by_mtu = defaultdict(list)
@@ -439,6 +435,17 @@ class Monitor(daemon.WorkerPoolDaemon):
                                 self._validate_mtus, [], 'mtus')
 
                         if config.NODE_IS_NETWORK_NODE:
+                            try:
+                                n = network.Network.from_db('floating')
+                                usage = util_network.get_interface_statistics(
+                                    config.NODE_EGRESS_NIC)
+                                usage['subnets'] = n.subnets
+                                n.add_event(
+                                    'usage', extra=usage, suppress_event_logging=True)
+                            except exceptions.NoInterfaceStatistics as e:
+                                LOG.with_fields({'network': n}).info(
+                                    'Failed to collect network usage: %s' % e)
+
                             LOG.info('Reaping stray floating IPs')
                             if floating_ip_reap_worker not in worker_pids:
                                 floating_ip_reap_worker = self.start_workitem(

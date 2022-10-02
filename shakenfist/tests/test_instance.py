@@ -1,5 +1,6 @@
 import base64
 from functools import partial
+import ipaddress
 import json
 import mock
 import os
@@ -13,18 +14,31 @@ from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     State)
 from shakenfist import exceptions
-from shakenfist.ipmanager import IPManager
 from shakenfist import instance
 from shakenfist.config import SFConfig
 from shakenfist.tests import base
+
+
+class FakeSubnet(object):
+    object_type = 'subnet'
+
+    def __init__(self, uuid=None, network_uuid=None, iprange=None):
+        super(FakeSubnet, self).__init__()
+        self.uuid = uuid
+        self.network_uuid = network_uuid
+        self.iprange = iprange
+
+    def get_address_at_index(self, idx):
+        self.ipblock_obj = ipaddress.ip_network(self.iprange, strict=False)
+        return str(self.ipblock_obj[idx])
 
 
 class FakeNetwork(object):
     object_type = 'network'
 
     def __init__(self):
-        self.ipmanager = IPManager('uuid', '127.0.0.0/8')
-        self.router = self.ipmanager.get_address_at_index(1)
+        self.subnet = FakeSubnet('uuid', 'net_uuid', '127.0.0.0/8')
+        self.router = self.subnet.get_address_at_index(1)
         self.netmask = '255.0.0.0'
         self.dhcp_start = '127.0.0.2'
         self.broadcast = '127.255.255.255'
