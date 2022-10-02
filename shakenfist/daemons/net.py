@@ -321,7 +321,6 @@ class Monitor(daemon.WorkerPoolDaemon):
         with db.get_lock('ipmanager', None, 'floating', ttl=120,
                          op='Cleanup leaks'):
             floating_network = network.floating_network()
-            floating_ipm = IPManager.from_db('floating')
 
             # Collect floating gateways and floating IPs, while ensuring that
             # they are correctly reserved on the floating network as well
@@ -330,9 +329,8 @@ class Monitor(daemon.WorkerPoolDaemon):
                 fg = n.floating_gateway
                 if fg:
                     floating_gateways.append(fg)
-                    if floating_ipm.is_free(fg):
-                        floating_ipm.reserve(fg, n.unique_label())
-                        floating_ipm.persist()
+                    if floating_network.is_free(fg):
+                        floating_network.reserve(fg, n.unique_label())
                         LOG.with_fields({
                             'network': n.uuid,
                             'address': fg
@@ -345,15 +343,15 @@ class Monitor(daemon.WorkerPoolDaemon):
                 fa = ni.floating.get('floating_address')
                 if fa:
                     floating_addresses.append(fa)
-                    if floating_ipm.is_free(fa):
-                        floating_ipm.reserve(fa, ni.unique_label())
-                        floating_ipm.persist()
+                    if floating_network.is_free(fa):
+                        floating_network.reserve(fa, ni.unique_label())
                         LOG.with_fields({
                             'networkinterface': ni.uuid,
                             'address': fa
                         }).error('Floating address not reserved correctly')
             LOG.info('Found floating addresses: %s' % floating_addresses)
 
+            floating_ipm = IPManager.from_db('floating')
             floating_reserved = [
                 floating_network.get_address_at_index(0),
                 floating_network.get_address_at_index(1),
