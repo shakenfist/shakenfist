@@ -770,6 +770,10 @@ class Network(dbo):
         ipm = self._get_ipmanager()
         return ipm.get_address_at_index(idx)
 
+    def is_free(self, address):
+        ipm = self._get_ipmanager()
+        return ipm.is_free(address)
+
 
 class Networks(dbo_iter):
     def __iter__(self):
