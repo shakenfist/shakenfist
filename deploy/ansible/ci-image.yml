@@ -26,7 +26,7 @@
 
     - name: Create an instance
       sf_instance:
-        name: "{{rebuild}}"
+        name: "rebuild"
         cpu: 4
         ram: 4096
         disks:
@@ -76,18 +76,6 @@
         group: root
         mode: u=r,g=r,o=r
 
-    # Setup ansible PPA so we get never versions for Ubuntu to work around
-    # https://github.com/ansible/ansible/issues/69401
-    - name: Setup Ansible PPA
-      copy:
-        content: |
-          deb http://ppa.launchpad.net/ansible/ansible/ubuntu focal main
-        dest: /etc/apt/sources.list.d/ansible.list
-        owner: root
-        group: root
-        mode: u=r,g=r,o=r
-      when: ansible_distribution == 'Ubuntu'
-
     # As recommended on the ansible apt module documentation...
     - name: Install packages only when the apt process is not locked
       apt:
@@ -96,14 +84,6 @@
       register: apt_action
       retries: 100
       until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
-
-    # Add GPG key for Ansible PPA
-    - name: Force an apt-get update with Ansible PPA
-      shell: |
-        apt-get update
-        apt-get install gnupg
-        apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367
-      when: ansible_distribution == 'Ubuntu'
 
     # I am unsure why I need to manually force this, but I do need to.
     - name: Force an apt-get update
@@ -115,34 +95,31 @@
         upgrade: dist
         autoremove: yes
 
-    # TODO(mikal): dial this back once we have things working.
-    - name: Install dependencies
+    - name: Install minimum dependencies for sf-agent
       apt:
         name:
-          - ansible
-          - apache2
-          - git
-          - prometheus
-          - pwgen
           - python3
           - python3-dev
-          - python3-grpcio
           - python3-pip
-          - python3-venv
           - python3-wheel
         state: latest
 
-    - name: Install non-hypervisor dependencies
+    # NOTE(mikal): I don't love this, as it increases the risk that we will
+    # miss a package in getsf, but its so slow to install these without
+    # pre-caching that doing this saves an hour off the CI job duration.
+    - name: Install packages which CI uses, to make CI runs faster
       apt:
         name:
+          - ack
           - arping
           - bridge-utils
+          - build-essential
           - cpu-checker
           - dnsmasq
           - dnsutils
           - hddtemp
+          - libffi-dev
           - libmagic-dev
-          - libssl-dev
           - libssl-dev
           - libvirt-daemon-system
           - libvirt-dev
@@ -150,8 +127,18 @@
           - net-tools
           - ovmf
           - prometheus-node-exporter
+          - pwgen
+          - python3
+          - python3-cffi
+          - python3-dev
+          - python3-fixtures
+          - python3-grpcio
           - python3-libvirt
+          - python3-pip
+          - python3-venv
+          - python3-wheel
           - qemu-kvm
+          - tox
           - unzip
         state: latest
 
@@ -163,26 +150,49 @@
 
     # This is driven by issues with the version of tox packaged on Debian 10
     - name: Install tox and dependencies via pip on Debian
-      shell: pip3 install -U tox filelock virtualenv
+      shell: pip3 install -U tox filelock
       when: ansible_distribution == 'Debian'
 
-    - name: Install Grafana prerequisites
-      apt:
-        name: ["apt-transport-https", "software-properties-common"]
-        update_cache: yes
-        state: latest
+    - name: Install the Shaken Fist agent
+      shell: pip3 install -U shakenfist-agent
 
-    - name: Add Grafana GPG key
-      apt_key: url=https://packages.grafana.com/gpg.key
+    - name: Add systemd unit for the Shaken Fist agent
+      copy:
+        content: |
+          [Unit]
+          Description=Shaken Fist minimal cloud in guest agent
+          After=network.target remote-fs.target nss-lookup.target
 
-    - name: Add Grafana APT repository
-      apt_repository:
-        repo: deb [arch=amd64] http://packages.grafana.com/oss/deb stable main
+          [Service]
+          Type=simple
+          User=root
+          Group=root
 
-    - name: Install Grafana
-      apt:
-        name: ["grafana"]
-        update_cache: yes
+          ExecStart=/bin/sh -c '/usr/local/bin/sf-agent --verbose daemon run'
+
+          Restart=on-failure
+          RestartSec=5
+
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/sf-agent.service
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
+
+    - name: Restart the Shaken Fist agent
+      service:
+        name: sf-agent
+        enabled: yes
+        state: restarted
+        daemon_reload: yes
+
+    - name: Ensure /etc/ansible exists
+      file:
+        path: /etc/ansible
+        state: directory
+        owner: root
+        group: root
 
     - name: Copy ansible config
       copy:
@@ -191,40 +201,6 @@
         owner: root
         group: root
         mode: u=r,g=r,o=r
-
-    - name: Copy SF installer ansible requirements
-      copy:
-        src: ../../requirements.yml
-        dest: /tmp/ansible-requirements.yml
-        owner: root
-        group: root
-        mode: u=r,g=r,o=r
-
-    - name: Install ansible galaxy roles
-      shell: ansible-galaxy install -r /tmp/ansible-requirements.yml
-
-    - name: Copy SF requirements.txt
-      copy:
-        src: ../../../requirements.txt
-        dest: /tmp/sf-requirements.txt
-        owner: root
-        group: root
-        mode: u=r,g=r,o=r
-
-    - name: Copy SF client requirements.txt
-      copy:
-        src: ../../../../client-python/requirements.txt
-        dest: /tmp/client-requirements.txt
-        owner: root
-        group: root
-        mode: u=r,g=r,o=r
-
-    - name: Make venv and install server wheel
-      shell: |
-        python3 -m venv --system-site-packages /srv/shakenfist/venv
-        /srv/shakenfist/venv/bin/pip install -U pip
-        /srv/shakenfist/venv/bin/pip install -U -r /tmp/sf-requirements.txt
-        /srv/shakenfist/venv/bin/pip install -U -r /tmp/client-requirements.txt
 
     - name: Make a directory for cached images
       file:
@@ -239,17 +215,24 @@
         mode: u+r
       loop:
         - {
-            url: "https://cloud-images.ubuntu.com/releases/bionic/release/ubuntu-18.04-server-cloudimg-amd64.img",
-            name: "ubuntu:18.04",
-          }
-        - {
-            url: "https://cloud-images.ubuntu.com/releases/focal/release/ubuntu-20.04-server-cloudimg-amd64.img",
-            name: "ubuntu:20.04",
-          }
-        - {
             url: "https://download.cirros-cloud.net/0.5.2/cirros-0.5.2-x86_64-disk.img",
             name: "cirros",
           }
+        - {
+            url: "https://images.shakenfist.com/ubuntu:18.04/latest.qcow2",
+            name: "ubuntu:18.04",
+          }
+        - {
+            url: "https://images.shakenfist.com/ubuntu:20.04/latest.qcow2",
+            name: "ubuntu:20.04",
+          }
+        - {
+            url: "https://images.shakenfist.com/debian:11/latest.qcow2",
+            name: "debian:11",
+          }
+
+    - name: Cleanup cloud-init
+      shell: cloud-init clean
 
     - name: Try and avoid the disk being corrupt when snapshot
       shell: |
@@ -356,17 +339,17 @@
     - name: Delete test instance
       sf_instance:
         uuid: "{{hostvars['imagetest']['sf_instance_uuid']}}"
-        namespace: ci
+        namespace: "{{identifier}}"
         state: absent
 
     - name: Delete build instance
       sf_instance:
         uuid: "{{hostvars['imagerebuild']['sf_instance_uuid']}}"
-        namespace: ci
+        namespace: "{{identifier}}"
         state: absent
 
     - name: Delete network
       sf_network:
         uuid: "{{hostvars['imagerebuild']['sf_network_uuid']}}"
-        namespace: ci
+        namespace: "{{identifier}}"
         state: absent
