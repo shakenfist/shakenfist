@@ -46,21 +46,24 @@ def main():
     primary_repo = git.Repo(primary_repo_path)
 
     primary_branch = None
+    primary_base_reference = os.environ.get('GITHUB_BASE_REF')
     try:
         primary_branch = primary_repo.active_branch
     except TypeError:
-        pass
+        primary_branch = primary_base_reference
 
     print('Primary repo: %s' % os.environ['SF_PRIMARY_REPO'])
     print('Primary commit: %s' % os.environ['SF_HEAD_SHA'])
     print('Primary branch: %s' % primary_branch)
+    print('Primary base reference: %s' % primary_base_reference)
+    print('Github event name: %s' % os.environ.get('GITHUB_EVENT_NAME'))
 
     primary_commit_sha = os.environ['SF_HEAD_SHA']
     primary_commit = primary_repo.commit(primary_commit_sha)
 
     # We looks for depends on syntax, but only for PRs. Otherwise we just
     # make sure that we have matching branches ("develop", "v0.6-releases", etc).
-    if not primary_branch:
+    if os.environ.get('GITHUB_EVENT_NAME') in ['pull_request', 'push']:
         for line in primary_commit.message.split('\n'):
             line = line.lstrip(' ')
             if line.startswith('Depends on '):
