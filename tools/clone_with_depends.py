@@ -45,25 +45,53 @@ def main():
         os.environ['GITHUB_WORKSPACE'], os.environ['SF_PRIMARY_REPO'])
     primary_repo = git.Repo(primary_repo_path)
 
+    primary_branch = None
+    try:
+        primary_branch = primary_repo.active_branch
+    except TypeError:
+        pass
+
+    print('Primary repo: %s' % os.environ['SF_PRIMARY_REPO'])
+    print('Primary commit: %s' % os.environ['SF_HEAD_SHA'])
+    print('Primary branch: %s' % primary_branch)
+
     primary_commit_sha = os.environ['SF_HEAD_SHA']
     primary_commit = primary_repo.commit(primary_commit_sha)
 
-    for line in primary_commit.message.split('\n'):
-        line = line.lstrip(' ')
-        if line.startswith('Depends on '):
-            m = DEPENDS_RE.match(line)
-            if m:
-                print('Depends on detected: %s' % line)
-                dep_repo_name = m.group(1)
-                dep_pr = m.group(2)
+    # We looks for depends on syntax, but only for PRs. Otherwise we just
+    # make sure that we have matching branches ("develop", "v0.6-releases", etc).
+    if not primary_branch:
+        for line in primary_commit.message.split('\n'):
+            line = line.lstrip(' ')
+            if line.startswith('Depends on '):
+                m = DEPENDS_RE.match(line)
+                if m:
+                    print('Depends on detected: %s' % line)
+                    dep_repo_name = m.group(1)
+                    dep_pr = m.group(2)
 
-                dep_repo_path = os.path.join(
-                    os.environ['GITHUB_WORKSPACE'], dep_repo_name)
-                dep_git = git.Git(dep_repo_path)
+                    dep_repo_path = os.path.join(
+                        os.environ['GITHUB_WORKSPACE'], dep_repo_name)
+                    dep_git = git.Git(dep_repo_path)
 
-                dep_git.execute(['git', 'fetch', 'origin',
-                                 '%s/head:dependson' % dep_pr])
-                dep_git.execute(['git', 'checkout', 'dependson'])
+                    dep_git.execute(['git', 'fetch', 'origin',
+                                     '%s/head:dependson' % dep_pr])
+                    dep_git.execute(['git', 'checkout', 'dependson'])
+
+    else:
+        for repo in REPOS:
+            if repo == primary_repo:
+                continue
+
+            dep_repo_path = os.path.join(
+                os.environ['GITHUB_WORKSPACE'], repo)
+            dep_git = git.Git(dep_repo_path)
+
+            try:
+                dep_git.execute(['git', 'checkout', primary_branch])
+            except Exception as e:
+                print('Failed to checkout %s on %s: %s'
+                      % (primary_branch, repo, e))
 
 
 if __name__ == '__main__':
