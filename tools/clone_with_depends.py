@@ -54,7 +54,7 @@ def main():
     primary_commit_sha = os.environ['SF_HEAD_SHA']
     primary_commit = primary_repo.commit(primary_commit_sha)
 
-    handled_repos = []
+    handled_repos = [os.environ['SF_PRIMARY_REPO']]
 
     # We looks for depends on syntax, but only for PRs. Otherwise we just
     # make sure that we have matching branches ("develop", "v0.6-releases", etc).
@@ -80,8 +80,6 @@ def main():
     # Then for any repo which hasn't been handled, we should use the base
     # reference
     for repo in REPOS:
-        if repo == primary_repo:
-            continue
         if repo in handled_repos:
             continue
 
