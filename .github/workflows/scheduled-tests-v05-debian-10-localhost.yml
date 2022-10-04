@@ -206,3 +206,19 @@ jobs:
           name: bundle.zip
           retention-days: 14
           path: ${{ github.workspace }}/artifacts/bundle.zip
+
+      - uses: JasonEtco/create-an-issue@v2
+        if: failure()
+        id: create-issue
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SF_CI_NAME: v05-debian-10-localhost
+          SF_BRANCH: v0.5-releases
+          SF_ACTION_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          filename: .github/workflows/scheduled-tests-failure.md
+          update_existing: true
+          search_existing: open
+
+      - if: failure()
+        run: 'echo Created ${{ steps.create-issue.outputs.url }}'
