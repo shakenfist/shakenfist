@@ -15,12 +15,6 @@ jobs:
     # variables at https://docs.github.com/en/actions/learn-github-actions/environment-variables
 
     steps:
-      - name: Remove previous unfinished runs
-        uses: n1hility/cancel-previous-runs@v2
-        with: 
-          token: {% raw %}${{{% endraw %} secrets.GITHUB_TOKEN {% raw %}}}{% endraw %}
-          workflow: functional-tests-{{name}}.yml
-
       - name: Set environment variables
         run: |
           echo "SF_HEAD_SHA={% raw %}${{{% endraw %} github.event.pull_request.head.sha {% raw %}}}{% endraw %}" >> $GITHUB_ENV
@@ -216,7 +210,7 @@ jobs:
           SF_BRANCH: {{branch}}
           SF_ACTION_RUN: {% raw %}${{{% endraw %} github.server_url {% raw %}}}{% endraw %}/{% raw %}${{{% endraw %} github.repository {% raw %}}}{% endraw %}/actions/runs/{% raw %}${{{% endraw %} github.run_id {% raw %}}}{% endraw %}
         with:
-          filename: .github/workflows/scheduled-tests-failure.md
+          filename: shakenfist/.github/workflows/scheduled-tests-failure.md
           update_existing: true
           search_existing: open
 
