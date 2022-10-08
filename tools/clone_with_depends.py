@@ -57,7 +57,7 @@ def main():
 
     if not primary_base_reference:
         print('No github provided base ref, using the current branch')
-        primary_base_reference = primary_repo.active_branch
+        primary_base_reference = str(primary_repo.active_branch)
         print('Primary base reference: %s' % primary_base_reference)
 
     # We looks for depends on syntax, but only for PRs. Otherwise we just
