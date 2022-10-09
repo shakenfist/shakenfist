@@ -99,6 +99,30 @@ JOBS = {
             'concurrency': 5,
             'branch': 'v0.6-releases'
         },
+        {
+            'name': 'v06-released-debian-10-localhost',
+            'baseimage': 'sf://label/system/sfci-debian-10',
+            'baseuser': 'debian',
+            'topology': 'localhost-released',
+            'concurrency': 3,
+            'branch': 'v0.6-releases'
+        },
+        {
+            'name': 'v06-released-debian-11-slim-primary',
+            'baseimage': 'sf://label/system/sfci-debian-11',
+            'baseuser': 'debian',
+            'topology': 'slim-primary-released',
+            'concurrency': 5,
+            'branch': 'v0.6-releases'
+        },
+        {
+            'name': 'v06-released-ubuntu-2004-slim-primary',
+            'baseimage': 'sf://label/system/sfci-ubuntu-2004',
+            'baseuser': 'ubuntu',
+            'topology': 'slim-primary-released',
+            'concurrency': 5,
+            'branch': 'v0.6-releases'
+        },
     ]
 }
 
