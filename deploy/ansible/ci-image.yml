@@ -6,24 +6,8 @@
     source_path: "/home/jenkins/src/shakenfist/"
     base_image: "ubuntu:20.04"
     base_image_user: "ubuntu"
-    keyfile_private: "/home/jenkins/id_ci"
-    keyfile_public: "/home/jenkins/id_ci.pub"
 
   tasks:
-    - name: Create the namespace
-      shell: sf-client namespace create "{{identifier}}"
-
-    - name: Create a network
-      sf_network:
-        netblock: "10.0.0.0/24"
-        name: "rebuild"
-        namespace: "{{identifier}}"
-      register: cinetwork
-
-    - name: Log network details
-      debug:
-        msg: "Network is {{cinetwork['meta']['uuid']}}"
-
     - name: Create an instance
       sf_instance:
         name: "rebuild"
@@ -32,8 +16,8 @@
         disks:
           - "30@{{base_image}}"
         networkspecs:
-          - network_uuid="{{cinetwork['meta']['uuid']}}",float=True
-        ssh_key: "{{ lookup('file', keyfile_public) }}"
+          - network_uuid="{{identifier}}"
+        ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
         state: present
       register: imagerebuild
@@ -41,12 +25,11 @@
     - name: Add to ansible
       add_host:
         hostname: imagerebuild
-        ansible_ssh_host: "{{imagerebuild['meta']['network_interfaces'][0]['floating']}}"
+        ansible_ssh_host: "{{imagerebuild['meta']['network_interfaces'][0]['ipv4']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
-        ansible_ssh_private_key_file: "{{keyfile_private}}"
+        ansible_ssh_private_key_file: "/srv/github/id_ci"
         sf_instance_uuid: "{{imagerebuild['meta']['uuid']}}"
-        sf_network_uuid: "{{imagerebuild['meta']['network_interfaces'][0]['network_uuid']}}"
         groups: sfall
 
     - name: Log instance
@@ -290,12 +273,11 @@
     - name: Add to ansible
       add_host:
         hostname: imagetest
-        ansible_ssh_host: "{{imagetest['meta']['network_interfaces'][0]['floating']}}"
+        ansible_ssh_host: "{{imagetest['meta']['network_interfaces'][0]['ipv4']}}"
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
-        ansible_ssh_private_key_file: "{{keyfile_private}}"
+        ansible_ssh_private_key_file: "/srv/github/id_ci"
         sf_instance_uuid: "{{imagetest['meta']['uuid']}}"
-        sf_network_uuid: "{{imagetest['meta']['network_interfaces'][0]['network_uuid']}}"
         groups: sfall
 
     - name: Log instance

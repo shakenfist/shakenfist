@@ -3,7 +3,27 @@
 import jinja2
 
 JOBS = {
-    'functional': [
+    'ci-images': [
+        {
+            'name': 'debian-10',
+            'baseimage': 'debian:10',
+            'baseuser': 'debian',
+            'outputlabel': 'sfci-debian-10'
+        },
+        {
+            'name': 'debian-11',
+            'baseimage': 'debian:11',
+            'baseuser': 'debian',
+            'outputlabel': 'sfci-debian-11'
+        },
+        {
+            'name': 'ubuntu-2004',
+            'baseimage': 'ubuntu:20.04',
+            'baseuser': 'ubuntu',
+            'outputlabel': 'sfci-ubuntu-2004'
+        },
+    ],
+    'functional-tests': [
         {
             'name': 'debian-10-localhost',
             'baseimage': 'sf://label/system/sfci-debian-10',
@@ -26,7 +46,7 @@ JOBS = {
             'concurrency': 5
         },
     ],
-    'scheduled': [
+    'scheduled-tests': [
         {
             'name': 'develop-debian-10-localhost',
             'baseimage': 'sf://label/system/sfci-debian-10',
@@ -105,9 +125,9 @@ JOBS = {
 
 if __name__ == '__main__':
     for style in JOBS.keys():
-        with open('%s-tests.tmpl' % style) as f:
+        with open('%s.tmpl' % style) as f:
             t = jinja2.Template(f.read())
 
         for job in JOBS[style]:
-            with open('%s-tests-%s.yml' % (style, job['name']), 'w') as f:
+            with open('%s-%s.yml' % (style, job['name']), 'w') as f:
                 f.write(t.render(job))
