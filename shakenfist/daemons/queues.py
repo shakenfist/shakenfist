@@ -430,6 +430,13 @@ def snapshot(inst, disk, artifact_uuid, blob_uuid, thin=False):
         # The artifact was deleted while we were creating the blob, just delete
         # the blob too.
         b.state = blob.Blob.STATE_DELETED
+        return
+
+    if inst.state.value == instance.Instance.STATE_DELETED:
+        # If the instance we were snapshotting has been deleted by the time we
+        # finish the snapshot, then just delete the blob.
+        b.state = blob.Blob.STATE_DELETED
+        return
 
     try:
         b.ref_count_inc()
