@@ -215,9 +215,10 @@ class Monitor(daemon.WorkerPoolDaemon):
 
         if isinstance(workitem, DestroyNetworkTask):
             if n.networkinterfaces:
-                log_ctx.error(
-                    'DestroyNetworkTask for network with interfaces: %s',
-                    n.networkinterfaces)
+                log_ctx.with_fields(
+                    {'networkinterfaces': n.networkinterfaces}).info(
+                    'DestroyNetworkTask for network with interfaces, deferring.')
+                etcd.enqueue('networknode', workitem, delay=60)
                 return
             try:
                 n.delete_on_network_node()
