@@ -76,7 +76,8 @@ jobs:
 
           exit 1
 
-      - name: Import cached images
+      - name: Import cached images (v0.6+)
+        if: false
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
@@ -91,6 +92,25 @@ jobs:
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               debian@$primary \
               '. /etc/sf/sfrc; sf-client artifact upload cirros /srv/ci/cirros --shared'
+
+      # It turns out that scheduled tests for other branches still use the workflow from develop, so
+      # this version must handle all of those branches
+      - name: Import cached images (v0.5)
+        if: true
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary \
+              '. /etc/sf/sfrc; sf-client artifact upload ubuntu-1804 /srv/ci/ubuntu:18.04'
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary \
+              '. /etc/sf/sfrc; sf-client artifact upload ubuntu-2004 /srv/ci/ubuntu:20.04'
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary \
+              '. /etc/sf/sfrc; sf-client artifact upload debian-11 /srv/ci/debian:11'
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary \
+              '. /etc/sf/sfrc; sf-client artifact upload cirros /srv/ci/cirros'
 
       - name: Create a base level of activity in the cluster
         run: |
