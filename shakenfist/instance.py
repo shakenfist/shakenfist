@@ -1166,6 +1166,7 @@ class Instance(dbo):
                                          'domain is not running'):
                     self.log.error('Failed to delete domain: %s', e)
 
+            self.agent_state = 'not ready (instance powered off)'
             self.update_power_state('off')
             self.add_event('poweroff')
 
@@ -1197,6 +1198,7 @@ class Instance(dbo):
                     'you cannot pause a powered off instance')
 
             inst.suspend()
+            self.agent_state = 'not ready (instance paused)'
             self.update_power_state(lc.extract_power_state(inst))
             self.add_event('pause')
 
