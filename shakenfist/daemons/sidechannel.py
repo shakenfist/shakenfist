@@ -145,7 +145,8 @@ class Monitor(daemon.Daemon):
                         except (BrokenPipeError,
                                 ConnectionRefusedError,
                                 ConnectionResetError,
-                                FileNotFoundError):
+                                FileNotFoundError,
+                                OSError):
                             if sc in sc_clients:
                                 del sc_clients[sc]
 
