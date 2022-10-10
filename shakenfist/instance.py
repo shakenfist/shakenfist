@@ -613,17 +613,7 @@ class Instance(dbo):
         # Configure block devices, include config drive creation
         self._configure_block_devices(lock)
 
-        # Create the actual instance. Sometimes on Ubuntu 20.04 we need to wait
-        # for port binding to work. Revisiting this is tracked by issue 320 on
-        # github.
-        if not self.power_on():
-            attempts = 0
-            while not self.power_on() and attempts < 5:
-                self.log.warning(
-                    'Instance required an additional attempt to power on')
-                time.sleep(5)
-                attempts += 1
-
+        self.power_on()
         if self.is_powered_on():
             self.state = self.STATE_CREATED
         else:
@@ -1105,6 +1095,19 @@ class Instance(dbo):
             return lc.extract_power_state(inst)
 
     def power_on(self):
+        # Create the actual instance. Sometimes on Ubuntu 20.04 we need to wait
+        # for port binding to work. Revisiting this is tracked by issue 320 on
+        # github. Additionally, sometimes ports are not released correctly by a
+        # domain destroy, which means we need to reassign on domain start.
+        if not self._power_on_inner():
+            attempts = 0
+            while not self._power_on_inner() and attempts < 5:
+                self.log.warning(
+                    'Instance required an additional attempt to power on')
+                time.sleep(5)
+                attempts += 1
+
+    def _power_on_inner(self):
         with util_libvirt.LibvirtConnection() as lc:
             inst = lc.get_domain_from_sf_uuid(self.uuid)
             if not inst:
@@ -1122,7 +1125,8 @@ class Instance(dbo):
                     pass
                 elif str(e).find('Failed to find an available port: '
                                  'Address already in use') != -1:
-                    self.log.warning('Instance ports clash: %s', e)
+                    self.add_event(
+                        'instance ports clash during boot attempt: %s' % e)
 
                     # Free those ports and pick some new ones
                     ports = self.ports
