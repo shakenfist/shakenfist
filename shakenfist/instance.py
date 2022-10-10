@@ -1125,7 +1125,7 @@ class Instance(dbo):
                     pass
                 elif str(e).find('Failed to find an available port: '
                                  'Address already in use') != -1:
-                    self.add_event(
+                    self.add_event2(
                         'instance ports clash during boot attempt: %s' % e)
 
                     # Free those ports and pick some new ones
