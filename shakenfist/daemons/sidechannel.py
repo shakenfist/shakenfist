@@ -37,6 +37,8 @@ class SFSocketAgent(protocol.SocketAgent):
         self.add_command('gather-facts-response',
                          self.gather_facts_response)
 
+        self.instance.agent_state = 'not ready (no contact)'
+
     def poll(self):
         if time.time() - self.last_response > 15:
             self.instance.agent_state = 'not ready (unresponsive)'
