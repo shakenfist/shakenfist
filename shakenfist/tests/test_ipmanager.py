@@ -147,7 +147,7 @@ class IPManagerTestCase(base.ShakenFistTestCase):
         ipm = IPManager('uuid', '10.0.0.0/8')
 
         for _ in range(65025):
-            ipm.get_random_free_address(('test', '123'))
+            ipm.reserve_random_free_address(('test', '123'))
 
         # The extra two are the reserved network and broadcast
         # addresses
@@ -158,7 +158,7 @@ class IPManagerTestCase(base.ShakenFistTestCase):
 
         try:
             for _ in range(65025):
-                ipm.get_random_free_address(('test', '123'))
+                ipm.reserve_random_free_address(('test', '123'))
 
         except exceptions.CongestedNetwork:
             pass

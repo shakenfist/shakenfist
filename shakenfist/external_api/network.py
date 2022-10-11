@@ -14,7 +14,6 @@ from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist import eventlog
-from shakenfist.ipmanager import IPManager
 from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist.util import process as util_process

@@ -20,7 +20,6 @@ from shakenfist.external_api import (
     base as api_base,
     util as api_util)
 from shakenfist import instance
-from shakenfist.ipmanager import IPManager
 from shakenfist import network as sfnet  # Unfortunate, but we have an API arg
 # called network too.
 from shakenfist.networkinterface import NetworkInterface
@@ -382,9 +381,8 @@ class InstancesEndpoint(sf_api.Resource):
                     else:
                         with db.get_lock('ipmanager', None,  netdesc['network_uuid'],
                                          ttl=120, op='Network allocate IP'):
-                            ipm = IPManager.from_db(netdesc['network_uuid'])
                             if 'address' not in netdesc or not netdesc['address']:
-                                netdesc['address'] = ipm.get_random_free_address(
+                                netdesc['address'] = n.reserve_random_free_address(
                                     inst.unique_label())
                                 inst.add_event(
                                     'allocated ip address', extra=netdesc)
@@ -395,8 +393,6 @@ class InstancesEndpoint(sf_api.Resource):
                                         % netdesc['network_uuid'])
                                     return sf_api.error(
                                         409, 'address %s in use' % netdesc['address'])
-
-                            ipm.persist()
                 except exceptions.CongestedNetwork as e:
                     inst.enqueue_delete_due_error(
                         'cannot allocate address: %s' % e)

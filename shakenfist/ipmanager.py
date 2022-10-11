@@ -120,7 +120,7 @@ class IPManager(object):
             self.ipblock_obj.max_prefixlen - self.ipblock_obj.prefixlen)
         return str(ipaddress.IPv4Address(self.ipblock_obj.network_address + bits))
 
-    def get_random_free_address(self, unique_label_tuple):
+    def reserve_random_free_address(self, unique_label_tuple):
         # Fast path give up for full networks
         if self.in_use_counter == self.num_addresses:
             raise exceptions.CongestedNetwork('No free addresses on network')
