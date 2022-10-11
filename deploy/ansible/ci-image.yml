@@ -233,8 +233,6 @@
   vars:
     identifier: cron
     base_image_user: "ubuntu"
-    keyfile_private: "/home/jenkins/id_ci"
-    keyfile_public: "/home/jenkins/id_ci.pub"
     label: "sfci-image"
 
   tasks:
@@ -265,7 +263,7 @@
           - "30@sf://blob/{{hostvars['localhost']['snapshot_uuid']}}"
         networkspecs:
           - network_uuid="{{identifier}}"
-        ssh_key: "{{ lookup('file', keyfile_public) }}"
+        ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
         state: present
       register: imagetest
