@@ -264,7 +264,7 @@
         disks:
           - "30@sf://blob/{{hostvars['localhost']['snapshot_uuid']}}"
         networkspecs:
-          - network_uuid="{{cinetwork['meta']['uuid']}}",float=True
+          - network_uuid="{{identifier}}"
         ssh_key: "{{ lookup('file', keyfile_public) }}"
         namespace: "{{identifier}}"
         state: present
