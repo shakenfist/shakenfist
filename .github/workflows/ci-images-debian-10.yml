@@ -25,9 +25,9 @@ jobs:
           path: shakenfist
           fetch-depth: 0
 
-      - name: Run functional tests
+      - name: Build image
         run: |
           ansible-playbook -i /home/debian/ansible-hosts \
             --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
-              base_image=debian:10 base_image_user=debian" label=sfci-debian-10" \
+              base_image=debian:10 base_image_user=debian label=sfci-debian-10" \
             deploy/ansible/ci-image.yml
