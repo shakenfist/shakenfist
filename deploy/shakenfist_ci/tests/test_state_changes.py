@@ -122,6 +122,11 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         time.sleep(5)
         self._test_ping(inst['uuid'], self.net['uuid'], ip, 100)
 
+        # Rapidly powering on an instance has been showing to confuse libvirt
+        # in some cases. Let's see if being more patient here makes it work
+        # better.
+        time.sleep(30)
+
         # Power on
         self.test_client.delete_console_data(inst['uuid'])
         self.test_client.power_on_instance(inst['uuid'])
