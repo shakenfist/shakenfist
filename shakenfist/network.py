@@ -774,6 +774,10 @@ class Network(dbo):
         ipm = self._get_ipmanager()
         return ipm.is_free(address)
 
+    def is_in_range(self, address):
+        ipm = self._get_ipmanager()
+        return ipm.is_in_range(address)
+
 
 class Networks(dbo_iter):
     def __iter__(self):

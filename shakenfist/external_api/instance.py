@@ -303,8 +303,7 @@ class InstancesEndpoint(sf_api.Resource):
                 if netdesc.get('address') and not util_general.noneish(netdesc.get('address')):
                     # The requested address must be within the ip range specified
                     # for that virtual network, unless it is equivalent to "none".
-                    ipm = IPManager.from_db(n.uuid)
-                    if not ipm.is_in_range(netdesc['address']):
+                    if not n.is_in_range(netdesc['address']):
                         return sf_api.error(
                             400,
                             'network specification requests an address outside the '
