@@ -418,16 +418,14 @@ class Network(dbo):
                 # we don't need to construct two identical ipmanagers one after
                 # the other.
                 try:
-                    with db.get_lock('ipmanager', None, 'floating', ttl=120,
-                                     op='Network deploy NAT'):
-                        fn = floating_network()
-                        if not self.floating_gateway:
-                            self.update_floating_gateway(
-                                fn.reserve_random_free_address(self.unique_label()))
+                    fn = floating_network()
+                    if not self.floating_gateway:
+                        self.update_floating_gateway(
+                            fn.reserve_random_free_address(self.unique_label()))
 
-                        subst['floating_router'] = fn.get_address_at_index(1)
-                        subst['floating_gateway'] = self.floating_gateway
-                        subst['floating_netmask'] = fn.netmask
+                    subst['floating_router'] = fn.get_address_at_index(1)
+                    subst['floating_gateway'] = self.floating_gateway
+                    subst['floating_netmask'] = fn.netmask
                 except CongestedNetwork:
                     self.error('Unable to allocate floating gateway IP')
 
@@ -496,11 +494,9 @@ class Network(dbo):
                 util_process.execute(None, 'ip netns del %s' % self.uuid)
 
             if self.floating_gateway:
-                with db.get_lock('ipmanager', None, 'floating', ttl=120,
-                                 op='Network delete'):
-                    fn = floating_network()
-                    fn.release(self.floating_gateway)
-                    self.update_floating_gateway(None)
+                fn = floating_network()
+                fn.release(self.floating_gateway)
+                self.update_floating_gateway(None)
 
             self.state = self.STATE_DELETED
 
@@ -583,11 +579,9 @@ class Network(dbo):
     def remove_nat(self):
         if config.NODE_IS_NETWORK_NODE:
             if self.floating_gateway:
-                with db.get_lock('ipmanager', None, 'floating', ttl=120,
-                                 op='Remove NAT'):
-                    fn = floating_network()
-                    fn.release(self.floating_gateway)
-                    self.update_floating_gateway(None)
+                fn = floating_network()
+                fn.release(self.floating_gateway)
+                self.update_floating_gateway(None)
 
         else:
             etcd.enqueue('networknode', RemoveNATNetworkTask(self.uuid))
@@ -754,20 +748,30 @@ class Network(dbo):
         return IPManager.from_db(self.uuid)
 
     def reserve(self, address, unique_label_tuple):
+        with db.get_lock('ipmanager', None, self.uuid, ttl=120, op='reserve'):
+            return self._reserve_inner(address, unique_label_tuple)
+
+    def _reserve_inner(self, address, unique_label_tuple):
         ipm = self._get_ipmanager()
-        retval = ipm.reserve(address, unique_label_tuple=unique_label_tuple)
+        retval = ipm.reserve(
+            address, unique_label_tuple=unique_label_tuple)
         if retval:
             ipm.persist()
         return retval
 
     def reserve_random_free_address(self, unique_label_tuple):
-        ipm = self._get_ipmanager()
-        retval = ipm.reserve_random_free_address(
-            unique_label_tuple=unique_label_tuple)
-        ipm.persist()
-        return retval
+        with db.get_lock('ipmanager', None, self.uuid, ttl=120, op='reserve random'):
+            ipm = self._get_ipmanager()
+            retval = ipm.reserve_random_free_address(
+                unique_label_tuple=unique_label_tuple)
+            ipm.persist()
+            return retval
 
     def release(self, address):
+        with db.get_lock('ipmanager', None, self.uuid, ttl=120, op='release'):
+            self._release_inner(address)
+
+    def _release_inner(self, address):
         ipm = self._get_ipmanager()
         if ipm.release(address):
             ipm.persist()

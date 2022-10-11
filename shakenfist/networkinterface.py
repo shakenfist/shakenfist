@@ -149,9 +149,7 @@ class NetworkInterface(dbo):
         if not n:
             raise exceptions.NetworkMissing(
                 'No such network: %s' % self.network_uuid)
-        with db.get_lock('ipmanager', None, self.network_uuid,
-                         ttl=120, op='Release fixed IP'):
-            n.release(self.ipv4)
+        n.release(self.ipv4)
         n.remove_networkinterface(self.uuid)
 
         self.state = dbo.STATE_DELETED
