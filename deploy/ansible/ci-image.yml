@@ -329,9 +329,3 @@
         uuid: "{{hostvars['imagerebuild']['sf_instance_uuid']}}"
         namespace: "{{identifier}}"
         state: absent
-
-    - name: Delete network
-      sf_network:
-        uuid: "{{hostvars['imagerebuild']['sf_network_uuid']}}"
-        namespace: "{{identifier}}"
-        state: absent
