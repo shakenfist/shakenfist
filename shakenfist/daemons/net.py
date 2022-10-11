@@ -377,7 +377,7 @@ class Monitor(daemon.WorkerPoolDaemon):
 
             for ip in leaks:
                 LOG.error('Leaked floating IP %s has been released.' % ip)
-                floating_ipm.release(ip)
+                floating_network.release(ip)
             floating_ipm.persist()
 
     def _validate_mtus(self):

@@ -14,7 +14,6 @@ from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist import eventlog
-from shakenfist.ipmanager import IPManager
 from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist.util import process as util_process
@@ -249,8 +248,7 @@ class NetworkPingEndpoint(sf_api.Resource):
     @api_base.redirect_to_network_node
     @api_base.requires_network_active
     def get(self, network_ref=None, address=None, network_from_db=None):
-        ipm = IPManager.from_db(network_from_db.uuid)
-        if not ipm.is_in_range(address):
+        if not network_from_db.is_in_range(address):
             return sf_api.error(400, 'ping request for address outside network block')
 
         out, err = util_process.execute(

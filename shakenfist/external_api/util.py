@@ -4,7 +4,6 @@ from shakenfist_utilities import api as sf_api, logs
 from shakenfist.daemons import daemon
 from shakenfist import db
 from shakenfist.instance import Instance
-from shakenfist.ipmanager import IPManager
 from shakenfist import network
 from shakenfist.networkinterface import NetworkInterface
 
@@ -33,9 +32,8 @@ def metadata_putpost(meta_type, owner, key, value):
 def assign_floating_ip(ni):
     # Address is allocated and added to the record here, so the job has it later.
     with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Interface float'):
-        ipm = IPManager.from_db('floating')
-        addr = ipm.get_random_free_address(ni.unique_label())
-        ipm.persist()
+        fn = network.floating_network()
+        addr = fn.reserve_random_free_address(ni.unique_label())
 
     ni.floating = addr
 

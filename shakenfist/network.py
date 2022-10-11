@@ -420,15 +420,14 @@ class Network(dbo):
                 try:
                     with db.get_lock('ipmanager', None, 'floating', ttl=120,
                                      op='Network deploy NAT'):
-                        ipm = IPManager.from_db('floating')
+                        fn = floating_network()
                         if not self.floating_gateway:
                             self.update_floating_gateway(
-                                ipm.get_random_free_address(self.unique_label()))
-                            ipm.persist()
+                                fn.reserve_random_free_address(self.unique_label()))
 
-                        subst['floating_router'] = ipm.get_address_at_index(1)
+                        subst['floating_router'] = fn.get_address_at_index(1)
                         subst['floating_gateway'] = self.floating_gateway
-                        subst['floating_netmask'] = ipm.netmask
+                        subst['floating_netmask'] = fn.netmask
                 except CongestedNetwork:
                     self.error('Unable to allocate floating gateway IP')
 
@@ -761,6 +760,13 @@ class Network(dbo):
             ipm.persist()
         return retval
 
+    def reserve_random_free_address(self, unique_label_tuple):
+        ipm = self._get_ipmanager()
+        retval = ipm.reserve_random_free_address(
+            unique_label_tuple=unique_label_tuple)
+        ipm.persist()
+        return retval
+
     def release(self, address):
         ipm = self._get_ipmanager()
         if ipm.release(address):
@@ -773,6 +779,10 @@ class Network(dbo):
     def is_free(self, address):
         ipm = self._get_ipmanager()
         return ipm.is_free(address)
+
+    def is_in_range(self, address):
+        ipm = self._get_ipmanager()
+        return ipm.is_in_range(address)
 
 
 class Networks(dbo_iter):
