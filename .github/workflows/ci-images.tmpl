@@ -27,6 +27,7 @@ jobs:
 
       - name: Build image
         run: |
+          cd ${GITHUB_WORKSPACE}/shakenfist
           ansible-playbook -i /home/debian/ansible-hosts \
             --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
               base_image={{baseimage}} base_image_user={{baseuser}} label={{outputlabel}}" \
