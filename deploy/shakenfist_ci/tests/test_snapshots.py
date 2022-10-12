@@ -32,7 +32,6 @@ class TestSnapshots(base.BaseNamespacedTestCase):
 
         self.assertIsNotNone(inst1['uuid'])
         self.assertIsNotNone(inst1['node'])
-
         self._await_instance_ready(inst1['uuid'])
 
         # Take a snapshot
@@ -58,8 +57,12 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         snapshot_uuid = snapshots[-1]['uuid']
         snap1_info = self.test_client.get_artifact(snapshot_uuid)
         self.assertEqual(1, len(snap1_info.get('blobs', [])))
-        self.assertEqual(1, snap1_info['blobs'][1]['reference_count'])
-        self.assertEqual(None, snap1_info['blobs'][1]['depends_on'])
+        self.assertEqual(1, snap1_info['blobs'][1]['reference_count'],
+                         'blob %s does not have a reference count of 1'
+                         % snap1_info['blobs'][1]['uuid'])
+        self.assertEqual(None, snap1_info['blobs'][1]['depends_on'],
+                         'blob %s should not depend on another blob'
+                         % snap1_info['blobs'][1]['uuid'])
 
         # Take another snapshot, we only get the new snapshot returned
         snap2 = self.test_client.snapshot_instance(inst1['uuid'])
