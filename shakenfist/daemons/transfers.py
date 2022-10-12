@@ -3,6 +3,7 @@ import os
 from shakenfist_utilities import logs
 import socket
 
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
@@ -17,7 +18,13 @@ def transfer_server(name, data):
     try:
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server.settimeout(60)
-        server.bind((config.NODE_MESH_IP, data['port']))
+        server.bind((config.NODE_MESH_IP, 0))
+
+        # Update etcd with where we are listening
+        data['server_state'] = dbo.STATE_CREATED
+        data['port'] = server.getsockname()[1]
+        etcd.put('transfer', config.NODE_NAME, name, data)
+
         log.info('Awaiting transfer connection')
         server.listen()
 
