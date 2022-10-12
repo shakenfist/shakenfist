@@ -274,11 +274,8 @@ class Monitor(daemon.WorkerPoolDaemon):
 
         if isinstance(workitem, DefloatNetworkInterfaceTask):
             n.remove_floating_ip(ni.floating.get('floating_address'), ni.ipv4)
-
-            with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Instance defloat'):
-                fn = network.floating_network()
-                fn.release(ni.floating.get('floating_address'))
-
+            fn = network.floating_network()
+            fn.release(ni.floating.get('floating_address'))
             ni.floating = None
 
         # Tasks that should not operate on a dead network
@@ -318,20 +315,23 @@ class Monitor(daemon.WorkerPoolDaemon):
             self.exit.wait(60)
             processing, waiting, _ = etcd.get_queue_length('networknode')
 
-        # Ensure we haven't leaked any floating IPs (because we used to)
+        # Ensure we haven't leaked any floating IPs (because we used to). We
+        # have to hold a lock here to avoid races where an IP is freed while
+        # we're iterating through the loop. Note that this means we can't call
+        # anything which also wants to lock the ipmanager.
         with db.get_lock('ipmanager', None, 'floating', ttl=120,
                          op='Cleanup leaks'):
             floating_network = network.floating_network()
 
             # Collect floating gateways and floating IPs, while ensuring that
-            # they are correctly reserved on the floating network as well
+            # they are correctly reserved on the floating network as well.
             floating_gateways = []
             for n in network.Networks([baseobject.active_states_filter]):
                 fg = n.floating_gateway
                 if fg:
                     floating_gateways.append(fg)
                     if floating_network.is_free(fg):
-                        floating_network.reserve(fg, n.unique_label())
+                        floating_network._reserve_inner(fg, n.unique_label())
                         LOG.with_fields({
                             'network': n.uuid,
                             'address': fg
@@ -345,7 +345,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                 if fa:
                     floating_addresses.append(fa)
                     if floating_network.is_free(fa):
-                        floating_network.reserve(fa, ni.unique_label())
+                        floating_network._reserve_inner(fa, ni.unique_label())
                         LOG.with_fields({
                             'networkinterface': ni.uuid,
                             'address': fa
@@ -377,7 +377,7 @@ class Monitor(daemon.WorkerPoolDaemon):
 
             for ip in leaks:
                 LOG.error('Leaked floating IP %s has been released.' % ip)
-                floating_network.release(ip)
+                floating_network._release_inner(ip)
             floating_ipm.persist()
 
     def _validate_mtus(self):

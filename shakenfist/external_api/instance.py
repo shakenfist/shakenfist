@@ -379,20 +379,18 @@ class InstancesEndpoint(sf_api.Resource):
                     if 'address' in netdesc and util_general.noneish(netdesc['address']):
                         netdesc['address'] = None
                     else:
-                        with db.get_lock('ipmanager', None,  netdesc['network_uuid'],
-                                         ttl=120, op='Network allocate IP'):
-                            if 'address' not in netdesc or not netdesc['address']:
-                                netdesc['address'] = n.reserve_random_free_address(
-                                    inst.unique_label())
-                                inst.add_event(
-                                    'allocated ip address', extra=netdesc)
-                            else:
-                                if not n.reserve(netdesc['address'], inst.unique_label()):
-                                    inst.enqueue_delete_due_error(
-                                        'failed to reserve an IP on network %s'
-                                        % netdesc['network_uuid'])
-                                    return sf_api.error(
-                                        409, 'address %s in use' % netdesc['address'])
+                        if 'address' not in netdesc or not netdesc['address']:
+                            netdesc['address'] = n.reserve_random_free_address(
+                                inst.unique_label())
+                            inst.add_event(
+                                'allocated ip address', extra=netdesc)
+                        else:
+                            if not n.reserve(netdesc['address'], inst.unique_label()):
+                                inst.enqueue_delete_due_error(
+                                    'failed to reserve an IP on network %s'
+                                    % netdesc['network_uuid'])
+                                return sf_api.error(
+                                    409, 'address %s in use' % netdesc['address'])
                 except exceptions.CongestedNetwork as e:
                     inst.enqueue_delete_due_error(
                         'cannot allocate address: %s' % e)

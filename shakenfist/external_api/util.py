@@ -31,11 +31,8 @@ def metadata_putpost(meta_type, owner, key, value):
 
 def assign_floating_ip(ni):
     # Address is allocated and added to the record here, so the job has it later.
-    with db.get_lock('ipmanager', None, 'floating', ttl=120, op='Interface float'):
-        fn = network.floating_network()
-        addr = fn.reserve_random_free_address(ni.unique_label())
-
-    ni.floating = addr
+    fn = network.floating_network()
+    ni.floating = fn.reserve_random_free_address(ni.unique_label())
 
 
 def safe_get_network_interface(interface_uuid):

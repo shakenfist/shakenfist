@@ -46,12 +46,9 @@ class IPManager(object):
 
     @staticmethod
     def new(uuid, ipblock):
-        with db.get_lock('ipmanager', None, uuid, ttl=120,
-                         op='Network object initialization'):
-            ipm = IPManager(uuid, ipblock)
-            # Reserve first IP address
-            ipm.reserve(ipm.get_address_at_index(1), ipm.unique_label())
-            ipm.persist()
+        ipm = IPManager(uuid, ipblock)
+        ipm.reserve(ipm.get_address_at_index(1), ipm.unique_label())
+        ipm.persist()
         return ipm
 
     @staticmethod
