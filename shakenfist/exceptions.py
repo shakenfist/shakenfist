@@ -233,3 +233,7 @@ class BlobsMustHaveContent(Exception):
 
 class BlobAlreadyBeingTransferred(Exception):
     pass
+
+
+class BlobTransferSetupFailed(Exception):
+    pass

@@ -17,7 +17,8 @@ from shakenfist import db
 from shakenfist import etcd
 from shakenfist.exceptions import (BlobDeleted, BlobFetchFailed,
                                    BlobDependencyMissing, BlobsMustHaveContent,
-                                   BlobAlreadyBeingTransferred)
+                                   BlobAlreadyBeingTransferred,
+                                   BlobTransferSetupFailed)
 from shakenfist import instance
 from shakenfist.metrics import get_minimum_object_version as gmov
 from shakenfist.node import (Node, Nodes, nodes_by_free_disk_descending,
@@ -365,11 +366,10 @@ class Blob(dbo):
             # probably have a retry thing here.
             locations = self.locations
             random.shuffle(locations)
-            port = random.randint(14000, 24000)
             name = sf_random.random_id()
             token = sf_random.random_id()
             data = {
-                'port': port,
+                'server_state': dbo.STATE_INITIAL,
                 'requestor': config.NODE_MESH_IP,
                 'blob_uuid': self.uuid,
                 'token': token
@@ -377,10 +377,20 @@ class Blob(dbo):
 
             etcd.put('transfer', locations[0], name, data)
             self.log.with_fields(data).info('Created transfer request')
-            time.sleep(10)
+
+            waiting_time = time.time()
+            while time.time() - waiting_time < 30:
+                data = etcd.get('transfer', locations[0], name)
+                if data['server_state'] == dbo.STATE_CREATED:
+                    break
+                time.sleep(1)
+
+            if data['server_state'] != dbo.STATE_CREATED:
+                raise BlobTransferSetupFailed(
+                    'transfer %s failed to setup' % name)
 
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            client.connect((locations[0], port))
+            client.connect((locations[0], data['port']))
             client.send(token.encode('utf-8'))
 
             with open(partial_path, 'wb') as f:
