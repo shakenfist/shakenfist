@@ -1,14 +1,10 @@
 import cpuinfo
 import distro
-import json
 import os
 import pathlib
 from pbr.version import VersionInfo
-import requests
-import secrets
 from shakenfist_utilities import logs
 import stat
-import string
 import sys
 import time
 import traceback
@@ -18,7 +14,6 @@ import uuid
 # To avoid circular imports, util modules should only import a limited
 # set of shakenfist modules, mainly exceptions, and specific
 # other util modules.
-from shakenfist import db
 from shakenfist import eventlog
 
 
@@ -58,31 +53,6 @@ class RecordedOperation():
             object_uuid = None
 
         return object_type, object_uuid
-
-
-def get_api_token(base_url, namespace='system'):
-    with db.get_lock('namespace', None, namespace, op='Get API token'):
-        auth_url = base_url + '/auth'
-        LOG.info('Fetching %s auth token from %s', namespace, auth_url)
-        ns = db.get_namespace(namespace)
-        if 'service_key' in ns:
-            key = ns['service_key']
-        else:
-            key = ''.join(secrets.choice(string.ascii_lowercase)
-                          for i in range(50))
-            ns['service_key'] = key
-            db.persist_namespace(namespace, ns)
-
-    r = requests.request('POST', auth_url,
-                         data=json.dumps({
-                             'namespace': namespace,
-                             'key': key
-                         }),
-                         headers={'Content-Type': 'application/json',
-                                  'User-Agent': get_user_agent()})
-    if r.status_code != 200:
-        raise Exception('Unauthorized')
-    return 'Bearer %s' % r.json()['access_token']
 
 
 CACHED_VERSION = None

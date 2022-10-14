@@ -157,8 +157,9 @@ class NetworksEndpoint(sf_api.Resource):
 
         networks_del = []
         networks_unable = []
-        for n in network.Networks([partial(baseobject.namespace_filter, namespace)]):
-            if n.networkinterfaces:
+        for n in network.Networks([partial(baseobject.namespace_filter, namespace),
+                                   baseobject.active_states_filter]):
+            if not n.networkinterfaces:
                 _delete_network(n)
             else:
                 if clean_wait:

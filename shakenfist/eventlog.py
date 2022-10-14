@@ -24,6 +24,9 @@ def add_event(object_type, object_uuid, message, duration=None,
               extra=None, suppress_event_logging=False):
     timestamp = time.time()
 
+    if not object_type or not object_uuid:
+        return
+
     if not suppress_event_logging:
         log = LOG
         if extra:

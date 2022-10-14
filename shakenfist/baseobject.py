@@ -111,6 +111,11 @@ class DatabaseBackedObject(object):
         eventlog.add_event(cls.object_type, object_uuid, 'db record created',
                            extra=metadata)
 
+        if 'namespace' in metadata and metadata['namespace']:
+            eventlog.add_event('namespace', metadata['namespace'],
+                               '%s object created' % cls.object_type,
+                               extra=metadata, suppress_event_logging=True)
+
     @classmethod
     def _db_get(cls, object_uuid):
         o = etcd.get(cls.object_type, None, object_uuid)
