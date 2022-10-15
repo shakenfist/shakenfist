@@ -48,7 +48,7 @@ def bootstrap_system_key(keyname, key):
 
 @click.command()
 def show_etcd_config():
-    value = etcd.WrappedEtcd3Client().get('/sf/config', metadata=True)
+    value = etcd.WrappedEtcdClient().get('/sf/config', metadata=True)
     if value is None or len(value) == 0:
         click.echo('{}')
     else:
@@ -60,7 +60,7 @@ def show_etcd_config():
 @click.argument('flag')
 @click.argument('value')
 def set_etcd_config(flag, value):
-    client = etcd.WrappedEtcd3Client()
+    client = etcd.WrappedEtcdClient()
     config = {}
     current_config = client.get('/sf/config', metadata=True)
     if current_config is None or len(current_config) == 0:
