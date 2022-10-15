@@ -699,11 +699,6 @@
         /srv/shakenfist/venv/bin/sf-ctl set-etcd-config \
             HTTP_PROXY "{{hostvars['localhost']['http_proxy']}}"
       when: "{{hostvars['localhost']['http_proxy']}}"
-        
-    - name: Set traceback configuration in etcd
-      shell: |
-        /srv/shakenfist/venv/bin/sf-ctl set-etcd-config \
-            INCLUDE_TRACEBACKS "{{hostvars['localhost']['include_tracebacks']}}"
 
     - name: Parse back etcd configuration
       shell: |
