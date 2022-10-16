@@ -8,10 +8,10 @@ from shakenfist_utilities import api as sf_api, logs
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
-from shakenfist import db
 from shakenfist import exceptions
 from shakenfist.etcd import ThreadLocalReadOnlyCache
 from shakenfist.instance import Instance
+from shakenfist.namespace import Namespace, get_api_token
 from shakenfist import network
 from shakenfist.upload import Upload
 from shakenfist.util import general as util_general
@@ -57,7 +57,7 @@ def redirect_instance_request(func):
         if placement.get('node') != config.NODE_NAME:
             url = 'http://%s:%d%s' % (placement['node'], config.API_PORT,
                                       flask.request.environ['PATH_INFO'])
-            api_token = util_general.get_api_token(
+            api_token = get_api_token(
                 'http://%s:%d' % (placement['node'], config.API_PORT),
                 namespace=get_jwt_identity()[0])
             r = requests.request(
@@ -138,7 +138,7 @@ def redirect_to_network_node(func):
     # Redirect method to the network node
     def wrapper(*args, **kwargs):
         if not config.NODE_IS_NETWORK_NODE:
-            admin_token = util_general.get_api_token(
+            admin_token = get_api_token(
                 'http://%s:%d' % (config.NETWORK_NODE_IP, config.API_PORT),
                 namespace='system')
             r = requests.request(
@@ -200,7 +200,7 @@ def requires_network_active(func):
 def requires_namespace_exist(func):
     def wrapper(*args, **kwargs):
         if kwargs.get('namespace'):
-            if not db.get_namespace(kwargs['namespace']):
+            if not Namespace.from_db(kwargs['namespace']):
                 LOG.with_fields({'namespace': kwargs['namespace']}).warning(
                     'Attempt to use non-existent namespace')
                 return sf_api.error(404, 'namespace not found')
@@ -237,7 +237,7 @@ def redirect_upload_request(func):
         if u.node != config.NODE_NAME:
             url = 'http://%s:%d%s' % (u.node, config.API_PORT,
                                       flask.request.environ['PATH_INFO'])
-            api_token = util_general.get_api_token(
+            api_token = get_api_token(
                 'http://%s:%d' % (u.node, config.API_PORT),
                 namespace=get_jwt_identity()[0])
             r = requests.request(
@@ -262,7 +262,7 @@ def redirect_to_eventlog_node(func):
     # Redirect method to the event node
     def wrapper(*args, **kwargs):
         if not config.NODE_IS_EVENTLOG_NODE:
-            admin_token = util_general.get_api_token(
+            admin_token = get_api_token(
                 'http://%s:%d' % (config.EVENTLOG_NODE_IP, config.API_PORT),
                 namespace='system')
             r = requests.request(

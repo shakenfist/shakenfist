@@ -20,7 +20,13 @@ class Monitor(daemon.WorkerPoolDaemon):
                 results = defaultdict(list)
 
                 for k, v in etcd.get_all('event', None, limit=10000):
-                    _, _, _, objtype, objuuid, _ = k.split('/')
+                    try:
+                        _, _, _, objtype, objuuid, _ = k.split('/')
+                    except ValueError as e:
+                        util_general.ignore_exception(
+                            'failed to parse event key "%s"' % k, e)
+                        continue
+
                     results[(objtype, objuuid)].append((k, v))
 
                 for objtype, objuuid in results:

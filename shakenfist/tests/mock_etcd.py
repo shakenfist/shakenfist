@@ -15,6 +15,7 @@ import time
 from shakenfist import db
 from shakenfist.baseobject import DatabaseBackedObject
 from shakenfist.instance import Instance
+from shakenfist.namespace import Namespace
 from shakenfist.network import Network
 from shakenfist.networkinterface import NetworkInterface
 from shakenfist.node import Node
@@ -149,15 +150,11 @@ class MockEtcd():
     def create_namespace(self, namespace, key_name, key):
         encoded = str(base64.b64encode(bcrypt.hashpw(
                       key.encode('utf-8'), bcrypt.gensalt())), 'utf-8')
-        rec = {
-            'name': namespace,
-            'keys': {
-                key_name: encoded
-            }
-        }
+        ns = Namespace.new(namespace)
+        ns.add_key(key_name, encoded)
         db.persist_metadata('namespace', namespace, {})
-        db.persist_namespace(namespace, rec)
 
+    # Find a path through the allowed states which gets us to the requested state
     @staticmethod
     def _find_start(obj, state_path, initial, dest):
         for s in state_path[dest]:

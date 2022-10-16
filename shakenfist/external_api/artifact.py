@@ -20,6 +20,7 @@ from shakenfist import eventlog
 from shakenfist.external_api import base as api_base
 from shakenfist.config import config
 from shakenfist import etcd
+from shakenfist.namespace import get_api_token
 from shakenfist.tasks import FetchImageTask
 from shakenfist.upload import Upload
 from shakenfist.util import general as util_general
@@ -184,7 +185,7 @@ class ArtifactUploadEndpoint(sf_api.Resource):
         if u.node != config.NODE_NAME:
             url = 'http://%s:%d%s' % (u.node, config.API_PORT,
                                       flask.request.environ['PATH_INFO'])
-            api_token = util_general.get_api_token(
+            api_token = get_api_token(
                 'http://%s:%d' % (u.node, config.API_PORT),
                 namespace=get_jwt_identity()[0])
             r = requests.request(

@@ -11,6 +11,7 @@ from shakenfist import baseobject
 from shakenfist.blob import Blob, Blobs
 from shakenfist.config import config
 from shakenfist import etcd
+from shakenfist.namespace import get_api_token
 from shakenfist.util import general as util_general
 
 
@@ -24,7 +25,7 @@ def _read_file(filename, offset):
 
 
 def _read_remote(target, blob_uuid, offset=0):
-    api_token = util_general.get_api_token(
+    api_token = get_api_token(
         'http://%s:%d' % (target, config.API_PORT),
         namespace=get_jwt_identity()[0])
     url = 'http://%s:%d/blobs/%s/data?offset=%d' % (

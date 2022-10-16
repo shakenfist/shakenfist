@@ -54,28 +54,6 @@ def persist_ipmanager(network_uuid, data):
 def delete_ipmanager(network_uuid):
     etcd.delete('ipmanager', None, uuid)
 
-
-#####################################################################
-# Namespaces
-#####################################################################
-
-
-def list_namespaces():
-    for _, value in etcd.get_all('namespace', None):
-        yield value
-
-
-def get_namespace(namespace):
-    return etcd.get('namespace', None, namespace)
-
-
-def persist_namespace(namespace, data):
-    etcd.put('namespace', None, namespace, data)
-
-
-def delete_namespace(namespace):
-    etcd.delete('namespace', None, namespace)
-
 #####################################################################
 # Metadata
 #####################################################################

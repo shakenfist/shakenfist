@@ -8,8 +8,8 @@ import logging
 import time
 
 from shakenfist.config import config
-from shakenfist import db
 from shakenfist import etcd
+from shakenfist.namespace import Namespace
 from shakenfist.node import Node
 
 
@@ -36,13 +36,8 @@ def bootstrap_system_key(keyname, key):
     encoded = str(base64.b64encode(bcrypt.hashpw(
         key.encode('utf-8'), bcrypt.gensalt())), 'utf-8')
 
-    db.persist_namespace('system',
-                         {
-                             'name': 'system',
-                             'keys': {
-                                 keyname: encoded
-                             }
-                         })
+    ns = Namespace.new('system')
+    ns.add_key(keyname, encoded)
     click.echo('Done')
 
 

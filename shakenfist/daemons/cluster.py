@@ -52,6 +52,22 @@ class Monitor(daemon.Daemon):
     def _cluster_wide_cleanup(self, last_loop_run):
         LOG.info('Running cluster maintenance')
 
+        # Emit billing statistics for artifacts in namespaces
+        for a in artifact.Artifacts([active_states_filter]):
+            total_used_storage = 0
+            for blob_index in a.get_all_indexes():
+                blob_uuid = blob_index['blob_uuid']
+                b = blob.Blob.from_db(blob_uuid)
+                if b:
+                    # NOTE(mikal): I've decided not to include blob replication
+                    # cost in this number, as that is a decision the cluster
+                    # deployer machines (its a config option), not a decision
+                    # the owner of the blob makes.
+                    total_used_storage += b.size
+
+            a.add_event('usage', extra={'bytes': total_used_storage},
+                        suppress_event_logging=True)
+
         # Recompute our cache of what blobs are on what nodes every 30 minutes
         if time.time() - last_loop_run > 1800:
             per_node = defaultdict(list)
