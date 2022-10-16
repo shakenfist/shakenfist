@@ -2,7 +2,6 @@ from functools import partial
 from flask_jwt_extended import jwt_required
 from flask_restful import fields
 from flask_restful import marshal_with
-import time
 
 
 from shakenfist.baseobject import (
@@ -25,23 +24,19 @@ class NodeEndpoint(api_base.Resource):
         # This really shouldn't happen in the API layer, but it can't happen
         # in blobs.py because of circular imports. I need to think about that
         # more, and its a problem bigger than just this method.
-        if time.time() - self.last_seen < 60:
-            # If we have seen the node recently, we should try and be nice
-            # about deleting resources on it
-            for i in healthy_instances_on_node(self.fqdn):
-                i.add_event2(
-                    'Deleting instance as hosting node has been deleted')
-                i.delete()
+        for i in healthy_instances_on_node(n.fqdn):
+            i.add_event('Deleting instance as hosting node has been deleted')
+            i.delete()
 
         blobs_to_remove = []
         with etcd.ThreadLocalReadOnlyCache():
             for b in Blobs([dbo_active_states_filter,
-                            partial(placement_filter, self.fqdn)]):
+                            partial(placement_filter, n.fqdn)]):
                 blobs_to_remove.append(b)
         for b in blobs_to_remove:
-            b.add_event2(
-                'Removing %s as a location, as node has been deleted' % self.fqdn)
-            b.remove_location(self.fqdn)
+            b.add_event(
+                'Removing %s as a location, as node has been deleted' % n.fqdn)
+            b.remove_location(n.fqdn)
 
         n.delete()
         return n.external_view()
