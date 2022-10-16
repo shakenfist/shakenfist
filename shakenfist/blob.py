@@ -60,7 +60,7 @@ class Blob(dbo):
         self.__size = static_values['size']
         self.__modified = static_values['modified']
         self.__fetched_at = static_values['fetched_at']
-        self.__depends_on = static_values['depends_on']
+        self.__depends_on = static_values.get('depends_on')
 
     @classmethod
     def upgrade(cls, static_values):
