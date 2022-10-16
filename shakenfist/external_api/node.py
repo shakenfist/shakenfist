@@ -40,7 +40,7 @@ class NodeEndpoint(sf_api.Resource):
             n.add_event(
                 'Deleting blob %s location as hosting node has been deleted' % b.uuid)
             b.add_event(
-                'Deleting blob location %s as hosting node %s has been deleted' % n.uuid)
+                'Deleting blob location as hosting node %s has been deleted' % n.uuid)
             b.remove_location(n.fqdn)
 
         n.delete()

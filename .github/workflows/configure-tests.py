@@ -72,30 +72,6 @@ JOBS = {
             'branch': 'develop'
         },
         {
-            'name': 'v05-debian-10-localhost',
-            'baseimage': 'sf://label/system/sfci-debian-10',
-            'baseuser': 'debian',
-            'topology': 'localhost',
-            'concurrency': 3,
-            'branch': 'v0.5-releases'
-        },
-        {
-            'name': 'v05-debian-11-slim-primary',
-            'baseimage': 'sf://label/system/sfci-debian-11',
-            'baseuser': 'debian',
-            'topology': 'slim-primary',
-            'concurrency': 5,
-            'branch': 'v0.5-releases'
-        },
-        {
-            'name': 'v05-ubuntu-2004-slim-primary',
-            'baseimage': 'sf://label/system/sfci-ubuntu-2004',
-            'baseuser': 'ubuntu',
-            'topology': 'slim-primary',
-            'concurrency': 5,
-            'branch': 'v0.5-releases'
-        },
-        {
             'name': 'v06-debian-10-localhost',
             'baseimage': 'sf://label/system/sfci-debian-10',
             'baseuser': 'debian',
