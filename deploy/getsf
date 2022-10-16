@@ -247,7 +247,23 @@ fi
 question_end
 echo
 
-# We only support single node localhost installs for now
+# Determine what DNS server to use
+question_start
+echo "What DNS server should we use? For most cases, the default"
+echo "of 8.8.8.8 will work just fine, but this is your chance to"
+echo "override that."
+echo
+if [ -z ${GETSF_DNS_SERVER} ]; then
+    echo -n "(an ip address, like 8.8.8.8) >> "
+    read GETSF_DNS_SERVER
+    record_answer GETSF_DNS_SERVER "${GETSF_DNS_SERVER}"
+else
+    echo "(an ip address, like 8.8.8.8) >> ${GETSF_DNS_SERVER}"
+fi
+question_end
+echo
+
+# Determine the nodes to install
 question_start
 echo "What are the names of the machines you'd like to install"
 echo "Shaken Fist to?"
@@ -784,6 +800,7 @@ cat - > /root/sf-deploy << DEPLOYEOF
 
 export ADMIN_PASSWORD=${GETSF_ADMIN_PASSWORD}
 export FLOATING_IP_BLOCK="${GETSF_FLOATING_BLOCK}"
+export DNS_SERVER="${GETSF_DNS_SERVER}"
 export DEPLOY_NAME="${GETSF_DEPLOY_NAME}"
 DEPLOYEOF
 

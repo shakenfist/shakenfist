@@ -33,14 +33,3 @@ SHAKENFIST_NODE_IS_EVENTLOG_NODE=False
 SHAKENFIST_FLOATING_NETWORK="{{floating_network_ipblock}}"
 SHAKENFIST_NETWORK_NODE_IP="{{hostvars[groups['network_node'][0]]['node_mesh_ip']}}"
 SHAKENFIST_EVENTLOG_NODE_IP="{{hostvars[groups['eventlog_node'][0]]['node_mesh_ip']}}"
-SHAKENFIST_AUTH_SECRET_SEED="{{hostvars['localhost']['auth_secret']}}"
-SHAKENFIST_INCLUDE_TRACEBACKS="{{hostvars['localhost']['include_tracebacks']}}"
-
-# Cluster tuning.
-SHAKENFIST_RAM_SYSTEM_RESERVATION={{hostvars['localhost']['ram_system_reservation']}}
-SHAKENFIST_MAX_HYPERVISOR_MTU={{hostvars[groups['primary_node'][0]]['lowest_mtu']}}
-SHAKENFIST_DNS_SERVER="{{dns_server}}"
-
-{% if http_proxy != '' %}
-SHAKENFIST_HTTP_PROXY_SERVER="{{http_proxy}}"
-{% endif %}

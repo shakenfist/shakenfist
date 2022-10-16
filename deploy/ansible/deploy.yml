@@ -7,11 +7,15 @@
   become: yes
   vars:
     ram_system_reservation: 5.0
+    dns_server: 8.8.8.8
+    http_proxy:
 
   tasks:
-    - name: Set RAM reservation as a var
+    - name: Set global configurations as facts
       set_fact:
         "ram_system_reservation": "{{ram_system_reservation}}"
+        "dns_server": "{{dns_server}}"
+        "http_proxy": "{{http_proxy}}"
       delegate_to: localhost
       delegate_facts: true
 
@@ -664,6 +668,42 @@
         owner: root
         group: root
         mode: "0644"
+
+- hosts: primary_node
+  any_errors_fatal: true
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - name: Set auth secret in etcd
+      shell: |
+        /srv/shakenfist/venv/bin/sf-ctl set-etcd-config \
+            AUTH_SECRET_SEED "{{hostvars['localhost']['auth_secret']}}"
+        
+    - name: Set ram reservation in etcd
+      shell: |
+        /srv/shakenfist/venv/bin/sf-ctl set-etcd-config \
+            RAM_SYSTEM_RESERVATION "{{hostvars['localhost']['ram_system_reservation']}}"
+        
+    - name: Set lowest_mtu in etcd
+      shell: |
+        /srv/shakenfist/venv/bin/sf-ctl set-etcd-config \
+            MAX_HYPERVISOR_MTU "{{hostvars[groups['primary_node'][0]]['lowest_mtu']}}"
+        
+    - name: Set DNS server in etcd
+      shell: |
+        /srv/shakenfist/venv/bin/sf-ctl set-etcd-config \
+            DNS_SERVER "{{hostvars['localhost']['dns_server']}}"
+        
+    - name: Set HTTP proxy in etcd
+      shell: |
+        /srv/shakenfist/venv/bin/sf-ctl set-etcd-config \
+            HTTP_PROXY "{{hostvars['localhost']['http_proxy']}}"
+      when: "{{hostvars['localhost']['http_proxy']}}"
+
+    - name: Parse back etcd configuration
+      shell: |
+        /srv/shakenfist/venv/bin/sf-ctl show-etcd-config
 
 - hosts: hypervisors, network_node, etcd_master, storage
   any_errors_fatal: true
