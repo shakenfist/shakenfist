@@ -120,7 +120,7 @@ class Node(dbo):
         self._remove_item_in_attribute_list('blobs', blob)
 
     def delete(self):
-        self.state == self.STATE_DELETED
+        self.state = self.STATE_DELETED
 
 
 class Nodes(dbo_iter):
