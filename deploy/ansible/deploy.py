@@ -55,8 +55,6 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
     variables['ignore_mtu'] = (os.environ.get('IGNORE_MTU', 0) == 1)
     variables['dns_server'] = os.environ.get('DNS_SERVER', '8.8.8.8')
     variables['http_proxy'] = os.environ.get('HTTP_PROXY', '')
-    variables['include_tracebacks'] = (
-        int(os.environ.get('INCLUDE_TRACEBACKS', '0')) == 1)
 
     with open('/etc/sf/deploy-vars.json', 'w') as varsfile:
         varsfile.write(json.dumps(variables, indent=4, sort_keys=True))
