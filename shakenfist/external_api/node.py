@@ -25,9 +25,9 @@ class NodeEndpoint(api_base.Resource):
         # in blobs.py because of circular imports. I need to think about that
         # more, and its a problem bigger than just this method.
         for i in healthy_instances_on_node(n):
-            n.add_event(
+            n.add_event2(
                 'Deleting instance %s as hosting node has been deleted' % i.uuid)
-            i.add_event(
+            i.add_event2(
                 'Deleting instance as hosting node %s has been deleted' % n.uuid)
             i.delete()
 
@@ -37,9 +37,9 @@ class NodeEndpoint(api_base.Resource):
                             partial(placement_filter, n.fqdn)]):
                 blobs_to_remove.append(b)
         for b in blobs_to_remove:
-            n.add_event(
+            n.add_event2(
                 'Deleting blob %s location as hosting node has been deleted' % b.uuid)
-            b.add_event(
+            b.add_event2(
                 'Deleting blob location %s as hosting node %s has been deleted' % n.uuid)
             b.remove_location(n.fqdn)
 
