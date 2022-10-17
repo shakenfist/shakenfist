@@ -116,36 +116,11 @@ def handle(jobname, workitem):
                          task.thin())
 
             elif isinstance(task, DeleteNetworkWhenClean):
-                # Check if any interfaces remain on network
-                task_network = network.Network.from_db(task.network_uuid())
-                cur_interfaces = task_network.networkinterfaces
-
-                if cur_interfaces:
-                    LOG.with_fields({'network': task_network}).warning(
-                        'During DeleteNetworkWhenClean new interfaces have '
-                        'connected to network: %s', cur_interfaces)
-
-                # Only check those present at delete task initiation time.
-                remain_interfaces = list(set(task.wait_interfaces()) &
-                                         set(cur_interfaces))
-                while remain_interfaces:
-                    # Queue task on a node with a remaining instance
-                    iface = networkinterface.NetworkInterface.from_db(
-                        remain_interfaces.pop(0))
-                    if iface:
-                        inst = instance.Instance.from_db(iface.instance_uuid)
-                        etcd.enqueue(inst.placement['node'],
-                                     {'tasks': [
-                                         DeleteNetworkWhenClean(task.network_uuid(),
-                                                                remain_interfaces)
-                                     ]},
-                                     delay=60)
-                        break
-
-                if remain_interfaces:
-                    # All original instances deleted, safe to delete network
-                    etcd.enqueue('networknode',
-                                 DestroyNetworkTask(task.network_uuid()))
+                # This is a historical concept, it turns out the network node
+                # now just defers the delete task until there are no interfaces,
+                # so we don't need this at all.
+                etcd.enqueue(
+                    'networknode', DestroyNetworkTask(task.network_uuid()))
 
             elif isinstance(task, HypervisorDestroyNetworkTask):
                 n = network.Network.from_db(task.network_uuid())

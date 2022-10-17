@@ -23,7 +23,6 @@ from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist.node import (
     Node, Nodes,
-    active_states_filter as node_active_states_filter,
     inactive_states_filter as node_inactive_states_filter,
     nodes_by_free_disk_descending)
 from shakenfist.upload import Uploads
@@ -321,6 +320,14 @@ class Monitor(daemon.Daemon):
                         b.request_replication()
 
                 # Clean up any lingering queue tasks
+                jobname, workitem = etcd.dequeue(n.uuid)
+                while workitem:
+                    LOG.with_fields({
+                        'jobname': jobname,
+                        'node': n.uuid
+                    }).info('Deleting work item for deleted node')
+                    etcd.resolve(n.uuid, jobname)
+                    jobname, workitem = etcd.dequeue(n.uuid)
 
         # And we're done
         LOG.info('Cluster maintenance loop complete')

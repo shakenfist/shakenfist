@@ -4,8 +4,6 @@ from flask_restful import marshal_with
 from shakenfist_utilities import api as sf_api
 
 
-from shakenfist import etcd
-from shakenfist.instance import healthy_instances_on_node
 from shakenfist.node import Node, Nodes
 
 
