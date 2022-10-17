@@ -53,6 +53,7 @@ class NodesEndpoint(api_base.Resource):
     @marshal_with({
         'name': fields.String(attribute='fqdn'),
         'ip': fields.String,
+        'state': fields.String,
         'lastseen': fields.Float,
         'version': fields.String,
     })
