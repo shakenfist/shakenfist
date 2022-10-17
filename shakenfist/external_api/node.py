@@ -3,9 +3,7 @@ from flask_restful import fields
 from flask_restful import marshal_with
 
 
-from shakenfist import etcd
 from shakenfist.external_api import base as api_base
-from shakenfist.instance import healthy_instances_on_node
 from shakenfist.node import Node, Nodes
 
 
