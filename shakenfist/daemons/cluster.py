@@ -4,6 +4,7 @@
 # maintenance daemon per cluster.
 
 from collections import defaultdict
+from functools import partial
 import setproctitle
 from shakenfist_utilities import logs
 import time
@@ -12,13 +13,14 @@ from shakenfist import artifact
 from shakenfist.baseobject import (DatabaseBackedObject as dbo,
                                    active_states_filter)
 from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
-from shakenfist import blob
+from shakenfist.blob import Blob, Blobs, placement_filter
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import network
+from shakenfist import networkinterface
 from shakenfist.node import (
     Node, Nodes,
     active_states_filter as node_active_states_filter,
@@ -57,7 +59,7 @@ class Monitor(daemon.Daemon):
             total_used_storage = 0
             for blob_index in a.get_all_indexes():
                 blob_uuid = blob_index['blob_uuid']
-                b = blob.Blob.from_db(blob_uuid)
+                b = Blob.from_db(blob_uuid)
                 if b:
                     # NOTE(mikal): I've decided not to include blob replication
                     # cost in this number, as that is a decision the cluster
@@ -72,7 +74,7 @@ class Monitor(daemon.Daemon):
         if time.time() - last_loop_run > 1800:
             per_node = defaultdict(list)
             with etcd.ThreadLocalReadOnlyCache():
-                for b in blob.Blobs([active_states_filter]):
+                for b in Blobs([active_states_filter]):
                     for node in b.locations:
                         per_node[node].append(b.uuid)
 
@@ -152,7 +154,7 @@ class Monitor(daemon.Daemon):
 
         in_use_blobs = []
         with etcd.ThreadLocalReadOnlyCache():
-            for b in blob.Blobs([active_states_filter]):
+            for b in Blobs([active_states_filter]):
                 if b.instances:
                     in_use_blobs.append(b)
 
@@ -231,7 +233,7 @@ class Monitor(daemon.Daemon):
 
         # Prune over replicated blobs
         for blob_uuid in overreplicated:
-            b = blob.Blob.from_db(blob_uuid)
+            b = Blob.from_db(blob_uuid)
             for node in overreplicated[blob_uuid]:
                 LOG.with_fields({
                     'blob': b,
@@ -251,7 +253,7 @@ class Monitor(daemon.Daemon):
                     'Too many concurrent blob transfers queued, not queueing more')
                 break
 
-            b = blob.Blob.from_db(blob_uuid)
+            b = Blob.from_db(blob_uuid)
             LOG.with_fields({
                 'blob': b
             }).info('Blob under replicated, attempting to correct')
@@ -261,7 +263,7 @@ class Monitor(daemon.Daemon):
         # Find transcodes of not recently used blobs and reap them
         old_transcodes = []
         with etcd.ThreadLocalReadOnlyCache():
-            for b in blob.Blobs([active_states_filter]):
+            for b in Blobs([active_states_filter]):
                 if not b.transcoded:
                     continue
 
@@ -269,43 +271,56 @@ class Monitor(daemon.Daemon):
                     old_transcodes.append((b.uuid, b.transcoded))
 
         for blob_uuid, transcodes in old_transcodes:
-            b = blob.Blob.from_db(blob_uuid)
+            b = Blob.from_db(blob_uuid)
             b.remove_transcodes()
 
             for transcode in transcodes:
-                tb = blob.Blob.from_db(transcodes[transcode])
+                tb = Blob.from_db(transcodes[transcode])
                 tb.ref_count_dec()
 
         # Node management
-        for n in Nodes([node_inactive_states_filter]):
+        for n in Nodes([]):
             age = time.time() - n.last_seen
 
             # Find nodes which have returned from being missing
-            if age < config.NODE_CHECKIN_MAXIMUM:
-                n.state = Node.STATE_CREATED
-                LOG.with_fields({'node': n}).info(
-                    'Node returned from being missing')
-
-            # Find nodes which have been offline for a long time, unless
-            # this machine has been asleep for a long time (think developer
-            # laptop).
-            if (time.time() - last_loop_run < config.NODE_CHECKIN_MAXIMUM
-                    and age > config.NODE_CHECKIN_MAXIMUM * 10):
-                n.state = Node.STATE_ERROR
+            if n.state.value == Node.STATE_CREATED:
+                if age > config.NODE_CHECKIN_MAXIMUM:
+                    n.state = Node.STATE_MISSING
+                    n.add_event('Node has gone missing')
+            elif n.state.value == Node.STATE_MISSING:
+                if age < config.NODE_CHECKIN_MAXIMUM:
+                    n.state = Node.STATE_CREATED
+                    n.add_event('Node returned from being missing')
+            elif n.state.value == Node.DELETED:
+                # Find instances on deleted nodes
                 for i in instance.healthy_instances_on_node(n):
-                    LOG.with_fields({
-                        'instance': i,
-                        'node': n}).info(
-                        'Node in error state, erroring instance')
-                    # Note, this queue job is just in case the node comes
-                    # back.
-                    i.enqueue_delete_due_error('Node in error state')
+                    i.add_event('Instance is on deleted node, deleting.')
+                    n.add_event('Deleting instance %s as node as been deleted'
+                                % i.uuid)
+                    i.delete(global_only=True)
 
-        # Find nodes which haven't checked in recently
-        for n in Nodes([node_active_states_filter]):
-            age = time.time() - n.last_seen
-            if age > config.NODE_CHECKIN_MAXIMUM:
-                n.state = Node.STATE_MISSING
+                    # Cleanup the instance's interfaces
+                    for ni in networkinterface.interfaces_for_instance(i):
+                        ni.delete()
+
+                    # Cleanup any blob locations
+                    blobs_to_remove = []
+                    with etcd.ThreadLocalReadOnlyCache():
+                        for b in Blobs([active_states_filter,
+                                        partial(placement_filter, n.fqdn)]):
+                            blobs_to_remove.append(b)
+
+                    for b in blobs_to_remove:
+                        n.add_event(
+                            'Deleting blob %s location as hosting node has been deleted'
+                            % b.uuid)
+                        b.add_event(
+                            'Deleting blob location as hosting node %s has been deleted'
+                            % n.uuid)
+                        b.remove_location(n.fqdn)
+                        b.request_replication()
+
+                # Clean up any lingering queue tasks
 
         # And we're done
         LOG.info('Cluster maintenance loop complete')

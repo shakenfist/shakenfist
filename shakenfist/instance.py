@@ -622,7 +622,7 @@ class Instance(dbo):
             self.add_event('instance failed to power on')
             self.enqueue_delete_due_error('Instance failed to power on')
 
-    def delete(self):
+    def _delete_on_hypervisor(self):
         for disk in self.block_devices.get('devices', []):
             if 'blob_uuid' in disk and disk['blob_uuid']:
                 # Mark files we used in the image cache as recently used so that
@@ -633,11 +633,6 @@ class Instance(dbo):
                     ['iso', 'qcow2'])
                 if cached_image_path:
                     pathlib.Path(cached_image_path).touch(exist_ok=True)
-
-                # Decrement the blob reference count
-                b = blob.Blob.from_db(disk['blob_uuid'])
-                if b:
-                    b.ref_count_dec()
 
         try:
             self.power_off()
@@ -665,12 +660,23 @@ class Instance(dbo):
                 util_general.ignore_exception(
                     'instance delete disks %s' % self, e)
 
+    def _delete_globally(self):
+        for disk in self.block_devices.get('devices', []):
+            if 'blob_uuid' in disk and disk['blob_uuid']:
+                b = blob.Blob.from_db(disk['blob_uuid'])
+                if b:
+                    b.ref_count_dec()
+
         self.deallocate_instance_ports()
 
         if self.state.value.endswith('-%s' % self.STATE_ERROR):
             self.state = self.STATE_ERROR
         else:
             self.state = self.STATE_DELETED
+
+    def delete(self, global_only=False):
+        self._delete_on_hypervisor()
+        self._delete_globally()
 
     def _allocate_console_port(self):
         node = config.NODE_NAME
