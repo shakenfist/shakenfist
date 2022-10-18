@@ -111,12 +111,14 @@
       apt:
         name:
           - ack
+          - ansible
           - arping
           - bridge-utils
           - build-essential
           - cpu-checker
           - dnsmasq
           - dnsutils
+          - git
           - hddtemp
           - libffi-dev
           - libmagic-dev
@@ -132,6 +134,7 @@
           - python3-cffi
           - python3-dev
           - python3-fixtures
+          - python3-git
           - python3-grpcio
           - python3-libvirt
           - python3-pip
@@ -140,6 +143,7 @@
           - qemu-kvm
           - tox
           - unzip
+          - zip
         state: latest
 
     - name: Install tox and dependencies via apt on Ubuntu
