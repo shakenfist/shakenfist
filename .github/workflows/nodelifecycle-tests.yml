@@ -109,7 +109,7 @@ jobs:
               $source_path/shakenfist \
               debian@$primary:shakenfist
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@$primary "cd shakenfist/deploy; . /etc/sf/sfrc; nodelifecycletests.sh"
+              debian@$primary "cd shakenfist/deploy; . /etc/sf/sfrc; bash nodelifecycletests.sh"
 
       - name: Check logs
         if: ${{ ! cancelled() }}
@@ -156,6 +156,14 @@ jobs:
             echo "grpc called after a fork!"
             exit 1
           fi
+
+      - name: Restart sf-2 so we can collect logs
+        if: ${{ ! cancelled() }}
+        run: |
+          set -x
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          sf-client instance reboot --hard ${sf2_uuid}
+          sleep 30
 
       - name: Gather logs
         if: ${{ ! cancelled() }}

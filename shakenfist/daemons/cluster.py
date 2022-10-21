@@ -67,7 +67,7 @@ class Monitor(daemon.Daemon):
                     total_used_storage += b.size
 
             a.add_event2('usage', extra={'bytes': total_used_storage},
-                        suppress_event_logging=True)
+                         suppress_event_logging=True)
 
         # Recompute our cache of what blobs are on what nodes every 30 minutes
         if time.time() - last_loop_run > 1800:
@@ -290,12 +290,12 @@ class Monitor(daemon.Daemon):
                 if age < config.NODE_CHECKIN_MAXIMUM:
                     n.state = Node.STATE_CREATED
                     n.add_event2('Node returned from being missing')
-            elif n.state.value == Node.DELETED:
+            elif n.state.value == Node.STATE_DELETED:
                 # Find instances on deleted nodes
                 for i in instance.healthy_instances_on_node(n):
                     i.add_event2('Instance is on deleted node, deleting.')
                     n.add_event2('Deleting instance %s as node as been deleted'
-                                % i.uuid)
+                                 % i.uuid)
                     i.delete(global_only=True)
 
                     # Cleanup the instance's interfaces

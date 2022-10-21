@@ -30,6 +30,7 @@
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/srv/github/id_ci"
+        sf_uuid: "{{primary['meta']['uuid']}}"
         groups: sfall
 
     - name: Log instance details

@@ -3,6 +3,7 @@
     content: |
       {% for svr in groups.sfall %}
       export {{ svr | replace('-', '_') }}={{hostvars[svr]['ansible_ssh_host']}}
+      export {{ svr | replace('-', '_') }}_uuid={{hostvars[svr]['sf_uuid']}}
       {% endfor %}
 
       export identifier={{identifier}}
