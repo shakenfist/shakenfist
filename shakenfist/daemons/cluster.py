@@ -290,7 +290,7 @@ class Monitor(daemon.Daemon):
                 if age < config.NODE_CHECKIN_MAXIMUM:
                     n.state = Node.STATE_CREATED
                     n.add_event('Node returned from being missing')
-            elif n.state.value == Node.DELETED:
+            elif n.state.value == Node.STATE_DELETED:
                 # Find instances on deleted nodes
                 for i in instance.healthy_instances_on_node(n):
                     i.add_event('Instance is on deleted node, deleting.')
