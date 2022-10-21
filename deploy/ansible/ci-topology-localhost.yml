@@ -8,25 +8,6 @@
     base_image_user: "ubuntu"
 
   tasks:
-    - name: Setup cloud-config to add a password to CI nodes for debugging
-      set_fact:
-        userdata_decoded: |
-          #cloud-config
-          ssh_pwauth: True
-          chpasswd: { expire: False }
-
-          users:
-            - name: ciuser
-              lock-passwd: False
-              sudo: [ "ALL=(ALL) NOPASSWD:ALL" ]
-              shell: /bin/bash
-              # This password hash is generated with mkpasswd --method=SHA-512 --rounds=4096
-              passwd: "$6$rounds=4096$jBqTFFRr$75ehRH5AtiUxWMlFf1Ji.szp1NCjut2WiiD./QHsfWbCfKKjX1bs6MtBcWedlqKwcBKEPP/oLinTbH6gwcwUA1"
-
-    - name: Encode user data
-      set_fact:
-        userdata_encoded: "{{ userdata_decoded | b64encode }}"
-
     - name: Create a primary instance
       sf_instance:
         name: "primary"
@@ -38,7 +19,6 @@
           - network_uuid="{{identifier}}"
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
-        user_data: "{{userdata_encoded}}"
         state: present
       register: primary
 
