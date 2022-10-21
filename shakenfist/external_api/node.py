@@ -28,6 +28,10 @@ class NodesEndpoint(sf_api.Resource):
         'state': fields.String,
         'lastseen': fields.Float,
         'version': fields.String,
+        'is_etcd_master': fields.Boolean,
+        'is_hypervisor': fields.Boolean,
+        'is_network_node': fields.Boolean,
+        'is_eventlog_node': fields.Boolean
     })
     def get(self):
         out = []
