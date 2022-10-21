@@ -75,10 +75,19 @@ class Node(dbo):
                                 'release': util_general.get_version()
                             })
 
+        roles = {
+            'is_etcd_master': config.NODE_IS_ETCD_MASTER,
+            'is_hypervisor': config.NODE_IS_HYPERVISOR,
+            'is_network_node': config.NODE_IS_NETWORK_NODE,
+            'is_eventlog_node': config.NODE_IS_EVENTLOG_NODE
+        }
+        if n._db_get_attribute('roles') != roles:
+            n._db_set_attribute('roles', roles)
+
     def external_view(self):
         # If this is an external view, then mix back in attributes that users
         # expect
-        return {
+        retval = {
             'uuid': self.uuid,
             'fqdn': self.fqdn,
             'ip': self.ip,
@@ -86,6 +95,8 @@ class Node(dbo):
             'lastseen': self.last_seen,
             'version': self.installed_version
         }
+        retval.update(self._db_get_attribute('roles', {}))
+        return retval
 
     # Static values
     @property
