@@ -133,6 +133,10 @@ class Node(dbo):
     def delete(self):
         self.state = self.STATE_DELETED
 
+    def hard_delete(self):
+        # We do not hard delete nodes, they're special.
+        pass
+
 
 class Nodes(dbo_iter):
     def __iter__(self):
