@@ -116,7 +116,7 @@ class SFConfig(BaseSettings):
                     'database'
     )
     NODE_CHECKIN_MAXIMUM: int = Field(
-        300,
+        120,
         description='How long to wait before declaring a node to be offline '
                     'due to failure to check in'
     )
