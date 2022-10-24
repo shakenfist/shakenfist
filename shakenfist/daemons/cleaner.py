@@ -392,3 +392,5 @@ class Monitor(daemon.Daemon):
                 last_libvirt_log_clean = time.time()
 
             self.exit.wait(60)
+
+        LOG.info('Terminating')

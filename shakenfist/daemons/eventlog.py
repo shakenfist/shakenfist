@@ -46,3 +46,5 @@ class Monitor(daemon.WorkerPoolDaemon):
 
             except Exception as e:
                 util_general.ignore_exception('eventlog daemon', e)
+
+        LOG.info('Terminating')

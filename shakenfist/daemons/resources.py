@@ -282,3 +282,5 @@ class Monitor(daemon.Daemon):
 
             except Exception as e:
                 util_general.ignore_exception('resource statistics', e)
+
+        LOG.info('Terminating')
