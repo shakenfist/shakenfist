@@ -3,14 +3,15 @@
 from etcd3gw.client import Etcd3Client
 from etcd3gw.exceptions import ConnectionFailedError
 import json
-import socket
-
 from pydantic import (
     BaseSettings,
     Field,
     SecretStr,
     AnyHttpUrl,
 )
+import socket
+
+from shakenfist import exceptions
 
 
 def get_node_name():
@@ -267,7 +268,7 @@ class SFConfig(BaseSettings):
 
     # etcd
     ETCD_HOST: str = Field(
-        'localhost', description='Hostname or IP of the etcd host to query'
+        '', description='Hostname or IP of the etcd host to query'
     )
     EXCESSIVE_ETCD_CACHE_LOGGING: bool = Field(
         False, description='Record detailed information about etcd cache performance.'
@@ -282,3 +283,7 @@ class SFConfig(BaseSettings):
 
 
 config = SFConfig()
+if config.ETCD_HOST == '':
+    raise exceptions.NoEtcd(
+        'Shaken Fist is configured incorrectly, you _must_ configure '
+        'at least ETCD_HOST!')
