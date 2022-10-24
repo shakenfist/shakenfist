@@ -3,11 +3,12 @@
 import base64
 import bcrypt
 import click
+import importlib
 import json
 import logging
+import os
 import time
 
-from shakenfist.config import config
 from shakenfist import etcd
 from shakenfist.namespace import Namespace
 from shakenfist.node import Node
@@ -17,6 +18,27 @@ logging.basicConfig(level=logging.INFO)
 
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
+
+
+# Utilities not started by systemd need to load /etc/sf/config to ensure
+# that they are correctly configured
+if os.path.exists('/etc/sf/config'):
+    with open('/etc/sf/config') as f:
+        for line in f.readlines():
+            line = line.rstrip()
+
+            if line.startswith('#'):
+                continue
+            if line == '':
+                continue
+
+            key, value = line.split('=')
+            value = value.strip('\'"')
+
+            os.environ[key] = value
+
+sf_config = importlib.import_module('shakenfist.config')
+config = sf_config.config
 
 
 @click.group()
