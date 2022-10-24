@@ -3,6 +3,7 @@ from flask_restful import fields
 from flask_restful import marshal_with
 
 
+from shakenfist import eventlog
 from shakenfist.external_api import base as api_base
 from shakenfist.node import Node, Nodes
 
@@ -38,3 +39,12 @@ class NodesEndpoint(api_base.Resource):
         for n in Nodes([]):
             out.append(n.external_view())
         return out
+
+
+class NodeEventsEndpoint(sf_api.Resource):
+    @jwt_required()
+    @sf_api.caller_is_admin
+    @api_base.redirect_to_eventlog_node
+    def get(self, node=None):
+        with eventlog.EventLog('node', node) as eventdb:
+            return list(eventdb.read_events())
