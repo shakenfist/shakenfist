@@ -100,18 +100,18 @@ def restore_instances():
 DAEMON_PROCS = {}
 
 
-def emit_trace():
+def propagate_signal(signum, _frame):
     # We have a bunch of subprocesses here, so we can't just use the default
     # faulthandler mechanism.
     faulthandler.dump_traceback
     for proc in DAEMON_PROCS:
         try:
-            os.kill(DAEMON_PROCS[proc].pid, signal.SIGUSR1)
+            os.kill(DAEMON_PROCS[proc].pid, signum)
         except ProcessLookupError:
             pass
 
 
-signal.signal(signal.SIGUSR1, emit_trace)
+signal.signal(signal.SIGUSR1, propagate_signal)
 
 
 def main():
@@ -263,7 +263,7 @@ def main():
                     LOG.warning('%s daemon still running (pid %d)'
                                 % (proc, DAEMON_PROCS[proc].pid))
                 LOG.warning('Dumping thread traces')
-                emit_trace()
+                propagate_signal(signal.SIGUSR1, None)
                 shutdown_commenced = time.time()
 
             running = False

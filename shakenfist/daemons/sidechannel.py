@@ -276,3 +276,5 @@ class Monitor(daemon.Daemon):
 
         for instance_uuid in monitors:
             os.kill(monitors[instance_uuid].pid, signal.SIGKILL)
+
+        LOG.info('Terminating')
