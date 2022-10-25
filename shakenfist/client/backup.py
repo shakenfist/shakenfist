@@ -5,14 +5,13 @@ import importlib
 import io
 import logging
 import os
+from shakenfist_utilities import logs
 import tarfile
 
 from shakenfist import etcd
 
-logging.basicConfig(level=logging.INFO)
 
-LOG = logging.getLogger(__name__)
-LOG.setLevel(logging.INFO)
+LOG = logs.setup_console(__name__)
 
 
 # Utilities not started by systemd need to load /etc/sf/config to ensure

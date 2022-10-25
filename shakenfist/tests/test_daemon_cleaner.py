@@ -68,6 +68,7 @@ class FakeConfig(BaseSettings):
     NODE_NAME: str = 'abigcomputer'
     STORAGE_PATH: str = '/srv/shakenfist'
     LOGLEVEL_CLEANER: str = 'debug'
+    ETCD_HOST: str = '127.0.0.1'
 
 
 fake_config = FakeConfig()

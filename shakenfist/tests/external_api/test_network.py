@@ -34,7 +34,8 @@ class NetworksDeleteNoneTestCase(base.ShakenFistTestCase):
             NETWORK_NODE_IP='127.0.0.1',
             NODE_EGRESS_NIC='eth0',
             NODE_MESH_NIC='eth1',
-            NODE_IS_NETWORK_NODE=True
+            NODE_IS_NETWORK_NODE=True,
+            ETCD_HOST='127.0.0.1'
         )
         self.config = mock.patch(
             'shakenfist.external_api.base.config', fake_config)

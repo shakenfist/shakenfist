@@ -287,6 +287,14 @@ class Monitor(daemon.Daemon):
         for n in Nodes([]):
             age = time.time() - n.last_seen
 
+            LOG.with_fields(
+                {
+                    'node': n.uuid,
+                    'status_age': age,
+                    'last_seen': n.last_seen,
+                    'state': n.state.value
+                }).debug('Considering node status')
+
             # Find nodes which have returned from being missing
             if n.state.value == Node.STATE_CREATED:
                 if age > config.NODE_CHECKIN_MAXIMUM:
@@ -347,7 +355,7 @@ class Monitor(daemon.Daemon):
             setproctitle.setproctitle(daemon.process_name('cluster') + ' idle')
             self._await_election()
 
-            if self.is_elected and not self.exit.is_set():
+            while self.is_elected and not self.exit.is_set():
                 setproctitle.setproctitle(
                     daemon.process_name('cluster') + ' active')
                 self.lock.refresh()

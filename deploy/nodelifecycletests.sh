@@ -78,12 +78,24 @@ if [ $running -gt 0 ]; then
 fi
 
 # Wait a bit
-log "Pausing so node can be noticed as gone..."
-sleep 420
+log "Pausing so nodes can be noticed as gone..."
+sleep 480
 
 echo
 sf-client node list
 echo
+
+# Ensure sf-2 is missing and sf-3 is stopped
+echo
+log "Check node state"
+if [ $(sf-client --json node list | jq --raw-output '.[] | select(.name=="sf-2") | .state') != "missing" ]; then
+    echo "sf-2 not in missing state"
+    exit 1
+fi
+if [ $(sf-client --json node list | jq --raw-output '.[] | select(.name=="sf-3") | .state') != "stopped" ]; then
+    echo "sf-2 not in stopped state"
+    exit 1
+fi
 
 # Delete node
 echo
@@ -95,6 +107,18 @@ sf-client node delete sf-3
 # Wait a bit
 log "Pausing so node can be noticed as deleted..."
 sleep 420
+
+# Ensure sf-2 and sf-3 are now deleted
+echo
+log "Check node state"
+if [ $(sf-client --json node list | jq --raw-output '.[] | select(.name=="sf-2") | .state') != "deleted" ]; then
+    echo "sf-2 not in deleted state"
+    exit 1
+fi
+if [ $(sf-client --json node list | jq --raw-output '.[] | select(.name=="sf-3") | .state') != "deleted" ]; then
+    echo "sf-2 not in deleted state"
+    exit 1
+fi
 
 # Ensure the instances on sf-2 and sf-3 are now absent
 echo
