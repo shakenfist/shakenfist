@@ -7,16 +7,15 @@ import importlib
 import json
 import logging
 import os
+from shakenfist_utilities import logs
 import time
 
+from shakenfist import config
 from shakenfist import etcd
 from shakenfist.node import Node
 
 
-logging.basicConfig(level=logging.INFO)
-
-LOG = logging.getLogger(__name__)
-LOG.setLevel(logging.INFO)
+LOG = logs.setup_console(__name__)
 
 
 # Utilities not started by systemd need to load /etc/sf/config to ensure
@@ -111,7 +110,7 @@ def set_etcd_config(flag, value):
 @click.command()
 def stop():
     click.echo('Gracefully stopping Shaken Fist on this node...')
-    n = Node.from_db(config.NODE_NAME)
+    n = Node.from_db(config.config.NODE_NAME)
     n.state = Node.STATE_STOPPING
     click.echo('Placed node in stopping state')
 

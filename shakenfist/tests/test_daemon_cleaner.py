@@ -69,6 +69,7 @@ class FakeConfig(BaseSettings):
     STORAGE_PATH: str = '/srv/shakenfist'
     LOGLEVEL_CLEANER: str = 'debug'
     LOG_METHOD_TRACE: int = 1
+    ETCD_HOST: str = '127.0.0.1'
 
 
 fake_config = FakeConfig()

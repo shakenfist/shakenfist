@@ -55,9 +55,10 @@ class DHCPTestCase(testtools.TestCase):
             NODE_EGRESS_IP: IPvAnyAddress = '127.0.0.1'
             DOWNLOAD_URL_CIRROS: AnyHttpUrl = ('http://download.cirros-cloud.net/%(vernum)s/'
                                                'cirros-%(vernum)s-x86_64-disk.img')
-
             DOWNLOAD_URL_UBUNTU: AnyHttpUrl = ('https://cloud-images.ubuntu.com/%(vername)s/current/'
                                                '%(vername)s-server-cloudimg-amd64.img')
+            ETCD_HOST: str = '127.0.0.1'
+
         fake_config = FakeConfig()
 
         self.config = mock.patch('shakenfist.dhcp.config',

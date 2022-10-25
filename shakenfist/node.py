@@ -37,7 +37,7 @@ class Node(dbo):
 
         # A node can return from the dead...
         dbo.STATE_ERROR: (dbo.STATE_CREATED, dbo.STATE_DELETED),
-        STATE_MISSING: (dbo.STATE_CREATED, dbo.STATE_ERROR)
+        STATE_MISSING: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR)
     }
 
     def __init__(self, static_values):
