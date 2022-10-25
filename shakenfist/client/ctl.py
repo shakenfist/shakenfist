@@ -10,7 +10,6 @@ import os
 from shakenfist_utilities import logs
 import time
 
-from shakenfist import config
 from shakenfist import etcd
 from shakenfist.namespace import Namespace
 from shakenfist.node import Node
