@@ -10,10 +10,6 @@ import os
 from shakenfist_utilities import logs
 import time
 
-from shakenfist import etcd
-from shakenfist.namespace import Namespace
-from shakenfist.node import Node
-
 
 LOG = logs.setup_console(__name__)
 
@@ -37,6 +33,11 @@ if os.path.exists('/etc/sf/config'):
 
 sf_config = importlib.import_module('shakenfist.config')
 config = sf_config.config
+
+# These imports _must_ occur after the extra config setup has run.
+from shakenfist import etcd                  # noqa
+from shakenfist.namespace import Namespace   # noqa
+from shakenfist.node import Node             # noqa
 
 
 @click.group()
@@ -105,7 +106,7 @@ def set_etcd_config(flag, value):
 @click.command()
 def stop():
     click.echo('Gracefully stopping Shaken Fist on this node...')
-    n = Node.from_db(config.config.NODE_NAME)
+    n = Node.from_db(config.NODE_NAME)
     n.state = Node.STATE_STOPPING
     click.echo('Placed node in stopping state')
 

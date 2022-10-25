@@ -8,8 +8,6 @@ import os
 from shakenfist_utilities import logs
 import tarfile
 
-from shakenfist import etcd
-
 
 LOG = logs.setup_console(__name__)
 
@@ -33,6 +31,9 @@ if os.path.exists('/etc/sf/config'):
 
 sf_config = importlib.import_module('shakenfist.config')
 config = sf_config.config
+
+# These imports _must_ occur after the extra config setup has run.
+from shakenfist import etcd                  # noqa
 
 
 @click.group()
