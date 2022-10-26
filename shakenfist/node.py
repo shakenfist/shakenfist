@@ -95,7 +95,7 @@ class Node(dbo):
             'lastseen': self.last_seen,
             'version': self.installed_version
         }
-        retval.update(self._db_get_attribute('roles', {}))
+        retval.update(self._db_get_attribute('roles'))
         return retval
 
     # Static values

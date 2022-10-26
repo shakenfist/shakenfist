@@ -65,8 +65,8 @@ class Monitor(daemon.Daemon):
                         # the owner of the blob makes.
                         total_used_storage += b.size
 
-                a.add_event('usage', extra={'bytes': total_used_storage},
-                            suppress_event_logging=True)
+                a.add_event2('usage', extra={'bytes': total_used_storage},
+                             suppress_event_logging=True)
 
             return True
 

@@ -185,8 +185,8 @@ def _get_stats():
                 OBJECT_NAMES_TO_CLASSES[obj].current_version
 
         n = Node.from_db(config.NODE_NAME)
-        n.add_event('Updated node resources', extra=retval,
-                    suppress_event_logging=True)
+        n.add_event2('Updated node resources', extra=retval,
+                     suppress_event_logging=True)
         return retval
 
 

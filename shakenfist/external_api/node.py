@@ -41,9 +41,9 @@ class NodesEndpoint(api_base.Resource):
         return out
 
 
-class NodeEventsEndpoint(sf_api.Resource):
+class NodeEventsEndpoint(api_base.Resource):
     @jwt_required()
-    @sf_api.caller_is_admin
+    @api_base.caller_is_admin
     @api_base.redirect_to_eventlog_node
     def get(self, node=None):
         with eventlog.EventLog('node', node) as eventdb:
