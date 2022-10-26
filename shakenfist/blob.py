@@ -15,7 +15,7 @@ from shakenfist.config import config
 from shakenfist.constants import LOCK_REFRESH_SECONDS, GiB
 from shakenfist import db
 from shakenfist import etcd
-from shakenfist.exceptions import (BlobDeleted, BlobFetchFailed,
+from shakenfist.exceptions import (BlobMissing, BlobDeleted, BlobFetchFailed,
                                    BlobDependencyMissing, BlobsMustHaveContent,
                                    BlobAlreadyBeingTransferred,
                                    BlobTransferSetupFailed)
@@ -361,10 +361,16 @@ class Blob(dbo):
             last_refresh = 0
             previous_percentage = 0
 
-            # NOTE(mikal): this port allocaiton scheme isn't great as it doesn't
+            # NOTE(mikal): this port allocation scheme isn't great as it doesn't
             # handle a port being in use already on the remote node. We should
             # probably have a retry thing here.
             locations = self.locations
+            for n in Nodes([node_inactive_states_filter]):
+                if n.uuid in locations:
+                    locations.remove(n.uuid)
+            if len(locations) == 0:
+                raise BlobMissing('There are no online sources for this blob')
+
             random.shuffle(locations)
             name = sf_random.random_id()
             token = sf_random.random_id()

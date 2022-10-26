@@ -420,6 +420,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
 
         fake_config = SFConfig(
             NODE_NAME='node1',
+            ETCD_HOST='127.0.0.1'
         )
         self.config = mock.patch('shakenfist.instance.config', fake_config)
         self.mock_config = self.config.start()

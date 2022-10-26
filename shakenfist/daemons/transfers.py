@@ -94,3 +94,5 @@ class Monitor(daemon.WorkerPoolDaemon):
 
             except Exception as e:
                 util_general.ignore_exception('transfer worker', e)
+
+        LOG.info('Terminating')

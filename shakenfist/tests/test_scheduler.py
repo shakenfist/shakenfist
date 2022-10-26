@@ -16,6 +16,7 @@ fake_config = SFConfig(
     RAM_OVERCOMMIT_RATIO=1.5,
     RAM_SYSTEM_RESERVATION=5.0,
     NETWORK_NODE_IP='10.0.0.1',
+    ETCD_HOST='127.0.0.1'
 )
 
 

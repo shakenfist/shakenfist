@@ -47,10 +47,11 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super(VirtMetaTestCase, self).setUp()
         fake_config = SFConfig(
-            STORAGE_PATH="/a/b/c",
-            DISK_BUS="virtio",
-            ZONE="sfzone",
-            NODE_NAME="node01",
+            STORAGE_PATH='/a/b/c',
+            DISK_BUS='virtio',
+            ZONE='sfzone',
+            NODE_NAME='node01',
+            ETCD_HOST='127.0.0.1'
         )
 
         self.config = mock.patch('shakenfist.instance.config', fake_config)
@@ -170,10 +171,11 @@ class InstanceTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super(InstanceTestCase, self).setUp()
         fake_config = SFConfig(
-            STORAGE_PATH="/a/b/c",
-            DISK_BUS="virtio",
-            ZONE="sfzone",
-            NODE_NAME="node01",
+            STORAGE_PATH='/a/b/c',
+            DISK_BUS='virtio',
+            ZONE='sfzone',
+            NODE_NAME='node01',
+            ETCD_HOST='127.0.0.1'
         )
 
         self.config = mock.patch('shakenfist.instance.config',

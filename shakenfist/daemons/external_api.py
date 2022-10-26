@@ -28,6 +28,8 @@ class Monitor(daemon.Daemon):
                              env_variables=os.environ,
                              check_exit_code=[0, 1, -15])
 
+        LOG.info('Terminating')
+
     def exit_gracefully(self, sig, _frame):
         if sig == signal.SIGTERM:
             if os.path.exists('/var/run/sf/gunicorn.pid'):
