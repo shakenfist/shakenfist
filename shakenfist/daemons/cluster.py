@@ -42,7 +42,7 @@ class Monitor(daemon.Daemon):
         # release the lock, it gets cleared on a crash. This is so that only
         # one node at a time is performing cluster maintenance.
         while not self.exit.is_set():
-            self.lock = etcd.get_lock('cluster', None, None, ttl=900, timeout=10,
+            self.lock = etcd.get_lock('cluster', None, None, ttl=120, timeout=10,
                                       op='Cluster maintenance')
             result = self.lock.acquire()
             if result:
@@ -356,17 +356,23 @@ class Monitor(daemon.Daemon):
             self._await_election()
 
             while self.is_elected and not self.exit.is_set():
+                self.lock.refresh()
+
                 setproctitle.setproctitle(
                     daemon.process_name('cluster') + ' active')
                 self.lock.refresh()
 
                 if self._cluster_wide_billing(last_billing):
                     last_billing = time.time()
+                self.lock.refresh()
 
                 self._cluster_wide_cleanup(last_loop_run)
                 last_loop_run = time.time()
-
                 self.lock.refresh()
+
                 self.exit.wait(60)
 
+        # Stop being the cluster maintenance node if we were
+        if self.lock.is_acquired():
+            self.lock.release()
         LOG.info('Terminating')

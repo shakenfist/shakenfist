@@ -157,12 +157,14 @@ jobs:
             exit 1
           fi
 
-      - name: Restart sf-2 so we can collect logs
+      - name: Restart shaken fist nodes so we can collect logs
         if: ${{ ! cancelled() }}
         run: |
           set -x
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          sf-client instance reboot --hard ${sf2_uuid}
+          for node in ${sf1_uuid} ${sf2_uuid} ${sf3_uuid} ${sf4_uuid} ${sf5_uuid}; do
+              sf-client instance reboot --hard ${node}
+          done
           sleep 30
 
       - name: Gather logs

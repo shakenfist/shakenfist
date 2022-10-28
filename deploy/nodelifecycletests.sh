@@ -63,17 +63,24 @@ sf-client instance list
 echo
 failed=$(sf-client --json instance list | jq --raw-output '.instances | .[] | select(.state != "created") | "\(.uuid), \(.name), \(.state)"')
 
-# Terminate the node uncleanly for sf-2, with extra flags so we don't hang
+# Determine which node is the current cluster maintenance node
+maintainer=$(sf-client --json node list | jq --raw-output '.[] | select(.is_cluster_maintainer) | .name')
+other_victim=$(sf-client --json node list | jq --raw-output '.[] | select(.is_cluster_maintainer != true) | .name' | head -1)
+
+log "Will hard stop the cluster maintainer, ${maintainer}"
+log "Will gracefully stop another node, ${other_victim}"
+
+# Terminate the node uncleanly for ${maintainer}, with extra flags so we don't hang
 sudo ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=1 \
-    -o ServerAliveCountMax=1 debian@sf-2 "sudo halt --force --force"
+    -o ServerAliveCountMax=1 debian@${maintainer} "sudo halt --force --force"
 
-# Stop SF on sf-3
-sudo ssh -o StrictHostKeyChecking=no debian@sf-3 "sudo systemctl stop sf"
+# Stop SF on ${other_victim}
+sudo ssh -o StrictHostKeyChecking=no debian@${other_victim} "sudo systemctl stop sf"
 
-# Ensure SF really stopped on sf-3
-running=$(sudo ssh -o StrictHostKeyChecking=no debian@sf-3 "sudo ps -ef | grep sf | egrep -v '(ata_sff|kvm|agent|grep)'" | wc -l)
+# Ensure SF really stopped on ${other_victim}
+running=$(sudo ssh -o StrictHostKeyChecking=no debian@${other_victim} "sudo ps -ef | grep sf | egrep -v '(ata_sff|kvm|agent|grep)'" | wc -l)
 if [ $running -gt 0 ]; then
-    log "SF failed to stop on sf-3"
+    log "SF failed to stop on ${other_victim}"
     exit 1
 fi
 
@@ -85,66 +92,66 @@ echo
 sf-client node list
 echo
 
-# Ensure sf-2 is missing and sf-3 is stopped
+# Ensure ${maintainer} is missing and ${other_victim} is stopped
 echo
 log "Check node state"
-if [ $(sf-client --json node list | jq --raw-output '.[] | select(.name=="sf-2") | .state') != "missing" ]; then
-    echo "sf-2 not in missing state"
+if [ $(sf-client --json node list | jq --raw-output ".[] | select(.name==\"${maintainer}\") | .state") != "missing" ]; then
+    echo "${maintainer} not in missing state"
     exit 1
 fi
-if [ $(sf-client --json node list | jq --raw-output '.[] | select(.name=="sf-3") | .state') != "stopped" ]; then
-    echo "sf-2 not in stopped state"
+if [ $(sf-client --json node list | jq --raw-output ".[] | select(.name==\"${other_victim}\") | .state") != "stopped" ]; then
+    echo "${other_victim} not in stopped state"
     exit 1
 fi
 
 # Delete node
 echo
-log "Deleting sf-2"
-sf-client node delete sf-2
-log "Deleting sf-3"
-sf-client node delete sf-3
+log "Deleting ${maintainer}"
+sf-client node delete ${maintainer}
+log "Deleting ${other_victim}"
+sf-client node delete ${other_victim}
 
 # Wait a bit
 log "Pausing so node can be noticed as deleted..."
 sleep 420
 
-# Ensure sf-2 and sf-3 are now deleted
+# Ensure ${maintainer} and ${other_victim} are now deleted
 echo
 log "Check node state"
-if [ $(sf-client --json node list | jq --raw-output '.[] | select(.name=="sf-2") | .state') != "deleted" ]; then
-    echo "sf-2 not in deleted state"
+if [ $(sf-client --json node list | jq --raw-output '.[] | select(.name=="${maintainer}") | .state') != "deleted" ]; then
+    echo "${maintainer} not in deleted state"
     exit 1
 fi
-if [ $(sf-client --json node list | jq --raw-output '.[] | select(.name=="sf-3") | .state') != "deleted" ]; then
-    echo "sf-2 not in deleted state"
+if [ $(sf-client --json node list | jq --raw-output '.[] | select(.name=="${other_victim}") | .state') != "deleted" ]; then
+    echo "${maintainer} not in deleted state"
     exit 1
 fi
 
-# Ensure the instances on sf-2 and sf-3 are now absent
+# Ensure the instances on ${maintainer} and ${other_victim} are now absent
 echo
 sf-client instance list
 
 echo
-log "Ensure there are no instances from sf-2 present any more"
-if [ $(sf-client instance list | grep -c sf-2) -gt 0 ]; then
-    log "Instances remain from sf-2"
+log "Ensure there are no instances from ${maintainer} present any more"
+if [ $(sf-client instance list | grep -c ${maintainer}) -gt 0 ]; then
+    log "Instances remain from ${maintainer}"
     exit 1
 fi
-log "Ensure there are no instances from sf-3 present any more"
-if [ $(sf-client instance list | grep -c sf-3) -gt 0 ]; then
-    log "Instances remain from sf-3"
+log "Ensure there are no instances from ${other_victim} present any more"
+if [ $(sf-client instance list | grep -c ${other_victim}) -gt 0 ]; then
+    log "Instances remain from ${other_victim}"
     exit 1
 fi
 
-# Ensure there are no queued jobs for sf-2 and sf-3
+# Ensure there are no queued jobs for ${maintainer} and ${other_victim}
 echo
-log "Ensure there node queues have been cleared for sf-2"
-if [ $(etcdctl get --prefix /sf/queue/sf-2 | wc -l) -gt 0 ]; then
-    log "Queue jobs remain for sf-2"
+log "Ensure there node queues have been cleared for ${maintainer}"
+if [ $(etcdctl get --prefix /sf/queue/${maintainer} | wc -l) -gt 0 ]; then
+    log "Queue jobs remain for ${maintainer}"
 fi
-log "Ensure there node queues have been cleared for sf-2"
-if [ $(etcdctl get --prefix /sf/queue/sf-2 | wc -l) -gt 0 ]; then
-    log "Queue jobs remain for sf-2"
+log "Ensure there node queues have been cleared for ${other_victim}"
+if [ $(etcdctl get --prefix /sf/queue/${other_victim} | wc -l) -gt 0 ]; then
+    log "Queue jobs remain for ${other_victim}"
 fi
 
 # Done
