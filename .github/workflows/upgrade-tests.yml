@@ -1,0 +1,162 @@
+name: Upgrade testing
+
+on:
+  push:
+    branches:
+      - develop
+      - v*-releases
+  pull_request:
+    branches:
+      - develop
+      - v*-releases
+
+jobs:
+  upgrade:
+    runs-on: self-hosted
+    timeout-minutes: 120
+
+    # NOTE(mikal): git repos are checked out to /srv/github/_work/{repo}/{repo}
+    # which is available as GITHUB_WORKSPACE. You can find other environment
+    # variables at https://docs.github.com/en/actions/learn-github-actions/environment-variables
+
+    steps:
+      - name: Remove previous unfinished runs
+        uses: n1hility/cancel-previous-runs@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set environment variables
+        run: |
+          echo "SF_HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
+          echo "SF_PRIMARY_REPO=$( echo ${{ github.repository }} | cut -f 2 -d '/' )" >> $GITHUB_ENV
+          echo "SHAKENFIST_NAMESPACE=$(hostname)" >> $GITHUB_ENV
+
+      - name: Checkout shakenfist
+        uses: actions/checkout@v3
+        with:
+          path: shakenfist
+          fetch-depth: 0
+
+      - name: Determine if there is any dependency between the repositories
+        run: |
+          python3 ${GITHUB_WORKSPACE}/shakenfist/tools/clone_with_depends.py
+
+      - name: Build infrastructure
+        run: |
+          cd ${GITHUB_WORKSPACE}/shakenfist
+          ansible-playbook -i /home/debian/ansible-hosts \
+              --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
+              base_image=sf://label/system/sfci-debian-11 base_image_user=debian \
+              version_constraint='<0.6.0'" \
+              deploy/ansible/ci-topology-slim-primary-released.yml
+
+      # NOTE: this is going to install the latest release until we fiddle with this some
+      # more.
+
+      - name: Run getsf installer on primary
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              debian@$primary /tmp/getsf-wrapper
+          echo ""
+          echo ""
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              debian@$primary \
+              'sudo rm /etc/apache2/sites-enabled/*; sudo a2ensite sf-example.conf; sudo apachectl graceful'
+
+      - name: Wait for API to start answering
+        run: |
+          set +e
+
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary 'sudo chmod ugo+r /etc/sf/sfrc /etc/sf/shakenfist.json /var/log/syslog'
+
+          count=0
+          while [ $count -lt 60 ]
+          do
+            ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary '. /etc/sf/sfrc; sf-client instance list'
+            if [ $? == 0 ]; then
+              exit 0
+            fi
+
+            count=$(( $count + 1 ))
+            sleep 5
+          done
+
+          exit 1
+
+      - name: Log Shaken Fist versions
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary '. /etc/sf/sfrc; sf-client node list'
+
+      - name: Import cached images
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary \
+              '. /etc/sf/sfrc; sf-client artifact upload ubuntu-1804 /srv/ci/ubuntu:18.04'
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary \
+              '. /etc/sf/sfrc; sf-client artifact upload ubuntu-2004 /srv/ci/ubuntu:20.04'
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary \
+              '. /etc/sf/sfrc; sf-client artifact upload debian-11 /srv/ci/debian:11'
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              debian@$primary \
+              '. /etc/sf/sfrc; sf-client artifact upload cirros /srv/ci/cirros'
+
+      - name: Start a simple workload before upgrade
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          for i in $(seq 1 3); do
+            ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                debian@$primary \
+                ". /etc/sf/sfrc; sf-client network create net-$i 10.0.$i.0/24; sf-client instance create vm-$i 1 1024 -d 20@debian:11 -f net-$i"
+          done
+
+
+      - name: Gather logs
+        if: ${{ ! cancelled() }}
+        run: |
+          set -x
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+
+          cd ${GITHUB_WORKSPACE}
+          rm -rf artifacts bundle
+          mkdir -p artifacts bundle
+
+          echo "=============================="
+          for node in $nodes
+          do
+            echo "=== $node ==="
+            safe_node=$(echo $node | tr "-" "_")
+
+            ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                debian@${!safe_node} sudo /srv/shakenfist/venv/bin/clingwrap gather \
+                --target /srv/shakenfist/venv/share/clingwrap/shakenfist-ci-failure.cwd --output /tmp/$node.zip
+            scp -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                debian@${!safe_node}:/tmp/$node.zip bundle/
+
+            mkdir -p bundle/$node
+
+            # We ignore the exit code of unzip, as it will return 1 if a warning is
+            # emitted during expansion, even though expansion worked correctly. For
+            # example stripping a leading / from paths.
+            unzip -q bundle/$node.zip -d bundle/$node/ || true
+            rm bundle/$node.zip
+          done
+
+          zip -rq artifacts/bundle.zip bundle/*
+
+      - uses: actions/upload-artifact@v3
+        if: ${{ ! cancelled() }}
+        with:
+          name: bundle.zip
+          retention-days: 14
+          path: ${{ github.workspace }}/artifacts/bundle.zip

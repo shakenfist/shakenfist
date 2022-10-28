@@ -86,6 +86,8 @@
           export GETSF_DNS_SERVER=8.8.8.8
           export GETSF_DEPLOY_NAME=bonkerslab
           export GETSF_RELEASE=pre-release
+          export GETSF_RELEASE_SHAKENFIST_CONSTRAINT=""
+          export GETSF_RELEASE_CLIENT_CONSTRAINT=""
           export GETSF_NODES=localhost
           export GETSF_WARNING=yes
 
