@@ -19,7 +19,6 @@ OBJECT_NAMES_TO_ITERATORS = {
     'artifact': artifact.Artifacts,
     'blob': blob.Blobs,
     'instance': instance.Instances,
-    'namespace': namespace.Namespaces,
     'network': network.Networks,
     'networkinterface': networkinterface.NetworkInterfaces,
     'node': node.Nodes
