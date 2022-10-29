@@ -297,6 +297,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
 
         fake_config = SFConfig(
             NODE_NAME='node1',
+            ETCD_HOST='127.0.0.1'
         )
         self.config = mock.patch('shakenfist.instance.config', fake_config)
         self.mock_config = self.config.start()
@@ -596,7 +597,8 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(400, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
         self.assertEqual(
-            {'error': 'multiple instances have the name "barry"', 'status': 400},
+            {'error': 'multiple instances have the name "barry" in namespace "system"',
+             'status': 400},
             resp.get_json())
 
         resp = self.client.get('/instances/barry',
@@ -824,6 +826,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         class FakeConfig(BaseSettings):
             API_ASYNC_WAIT: int = 1
             LOG_METHOD_TRACE: int = 1
+            ETCD_HOST: str = '127.0.0.1'
 
         fake_config = FakeConfig()
 
@@ -1045,8 +1048,9 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                 'namespace': 'two',
             }))
         self.assertEqual(400, resp.status_code)
-        self.assertEqual('multiple networks have the name "betsy"',
-                         resp.get_json().get('error'))
+        self.assertEqual(
+            'multiple networks have the name "betsy" in namespace "None"',
+            resp.get_json().get('error'))
 
 
 class ExternalApiNetworkTestCase(base.ShakenFistTestCase):
@@ -1205,6 +1209,7 @@ class ExternalApiNoNamespaceMockTestCase(base.ShakenFistTestCase):
 
         fake_config = SFConfig(
             NODE_NAME='node1',
+            ETCD_HOST='127.0.0.1'
         )
 
         self.config = mock.patch('shakenfist.instance.config',

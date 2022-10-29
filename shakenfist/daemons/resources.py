@@ -14,6 +14,7 @@ from shakenfist import exceptions
 from shakenfist import logutil
 from shakenfist import instance
 from shakenfist import network
+from shakenfist.node import Node
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
 from shakenfist.util import network as util_network
@@ -183,7 +184,9 @@ def _get_stats():
             retval['object_version_%s' % obj] = \
                 OBJECT_NAMES_TO_CLASSES[obj].current_version
 
-        LOG.with_fields(retval).debug('Updated node metrics')
+        n = Node.from_db(config.NODE_NAME)
+        n.add_event2('Updated node resources', extra=retval,
+                     suppress_event_logging=True)
         return retval
 
 
@@ -280,3 +283,5 @@ class Monitor(daemon.Daemon):
 
             except Exception as e:
                 util_general.ignore_exception('resource statistics', e)
+
+        LOG.info('Terminating')

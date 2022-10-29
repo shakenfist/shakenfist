@@ -92,8 +92,8 @@ class DatabaseBackedObject(object):
             if o.name == object_ref:
                 if found_obj:
                     raise exceptions.MultipleObjects(
-                        'multiple %ss have the name "%s"' % (
-                            cls.object_type, object_ref))
+                        'multiple %ss have the name "%s" in namespace "%s"'
+                        % (cls.object_type, object_ref, namespace))
                 found_obj = o
 
         return found_obj

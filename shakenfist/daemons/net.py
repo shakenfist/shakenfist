@@ -216,6 +216,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                     'DestroyNetworkTask for network with interfaces, deferring.')
                 etcd.enqueue('networknode', workitem, delay=60)
                 return
+
             try:
                 n.delete_on_network_node()
             except exceptions.DeadNetwork as e:
@@ -455,3 +456,5 @@ class Monitor(daemon.WorkerPoolDaemon):
 
             except Exception as e:
                 util_general.ignore_exception('network worker', e)
+
+        LOG.info('Terminating')

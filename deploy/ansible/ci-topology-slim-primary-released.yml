@@ -21,25 +21,6 @@
         msg:
           - "Mesh traffic network is {{meshnetwork['meta']['uuid']}}"
 
-    - name: Setup cloud-config to add a password to CI nodes for debugging
-      set_fact:
-        userdata_decoded: |
-          #cloud-config
-          ssh_pwauth: True
-          chpasswd: { expire: False }
-
-          users:
-            - name: ciuser
-              lock-passwd: False
-              sudo: [ "ALL=(ALL) NOPASSWD:ALL" ]
-              shell: /bin/bash
-              # This password hash is generated with mkpasswd --method=SHA-512 --rounds=4096
-              passwd: "$6$rounds=4096$jBqTFFRr$75ehRH5AtiUxWMlFf1Ji.szp1NCjut2WiiD./QHsfWbCfKKjX1bs6MtBcWedlqKwcBKEPP/oLinTbH6gwcwUA1"
-
-    - name: Encode user data
-      set_fact:
-        userdata_encoded: "{{ userdata_decoded | b64encode }}"
-
     - name: Create a primary instance
       sf_instance:
         name: "primary"
@@ -52,7 +33,6 @@
           - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
-        user_data: "{{userdata_encoded}}"
         state: present
       register: primary
 
@@ -66,6 +46,7 @@
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/srv/github/id_ci"
+        sf_uuid: "{{primary['meta']['uuid']}}"
         groups: sfall
 
     - name: Create sf-1
@@ -80,7 +61,6 @@
           - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
-        user_data: "{{userdata_encoded}}"
         state: present
       register: sf1
 
@@ -94,6 +74,7 @@
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/srv/github/id_ci"
+        sf_uuid: "{{sf1['meta']['uuid']}}"
         groups: hypervisors, sfall
 
     - name: Create sf-2
@@ -108,7 +89,6 @@
           - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
-        user_data: "{{userdata_encoded}}"
         state: present
       register: sf2
 
@@ -122,6 +102,7 @@
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/srv/github/id_ci"
+        sf_uuid: "{{sf2['meta']['uuid']}}"
         groups: hypervisors, sfall
 
     - name: Create sf-3
@@ -136,7 +117,6 @@
           - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
-        user_data: "{{userdata_encoded}}"
         state: present
       register: sf3
 
@@ -150,6 +130,7 @@
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/srv/github/id_ci"
+        sf_uuid: "{{sf3['meta']['uuid']}}"
         groups: hypervisors, sfall
 
     - name: Create sf-4
@@ -164,7 +145,6 @@
           - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
-        user_data: "{{userdata_encoded}}"
         state: present
       register: sf4
 
@@ -178,6 +158,7 @@
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/srv/github/id_ci"
+        sf_uuid: "{{sf4['meta']['uuid']}}"
         groups: hypervisors, sfall
 
     - name: Create sf-5
@@ -192,7 +173,6 @@
           - network_uuid="{{meshnetwork['meta']['uuid']}},address=none"
         ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
         namespace: "{{identifier}}"
-        user_data: "{{userdata_encoded}}"
         state: present
       register: sf5
 
@@ -206,6 +186,7 @@
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/srv/github/id_ci"
+        sf_uuid: "{{sf5['meta']['uuid']}}"
         groups: hypervisors, sfall
 
     - name: Log instance details

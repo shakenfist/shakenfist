@@ -16,7 +16,7 @@ from shakenfist.config import config
 from shakenfist.constants import LOCK_REFRESH_SECONDS, GiB
 from shakenfist import db
 from shakenfist import etcd
-from shakenfist.exceptions import (BlobDeleted, BlobFetchFailed,
+from shakenfist.exceptions import (BlobMissing, BlobDeleted, BlobFetchFailed,
                                    BlobDependencyMissing, BlobsMustHaveContent)
 from shakenfist import instance
 from shakenfist import logutil
@@ -359,6 +359,13 @@ class Blob(dbo):
 
             while not done:
                 locations = self.locations
+                for n in Nodes([node_inactive_states_filter]):
+                    if n.uuid in locations:
+                        locations.remove(n.uuid)
+                if len(locations) == 0:
+                    raise BlobMissing(
+                        'There are no online sources for this blob')
+
                 random.shuffle(locations)
                 blob_source = locations[0]
                 bytes_in_attempt = 0

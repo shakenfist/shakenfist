@@ -11,6 +11,10 @@ class NoNetworkNode(Exception):
     pass
 
 
+class NoEtcd(Exception):
+    pass
+
+
 # Objects
 class ObjectException(Exception):
     pass

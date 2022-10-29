@@ -1,16 +1,39 @@
 # Copyright 2020 Michael Still
 
 import click
+import importlib
 import io
 import logging
+import os
+from shakenfist_utilities import logs
 import tarfile
 
-from shakenfist import etcd
 
-logging.basicConfig(level=logging.INFO)
+LOG = logs.setup_console(__name__)
 
-LOG = logging.getLogger(__name__)
-LOG.setLevel(logging.INFO)
+
+# Utilities not started by systemd need to load /etc/sf/config to ensure
+# that they are correctly configured
+if os.path.exists('/etc/sf/config'):
+    with open('/etc/sf/config') as f:
+        for line in f.readlines():
+            line = line.rstrip()
+
+            if line.startswith('#'):
+                continue
+            if line == '':
+                continue
+
+            key, value = line.split('=')
+            value = value.strip('\'"')
+
+            os.environ[key] = value
+
+sf_config = importlib.import_module('shakenfist.config')
+config = sf_config.config
+
+# These imports _must_ occur after the extra config setup has run.
+from shakenfist import etcd                  # noqa
 
 
 @click.group()
