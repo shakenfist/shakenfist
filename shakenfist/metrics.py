@@ -38,7 +38,8 @@ VERSION_CACHE = None
 VERSION_CACHE_AGE = 0
 
 # This doesn't use OBJECT_NAME_TO_CLASSES because of circular imports.
-OBJECT_NAMES = ['artifact', 'blob', 'instance', 'network', 'networkinterface']
+OBJECT_NAMES = ['artifact', 'blob', 'instance', 'namespace', 'network',
+                'networkinterface', 'node']
 
 
 def get_minimum_object_version(objname):
