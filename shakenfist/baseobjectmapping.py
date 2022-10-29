@@ -6,6 +6,7 @@ from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist import node
 
+# Remember to update the separate list in metrics.py as well!
 OBJECT_NAMES_TO_CLASSES = {
     'artifact': artifact.Artifact,
     'blob': blob.Blob,
