@@ -48,7 +48,7 @@ class Namespace(dbo):
         changed = False
         starting_version = static_values.get('version', 1)
 
-        if static_values.get('version') == 1:
+        if static_values.get('version', 1) == 1:
             static_values['uuid'] = static_values['name']
             del static_values['name']
 
