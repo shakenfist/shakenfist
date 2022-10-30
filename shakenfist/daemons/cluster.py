@@ -10,14 +10,13 @@ from shakenfist_utilities import logs
 import time
 
 from shakenfist import artifact
-from shakenfist.baseobject import (DatabaseBackedObject as dbo,
-                                   active_states_filter)
-from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
+from shakenfist.baseobject import (
+    DatabaseBackedObject as dbo, active_states_filter)
+from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_ITERATORS
 from shakenfist.blob import Blob, Blobs, placement_filter
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
-from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import network
 from shakenfist import networkinterface
@@ -87,18 +86,11 @@ class Monitor(daemon.Daemon):
                 node.blobs = per_node.get(node.uuid, [])
 
         # Cleanup soft deleted objects
-        for objtype in OBJECT_NAMES_TO_CLASSES:
-            for _, objdata in etcd.get_all(objtype, None):
-                try:
-                    obj = OBJECT_NAMES_TO_CLASSES[objtype].from_db(
-                        objdata['uuid'])
-                    if (obj.state.value == dbo.STATE_DELETED and
-                            time.time() - obj.state.update_time > config.CLEANER_DELAY):
-                        obj.hard_delete()
-                except exceptions.BadObjectVersion:
-                    LOG.with_fields({
-                        objtype: objdata['uuid']
-                    }).warning('Could not load object for hard delete, bad version')
+        for objtype in OBJECT_NAMES_TO_ITERATORS:
+            for obj in OBJECT_NAMES_TO_ITERATORS[objtype]([]):
+                if (obj.state.value == dbo.STATE_DELETED and
+                        time.time() - obj.state.update_time > config.CLEANER_DELAY):
+                    obj.hard_delete()
 
         # Cleanup vxids which specify a missing network
         for k, objdata in etcd.get_all('vxlan', None):
