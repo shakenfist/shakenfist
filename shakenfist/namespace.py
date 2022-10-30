@@ -142,7 +142,13 @@ class Namespace(dbo):
 class Namespaces(dbo_iter):
     def __iter__(self):
         for _, n in etcd.get_all('namespace', None):
-            n = Namespace.from_db(n['uuid'])
+            uniq = n.get('uuid')
+            if not uniq:
+                uniq = n.get('name')
+            if not uniq:
+                continue
+
+            n = Namespace.from_db(uniq)
             if not n:
                 continue
 

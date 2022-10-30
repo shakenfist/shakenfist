@@ -141,7 +141,13 @@ class Node(dbo):
 class Nodes(dbo_iter):
     def __iter__(self):
         for _, n in etcd.get_all('node', None):
-            n = Node.from_db(n['uuid'])
+            uniq = n.get('uuid')
+            if not uniq:
+                uniq = n.get('fqdn')
+            if not uniq:
+                continue
+
+            n = Node.from_db(uniq)
             if not n:
                 continue
 
