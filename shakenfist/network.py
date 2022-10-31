@@ -788,6 +788,19 @@ class Network(dbo):
         ipm = self._get_ipmanager()
         return ipm.is_in_range(address)
 
+    def get_broadcast_address(self):
+        return self._get_ipmanager().broadcast_address
+
+    def get_network_address(self):
+        return self._get_ipmanager().network_address
+
+    def get_in_use_addresses(self):
+        return self._get_ipmanager().in_use
+
+    def get_allocation_age(self, address):
+        ipm = self._get_ipmanager()
+        return ipm.in_use[address]['when']
+
 
 class Networks(dbo_iter):
     def __iter__(self):

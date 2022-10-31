@@ -12,7 +12,6 @@ from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
-from shakenfist.ipmanager import IPManager
 from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist.networkinterface import NetworkInterface
@@ -353,33 +352,31 @@ class Monitor(daemon.WorkerPoolDaemon):
                         }).error('Floating address not reserved correctly')
             LOG.info('Found floating addresses: %s' % floating_addresses)
 
-            floating_ipm = IPManager.from_db('floating')
             floating_reserved = [
                 floating_network.get_address_at_index(0),
                 floating_network.get_address_at_index(1),
-                floating_ipm.broadcast_address,
-                floating_ipm.network_address
+                floating_network.get_broadcast_address(),
+                floating_network.get_network_address()
             ]
             LOG.info('Found floating reservations: %s' % floating_reserved)
 
             # Now the reverse check. Test if there are any reserved IPs which
             # are not actually in use. Free any we find.
             leaks = []
-            for ip in floating_ipm.in_use:
+            for ip in floating_network.get_in_use_addresses():
                 if ip not in itertools.chain(floating_gateways,
                                              floating_addresses,
                                              floating_reserved):
                     LOG.error('Floating IP %s has leaked.' % ip)
 
                     # This IP needs to have been allocated more than 300 seconds
-                    # ago to ensure that the network setup isn't still queueud.
-                    if time.time() - floating_ipm.in_use[ip]['when'] > 300:
+                    # ago to ensure that the network setup isn't still queued.
+                    if time.time() - floating_network.get_allocation_age(ip) > 300:
                         leaks.append(ip)
 
             for ip in leaks:
                 LOG.error('Leaked floating IP %s has been released.' % ip)
                 floating_network._release_inner(ip)
-            floating_ipm.persist()
 
     def _validate_mtus(self):
         by_mtu = defaultdict(list)
