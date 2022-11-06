@@ -308,22 +308,22 @@ class Monitor(daemon.Daemon):
                     for ni in networkinterface.interfaces_for_instance(i):
                         ni.delete()
 
-                    # Cleanup any blob locations
-                    blobs_to_remove = []
-                    with etcd.ThreadLocalReadOnlyCache():
-                        for b in Blobs([active_states_filter,
-                                        partial(placement_filter, n.fqdn)]):
-                            blobs_to_remove.append(b)
+                # Cleanup any blob locations
+                blobs_to_remove = []
+                with etcd.ThreadLocalReadOnlyCache():
+                    for b in Blobs([active_states_filter,
+                                    partial(placement_filter, n.fqdn)]):
+                        blobs_to_remove.append(b)
 
-                    for b in blobs_to_remove:
-                        n.add_event2(
-                            'Deleting blob %s location as hosting node has been deleted'
-                            % b.uuid)
-                        b.add_event2(
-                            'Deleting blob location as hosting node %s has been deleted'
-                            % n.uuid)
-                        b.remove_location(n.fqdn)
-                        b.request_replication()
+                for b in blobs_to_remove:
+                    n.add_event2(
+                        'Deleting blob %s location as hosting node has been deleted'
+                        % b.uuid)
+                    b.add_event2(
+                        'Deleting blob location as hosting node %s has been deleted'
+                        % n.uuid)
+                    b.remove_location(n.fqdn)
+                    b.request_replication()
 
                 # Clean up any lingering queue tasks
                 jobname, workitem = etcd.dequeue(n.uuid)
