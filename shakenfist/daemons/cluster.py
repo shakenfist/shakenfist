@@ -62,7 +62,7 @@ class Monitor(daemon.Daemon):
                         # cost in this number, as that is a decision the cluster
                         # deployer machines (its a config option), not a decision
                         # the owner of the blob makes.
-                        total_used_storage += b.size
+                        total_used_storage += int(b.size)
 
                 a.add_event2('usage', extra={'bytes': total_used_storage},
                              suppress_event_logging=True)
