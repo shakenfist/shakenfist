@@ -122,6 +122,10 @@ class FakeNamespaceServiceKey(FakeNamespaceNoServiceKey):
     def add_event(self, *args, **kwargs):
         ...
 
+    @property
+    def trust(self):
+        return ['system']
+
 
 class ExternalApiTestCase(base.ShakenFistTestCase):
     def setUp(self):
@@ -690,7 +694,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                 'cpus': 1,
                 'memory': 1024,
                 'network': [{'network_uuid': 'betsy',
-                             'address': '10.1.2.11'}],
+                            'address': '10.1.2.11'}],
                 'disk': [{'size': 8,
                           'base': 'cirros'}],
                 'namespace': 'two',
@@ -706,7 +710,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                 'cpus': 1,
                 'memory': 1024,
                 'network': [{'network_uuid': 'betsy',
-                             'address': '10.1.200.11'}],
+                            'address': '10.1.200.11'}],
                 'disk': [{'size': 8,
                           'base': 'cirros'}],
                 'namespace': 'two',
@@ -724,7 +728,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                 'cpus': 1,
                 'memory': 1024,
                 'network': [{'network_uuid': 'betsy',
-                             'address': '10.1.2.11'}],
+                            'address': '10.1.2.11'}],
                 'disk': [{'size': 8,
                           'base': 'cirros'}],
                 'namespace': 'two',

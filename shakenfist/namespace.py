@@ -18,7 +18,7 @@ LOG, _ = logs.setup(__name__)
 
 class Namespace(dbo):
     object_type = 'namespace'
-    current_version = 2
+    current_version = 3
     upgrade_supported = True
 
     ACTIVE_STATES = set([dbo.STATE_CREATED])
@@ -77,6 +77,13 @@ class Namespace(dbo):
             static_values['version'] = 2
             changed = True
 
+        if static_values.get('version') == 2:
+            etcd.put(
+                'attribute/namespace', static_values['uuid'], 'trust',
+                {'full_trust': 'system'})
+            static_values['version'] = 3
+            changed = True
+
         if changed:
             LOG.with_fields({
                 cls.object_type: static_values['uuid'],
@@ -97,6 +104,7 @@ class Namespace(dbo):
         })
         n = Namespace.from_db(name)
         n.state = cls.STATE_CREATED
+        n._db_set_attribute('trust', {'full_trust': 'system'})
         return n
 
     @property
@@ -129,6 +137,27 @@ class Namespace(dbo):
             k = self._db_get_attribute('keys')
             del k[name]
             self._db_set_attribute('keys', k)
+
+    @property
+    def trust(self):
+        db_data = self._db_get_attribute('trust')
+        if not db_data:
+            return []
+        return db_data['full_trust']
+
+    def add_trust(self, namespace):
+        with self.get_lock_attr('trust', 'Add trust'):
+            db_data = self._db_get_attribute('trust')
+            if namespace not in db_data['full_trust']:
+                db_data['full_trust'].append(namespace)
+            self._db_set_attribute('trust', db_data)
+
+    def remove_trust(self, namespace):
+        with self.get_lock_attr('trust', 'Remove trust'):
+            db_data = self._db_get_attribute('trust')
+            if namespace in db_data['full_trust']:
+                db_data['full_trust'].remove(namespace)
+            self._db_set_attribute('trust', db_data)
 
     def external_view(self):
         # If this is an external view, then mix back in attributes that users
@@ -179,3 +208,17 @@ def get_api_token(base_url, namespace='system'):
     if r.status_code != 200:
         raise Exception('Unauthorized')
     return 'Bearer %s' % r.json()['access_token']
+
+
+def namespace_is_trusted(namespace, requestor):
+    if namespace == requestor:
+        return True
+
+    ns = Namespace.from_db(namespace)
+    if not ns:
+        return False
+
+    if requestor not in ns.trust:
+        return False
+
+    return True
