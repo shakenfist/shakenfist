@@ -290,6 +290,8 @@
   gather_facts: yes
   connection: ssh
   become: true
+  vars:
+    version_constraint: ""
 
   tasks:
     - name: Copy ssh key to primary node
@@ -312,6 +314,8 @@
           export GETSF_DNS_SERVER=8.8.8.8
           export GETSF_DEPLOY_NAME=bonkerslab
           export GETSF_RELEASE=pre-release
+          export GETSF_RELEASE_SHAKENFIST_CONSTRAINT="{{version_constraint}}"
+          export GETSF_RELEASE_CLIENT_CONSTRAINT="{{version_constraint}}"
           export GETSF_WARNING=yes
 
           export GETSF_NODES="sf-primary sf-1 sf-2 sf-3 sf-4 sf-5"

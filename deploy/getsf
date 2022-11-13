@@ -99,9 +99,39 @@ question_end
 PIP_EXTRA=""
 if [ ${GETSF_RELEASE} == "release" ]; then
     status "We will use released packages."
-    GETSF_SERVER_PACKAGE="shakenfist"
-    GETSF_CLIENT_PACKAGE="shakenfist-client"
-    GETSF_AGENT_PACKAGE="shakenfist-agent"
+
+    question_start
+    echo "Do you want a specific version of Shaken Fist, or just the most"
+    echo "recent? Enter a release version constraint here, or leave blank for"
+    echo "most recent packages. Constraints look like this:"
+    echo "    If we wanted any v0.5 release: >= 0.5,<0.6"
+    echo
+    if [ -z ${GETSF_RELEASE_SHAKENFIST_CONSTRAINT} ]; then
+        echo -n "(empty, or a version constraint) >> "
+        read GETSF_RELEASE_SHAKENFIST_CONSTRAINT
+        record_answer GETSF_RELEASE_SHAKENFIST_CONSTRAINT "${GETSF_RELEASE_SHAKENFIST_CONSTRAINT}"
+    else
+        echo "(empty, or a version number) >> ${GETSF_RELEASE_SHAKENFIST_CONSTRAINT}"
+    fi
+    question_end
+
+    question_start
+    echo "Do you want a specific version of the Shaken Fist client, or just the"
+    echo "most recent? Enter a release version constraint here, or leave blank"
+    echo "for most recent packages. Constraints look like this:"
+    echo "    If we wanted any v0.5 release: >= 0.5,<0.6"
+    echo
+    if [ -z ${GETSF_RELEASE_CLIENT_CONSTRAINT} ]; then
+        echo -n "(empty, or a version constraint) >> "
+        read GETSF_RELEASE_CLIENT_CONSTRAINT
+        record_answer GETSF_RELEASE_CLIENT_CONSTRAINT "${GETSF_RELEASE_CLIENT_CONSTRAINT}"
+    else
+        echo "(empty, or a version number) >> ${GETSF_RELEASE_CLIENT_CONSTRAINT}"
+    fi
+    question_end
+
+    GETSF_SERVER_PACKAGE="shakenfist${GETSF_RELEASE_SHAKENFIST_CONSTRAINT}"
+    GETSF_CLIENT_PACKAGE="shakenfist-client${GETSF_RELEASE_CLIENT_CONSTRAINT}"
 elif [ ${GETSF_RELEASE} == "pre-release" ]; then
     status "We will use pre-release packages."
     PIP_EXTRA="--pre"
