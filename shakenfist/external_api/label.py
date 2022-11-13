@@ -7,6 +7,7 @@ from shakenfist.baseobject import active_states_filter, DatabaseBackedObject as 
 from shakenfist.blob import Blob
 from shakenfist.daemons import daemon
 from shakenfist.exceptions import BlobDeleted
+from shakenfist.external_api import base as api_base
 
 
 LOG, HANDLER = logs.setup(__name__)
@@ -19,6 +20,7 @@ def _label_url(label_name):
 
 class LabelEndpoint(sf_api.Resource):
     @jwt_required()
+    @api_base.log_token_use
     def post(self, label_name=None, blob_uuid=None, max_versions=0):
         b = Blob.from_db(blob_uuid)
         if not b:
@@ -36,6 +38,7 @@ class LabelEndpoint(sf_api.Resource):
         return a.external_view()
 
     @jwt_required()
+    @api_base.log_token_use
     def get(self, label_name=None):
         artifacts = list(Artifacts(filters=[
             partial(type_filter, Artifact.TYPE_LABEL),
@@ -47,6 +50,7 @@ class LabelEndpoint(sf_api.Resource):
         return artifacts[0].external_view()
 
     @jwt_required()
+    @api_base.log_token_use
     def delete(self, label_name=None):
         artifacts = list(Artifacts(filters=[
             partial(type_filter, Artifact.TYPE_LABEL),

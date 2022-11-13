@@ -40,6 +40,9 @@ class FakeNamespaceNoServiceKey(object):
     def remove_key(self, key_name):
         del self.__keys[key_name]
 
+    def add_event(self, *args, **kwargs):
+        ...
+
 
 class FakeNamespaceServiceKey(FakeNamespaceNoServiceKey):
     @property

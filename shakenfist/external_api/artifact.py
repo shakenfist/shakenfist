@@ -84,6 +84,7 @@ class ArtifactEndpoint(sf_api.Resource):
     @jwt_required()
     @arg_is_artifact_uuid
     @requires_artifact_access
+    @api_base.log_token_use
     def get(self, artifact_uuid=None, artifact_from_db=None):
         with etcd.ThreadLocalReadOnlyCache():
             return artifact_from_db.external_view()
@@ -91,6 +92,7 @@ class ArtifactEndpoint(sf_api.Resource):
     @jwt_required()
     @arg_is_artifact_uuid
     @requires_artifact_ownership
+    @api_base.log_token_use
     def delete(self, artifact_uuid=None, artifact_from_db=None):
         if artifact_from_db.state.value == Artifact.STATE_DELETED:
             return
@@ -100,6 +102,7 @@ class ArtifactEndpoint(sf_api.Resource):
 
 class ArtifactsEndpoint(sf_api.Resource):
     @jwt_required()
+    @api_base.log_token_use
     def get(self, node=None):
         retval = []
         with etcd.ThreadLocalReadOnlyCache():
@@ -117,6 +120,7 @@ class ArtifactsEndpoint(sf_api.Resource):
         return retval
 
     @jwt_required()
+    @api_base.log_token_use
     @api_base.requires_namespace_exist
     def post(self, url=None, shared=False, namespace=None):
         # The only artifact type you can force the cluster to fetch is an
@@ -146,6 +150,7 @@ class ArtifactsEndpoint(sf_api.Resource):
         return a.external_view()
 
     @jwt_required()
+    @api_base.log_token_use
     @api_base.requires_namespace_exist
     def delete(self, confirm=False, namespace=None):
         """Delete all artifacts in the namespace."""
@@ -175,6 +180,7 @@ class ArtifactsEndpoint(sf_api.Resource):
 
 class ArtifactUploadEndpoint(sf_api.Resource):
     @jwt_required()
+    @api_base.log_token_use
     @api_base.requires_namespace_exist
     def post(self, artifact_name=None, upload_uuid=None, source_url=None,
              shared=False, namespace=None):
@@ -256,6 +262,7 @@ class ArtifactEventsEndpoint(sf_api.Resource):
     @jwt_required()
     @arg_is_artifact_uuid
     @requires_artifact_access
+    @api_base.log_token_use
     @api_base.redirect_to_eventlog_node
     def get(self, artifact_uuid=None, artifact_from_db=None):
         with eventlog.EventLog('artifact', artifact_uuid) as eventdb:
@@ -278,6 +285,7 @@ class ArtifactVersionsEndpoint(sf_api.Resource):
     @jwt_required()
     @arg_is_artifact_uuid
     @requires_artifact_ownership
+    @api_base.log_token_use
     def post(self, artifact_uuid=None, artifact_from_db=None,
              max_versions=config.ARTIFACT_MAX_VERSIONS_DEFAULT):
         try:
@@ -291,6 +299,7 @@ class ArtifactVersionEndpoint(sf_api.Resource):
     @jwt_required()
     @arg_is_artifact_uuid
     @requires_artifact_ownership
+    @api_base.log_token_use
     def delete(self, artifact_uuid=None, artifact_from_db=None, version_id=0):
         try:
             ver_index = int(version_id)
@@ -312,6 +321,7 @@ class ArtifactShareEndpoint(sf_api.Resource):
     @jwt_required()
     @arg_is_artifact_uuid
     @requires_artifact_ownership
+    @api_base.log_token_use
     def post(self, artifact_uuid=None, artifact_from_db=None):
         if artifact_from_db.namespace != 'system':
             return sf_api.error(
@@ -324,6 +334,7 @@ class ArtifactUnshareEndpoint(sf_api.Resource):
     @jwt_required()
     @arg_is_artifact_uuid
     @requires_artifact_ownership
+    @api_base.log_token_use
     def post(self, artifact_uuid=None, artifact_from_db=None):
         if not artifact_from_db.shared:
             return sf_api.error(403, 'artifact not shared')

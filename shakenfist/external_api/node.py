@@ -13,6 +13,7 @@ from shakenfist.node import Node, Nodes
 class NodeEndpoint(sf_api.Resource):
     @jwt_required()
     @sf_api.caller_is_admin
+    @api_base.log_token_use
     def delete(self, node=None):
         n = Node.from_db(node)
         if not n:
@@ -37,6 +38,7 @@ class NodesEndpoint(sf_api.Resource):
         'is_eventlog_node': fields.Boolean,
         'is_cluster_maintainer': fields.Boolean
     })
+    @api_base.log_token_use
     def get(self):
         # This is a little terrible. The way to work out which node is currently
         # doing cluster maintenance is to lookup the lock.
@@ -55,6 +57,7 @@ class NodeEventsEndpoint(sf_api.Resource):
     @jwt_required()
     @sf_api.caller_is_admin
     @api_base.redirect_to_eventlog_node
+    @api_base.log_token_use
     def get(self, node=None):
         with eventlog.EventLog('node', node) as eventdb:
             return list(eventdb.read_events())

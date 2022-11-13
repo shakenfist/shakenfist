@@ -1,7 +1,7 @@
 import base64
 import bcrypt
-from flask_jwt_extended import create_access_token
-from flask_jwt_extended import jwt_required
+import flask
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from shakenfist_utilities import api as sf_api, logs
 
 from shakenfist.baseobject import (
@@ -47,12 +47,16 @@ class AuthEndpoint(sf_api.Resource):
         for key_name in keys:
             possible_key = base64.b64decode(keys[key_name])
             if bcrypt.checkpw(key.encode('utf-8'), possible_key):
-                return {
-                    'access_token': create_access_token(identity=[namespace, key_name])
-                }
+                token = create_access_token(identity=[namespace, key_name])
+                ns.add_event(
+                    'Token created from key',
+                    extra={
+                        'keyname': key_name,
+                        'token': token
+                    })
+                return {'access_token': token}
 
-        LOG.with_fields({'namespace': namespace}).info(
-            'Key not found during auth request')
+        ns.add_event('Attempt to use incorrect namespace key')
         return sf_api.error(401, 'unauthorized')
 
 
@@ -64,6 +68,32 @@ class AuthNamespacesEndpoint(sf_api.Resource):
             return sf_api.error(400, 'no namespace specified')
 
         ns = Namespace.new(namespace)
+
+        # Log this special case of a token being used
+        auth_header = flask.request.headers.get('Authorization', 'Bearer none')
+        token = auth_header.split(' ')[1]
+        invoking_namespace, keyname = get_jwt_identity()
+        parent_ns = Namespace.from_db(invoking_namespace)
+        if parent_ns:
+            parent_ns.add_event(
+                'Token used to create namespace %s' % namespace,
+                extra={
+                    'token': token,
+                    'keyname': keyname,
+                    'method': flask.request.environ['REQUEST_METHOD'],
+                    'path': flask.request.environ['PATH_INFO'],
+                    'remote-address': flask.request.remote_addr,
+                    'created-namespace': namespace
+                })
+        ns.add_event(
+            'Token used to create namespace',
+            extra={
+                'token': token,
+                'keyname': keyname,
+                'method': flask.request.environ['REQUEST_METHOD'],
+                'path': flask.request.environ['PATH_INFO'],
+                'remote-address': flask.request.remote_addr
+            })
 
         # Allow shortcut of creating key at same time as the namespace
         if key_name:
@@ -86,6 +116,7 @@ class AuthNamespacesEndpoint(sf_api.Resource):
 
     @jwt_required()
     @sf_api.caller_is_admin
+    @api_base.log_token_use
     def get(self):
         retval = []
         for ns in Namespaces(filters=[active_states_filter]):
@@ -96,6 +127,7 @@ class AuthNamespacesEndpoint(sf_api.Resource):
 class AuthNamespaceEndpoint(sf_api.Resource):
     @jwt_required()
     @sf_api.caller_is_admin
+    @api_base.log_token_use
     def delete(self, namespace):
         if not namespace:
             return sf_api.error(400, 'no namespace specified')
@@ -158,6 +190,7 @@ class AuthNamespaceKeysEndpoint(sf_api.Resource):
     @jwt_required()
     @sf_api.caller_is_admin
     @api_base.requires_namespace_exist
+    @api_base.log_token_use
     def get(self, namespace=None):
         out = []
         ns = Namespace.from_db(namespace)
@@ -168,6 +201,7 @@ class AuthNamespaceKeysEndpoint(sf_api.Resource):
     @jwt_required()
     @sf_api.caller_is_admin
     @api_base.requires_namespace_exist
+    @api_base.log_token_use
     def post(self, namespace=None, key_name=None, key=None):
         return _namespace_keys_putpost(namespace, key_name, key)
 
@@ -176,6 +210,7 @@ class AuthNamespaceKeyEndpoint(sf_api.Resource):
     @jwt_required()
     @sf_api.caller_is_admin
     @api_base.requires_namespace_exist
+    @api_base.log_token_use
     def put(self, namespace=None, key_name=None, key=None):
         ns = Namespace.from_db(namespace)
         if key_name not in ns.keys:
@@ -186,6 +221,7 @@ class AuthNamespaceKeyEndpoint(sf_api.Resource):
     @jwt_required()
     @sf_api.caller_is_admin
     @api_base.requires_namespace_exist
+    @api_base.log_token_use
     def delete(self, namespace, key_name):
         if not namespace:
             return sf_api.error(400, 'no namespace specified')
@@ -203,6 +239,7 @@ class AuthMetadatasEndpoint(sf_api.Resource):
     @jwt_required()
     @sf_api.caller_is_admin
     @api_base.requires_namespace_exist
+    @api_base.log_token_use
     def get(self, namespace=None):
         md = db.get_metadata('namespace', namespace)
         if not md:
@@ -212,6 +249,7 @@ class AuthMetadatasEndpoint(sf_api.Resource):
     @jwt_required()
     @sf_api.caller_is_admin
     @api_base.requires_namespace_exist
+    @api_base.log_token_use
     def post(self, namespace=None, key=None, value=None):
         return api_util.metadata_putpost('namespace', namespace, key, value)
 
@@ -220,12 +258,14 @@ class AuthMetadataEndpoint(sf_api.Resource):
     @jwt_required()
     @sf_api.caller_is_admin
     @api_base.requires_namespace_exist
+    @api_base.log_token_use
     def put(self, namespace=None, key=None, value=None):
         return api_util.metadata_putpost('namespace', namespace, key, value)
 
     @jwt_required()
     @sf_api.caller_is_admin
     @api_base.requires_namespace_exist
+    @api_base.log_token_use
     def delete(self, namespace=None, key=None, value=None):
         if not key:
             return sf_api.error(400, 'no key specified')

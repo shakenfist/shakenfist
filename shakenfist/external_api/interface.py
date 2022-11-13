@@ -20,6 +20,7 @@ daemon.set_log_level(LOG, 'api')
 class InterfaceEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.redirect_to_network_node
+    @api_base.log_token_use
     def get(self, interface_uuid=None):
         ni, _, err = api_util.safe_get_network_interface(interface_uuid)
         if err:
@@ -29,6 +30,7 @@ class InterfaceEndpoint(sf_api.Resource):
 
 class InterfaceFloatEndpoint(sf_api.Resource):
     @jwt_required()
+    @api_base.log_token_use
     def post(self, interface_uuid=None):
         ni, n, err = api_util.safe_get_network_interface(interface_uuid)
         if err:
@@ -45,6 +47,7 @@ class InterfaceFloatEndpoint(sf_api.Resource):
 
 class InterfaceDefloatEndpoint(sf_api.Resource):
     @jwt_required()
+    @api_base.log_token_use
     def post(self, interface_uuid=None):
         ni, n, err = api_util.safe_get_network_interface(interface_uuid)
         if err:

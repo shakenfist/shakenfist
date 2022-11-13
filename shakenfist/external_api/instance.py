@@ -46,6 +46,7 @@ class InstanceEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
+    @api_base.log_token_use
     def get(self, instance_ref=None, instance_from_db=None):
         return instance_from_db.external_view()
 
@@ -53,6 +54,7 @@ class InstanceEndpoint(sf_api.Resource):
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.requires_namespace_exist
+    @api_base.log_token_use
     def delete(self, instance_ref=None, instance_from_db=None, namespace=None):
         # Check if instance has already been deleted
         if instance_from_db.state.value == dbo.STATE_DELETED:
@@ -99,6 +101,7 @@ def _artifact_safety_checks(a, instance_uuid=None):
 
 class InstancesEndpoint(sf_api.Resource):
     @jwt_required()
+    @api_base.log_token_use
     def get(self, all=False):
         with etcd.ThreadLocalReadOnlyCache():
             filters = [partial(baseobject.namespace_filter,
@@ -114,6 +117,7 @@ class InstancesEndpoint(sf_api.Resource):
 
     @jwt_required()
     @api_base.requires_namespace_exist
+    @api_base.log_token_use
     def post(self, name=None, cpus=None, memory=None, network=None, disk=None,
              ssh_key=None, user_data=None, placed_on=None, namespace=None,
              video=None, uefi=False, configdrive=None, metadata=None,
@@ -481,6 +485,7 @@ class InstancesEndpoint(sf_api.Resource):
 
     @jwt_required()
     @api_base.requires_namespace_exist
+    @api_base.log_token_use
     def delete(self, confirm=False, namespace=None):
         """Delete all instances in the namespace."""
 
@@ -522,6 +527,7 @@ class InstanceInterfacesEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
+    @api_base.log_token_use
     def get(self, instance_ref=None, instance_from_db=None):
         out = []
         for iface_uuid in instance_from_db.interfaces:
@@ -537,6 +543,7 @@ class InstanceEventsEndpoint(sf_api.Resource):
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_to_eventlog_node
+    @api_base.log_token_use
     def get(self, instance_ref=None, instance_from_db=None):
         with eventlog.EventLog('instance', instance_from_db.uuid) as eventdb:
             return list(eventdb.read_events())
@@ -548,6 +555,7 @@ class InstanceRebootSoftEndpoint(sf_api.Resource):
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
+    @api_base.log_token_use
     def post(self, instance_ref=None, instance_from_db=None):
         try:
             with instance_from_db.get_lock(op='Instance reboot soft'):
@@ -562,6 +570,7 @@ class InstanceRebootHardEndpoint(sf_api.Resource):
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
+    @api_base.log_token_use
     def post(self, instance_ref=None, instance_from_db=None):
         try:
             with instance_from_db.get_lock(op='Instance reboot hard'):
@@ -576,6 +585,7 @@ class InstancePowerOffEndpoint(sf_api.Resource):
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
+    @api_base.log_token_use
     def post(self, instance_ref=None, instance_from_db=None):
         try:
             with instance_from_db.get_lock(op='Instance power off'):
@@ -590,6 +600,7 @@ class InstancePowerOnEndpoint(sf_api.Resource):
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
+    @api_base.log_token_use
     def post(self, instance_ref=None, instance_from_db=None):
         try:
             with instance_from_db.get_lock(op='Instance power on'):
@@ -604,6 +615,7 @@ class InstancePauseEndpoint(sf_api.Resource):
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
+    @api_base.log_token_use
     def post(self, instance_ref=None, instance_from_db=None):
         try:
             with instance_from_db.get_lock(op='Instance pause'):
@@ -618,6 +630,7 @@ class InstanceUnpauseEndpoint(sf_api.Resource):
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
+    @api_base.log_token_use
     def post(self, instance_ref=None, instance_from_db=None):
         try:
             with instance_from_db.get_lock(op='Instance unpause'):
@@ -630,6 +643,7 @@ class InstanceMetadatasEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
+    @api_base.log_token_use
     def get(self, instance_ref=None, instance_from_db=None):
         md = db.get_metadata('instance', instance_from_db.uuid)
         if not md:
@@ -639,6 +653,7 @@ class InstanceMetadatasEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
+    @api_base.log_token_use
     def post(self, instance_ref=None, key=None, value=None, instance_from_db=None):
         err = _validate_instance_metadata(key, value)
         if err:
@@ -679,6 +694,7 @@ class InstanceMetadataEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
+    @api_base.log_token_use
     def put(self, instance_ref=None, key=None, value=None, instance_from_db=None):
         err = _validate_instance_metadata(key, value)
         if err:
@@ -689,6 +705,7 @@ class InstanceMetadataEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
+    @api_base.log_token_use
     def delete(self, instance_ref=None, key=None, instance_from_db=None):
         if not key:
             return sf_api.error(400, 'no key specified')
@@ -706,6 +723,7 @@ class InstanceConsoleDataEndpoint(sf_api.Resource):
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
+    @api_base.log_token_use
     def get(self, instance_ref=None, length=None, instance_from_db=None):
         parsed_length = None
 
@@ -732,5 +750,6 @@ class InstanceConsoleDataEndpoint(sf_api.Resource):
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
+    @api_base.log_token_use
     def delete(self, instance_ref=None, instance_from_db=None):
         instance_from_db.delete_console_data()

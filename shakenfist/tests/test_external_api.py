@@ -119,6 +119,9 @@ class FakeNamespaceServiceKey(FakeNamespaceNoServiceKey):
     def service_key(self):
         return {'service_key': 'cheese'}
 
+    def add_event(self, *args, **kwargs):
+        ...
+
 
 class ExternalApiTestCase(base.ShakenFistTestCase):
     def setUp(self):

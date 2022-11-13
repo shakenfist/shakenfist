@@ -52,6 +52,7 @@ class NetworkEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
+    @api_base.log_token_use
     def get(self, network_ref=None, network_from_db=None):
         return network_from_db.external_view()
 
@@ -60,6 +61,7 @@ class NetworkEndpoint(sf_api.Resource):
     @api_base.requires_network_ownership
     @api_base.requires_namespace_exist
     @api_base.redirect_to_network_node
+    @api_base.log_token_use
     def delete(self, network_ref=None, network_from_db=None, namespace=None):
         if network_ref == 'floating':
             return sf_api.error(403, 'you cannot delete the floating network')
@@ -92,6 +94,7 @@ class NetworksEndpoint(sf_api.Resource):
         'state': fields.String
     })
     @jwt_required()
+    @api_base.log_token_use
     def get(self, all=False):
         with etcd.ThreadLocalReadOnlyCache():
             filters = [partial(baseobject.namespace_filter,
@@ -107,6 +110,7 @@ class NetworksEndpoint(sf_api.Resource):
 
     @jwt_required()
     @api_base.requires_namespace_exist
+    @api_base.log_token_use
     def post(self, netblock=None, provide_dhcp=None, provide_nat=None, name=None,
              namespace=None):
         try:
@@ -132,6 +136,7 @@ class NetworksEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.requires_namespace_exist
     @api_base.redirect_to_network_node
+    @api_base.log_token_use
     def delete(self, confirm=False, namespace=None, clean_wait=False):
         """Delete all networks in the namespace.
 
@@ -184,6 +189,7 @@ class NetworkEventsEndpoint(sf_api.Resource):
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.redirect_to_eventlog_node
+    @api_base.log_token_use
     def get(self, network_ref=None, network_from_db=None):
         with eventlog.EventLog('network', network_from_db.uuid) as eventdb:
             return list(eventdb.read_events())
@@ -193,6 +199,7 @@ class NetworkInterfacesEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
+    @api_base.log_token_use
     def get(self, network_ref=None, network_from_db=None):
         out = []
         for ni_uuid in network_from_db.networkinterfaces:
@@ -207,6 +214,7 @@ class NetworkMetadatasEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
+    @api_base.log_token_use
     def get(self, network_ref=None, network_from_db=None):
         md = db.get_metadata('network', network_from_db.uuid)
         if not md:
@@ -216,6 +224,7 @@ class NetworkMetadatasEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
+    @api_base.log_token_use
     def post(self, network_ref=None, key=None, value=None, network_from_db=None):
         return api_util.metadata_putpost('network', network_from_db.uuid, key, value)
 
@@ -224,12 +233,14 @@ class NetworkMetadataEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
+    @api_base.log_token_use
     def put(self, network_ref=None, key=None, value=None, network_from_db=None):
         return api_util.metadata_putpost('network', network_from_db.uuid, key, value)
 
     @jwt_required()
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
+    @api_base.log_token_use
     def delete(self, network_ref=None, key=None, network_from_db=None):
         if not key:
             return sf_api.error(400, 'no key specified')
@@ -248,6 +259,7 @@ class NetworkPingEndpoint(sf_api.Resource):
     @api_base.requires_network_ownership
     @api_base.redirect_to_network_node
     @api_base.requires_network_active
+    @api_base.log_token_use
     def get(self, network_ref=None, address=None, network_from_db=None):
         if not network_from_db.is_in_range(address):
             return sf_api.error(400, 'ping request for address outside network block')
