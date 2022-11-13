@@ -16,6 +16,7 @@ daemon.set_log_level(LOG, 'api')
 
 class UploadCreateEndpoint(sf_api.Resource):
     @jwt_required()
+    @api_base.log_token_use
     def post(self):
         return Upload.new(str(uuid.uuid4()), config.NODE_NAME).external_view()
 
@@ -24,6 +25,7 @@ class UploadDataEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_upload_uuid
     @api_base.redirect_upload_request
+    @api_base.log_token_use
     def post(self, upload_uuid=None, upload_from_db=None):
         upload_dir = os.path.join(config.STORAGE_PATH, 'uploads')
         os.makedirs(upload_dir, exist_ok=True)
@@ -41,6 +43,7 @@ class UploadTruncateEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_upload_uuid
     @api_base.redirect_upload_request
+    @api_base.log_token_use
     def post(self, upload_uuid=None, offset=None, upload_from_db=None):
         upload_dir = os.path.join(config.STORAGE_PATH, 'uploads')
         os.makedirs(upload_dir, exist_ok=True)

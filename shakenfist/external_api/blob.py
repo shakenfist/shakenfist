@@ -11,6 +11,7 @@ from shakenfist import baseobject
 from shakenfist.blob import Blob, Blobs
 from shakenfist.config import config
 from shakenfist import etcd
+from shakenfist.external_api import base as api_base
 from shakenfist.namespace import get_api_token
 from shakenfist.util import general as util_general
 
@@ -40,6 +41,7 @@ def _read_remote(target, blob_uuid, offset=0):
 
 class BlobEndpoint(sf_api.Resource):
     @jwt_required()
+    @api_base.log_token_use
     def get(self, blob_uuid=None):
         b = Blob.from_db(blob_uuid)
         if not b:
@@ -58,6 +60,7 @@ class BlobDataEndpoint(sf_api.Resource):
 
     @jwt_required()
     @use_kwargs(get_args, location='query')
+    @api_base.log_token_use
     def get(self, blob_uuid=None, offset=0):
         # Ensure the blob exists
         b = Blob.from_db(blob_uuid)
@@ -86,6 +89,7 @@ class BlobDataEndpoint(sf_api.Resource):
 class BlobsEndpoint(sf_api.Resource):
     @jwt_required()
     @sf_api.caller_is_admin
+    @api_base.log_token_use
     def get(self, node=None):
         retval = []
 

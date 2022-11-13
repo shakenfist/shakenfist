@@ -1,3 +1,5 @@
+import copy
+import flask
 import json
 from oslo_concurrency import lockutils
 import os
@@ -26,6 +28,21 @@ def add_event(object_type, object_uuid, message, duration=None,
 
     if not object_type or not object_uuid:
         return
+
+    # If we alter extra, we don't want that to leak back to the caller.
+    if not extra:
+        extra = {}
+    else:
+        extra = copy.deepcopy(extra)
+
+    # If this event was created in the context of a request from our API, then
+    # we should record the request id that caused this event.
+    try:
+        request_id = flask.request.environ.get('FLASK_REQUEST_ID')
+    except RuntimeError:
+        request_id = None
+    if request_id and 'request-id' not in extra:
+        extra['request-id'] = request_id
 
     if not suppress_event_logging:
         log = LOG

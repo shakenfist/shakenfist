@@ -19,6 +19,7 @@ class InstanceSnapshotEndpoint(sf_api.Resource):
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
     @api_base.requires_instance_active
+    @api_base.log_token_use
     def post(self, instance_ref=None, instance_from_db=None, all=None,
              device=None, max_versions=0, thin=None):
         if not thin:
@@ -29,6 +30,7 @@ class InstanceSnapshotEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
+    @api_base.log_token_use
     def get(self, instance_ref=None, instance_from_db=None):
         out = []
         for snap in Artifacts([

@@ -21,6 +21,29 @@ LOG, _ = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 
+def log_token_use(func):
+    def wrapper(*args, **kwargs):
+        auth_header = flask.request.headers.get('Authorization', 'Bearer none')
+        token = auth_header.split(' ')[1]
+        namespace, keyname = get_jwt_identity()
+
+        ns = Namespace.from_db(namespace)
+        if not ns:
+            return sf_api.error(401, 'authenticated namespace not known')
+        ns.add_event(
+            'Token used to authenticate request',
+            extra={
+                'token': token,
+                'keyname': keyname,
+                'method': flask.request.environ['REQUEST_METHOD'],
+                'path': flask.request.environ['PATH_INFO'],
+                'remote-address': flask.request.remote_addr
+            })
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
 def arg_is_instance_ref(func):
     # Method uses the instance from the db
     def wrapper(*args, **kwargs):
