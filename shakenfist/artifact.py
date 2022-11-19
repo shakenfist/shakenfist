@@ -15,6 +15,7 @@ from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist.metrics import get_minimum_object_version as gmov
+from shakenfist.namespace import namespace_is_trusted
 
 
 LOG, _ = logs.setup(__name__)
@@ -352,5 +353,7 @@ def namespace_or_shared_filter(namespace, o):
     if namespace == 'system':
         return True
     if o.shared:
+        return True
+    if namespace_is_trusted(o.namespace, namespace):
         return True
     return o.namespace == namespace

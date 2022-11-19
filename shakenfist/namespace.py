@@ -80,7 +80,7 @@ class Namespace(dbo):
         if static_values.get('version') == 2:
             etcd.put(
                 'attribute/namespace', static_values['uuid'], 'trust',
-                {'full_trust': 'system'})
+                {'full_trust': ['system']})
             static_values['version'] = 3
             changed = True
 
@@ -104,7 +104,7 @@ class Namespace(dbo):
         })
         n = Namespace.from_db(name)
         n.state = cls.STATE_CREATED
-        n._db_set_attribute('trust', {'full_trust': 'system'})
+        n._db_set_attribute('trust', {'full_trust': ['system']})
         return n
 
     @property
@@ -150,14 +150,14 @@ class Namespace(dbo):
             db_data = self._db_get_attribute('trust')
             if namespace not in db_data['full_trust']:
                 db_data['full_trust'].append(namespace)
-            self._db_set_attribute('trust', db_data)
+                self._db_set_attribute('trust', db_data)
 
     def remove_trust(self, namespace):
         with self.get_lock_attr('trust', 'Remove trust'):
             db_data = self._db_get_attribute('trust')
             if namespace in db_data['full_trust']:
                 db_data['full_trust'].remove(namespace)
-            self._db_set_attribute('trust', db_data)
+                self._db_set_attribute('trust', db_data)
 
     def external_view(self):
         # If this is an external view, then mix back in attributes that users
