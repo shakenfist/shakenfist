@@ -252,10 +252,10 @@ class TestTypoedLabel(base.BaseNamespacedTestCase):
                           self.test_client.create_instance,
                           'typoedlabel', 1, 1024, None,
                           [
-                                {
-                                    'size': 20,
-                                    'base': 'label:doesnotexist',
-                                    'type': 'disk'
-                                }
+                              {
+                                  'size': 20,
+                                  'base': 'label:doesnotexist',
+                                  'type': 'disk'
+                              }
                           ],
                           None, None, side_channels=['sf-agent'])
