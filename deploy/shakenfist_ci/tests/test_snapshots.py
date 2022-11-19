@@ -54,7 +54,16 @@ class TestSnapshots(base.BaseNamespacedTestCase):
 
         # Check blob exists and has correct reference count
         snapshot_uuid = snapshots[-1]['uuid']
-        snap1_info = self.test_client.get_artifact(snapshot_uuid)
+
+        # Wait until snapshot is in the created state
+        start_time = time.time()
+        while time.time() - start_time < 300:
+            snap1_info = self.test_client.get_artifact(snapshot_uuid)
+            if snap1_info['state'] == 'created':
+                break
+            time.sleep(5)
+
+        self.assertEqual('created', snap1_info['state'])
         self.assertEqual(1, len(snap1_info.get('blobs', [])))
         self.assertEqual(1, snap1_info['blobs'][1]['reference_count'])
         self.assertEqual(None, snap1_info['blobs'][1]['depends_on'])
