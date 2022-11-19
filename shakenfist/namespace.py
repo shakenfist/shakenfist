@@ -164,7 +164,10 @@ class Namespace(dbo):
         # expect
         return {
             'name': self.uuid,
-            'state': self.state.value
+            'state': self.state.value,
+            'trust': {
+                'full': self.trust
+            }
         }
 
 

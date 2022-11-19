@@ -458,10 +458,10 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
                                headers={'Authorization': self.auth_token})
         self.assertEqual(200, resp.status_code)
         self.assertEqual([
-            {'name': 'foo', 'state': 'created'},
-            {'name': 'system', 'state': 'created'},
-            {'name': 'three', 'state': 'created'},
-            {'name': 'two', 'state': 'created'}
+            {'name': 'foo', 'state': 'created', 'trust': {'full': 'system'}},
+            {'name': 'system', 'state': 'created', 'trust': {'full': 'system'}},
+            {'name': 'three', 'state': 'created', 'trust': {'full': 'system'}},
+            {'name': 'two', 'state': 'created', 'trust': {'full': 'system'}}
         ], resp.get_json())
 
     def test_delete_namespace_missing_args(self):
