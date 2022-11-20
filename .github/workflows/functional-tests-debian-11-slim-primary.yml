@@ -122,7 +122,7 @@ jobs:
               $source_path/shakenfist \
               debian@$primary:shakenfist
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@$primary "cd shakenfist/deploy; . /etc/sf/sfrc; SHAKENFIST_CI_CONCURRENCY=5 tox -epy3"
+              debian@$primary "cd shakenfist/deploy; . /etc/sf/sfrc; sudo pip3 install -r requirements.txt; stestr run --concurrency=5"
 
       - name: Check logs
         if: ${{ ! cancelled() }}
