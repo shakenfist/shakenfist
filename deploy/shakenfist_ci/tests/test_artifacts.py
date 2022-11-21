@@ -242,6 +242,49 @@ class TestSharedImages(base.BaseNamespacedTestCase):
             self.test_client.cache_artifact, url, shared=True)
 
 
+class TestTrusts(base.BaseNamespacedTestCase):
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'trusts'
+        super(TestTrusts, self).__init__(*args, **kwargs)
+
+    def test_trusts(self):
+        url = ('https://sfcbr.shakenfist.com/gw-basic-trust.qcow2')
+
+        self.test_client_one = self._make_namespace(
+            self.namespace + '-1', self.namespace_key)
+        self.test_client_two = self._make_namespace(
+            self.namespace + '-2', self.namespace_key)
+
+        # Cache a non-shared version of the image in the first namespace
+        self.test_client_one.cache_artifact(url)
+
+        image_urls = []
+        for image in self.test_client_two.get_artifacts():
+            image_urls.append(image['source_url'])
+        self.assertNotIn(url, image_urls)
+
+        # Add a trust
+        self.test_client_one.add_namespace_trust(
+            self.namespace + '-1', self.namespace + '-2')
+
+        image_urls = []
+        for image in self.test_client_two.get_artifacts():
+            image_urls.append(image['source_url'])
+        self.assertIn(url, image_urls)
+
+        # Remove trust
+        self.test_client_one.remove_namespace_trust(
+            self.namespace + '-1', self.namespace + '-2')
+
+        image_urls = []
+        for image in self.test_client_two.get_artifacts():
+            image_urls.append(image['source_url'])
+        self.assertNotIn(url, image_urls)
+
+        self.system_client.delete_namespace(self.namespace + '-1')
+        self.system_client.delete_namespace(self.namespace + '-2')
+
+
 class TestTypoedLabel(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'sharedimages'
@@ -252,10 +295,10 @@ class TestTypoedLabel(base.BaseNamespacedTestCase):
                           self.test_client.create_instance,
                           'typoedlabel', 1, 1024, None,
                           [
-                                {
-                                    'size': 20,
-                                    'base': 'label:doesnotexist',
-                                    'type': 'disk'
-                                }
+                              {
+                                  'size': 20,
+                                  'base': 'label:doesnotexist',
+                                  'type': 'disk'
+                              }
                           ],
                           None, None, side_channels=['sf-agent'])

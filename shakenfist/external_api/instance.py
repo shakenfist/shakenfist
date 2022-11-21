@@ -20,6 +20,7 @@ from shakenfist.external_api import (
     base as api_base,
     util as api_util)
 from shakenfist import instance
+from shakenfist.namespace import namespace_is_trusted
 from shakenfist import network as sfnet  # Unfortunate, but we have an API arg
 # called network too.
 from shakenfist.networkinterface import NetworkInterface
@@ -139,7 +140,7 @@ class InstancesEndpoint(sf_api.Resource):
             namespace = get_jwt_identity()[0]
 
         # If accessing a foreign namespace, we need to be an admin
-        if get_jwt_identity()[0] not in [namespace, 'system']:
+        if not namespace_is_trusted(namespace, get_jwt_identity()[0]):
             return sf_api.error(404, 'namespace not found')
 
         # Check that the instance name is safe for use as a DNS host name

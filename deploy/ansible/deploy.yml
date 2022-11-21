@@ -802,6 +802,8 @@
       shell: "{{hostvars['localhost']['utility_path']}}/sf-ctl bootstrap-system-key deploy {{hostvars[groups['primary_node'][0]]['system_key']}}"
       environment:
         SHAKENFIST_ETCD_HOST: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
+        SHAKENFIST_NODE_MESH_IP: "{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
+        SHAKENFIST_EVENTLOG_NODE_IP: "{{hostvars[groups['eventlog_node'][0]]['node_mesh_ip']}}"
       run_once: true
 
 - hosts: primary_node

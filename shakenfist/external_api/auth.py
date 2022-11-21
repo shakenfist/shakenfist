@@ -13,7 +13,7 @@ from shakenfist.external_api import (
     base as api_base,
     util as api_util)
 from shakenfist import instance
-from shakenfist.namespace import Namespace, Namespaces
+from shakenfist.namespace import Namespace, Namespaces, namespace_is_trusted
 from shakenfist import network
 
 
@@ -275,3 +275,43 @@ class AuthMetadataEndpoint(sf_api.Resource):
             return sf_api.error(404, 'key not found')
         del md[key]
         db.persist_metadata('namespace', namespace, md)
+
+
+class AuthNamespaceTrustsEndpoint(sf_api.Resource):
+    @jwt_required()
+    @api_base.requires_namespace_exist
+    @api_base.log_token_use
+    def post(self, namespace=None, external_namespace=None):
+        if not namespace:
+            return sf_api.error(400, 'missing namespace in request')
+        if not external_namespace:
+            return sf_api.error(400, 'no external namespace specified')
+
+        if not namespace_is_trusted(namespace, get_jwt_identity()[0]):
+            LOG.with_fields({'namespace': namespace}).info(
+                'Namespace not found, trust test failed')
+            return sf_api.error(404, 'namespace not found')
+
+        ns = Namespace.from_db(namespace)
+        ns.add_trust(external_namespace)
+        return ns.external_view()
+
+
+class AuthNamespaceTrustEndpoint(sf_api.Resource):
+    @jwt_required()
+    @api_base.requires_namespace_exist
+    @api_base.log_token_use
+    def delete(self, namespace=None, external_namespace=None):
+        if not namespace:
+            return sf_api.error(400, 'missing namespace in request')
+        if not external_namespace:
+            return sf_api.error(400, 'no external namespace specified')
+
+        if not namespace_is_trusted(namespace, get_jwt_identity()[0]):
+            LOG.with_fields({'namespace': namespace}).info(
+                'Namespace not found, trust test failed')
+            return sf_api.error(404, 'namespace not found')
+
+        ns = Namespace.from_db(namespace)
+        ns.remove_trust(external_namespace)
+        return ns.external_view()

@@ -102,6 +102,10 @@ api.add_resource(api_auth.AuthMetadatasEndpoint,
                  '/auth/namespaces/<namespace>/metadata')
 api.add_resource(api_auth.AuthMetadataEndpoint,
                  '/auth/namespaces/<namespace>/metadata/<key>')
+api.add_resource(api_auth.AuthNamespaceTrustsEndpoint,
+                 '/auth/namespaces/<namespace>/trust')
+api.add_resource(api_auth.AuthNamespaceTrustEndpoint,
+                 '/auth/namespaces/<namespace>/trust/<external_namespace>')
 
 api.add_resource(api_blob.BlobsEndpoint, '/blobs')
 api.add_resource(api_blob.BlobEndpoint, '/blobs/<blob_uuid>')

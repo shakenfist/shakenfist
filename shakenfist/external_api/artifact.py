@@ -20,7 +20,7 @@ from shakenfist import eventlog
 from shakenfist.external_api import base as api_base
 from shakenfist.config import config
 from shakenfist import etcd
-from shakenfist.namespace import get_api_token
+from shakenfist.namespace import get_api_token, namespace_is_trusted
 from shakenfist.tasks import FetchImageTask
 from shakenfist.upload import Upload
 from shakenfist.util import general as util_general
@@ -53,7 +53,7 @@ def requires_artifact_ownership(func):
             return sf_api.error(404, 'artifact not found')
 
         a = kwargs['artifact_from_db']
-        if get_jwt_identity()[0] not in [a.namespace, 'system']:
+        if not namespace_is_trusted(a.namespace, get_jwt_identity()[0]):
             LOG.with_fields({'artifact': a}).info(
                 'Artifact not found, ownership test in decorator')
             return sf_api.error(404, 'artifact not found')
@@ -130,10 +130,6 @@ class ArtifactsEndpoint(sf_api.Resource):
         if not namespace:
             namespace = get_jwt_identity()[0]
 
-        # If accessing a foreign namespace, we need to be an admin
-        if get_jwt_identity()[0] not in [namespace, 'system']:
-            return sf_api.error(404, 'namespace not found')
-
         a = Artifact.from_url(Artifact.TYPE_IMAGE, url, namespace=namespace,
                               create_if_new=True)
 
@@ -143,6 +139,9 @@ class ArtifactsEndpoint(sf_api.Resource):
                 return sf_api.error(
                     403, 'only the system namespace can create shared artifacts')
             a.shared = True
+
+        if not namespace_is_trusted(a.namespace, get_jwt_identity()[0]):
+            return sf_api.error(404, 'namespace not found')
 
         etcd.enqueue(config.NODE_NAME, {
             'tasks': [FetchImageTask(url, namespace=namespace)],
@@ -214,12 +213,11 @@ class ArtifactUploadEndpoint(sf_api.Resource):
         if not namespace:
             namespace = get_jwt_identity()[0]
 
-        # If accessing a foreign namespace, we need to be an admin
-        if get_jwt_identity()[0] not in [namespace, 'system']:
-            return sf_api.error(404, 'namespace not found')
-
         a = Artifact.from_url(Artifact.TYPE_IMAGE, source_url,
                               namespace=namespace, create_if_new=True)
+
+        if not namespace_is_trusted(a.namespace, get_jwt_identity()[0]):
+            return sf_api.error(404, 'namespace not found')
 
         # Only admin can create shared artifacts
         if shared:
