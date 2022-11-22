@@ -6,7 +6,7 @@ from shakenfist.artifact import Artifact, Artifacts, LABEL_URL, type_filter, url
 from shakenfist.baseobject import active_states_filter, DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
 from shakenfist.daemons import daemon
-from shakenfist.exceptions import BlobDeleted
+from shakenfist.exceptions import BlobDeleted, LabelHierarchyTooDeep
 from shakenfist.external_api import base as api_base
 
 
@@ -15,7 +15,15 @@ daemon.set_log_level(LOG, 'api')
 
 
 def _label_url(label_name):
-    return '%s%s/%s' % (LABEL_URL, get_jwt_identity()[0], label_name)
+    if '/' in label_name:
+        elems = label_name.split('/')
+        if len(elems) > 2:
+            raise LabelHierarchyTooDeep()
+        namespace, label = elems
+    else:
+        namespace = get_jwt_identity()[0]
+        label = label_name
+    return '%s%s/%s' % (LABEL_URL, namespace, label)
 
 
 class LabelEndpoint(sf_api.Resource):
