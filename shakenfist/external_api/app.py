@@ -160,7 +160,7 @@ api.add_resource(api_artifact.ArtifactShareEndpoint,
 api.add_resource(api_artifact.ArtifactUnshareEndpoint,
                  '/artifacts/<artifact_uuid>/unshare')
 
-api.add_resource(api_label.LabelEndpoint, '/label/<label_name>')
+api.add_resource(api_label.LabelEndpoint, '/label/<path:label_name>')
 
 api.add_resource(api_network.NetworksEndpoint, '/networks')
 api.add_resource(api_network.NetworkEndpoint, '/networks/<network_ref>')
