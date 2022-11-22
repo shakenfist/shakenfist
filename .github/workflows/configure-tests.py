@@ -8,19 +8,19 @@ JOBS = {
             'name': 'debian-10',
             'baseimage': 'debian:10',
             'baseuser': 'debian',
-            'outputlabel': 'sfci-debian-10'
+            'outputlabel': 'ci-images/debian-10'
         },
         {
             'name': 'debian-11',
             'baseimage': 'debian:11',
             'baseuser': 'debian',
-            'outputlabel': 'sfci-debian-11'
+            'outputlabel': 'ci-images/debian-11'
         },
         {
             'name': 'ubuntu-2004',
             'baseimage': 'ubuntu:20.04',
             'baseuser': 'ubuntu',
-            'outputlabel': 'sfci-ubuntu-2004'
+            'outputlabel': 'ci-images/ubuntu-2004'
         },
     ],
     'functional-tests': [

@@ -154,6 +154,11 @@ class Namespace(dbo):
 
     def remove_trust(self, namespace):
         with self.get_lock_attr('trust', 'Remove trust'):
+            # You cannot remove the trust of the system namespace, because if
+            # you could then the cluster admin wouldn't see your resources.
+            if namespace == 'system':
+                return
+
             db_data = self._db_get_attribute('trust')
             if namespace in db_data['full_trust']:
                 db_data['full_trust'].remove(namespace)
