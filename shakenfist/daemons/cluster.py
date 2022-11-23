@@ -18,6 +18,7 @@ from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import instance
+from shakenfist import namespace
 from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist.node import (
@@ -123,8 +124,15 @@ class Monitor(daemon.Daemon):
                 }).warning('Cleaning up stale upload')
                 upload.hard_delete()
 
-        # Prune artifacts which might have too many versions
         for a in artifact.Artifacts([]):
+            # If the artifact's namespace is deleted then we should remove the
+            # artifact
+            ns = namespace.Namespace.from_db(a.namespace)
+            if not ns:
+                a.delete()
+                continue
+
+            # Prune artifacts which might have too many versions
             a.delete_old_versions()
 
         # Inspect current state of blobs, the actual changes are done below outside

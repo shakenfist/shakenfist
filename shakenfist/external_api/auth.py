@@ -4,6 +4,7 @@ import flask
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from shakenfist_utilities import api as sf_api, logs
 
+from shakenfist import artifact
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     active_states_filter)
@@ -160,6 +161,9 @@ class AuthNamespaceEndpoint(sf_api.Resource):
                 networks.append(n.uuid)
         if len(networks) > 0:
             return sf_api.error(400, 'you cannot delete a namespace with networks')
+
+        for a in artifact.artifacts_in_namespace(namespace):
+            a.delete()
 
         ns.state = dbo.STATE_DELETED
         db.delete_metadata('namespace', namespace)
