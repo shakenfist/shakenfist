@@ -357,3 +357,7 @@ def namespace_or_shared_filter(namespace, o):
     if namespace_is_trusted(o.namespace, namespace):
         return True
     return o.namespace == namespace
+
+
+def artifacts_in_namespace(namespace):
+    return Artifacts([partial(baseobject.namespace_filter, namespace)])
