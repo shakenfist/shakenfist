@@ -782,10 +782,37 @@ status "Install client package in system pip on the primary node."
 pip3 install -U ${PIP_EXTRA} ${GETSF_CLIENT_PACKAGE}
 echo
 
+# NOTE(mikal): chasing how ansible doesn't love non-blocking stdout...
+cat - > /tmp/getsf_blocking_test.py << DEPLOYEDEOF
+#!/usr/bin/python
+
+import os
+import sys
+
+
+def get_status(fd):
+    if os.get_blocking(fd):
+        return 'blocking'
+    else:
+        return 'non-blocking'
+
+
+if __name__ == '__main__':
+    stdin = sys.stdin.fileno()
+    stdout = sys.stdout.fileno()
+    stderr = sys.stderr.fileno()
+
+    print('stdin: %s, stdout: %s, stderr: %s'
+          % (get_status(stdin), get_status(stdout), get_status(stderr)))
+DEPLOYEDEOF
+status "Terminal blocking status:"
+python3 /tmp/getsf_blocking_test.py
+echo
+
 # NOTE(mikal): I also don't love how we do this, but it will do until I have time
 # to rework the etcd installation.
 status "Installing ansible-galaxy requirements."
-ansible-galaxy install --force -r /srv/shakenfist/venv/share/shakenfist/installer/requirements.yml
+ansible-galaxy install --force -r /srv/shakenfist/venv/share/shakenfist/installer/requirements.yml | cat -
 echo
 
 status "Creating /root/sf-deploy script"
