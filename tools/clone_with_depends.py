@@ -3,6 +3,7 @@
 import git
 import re
 import os
+import requests
 
 # Clone all the required repositories, with handling for dependencies between
 # them. This script assumes it is being called by a github action and that
@@ -32,6 +33,8 @@ DEPENDS_RE = re.compile(
 
 
 def main():
+    r = requests.get("https://ip.me")
+    print(f"MY IP IS {r.text}")
     # Ensure we have a checkout of all repositories
     for repo in REPOS:
         repo_path = os.path.join(os.environ['GITHUB_WORKSPACE'], repo)
