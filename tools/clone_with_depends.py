@@ -34,6 +34,7 @@ DEPENDS_RE = re.compile(
 
 def main():
     r = requests.get("https://ip.me")
+    print("THIS IS AFTER THE ORG CHANGE")
     print(f"MY IP IS {r.text}")
     # Ensure we have a checkout of all repositories
     for repo in REPOS:
