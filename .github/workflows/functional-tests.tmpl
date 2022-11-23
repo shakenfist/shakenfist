@@ -49,6 +49,17 @@ jobs:
               base_image={{baseimage}} base_image_user={{baseuser}}" \
               deploy/ansible/ci-topology-{{topology}}.yml
 
+      - name: Log github actions buffering status
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/shakenfist
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              tools/buffer.py {{baseuser}}@$primary:buffer.py
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              {{baseuser}}@$primary python3 buffer.py
+
       - name: Run getsf installer on primary
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh

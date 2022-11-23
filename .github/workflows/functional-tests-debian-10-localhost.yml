@@ -49,6 +49,17 @@ jobs:
               base_image=sf://label/system/sfci-debian-10 base_image_user=debian" \
               deploy/ansible/ci-topology-localhost.yml
 
+      - name: Log github actions buffering status
+        run: |
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          cd ${GITHUB_WORKSPACE}/shakenfist
+          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              tools/buffer.py debian@$primary:buffer.py
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              debian@$primary python3 buffer.py
+
       - name: Run getsf installer on primary
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
