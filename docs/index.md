@@ -98,7 +98,7 @@ We also have a few "more internal" repositories:
 
 * [The load test repository](http://github.com/shakenfist/loadtest) contains a simpler load tester we use for validating releases.
 
-* [The reproducibles repository](http://github.com/shakenfist/reproducables) contains simple test cases for reproducing strange behaviours we have seen while developing Shaken Fist.
+* [The reproducables repository](http://github.com/shakenfist/reproducables) contains simple test cases for reproducing strange behaviours we have seen while developing Shaken Fist.
 
 ## What is Shaken Fist? Can I help?
 
@@ -110,13 +110,6 @@ We need more of these. For now, we have the following:
 
 * [An installation guide](installation.md)
 * [A user guide](usage.md), which is currently incomplete but better than nothing.
-
-## Release changelogs
-
-Version v0.2 was when we started taking releases and upgrades seriously. Thus, its also when we started writing changelogs:
-
-* [v0.3 series](changelog/changelog_v03.md)
-* [v0.2 series](changelog/changelog_v02.md)
 
 ## API documentation
 
