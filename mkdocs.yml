@@ -12,26 +12,21 @@ markdown_extensions:
 nav:
         - Introduction: index.md
         - Manifesto: manifesto.md
+        - Features: features.md
         - Community: community.md
         - User Guide:
                   - "Installation": installation.md
-                  - "State machine": development/state_machine.md
                   - "Usage": usage.md
         - Developer Guide:
-                  - "CI API coverage": development/ci_api_coverage.md
-                  - "CI images": development/ci_images.md
-                  - "Namespace Authentication": development/namespace_auth.md
-                  - "Releases": development/release_process.md
-                  - "Standards": development/standards.md
-                  - "State machine": development/state_machine.md
-                  - "Website": development/updating_docs.md
-                  - "Workflow": development/git_usage.md
+                  - "Authentication": developer_guide/authentication.md
+                  - "CI API coverage": developer_guide/ci_api_coverage.md
+                  - "Release process": developer_guide/release_process.md
+                  - "Standards": developer_guide/standards.md
+                  - "State machine": developer_guide/state_machine.md
+                  - "Updating docs": developer_guide/updating_docs.md
+                  - "Workflow": developer_guide/workflow.md
         - Operator Guide:
-                  - "Networking Explained":
-                            - "Overview": "networking/overview.md"
-                            - "Single Instance": "networking/single_instance.md"
-                  - "Power States": "power_states.md"
-        - Change Log:
-                  - v0.4: "changelog/changelog_v04.md"
-                  - v0.3: "changelog/changelog_v03.md"
-                  - v0.2: "changelog/changelog_v02.md"
+                  - "Networking":
+                            - "Overview": "operator_guide/networking/overview.md"
+                            - "Single Instance": "operator_guide/networking/single_instance.md"
+                  - "Power States": "operator_guide/power_states.md"
