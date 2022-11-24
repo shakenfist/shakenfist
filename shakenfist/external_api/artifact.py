@@ -244,7 +244,6 @@ class ArtifactUploadEndpoint(sf_api.Resource):
                 time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime()),
                 time.time())
             b.state = Blob.STATE_CREATED
-            b.ref_count_inc()
             b.observe()
             b.request_replication()
 

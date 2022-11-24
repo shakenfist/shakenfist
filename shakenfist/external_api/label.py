@@ -30,14 +30,6 @@ class LabelEndpoint(sf_api.Resource):
     @jwt_required()
     @api_base.log_token_use
     def post(self, label_name=None, blob_uuid=None, max_versions=0):
-        b = Blob.from_db(blob_uuid)
-        if not b:
-            return sf_api.error(404, 'blob not found')
-        try:
-            b.ref_count_inc()
-        except BlobDeleted:
-            return sf_api.error(400, 'blob has been deleted')
-
         namespace, label_url = _label_url(label_name)
         a = Artifact.from_url(Artifact.TYPE_LABEL, label_url,
                               max_versions, namespace=namespace,

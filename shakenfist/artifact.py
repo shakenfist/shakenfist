@@ -245,6 +245,10 @@ class Artifact(dbo):
 
     def add_index(self, blob_uuid):
         with self.get_lock_attr('index', 'Artifact index creation'):
+            b = blob.Blob.from_db(blob_uuid)
+            if not b:
+                raise exceptions.BlobMissing()
+
             highest_index = self._db_get_attribute(
                 'highest_index', {'index': 0})
             index = highest_index['index'] + 1
@@ -256,6 +260,7 @@ class Artifact(dbo):
             }
             self._db_set_attribute('index_%012d' % index, entry)
             self.add_event('Added index %d to artifact' % index)
+            b.ref_count_inc()
             self.delete_old_versions()
             return entry
 
