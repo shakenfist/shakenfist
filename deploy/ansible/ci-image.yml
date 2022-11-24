@@ -315,6 +315,10 @@
       shell: |
         sf-client label update "{{label}}" "{{hostvars['localhost']['snapshot_uuid']}}"
 
+    - name: Log the snapshot update
+      debug:
+        msg: "Set label {{label}} to blob uuid {{hostvars['localhost']['snapshot_uuid']}}"
+
     - name: Delete the snapshot (its a label now if it passed)
       sf_snapshot:
         uuid: "{{cisnapshot['meta']['vda']['artifact_uuid']}}"
