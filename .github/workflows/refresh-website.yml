@@ -1,4 +1,4 @@
-name: Refresh
+name: Refresh shakenfist.com daily
 
 on:
   workflow_dispatch:
@@ -17,4 +17,4 @@ jobs:
         env:
           # You must create a personal token with repo access as GitHub does
           # not yet support server-to-server page builds.
-          USER_TOKEN: ${{ secrets.USER_TOKEN }}
+          USER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
