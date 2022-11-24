@@ -6,7 +6,7 @@ from shakenfist.artifact import Artifact, Artifacts, LABEL_URL, type_filter, url
 from shakenfist.baseobject import active_states_filter, DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
 from shakenfist.daemons import daemon
-from shakenfist.exceptions import BlobDeleted, LabelHierarchyTooDeep
+from shakenfist.exceptions import LabelHierarchyTooDeep
 from shakenfist.external_api import base as api_base
 
 

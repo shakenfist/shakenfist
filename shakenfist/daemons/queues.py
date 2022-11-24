@@ -414,7 +414,7 @@ def snapshot(inst, disk, artifact_uuid, blob_uuid, thin=False):
         return
 
     try:
-        b.ref_count_inc()
+        a.add_index(b.uuid)
         a.state = Artifact.STATE_CREATED
     except exceptions.BlobDeleted:
         if a.state.value != Artifact.STATE_DELETED:

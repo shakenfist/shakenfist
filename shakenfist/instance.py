@@ -1307,12 +1307,9 @@ class Instance(dbo):
                 max_versions, namespace=self.namespace, create_if_new=True)
 
             blob_uuid = str(uuid4())
-            entry = a.add_index(blob_uuid)
-
             out[disk['device']] = {
                 'source_url': a.source_url,
                 'artifact_uuid': a.uuid,
-                'artifact_index': entry['index'],
                 'blob_uuid': blob_uuid
             }
 
