@@ -8,7 +8,8 @@ from uuid import uuid4
 from shakenfist import baseobject
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
-    DatabaseBackedObjectIterator as dbo_iter)
+    DatabaseBackedObjectIterator as dbo_iter,
+    active_states_filter)
 from shakenfist import blob
 from shakenfist.config import config
 from shakenfist import etcd
@@ -365,4 +366,5 @@ def namespace_or_shared_filter(namespace, o):
 
 
 def artifacts_in_namespace(namespace):
-    return Artifacts([partial(baseobject.namespace_filter, namespace)])
+    return Artifacts([partial(baseobject.namespace_filter, namespace),
+                      active_states_filter])
