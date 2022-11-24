@@ -36,6 +36,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://shakenfist.com/development/authentication/</loc>
+         <lastmod>2022-11-24</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://shakenfist.com/development/ci_api_coverage/</loc>
          <lastmod>2022-11-24</lastmod>
          <changefreq>daily</changefreq>
