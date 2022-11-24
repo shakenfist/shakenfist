@@ -16,72 +16,72 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://shakenfist.com/installation/</loc>
-         <lastmod>2022-11-24</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
          <loc>https://shakenfist.com/manifesto/</loc>
          <lastmod>2022-11-24</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://shakenfist.com/power_states/</loc>
+         <loc>https://shakenfist.com/developer_guide/authentication/</loc>
          <lastmod>2022-11-24</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://shakenfist.com/usage/</loc>
+         <loc>https://shakenfist.com/developer_guide/ci_api_coverage/</loc>
          <lastmod>2022-11-24</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://shakenfist.com/development/authentication/</loc>
+         <loc>https://shakenfist.com/developer_guide/io_performance_tuning/</loc>
          <lastmod>2022-11-24</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://shakenfist.com/development/ci_api_coverage/</loc>
+         <loc>https://shakenfist.com/developer_guide/release_process/</loc>
          <lastmod>2022-11-24</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://shakenfist.com/development/git_usage/</loc>
+         <loc>https://shakenfist.com/developer_guide/standards/</loc>
          <lastmod>2022-11-24</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://shakenfist.com/development/io_performance_tuning/</loc>
+         <loc>https://shakenfist.com/developer_guide/state_machine/</loc>
          <lastmod>2022-11-24</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://shakenfist.com/development/release_process/</loc>
+         <loc>https://shakenfist.com/developer_guide/updating_docs/</loc>
          <lastmod>2022-11-24</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://shakenfist.com/development/standards/</loc>
+         <loc>https://shakenfist.com/developer_guide/workflow/</loc>
          <lastmod>2022-11-24</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://shakenfist.com/development/state_machine/</loc>
+         <loc>https://shakenfist.com/operator_guide/power_states/</loc>
          <lastmod>2022-11-24</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://shakenfist.com/development/updating_docs/</loc>
+         <loc>https://shakenfist.com/operator_guide/networking/overview/</loc>
          <lastmod>2022-11-24</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://shakenfist.com/networking/overview/</loc>
+         <loc>https://shakenfist.com/operator_guide/networking/single_instance/</loc>
          <lastmod>2022-11-24</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://shakenfist.com/networking/single_instance/</loc>
+         <loc>https://shakenfist.com/user_guide/installation/</loc>
+         <lastmod>2022-11-24</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/user_guide/usage/</loc>
          <lastmod>2022-11-24</lastmod>
          <changefreq>daily</changefreq>
     </url>
