@@ -300,7 +300,9 @@ class ImageFetchHelper(object):
                      config.LIBVIRT_GROUP)
         self.log.with_fields(util_general.stat_log_fields(cache_path)).info(
             'Cache file %s created' % cache_path)
-        self.artifact.state = Artifact.STATE_CREATED
+
+        if self.artifact.state.value == Artifact.STATE_INITIAL:
+            self.artifact.state = Artifact.STATE_CREATED
 
     def _blob_get(self, lock, url):
         """Fetch a blob from the cluster."""
