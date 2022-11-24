@@ -23,7 +23,7 @@ def _label_url(label_name):
     else:
         namespace = get_jwt_identity()[0]
         label = label_name
-    return '%s%s/%s' % (LABEL_URL, namespace, label)
+    return (namespace, '%s%s/%s' % (LABEL_URL, namespace, label))
 
 
 class LabelEndpoint(sf_api.Resource):
@@ -38,8 +38,9 @@ class LabelEndpoint(sf_api.Resource):
         except BlobDeleted:
             return sf_api.error(400, 'blob has been deleted')
 
-        a = Artifact.from_url(Artifact.TYPE_LABEL, _label_url(label_name),
-                              max_versions, namespace=get_jwt_identity()[0],
+        namespace, label_url = _label_url(label_name)
+        a = Artifact.from_url(Artifact.TYPE_LABEL, label_url,
+                              max_versions, namespace=namespace,
                               create_if_new=True)
         a.add_index(blob_uuid)
         a.state = dbo.STATE_CREATED
