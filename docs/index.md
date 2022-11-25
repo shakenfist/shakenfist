@@ -3,67 +3,45 @@ title: Introduction
 ---
 # Shaken Fist, a minimal cloud aimed at small and edge deployments
 
-Shaken Fist is a deliberately minimal cloud intended for small deployments. We spend a lot of time trying to do the simplest possible thing well, and keep our resource usage on idle deployments as low as possible. Shaken Fist also currently a work in progress, so take statements here with a grain of salt.
+Shaken Fist is a deliberately minimal cloud intended for small deployments. We
+spend a lot of time trying to do the simplest possible thing well, and keep our
+resource usage on idle deployments as low as possible. Shaken Fist has progressed
+from being a proof of concept to being a functional cloud, although the release
+numbers being below zero indicates that we are still stabilizing the REST API
+and that breaking changes might occur. 1.0 will be released when we are relatively
+sure of stability going forwards.
 
-Shaken Fist started a personal research project, but has grown into something which is starting to see wider contributions and some small commercial deployments.
-
-Here's a simple feature matrix:
-
-| Feature                                           | Implemented | Planned | Not Planned |
-|---------------------------------------------------|-------------|---------|-------------|
-| Servers / instances                               | v0.1        |         |             |
-| Networks                                          | v0.1        |         |             |
-| Multiple NIC's for a given server                 | v0.1        |         |             |
-| Pre-cache a server image                          | v0.1        |         |             |
-| Floating IPs                                      | v0.1        |         |             |
-| Pause                                             | v0.1        |         |             |
-| Reboot (hard and soft)                            | v0.1        |         |             |
-| Security groups                                   |             | Yes     |             |
-| Text console                                      | v0.1        |         |             |
-| VDI                                               | v0.1        |         |             |
-| User data                                         | v0.1        |         |             |
-| Keypairs                                          | v0.1        |         |             |
-| Virtual networks allow overlapping IP allocations | v0.1        |         |             |
-| REST API authentication and object ownership      | v0.2        |         |             |
-| Snapshots (of all disks)                          | v0.1        |         |             |
-| Central API service                               | v0.1        |         |             |
-| Scheduling                                        | v0.1        |         |             |
-| Volumes                                           |             |         | No plans    |
-| Quotas                                            |             |         | No plans    |
-| API versioning                                    |             |         | No plans    |
-| Keystone style service lookup and URLs            |             |         | No plans    |
-| Create multiple servers in a single request       |             |         | No plans    |
-| Resize a server                                   |             |         | No plans    |
-| Server groups                                     |             |         | No plans    |
-| Change admin password                             |             |         | No plans    |
-| Rebuild a server                                  |             |         | No plans    |
-| Shelve / unshelve                                 |             |         | No plans    |
-| Trigger crash dump                                |             |         | No plans    |
-| Live migration                                    |             |         | No plans    |
-| Flavors                                           |             |         | No plans    |
-| Guest agents                                      |             |         | No plans    |
-| Host aggregates                                   |             |         | No plans    |
-| Server tags                                       | v0.2, we call them "metadata"  |             |
-| ~~Persistence in MySQL~~                          | v0.1        |         |             |
-| Distributed etcd for locking and persistence      | v0.2        |         |             |
-| Production grade REST API via gunicorn            | v0.2        |         |             |
-| Python REST API client                            | v0.1        |         |             |
-| [golang REST API client](http://github.com/shakenfist/client-go) | v0.2        |         |             |
-| [Terraform provider](http://github.com/shakenfist/terraform-provider-shakenfist) | v0.2        |         |             |
+Shaken Fist started a personal research project, but has grown into something
+which is starting to see wider contributions and some small commercial deployments.
 
 ## The underlying idea
 
-Originally Shaken Fist came about as a reaction to the increasing complexity of OpenStack, as well as a desire to experiment with alternative approaches to solving the problems that OpenStack Compute addresses. What I really wanted was a simple API to orchestrate virtual machines, but it needed to run with minimal resource overhead and be simple to deploy. I also wanted it to always work in a predictable way.
+Originally Shaken Fist came about as a reaction to the increasing complexity of
+OpenStack, as well as a desire to experiment with alternative approaches to
+solving the problems that OpenStack Compute addresses. What I really wanted was
+a simple API to orchestrate virtual machines, but it needed to run with minimal
+resource overhead and be simple to deploy. I also wanted it to always work in a
+predictable way.
 
-One of the reasons OpenStack is so complicated and its behaviour varies is because it has many options to configure. The solution seemed obvious to me -- a cloud that is super opinionated. For each different functional requirement there is one option, and the simplest option is chosen where possible. Read on for some examples.
+One of the reasons OpenStack is so complicated and its behaviour varies is because
+it has many options to configure. The solution seemed obvious to me -- a cloud
+that is super opinionated. For each different functional requirement there is
+one option, and the simplest option is chosen where possible. Read on for some
+examples.
 
 ## Development choices
 
-If there is an existing library which does a thing, we use it. OpenStack suffered from being old (and having issues with re-writes being hard), as well as licensing constraints. We just use the code that others have provided to the community. Always.
+If there is an existing library which does a thing, we use it. OpenStack suffered
+from being old (and having issues with re-writes being hard), as well as licensing
+constraints. We just use the code that others have provided to the community. Always.
 
 ## Deployment choices
 
-libvirt is the only supported hypervisor. Instances are specified to libvirt with simple templated XML. If your local requirements are different to what's in the template, you're welcome to change the template to meet your needs. If your template changes break things, you're also welcome to debug what went wrong for yourself. We provide a sample Ansible based deployer in the `deploy` directory.
+libvirt is the only supported hypervisor. Instances are specified to libvirt with
+simple templated XML. If your local requirements are different to what's in the
+template, you're welcome to change the template to meet your needs. If your
+template changes break things, you're also welcome to debug what went wrong for
+yourself.
 
 ## Here's what I said when the project was first announced
 
@@ -108,15 +86,15 @@ We also have a few "more internal" repositories:
 
 We need more of these. For now, we have the following:
 
-* [An installation guide](installation.md)
-* [A user guide](usage.md), which is currently incomplete but better than nothing.
+* [An installation guide](user_guide/installation.md)
+* [A user guide](user_guide/usage.md), which is currently incomplete but better than nothing.
 
 ## API documentation
 
 There is some limited API documentation, its definitely a known gap.
 
-* [The power states an instance can be in](power_states.md)
+* [The power states an instance can be in](operator_guide/power_states.md)
 
 ## Documentation for developers of Shaken Fist
 * We have [release documentation](development/release_process.md). We found this mildly surprising too.
-* Everyone is confused by the networking, so we wrote some [networking documentation](networking/overview.md). Hopefully it helps.
+* Everyone is confused by the networking, so we wrote some [networking documentation](operator_guide/networking/overview.md). Hopefully it helps.
