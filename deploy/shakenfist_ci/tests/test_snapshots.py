@@ -37,7 +37,6 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         # Take a snapshot
         snap1 = self.test_client.snapshot_instance(inst1['uuid'])
         self.assertIsNotNone(snap1)
-        self.assertEqual(1, snap1['vda']['artifact_index'])
 
         # Wait until the blob uuid specified above is the one used for the
         # current snapshot
@@ -75,7 +74,6 @@ class TestSnapshots(base.BaseNamespacedTestCase):
 
         # Take another snapshot, we only get the new snapshot returned
         snap2 = self.test_client.snapshot_instance(inst1['uuid'])
-        self.assertEqual(2, snap2['vda']['artifact_index'])
 
         # Wait until the blob uuid specified above is the one used for the
         # current snapshot
@@ -139,8 +137,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self.assertEqual(1, len(versions))
 
         # Take snapshot and check the index increases (does not reuse index 2)
-        snap3 = self.test_client.snapshot_instance(inst1['uuid'])
-        self.assertEqual(3, snap3['vda']['artifact_index'])
+        self.test_client.snapshot_instance(inst1['uuid'])
 
         # Quickly delete snapshot whilst still in progress
         self.test_client.delete_artifact_version(snapshot_uuid, 3)
@@ -408,7 +405,6 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         # Take a snapshot
         snap1 = self.test_client.snapshot_instance(inst1['uuid'], thin=True)
         self.assertIsNotNone(snap1)
-        self.assertEqual(1, snap1['vda']['artifact_index'])
 
         # Ensure the snapshot is ready
         self._await_artifacts_ready([snap1['vda']['artifact_uuid']])

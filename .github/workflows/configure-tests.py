@@ -26,21 +26,21 @@ JOBS = {
     'functional-tests': [
         {
             'name': 'debian-10-localhost',
-            'baseimage': 'sf://label/system/sfci-debian-10',
+            'baseimage': 'sf://label/ci-images/debian-10',
             'baseuser': 'debian',
             'topology': 'localhost',
             'concurrency': 3
         },
         {
             'name': 'debian-11-slim-primary',
-            'baseimage': 'sf://label/system/sfci-debian-11',
+            'baseimage': 'sf://label/ci-images/debian-11',
             'baseuser': 'debian',
             'topology': 'slim-primary',
             'concurrency': 5
         },
         {
             'name': 'ubuntu-2004-slim-primary',
-            'baseimage': 'sf://label/system/sfci-ubuntu-2004',
+            'baseimage': 'sf://label/ci-images/ubuntu-2004',
             'baseuser': 'ubuntu',
             'topology': 'slim-primary',
             'concurrency': 5
@@ -49,7 +49,7 @@ JOBS = {
     'scheduled-tests': [
         {
             'name': 'develop-debian-10-localhost',
-            'baseimage': 'sf://label/system/sfci-debian-10',
+            'baseimage': 'sf://label/ci-images/debian-10',
             'baseuser': 'debian',
             'topology': 'localhost',
             'concurrency': 3,
@@ -57,7 +57,7 @@ JOBS = {
         },
         {
             'name': 'develop-debian-11-slim-primary',
-            'baseimage': 'sf://label/system/sfci-debian-11',
+            'baseimage': 'sf://label/ci-images/debian-11',
             'baseuser': 'debian',
             'topology': 'slim-primary',
             'concurrency': 5,
@@ -65,7 +65,7 @@ JOBS = {
         },
         {
             'name': 'develop-ubuntu-2004-slim-primary',
-            'baseimage': 'sf://label/system/sfci-ubuntu-2004',
+            'baseimage': 'sf://label/ci-images/ubuntu-2004',
             'baseuser': 'ubuntu',
             'topology': 'slim-primary',
             'concurrency': 5,
@@ -73,7 +73,7 @@ JOBS = {
         },
         {
             'name': 'v06-debian-10-localhost',
-            'baseimage': 'sf://label/system/sfci-debian-10',
+            'baseimage': 'sf://label/ci-images/debian-10',
             'baseuser': 'debian',
             'topology': 'localhost',
             'concurrency': 3,
@@ -81,7 +81,7 @@ JOBS = {
         },
         {
             'name': 'v06-debian-11-slim-primary',
-            'baseimage': 'sf://label/system/sfci-debian-11',
+            'baseimage': 'sf://label/ci-images/debian-11',
             'baseuser': 'debian',
             'topology': 'slim-primary',
             'concurrency': 5,
@@ -89,7 +89,7 @@ JOBS = {
         },
         {
             'name': 'v06-ubuntu-2004-slim-primary',
-            'baseimage': 'sf://label/system/sfci-ubuntu-2004',
+            'baseimage': 'sf://label/ci-images/ubuntu-2004',
             'baseuser': 'ubuntu',
             'topology': 'slim-primary',
             'concurrency': 5,
@@ -97,7 +97,7 @@ JOBS = {
         },
         {
             'name': 'v06-released-debian-10-localhost',
-            'baseimage': 'sf://label/system/sfci-debian-10',
+            'baseimage': 'sf://label/ci-images/debian-10',
             'baseuser': 'debian',
             'topology': 'localhost-released',
             'concurrency': 3,
@@ -105,7 +105,7 @@ JOBS = {
         },
         {
             'name': 'v06-released-debian-11-slim-primary',
-            'baseimage': 'sf://label/system/sfci-debian-11',
+            'baseimage': 'sf://label/ci-images/debian-11',
             'baseuser': 'debian',
             'topology': 'slim-primary-released',
             'concurrency': 5,
@@ -113,7 +113,7 @@ JOBS = {
         },
         {
             'name': 'v06-released-ubuntu-2004-slim-primary',
-            'baseimage': 'sf://label/system/sfci-ubuntu-2004',
+            'baseimage': 'sf://label/ci-images/ubuntu-2004',
             'baseuser': 'ubuntu',
             'topology': 'slim-primary-released',
             'concurrency': 5,
