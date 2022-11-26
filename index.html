@@ -771,262 +771,37 @@
 
 
 <h1 id="shaken-fist-a-minimal-cloud-aimed-at-small-and-edge-deployments">Shaken Fist, a minimal cloud aimed at small and edge deployments</h1>
-<p>Shaken Fist is a deliberately minimal cloud intended for small deployments. We spend a lot of time trying to do the simplest possible thing well, and keep our resource usage on idle deployments as low as possible. Shaken Fist also currently a work in progress, so take statements here with a grain of salt.</p>
-<p>Shaken Fist started a personal research project, but has grown into something which is starting to see wider contributions and some small commercial deployments.</p>
-<p>Here's a simple feature matrix:</p>
-<table>
-<thead>
-<tr>
-<th>Feature</th>
-<th>Implemented</th>
-<th>Planned</th>
-<th>Not Planned</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Servers / instances</td>
-<td>v0.1</td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td>Networks</td>
-<td>v0.1</td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td>Multiple NIC's for a given server</td>
-<td>v0.1</td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td>Pre-cache a server image</td>
-<td>v0.1</td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td>Floating IPs</td>
-<td>v0.1</td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td>Pause</td>
-<td>v0.1</td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td>Reboot (hard and soft)</td>
-<td>v0.1</td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td>Security groups</td>
-<td></td>
-<td>Yes</td>
-<td></td>
-</tr>
-<tr>
-<td>Text console</td>
-<td>v0.1</td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td>VDI</td>
-<td>v0.1</td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td>User data</td>
-<td>v0.1</td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td>Keypairs</td>
-<td>v0.1</td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td>Virtual networks allow overlapping IP allocations</td>
-<td>v0.1</td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td>REST API authentication and object ownership</td>
-<td>v0.2</td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td>Snapshots (of all disks)</td>
-<td>v0.1</td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td>Central API service</td>
-<td>v0.1</td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td>Scheduling</td>
-<td>v0.1</td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td>Volumes</td>
-<td></td>
-<td></td>
-<td>No plans</td>
-</tr>
-<tr>
-<td>Quotas</td>
-<td></td>
-<td></td>
-<td>No plans</td>
-</tr>
-<tr>
-<td>API versioning</td>
-<td></td>
-<td></td>
-<td>No plans</td>
-</tr>
-<tr>
-<td>Keystone style service lookup and URLs</td>
-<td></td>
-<td></td>
-<td>No plans</td>
-</tr>
-<tr>
-<td>Create multiple servers in a single request</td>
-<td></td>
-<td></td>
-<td>No plans</td>
-</tr>
-<tr>
-<td>Resize a server</td>
-<td></td>
-<td></td>
-<td>No plans</td>
-</tr>
-<tr>
-<td>Server groups</td>
-<td></td>
-<td></td>
-<td>No plans</td>
-</tr>
-<tr>
-<td>Change admin password</td>
-<td></td>
-<td></td>
-<td>No plans</td>
-</tr>
-<tr>
-<td>Rebuild a server</td>
-<td></td>
-<td></td>
-<td>No plans</td>
-</tr>
-<tr>
-<td>Shelve / unshelve</td>
-<td></td>
-<td></td>
-<td>No plans</td>
-</tr>
-<tr>
-<td>Trigger crash dump</td>
-<td></td>
-<td></td>
-<td>No plans</td>
-</tr>
-<tr>
-<td>Live migration</td>
-<td></td>
-<td></td>
-<td>No plans</td>
-</tr>
-<tr>
-<td>Flavors</td>
-<td></td>
-<td></td>
-<td>No plans</td>
-</tr>
-<tr>
-<td>Guest agents</td>
-<td></td>
-<td></td>
-<td>No plans</td>
-</tr>
-<tr>
-<td>Host aggregates</td>
-<td></td>
-<td></td>
-<td>No plans</td>
-</tr>
-<tr>
-<td>Server tags</td>
-<td>v0.2, we call them "metadata"</td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td>~~Persistence in MySQL~~</td>
-<td>v0.1</td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td>Distributed etcd for locking and persistence</td>
-<td>v0.2</td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td>Production grade REST API via gunicorn</td>
-<td>v0.2</td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td>Python REST API client</td>
-<td>v0.1</td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td><a href="http://github.com/shakenfist/client-go">golang REST API client</a></td>
-<td>v0.2</td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td><a href="http://github.com/shakenfist/terraform-provider-shakenfist">Terraform provider</a></td>
-<td>v0.2</td>
-<td></td>
-<td></td>
-</tr>
-</tbody>
-</table>
+<p>Shaken Fist is a deliberately minimal cloud intended for small deployments. We
+spend a lot of time trying to do the simplest possible thing well, and keep our
+resource usage on idle deployments as low as possible. Shaken Fist has progressed
+from being a proof of concept to being a functional cloud, although the release
+numbers being below zero indicates that we are still stabilizing the REST API
+and that breaking changes might occur. 1.0 will be released when we are relatively
+sure of stability going forwards.</p>
+<p>Shaken Fist started a personal research project, but has grown into something
+which is starting to see wider contributions and some small commercial deployments.</p>
 <h2 id="the-underlying-idea">The underlying idea</h2>
-<p>Originally Shaken Fist came about as a reaction to the increasing complexity of OpenStack, as well as a desire to experiment with alternative approaches to solving the problems that OpenStack Compute addresses. What I really wanted was a simple API to orchestrate virtual machines, but it needed to run with minimal resource overhead and be simple to deploy. I also wanted it to always work in a predictable way.</p>
-<p>One of the reasons OpenStack is so complicated and its behaviour varies is because it has many options to configure. The solution seemed obvious to me -- a cloud that is super opinionated. For each different functional requirement there is one option, and the simplest option is chosen where possible. Read on for some examples.</p>
+<p>Originally Shaken Fist came about as a reaction to the increasing complexity of
+OpenStack, as well as a desire to experiment with alternative approaches to
+solving the problems that OpenStack Compute addresses. What I really wanted was
+a simple API to orchestrate virtual machines, but it needed to run with minimal
+resource overhead and be simple to deploy. I also wanted it to always work in a
+predictable way.</p>
+<p>One of the reasons OpenStack is so complicated and its behaviour varies is because
+it has many options to configure. The solution seemed obvious to me -- a cloud
+that is super opinionated. For each different functional requirement there is
+one option, and the simplest option is chosen where possible. Read on for some
+examples.</p>
 <h2 id="development-choices">Development choices</h2>
-<p>If there is an existing library which does a thing, we use it. OpenStack suffered from being old (and having issues with re-writes being hard), as well as licensing constraints. We just use the code that others have provided to the community. Always.</p>
+<p>If there is an existing library which does a thing, we use it. OpenStack suffered
+from being old (and having issues with re-writes being hard), as well as licensing
+constraints. We just use the code that others have provided to the community. Always.</p>
 <h2 id="deployment-choices">Deployment choices</h2>
-<p>libvirt is the only supported hypervisor. Instances are specified to libvirt with simple templated XML. If your local requirements are different to what's in the template, you're welcome to change the template to meet your needs. If your template changes break things, you're also welcome to debug what went wrong for yourself. We provide a sample Ansible based deployer in the <code>deploy</code> directory.</p>
+<p>libvirt is the only supported hypervisor. Instances are specified to libvirt with
+simple templated XML. If your local requirements are different to what's in the
+template, you're welcome to change the template to meet your needs. If your
+template changes break things, you're also welcome to debug what went wrong for
+yourself.</p>
 <h2 id="heres-what-i-said-when-the-project-was-first-announced">Here's what I said when the project was first announced</h2>
 <p><em>To give you a basic flavour of the intent of Shaken Fist, here's what I said when I first announced the project.</em></p>
 <p>For at least six months I’ve felt the desire for a simpler cloud orchestration layer — both for my own personal uses, and also as a test bed for ideas for what a smaller, simpler cloud might look like. My personal use case involves a relatively small environment which echoes what we now think of as edge compute — less than 10 RU of machines with a minimum of orchestration and management overhead.</p>
@@ -1069,18 +844,18 @@
 <h2 id="new-user-guides">New user guides</h2>
 <p>We need more of these. For now, we have the following:</p>
 <ul>
-<li><a href="installation.md">An installation guide</a></li>
-<li><a href="usage.md">A user guide</a>, which is currently incomplete but better than nothing.</li>
+<li><a href="user_guide/installation/">An installation guide</a></li>
+<li><a href="user_guide/usage/">A user guide</a>, which is currently incomplete but better than nothing.</li>
 </ul>
 <h2 id="api-documentation">API documentation</h2>
 <p>There is some limited API documentation, its definitely a known gap.</p>
 <ul>
-<li><a href="power_states.md">The power states an instance can be in</a></li>
+<li><a href="operator_guide/power_states/">The power states an instance can be in</a></li>
 </ul>
 <h2 id="documentation-for-developers-of-shaken-fist">Documentation for developers of Shaken Fist</h2>
 <ul>
 <li>We have <a href="development/release_process.md">release documentation</a>. We found this mildly surprising too.</li>
-<li>Everyone is confused by the networking, so we wrote some <a href="networking/overview.md">networking documentation</a>. Hopefully it helps.</li>
+<li>Everyone is confused by the networking, so we wrote some <a href="operator_guide/networking/overview/">networking documentation</a>. Hopefully it helps.</li>
 </ul>
 
 

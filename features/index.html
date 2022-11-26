@@ -742,6 +742,259 @@
 <li>graceful shutdown of hypervisors where current work is finished before the processes are stopped</li>
 <li>online upgrade of object versions as required</li>
 </ul>
+<h1 id="comparison-to-openstack">Comparison to OpenStack</h1>
+<p>The development team's background is OpenStack, so we find it useful to provide
+a comparison between what OpenStack supports and what Shaken Fist supports.
+However, Shaken Fist does not intend to be a direct replacement for OpenStack,
+and implements many features not present in OpenStack (for example in guest
+agents).</p>
+<p>Here's a simple feature matrix listing when a feature was introduced:</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Implemented</th>
+<th>Planned</th>
+<th>Not Planned</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Servers / instances</td>
+<td>v0.1</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Networks</td>
+<td>v0.1</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Multiple NIC's for a given server</td>
+<td>v0.1</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Pre-cache a server image</td>
+<td>v0.1</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Floating IPs</td>
+<td>v0.1</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Pause</td>
+<td>v0.1</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Reboot (hard and soft)</td>
+<td>v0.1</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Security groups</td>
+<td></td>
+<td>Yes</td>
+<td></td>
+</tr>
+<tr>
+<td>Text console</td>
+<td>v0.1</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>VDI</td>
+<td>v0.1</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>User data</td>
+<td>v0.1</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Keypairs</td>
+<td>v0.1</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Virtual networks allow overlapping IP allocations</td>
+<td>v0.1</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>REST API authentication and object ownership</td>
+<td>v0.2</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Snapshots (of all disks)</td>
+<td>v0.1</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Central API service</td>
+<td>v0.1</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Scheduling</td>
+<td>v0.1</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Volumes</td>
+<td></td>
+<td></td>
+<td>No plans</td>
+</tr>
+<tr>
+<td>Quotas</td>
+<td></td>
+<td></td>
+<td>No plans</td>
+</tr>
+<tr>
+<td>API versioning</td>
+<td></td>
+<td></td>
+<td>No plans</td>
+</tr>
+<tr>
+<td>Keystone style service lookup and URLs</td>
+<td></td>
+<td></td>
+<td>No plans</td>
+</tr>
+<tr>
+<td>Create multiple servers in a single request</td>
+<td></td>
+<td></td>
+<td>No plans</td>
+</tr>
+<tr>
+<td>Resize a server</td>
+<td></td>
+<td></td>
+<td>No plans</td>
+</tr>
+<tr>
+<td>Server groups</td>
+<td></td>
+<td></td>
+<td>No plans</td>
+</tr>
+<tr>
+<td>Change admin password</td>
+<td></td>
+<td></td>
+<td>No plans</td>
+</tr>
+<tr>
+<td>Rebuild a server</td>
+<td></td>
+<td></td>
+<td>No plans</td>
+</tr>
+<tr>
+<td>Shelve / unshelve</td>
+<td></td>
+<td></td>
+<td>No plans</td>
+</tr>
+<tr>
+<td>Trigger crash dump</td>
+<td></td>
+<td></td>
+<td>No plans</td>
+</tr>
+<tr>
+<td>Live migration</td>
+<td></td>
+<td></td>
+<td>No plans</td>
+</tr>
+<tr>
+<td>Flavors</td>
+<td></td>
+<td></td>
+<td>No plans</td>
+</tr>
+<tr>
+<td>Guest agents</td>
+<td></td>
+<td></td>
+<td>No plans</td>
+</tr>
+<tr>
+<td>Host aggregates</td>
+<td></td>
+<td></td>
+<td>No plans</td>
+</tr>
+<tr>
+<td>Server tags</td>
+<td>v0.2, we call them "metadata"</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>~~Persistence in MySQL~~</td>
+<td>v0.1</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Distributed etcd for locking and persistence</td>
+<td>v0.2</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Production grade REST API via gunicorn</td>
+<td>v0.2</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Python REST API client</td>
+<td>v0.1</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><a href="http://github.com/shakenfist/client-go">golang REST API client</a></td>
+<td>v0.2</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><a href="http://github.com/shakenfist/terraform-provider-shakenfist">Terraform provider</a></td>
+<td>v0.2</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
 
 
 
