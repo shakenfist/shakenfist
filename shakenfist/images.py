@@ -195,9 +195,6 @@ class ImageFetchHelper(object):
             self.log.info('Fetching image from the internet')
             b = self._http_get_inner(lock, url, checksum, checksum_type,
                                      instance_object=self.instance)
-            # Ref count increased here since it is known here whether the blob
-            # will be used from within the cluster or newly created.
-            b.ref_count_inc()
 
         return b
 
