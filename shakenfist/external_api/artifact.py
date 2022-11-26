@@ -1,5 +1,6 @@
 import flask
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from flasgger import swag_from
 from functools import partial
 import json
 import os
@@ -80,7 +81,83 @@ def requires_artifact_access(func):
     return wrapper
 
 
+artifact_get_example = """{
+    "artifact_type": "image",
+    "blob_uuid": "25adc99e-369b-4959-a387-2ae046ee6ad4",
+    "blobs": {
+        "99": {
+            "depends_on": null,
+            "instances": [],
+            "reference_count": 1,
+            "size": 307552768,
+            "uuid": "6c72c98e-e579-48c0-afd5-e1d02a834b99"
+        },
+        "100": {
+            "depends_on": null,
+            "instances": [],
+            "reference_count": 1,
+            "size": 307489280,
+            "uuid": "af85e6cd-4a93-4fb9-becf-999e3a2c7526"
+        },
+        "101": {
+            "depends_on": null,
+            "instances": [],
+            "reference_count": 1,
+            "size": 308406784,
+            "uuid": "25adc99e-369b-4959-a387-2ae046ee6ad4"
+        }
+    },
+    "index": 101,
+    "max_versions": 3,
+    "namespace": "system",
+    "shared": true,
+    "source_url": "debian:11",
+    "state": "created",
+    "uuid": "69ff59a7-f6ac-4f64-a575-bb54a7ee8961"
+}"""
+
+
+artifact_delete_example = """{
+    "artifact_type": "image",
+    "blob_uuid": "25adc99e-369b-4959-a387-2ae046ee6ad4",
+    "blobs": {
+        "99": {
+            "depends_on": null,
+            "instances": [],
+            "reference_count": 1,
+            "size": 307552768,
+            "uuid": "6c72c98e-e579-48c0-afd5-e1d02a834b99"
+        },
+        "100": {
+            "depends_on": null,
+            "instances": [],
+            "reference_count": 1,
+            "size": 307489280,
+            "uuid": "af85e6cd-4a93-4fb9-becf-999e3a2c7526"
+        },
+        "101": {
+            "depends_on": null,
+            "instances": [],
+            "reference_count": 1,
+            "size": 308406784,
+            "uuid": "25adc99e-369b-4959-a387-2ae046ee6ad4"
+        }
+    },
+    "index": 101,
+    "max_versions": 3,
+    "namespace": "system",
+    "shared": true,
+    "source_url": "debian:11",
+    "state": "deleted",
+    "uuid": "69ff59a7-f6ac-4f64-a575-bb54a7ee8961"
+}"""
+
+
 class ArtifactEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'artifact', 'Get artifact information.',
+        [('artifact_uuid', 'query', 'uuid', 'The UUID of the artifact.', True)],
+        [(200, 'Information about a single artifact.', artifact_get_example)]))
     @jwt_required()
     @arg_is_artifact_uuid
     @requires_artifact_access
@@ -89,6 +166,12 @@ class ArtifactEndpoint(sf_api.Resource):
         with etcd.ThreadLocalReadOnlyCache():
             return artifact_from_db.external_view()
 
+    @swag_from(api_base.swagger_helper(
+        'artifact', 'Delete an artifact.',
+        [('artifact_uuid', 'query', 'uuid', 'The UUID of the artifact.', True)],
+        [(200, ('The artifact has been deleted. The final state of the '
+                'artifact is returned.'),
+          artifact_delete_example)]))
     @jwt_required()
     @arg_is_artifact_uuid
     @requires_artifact_ownership
@@ -100,7 +183,49 @@ class ArtifactEndpoint(sf_api.Resource):
         return artifact_from_db.external_view()
 
 
+artifacts_get_example = """[
+    {
+        "artifact_type": "label",
+        "blob_uuid": "21f69064-679e-40c3-a23e-a7ff79cbb596",
+        ...
+        "state": "created",
+        "uuid": "3420f4ac-529a-4b34-b8d8-c05a838b9e0c",
+        "version": 4
+    },
+    {
+        "artifact_type": "label",
+        "blob_uuid": "a50f0af1-f8f0-4b10-88bb-bf1279575932",
+        ...
+        "state": "created",
+        "uuid": "6c8b0b52-ab1b-4351-b50f-d8a32999fd29",
+        "version": 4
+    },
+        {
+        "artifact_type": "label",
+        "blob_uuid": "99c4eeca-088f-48ee-918a-f7aa7907f83b",
+        ...
+        "state": "created",
+        "uuid": "e01c71eb-33d4-431a-b70f-df764fa7ed99",
+        "version": 4
+    },
+]"""
+
+
+artifact_uuid_list_example = """[
+    0411861d-c323-4ea7-85b5-2b4fcbe4493c,
+    050e4397-d1ee-4e8f-ac76-7371977d7530
+]"""
+
+
 class ArtifactsEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'artifact', ('Get all artifacts visible to the currently '
+                     'authenticated namespace.'),
+        [('node', 'body', 'string',
+          'Limit results to a specific hypervisor node.', False)],
+        [(200, ('A list of artifact dictionaries, each containing the same '
+                'output as a GET for a single artifact would show.'),
+          artifacts_get_example)]))
     @jwt_required()
     @api_base.log_token_use
     def get(self, node=None):
@@ -119,6 +244,18 @@ class ArtifactsEndpoint(sf_api.Resource):
                     retval.append(a.external_view())
         return retval
 
+    @swag_from(api_base.swagger_helper(
+        'artifact', ('Fetch an image artifact into the cluster.'),
+        [
+            ('url', 'body', 'url', 'The URL to fetch.', True),
+            ('shared', 'body', 'boolean',
+             ('Should this artifact be shared? You must be authenticated against '
+              'the system namespace to set this option to True.'), True),
+            ('namespace', 'body', 'namespace',
+             ('Which namespace to store the artifact in. You must be authenticated '
+              'against the system namespace to set this option.'), False)
+        ],
+        [(200, 'Information about a single artifact.', artifact_get_example)]))
     @jwt_required()
     @api_base.log_token_use
     @api_base.requires_namespace_exist
@@ -130,6 +267,9 @@ class ArtifactsEndpoint(sf_api.Resource):
         if not namespace:
             namespace = get_jwt_identity()[0]
 
+        if not namespace_is_trusted(namespace, get_jwt_identity()[0]):
+            return sf_api.error(404, 'namespace not found')
+
         a = Artifact.from_url(Artifact.TYPE_IMAGE, url, namespace=namespace,
                               create_if_new=True)
 
@@ -140,14 +280,20 @@ class ArtifactsEndpoint(sf_api.Resource):
                     403, 'only the system namespace can create shared artifacts')
             a.shared = True
 
-        if not namespace_is_trusted(a.namespace, get_jwt_identity()[0]):
-            return sf_api.error(404, 'namespace not found')
-
         etcd.enqueue(config.NODE_NAME, {
             'tasks': [FetchImageTask(url, namespace=namespace)],
         })
         return a.external_view()
 
+    @swag_from(api_base.swagger_helper(
+        'artifact', ('Delete all artifacts in a namespace.'),
+        [
+            ('confirm', 'body', 'boolean', 'Yes I really mean it.', True),
+            ('namespace', 'body', 'namespace',
+             ('Which namespace to remove artifacts from. You must be authenticated '
+              'against the system namespace to set this option.'), False)
+        ], [(200, 'A list of artifact uuids that were deleted.',
+             artifact_uuid_list_example)]))
     @jwt_required()
     @api_base.log_token_use
     @api_base.requires_namespace_exist
@@ -178,10 +324,23 @@ class ArtifactsEndpoint(sf_api.Resource):
 
 
 class ArtifactUploadEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'artifact', 'Convert an upload into an artifact.',
+        [
+            ('artifact_uuid', 'query', 'uuid', 'The UUID of the artifact.', True),
+            ('upload_uuid', 'body', 'uuid', 'The UUID of the upload.', True),
+            ('source_url', 'body', 'url',
+             'The URL the artifact should claim to be downloaded from.', False),
+            ('shared', 'body', 'boolean',
+                'Is this artifact shared? Defaults to False.', False),
+            ('namespace', 'body', 'namespace',
+                ('Which namespace to remove artifacts from. You must be authenticated '
+                 'against the system namespace to set this option.'), False)
+        ], [(200, 'Information about a single artifact.', artifact_get_example)]))
     @jwt_required()
     @api_base.log_token_use
     @api_base.requires_namespace_exist
-    def post(self, artifact_name=None, upload_uuid=None, source_url=None,
+    def post(self, artifact_uuid=None, upload_uuid=None, source_url=None,
              shared=False, namespace=None):
         u = Upload.from_db(upload_uuid)
         if not u:
@@ -208,7 +367,7 @@ class ArtifactUploadEndpoint(sf_api.Resource):
 
         if not source_url:
             source_url = ('%s%s/%s'
-                          % (UPLOAD_URL, get_jwt_identity()[0], artifact_name))
+                          % (UPLOAD_URL, get_jwt_identity()[0], artifact_uuid))
 
         if not namespace:
             namespace = get_jwt_identity()[0]
@@ -255,7 +414,70 @@ class ArtifactUploadEndpoint(sf_api.Resource):
             return a.external_view()
 
 
+artifact_events_example = """[
+    {
+        "duration": null,
+        "extra": "{\"artifact_type\": \"label\", \"namespace\": \"ci-images\", \"request-id\": \"94a361b1-48f6-432d-83eb-45f7e01cda70\", \"source_url\": \"sf://label/ci-images/debian-11\", \"uuid\": \"3420f4ac-529a-4b34-b8d8-c05a838b9e0c\", \"version\": 4}",
+        "fqdn": "sf-3",
+        "message": "db record created",
+        "operation": null,
+        "phase": null,
+        "timestamp": 1669309125.7316115
+    },
+    {
+        "duration": null,
+        "extra": "{\"attribute\": \"state\", \"request-id\": \"94a361b1-48f6-432d-83eb-45f7e01cda70\", \"update_time\": 1669309125.7451868, \"value\": \"initial\"}",
+        "fqdn": "sf-3",
+        "message": "set attribute",
+        "operation": null,
+        "phase": null,
+        "timestamp": 1669309125.7451944
+    },
+    {
+        "duration": null,
+        "extra": "{\"attribute\": \"max_versions\", \"max_versions\": 3, \"request-id\": \"94a361b1-48f6-432d-83eb-45f7e01cda70\"}",
+        "fqdn": "sf-3",
+        "message": "set attribute",
+        "operation": null,
+        "phase": null,
+        "timestamp": 1669309125.7555978
+    },
+    {
+        "duration": null,
+        "extra": "{\"attribute\": \"highest_index\", \"index\": 1, \"request-id\": \"94a361b1-48f6-432d-83eb-45f7e01cda70\"}",
+        "fqdn": "sf-3",
+        "message": "set attribute",
+        "operation": null,
+        "phase": null,
+        "timestamp": 1669309125.7720575
+    },
+    {
+        "duration": null,
+        "extra": "{\"attribute\": \"index_000000000001\", \"blob_uuid\": \"736999e2-06cb-4329-82e7-8242878c019b\", \"index\": 1, \"request-id\": \"94a361b1-48f6-432d-83eb-45f7e01cda70\"}",
+        "fqdn": "sf-3",
+        "message": "set attribute",
+        "operation": null,
+        "phase": null,
+        "timestamp": 1669309125.776037
+    },
+    {
+        "duration": null,
+        "extra": "{\"request-id\": \"94a361b1-48f6-432d-83eb-45f7e01cda70\"}",
+        "fqdn": "sf-3",
+        "message": "Added index 1 to artifact",
+        "operation": null,
+        "phase": null,
+        "timestamp": 1669309125.780829
+    },
+    ...
+]"""
+
+
 class ArtifactEventsEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'artifact', 'Get artifact event information.',
+        [('artifact_uuid', 'query', 'uuid', 'The UUID of the artifact.', True)],
+        [(200, 'Event information about a single artifact.', artifact_events_example)]))
     @jwt_required()
     @arg_is_artifact_uuid
     @requires_artifact_access
@@ -264,6 +486,42 @@ class ArtifactEventsEndpoint(sf_api.Resource):
     def get(self, artifact_uuid=None, artifact_from_db=None):
         with eventlog.EventLog('artifact', artifact_uuid) as eventdb:
             return list(eventdb.read_events())
+
+
+artifact_versions_example = """[
+    ...
+    {
+        "uuid": "cc6a6a96-8182-474a-ab31-45f1f9310b44",
+        "state": "created",
+        "size": 3093721088,
+        "modified": 1669567073.027112,
+        "fetched_at": 1669567073.027112,
+        "depends_on": null,
+        "transcodes": {
+            "gunzip;qcow2;cluster_size": "84ae268a-a18d-49e7-8195-d151016561cf"
+        },
+        "locations": [
+            "sf-3",
+            "sf-2",
+            "sf-4",
+            "sf-1"
+        ],
+        "reference_count": 177,
+        "instances": [
+            "6bcb21a4-b2a5-4fba-81f5-5c8348e41b5f"
+        ],
+        "last_used": 1669787223.1966972,
+        "cluster_size": 2097152.0,
+        "compat": 1.1,
+        "compression type": "zlib",
+        "disk size": "2.87 GiB",
+        "extended l2": "false",
+        "file format": "qcow2",
+        "mime-type": "application/octet-stream",
+        "virtual size": 32212254720.0,
+        "index": 6
+    }
+]"""
 
 
 class ArtifactVersionsEndpoint(sf_api.Resource):

@@ -21,6 +21,83 @@ LOG, _ = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 
+# https://swagger.io/specification/v2/ defines the schema for this dictionary
+def swagger_helper(section, description, parameters, responses,
+                   requires_admin=False, requires_auth=True):
+    out = {
+        'tags': [section],
+        'parameters': [],
+        'consumes': [
+            'application/json'
+        ],
+        'produces': [
+            'application/json'
+        ],
+        'security': {
+            'bearerAuth': []
+        },
+        'deprecated': False,
+        'description': description,
+        'responses': {}
+    }
+
+    # Type MUST be one of "string", "number", "integer", "boolean", "array" or "file".
+    argtypes = {
+        'bearer': {'type': 'string', 'format': 'Bearer ...JWT...'},
+        'binary': {'type': 'string', 'format': 'Binary data'},
+        'boolean': {'type': 'boolean', 'type': 'boolean'},
+        'integer': {'type': 'integer', 'type': 'integer'},
+        'namespace': {'type': 'string', 'format': 'namespace'},
+        'string': {'type': 'string', 'format': 'string'},
+        'url': {'type': 'string', 'format': 'url'},
+        'uuid': {'type': 'string', 'format': 'uuid'}
+    }
+
+    if requires_auth:
+        out['parameters'].append({
+            'name': 'Authorization',
+            'in': 'header',
+            'required': True,
+            'description': 'JWT authorization header'
+        })
+        out['parameters'][-1].update(argtypes['bearer'])
+
+    for (name, location, argtype, argdescription, argrequired) in parameters:
+        out['parameters'].append({
+            'name': name,
+            'in': location,
+            'required': argrequired,
+            'description': argdescription
+        })
+        out['parameters'][-1].update(argtypes[argtype])
+
+    if requires_auth:
+        responses.append((
+            401,
+            'You must authenticate. See '
+            'https://shakenfist.com/developer_guide/authentication/ for details.',
+            None))
+    for (httpcode, respdescription, sample) in responses:
+        out['responses'][httpcode] = {
+            'description': respdescription
+        }
+        if sample:
+            out['responses'][httpcode]['examples'] = {
+                'application/json': sample
+            }
+
+    constraints = []
+    if requires_admin:
+        constraints.append(
+            'Requires authentication as a member of the system namespace.')
+
+    if constraints:
+        out['description'] += \
+            '<br/><br/><i>%s</i>' % '<br/>'.join(constraints)
+
+    return out
+
+
 def log_token_use(func):
     def wrapper(*args, **kwargs):
         auth_header = flask.request.headers.get('Authorization', 'Bearer none')

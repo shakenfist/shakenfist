@@ -66,6 +66,18 @@ class SFConfig(BaseSettings):
         ),
         description='The gunicorn command line to use'
     )
+    API_ADVERTISED_HOST: str = Field(
+        'localhost',
+        description='The DNS name of the REST API host as advertised to users'
+    )
+    API_ADVERTISED_BASE_PATH: str = Field(
+        '/',
+        description='The URL at API_ADVERTISED_HOST that the API is rooted at'
+    )
+    API_ADVERTISED_HTTP_SCHEMES: str = Field(
+        'http',
+        description='Space separated list of schemes (http, https) for the API'
+    )
 
     # Scheduler Options
     SCHEDULER_CACHE_TIMEOUT: int = Field(

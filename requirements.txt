@@ -21,6 +21,7 @@ click>=8.0.0                # bsd
 Werkzeug                    # bsd
 flask                       # bsd
 flask_restful               # bsd
+flasgger                    # mit
 psutil>=5.9.0               # bsd
 prometheus_client           # apache2
 etcd3                       # apache2
