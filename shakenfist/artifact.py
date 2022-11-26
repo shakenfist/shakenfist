@@ -8,7 +8,8 @@ from uuid import uuid4
 from shakenfist import baseobject
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
-    DatabaseBackedObjectIterator as dbo_iter)
+    DatabaseBackedObjectIterator as dbo_iter,
+    active_states_filter)
 from shakenfist import blob
 from shakenfist.config import config
 from shakenfist import etcd
@@ -245,6 +246,10 @@ class Artifact(dbo):
 
     def add_index(self, blob_uuid):
         with self.get_lock_attr('index', 'Artifact index creation'):
+            b = blob.Blob.from_db(blob_uuid)
+            if not b:
+                raise exceptions.BlobMissing()
+
             highest_index = self._db_get_attribute(
                 'highest_index', {'index': 0})
             index = highest_index['index'] + 1
@@ -256,6 +261,7 @@ class Artifact(dbo):
             }
             self._db_set_attribute('index_%012d' % index, entry)
             self.add_event('Added index %d to artifact' % index)
+            b.ref_count_inc()
             self.delete_old_versions()
             return entry
 
@@ -360,4 +366,5 @@ def namespace_or_shared_filter(namespace, o):
 
 
 def artifacts_in_namespace(namespace):
-    return Artifacts([partial(baseobject.namespace_filter, namespace)])
+    return Artifacts([partial(baseobject.namespace_filter, namespace),
+                      active_states_filter])
