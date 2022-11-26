@@ -46,7 +46,7 @@ jobs:
           cd ${GITHUB_WORKSPACE}/shakenfist
           ansible-playbook -i /home/debian/ansible-hosts \
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
-              base_image=sf://label/system/sfci-debian-10 base_image_user=debian" \
+              base_image=sf://label/ci-images/debian-10 base_image_user=debian" \
               deploy/ansible/ci-topology-localhost.yml
 
       - name: Log github actions buffering status
