@@ -104,3 +104,54 @@ Shaken Fist supports the follow other features that are not directly related to 
 * graceful shutdown of hypervisors where current work is finished before the processes are stopped
 * online upgrade of object versions as required
 
+# Comparison to OpenStack
+
+The development team's background is OpenStack, so we find it useful to provide
+a comparison between what OpenStack supports and what Shaken Fist supports.
+However, Shaken Fist does not intend to be a direct replacement for OpenStack,
+and implements many features not present in OpenStack (for example in guest
+agents).
+
+Here's a simple feature matrix listing when a feature was introduced:
+
+| Feature                                           | Implemented | Planned | Not Planned |
+|---------------------------------------------------|-------------|---------|-------------|
+| Servers / instances                               | v0.1        |         |             |
+| Networks                                          | v0.1        |         |             |
+| Multiple NIC's for a given server                 | v0.1        |         |             |
+| Pre-cache a server image                          | v0.1        |         |             |
+| Floating IPs                                      | v0.1        |         |             |
+| Pause                                             | v0.1        |         |             |
+| Reboot (hard and soft)                            | v0.1        |         |             |
+| Security groups                                   |             | Yes     |             |
+| Text console                                      | v0.1        |         |             |
+| VDI                                               | v0.1        |         |             |
+| User data                                         | v0.1        |         |             |
+| Keypairs                                          | v0.1        |         |             |
+| Virtual networks allow overlapping IP allocations | v0.1        |         |             |
+| REST API authentication and object ownership      | v0.2        |         |             |
+| Snapshots (of all disks)                          | v0.1        |         |             |
+| Central API service                               | v0.1        |         |             |
+| Scheduling                                        | v0.1        |         |             |
+| Volumes                                           |             |         | No plans    |
+| Quotas                                            |             |         | No plans    |
+| API versioning                                    |             |         | No plans    |
+| Keystone style service lookup and URLs            |             |         | No plans    |
+| Create multiple servers in a single request       |             |         | No plans    |
+| Resize a server                                   |             |         | No plans    |
+| Server groups                                     |             |         | No plans    |
+| Change admin password                             |             |         | No plans    |
+| Rebuild a server                                  |             |         | No plans    |
+| Shelve / unshelve                                 |             |         | No plans    |
+| Trigger crash dump                                |             |         | No plans    |
+| Live migration                                    |             |         | No plans    |
+| Flavors                                           |             |         | No plans    |
+| Guest agents                                      |             |         | No plans    |
+| Host aggregates                                   |             |         | No plans    |
+| Server tags                                       | v0.2, we call them "metadata"  |             |
+| ~~Persistence in MySQL~~                          | v0.1        |         |             |
+| Distributed etcd for locking and persistence      | v0.2        |         |             |
+| Production grade REST API via gunicorn            | v0.2        |         |             |
+| Python REST API client                            | v0.1        |         |             |
+| [golang REST API client](http://github.com/shakenfist/client-go) | v0.2        |         |             |
+| [Terraform provider](http://github.com/shakenfist/terraform-provider-shakenfist) | v0.2        |         |             |
