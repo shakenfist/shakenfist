@@ -95,15 +95,6 @@
         upgrade: dist
         autoremove: yes
 
-    - name: Install minimum dependencies for sf-agent
-      apt:
-        name:
-          - python3
-          - python3-dev
-          - python3-pip
-          - python3-wheel
-        state: latest
-
     # NOTE(mikal): I don't love this, as it increases the risk that we will
     # miss a package in getsf, but its so slow to install these without
     # pre-caching that doing this saves an hour off the CI job duration.
@@ -130,6 +121,7 @@
           - ovmf
           - prometheus-node-exporter
           - pwgen
+          - python
           - python3
           - python3-cffi
           - python3-dev
