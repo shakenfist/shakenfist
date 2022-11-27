@@ -656,20 +656,20 @@ isubuntu=0
 if [ -e /etc/os-release ]; then
     source /etc/os-release
     if [ \${ID} == "debian" ]; then
-	status "Detected Debian."
-	isdebian=1
+        status "Detected Debian."
+        isdebian=1
 
-	if [ \${VERSION_ID} -gt 9 ]; then
-	    osok=1
-	fi
+        if [ \${VERSION_ID} -gt 9 ]; then
+            osok=1
+        fi
     elif [ \${ID} == "ubuntu" ]; then
-	status "Detected Ubuntu."
-	isubuntu=1
+        status "Detected Ubuntu."
+        isubuntu=1
 
-	MAJOR_VERSION=\$(echo \${VERSION_ID} | cut -f 1 -d ".")
-	if [ \${MAJOR_VERSION} -gt 19 ]; then
-	    osok=1
-	fi
+        MAJOR_VERSION=\$(echo \${VERSION_ID} | cut -f 1 -d ".")
+        if [ \${MAJOR_VERSION} -gt 19 ]; then
+            osok=1
+        fi
     else
         status "Distribution \${ID} is unknown."
     fi
@@ -747,6 +747,21 @@ status "Installing git, and requirements for the primary venv."
 DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpkg::Options::="--force-confold" -y \
     install git python3-cffi python3-dev python3-grpcio python3-pip python3-venv python3-wheel
 echo
+
+# Operating system version specific installation fixups
+if [ -e /etc/os-release ]; then
+    source /etc/os-release
+    status "Target OS is ${ID} ${VERSION_ID}."
+    if [ ${ID} == "debian" ]; then
+        if [ ${VERSION_ID} -eq "10" ]; then
+            # This is Debian 10, we also need to install python2 for ansible to work
+            status "... Ensuring Debian 10 has python 2 installed."
+            DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=-1 -o Dpkg::Options::="--force-confold" -y \
+            install python
+            echo
+        fi
+    fi
+fi
 
 echo
 status "Install ansible from pip"
