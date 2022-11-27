@@ -93,11 +93,14 @@ def _artifact_safety_checks(a, instance_uuid=None):
         log.info('Artifact not in ready state')
         return sf_api.error(
             404, 'artifact not ready (state=%s)' % a.state.value)
-    if get_jwt_identity()[0] != 'system':
-        if not a.shared and a.namespace != get_jwt_identity()[0]:
-            log.info('Artifact not owned by requestor and not shared')
-            return sf_api.error(404, 'artifact not found')
-    return
+
+    if namespace_is_trusted(a.namespace, get_jwt_identity()[0]):
+        return
+    if a.shared:
+        return
+
+    log.info('Artifact not owned or trusted by requestor and not shared')
+    return sf_api.error(404, 'artifact not found')
 
 
 class InstancesEndpoint(sf_api.Resource):
