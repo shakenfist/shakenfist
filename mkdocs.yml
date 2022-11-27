@@ -15,8 +15,8 @@ nav:
         - Features: features.md
         - Community: community.md
         - User Guide:
-                  - "Installation": installation.md
-                  - "Usage": usage.md
+                  - "Installation": user_guide/installation.md
+                  - "Usage": user_guide/usage.md
         - Developer Guide:
                   - "Authentication": developer_guide/authentication.md
                   - "CI API coverage": developer_guide/ci_api_coverage.md
