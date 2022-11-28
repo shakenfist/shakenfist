@@ -311,7 +311,7 @@ class ArtifactVersionEndpoint(sf_api.Resource):
                     artifact_from_db.state = Artifact.STATE_DELETED
                 return artifact_from_db.external_view()
 
-        return api_base.error(404, 'artifact index not found')
+        return sf_api.error(404, 'artifact index not found')
 
 
 class ArtifactShareEndpoint(sf_api.Resource):
