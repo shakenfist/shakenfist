@@ -37,7 +37,7 @@ jobs:
           cd ${GITHUB_WORKSPACE}/shakenfist
           ansible-playbook -i /home/debian/ansible-hosts \
               --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
-              base_image=sf://label/system/sfci-ubuntu-2004 base_image_user=ubuntu" \
+              base_image=sf://label/ci-images/ubuntu-2004 base_image_user=ubuntu" \
               deploy/ansible/ci-topology-slim-primary-released.yml
 
       - name: Run getsf installer on primary
