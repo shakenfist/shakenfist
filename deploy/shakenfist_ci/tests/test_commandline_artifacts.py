@@ -68,7 +68,7 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         self.assertEqual(1, len(versions))
 
     def test_artifact_commands_multiple_versions(self):
-        url = 'http://uuid.com/'
+        url = 'https://sfcbr.shakenfist.com/cgi-bin/uuid.cgi'
         self._exec_client('artifact cache "%s"' % url)
         time.sleep(5)
         self._exec_client('artifact cache "%s"' % url)
