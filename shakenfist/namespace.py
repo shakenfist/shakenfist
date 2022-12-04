@@ -1,7 +1,9 @@
+import base64
+import bcrypt
 import json
 import requests
 import secrets
-from shakenfist_utilities import logs
+from shakenfist_utilities import logs, random as sfrandom
 import string
 import time
 
@@ -18,7 +20,7 @@ LOG, _ = logs.setup(__name__)
 
 class Namespace(dbo):
     object_type = 'namespace'
-    current_version = 3
+    current_version = 4
     upgrade_supported = True
 
     ACTIVE_STATES = set([dbo.STATE_CREATED])
@@ -84,6 +86,46 @@ class Namespace(dbo):
             static_values['version'] = 3
             changed = True
 
+        if static_values.get('version') == 3:
+            keys = etcd.get(
+                'attribute/namespace', static_values['uuid'], 'keys')
+            nonced_keys = {}
+
+            # Convert across keys in the correct location
+            for k in keys.get('keys', {}):
+                nonced_keys[k] = {
+                    'key': keys['keys'][k],
+                    'nonce': sfrandom.random_id()
+                }
+            del keys['keys']
+
+            # Move across keys in the incorrect location. These override as they
+            # are how the namespace and auth code was actually using keys.
+            for k in keys:
+                nonced_keys[k] = {
+                    'key': keys[k],
+                    'nonce': sfrandom.random_id()
+                }
+
+            # Move across the service key
+            db_data = etcd.get(
+                'attribute/namespace', static_values['uuid'], 'service_key')
+            if db_data:
+                nonced_keys['_service_key'] = {
+                    'key': db_data['service_key'],
+                    'nonce': sfrandom.random_id(),
+                    'expiry': time.time() + 300
+                }
+                etcd.delete(
+                    'attribute/namespace', static_values['uuid'], 'service_key')
+
+            etcd.put(
+                'attribute/namespace', static_values['uuid'], 'keys',
+                {'nonced_keys': nonced_keys})
+
+            static_values['version'] = 4
+            changed = True
+
         if changed:
             LOG.with_fields({
                 cls.object_type: static_values['uuid'],
@@ -108,34 +150,41 @@ class Namespace(dbo):
         return n
 
     @property
-    def service_key(self):
-        db_data = self._db_get_attribute('service_key')
-        if not db_data:
-            return {}
-        return db_data
-
-    @service_key.setter
-    def service_key(self, value):
-        self._db_set_attribute('service_key', {'service_key': value})
-
-    @property
     def keys(self):
-        with self.get_lock_attr('keys', 'Read keys'):
-            db_data = self._db_get_attribute('keys')
+        db_data = self._db_get_attribute('keys')
         if not db_data:
             return {}
-        return db_data
 
-    def add_key(self, name, value):
+        nonced_keys = db_data.get('nonced_keys', {})
+        for k in list(nonced_keys.keys()):
+            if 'expiry' in nonced_keys[k]:
+                if time.time() > nonced_keys[k]['expiry']:
+                    del nonced_keys[k]
+
+        return {'nonced_keys': nonced_keys}
+
+    def add_key(self, name, value, expiry=None):
+        encoded = str(base64.b64encode(bcrypt.hashpw(
+            value.encode('utf-8'), bcrypt.gensalt())), 'utf-8')
+
         with self.get_lock_attr('keys', 'Add key'):
-            k = self._db_get_attribute('keys')
-            k[name] = value
+            k = self.keys
+            if 'nonced_keys' not in k:
+                k['nonced_keys'] = {}
+
+            k['nonced_keys'][name] = {
+                'key': encoded,
+                'nonce': sfrandom.random_id()
+            }
+            if expiry:
+                k['nonced_keys'][name]['expiry'] = expiry
             self._db_set_attribute('keys', k)
 
     def remove_key(self, name):
         with self.get_lock_attr('keys', 'Remove key'):
-            k = self._db_get_attribute('keys')
-            del k[name]
+            k = self.keys
+            if 'nonced_keys' in k:
+                del k['nonced_keys'][name]
             self._db_set_attribute('keys', k)
 
     @property
@@ -199,12 +248,9 @@ def get_api_token(base_url, namespace='system'):
     LOG.info('Fetching %s auth token from %s', namespace, auth_url)
 
     ns = Namespace.from_db(namespace)
-    if ns.service_key:
-        key = ns.service_key['service_key']
-    else:
-        key = ''.join(secrets.choice(string.ascii_lowercase)
-                      for i in range(50))
-        ns.service_key = key
+    key = ''.join(secrets.choice(string.ascii_letters) for i in range(50))
+    unique = ''.join(secrets.choice(string.ascii_letters) for i in range(5))
+    ns.add_key('_service_key_%s' % unique, key, expiry=(time.time() + 300))
 
     r = requests.request('POST', auth_url,
                          data=json.dumps({

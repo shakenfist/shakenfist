@@ -118,7 +118,7 @@ There can be more than one key for a namespace. The key name is not used as part
 of the authentication process, and is largely used for key management (deleting
 the key) and logging which access token was used in the event logs.
 
-Please note the key name "service_key" is reserved for internal use within
+Please note the key prefix "_service_key" is reserved for internal use within
 Shaken Fist. This usage is discussed in the *Inter-node Authentication* section
 below.
 
@@ -211,9 +211,10 @@ users.*
 
 For releases prior to v0.7, the token was blindly trusted for authentication. From
 v0.7 we verify that the named key still exists in the namespace before authorizing
-API requests. Note this is a naive test -- we ensure there is a key with that name
-present. Therefore when revoking a key, it is important that you not create a key
-with the same name while there are JWT tokens still valid for the previous key.
+API requests. This test is performed by updating a "nonce" value for a given key
+when the key is updated. The JWT token a caller is handed includes this nonce, and
+if the nonce we are handed on a request does not match the current value in the
+database the request is rejected.
 
 ## Inter-node Authentication
 
@@ -225,6 +226,12 @@ of the original request.
 When a request is made from the "system" namespace for a resource in a different
 namespace, the API request is made using the foreign namespace and the foreign
 namespace's service key.
+
+Service keys exist in the namespace's key data structures just as other keys do,
+and are therefore visible when you list keys. As of v0.7, service keys expire
+after five minutes, and are never reused. Before v0.7 service keys were always
+named "_service_key". From v0.7 service keys have a name of the form
+"_service_key[a-zA-Z]+".
 
 ## Key Storage
 

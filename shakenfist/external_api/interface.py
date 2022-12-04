@@ -1,5 +1,4 @@
 
-from flask_jwt_extended import jwt_required
 from shakenfist_utilities import api as sf_api, logs
 
 from shakenfist.daemons import daemon
@@ -18,7 +17,7 @@ daemon.set_log_level(LOG, 'api')
 
 
 class InterfaceEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.redirect_to_network_node
     @api_base.log_token_use
     def get(self, interface_uuid=None):
@@ -29,7 +28,7 @@ class InterfaceEndpoint(sf_api.Resource):
 
 
 class InterfaceFloatEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.log_token_use
     def post(self, interface_uuid=None):
         ni, n, err = api_util.safe_get_network_interface(interface_uuid)
@@ -46,7 +45,7 @@ class InterfaceFloatEndpoint(sf_api.Resource):
 
 
 class InterfaceDefloatEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.log_token_use
     def post(self, interface_uuid=None):
         ni, n, err = api_util.safe_get_network_interface(interface_uuid)

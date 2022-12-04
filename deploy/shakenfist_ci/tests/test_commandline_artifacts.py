@@ -86,7 +86,9 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
             artifact_urls.append(a['source_url'])
             if a['source_url'] == url:
                 artifact_uuid = a['uuid']
-                self.assertIn(a['state'], ['initial', 'created'])
+                self.assertIn(
+                    a['state'], ['initial', 'created'],
+                    'Artifact %s was not created' % a['uuid'])
         self.assertIsNotNone(artifact_uuid)
 
         # Wait for downloads

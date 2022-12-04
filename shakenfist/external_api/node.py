@@ -1,4 +1,3 @@
-from flask_jwt_extended import jwt_required
 from flask_restful import fields
 from flask_restful import marshal_with
 from shakenfist_utilities import api as sf_api
@@ -11,7 +10,7 @@ from shakenfist.node import Node, Nodes
 
 
 class NodeEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @sf_api.caller_is_admin
     @api_base.log_token_use
     def delete(self, node=None):
@@ -24,7 +23,7 @@ class NodeEndpoint(sf_api.Resource):
 
 
 class NodesEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @sf_api.caller_is_admin
     @marshal_with({
         'name': fields.String(attribute='fqdn'),
@@ -54,7 +53,7 @@ class NodesEndpoint(sf_api.Resource):
 
 
 class NodeEventsEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @sf_api.caller_is_admin
     @api_base.redirect_to_eventlog_node
     @api_base.log_token_use

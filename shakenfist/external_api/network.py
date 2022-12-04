@@ -1,5 +1,5 @@
 from functools import partial
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import get_jwt_identity
 from flask_restful import fields, marshal_with
 import ipaddress
 from shakenfist_utilities import api as sf_api, logs
@@ -49,14 +49,14 @@ def _delete_network(network_from_db, wait_interfaces=None):
 
 
 class NetworkEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.log_token_use
     def get(self, network_ref=None, network_from_db=None):
         return network_from_db.external_view()
 
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.requires_namespace_exist
@@ -93,7 +93,7 @@ class NetworksEndpoint(sf_api.Resource):
         'name': fields.String,
         'state': fields.String
     })
-    @jwt_required()
+    @api_base.verify_token
     @api_base.log_token_use
     def get(self, all=False):
         with etcd.ThreadLocalReadOnlyCache():
@@ -108,7 +108,7 @@ class NetworksEndpoint(sf_api.Resource):
                 retval.append(n.external_view())
             return retval
 
-    @jwt_required()
+    @api_base.verify_token
     @api_base.requires_namespace_exist
     @api_base.log_token_use
     def post(self, netblock=None, provide_dhcp=None, provide_nat=None, name=None,
@@ -133,7 +133,7 @@ class NetworksEndpoint(sf_api.Resource):
                                 provide_nat)
         return n.external_view()
 
-    @jwt_required()
+    @api_base.verify_token
     @api_base.requires_namespace_exist
     @api_base.redirect_to_network_node
     @api_base.log_token_use
@@ -185,7 +185,7 @@ class NetworksEndpoint(sf_api.Resource):
 
 
 class NetworkEventsEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.redirect_to_eventlog_node
@@ -196,7 +196,7 @@ class NetworkEventsEndpoint(sf_api.Resource):
 
 
 class NetworkInterfacesEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.log_token_use
@@ -211,7 +211,7 @@ class NetworkInterfacesEndpoint(sf_api.Resource):
 
 
 class NetworkMetadatasEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.log_token_use
@@ -221,7 +221,7 @@ class NetworkMetadatasEndpoint(sf_api.Resource):
             return {}
         return md
 
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.log_token_use
@@ -230,14 +230,14 @@ class NetworkMetadatasEndpoint(sf_api.Resource):
 
 
 class NetworkMetadataEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.log_token_use
     def put(self, network_ref=None, key=None, value=None, network_from_db=None):
         return api_util.metadata_putpost('network', network_from_db.uuid, key, value)
 
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.log_token_use
@@ -254,7 +254,7 @@ class NetworkMetadataEndpoint(sf_api.Resource):
 
 
 class NetworkPingEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.redirect_to_network_node

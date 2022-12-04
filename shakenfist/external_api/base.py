@@ -1,5 +1,6 @@
 import flask
-from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
+from flask_jwt_extended.exceptions import NoAuthorizationError
 import json
 import requests
 from shakenfist_utilities import api as sf_api, logs
@@ -96,6 +97,47 @@ def swagger_helper(section, description, parameters, responses,
             '<br/><br/><i>%s</i>' % '<br/>'.join(constraints)
 
     return out
+
+
+def verify_token(func):
+    def wrapper(*args, **kwargs):
+        # Ensure there is a valid JWT with a correct signature
+        _, jwt_data = verify_jwt_in_request(
+            False, False, False, ['headers'], True)
+
+        # Perform SF specific safety checks
+        try:
+            ns_name, key_name = jwt_data['sub']
+        except TypeError:
+            LOG.error('JWT token does not contain a namespace and key name in '
+                      'the subject field')
+            raise NoAuthorizationError()
+
+        ns = Namespace.from_db(ns_name)
+        if not ns:
+            LOG.with_fields({'namespace', ns_name}).error(
+                'JWT token is for non-existent namespace')
+            raise NoAuthorizationError()
+
+        if key_name != '_service_key':
+            keys = ns.keys.get('nonced_keys', {})
+            if key_name not in keys:
+                LOG.with_fields({'namespace', ns_name}).error(
+                    'JWT token uses non-existent key')
+                raise NoAuthorizationError()
+
+            nonce = keys[key_name].get('nonce')
+            if 'nonce' not in jwt_data:
+                LOG.with_fields({'namespace', ns_name}).error(
+                    'JWT token lacks nonce')
+                raise NoAuthorizationError()
+            if jwt_data['nonce'] != nonce:
+                LOG.with_fields({'namespace', ns_name}).error(
+                    'JWT token has incorrect nonce')
+                raise NoAuthorizationError()
+
+        return func(*args, **kwargs)
+    return wrapper
 
 
 def log_token_use(func):

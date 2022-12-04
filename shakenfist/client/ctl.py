@@ -1,7 +1,5 @@
 # Copyright 2020 Michael Still
 
-import base64
-import bcrypt
 import click
 import importlib
 import json
@@ -53,12 +51,8 @@ def cli(ctx, verbose=None):
 @click.argument('key')
 def bootstrap_system_key(keyname, key):
     click.echo('Creating key %s' % keyname)
-
-    encoded = str(base64.b64encode(bcrypt.hashpw(
-        key.encode('utf-8'), bcrypt.gensalt())), 'utf-8')
-
     ns = Namespace.new('system')
-    ns.add_key(keyname, encoded)
+    ns.add_key(keyname, key)
     click.echo('Done')
 
 

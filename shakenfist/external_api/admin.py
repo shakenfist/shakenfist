@@ -1,4 +1,3 @@
-from flask_jwt_extended import jwt_required
 from flasgger import swag_from
 from shakenfist_utilities import api as sf_api
 
@@ -22,7 +21,7 @@ class AdminLocksEndpoint(sf_api.Resource):
         [(200, 'All locks currently held in the cluster.',
           admin_locks_get_example)],
         requires_admin=True))
-    @jwt_required()
+    @api_base.verify_token
     @sf_api.caller_is_admin
     @api_base.log_token_use
     def get(self):

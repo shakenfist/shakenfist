@@ -1,5 +1,5 @@
 import flask
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import get_jwt_identity
 from flasgger import swag_from
 from functools import partial
 import json
@@ -158,7 +158,7 @@ class ArtifactEndpoint(sf_api.Resource):
         'artifact', 'Get artifact information.',
         [('artifact_uuid', 'query', 'uuid', 'The UUID of the artifact.', True)],
         [(200, 'Information about a single artifact.', artifact_get_example)]))
-    @jwt_required()
+    @api_base.verify_token
     @arg_is_artifact_uuid
     @requires_artifact_access
     @api_base.log_token_use
@@ -172,7 +172,7 @@ class ArtifactEndpoint(sf_api.Resource):
         [(200, ('The artifact has been deleted. The final state of the '
                 'artifact is returned.'),
           artifact_delete_example)]))
-    @jwt_required()
+    @api_base.verify_token
     @arg_is_artifact_uuid
     @requires_artifact_ownership
     @api_base.log_token_use
@@ -226,7 +226,7 @@ class ArtifactsEndpoint(sf_api.Resource):
         [(200, ('A list of artifact dictionaries, each containing the same '
                 'output as a GET for a single artifact would show.'),
           artifacts_get_example)]))
-    @jwt_required()
+    @api_base.verify_token
     @api_base.log_token_use
     def get(self, node=None):
         retval = []
@@ -256,7 +256,7 @@ class ArtifactsEndpoint(sf_api.Resource):
               'against the system namespace to set this option.'), False)
         ],
         [(200, 'Information about a single artifact.', artifact_get_example)]))
-    @jwt_required()
+    @api_base.verify_token
     @api_base.log_token_use
     @api_base.requires_namespace_exist
     def post(self, url=None, shared=False, namespace=None):
@@ -294,7 +294,7 @@ class ArtifactsEndpoint(sf_api.Resource):
               'against the system namespace to set this option.'), False)
         ], [(200, 'A list of artifact uuids that were deleted.',
              artifact_uuid_list_example)]))
-    @jwt_required()
+    @api_base.verify_token
     @api_base.log_token_use
     @api_base.requires_namespace_exist
     def delete(self, confirm=False, namespace=None):
@@ -337,7 +337,7 @@ class ArtifactUploadEndpoint(sf_api.Resource):
                 ('Which namespace to remove artifacts from. You must be authenticated '
                  'against the system namespace to set this option.'), False)
         ], [(200, 'Information about a single artifact.', artifact_get_example)]))
-    @jwt_required()
+    @api_base.verify_token
     @api_base.log_token_use
     @api_base.requires_namespace_exist
     def post(self, artifact_uuid=None, upload_uuid=None, source_url=None,
@@ -470,7 +470,7 @@ artifact_events_example = """[
         "timestamp": 1669309125.780829
     },
     ...
-]"""
+]"""  # noqa
 
 
 class ArtifactEventsEndpoint(sf_api.Resource):
@@ -478,7 +478,7 @@ class ArtifactEventsEndpoint(sf_api.Resource):
         'artifact', 'Get artifact event information.',
         [('artifact_uuid', 'query', 'uuid', 'The UUID of the artifact.', True)],
         [(200, 'Event information about a single artifact.', artifact_events_example)]))
-    @jwt_required()
+    @api_base.verify_token
     @arg_is_artifact_uuid
     @requires_artifact_access
     @api_base.log_token_use
@@ -525,7 +525,7 @@ artifact_versions_example = """[
 
 
 class ArtifactVersionsEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @arg_is_artifact_uuid
     @requires_artifact_access
     def get(self, artifact_uuid=None, artifact_from_db=None):
@@ -537,7 +537,7 @@ class ArtifactVersionsEndpoint(sf_api.Resource):
             retval.append(bout)
         return retval
 
-    @jwt_required()
+    @api_base.verify_token
     @arg_is_artifact_uuid
     @requires_artifact_ownership
     @api_base.log_token_use
@@ -551,7 +551,7 @@ class ArtifactVersionsEndpoint(sf_api.Resource):
 
 
 class ArtifactVersionEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @arg_is_artifact_uuid
     @requires_artifact_ownership
     @api_base.log_token_use
@@ -573,7 +573,7 @@ class ArtifactVersionEndpoint(sf_api.Resource):
 
 
 class ArtifactShareEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @arg_is_artifact_uuid
     @requires_artifact_ownership
     @api_base.log_token_use
@@ -586,7 +586,7 @@ class ArtifactShareEndpoint(sf_api.Resource):
 
 
 class ArtifactUnshareEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @arg_is_artifact_uuid
     @requires_artifact_ownership
     @api_base.log_token_use

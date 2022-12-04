@@ -1,4 +1,3 @@
-from flask_jwt_extended import jwt_required
 from functools import partial
 from shakenfist_utilities import api as sf_api, logs
 
@@ -14,7 +13,7 @@ daemon.set_log_level(LOG, 'api')
 
 
 class InstanceSnapshotEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -27,7 +26,7 @@ class InstanceSnapshotEndpoint(sf_api.Resource):
         return instance_from_db.snapshot(
             all=all, device=device, max_versions=max_versions, thin=thin)
 
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use

@@ -1,9 +1,8 @@
-import base64
-import bcrypt
 import json
 import logging
 import mock
 
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config, SFConfig
 from shakenfist import db
 from shakenfist.external_api import app as external_api
@@ -12,42 +11,10 @@ from shakenfist.tests import base
 from shakenfist.tests.mock_etcd import MockEtcd
 
 
-def _encode_key(key):
-    return str(base64.b64encode(bcrypt.hashpw(
-               key.encode('utf-8'), bcrypt.gensalt())), 'utf-8')
-
-
 def _clean_traceback(resp):
     if 'traceback' in resp:
         del resp['traceback']
     return resp
-
-
-class FakeNamespaceNoServiceKey(object):
-    def __init__(self):
-        self.__keys = {
-            'key1': _encode_key('bacon')
-        }
-
-    @property
-    def service_key(self):
-        return {}
-
-    @property
-    def keys(self):
-        return self.__keys
-
-    def remove_key(self, key_name):
-        del self.__keys[key_name]
-
-    def add_event(self, *args, **kwargs):
-        ...
-
-
-class FakeNamespaceServiceKey(FakeNamespaceNoServiceKey):
-    @property
-    def service_key(self):
-        return {'service_key': 'cheese'}
 
 
 class FakeScheduler(object):
@@ -67,10 +34,10 @@ class AuthTestCase(base.ShakenFistTestCase):
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
-        self.get_namespace = mock.patch(
-            'shakenfist.namespace.Namespace.from_db')
-        self.mock_get_namespace = self.get_namespace.start()
-        self.addCleanup(self.get_namespace.stop)
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
+
+        self.mock_etcd.create_namespace('banana', 'key1', 'bacon')
 
         # The client must be created after all the mocks, or the mocks are not
         # correctly applied.
@@ -119,17 +86,13 @@ class AuthTestCase(base.ShakenFistTestCase):
             },
             resp.get_json())
 
-    @mock.patch('shakenfist.namespace.Namespace.from_db',
-                return_value=FakeNamespaceNoServiceKey())
-    def test_post_auth(self, mock_get_keys):
+    def test_post_auth(self):
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'banana', 'key': 'bacon'}))
         self.assertEqual(200, resp.status_code)
         self.assertIn('access_token', resp.get_json())
 
-    @mock.patch('shakenfist.namespace.Namespace.from_db',
-                return_value=FakeNamespaceServiceKey())
-    def test_post_auth_not_authorized(self, mock_get_keys):
+    def test_post_auth_not_authorized(self):
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'banana', 'key': 'hamster'}))
         self.assertEqual(401, resp.status_code)
@@ -199,9 +162,9 @@ class AuthWithServiceKeyTestCase(base.ShakenFistTestCase):
         self.mock_etcd.setup()
 
         ns = Namespace.new('banana')
-        ns.service_key = 'cheese'
-        ns.add_key('key1', _encode_key('bacon'))
-        ns.add_key('key2', _encode_key('sausage'))
+        ns.add_key('_service_key', 'cheese')
+        ns.add_key('key1', 'bacon')
+        ns.add_key('key2', 'sausage')
         db.persist_metadata('namespace', 'banana', {})
 
         # The client must be created after all the mocks, or the mocks are not
@@ -408,6 +371,8 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         self.mock_etcd = MockEtcd(self, node_count=4)
         self.mock_etcd.setup()
 
+        self.mock_etcd.create_namespace('banana', 'key1', 'cheese')
+
         self.scheduler = mock.patch(
             'shakenfist.scheduler.Scheduler', FakeScheduler)
         self.mock_scheduler = self.scheduler.start()
@@ -458,6 +423,11 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
                                headers={'Authorization': self.auth_token})
         self.assertEqual(200, resp.status_code)
         self.assertEqual([
+            {
+                'name': 'banana',
+                'state': 'created',
+                'trust': {'full': ['system']}
+            },
             {
                 'name': 'foo',
                 'state': 'created',
@@ -572,3 +542,59 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         self.assertEqual({'error': 'key not found', 'status': 404},
                          resp.get_json())
         self.assertEqual(404, resp.status_code)
+
+    @mock.patch('shakenfist.artifact.Artifact.from_url')
+    @mock.patch('shakenfist.network.Network._db_get_attribute',
+                return_value={'value': dbo.STATE_CREATED, 'update_time': 2})
+    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.ipmanager.IPManager.from_db')
+    def test_post_instance_only_system_specifies_namespaces(
+            self, mock_ipmanager, mock_lock, mock_net_attribute,
+            mock_get_artifact):
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'banana', 'key': 'cheese'}))
+        self.assertEqual(200, resp.status_code)
+        non_system_auth_header = 'Bearer %s' % resp.get_json()[
+            'access_token']
+
+        resp = self.client.post('/instances',
+                                headers={
+                                    'Authorization': non_system_auth_header},
+                                data=json.dumps({
+                                    'name': 'test-instance',
+                                    'cpus': 1,
+                                    'memory': 1024,
+                                    'network': [
+                                        {'network_uuid': '87c15186-5f73-4947-a9fb-2183c4951efc'}],
+                                    'disk': [{'size': 8,
+                                              'base': 'cirros'}],
+                                    'ssh_key': None,
+                                    'user_data': None,
+                                    'placed_on': None,
+                                    'namespace': 'gerkin',
+                                }))
+        self.assertEqual(
+            {'error': 'namespace not found',
+             'status': 404},
+            resp.get_json())
+        self.assertEqual(404, resp.status_code)
+
+    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.etcd.put')
+    def test_delete_namespace_key(self, mock_put, mock_lock):
+        resp = self.client.delete('/auth/namespaces/system/keys/key1',
+                                  headers={'Authorization': self.auth_token})
+        self.assertEqual(200, resp.status_code)
+
+    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('bcrypt.hashpw', return_value='terminator'.encode('utf-8'))
+    def test_auth_add_key_new_namespace(self, mock_hashpw, mock_lock):
+        resp = self.client.post('/auth/namespaces',
+                                headers={'Authorization': self.auth_token},
+                                data=json.dumps({
+                                    'namespace': 'foo',
+                                    'key_name': 'bernard',
+                                    'key': 'cheese'
+                                }))
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual('foo', resp.get_json())
