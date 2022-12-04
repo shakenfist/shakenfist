@@ -97,7 +97,8 @@ class Namespace(dbo):
                     'key': keys['keys'][k],
                     'nonce': sfrandom.random_id()
                 }
-            del keys['keys']
+            if 'keys' in keys:
+                del keys['keys']
 
             # Move across keys in the incorrect location. These override as they
             # are how the namespace and auth code was actually using keys.
