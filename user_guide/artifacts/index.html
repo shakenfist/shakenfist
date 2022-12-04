@@ -10,14 +10,14 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/developer_guide/authentication/">
+        <link rel="canonical" href="https://shakenfist.com/user_guide/artifacts/">
       
       <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.4.2, mkdocs-material-8.5.10">
     
     
       
-        <title>Authentication - Shaken Fist</title>
+        <title>Artifacts - Shaken Fist</title>
       
     
     
@@ -66,7 +66,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#authentication-and-namespaces" class="md-skip">
+        <a href="#artifact-creation" class="md-skip">
           Skip to content
         </a>
       
@@ -99,7 +99,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Authentication
+              Artifacts
             
           </span>
         </div>
@@ -267,12 +267,14 @@
 
   
   
+    
+  
   
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
       
-        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_5" type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_5" type="checkbox" id="__nav_5" checked>
       
       
       
@@ -295,7 +297,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/installation/" class="md-nav__link">
+      <a href="../installation/" class="md-nav__link">
         Installation
       </a>
     </li>
@@ -309,7 +311,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/usage/" class="md-nav__link">
+      <a href="../usage/" class="md-nav__link">
         Usage
       </a>
     </li>
@@ -321,11 +323,87 @@
               
   
   
+    
   
-    <li class="md-nav__item">
-      <a href="../../user_guide/artifacts/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          Artifacts
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         Artifacts
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#creating-an-image-artifact" class="md-nav__link">
+    Creating an image artifact
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#creating-a-snapshot-artifact" class="md-nav__link">
+    Creating a snapshot artifact
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#creating-label-artifacts" class="md-nav__link">
+    Creating label artifacts
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#controlling-the-number-of-versions" class="md-nav__link">
+    Controlling the number of versions
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#blob-replication" class="md-nav__link">
+    Blob replication
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#artifact-uploads-and-downloads" class="md-nav__link">
+    Artifact uploads and downloads
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -337,7 +415,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/events/" class="md-nav__link">
+      <a href="../events/" class="md-nav__link">
         Events
       </a>
     </li>
@@ -357,14 +435,12 @@
 
   
   
-    
-  
   
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
       
-        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_6" type="checkbox" id="__nav_6" checked>
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_6" type="checkbox" id="__nav_6" >
       
       
       
@@ -385,101 +461,11 @@
               
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          Authentication
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../developer_guide/authentication/" class="md-nav__link">
         Authentication
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#namespaces" class="md-nav__link">
-    Namespaces
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#authentication" class="md-nav__link">
-    Authentication
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#creating-namespaces" class="md-nav__link">
-    Creating namespaces
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#key-management" class="md-nav__link">
-    Key management
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#authenticating-directly-to-the-rest-api" class="md-nav__link">
-    Authenticating directly to the REST API
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#contents-of-the-jwt-tokens" class="md-nav__link">
-    Contents of the JWT tokens
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#inter-node-authentication" class="md-nav__link">
-    Inter-node Authentication
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#key-storage" class="md-nav__link">
-    Key Storage
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -491,7 +477,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../artifact_uploads_downloads/" class="md-nav__link">
+      <a href="../../developer_guide/artifact_uploads_downloads/" class="md-nav__link">
         Artifact uploads and downloads
       </a>
     </li>
@@ -505,7 +491,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ci_api_coverage/" class="md-nav__link">
+      <a href="../../developer_guide/ci_api_coverage/" class="md-nav__link">
         CI API coverage
       </a>
     </li>
@@ -519,7 +505,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../release_process/" class="md-nav__link">
+      <a href="../../developer_guide/release_process/" class="md-nav__link">
         Release process
       </a>
     </li>
@@ -533,7 +519,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../standards/" class="md-nav__link">
+      <a href="../../developer_guide/standards/" class="md-nav__link">
         Standards
       </a>
     </li>
@@ -547,7 +533,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../state_machine/" class="md-nav__link">
+      <a href="../../developer_guide/state_machine/" class="md-nav__link">
         State machine
       </a>
     </li>
@@ -561,7 +547,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../updating_docs/" class="md-nav__link">
+      <a href="../../developer_guide/updating_docs/" class="md-nav__link">
         Updating docs
       </a>
     </li>
@@ -575,7 +561,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../workflow/" class="md-nav__link">
+      <a href="../../developer_guide/workflow/" class="md-nav__link">
         Workflow
       </a>
     </li>
@@ -725,57 +711,43 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#namespaces" class="md-nav__link">
-    Namespaces
+  <a href="#creating-an-image-artifact" class="md-nav__link">
+    Creating an image artifact
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#authentication" class="md-nav__link">
-    Authentication
+  <a href="#creating-a-snapshot-artifact" class="md-nav__link">
+    Creating a snapshot artifact
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#creating-namespaces" class="md-nav__link">
-    Creating namespaces
+  <a href="#creating-label-artifacts" class="md-nav__link">
+    Creating label artifacts
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#key-management" class="md-nav__link">
-    Key management
+  <a href="#controlling-the-number-of-versions" class="md-nav__link">
+    Controlling the number of versions
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#authenticating-directly-to-the-rest-api" class="md-nav__link">
-    Authenticating directly to the REST API
+  <a href="#blob-replication" class="md-nav__link">
+    Blob replication
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#contents-of-the-jwt-tokens" class="md-nav__link">
-    Contents of the JWT tokens
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#inter-node-authentication" class="md-nav__link">
-    Inter-node Authentication
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#key-storage" class="md-nav__link">
-    Key Storage
+  <a href="#artifact-uploads-and-downloads" class="md-nav__link">
+    Artifact uploads and downloads
   </a>
   
 </li>
@@ -794,204 +766,142 @@
                 
                   
 
-  <a href="https://github.com/shakenfist/shakenfist/edit/master/docs/developer_guide/authentication.md" title="Edit this page" class="md-content__button md-icon">
+  <a href="https://github.com/shakenfist/shakenfist/edit/master/docs/user_guide/artifacts.md" title="Edit this page" class="md-content__button md-icon">
     
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25Z"/></svg>
   </a>
 
 
-<h1 id="authentication-and-namespaces">Authentication and Namespaces</h1>
-<p>Shaken Fist uses JWT tokens for authentication and access control. These tokens
-are created with a request to the REST API and then passed as part of subsequent
-calls in the form of a HTTP header on the request. The tokens can expire, in
-which case a caller needs to re-authenticate and then retry their request. The
-process to create and use a token is discussed further in the
-<em>Authentication</em> section below.</p>
-<p>Shaken Fist logically divides objects into "namespaces". These namespaces can be
-thought of as tenants, although there might be other reasons to divide resources
-into their own buckets -- for example the Shaken Fist CI system uses a namespace
-to store an archive of the images used for CI runs, and that namespace is referred
-to by the namespaces actually running tests. The process to create a namespace is
-discussed in the <em>Creating namespaces</em> section below.</p>
-<h2 id="namespaces">Namespaces</h2>
-<p>All resources (instances, networks, network interfaces, and artifacts) are
-assigned to a namespace. Notably, blobs are not within namespaces and more than
-one artifact can refer to a given blob even if those artifacts are in different
-namespaces. It is assumed that knowing the UUID of a given blob implies that
-you can access it.</p>
-<p>All requests to Shaken Fist have a namespace context. The namespace "system" is
-reserved and is used for administrative actions. Please note that the
-authentication configuration created by the <code>getsf</code> installer is for the system
-namespace, and if used directly will result in instances and other objects
-being created in that namespace. While this is supported and will function as
-expected, it is probably undesirable for anything other than a single user
-installation.</p>
-<p>By default only requests in the system namespace are able to access resources
-in other (foreign) namespaces. Before Shaken Fist v0.7 this behaviour was hard
-coded and not configurable. As of Shaken Fist v0.7, this is implemented in
-the form of "trusts", where every namespace is configured to "trust" the system
-namespace. This makes the resources visible to the system namespace. You cannot
-remove the trust of the system namespace from your namespaces. However, you can
-choose to trust additional namespaces, and this is done via the
-<code>sf-client namespace trust ...</code> series of commands and associated API calls.</p>
-<h2 id="authentication">Authentication</h2>
-<p>When the <code>getsf</code> installer ran, it created two authentication artifacts on the
-primary node which are useful to get started with Shaken Fist. First off, there
-is <code>/etc/sf/sfrc</code>, which is a file you can source in your shell to provide
-authentication environment variables. These environment variables can be used
-by Shaken Fist command line clients, Ansible modules, and the Python API client
-implementation itself. An example <code>sfrc</code> looks like this:</p>
-<pre><code># Command line hinting
-eval &quot;$(_SF_CLIENT_COMPLETE=bash_source sf-client)&quot;
-
-# Use the v3 etcd API
-export ETCDCTL_API=3
-
-# Client auth
-export SHAKENFIST_NAMESPACE=&quot;system&quot;
-export SHAKENFIST_KEY=&quot;oisoSe7T&quot;
-export SHAKENFIST_API_URL=&quot;https://shakenfist/api&quot;
-</code></pre>
-<p>The first two lines of the file enable tab completion for <code>sf-client</code> in a bash
-shell. The middle section defaults <code>etcd</code> to use the v3 API and can be ignored
-for now. The last three lines are the important authentication details:</p>
+<h1 id="artifact-creation">Artifact creation</h1>
+<p>Shaken Fist uses artifacts as disk templates for new instances. You therefore
+need to have a least one artifact before you can create your first instance,
+although there is a shorthand notation to create that artifact during instance
+creation.</p>
+<p>The following artifact types exist:</p>
 <ul>
-<li>the namespace we want to use is called "system".</li>
-<li>our access key is "oisoSe7T".</li>
-<li>the URL the API exists at is "<a href="https://shakenfist/api">https://shakenfist/api</a>"</li>
+<li><em>images</em>: these are generally downloaded from the Internet, although they can
+  also be created via an upload mechanism (see the artifact uploads section below
+  for a detailed introduction to uploading images to the cluster).</li>
+<li><em>snapshots</em>: these are created by taking a copy of the disk(s) of a running
+  instance.</li>
+<li><em>labels</em>: labels are a bit like symbolic links, although they still have
+  versioning like other forms of artifact.</li>
 </ul>
-<p><code>sfrc</code> is only useful to users of Unix-like shells, so there is also a JSON form
-of this configuration information, which is written by <code>getsf</code> at
-<code>/etc/sf/shakenfist.json</code>. Here's an example:</p>
-<pre><code>{
-    &quot;namespace&quot;: &quot;system&quot;,
-    &quot;key&quot;: &quot;oisoSe7T&quot;,
-    &quot;apiurl&quot;: &quot;https://shakenfist/api&quot;
-}
+<p>Behind the scenes, artifacts are references to blobs. You can think of them as
+symlinks if you'd like. All types of artifact support versioning. This is implemented
+by having each artifact have a list of blobs. You can see this in the output of a
+<code>sf-client artifact show ...</code> command:</p>
+<pre><code>$ sf-client artifact show 3420f4ac-529a-4b34-b8d8-c05a838b9e0c
+uuid                     : 3420f4ac-529a-4b34-b8d8-c05a838b9e0c
+namespace                : ci-images
+type                     : label
+state                    : created
+source url               : sf://label/ci-images/debian-11
+current version blob uuid: cc6a6a96-8182-474a-ab31-45f1f9310b44
+number of versions       : 3
+maximum versions         : 3
+shared                   : False
+
+Versions:
+    4  : blob f6090574-321c-4dec-b381-0caf001eeba5 is 2964.1MB
+    5  : blob 77b9032a-0d3e-4cc2-bb73-1730ad3c3cb0 is 2960.1MB
+    6  : blob cc6a6a96-8182-474a-ab31-45f1f9310b44 is 2950.4MB in use by
+         instances 78d566f1-c664-46d9-aa46-cf717aa63743
 </code></pre>
-<p>The Shaken Fist command line clients, Ansible modules, and the Python API client
-will look for configuration in the following locations:</p>
+<p>Here we can see a few things:</p>
 <ul>
-<li>environment variables.</li>
-<li><code>.shakenfist</code> in your home directory, that is <code>~/.shakenfist</code>.</li>
-<li><code>/etc/sf/shakenfist.json</code>.</li>
+<li>The artifact is a label in the ci-images namespace.</li>
+<li>There is a source URL, which is how you would reference this artifact when
+  starting an instance.</li>
+<li>There are three versions of the artifact currently stored (<code>number of versions</code>),
+  which is the maximum (<code>maximum versions</code>). However, there have been six versions
+  of this artifact ever (as shown by the indices of the versions being 4, 5, and
+  6).</li>
+<li>The most recent version is currently in use by an instance.</li>
 </ul>
-<h2 id="creating-namespaces">Creating namespaces</h2>
-<p>You can create your first namespace like this, assuming you are authenticated
-as the system namespace:</p>
-<pre><code>sf-client namespace create new-namespace
+<h2 id="creating-an-image-artifact">Creating an image artifact</h2>
+<p>Image artifacts are created by specifying the URL of an image to download. This
+can be either in the form of an explicit request to cache a URL with a
+<code>sf-client artifact cache</code> command, or implied by specifying the URL of the
+image in the specification for an instance.</p>
+<p>There is also a shorthand form of image URLs where you are using an image from
+<a href="https://images.shakenfist.com">https://images.shakenfist.com</a> -- in that case you can use urls like <code>debian:11</code>
+so specify the latest version of a Debian 11 base image. The valid shorthands
+are those listed in the top level directory listing of that site. At the time of writing this is:</p>
+<ul>
+<li>centos (shorthand for centos:8-stream)</li>
+<li>centos:7</li>
+<li>centos:8-stream</li>
+<li>debian (shorthand for debian:11)</li>
+<li>debian:10</li>
+<li>debian:11</li>
+<li>ubuntu (shorthand for ubuntu:20.04)</li>
+<li>ubuntu:18.04</li>
+<li>ubuntu:20.04</li>
+</ul>
+<p>These images are updated nightly by an automated job from <a href="https://github.com/shakenfist/images">https://github.com/shakenfist/images</a>.</p>
+<p>Whenever you specify a URL for an image (either a new <code>cache</code> command or at
+instance start), the URL is checked. If the image has changed a new version is
+downloaded, otherwise the already cached version is used.</p>
+<p>You can also create an image artifact by uploading it, but that's complicated
+enough that its covered separately in <a href="artifact_uploads_downloads.md">artifact uploads and downloads</a>.</p>
+<h2 id="creating-a-snapshot-artifact">Creating a snapshot artifact</h2>
+<p>These are created by the <code>sf-client instance snapshot</code> command. You can specify
+which disk to snapshot on a multi-disk instance with the <code>--device</code> flag. Repeated
+snapshots of the same instance will result in multiple versions of the one
+artifact being created. Note that there is an artifact per device snapshotted, so
+a single snapshot of a multi-disk instance will create multiple artifacts.</p>
+<h2 id="creating-label-artifacts">Creating label artifacts</h2>
+<p>So what's a label? Well downloading new versions of images automatically is great,
+but what if I want to ensure the version from two weeks ago that I tested is the
+one I use? Or what if I want to refer to my favourite instance snapshot by
+something more convenient than a snapshot URL like
+<code>sf://instance/78d566f1-c664-46d9-aa46-cf717aa63743/vda</code>? Well, labels are the
+answer to those questions.</p>
+<p>Labels are artifacts where <em>you</em> specify what the new version should be. So in the
+download example you'd test an image version and when you decide that its right,
+you'd add that version's blob UUID to your label of known tested versions.</p>
+<p>Blobs are reference counted, so even if the image artifact ages out a version,
+having that version referred to in a label artifact protects it from deletion.</p>
+<p>An example of labelling a known good version of an artifact would be something
+like this:</p>
+<pre><code>$ sf-client artifact show 3420f4ac-529a-4b34-b8d8-c05a838b9e0c
+uuid                     : 3420f4ac-529a-4b34-b8d8-c05a838b9e0c
+namespace                : ci-images
+type                     : label
+state                    : created
+source url               : sf://label/ci-images/debian-11
+current version blob uuid: cc6a6a96-8182-474a-ab31-45f1f9310b44
+number of versions       : 3
+maximum versions         : 3
+shared                   : False
+
+Versions:
+    4  : blob f6090574-321c-4dec-b381-0caf001eeba5 is 2964.1MB
+    5  : blob 77b9032a-0d3e-4cc2-bb73-1730ad3c3cb0 is 2960.1MB
+    6  : blob cc6a6a96-8182-474a-ab31-45f1f9310b44 is 2950.4MB in use by
+         instances 78d566f1-c664-46d9-aa46-cf717aa63743
+
+...test version 6 with blob UUID cc6a6a96-8182-474a-ab31-45f1f9310b44...
+
+$ sf-client label update my-tested-thing cc6a6a96-8182-474a-ab31-45f1f9310b44
 </code></pre>
-<p>By default a new namespace has no access keys or trusts configured, and therefore
-is only accessible to users of the system namespace.</p>
-<h2 id="key-management">Key management</h2>
-<p>Namespaces are accessed by providing a valid "key" for the namespace. While
-keys have names, they do not have to be usernames and passwords -- my mental
-model is more like API access tokens in something like GitHub than usernames and
-passwords. I tend to create a new key for each program which is interacting with
-the namespace, and then give it a descriptive name.</p>
-<p>You can create a new key like this:</p>
-<pre><code>sf-client namespace add-key namespace-name keyname key
-</code></pre>
-<p>There can be more than one key for a namespace. The key name is not used as part
-of the authentication process, and is largely used for key management (deleting
-the key) and logging which access token was used in the event logs.</p>
-<p>Please note the key prefix "_service_key" is reserved for internal use within
-Shaken Fist. This usage is discussed in the <em>Inter-node Authentication</em> section
-below.</p>
-<h2 id="authenticating-directly-to-the-rest-api">Authenticating directly to the REST API</h2>
-<p>The authentication endpoint <code>/auth</code> is used to obtain a token to authenticate
-future API requests. For example, I can obtain an authentication token from the
-REST API using <code>curl</code> like this:</p>
-<pre><code>curl -X POST https://shakenfist/api/auth -d '{&quot;namespace&quot;: &quot;system&quot;, &quot;key&quot;: &quot;oisoSe7T&quot;}'
-{&quot;access_token&quot;: &quot;eyJhbG...IkpXVCJ9.eyJmc...wwQ&quot;}
-</code></pre>
-<p>That is, a HTTP POST request to the <code>/auth</code> endpoint for the REST API (in our
-case hosted at <code>https://shakenfist/api</code>) with a JSON body containing a dictionary
-of the namespace name and the key to use.</p>
-<p>In the response the <code>access_token</code> value of  <code>eyJhbG...IkpXVCJ9.eyJmc...wwQ</code> is
-our JWT token and has been truncated in this example for readability. Authentication
-tokens expire after a fixed period of time (nominally 15 minutes), but you will
-be informed that the token as expired by receiving a 401 Unauthorized response.
-If that occurs, simply create a new token as above and retry your request.</p>
-<p>Subsequent requests to the REST API pass the token via an <code>Authorization</code> HTTP
-header, and should request a <code>Content-Type</code> of <code>application/json</code>. For example,
-to list the namespaces in our deployment we would make a <code>curl</code> request like this:</p>
-<pre><code>curl -X GET https://shakenfist/api/auth/namespaces \
-    -H 'Authorization: Bearer eyJhbG...IkpXVCJ9.eyJmc...wwQ' \
-    -H 'Content-Type: application/json'
-[
-    {
-        &quot;name&quot;: &quot;adhoc&quot;,
-        &quot;state&quot;: &quot;created&quot;,
-        &quot;trust&quot;: {&quot;full&quot;: [&quot;system&quot;]}
-    }, {
-        &quot;name&quot;: &quot;ci&quot;,
-        &quot;state&quot;: &quot;created&quot;,
-        &quot;trust&quot;: {&quot;full&quot;: [&quot;system&quot;]}
-    }, {
-        &quot;name&quot;: &quot;system&quot;,
-        &quot;state&quot;: &quot;created&quot;,
-        &quot;trust&quot;: {&quot;full&quot;: [&quot;system&quot;]}
-    }
-]
-</code></pre>
-<p>The JSON response here has been formatted for readability.</p>
-<p><strong><em>Note the word "Bearer" before the access token in the Authorization header.</em></strong></p>
-<h2 id="contents-of-the-jwt-tokens">Contents of the JWT tokens</h2>
-<p>JWT authentication tokens are base64 encoded parts separated by the <code>.</code> character.
-They are therefore trivial to decode. A decoded example (generated by the online
-decoder at <a href="https://jwt.io/">https://jwt.io/</a>) is:</p>
-<pre><code>{
-    &quot;alg&quot;: &quot;HS256&quot;,
-    &quot;typ&quot;: &quot;JWT&quot;
-}
-.
-{
-    &quot;fresh&quot;: false,
-    &quot;iat&quot;: 1669786988,
-    &quot;jti&quot;: &quot;906f4bfa-3218-4d07-a036-ac6b44ded67e&quot;,
-    &quot;type&quot;: &quot;access&quot;,
-    &quot;sub&quot;: [
-        &quot;system&quot;,
-        &quot;deploy&quot;
-    ],
-    &quot;nbf&quot;: 1669786988,
-    &quot;exp&quot;: 1669787888
-}
-.
-HMACSHA256(
-    base64UrlEncode(header) + &quot;.&quot; +
-    base64UrlEncode(payload),
-    your-256-bit-secret
-)
-</code></pre>
-<p>You can see here that Shaken Fist stores the authenticated namespace <code>system</code> and
-the key used to authenticate <code>deploy</code> under the <code>sub</code> key in this token. <em>You should
-not assume that the content of JWT tokens produced by Shaken Fist are opaque to
-users.</em></p>
-<p>For releases prior to v0.7, the token was blindly trusted for authentication. From
-v0.7 we verify that the named key still exists in the namespace before authorizing
-API requests. This test is performed by updating a "nonce" value for a given key
-when the key is updated. The JWT token a caller is handed includes this nonce, and
-if the nonce we are handed on a request does not match the current value in the
-database the request is rejected.</p>
-<h2 id="inter-node-authentication">Inter-node Authentication</h2>
-<p>Requests between Shaken Fist nodes use the same authentication system and REST API
-as external API requests. When a node makes an API request to another node, the
-originating node will create (or reuse) a "service key" specific to the namespace
-of the original request.</p>
-<p>When a request is made from the "system" namespace for a resource in a different
-namespace, the API request is made using the foreign namespace and the foreign
-namespace's service key.</p>
-<p>Service keys exist in the namespace's key data structures just as other keys do,
-and are therefore visible when you list keys. As of v0.7, service keys expire
-after five minutes, and are never reused. Before v0.7 service keys were always
-named "_service_key". From v0.7 service keys have a name of the form
-"_service_key[a-zA-Z]+".</p>
-<h2 id="key-storage">Key Storage</h2>
-<p>Shaken Fist stores the access keys in <code>etcd</code>. The keys are stored as the base64
-encoding of the key post salting and hashing. The python <code>bcrypt</code> library is used
-to perform salting, hashing, and key verification.</p>
+<p>If the label <code>my-tested-thing</code> does not exist, it will be created the first
+time you update it.</p>
+<h2 id="controlling-the-number-of-versions">Controlling the number of versions</h2>
+<p>You can also control the number of versions stored by an artifact with the
+<code>sf-client artifact max-versions</code> command.</p>
+<h2 id="blob-replication">Blob replication</h2>
+<p>You can control the number of copies of a given blob are stored in the cluster
+as well. This protects against machine or disk failures causing data loss. The
+default number of replicas is 2, but this is not configurable per-blob. It is
+configured with the <code>BLOB_REPLICATION_FACTOR</code> configuration variable.</p>
+<h2 id="artifact-uploads-and-downloads">Artifact uploads and downloads</h2>
+<p>Artifacts may also be uploaded and downloaded. This means you can extract a
+snapshot from your cluster for offline backup (or movement to another cloud),
+or upload an image built with a tool like Hashicorp Packer.</p>
+<p>To upload an artifact, use the <code>sf-client artifact upload</code> command. To download
+an artifact, use the <code>sf-client artifact download</code> command.</p>
 
 
 
@@ -1012,7 +922,7 @@ to perform salting, hashing, and key verification.</p>
     <nav class="md-footer__inner md-grid" aria-label="Footer" >
       
         
-        <a href="../../user_guide/events/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Events" rel="prev">
+        <a href="../usage/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Usage" rel="prev">
           <div class="md-footer__button md-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
           </div>
@@ -1021,20 +931,20 @@ to perform salting, hashing, and key verification.</p>
               <span class="md-footer__direction">
                 Previous
               </span>
-              Events
+              Usage
             </div>
           </div>
         </a>
       
       
         
-        <a href="../artifact_uploads_downloads/" class="md-footer__link md-footer__link--next" aria-label="Next: Artifact uploads and downloads" rel="next">
+        <a href="../events/" class="md-footer__link md-footer__link--next" aria-label="Next: Events" rel="next">
           <div class="md-footer__title">
             <div class="md-ellipsis">
               <span class="md-footer__direction">
                 Next
               </span>
-              Artifact uploads and downloads
+              Events
             </div>
           </div>
           <div class="md-footer__button md-icon">
