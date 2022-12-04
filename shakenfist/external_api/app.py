@@ -9,10 +9,15 @@
 # traceback.                                                                    #
 #################################################################################
 
+# To run a local test API, use this command line:
+#     SHAKENFIST_ETCD_HOST=localhost flask --app shakenfist.external_api.app:app --debug run
+
 import flask
 from flask_jwt_extended import JWTManager
 from flask_request_id import RequestID
 import flask_restful
+import flasgger
+from pbr.version import VersionInfo
 from shakenfist_utilities import api as sf_api, logs
 
 from shakenfist.config import config
@@ -39,8 +44,21 @@ daemon.set_log_level(LOG, 'api')
 app = flask.Flask(__name__)
 RequestID(app)
 api = flask_restful.Api(app, catch_all_404s=False)
+
 app.config['JWT_SECRET_KEY'] = config.AUTH_SECRET_SEED.get_secret_value()
 jwt = JWTManager(app)
+
+swagger = flasgger.Swagger(app, template={
+    'swagger': '2.0',
+    'info': {
+        'title': 'Shaken Fist REST API',
+        'description': 'Shaken Fist cluster control via REST API',
+        'version': VersionInfo('shakenfist').version_string(),
+    },
+    'host': config.API_ADVERTISED_HOST,
+    'basePath': config.API_ADVERTISED_BASE_PATH,
+    'schemes': config.API_ADVERTISED_HTTP_SCHEMES
+})
 
 # Use our handler to get SF log format (instead of gunicorn's handlers)
 app.logger.handlers = [HANDLER]
@@ -84,7 +102,7 @@ class Root(sf_api.Resource):
 
 
 # TODO(mikal): we are inconsistent in this interface. Elsewhere the object type
-# is always signular, here its a mix. We should move all of these to the
+# is always singular, here its a mix. We should move all of these to the
 # singular form for consistency.
 api.add_resource(Root, '/')
 
@@ -148,7 +166,7 @@ api.add_resource(api_interface.InterfaceDefloatEndpoint,
 api.add_resource(api_artifact.ArtifactEndpoint, '/artifacts/<artifact_uuid>')
 api.add_resource(api_artifact.ArtifactsEndpoint, '/artifacts')
 api.add_resource(api_artifact.ArtifactUploadEndpoint,
-                 '/artifacts/upload/<artifact_name>')
+                 '/artifacts/upload/<artifact_uuid>')
 api.add_resource(api_artifact.ArtifactEventsEndpoint,
                  '/artifacts/<artifact_uuid>/events')
 api.add_resource(api_artifact.ArtifactVersionsEndpoint,

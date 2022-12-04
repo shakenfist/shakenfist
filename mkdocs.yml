@@ -17,8 +17,11 @@ nav:
         - User Guide:
                   - "Installation": user_guide/installation.md
                   - "Usage": user_guide/usage.md
+                  - "Artifacts": user_guide/artifacts.md
+                  - "Events": user_guide/events.md
         - Developer Guide:
                   - "Authentication": developer_guide/authentication.md
+                  - "Artifact uploads and downloads": developer_guide/artifact_uploads_downloads.md
                   - "CI API coverage": developer_guide/ci_api_coverage.md
                   - "Release process": developer_guide/release_process.md
                   - "Standards": developer_guide/standards.md

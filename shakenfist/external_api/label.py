@@ -1,5 +1,5 @@
 from functools import partial
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import get_jwt_identity
 from shakenfist_utilities import api as sf_api, logs
 
 from shakenfist.artifact import Artifact, Artifacts, LABEL_URL, type_filter, url_filter
@@ -27,7 +27,7 @@ def _label_url(label_name):
 
 
 class LabelEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.log_token_use
     def post(self, label_name=None, blob_uuid=None, max_versions=0):
         namespace, label_url = _label_url(label_name)
@@ -38,7 +38,7 @@ class LabelEndpoint(sf_api.Resource):
         a.state = dbo.STATE_CREATED
         return a.external_view()
 
-    @jwt_required()
+    @api_base.verify_token
     @api_base.log_token_use
     def get(self, label_name=None):
         artifacts = list(Artifacts(filters=[
@@ -50,7 +50,7 @@ class LabelEndpoint(sf_api.Resource):
             sf_api.error(404, 'label %s not found' % label_name)
         return artifacts[0].external_view()
 
-    @jwt_required()
+    @api_base.verify_token
     @api_base.log_token_use
     def delete(self, label_name=None):
         artifacts = list(Artifacts(filters=[

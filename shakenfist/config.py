@@ -58,6 +58,10 @@ class SFConfig(BaseSettings):
     AUTH_SECRET_SEED: SecretStr = Field(
         'foo', description='A random string to seed auth secrets with'
     )
+    API_TOKEN_DURATION: int = Field(
+        15,
+        description='How long in minutes an API token is valid for.'
+    )
     API_COMMAND_LINE: str = Field(
         (
             '/srv/shakenfist/venv/bin/gunicorn --workers %(workers)d --bind 0.0.0.0:%(port)d '
@@ -65,6 +69,18 @@ class SFConfig(BaseSettings):
             '--pid /var/run/sf/gunicorn.pid shakenfist.external_api.app:app'
         ),
         description='The gunicorn command line to use'
+    )
+    API_ADVERTISED_HOST: str = Field(
+        'localhost',
+        description='The DNS name of the REST API host as advertised to users'
+    )
+    API_ADVERTISED_BASE_PATH: str = Field(
+        '/',
+        description='The URL at API_ADVERTISED_HOST that the API is rooted at'
+    )
+    API_ADVERTISED_HTTP_SCHEMES: str = Field(
+        'http',
+        description='Space separated list of schemes (http, https) for the API'
     )
 
     # Scheduler Options
@@ -187,7 +203,10 @@ class SFConfig(BaseSettings):
 
     # Other options
     ZONE: str = Field(
-        'shakenfist', description='What nova called an availability zone'
+        'shakenfist',
+        description=('What nova called an availability zone. Note that this '
+                     'value is also used as the issuer name for JWT authentication '
+                     'tokens and should be unique to each Shaken Fist cluster.')
     )
 
     #################

@@ -89,6 +89,10 @@ class Blob(dbo):
         if isinstance(timestamp, numbers.Number):
             return timestamp
 
+        # Or the timestamp could be empty, at which point we just default to now.
+        if timestamp is None:
+            return time.time()
+
         # Or a HTTP last-modified timestamp like "Sun, 09 Jan 2022 23:05:25 GMT"
         # to be converted to epoch seconds.
         t = time.strptime(timestamp, '%a, %d %b %Y %H:%M:%S %Z')

@@ -1,5 +1,5 @@
 import flask
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import get_jwt_identity
 import os
 import random
 import requests
@@ -40,7 +40,7 @@ def _read_remote(target, blob_uuid, offset=0):
 
 
 class BlobEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.log_token_use
     def get(self, blob_uuid=None):
         b = Blob.from_db(blob_uuid)
@@ -58,7 +58,7 @@ class BlobDataEndpoint(sf_api.Resource):
         'offset': fields.Int(missing=0)
     }
 
-    @jwt_required()
+    @api_base.verify_token
     @use_kwargs(get_args, location='query')
     @api_base.log_token_use
     def get(self, blob_uuid=None, offset=0):
@@ -87,7 +87,7 @@ class BlobDataEndpoint(sf_api.Resource):
 
 
 class BlobsEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @sf_api.caller_is_admin
     @api_base.log_token_use
     def get(self, node=None):

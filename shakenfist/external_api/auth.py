@@ -1,13 +1,15 @@
 import base64
 import bcrypt
+import datetime
 import flask
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import create_access_token, get_jwt_identity
 from shakenfist_utilities import api as sf_api, logs
 
 from shakenfist import artifact
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     active_states_filter)
+from shakenfist.config import config
 from shakenfist import db
 from shakenfist.daemons import daemon
 from shakenfist.external_api import (
@@ -20,6 +22,28 @@ from shakenfist import network
 
 LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
+
+
+def _create_token(ns, keyname, nonce):
+    token = create_access_token(
+        identity=[ns.uuid, keyname],
+        additional_claims={
+            'iss': config.ZONE,
+            'nonce': nonce
+        },
+        expires_delta=datetime.timedelta(minutes=config.API_TOKEN_DURATION))
+    ns.add_event(
+        'Token created from key',
+        extra={
+            'keyname': keyname,
+            'nonce': nonce,
+            'token': token
+        })
+    return {
+        'access_token': token,
+        'token_type': 'Bearer',
+        'expires_in': config.API_TOKEN_DURATION * 60
+    }
 
 
 class AuthEndpoint(sf_api.Resource):
@@ -38,31 +62,19 @@ class AuthEndpoint(sf_api.Resource):
             LOG.with_fields({'namespace': namespace}).info(
                 'Namespace not found during auth request')
             return sf_api.error(404, 'namespace not found during auth request')
-        service_key = ns.service_key.get('service_key')
-        if service_key and key == service_key:
-            return {
-                'access_token': create_access_token(identity=[namespace, '_service_key'])
-            }
 
-        keys = ns.keys
-        for key_name in keys:
-            possible_key = base64.b64decode(keys[key_name])
+        keys = ns.keys.get('nonced_keys', {})
+        for keyname in keys:
+            possible_key = base64.b64decode(keys[keyname]['key'])
             if bcrypt.checkpw(key.encode('utf-8'), possible_key):
-                token = create_access_token(identity=[namespace, key_name])
-                ns.add_event(
-                    'Token created from key',
-                    extra={
-                        'keyname': key_name,
-                        'token': token
-                    })
-                return {'access_token': token}
+                return _create_token(ns, keyname, keys[keyname]['nonce'])
 
         ns.add_event('Attempt to use incorrect namespace key')
         return sf_api.error(401, 'unauthorized')
 
 
 class AuthNamespacesEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @sf_api.caller_is_admin
     def post(self, namespace=None, key_name=None, key=None):
         if not namespace:
@@ -106,16 +118,14 @@ class AuthNamespacesEndpoint(sf_api.Resource):
             if key_name == 'service_key':
                 return sf_api.error(403, 'illegal key name')
 
-            encoded = str(base64.b64encode(bcrypt.hashpw(
-                key.encode('utf-8'), bcrypt.gensalt())), 'utf-8')
-            ns.add_key(key_name, encoded)
+            ns.add_key(key_name, key)
 
         # Initialise metadata
         db.persist_metadata('namespace', namespace, {})
 
         return namespace
 
-    @jwt_required()
+    @api_base.verify_token
     @sf_api.caller_is_admin
     @api_base.log_token_use
     def get(self):
@@ -126,7 +136,7 @@ class AuthNamespacesEndpoint(sf_api.Resource):
 
 
 class AuthNamespaceEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @sf_api.caller_is_admin
     @api_base.log_token_use
     def delete(self, namespace):
@@ -183,26 +193,23 @@ def _namespace_keys_putpost(namespace=None, key_name=None, key=None):
     if not ns:
         return sf_api.error(404, 'namespace does not exist')
 
-    encoded = str(base64.b64encode(bcrypt.hashpw(
-        key.encode('utf-8'), bcrypt.gensalt())), 'utf-8')
-    ns.add_key(key_name, encoded)
-
+    ns.add_key(key_name, key)
     return key_name
 
 
 class AuthNamespaceKeysEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @sf_api.caller_is_admin
     @api_base.requires_namespace_exist
     @api_base.log_token_use
     def get(self, namespace=None):
         out = []
         ns = Namespace.from_db(namespace)
-        for keyname in ns.keys:
+        for keyname in ns.get('nonced_keys', {}):
             out.append(keyname)
         return out
 
-    @jwt_required()
+    @api_base.verify_token
     @sf_api.caller_is_admin
     @api_base.requires_namespace_exist
     @api_base.log_token_use
@@ -211,7 +218,7 @@ class AuthNamespaceKeysEndpoint(sf_api.Resource):
 
 
 class AuthNamespaceKeyEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @sf_api.caller_is_admin
     @api_base.requires_namespace_exist
     @api_base.log_token_use
@@ -222,7 +229,7 @@ class AuthNamespaceKeyEndpoint(sf_api.Resource):
 
         return _namespace_keys_putpost(namespace, key_name, key)
 
-    @jwt_required()
+    @api_base.verify_token
     @sf_api.caller_is_admin
     @api_base.requires_namespace_exist
     @api_base.log_token_use
@@ -233,14 +240,14 @@ class AuthNamespaceKeyEndpoint(sf_api.Resource):
             return sf_api.error(400, 'no key name specified')
 
         ns = Namespace.from_db(namespace)
-        if key_name in ns.keys:
+        if key_name in ns.keys.get('nonced_keys', {}):
             ns.remove_key(key_name)
         else:
             return sf_api.error(404, 'key name not found in namespace')
 
 
 class AuthMetadatasEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @sf_api.caller_is_admin
     @api_base.requires_namespace_exist
     @api_base.log_token_use
@@ -250,7 +257,7 @@ class AuthMetadatasEndpoint(sf_api.Resource):
             return {}
         return md
 
-    @jwt_required()
+    @api_base.verify_token
     @sf_api.caller_is_admin
     @api_base.requires_namespace_exist
     @api_base.log_token_use
@@ -259,14 +266,14 @@ class AuthMetadatasEndpoint(sf_api.Resource):
 
 
 class AuthMetadataEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @sf_api.caller_is_admin
     @api_base.requires_namespace_exist
     @api_base.log_token_use
     def put(self, namespace=None, key=None, value=None):
         return api_util.metadata_putpost('namespace', namespace, key, value)
 
-    @jwt_required()
+    @api_base.verify_token
     @sf_api.caller_is_admin
     @api_base.requires_namespace_exist
     @api_base.log_token_use
@@ -282,7 +289,7 @@ class AuthMetadataEndpoint(sf_api.Resource):
 
 
 class AuthNamespaceTrustsEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.requires_namespace_exist
     @api_base.log_token_use
     def post(self, namespace=None, external_namespace=None):
@@ -302,7 +309,7 @@ class AuthNamespaceTrustsEndpoint(sf_api.Resource):
 
 
 class AuthNamespaceTrustEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.requires_namespace_exist
     @api_base.log_token_use
     def delete(self, namespace=None, external_namespace=None):

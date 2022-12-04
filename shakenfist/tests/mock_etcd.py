@@ -4,8 +4,6 @@
 # Mock the Etcd store with a Python dict.
 #
 
-import base64
-import bcrypt
 from collections import defaultdict
 from itertools import count
 import json
@@ -148,10 +146,8 @@ class MockEtcd():
     #
 
     def create_namespace(self, namespace, key_name, key):
-        encoded = str(base64.b64encode(bcrypt.hashpw(
-                      key.encode('utf-8'), bcrypt.gensalt())), 'utf-8')
         ns = Namespace.new(namespace)
-        ns.add_key(key_name, encoded)
+        ns.add_key(key_name, key)
         db.persist_metadata('namespace', namespace, {})
 
     # Find a path through the allowed states which gets us to the requested state
@@ -256,10 +252,10 @@ class MockEtcd():
                          model='virtio',
                          mac_address=None):
         return {
-                'network_uuid': network_uuid,
-                'address': address,
-                'model': model,
-                'macaddr': mac_address,
+            'network_uuid': network_uuid,
+            'address': address,
+            'model': model,
+            'macaddr': mac_address,
         }
 
     def create_network_interface(self,

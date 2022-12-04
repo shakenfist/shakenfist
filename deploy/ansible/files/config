@@ -1,5 +1,10 @@
 SHAKENFIST_ETCD_HOST="{{hostvars[groups['etcd_master'][0]]['node_mesh_ip']}}"
 
+# It is recommended that you set the following options:
+# API_ADVERTISED_HOST="shakenfist.mycompany.com"
+# API_ADVERTISED_BASE_PATH="/api"
+# API_ADVERTISED_HTTP_SCHEMES="https"
+
 SHAKENFIST_NODE_EGRESS_IP="{{node_egress_ip}}"
 SHAKENFIST_NODE_EGRESS_NIC="{{node_egress_nic}}"
 SHAKENFIST_NODE_MESH_IP="{{node_mesh_ip}}"

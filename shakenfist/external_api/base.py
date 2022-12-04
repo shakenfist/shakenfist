@@ -1,5 +1,6 @@
 import flask
-from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
+from flask_jwt_extended.exceptions import NoAuthorizationError
 import json
 import requests
 from shakenfist_utilities import api as sf_api, logs
@@ -19,6 +20,124 @@ from shakenfist.util import general as util_general
 
 LOG, _ = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
+
+
+# https://swagger.io/specification/v2/ defines the schema for this dictionary
+def swagger_helper(section, description, parameters, responses,
+                   requires_admin=False, requires_auth=True):
+    out = {
+        'tags': [section],
+        'parameters': [],
+        'consumes': [
+            'application/json'
+        ],
+        'produces': [
+            'application/json'
+        ],
+        'security': {
+            'bearerAuth': []
+        },
+        'deprecated': False,
+        'description': description,
+        'responses': {}
+    }
+
+    # Type MUST be one of "string", "number", "integer", "boolean", "array" or "file".
+    argtypes = {
+        'bearer': {'type': 'string', 'format': 'Bearer ...JWT...'},
+        'binary': {'type': 'string', 'format': 'Binary data'},
+        'boolean': {'type': 'boolean', 'type': 'boolean'},
+        'integer': {'type': 'integer', 'type': 'integer'},
+        'namespace': {'type': 'string', 'format': 'namespace'},
+        'string': {'type': 'string', 'format': 'string'},
+        'url': {'type': 'string', 'format': 'url'},
+        'uuid': {'type': 'string', 'format': 'uuid'}
+    }
+
+    if requires_auth:
+        out['parameters'].append({
+            'name': 'Authorization',
+            'in': 'header',
+            'required': True,
+            'description': 'JWT authorization header'
+        })
+        out['parameters'][-1].update(argtypes['bearer'])
+
+    for (name, location, argtype, argdescription, argrequired) in parameters:
+        out['parameters'].append({
+            'name': name,
+            'in': location,
+            'required': argrequired,
+            'description': argdescription
+        })
+        out['parameters'][-1].update(argtypes[argtype])
+
+    if requires_auth:
+        responses.append((
+            401,
+            'You must authenticate. See '
+            'https://shakenfist.com/developer_guide/authentication/ for details.',
+            None))
+    for (httpcode, respdescription, sample) in responses:
+        out['responses'][httpcode] = {
+            'description': respdescription
+        }
+        if sample:
+            out['responses'][httpcode]['examples'] = {
+                'application/json': sample
+            }
+
+    constraints = []
+    if requires_admin:
+        constraints.append(
+            'Requires authentication as a member of the system namespace.')
+
+    if constraints:
+        out['description'] += \
+            '<br/><br/><i>%s</i>' % '<br/>'.join(constraints)
+
+    return out
+
+
+def verify_token(func):
+    def wrapper(*args, **kwargs):
+        # Ensure there is a valid JWT with a correct signature
+        _, jwt_data = verify_jwt_in_request(
+            False, False, False, ['headers'], True)
+
+        # Perform SF specific safety checks
+        try:
+            ns_name, key_name = jwt_data['sub']
+        except TypeError:
+            LOG.error('JWT token does not contain a namespace and key name in '
+                      'the subject field')
+            raise NoAuthorizationError()
+
+        ns = Namespace.from_db(ns_name)
+        if not ns:
+            LOG.with_fields({'namespace', ns_name}).error(
+                'JWT token is for non-existent namespace')
+            raise NoAuthorizationError()
+
+        if key_name != '_service_key':
+            keys = ns.keys.get('nonced_keys', {})
+            if key_name not in keys:
+                LOG.with_fields({'namespace', ns_name}).error(
+                    'JWT token uses non-existent key')
+                raise NoAuthorizationError()
+
+            nonce = keys[key_name].get('nonce')
+            if 'nonce' not in jwt_data:
+                LOG.with_fields({'namespace', ns_name}).error(
+                    'JWT token lacks nonce')
+                raise NoAuthorizationError()
+            if jwt_data['nonce'] != nonce:
+                LOG.with_fields({'namespace', ns_name}).error(
+                    'JWT token has incorrect nonce')
+                raise NoAuthorizationError()
+
+        return func(*args, **kwargs)
+    return wrapper
 
 
 def log_token_use(func):

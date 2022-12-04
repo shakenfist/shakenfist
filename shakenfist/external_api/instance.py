@@ -1,7 +1,7 @@
 from collections import defaultdict
 from functools import partial
 import flask
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import get_jwt_identity
 import re
 from shakenfist_utilities import api as sf_api, logs
 import uuid
@@ -44,14 +44,14 @@ SCHEDULER = None
 
 
 class InstanceEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use
     def get(self, instance_ref=None, instance_from_db=None):
         return instance_from_db.external_view()
 
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.requires_namespace_exist
@@ -104,7 +104,7 @@ def _artifact_safety_checks(a, instance_uuid=None):
 
 
 class InstancesEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.log_token_use
     def get(self, all=False):
         with etcd.ThreadLocalReadOnlyCache():
@@ -119,7 +119,7 @@ class InstancesEndpoint(sf_api.Resource):
                 retval.append(i.external_view())
             return retval
 
-    @jwt_required()
+    @api_base.verify_token
     @api_base.requires_namespace_exist
     @api_base.log_token_use
     def post(self, name=None, cpus=None, memory=None, network=None, disk=None,
@@ -487,7 +487,7 @@ class InstancesEndpoint(sf_api.Resource):
         etcd.enqueue(placement, {'tasks': tasks})
         return inst.external_view()
 
-    @jwt_required()
+    @api_base.verify_token
     @api_base.requires_namespace_exist
     @api_base.log_token_use
     def delete(self, confirm=False, namespace=None):
@@ -528,7 +528,7 @@ class InstancesEndpoint(sf_api.Resource):
 
 
 class InstanceInterfacesEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use
@@ -543,7 +543,7 @@ class InstanceInterfacesEndpoint(sf_api.Resource):
 
 
 class InstanceEventsEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_to_eventlog_node
@@ -554,7 +554,7 @@ class InstanceEventsEndpoint(sf_api.Resource):
 
 
 class InstanceRebootSoftEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -569,7 +569,7 @@ class InstanceRebootSoftEndpoint(sf_api.Resource):
 
 
 class InstanceRebootHardEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -584,7 +584,7 @@ class InstanceRebootHardEndpoint(sf_api.Resource):
 
 
 class InstancePowerOffEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -599,7 +599,7 @@ class InstancePowerOffEndpoint(sf_api.Resource):
 
 
 class InstancePowerOnEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -614,7 +614,7 @@ class InstancePowerOnEndpoint(sf_api.Resource):
 
 
 class InstancePauseEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -629,7 +629,7 @@ class InstancePauseEndpoint(sf_api.Resource):
 
 
 class InstanceUnpauseEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -644,7 +644,7 @@ class InstanceUnpauseEndpoint(sf_api.Resource):
 
 
 class InstanceMetadatasEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use
@@ -654,7 +654,7 @@ class InstanceMetadatasEndpoint(sf_api.Resource):
             return {}
         return md
 
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use
@@ -695,7 +695,7 @@ def _validate_instance_metadata(key, value):
 
 
 class InstanceMetadataEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use
@@ -706,7 +706,7 @@ class InstanceMetadataEndpoint(sf_api.Resource):
         return api_util.metadata_putpost(
             'instance', instance_from_db.uuid, key, value)
 
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use
@@ -723,7 +723,7 @@ class InstanceMetadataEndpoint(sf_api.Resource):
 
 
 class InstanceConsoleDataEndpoint(sf_api.Resource):
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -750,7 +750,7 @@ class InstanceConsoleDataEndpoint(sf_api.Resource):
         resp.status_code = 200
         return resp
 
-    @jwt_required()
+    @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
