@@ -525,6 +525,10 @@ artifact_versions_example = """[
 
 
 class ArtifactVersionsEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'artifact', 'Get artifact version information.',
+        [('artifact_uuid', 'query', 'uuid', 'The UUID of the artifact.', True)],
+        [(200, 'A list of the blobs which form the artifact versions.', artifact_versions_example)]))
     @api_base.verify_token
     @arg_is_artifact_uuid
     @requires_artifact_access
@@ -537,6 +541,15 @@ class ArtifactVersionsEndpoint(sf_api.Resource):
             retval.append(bout)
         return retval
 
+    @swag_from(api_base.swagger_helper(
+        'artifact', 'Set the maximum number of versions for an artifact.',
+        [
+            ('artifact_uuid', 'query', 'uuid', 'The UUID of the artifact.', True),
+            ('max_versions', 'post', 'integer',
+             'The maximum number of versions, or revert to the default it not set.',
+             False)
+        ],
+        [(200, 'No return value', '')]))
     @api_base.verify_token
     @arg_is_artifact_uuid
     @requires_artifact_ownership
@@ -551,6 +564,16 @@ class ArtifactVersionsEndpoint(sf_api.Resource):
 
 
 class ArtifactVersionEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'artifact',
+        ('Delete the specified artifact version. Note that this will only '
+         'remove the blob if its reference count reaches zero. If the artifact '
+         'has no remaining versions, it will have its state set to deleted.'),
+        [
+            ('artifact_uuid', 'query', 'uuid', 'The UUID of the artifact.', True),
+            ('version_id', 'query', 'integer', 'The version number to remove.', False)
+        ],
+        [(200, 'Information about a single artifact.', artifact_get_example)]))
     @api_base.verify_token
     @arg_is_artifact_uuid
     @requires_artifact_ownership
@@ -573,6 +596,10 @@ class ArtifactVersionEndpoint(sf_api.Resource):
 
 
 class ArtifactShareEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'artifact', 'Share the specified artifact with all namespaces.',
+        [('artifact_uuid', 'query', 'uuid', 'The UUID of the artifact.', True)],
+        [(200, 'Information about a single artifact.', artifact_get_example)]))
     @api_base.verify_token
     @arg_is_artifact_uuid
     @requires_artifact_ownership
@@ -586,6 +613,10 @@ class ArtifactShareEndpoint(sf_api.Resource):
 
 
 class ArtifactUnshareEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'artifact', 'Unshare the specified artifact with all namespaces.',
+        [('artifact_uuid', 'query', 'uuid', 'The UUID of the artifact.', True)],
+        [(200, 'Information about a single artifact.', artifact_get_example)]))
     @api_base.verify_token
     @arg_is_artifact_uuid
     @requires_artifact_ownership
