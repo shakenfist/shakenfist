@@ -87,26 +87,27 @@ class Namespace(dbo):
             changed = True
 
         if static_values.get('version') == 3:
-            keys = etcd.get(
-                'attribute/namespace', static_values['uuid'], 'keys')
             nonced_keys = {}
 
-            # Convert across keys in the correct location
-            for k in keys.get('keys', {}):
-                nonced_keys[k] = {
-                    'key': keys['keys'][k],
-                    'nonce': sfrandom.random_id()
-                }
-            if 'keys' in keys:
-                del keys['keys']
+            keys = etcd.get(
+                'attribute/namespace', static_values['uuid'], 'keys')
+            if keys:
+                # Convert across keys in the correct location
+                for k in keys.get('keys', {}):
+                    nonced_keys[k] = {
+                        'key': keys['keys'][k],
+                        'nonce': sfrandom.random_id()
+                    }
+                if 'keys' in keys:
+                    del keys['keys']
 
-            # Move across keys in the incorrect location. These override as they
-            # are how the namespace and auth code was actually using keys.
-            for k in keys:
-                nonced_keys[k] = {
-                    'key': keys[k],
-                    'nonce': sfrandom.random_id()
-                }
+                # Move across keys in the incorrect location. These override as they
+                # are how the namespace and auth code was actually using keys.
+                for k in keys:
+                    nonced_keys[k] = {
+                        'key': keys[k],
+                        'nonce': sfrandom.random_id()
+                    }
 
             # Move across the service key
             db_data = etcd.get(
