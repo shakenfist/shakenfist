@@ -130,7 +130,11 @@ REST API using `curl` like this:
 
 ```
 curl -X POST https://shakenfist/api/auth -d '{"namespace": "system", "key": "oisoSe7T"}'
-{"access_token": "eyJhbG...IkpXVCJ9.eyJmc...wwQ"}
+{
+    "access_token": "eyJhbG...IkpXVCJ9.eyJmc...wwQ",
+    "token_type": "Bearer",
+    "expires_in": 900
+}
 ```
 
 That is, a HTTP POST request to the `/auth` endpoint for the REST API (in our
@@ -194,7 +198,9 @@ decoder at https://jwt.io/) is:
         "deploy"
     ],
     "nbf": 1669786988,
-    "exp": 1669787888
+    "exp": 1669787888,
+    "iss": "shakenfist",
+    "nonce": "ByKNRUVBfMBoQC1Z"
 }
 .
 HMACSHA256(
