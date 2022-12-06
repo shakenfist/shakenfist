@@ -149,7 +149,8 @@ class AuthNamespacesEndpoint(sf_api.Resource):
     def get(self):
         retval = []
         for ns in Namespaces(filters=[active_states_filter]):
-            retval.append(ns.external_view())
+            if namespace_is_trusted(ns.uuid, get_jwt_identity()[0]):
+                retval.append(ns.external_view())
         return retval
 
 
@@ -195,6 +196,15 @@ class AuthNamespaceEndpoint(sf_api.Resource):
 
         ns.state = dbo.STATE_DELETED
         db.delete_metadata('namespace', namespace)
+
+    @api_base.verify_token
+    @sf_api.caller_is_admin
+    @api_base.log_token_use
+    def get(self, namespace):
+        ns = Namespace.from_db(namespace)
+        if not ns:
+            return sf_api.error(404, 'namespace not found')
+        return ns.external_view()
 
 
 def _namespace_keys_putpost(namespace=None, key_name=None, key=None):
