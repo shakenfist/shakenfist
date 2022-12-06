@@ -308,7 +308,12 @@ class AuthKeysTestCase(base.ShakenFistTestCase):
                                     'namespace': 'foo'
                                 }))
         self.assertEqual(200, resp.status_code)
-        self.assertEqual('foo', resp.get_json())
+        self.assertEqual({
+            'keys': [],
+            'name': 'foo',
+            'state': 'created',
+            'trust': {'full': ['system']}
+            }, resp.get_json())
 
     def test_auth_add_key_missing_key(self):
         resp = self.client.post('/auth/namespaces',
@@ -424,26 +429,31 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
         self.assertEqual([
             {
+                'keys': ['key1'],
                 'name': 'banana',
                 'state': 'created',
                 'trust': {'full': ['system']}
             },
             {
+                'keys': ['key1'],
                 'name': 'foo',
                 'state': 'created',
                 'trust': {'full': ['system']}
             },
             {
+                'keys': ['key1'],
                 'name': 'system',
                 'state': 'created',
                 'trust': {'full': ['system']}
             },
             {
+                'keys': ['key1'],
                 'name': 'three',
                 'state': 'created',
                 'trust': {'full': ['system']}
             },
             {
+                'keys': ['key1'],
                 'name': 'two',
                 'state': 'created',
                 'trust': {'full': ['system']}
@@ -597,4 +607,9 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
                                     'key': 'cheese'
                                 }))
         self.assertEqual(200, resp.status_code)
-        self.assertEqual('foo', resp.get_json())
+        self.assertEqual({
+            'keys': ['bernard', 'key1'],
+            'name': 'foo',
+            'state': 'created',
+            'trust': {'full': ['system']}
+            }, resp.get_json())

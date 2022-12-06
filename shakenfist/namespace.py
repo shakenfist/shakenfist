@@ -218,13 +218,21 @@ class Namespace(dbo):
     def external_view(self):
         # If this is an external view, then mix back in attributes that users
         # expect
-        return {
+        retval = {
             'name': self.uuid,
             'state': self.state.value,
+            'keys': [],
             'trust': {
                 'full': self.trust
             }
         }
+
+        # Mix in key names
+        keys = self.keys
+        for k in keys.get('nonced_keys', {}):
+            retval['keys'].append(k)
+
+        return retval
 
 
 class Namespaces(dbo_iter):
