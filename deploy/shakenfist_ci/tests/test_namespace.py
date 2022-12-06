@@ -16,14 +16,14 @@ class TestNamespace(base.BaseNamespacedTestCase):
         self._await_networks_ready([self.net['uuid']])
 
     def test_namespace_create_delete_and_list(self):
-        self.system_client.namespace_create('a')
-        self.system_client.namespace_create('b')
-        self.system_client.namespace_create('c')
-        self.system_client.namespace_create('d')
-        self.system_client.namespace_delete('c')
+        self.system_client.create_namespace('a')
+        self.system_client.create_namespace('b')
+        self.system_client.create_namespace('c')
+        self.system_client.create_namespace('d')
+        self.system_client.delete_namespace('c')
 
         namespaces = []
-        for n in self.system_client.namespace_list():
+        for n in self.system_client.get_namespaces():
             namespaces.append(n['name'])
 
         self.assertIn('a', namespaces)
