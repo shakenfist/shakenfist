@@ -233,7 +233,7 @@ class AuthNamespaceKeysEndpoint(sf_api.Resource):
     def get(self, namespace=None):
         out = []
         ns = Namespace.from_db(namespace)
-        for keyname in ns.get('nonced_keys', {}):
+        for keyname in ns.keys.get('nonced_keys', {}):
             out.append(keyname)
         return out
 
