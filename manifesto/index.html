@@ -66,7 +66,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#shaken-fist-manifesto" class="md-skip">
+        <a href="#the-shaken-fist-manifesto" class="md-skip">
           Skip to content
         </a>
       
@@ -756,31 +756,41 @@
   </a>
 
 
-<h1 id="shaken-fist-manifesto">Shaken Fist Manifesto</h1>
-<p>This document attempts to list Shaken Fist's defining features, give guidance on what type of features should be added to the project, how they should be implemented and how we work together.</p>
+<h1 id="the-shaken-fist-manifesto">The Shaken Fist Manifesto</h1>
+<p>This document attempts to list Shaken Fist's defining features, give guidance on
+what type of features should be added to the project, how they should be implemented
+and how we work together.</p>
 <h2 id="shaken-fist-defining-characteristics">Shaken Fist Defining Characteristics</h2>
 <ul>
 <li>Shaken Fist is smaller, simpler cloud.</li>
 <li>It is designed for relatively small environments with minimum management overhead.</li>
-<li>Its features are highly opinionated. This means that the maintainers have chosen the best (in their opinion) features to support.</li>
-<li>Opinionated features do not handle every single possible use case. This reduces the code base size thus increasing long-term maintainability.</li>
+<li>Its features are highly opinionated. This means that the maintainers have chosen
+  the best (in their opinion) features to support.</li>
+<li>Opinionated features do not handle every single possible use case. This reduces
+  the code base size thus increasing long-term maintainability.</li>
 <li>The code base is understandable in its entirety by a single developer.</li>
 <li>A Shaken Fist cluster does not need a team of engineers to install or operate.</li>
-<li>A Shaken Fist cluster should be simple to set up. We define 'simple' as "a person with no knowledge of the project can build a reasonable cluster in an evening".</li>
+<li>A Shaken Fist cluster should be simple to set up. We define 'simple' as "a person
+  with no knowledge of the project can build a reasonable cluster in an evening".</li>
 </ul>
 <h2 id="project-goals">Project Goals</h2>
 <ul>
 <li>Allow simple management of virtual machine instances without complexity.</li>
-<li>Support networking between those machines and also facilitate access to external networks.</li>
+<li>Support networking between those machines and also facilitate access to external
+  networks.</li>
 <li>Avoid re-inventing the wheel (utilise other open source projects when appropriate).</li>
 </ul>
 <h2 id="feature-guidelines">Feature Guidelines</h2>
 <ul>
 <li>Features should be deliberately limited in the options available.</li>
-<li>The goal of limiting options is to reduce code complexity. If the option does not add significant code complexity then it should added.</li>
-<li>The supported features and the options of those features should aim to cover the majority of use cases.</li>
-<li>When a feature limits the available options, it should do so in a way that does not overly restrict a project fork from adding that option.</li>
-<li>New code should conform to the conventions of the existing code base and written to be easily understood.</li>
+<li>The goal of limiting options is to reduce code complexity. If the option does
+  not add significant code complexity then it should added.</li>
+<li>The supported features and the options of those features should aim to cover
+  the majority of use cases.</li>
+<li>When a feature limits the available options, it should do so in a way that does
+  not overly restrict a project fork from adding that option.</li>
+<li>New code should conform to the conventions of the existing code base and written
+  to be easily understood.</li>
 <li>New code should have new tests (please).</li>
 </ul>
 <h2 id="significant-opinionated-design-decisions">Significant Opinionated Design Decisions</h2>
@@ -788,15 +798,16 @@
 <li>The only supported hypervisor is KVM managed by libvirt.</li>
 <li>Virtual networking is only implemented via VXLAN meshes.</li>
 <li>Single machine clusters should always be possible.</li>
-<li>Only the current Ubuntu LTS version is supported by the main project (forks to support other operating systems are encouraged).</li>
+<li>Only the current Ubuntu LTS version and Debian supported by the main project
+  (pull requests to support other operating systems are encouraged).</li>
 </ul>
 <h2 id="project-interaction-guidelines">Project Interaction Guidelines</h2>
 <ul>
-<li>Always polite</li>
-<li>Always generous</li>
-<li>Being opinionated is encouraged (but gently)</li>
-<li>Updating the documentation is just as important as the code change itself</li>
-<li>Developers who write tests are the most highly prized of all the developers</li>
+<li>Always polite.</li>
+<li>Always generous.</li>
+<li>Being opinionated is encouraged (but gently).</li>
+<li>Updating the documentation is just as important as the code change itself.</li>
+<li>Developers who write tests are the most highly prized of all the developers.</li>
 </ul>
 
 

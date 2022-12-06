@@ -903,7 +903,11 @@ below.</p>
 future API requests. For example, I can obtain an authentication token from the
 REST API using <code>curl</code> like this:</p>
 <pre><code>curl -X POST https://shakenfist/api/auth -d '{&quot;namespace&quot;: &quot;system&quot;, &quot;key&quot;: &quot;oisoSe7T&quot;}'
-{&quot;access_token&quot;: &quot;eyJhbG...IkpXVCJ9.eyJmc...wwQ&quot;}
+{
+    &quot;access_token&quot;: &quot;eyJhbG...IkpXVCJ9.eyJmc...wwQ&quot;,
+    &quot;token_type&quot;: &quot;Bearer&quot;,
+    &quot;expires_in&quot;: 900
+}
 </code></pre>
 <p>That is, a HTTP POST request to the <code>/auth</code> endpoint for the REST API (in our
 case hosted at <code>https://shakenfist/api</code>) with a JSON body containing a dictionary
@@ -956,7 +960,9 @@ decoder at <a href="https://jwt.io/">https://jwt.io/</a>) is:</p>
         &quot;deploy&quot;
     ],
     &quot;nbf&quot;: 1669786988,
-    &quot;exp&quot;: 1669787888
+    &quot;exp&quot;: 1669787888,
+    &quot;iss&quot;: &quot;shakenfist&quot;,
+    &quot;nonce&quot;: &quot;ByKNRUVBfMBoQC1Z&quot;
 }
 .
 HMACSHA256(
