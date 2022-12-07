@@ -68,12 +68,6 @@ class AuthTestCase(base.ShakenFistTestCase):
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'banana', 'keyyy': 'pwd'}))
         self.assertEqual(400, resp.status_code)
-        self.assertEqual(
-            {
-                'error': "post() got an unexpected keyword argument 'keyyy'",
-                'status': 400
-            },
-            _clean_traceback(resp.get_json()))
 
     def test_post_auth_key_non_string(self):
         resp = self.client.post(
@@ -308,7 +302,12 @@ class AuthKeysTestCase(base.ShakenFistTestCase):
                                     'namespace': 'foo'
                                 }))
         self.assertEqual(200, resp.status_code)
-        self.assertEqual('foo', resp.get_json())
+        self.assertEqual({
+            'keys': [],
+            'name': 'foo',
+            'state': 'created',
+            'trust': {'full': ['system']}
+            }, resp.get_json())
 
     def test_auth_add_key_missing_key(self):
         resp = self.client.post('/auth/namespaces',
@@ -424,26 +423,31 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
         self.assertEqual([
             {
+                'keys': ['key1'],
                 'name': 'banana',
                 'state': 'created',
                 'trust': {'full': ['system']}
             },
             {
+                'keys': ['key1'],
                 'name': 'foo',
                 'state': 'created',
                 'trust': {'full': ['system']}
             },
             {
+                'keys': ['key1'],
                 'name': 'system',
                 'state': 'created',
                 'trust': {'full': ['system']}
             },
             {
+                'keys': ['key1'],
                 'name': 'three',
                 'state': 'created',
                 'trust': {'full': ['system']}
             },
             {
+                'keys': ['key1'],
                 'name': 'two',
                 'state': 'created',
                 'trust': {'full': ['system']}
@@ -597,4 +601,9 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
                                     'key': 'cheese'
                                 }))
         self.assertEqual(200, resp.status_code)
-        self.assertEqual('foo', resp.get_json())
+        self.assertEqual({
+            'keys': ['bernard', 'key1'],
+            'name': 'foo',
+            'state': 'created',
+            'trust': {'full': ['system']}
+            }, resp.get_json())

@@ -3,6 +3,7 @@ import bcrypt
 import datetime
 import flask
 from flask_jwt_extended import create_access_token, get_jwt_identity
+from flasgger import swag_from
 from shakenfist_utilities import api as sf_api, logs
 
 from shakenfist import artifact
@@ -46,7 +47,24 @@ def _create_token(ns, keyname, nonce):
     }
 
 
+auth_token_example = """{
+    "namespace": "system",
+    "key": "oisoSe7T",
+    "apiurl": "https://shakenfist/api"
+}
+"""
+
+
 class AuthEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Authenticate and create access token.',
+        [
+            ('namespace', 'body', 'string',
+             'The namespace to authenticate against.', True),
+            ('key', 'body', 'string',
+             'The secret for the key you wish to use.', True)
+        ],
+        [(200, 'An access token.', auth_token_example)]))
     @api_base.requires_namespace_exist
     def post(self, namespace=None, key=None):
         if not namespace:
@@ -123,7 +141,7 @@ class AuthNamespacesEndpoint(sf_api.Resource):
         # Initialise metadata
         db.persist_metadata('namespace', namespace, {})
 
-        return namespace
+        return ns.external_view()
 
     @api_base.verify_token
     @sf_api.caller_is_admin
@@ -131,7 +149,8 @@ class AuthNamespacesEndpoint(sf_api.Resource):
     def get(self):
         retval = []
         for ns in Namespaces(filters=[active_states_filter]):
-            retval.append(ns.external_view())
+            if namespace_is_trusted(ns.uuid, get_jwt_identity()[0]):
+                retval.append(ns.external_view())
         return retval
 
 
@@ -177,6 +196,15 @@ class AuthNamespaceEndpoint(sf_api.Resource):
 
         ns.state = dbo.STATE_DELETED
         db.delete_metadata('namespace', namespace)
+
+    @api_base.verify_token
+    @sf_api.caller_is_admin
+    @api_base.log_token_use
+    def get(self, namespace):
+        ns = Namespace.from_db(namespace)
+        if not ns:
+            return sf_api.error(404, 'namespace not found')
+        return ns.external_view()
 
 
 def _namespace_keys_putpost(namespace=None, key_name=None, key=None):

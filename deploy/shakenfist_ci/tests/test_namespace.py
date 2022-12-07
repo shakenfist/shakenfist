@@ -5,8 +5,6 @@ from shakenfist_ci import base
 
 
 class TestNamespace(base.BaseNamespacedTestCase):
-    """Make sure instances boot under various configurations."""
-
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'namespace_test'
         super(TestNamespace, self).__init__(*args, **kwargs)
@@ -16,6 +14,23 @@ class TestNamespace(base.BaseNamespacedTestCase):
         self.net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-net' % self.namespace)
         self._await_networks_ready([self.net['uuid']])
+
+    def test_namespace_create_delete_and_list(self):
+        self.system_client.create_namespace('a')
+        self.system_client.create_namespace('b')
+        self.system_client.create_namespace('c')
+        self.system_client.create_namespace('d')
+        self.system_client.delete_namespace('c')
+
+        namespaces = []
+        for n in self.system_client.get_namespaces():
+            namespaces.append(n['name'])
+
+        self.assertIn('a', namespaces)
+        self.assertIn('b', namespaces)
+        self.assertNotIn('c', namespaces)
+        self.assertIn('d', namespaces)
+        self.assertNotIn('e', namespaces)
 
     def test_namespace_clean(self):
         """Check that instances and networks are cleaned from namespace
