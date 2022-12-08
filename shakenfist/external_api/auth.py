@@ -91,7 +91,38 @@ class AuthEndpoint(sf_api.Resource):
         return sf_api.error(401, 'unauthorized')
 
 
+namespace_get_example = """{
+    "name": "system",
+    "key_names": [
+        "deploy"
+    ],
+    "metadata": {}
+}"""
+
+
+namespace_list_example = """[
+    ...,
+    {
+        "name": "system",
+        "key_names": [
+            "deploy"
+        ],
+        "metadata": {}
+    }
+]"""
+
+
 class AuthNamespacesEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Create a namespace.',
+        [
+            ('namespace', 'body', 'string', 'The namespace to create.', True),
+            ('key_name', 'body', 'string',
+             'Name of an optional first key created at the same time.', False),
+            ('key', 'body', 'string',
+             'Secret for an optional first key created at the same time.', False)
+        ],
+        [(200, 'The namespace as created.', namespace_get_example)]))
     @api_base.verify_token
     @sf_api.caller_is_admin
     def post(self, namespace=None, key_name=None, key=None):
@@ -143,6 +174,9 @@ class AuthNamespacesEndpoint(sf_api.Resource):
 
         return ns.external_view()
 
+    @swag_from(api_base.swagger_helper(
+        'auth', 'List all namespaces visible to this namespace.', [],
+        [(200, 'The namespace as created.', namespace_list_example)]))
     @api_base.verify_token
     @sf_api.caller_is_admin
     @api_base.log_token_use
@@ -214,7 +248,7 @@ def _namespace_keys_putpost(namespace=None, key_name=None, key=None):
         return sf_api.error(400, 'no key name specified')
     if not key:
         return sf_api.error(400, 'no key specified')
-    if key_name == 'service_key':
+    if key_name.startswith('_service_key'):
         return sf_api.error(403, 'illegal key name')
 
     ns = Namespace.from_db(namespace)

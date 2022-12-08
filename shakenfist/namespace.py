@@ -155,7 +155,7 @@ class Namespace(dbo):
     def keys(self):
         db_data = self._db_get_attribute('keys')
         if not db_data:
-            return {}
+            return {'nonced_keys': {}}
 
         nonced_keys = db_data.get('nonced_keys', {})
         for k in list(nonced_keys.keys()):
@@ -171,9 +171,6 @@ class Namespace(dbo):
 
         with self.get_lock_attr('keys', 'Add key'):
             k = self.keys
-            if 'nonced_keys' not in k:
-                k['nonced_keys'] = {}
-
             k['nonced_keys'][name] = {
                 'key': encoded,
                 'nonce': sfrandom.random_id()
@@ -185,9 +182,9 @@ class Namespace(dbo):
     def remove_key(self, name):
         with self.get_lock_attr('keys', 'Remove key'):
             k = self.keys
-            if 'nonced_keys' in k:
+            if name in k['nonced_keys']:
                 del k['nonced_keys'][name]
-            self._db_set_attribute('keys', k)
+                self._db_set_attribute('keys', k)
 
     @property
     def trust(self):
@@ -222,6 +219,7 @@ class Namespace(dbo):
             'name': self.uuid,
             'state': self.state.value,
             'keys': [],
+            'metadata': {},
             'trust': {
                 'full': self.trust
             }
@@ -231,6 +229,11 @@ class Namespace(dbo):
         keys = self.keys
         for k in keys.get('nonced_keys', {}):
             retval['keys'].append(k)
+
+        # Mix in metadata
+        md = db.get_metadata('namespace', self.uuid)
+        if md:
+            retval['metadata'] = md
 
         return retval
 
