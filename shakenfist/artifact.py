@@ -31,7 +31,7 @@ UPLOAD_URL = 'sf://upload/'
 
 class Artifact(dbo):
     object_type = 'artifact'
-    current_version = 4
+    current_version = 5
     upgrade_supported = True
 
     state_targets = {
@@ -83,10 +83,16 @@ class Artifact(dbo):
         if static_values.get('version') == 3:
             if static_values['namespace'] == 'sharedwithall':
                 static_values['namespace'] = 'system'
-                etcd.put('attribute/artifact',
-                         static_values['uuid'], 'shared', {'shared': True})
+                etcd.put(
+                    'attribute/artifact',  static_values['uuid'], 'shared',
+                    {'shared': True})
 
             static_values['version'] = 4
+            changed = True
+
+        if static_values.get('version') == 4:
+            cls._upgrade_metadata_to_attribute(static_values['uuid'])
+            static_values['version'] = 5
             changed = True
 
         if changed:

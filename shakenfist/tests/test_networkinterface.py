@@ -13,7 +13,7 @@ GET_ALL_INTERFACES = [
         'ipv4': '127.0.0.5',
         'order': 0,
         'model': 'virtio',
-        'version': 2
+        'version': 3
     }),
     (None, {
         'uuid': 'ifaceuuid2',
@@ -23,7 +23,7 @@ GET_ALL_INTERFACES = [
         'ipv4': '127.0.0.6',
         'order': 1,
         'model': 'virtio',
-        'version': 2
+        'version': 3
     })
 ]
 
@@ -36,7 +36,7 @@ JUST_INTERFACES = [
         'ipv4': '127.0.0.5',
         'order': 0,
         'model': 'virtio',
-        'version': 2
+        'version': 3
     },
     {
         'uuid': 'ifaceuuid2',
@@ -46,7 +46,7 @@ JUST_INTERFACES = [
         'ipv4': '127.0.0.6',
         'order': 1,
         'model': 'virtio',
-        'version': 2
+        'version': 3
     }
 ]
 

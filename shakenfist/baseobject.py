@@ -128,6 +128,13 @@ class DatabaseBackedObject(object):
                     'Unsupported object version - %s: %s' % (cls.object_type, o))
         return o
 
+    @classmethod
+    def _upgrade_metadata_to_attribute(cls, object_uuid):
+        md = etcd.get('metadata', cls.object_type, object_uuid)
+        if md:
+            etcd.put('attribute/%s' % cls.object_type, object_uuid, 'metadata', md)
+            etcd.delete('metadata', cls.object_type, object_uuid)
+
     # We need to force in memory values through JSON because some values require
     # a serializer to run to work when we read them.
     def _db_get_attribute(self, attribute, default=None):

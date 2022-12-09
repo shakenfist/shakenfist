@@ -77,7 +77,7 @@ def _safe_int_cast(i):
 
 class Instance(dbo):
     object_type = 'instance'
-    current_version = 7
+    current_version = 8
     upgrade_supported = True
 
     # docs/development/state_machine.md has a description of these states.
@@ -182,6 +182,11 @@ class Instance(dbo):
         if static_values.get('version') == 6:
             static_values['side_channels'] = []
             static_values['version'] = 7
+            changed = True
+
+        if static_values.get('version') == 7:
+            cls._upgrade_metadata_to_attribute(static_values['uuid'])
+            static_values['version'] = 8
             changed = True
 
         if changed:

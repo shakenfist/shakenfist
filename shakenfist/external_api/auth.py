@@ -169,9 +169,6 @@ class AuthNamespacesEndpoint(sf_api.Resource):
 
             ns.add_key(key_name, key)
 
-        # Initialise metadata
-        db.persist_metadata('namespace', namespace, {})
-
         return ns.external_view()
 
     @swag_from(api_base.swagger_helper(

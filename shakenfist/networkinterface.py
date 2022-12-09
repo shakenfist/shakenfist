@@ -11,6 +11,7 @@ from shakenfist.baseobject import (
 from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
+from shakenfist.metrics import get_minimum_object_version as gmov
 from shakenfist import network
 from shakenfist.tasks import DefloatNetworkInterfaceTask
 from shakenfist.util import network as util_network
@@ -21,7 +22,9 @@ LOG, _ = logs.setup(__name__)
 
 class NetworkInterface(dbo):
     object_type = 'networkinterface'
-    current_version = 2
+    current_version = 3
+    supports_upgrade = True
+
     state_targets = {
         None: (dbo.STATE_INITIAL, ),
         dbo.STATE_INITIAL: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR),
@@ -31,6 +34,17 @@ class NetworkInterface(dbo):
     }
 
     def __init__(self, static_values):
+        if static_values.get('version', 2) != self.current_version:
+            upgraded, static_values = self.upgrade(static_values)
+
+            if upgraded and gmov('networkinterface') == self.current_version:
+                etcd.put(
+                    self.object_type, None, static_values.get('uuid'),
+                    static_values)
+                LOG.with_fields({
+                    self.object_type: static_values['uuid']}).info(
+                        'Online upgrade committed')
+
         super(NetworkInterface, self).__init__(static_values.get('uuid'),
                                                static_values.get('version'))
 
@@ -40,6 +54,24 @@ class NetworkInterface(dbo):
         self.__ipv4 = static_values['ipv4']
         self.__order = static_values['order']
         self.__model = static_values['model']
+
+    @classmethod
+    def upgrade(cls, static_values):
+        changed = False
+        starting_version = static_values.get('version', 2)
+
+        if static_values.get('version') == 2:
+            cls._upgrade_metadata_to_attribute(static_values['uuid'])
+            static_values['version'] = 3
+            changed = True
+
+        if changed:
+            LOG.with_fields({
+                cls.object_type: static_values['uuid'],
+                'start_version': starting_version,
+                'final_version': static_values.get('version')
+            }).info('Object online upgraded')
+        return changed, static_values
 
     @classmethod
     def new(cls, interface_uuid, netdesc, instance_uuid, order):

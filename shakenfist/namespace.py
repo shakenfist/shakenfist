@@ -10,6 +10,7 @@ import time
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
+from shakenfist import db
 from shakenfist import etcd
 from shakenfist.metrics import get_minimum_object_version as gmov
 from shakenfist.util import general as util_general
@@ -20,7 +21,7 @@ LOG, _ = logs.setup(__name__)
 
 class Namespace(dbo):
     object_type = 'namespace'
-    current_version = 4
+    current_version = 5
     upgrade_supported = True
 
     ACTIVE_STATES = set([dbo.STATE_CREATED])
@@ -126,6 +127,11 @@ class Namespace(dbo):
                 {'nonced_keys': nonced_keys})
 
             static_values['version'] = 4
+            changed = True
+
+        if static_values.get('version') == 4:
+            cls._upgrade_metadata_to_attribute(static_values['uuid'])
+            static_values['version'] = 5
             changed = True
 
         if changed:

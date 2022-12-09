@@ -7,6 +7,7 @@ from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist import etcd
+from shakenfist.metrics import get_minimum_object_version as gmov
 
 
 LOG, _ = logs.setup(__name__)
@@ -14,7 +15,9 @@ LOG, _ = logs.setup(__name__)
 
 class Upload(dbo):
     object_type = 'upload'
-    current_version = 2
+    current_version = 3
+    supports_upgrade = True
+
     state_targets = {
         None: (dbo.STATE_CREATED),
         dbo.STATE_CREATED: (dbo.STATE_DELETED),
@@ -24,10 +27,39 @@ class Upload(dbo):
     ACTIVE_STATES = set([dbo.STATE_CREATED])
 
     def __init__(self, static_values):
+        if static_values.get('version', 2) != self.current_version:
+            upgraded, static_values = self.upgrade(static_values)
+
+            if upgraded and gmov('upload') == self.current_version:
+                etcd.put(
+                    self.object_type, None, static_values.get('uuid'),
+                    static_values)
+                LOG.with_fields({
+                    self.object_type: static_values['uuid']}).info(
+                        'Online upgrade committed')
+
         super(Upload, self).__init__(static_values.get('uuid'),
                                      static_values.get('version'))
         self.__node = static_values['node']
         self.__created_at = static_values['created_at']
+
+    @classmethod
+    def upgrade(cls, static_values):
+        changed = False
+        starting_version = static_values.get('version', 2)
+
+        if static_values.get('version') == 2:
+            cls._upgrade_metadata_to_attribute(static_values['uuid'])
+            static_values['version'] = 3
+            changed = True
+
+        if changed:
+            LOG.with_fields({
+                cls.object_type: static_values['uuid'],
+                'start_version': starting_version,
+                'final_version': static_values.get('version')
+            }).info('Object online upgraded')
+        return changed, static_values
 
     @classmethod
     def new(cls, upload_uuid, node):

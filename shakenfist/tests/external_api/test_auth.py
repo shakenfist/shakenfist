@@ -304,6 +304,7 @@ class AuthKeysTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
         self.assertEqual({
             'keys': [],
+            'metadata': {},
             'name': 'foo',
             'state': 'created',
             'trust': {'full': ['system']}
@@ -424,30 +425,35 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         self.assertEqual([
             {
                 'keys': ['key1'],
+                'metadata': {},
                 'name': 'banana',
                 'state': 'created',
                 'trust': {'full': ['system']}
             },
             {
                 'keys': ['key1'],
+                'metadata': {},
                 'name': 'foo',
                 'state': 'created',
                 'trust': {'full': ['system']}
             },
             {
                 'keys': ['key1'],
+                'metadata': {},
                 'name': 'system',
                 'state': 'created',
                 'trust': {'full': ['system']}
             },
             {
                 'keys': ['key1'],
+                'metadata': {},
                 'name': 'three',
                 'state': 'created',
                 'trust': {'full': ['system']}
             },
             {
                 'keys': ['key1'],
+                'metadata': {},
                 'name': 'two',
                 'state': 'created',
                 'trust': {'full': ['system']}
@@ -603,6 +609,7 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
         self.assertEqual({
             'keys': ['bernard', 'key1'],
+            'metadata': {},
             'name': 'foo',
             'state': 'created',
             'trust': {'full': ['system']}
