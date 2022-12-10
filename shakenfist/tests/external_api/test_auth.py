@@ -4,7 +4,6 @@ import mock
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config, SFConfig
-from shakenfist import db
 from shakenfist.external_api import app as external_api
 from shakenfist.namespace import Namespace
 from shakenfist.tests import base
@@ -159,7 +158,6 @@ class AuthWithServiceKeyTestCase(base.ShakenFistTestCase):
         ns.add_key('_service_key', 'cheese')
         ns.add_key('key1', 'bacon')
         ns.add_key('key2', 'sausage')
-        db.persist_metadata('namespace', 'banana', {})
 
         # The client must be created after all the mocks, or the mocks are not
         # correctly applied.
@@ -308,7 +306,7 @@ class AuthKeysTestCase(base.ShakenFistTestCase):
             'name': 'foo',
             'state': 'created',
             'trust': {'full': ['system']}
-            }, resp.get_json())
+        }, resp.get_json())
 
     def test_auth_add_key_missing_key(self):
         resp = self.client.post('/auth/namespaces',
@@ -481,19 +479,17 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
             },
             resp.get_json())
 
-    @mock.patch('shakenfist.db.get_metadata', return_value={'a': 'a', 'b': 'b'})
-    def test_get_namespace_metadata(self, mock_md_get):
+    def test_get_namespace_metadata(self):
+        self.mock_etcd.db['/sf/attribute/namespace/system/metadata'] = \
+            json.dumps({'a': 'a', 'b': 'b'}, indent=4, sort_keys=True)
         resp = self.client.get(
             '/auth/namespaces/system/metadata', headers={'Authorization': self.auth_token})
         self.assertEqual({'a': 'a', 'b': 'b'}, resp.get_json())
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.content_type)
 
-    @mock.patch('shakenfist.db.get_metadata', return_value={})
-    @mock.patch('shakenfist.db.persist_metadata')
     @mock.patch('shakenfist.db.get_lock')
-    def test_put_namespace_metadata(self, mock_get_lock, mock_md_put,
-                                    mock_md_get):
+    def test_put_namespace_metadata(self, mock_get_lock):
         resp = self.client.put('/auth/namespaces/system/metadata/foo',
                                headers={'Authorization': self.auth_token},
                                data=json.dumps({
@@ -502,13 +498,12 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
                                }))
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
-        mock_md_put.assert_called_with('namespace', 'system', {'foo': 'bar'})
+        self.assertEqual(
+            json.dumps({'foo': 'bar'}, indent=4, sort_keys=True),
+            self.mock_etcd.db['/sf/attribute/namespace/system/metadata'])
 
-    @mock.patch('shakenfist.db.get_metadata', return_value={})
-    @mock.patch('shakenfist.db.persist_metadata')
     @mock.patch('shakenfist.db.get_lock')
-    def test_post_namespace_metadata(self, mock_get_lock, mock_md_put,
-                                     mock_md_get):
+    def test_post_namespace_metadata(self, mock_get_lock):
         resp = self.client.post('/auth/namespaces/system/metadata',
                                 headers={'Authorization': self.auth_token},
                                 data=json.dumps({
@@ -517,41 +512,38 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
                                 }))
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
-        mock_md_put.assert_called_with('namespace', 'system', {'foo': 'bar'})
+        self.assertEqual(
+            json.dumps({'foo': 'bar'}, indent=4, sort_keys=True),
+            self.mock_etcd.db['/sf/attribute/namespace/system/metadata'])
 
-    @mock.patch('shakenfist.db.get_metadata', return_value={'foo': 'bar', 'real': 'smart'})
-    @mock.patch('shakenfist.db.persist_metadata')
     @mock.patch('shakenfist.db.get_lock')
-    def test_delete_namespace_metadata(self, mock_get_lock, mock_md_put,
-                                       mock_md_get):
+    def test_delete_namespace_metadata(self, mock_get_lock):
+        self.mock_etcd.db['/sf/attribute/namespace/system/metadata'] = \
+            json.dumps({'foo': 'bar', 'real': 'smart'}, indent=4,
+                       sort_keys=True)
         resp = self.client.delete('/auth/namespaces/system/metadata/foo',
                                   headers={'Authorization': self.auth_token})
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
-        mock_md_put.assert_called_with(
-            'namespace', 'system', {'real': 'smart'})
+        self.assertEqual(
+            json.dumps({'real': 'smart'}, indent=4, sort_keys=True),
+            self.mock_etcd.db['/sf/attribute/namespace/system/metadata'])
 
-    @mock.patch('shakenfist.db.get_metadata', return_value={})
-    @mock.patch('shakenfist.db.persist_metadata')
     @mock.patch('shakenfist.db.get_lock')
-    def test_delete_namespace_metadata_bad_key(self, mock_get_lock,
-                                               mock_md_put, mock_md_get):
+    def test_delete_namespace_metadata_bad_key(self, mock_get_lock):
+        # We now just silently ignore deletes of things which don't exist
         resp = self.client.delete('/auth/namespaces/system/metadata/wrong',
                                   headers={'Authorization': self.auth_token})
-        self.assertEqual({'error': 'key not found', 'status': 404},
-                         resp.get_json())
-        self.assertEqual(404, resp.status_code)
+        self.assertEqual(None, resp.get_json())
+        self.assertEqual(200, resp.status_code)
 
-    @mock.patch('shakenfist.db.get_metadata', return_value={'foo': 'bar', 'real': 'smart'})
-    @mock.patch('shakenfist.db.persist_metadata')
     @mock.patch('shakenfist.db.get_lock')
-    def test_delete_namespace_metadata_no_keys(self, mock_get_lock,
-                                               mock_md_put, mock_md_get):
+    def test_delete_namespace_metadata_no_keys(self, mock_get_lock):
+        # We now just silently ignore deletes of things which don't exist
         resp = self.client.delete('/auth/namespaces/system/metadata/wrong',
                                   headers={'Authorization': self.auth_token})
-        self.assertEqual({'error': 'key not found', 'status': 404},
-                         resp.get_json())
-        self.assertEqual(404, resp.status_code)
+        self.assertEqual(None, resp.get_json())
+        self.assertEqual(200, resp.status_code)
 
     @mock.patch('shakenfist.artifact.Artifact.from_url')
     @mock.patch('shakenfist.network.Network._db_get_attribute',
@@ -613,4 +605,4 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
             'name': 'foo',
             'state': 'created',
             'trust': {'full': ['system']}
-            }, resp.get_json())
+        }, resp.get_json())

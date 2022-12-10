@@ -12,7 +12,6 @@ from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
-from shakenfist import db
 from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist import exceptions
@@ -126,6 +125,9 @@ class InstancesEndpoint(sf_api.Resource):
              ssh_key=None, user_data=None, placed_on=None, namespace=None,
              video=None, uefi=False, configdrive=None, metadata=None,
              nvram_template=None, secure_boot=False, side_channels=None):
+        # NOTE(mikal): if we cleaned this up to have less business logic in it,
+        # then that would also mean that we could reduce the amount of duplicated
+        # logic in mock_etcd.create_instance().
         global SCHEDULER
 
         instance_uuid = str(uuid.uuid4())
@@ -361,9 +363,7 @@ class InstancesEndpoint(sf_api.Resource):
 
         # Initialise metadata
         if metadata:
-            db.persist_metadata('instance', inst.uuid, metadata)
-        else:
-            db.persist_metadata('instance', inst.uuid, {})
+            inst._db_set_attribute('metadata', metadata)
 
         # Allocate IP addresses
         order = 0
@@ -649,10 +649,7 @@ class InstanceMetadatasEndpoint(sf_api.Resource):
     @api_base.requires_instance_ownership
     @api_base.log_token_use
     def get(self, instance_ref=None, instance_from_db=None):
-        md = db.get_metadata('instance', instance_from_db.uuid)
-        if not md:
-            return {}
-        return md
+        return instance_from_db.metadata
 
     @api_base.verify_token
     @api_base.arg_is_instance_ref
@@ -662,10 +659,15 @@ class InstanceMetadatasEndpoint(sf_api.Resource):
         err = _validate_instance_metadata(key, value)
         if err:
             return err
-        return api_util.metadata_putpost('instance', instance_from_db.uuid, key, value)
+        instance_from_db.add_metadata_key(key, value)
 
 
 def _validate_instance_metadata(key, value):
+    if not key:
+        return sf_api.error(400, 'no key specified')
+    if not value:
+        return sf_api.error(400, 'no value specified')
+
     # Reserved key "tags" should be validated to avoid unexpected failures
     if key == instance.Instance.METADATA_KEY_TAGS:
         if not isinstance(value, list):
@@ -703,8 +705,7 @@ class InstanceMetadataEndpoint(sf_api.Resource):
         err = _validate_instance_metadata(key, value)
         if err:
             return err
-        return api_util.metadata_putpost(
-            'instance', instance_from_db.uuid, key, value)
+        instance_from_db.add_metadata_key(key, value)
 
     @api_base.verify_token
     @api_base.arg_is_instance_ref
@@ -713,13 +714,7 @@ class InstanceMetadataEndpoint(sf_api.Resource):
     def delete(self, instance_ref=None, key=None, instance_from_db=None):
         if not key:
             return sf_api.error(400, 'no key specified')
-
-        with instance_from_db.get_lock(op='Instance metadata delete'):
-            md = db.get_metadata('instance', instance_from_db.uuid)
-            if md is None or key not in md:
-                return sf_api.error(404, 'key not found')
-            del md[key]
-            db.persist_metadata('instance', instance_from_db.uuid, md)
+        instance_from_db.remove_metadata_key(key)
 
 
 class InstanceConsoleDataEndpoint(sf_api.Resource):

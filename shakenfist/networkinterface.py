@@ -8,7 +8,6 @@ from shakenfist import baseobject
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
-from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist.metrics import get_minimum_object_version as gmov
@@ -109,10 +108,6 @@ class NetworkInterface(dbo):
             raise exceptions.NetworkMissing(
                 'No such network: %s' % netdesc['network_uuid'])
         n.add_networkinterface(interface_uuid)
-
-        # TODO(andy): Integrate metadata into each object type
-        # Initialise metadata
-        db.persist_metadata('networkinterface', interface_uuid, {})
 
         return ni
 

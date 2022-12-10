@@ -53,19 +53,3 @@ def persist_ipmanager(network_uuid, data):
 
 def delete_ipmanager(network_uuid):
     etcd.delete('ipmanager', None, uuid)
-
-#####################################################################
-# Metadata
-#####################################################################
-
-
-def get_metadata(object_type, name):
-    return etcd.get('metadata', object_type, name)
-
-
-def persist_metadata(object_type, name, metadata):
-    etcd.put('metadata', object_type, name, metadata)
-
-
-def delete_metadata(object_type, name):
-    etcd.delete('metadata', object_type, name)

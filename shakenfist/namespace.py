@@ -10,7 +10,6 @@ import time
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
-from shakenfist import db
 from shakenfist import etcd
 from shakenfist.metrics import get_minimum_object_version as gmov
 from shakenfist.util import general as util_general
@@ -237,9 +236,7 @@ class Namespace(dbo):
             retval['keys'].append(k)
 
         # Mix in metadata
-        md = db.get_metadata('namespace', self.uuid)
-        if md:
-            retval['metadata'] = md
+        retval['metadata'] = self.metadata
 
         return retval
 

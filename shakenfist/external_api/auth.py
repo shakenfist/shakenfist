@@ -11,11 +11,8 @@ from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     active_states_filter)
 from shakenfist.config import config
-from shakenfist import db
 from shakenfist.daemons import daemon
-from shakenfist.external_api import (
-    base as api_base,
-    util as api_util)
+from shakenfist.external_api import base as api_base
 from shakenfist import instance
 from shakenfist.namespace import Namespace, Namespaces, namespace_is_trusted
 from shakenfist import network
@@ -93,7 +90,8 @@ class AuthEndpoint(sf_api.Resource):
         for keyname in keys:
             possible_key = base64.b64decode(keys[keyname]['key'])
             if bcrypt.checkpw(key.encode('utf-8'), possible_key):
-                return _create_token(ns, keyname, keys[keyname]['nonce'])
+                return _create_token(
+                    namespace_from_db, keyname, keys[keyname]['nonce'])
 
         namespace_from_db.add_event('Attempt to use incorrect namespace key')
         return sf_api.error(401, 'unauthorized')
@@ -228,7 +226,6 @@ class AuthNamespaceEndpoint(sf_api.Resource):
             a.delete()
 
         namespace_from_db.state = dbo.STATE_DELETED
-        db.delete_metadata('namespace', namespace)
 
     @api_base.verify_token
     @sf_api.caller_is_admin
@@ -279,7 +276,6 @@ class AuthNamespaceKeyEndpoint(sf_api.Resource):
     def put(self, namespace=None, key_name=None, key=None, namespace_from_db=None):
         if key_name not in namespace_from_db.keys:
             return sf_api.error(404, 'key does not exist')
-
         return _namespace_keys_putpost(namespace, key_name, key)
 
     @api_base.verify_token
@@ -302,10 +298,7 @@ class AuthMetadatasEndpoint(sf_api.Resource):
     @arg_is_namespace
     @api_base.log_token_use
     def get(self, namespace=None, namespace_from_db=None):
-        md = db.get_metadata('namespace', namespace)
-        if not md:
-            return {}
-        return md
+        return namespace_from_db.metadata
 
     @api_base.verify_token
     @sf_api.caller_is_admin
@@ -313,7 +306,11 @@ class AuthMetadatasEndpoint(sf_api.Resource):
     @api_base.requires_namespace_exist
     @api_base.log_token_use
     def post(self, namespace=None, key=None, value=None, namespace_from_db=None):
-        return api_util.metadata_putpost('namespace', namespace, key, value)
+        if not key:
+            return sf_api.error(400, 'no key specified')
+        if not value:
+            return sf_api.error(400, 'no value specified')
+        namespace_from_db.add_metadata_key(key, value)
 
 
 class AuthMetadataEndpoint(sf_api.Resource):
@@ -322,7 +319,11 @@ class AuthMetadataEndpoint(sf_api.Resource):
     @arg_is_namespace
     @api_base.log_token_use
     def put(self, namespace=None, key=None, value=None, namespace_from_db=None):
-        return api_util.metadata_putpost('namespace', namespace, key, value)
+        if not key:
+            return sf_api.error(400, 'no key specified')
+        if not value:
+            return sf_api.error(400, 'no value specified')
+        namespace_from_db.add_metadata_key(key, value)
 
     @api_base.verify_token
     @sf_api.caller_is_admin
@@ -331,12 +332,7 @@ class AuthMetadataEndpoint(sf_api.Resource):
     def delete(self, namespace=None, key=None, value=None, namespace_from_db=None):
         if not key:
             return sf_api.error(400, 'no key specified')
-
-        md = db.get_metadata('namespace', namespace)
-        if md is None or key not in md:
-            return sf_api.error(404, 'key not found')
-        del md[key]
-        db.persist_metadata('namespace', namespace, md)
+        namespace_from_db.remove_metadata_key(key)
 
 
 class AuthNamespaceTrustsEndpoint(sf_api.Resource):

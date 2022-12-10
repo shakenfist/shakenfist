@@ -23,7 +23,6 @@ from shakenfist.baseobject import (
 from shakenfist import blob
 from shakenfist.config import config
 from shakenfist import constants
-from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist.metrics import get_minimum_object_version as gmov
@@ -385,9 +384,7 @@ class Instance(dbo):
     # Values routed to attributes, writes are via helper methods.
     @property
     def affinity(self):
-        # TODO(andy) Move metadata to a new DBO subclass "DBO with metadata"
-        meta = db.get_metadata('instance', self.uuid)
-        return meta.get(self.METADATA_KEY_AFFINITY, {})
+        return self.metadata.get(self.METADATA_KEY_AFFINITY, {})
 
     @property
     def placement(self):
@@ -429,12 +426,7 @@ class Instance(dbo):
 
     @property
     def tags(self):
-        # TODO(andy): Move metadata to a new DBO subclass "DBO with metadata"
-        meta = db.get_metadata('instance', self.uuid)
-        if not meta:
-            # Gracefully handle malformed instances
-            return None
-        return meta.get(self.METADATA_KEY_TAGS, None)
+        return self.metadata.get(self.METADATA_KEY_TAGS, None)
 
     @property
     def agent_state(self):

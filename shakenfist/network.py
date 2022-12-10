@@ -146,10 +146,6 @@ class Network(dbo):
         # Networks should immediately appear on the network node
         etcd.enqueue('networknode', DeployNetworkTask(network_uuid))
 
-        # TODO(andy): Integrate metadata into each object type
-        # Initialise metadata
-        db.persist_metadata('network', network_uuid, {})
-
         return n
 
     def external_view(self):

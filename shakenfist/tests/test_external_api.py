@@ -308,7 +308,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(
             {'foo': 'bar'},
             json.loads(self.mock_etcd.db[
-                '/sf/metadata/instance/12345678-1234-4321-1234-000000000001']))
+                '/sf/attribute/instance/12345678-1234-4321-1234-000000000001/metadata']))
 
     def test_post_instance_metadata(self):
         self.mock_etcd.create_instance('banana')
@@ -324,7 +324,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(
             {'foo': 'bar'},
             json.loads(self.mock_etcd.db[
-                '/sf/metadata/instance/12345678-1234-4321-1234-000000000001']))
+                '/sf/attribute/instance/12345678-1234-4321-1234-000000000001/metadata']))
 
     def test_get_network(self):
         self.mock_etcd.create_network('barry')
@@ -388,7 +388,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(
             {'foo': 'bar'},
             json.loads(self.mock_etcd.db[
-                '/sf/metadata/network/12345678-1234-4321-1234-000000000001']))
+                '/sf/attribute/network/12345678-1234-4321-1234-000000000001/metadata']))
 
     def test_post_network_metadata(self):
         self.mock_etcd.create_network('banana', namespace='foo')
@@ -404,7 +404,7 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(
             {'foo': 'bar'},
             json.loads(self.mock_etcd.db[
-                '/sf/metadata/network/12345678-1234-4321-1234-000000000001']))
+                '/sf/attribute/network/12345678-1234-4321-1234-000000000001/metadata']))
 
     def test_delete_instance_metadata(self):
         self.mock_etcd.create_instance('banana',
@@ -417,17 +417,17 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(
             {'real': 'smart'},
             json.loads(self.mock_etcd.db[
-                '/sf/metadata/instance/12345678-1234-4321-1234-000000000001']))
+                '/sf/attribute/instance/12345678-1234-4321-1234-000000000001/metadata']))
 
     def test_delete_instance_metadata_bad_key(self):
-        self.mock_etcd.create_instance('banana',
-                                       metadata={'foo': 'bar', 'real': 'smart'})
+        # We now just silently ignore deletes of things which don't exist
+        self.mock_etcd.create_instance(
+            'banana', metadata={'foo': 'bar', 'real': 'smart'})
         resp = self.client.delete(
             '/instances/12345678-1234-4321-1234-000000000001/metadata/wrong',
             headers={'Authorization': self.auth_token})
-        self.assertEqual({'error': 'key not found', 'status': 404},
-                         resp.get_json())
-        self.assertEqual(404, resp.status_code)
+        self.assertEqual(None, resp.get_json())
+        self.assertEqual(200, resp.status_code)
 
     def test_delete_network_metadata(self):
         self.mock_etcd.create_network('banana', namespace='foo',
@@ -440,17 +440,17 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(
             {'real': 'smart'},
             json.loads(self.mock_etcd.db[
-                '/sf/metadata/network/12345678-1234-4321-1234-000000000001']))
+                '/sf/attribute/network/12345678-1234-4321-1234-000000000001/metadata']))
 
     def test_delete_network_metadata_bad_key(self):
+        # We now just silently ignore deletes of things which don't exist
         self.mock_etcd.create_network('banana', namespace='system',
                                       metadata={'foo': 'bar', 'real': 'smart'})
         resp = self.client.delete(
             '/networks/12345678-1234-4321-1234-000000000001/metadata/wrong',
             headers={'Authorization': self.auth_token})
-        self.assertEqual({'error': 'key not found', 'status': 404},
-                         resp.get_json())
-        self.assertEqual(404, resp.status_code)
+        self.assertEqual(None, resp.get_json())
+        self.assertEqual(200, resp.status_code)
 
 
 class ExternalApiNetworkInterfaceTestCase(ExternalApiTestCase):

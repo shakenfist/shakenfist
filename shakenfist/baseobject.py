@@ -278,10 +278,26 @@ class DatabaseBackedObject(object):
                     % (s, self.object_type))
         self._db_set_attribute('error', {'message': msg})
 
+    @property
+    def metadata(self):
+        return self._db_get_attribute('metadata', {})
+
+    def add_metadata_key(self, key, value):
+        with self.get_lock_attr('metadata', 'Add metadata key'):
+            md = self.metadata
+            md[key] = value
+            self._db_set_attribute('metadata', md)
+
+    def remove_metadata_key(self, key):
+        with self.get_lock_attr('metadata', 'Remove metadata key'):
+            md = self.metadata
+            if key in md:
+                del md[key]
+                self._db_set_attribute('metadata', md)
+
     def hard_delete(self):
         etcd.delete(self.object_type, None, self.uuid)
         etcd.delete_all('attribute/%s' % self.object_type, self.uuid)
-        db.delete_metadata(self.object_type, self.uuid)
         self.add_event('hard deleted object')
 
 
