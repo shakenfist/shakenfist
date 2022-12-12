@@ -17,6 +17,7 @@ from shakenfist.ipmanager import IPManager
 from shakenfist import instance
 from shakenfist.config import SFConfig
 from shakenfist.tests import base
+from shakenfist.tests.mock_etcd import MockEtcd
 
 
 class FakeNetwork(object):
@@ -58,10 +59,8 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
-        self.gmov = mock.patch(
-            'shakenfist.instance.gmov', return_value=6)
-        self.mock_gmov = self.gmov.start()
-        self.addCleanup(self.gmov.stop)
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
 
     @mock.patch('shakenfist.etcd.get',
                 return_value={
@@ -120,7 +119,7 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
                  'ssh_key': 'sshkey',
                  'user_data': 'userdata',
                  'uuid': 'uuid42',
-                 'version': 7,
+                 'version': 8,
                  'video': {'memory': 16384, 'model': 'cirrus'},
                  'uefi': False,
                  'configdrive': 'openstack-disk',
@@ -129,42 +128,6 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
                  'side_channels': None
              }),
             mock_create.mock_calls[0][1])
-
-    @mock.patch('shakenfist.etcd.get',
-                return_value={
-                    'cpus': 1,
-                    'disk_spec': [{}],
-                    'memory': 2048,
-                    'name': 'barry',
-                    'namespace': 'namespace',
-                    'requested_placement': None,
-                    'ssh_key': 'sshkey',
-                    'user_data': 'userdata',
-                    'uuid': 'uuid42',
-                    'version': 6,
-                    'video': {'memory': 16384, 'model': 'cirrus'},
-                    'uefi': False,
-                    'configdrive': 'openstack-disk',
-                    'nvram_template': None,
-                    'secure_boot': False
-                })
-    def test_from_db(self, mock_get):
-        inst = instance.Instance.from_db('uuid42')
-        self.assertEqual(1, inst.cpus)
-        self.assertEqual([{}], inst.disk_spec)
-        self.assertEqual(2048, inst.memory)
-        self.assertEqual('barry', inst.name)
-        self.assertEqual('namespace', inst.namespace)
-        self.assertEqual(None, inst.requested_placement)
-        self.assertEqual('sshkey', inst.ssh_key)
-        self.assertEqual('userdata', inst.user_data)
-        self.assertEqual('uuid42', inst.uuid)
-        self.assertEqual(7, inst.version)
-        self.assertEqual('openstack-disk', inst.configdrive)
-        self.assertEqual(None, inst.nvram_template)
-        self.assertEqual(False, inst.secure_boot)
-        self.assertEqual({'memory': 16384, 'model': 'cirrus'}, inst.video)
-        self.assertEqual('/a/b/c/instances/uuid42', inst.instance_path)
 
 
 class InstanceTestCase(base.ShakenFistTestCase):
@@ -614,10 +577,8 @@ class InstancesTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super(InstancesTestCase, self).setUp()
 
-        self.gmov = mock.patch(
-            'shakenfist.instance.gmov', return_value=6)
-        self.mock_gmov = self.gmov.start()
-        self.addCleanup(self.gmov.stop)
+        self.mock_etcd = MockEtcd(self, node_count=4)
+        self.mock_etcd.setup()
 
     @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
     def test_base_iteration(self, mock_get_all):

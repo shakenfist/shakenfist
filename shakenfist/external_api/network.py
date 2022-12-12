@@ -5,13 +5,10 @@ import ipaddress
 from shakenfist_utilities import api as sf_api, logs
 
 from shakenfist.config import config
-from shakenfist.external_api import (
-    base as api_base,
-    util as api_util)
+from shakenfist.external_api import base as api_base
 from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.daemons import daemon
-from shakenfist import db
 from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist import network
@@ -216,17 +213,18 @@ class NetworkMetadatasEndpoint(sf_api.Resource):
     @api_base.requires_network_ownership
     @api_base.log_token_use
     def get(self, network_ref=None, network_from_db=None):
-        md = db.get_metadata('network', network_from_db.uuid)
-        if not md:
-            return {}
-        return md
+        return network_from_db.metadata
 
     @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.log_token_use
     def post(self, network_ref=None, key=None, value=None, network_from_db=None):
-        return api_util.metadata_putpost('network', network_from_db.uuid, key, value)
+        if not key:
+            return sf_api.error(400, 'no key specified')
+        if not value:
+            return sf_api.error(400, 'no value specified')
+        network_from_db.add_metadata_key(key, value)
 
 
 class NetworkMetadataEndpoint(sf_api.Resource):
@@ -235,7 +233,11 @@ class NetworkMetadataEndpoint(sf_api.Resource):
     @api_base.requires_network_ownership
     @api_base.log_token_use
     def put(self, network_ref=None, key=None, value=None, network_from_db=None):
-        return api_util.metadata_putpost('network', network_from_db.uuid, key, value)
+        if not key:
+            return sf_api.error(400, 'no key specified')
+        if not value:
+            return sf_api.error(400, 'no value specified')
+        network_from_db.add_metadata_key(key, value)
 
     @api_base.verify_token
     @api_base.arg_is_network_ref
@@ -244,13 +246,7 @@ class NetworkMetadataEndpoint(sf_api.Resource):
     def delete(self, network_ref=None, key=None, network_from_db=None):
         if not key:
             return sf_api.error(400, 'no key specified')
-
-        with db.get_lock('metadata', 'network', network_from_db.uuid, op='Network metadata delete'):
-            md = db.get_metadata('network', network_from_db.uuid)
-            if md is None or key not in md:
-                return sf_api.error(404, 'key not found')
-            del md[key]
-            db.persist_metadata('network', network_from_db.uuid, md)
+        network_from_db.remove_metadata_key(key)
 
 
 class NetworkPingEndpoint(sf_api.Resource):

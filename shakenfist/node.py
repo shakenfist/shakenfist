@@ -16,6 +16,11 @@ from shakenfist.util import general as util_general
 LOG, _ = logs.setup(__name__)
 
 
+# NOTE(mikal): nodes are the only base object which don't support online
+# upgrades. That's because the online upgrade code relies on the Node object
+# in order to decide when to commit an upgrade to the database.
+
+
 class Node(dbo):
     object_type = 'node'
     current_version = 2

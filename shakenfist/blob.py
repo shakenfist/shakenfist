@@ -33,7 +33,7 @@ LOG, _ = logs.setup(__name__)
 
 class Blob(dbo):
     object_type = 'blob'
-    current_version = 4
+    current_version = 5
     upgrade_supported = True
 
     state_targets = {
@@ -72,6 +72,11 @@ class Blob(dbo):
             static_values['modified'] = cls.normalize_timestamp(
                 static_values['modified'])
             static_values['version'] = 4
+            changed = True
+
+        if static_values.get('version') == 4:
+            cls._upgrade_metadata_to_attribute(static_values['uuid'])
+            static_values['version'] = 5
             changed = True
 
         if changed:

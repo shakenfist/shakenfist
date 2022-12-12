@@ -23,7 +23,6 @@ from shakenfist.baseobject import (
 from shakenfist import blob
 from shakenfist.config import config
 from shakenfist import constants
-from shakenfist import db
 from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist.metrics import get_minimum_object_version as gmov
@@ -77,7 +76,7 @@ def _safe_int_cast(i):
 
 class Instance(dbo):
     object_type = 'instance'
-    current_version = 7
+    current_version = 8
     upgrade_supported = True
 
     # docs/development/state_machine.md has a description of these states.
@@ -182,6 +181,11 @@ class Instance(dbo):
         if static_values.get('version') == 6:
             static_values['side_channels'] = []
             static_values['version'] = 7
+            changed = True
+
+        if static_values.get('version') == 7:
+            cls._upgrade_metadata_to_attribute(static_values['uuid'])
+            static_values['version'] = 8
             changed = True
 
         if changed:
@@ -380,9 +384,7 @@ class Instance(dbo):
     # Values routed to attributes, writes are via helper methods.
     @property
     def affinity(self):
-        # TODO(andy) Move metadata to a new DBO subclass "DBO with metadata"
-        meta = db.get_metadata('instance', self.uuid)
-        return meta.get(self.METADATA_KEY_AFFINITY, {})
+        return self.metadata.get(self.METADATA_KEY_AFFINITY, {})
 
     @property
     def placement(self):
@@ -424,12 +426,7 @@ class Instance(dbo):
 
     @property
     def tags(self):
-        # TODO(andy): Move metadata to a new DBO subclass "DBO with metadata"
-        meta = db.get_metadata('instance', self.uuid)
-        if not meta:
-            # Gracefully handle malformed instances
-            return None
-        return meta.get(self.METADATA_KEY_TAGS, None)
+        return self.metadata.get(self.METADATA_KEY_TAGS, None)
 
     @property
     def agent_state(self):

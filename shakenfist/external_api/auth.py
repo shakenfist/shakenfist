@@ -11,11 +11,8 @@ from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     active_states_filter)
 from shakenfist.config import config
-from shakenfist import db
 from shakenfist.daemons import daemon
-from shakenfist.external_api import (
-    base as api_base,
-    util as api_util)
+from shakenfist.external_api import base as api_base
 from shakenfist import instance
 from shakenfist.namespace import Namespace, Namespaces, namespace_is_trusted
 from shakenfist import network
@@ -47,6 +44,22 @@ def _create_token(ns, keyname, nonce):
     }
 
 
+def arg_is_namespace(func):
+    def wrapper(*args, **kwargs):
+        if 'namespace' not in kwargs:
+            return sf_api.error(400, 'missing namespace in request')
+
+        ns = Namespace.from_db(kwargs.get('namespace'))
+        if not ns:
+            LOG.with_fields({'namesapace': kwargs.get('namespace')}).info(
+                'Namespace not found, missing or deleted')
+            return sf_api.error(404, 'namespace not found')
+
+        kwargs['namespace_from_db'] = ns
+        return func(*args, **kwargs)
+    return wrapper
+
+
 auth_token_example = """{
     "namespace": "system",
     "key": "oisoSe7T",
@@ -65,33 +78,57 @@ class AuthEndpoint(sf_api.Resource):
              'The secret for the key you wish to use.', True)
         ],
         [(200, 'An access token.', auth_token_example)]))
-    @api_base.requires_namespace_exist
-    def post(self, namespace=None, key=None):
-        if not namespace:
-            return sf_api.error(400, 'missing namespace in request')
+    @arg_is_namespace
+    def post(self, namespace=None, key=None, namespace_from_db=None):
         if not key:
             return sf_api.error(400, 'missing key in request')
         if not isinstance(key, str):
             # Must be a string to encode()
             return sf_api.error(400, 'key is not a string')
 
-        ns = Namespace.from_db(namespace)
-        if not ns:
-            LOG.with_fields({'namespace': namespace}).info(
-                'Namespace not found during auth request')
-            return sf_api.error(404, 'namespace not found during auth request')
-
-        keys = ns.keys.get('nonced_keys', {})
+        keys = namespace_from_db.keys.get('nonced_keys', {})
         for keyname in keys:
             possible_key = base64.b64decode(keys[keyname]['key'])
             if bcrypt.checkpw(key.encode('utf-8'), possible_key):
-                return _create_token(ns, keyname, keys[keyname]['nonce'])
+                return _create_token(
+                    namespace_from_db, keyname, keys[keyname]['nonce'])
 
-        ns.add_event('Attempt to use incorrect namespace key')
+        namespace_from_db.add_event('Attempt to use incorrect namespace key')
         return sf_api.error(401, 'unauthorized')
 
 
+namespace_get_example = """{
+    "name": "system",
+    "key_names": [
+        "deploy"
+    ],
+    "metadata": {}
+}"""
+
+
+namespace_list_example = """[
+    ...,
+    {
+        "name": "system",
+        "key_names": [
+            "deploy"
+        ],
+        "metadata": {}
+    }
+]"""
+
+
 class AuthNamespacesEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Create a namespace.',
+        [
+            ('namespace', 'body', 'string', 'The namespace to create.', True),
+            ('key_name', 'body', 'string',
+             'Name of an optional first key created at the same time.', False),
+            ('key', 'body', 'string',
+             'Secret for an optional first key created at the same time.', False)
+        ],
+        [(200, 'The namespace as created.', namespace_get_example)]))
     @api_base.verify_token
     @sf_api.caller_is_admin
     def post(self, namespace=None, key_name=None, key=None):
@@ -138,11 +175,11 @@ class AuthNamespacesEndpoint(sf_api.Resource):
 
             ns.add_key(key_name, key)
 
-        # Initialise metadata
-        db.persist_metadata('namespace', namespace, {})
-
         return ns.external_view()
 
+    @swag_from(api_base.swagger_helper(
+        'auth', 'List all namespaces visible to this namespace.', [],
+        [(200, 'The namespace as created.', namespace_list_example)]))
     @api_base.verify_token
     @sf_api.caller_is_admin
     @api_base.log_token_use
@@ -157,17 +194,11 @@ class AuthNamespacesEndpoint(sf_api.Resource):
 class AuthNamespaceEndpoint(sf_api.Resource):
     @api_base.verify_token
     @sf_api.caller_is_admin
+    @arg_is_namespace
     @api_base.log_token_use
-    def delete(self, namespace):
-        if not namespace:
-            return sf_api.error(400, 'no namespace specified')
+    def delete(self, namespace=None, namespace_from_db=None):
         if namespace == 'system':
             return sf_api.error(403, 'you cannot delete the system namespace')
-
-        # Namespace must exist
-        ns = Namespace.from_db(namespace)
-        if not ns:
-            return sf_api.error(404, 'namespace not found')
 
         # The namespace must be empty
         instances = []
@@ -194,32 +225,23 @@ class AuthNamespaceEndpoint(sf_api.Resource):
         for a in artifact.artifacts_in_namespace(namespace):
             a.delete()
 
-        ns.state = dbo.STATE_DELETED
-        db.delete_metadata('namespace', namespace)
+        namespace_from_db.state = dbo.STATE_DELETED
 
     @api_base.verify_token
     @sf_api.caller_is_admin
+    @arg_is_namespace
     @api_base.log_token_use
-    def get(self, namespace):
-        ns = Namespace.from_db(namespace)
-        if not ns:
-            return sf_api.error(404, 'namespace not found')
-        return ns.external_view()
+    def get(self, namespace=None, namespace_from_db=None):
+        return namespace_from_db.external_view()
 
 
-def _namespace_keys_putpost(namespace=None, key_name=None, key=None):
-    if not namespace:
-        return sf_api.error(400, 'no namespace specified')
+def _namespace_keys_putpost(ns=None, key_name=None, key=None):
     if not key_name:
         return sf_api.error(400, 'no key name specified')
     if not key:
         return sf_api.error(400, 'no key specified')
-    if key_name == 'service_key':
+    if key_name.startswith('_service_key'):
         return sf_api.error(403, 'illegal key name')
-
-    ns = Namespace.from_db(namespace)
-    if not ns:
-        return sf_api.error(404, 'namespace does not exist')
 
     ns.add_key(key_name, key)
     return key_name
@@ -228,48 +250,44 @@ def _namespace_keys_putpost(namespace=None, key_name=None, key=None):
 class AuthNamespaceKeysEndpoint(sf_api.Resource):
     @api_base.verify_token
     @sf_api.caller_is_admin
-    @api_base.requires_namespace_exist
+    @arg_is_namespace
     @api_base.log_token_use
-    def get(self, namespace=None):
+    def get(self, namespace=None, namespace_from_db=None):
         out = []
-        ns = Namespace.from_db(namespace)
-        for keyname in ns.keys.get('nonced_keys', {}):
+        for keyname in namespace_from_db.keys.get('nonced_keys', {}):
             out.append(keyname)
         return out
 
     @api_base.verify_token
     @sf_api.caller_is_admin
+    @arg_is_namespace
     @api_base.requires_namespace_exist
     @api_base.log_token_use
-    def post(self, namespace=None, key_name=None, key=None):
-        return _namespace_keys_putpost(namespace, key_name, key)
+    def post(self, namespace=None, key_name=None, key=None, namespace_from_db=None):
+        return _namespace_keys_putpost(namespace_from_db, key_name, key)
 
 
 class AuthNamespaceKeyEndpoint(sf_api.Resource):
     @api_base.verify_token
     @sf_api.caller_is_admin
+    @arg_is_namespace
     @api_base.requires_namespace_exist
     @api_base.log_token_use
-    def put(self, namespace=None, key_name=None, key=None):
-        ns = Namespace.from_db(namespace)
-        if key_name not in ns.keys:
+    def put(self, namespace=None, key_name=None, key=None, namespace_from_db=None):
+        if key_name not in namespace_from_db.keys:
             return sf_api.error(404, 'key does not exist')
-
         return _namespace_keys_putpost(namespace, key_name, key)
 
     @api_base.verify_token
     @sf_api.caller_is_admin
-    @api_base.requires_namespace_exist
+    @arg_is_namespace
     @api_base.log_token_use
-    def delete(self, namespace, key_name):
-        if not namespace:
-            return sf_api.error(400, 'no namespace specified')
+    def delete(self, namespace=None, key_name=None, namespace_from_db=None):
         if not key_name:
             return sf_api.error(400, 'no key name specified')
 
-        ns = Namespace.from_db(namespace)
-        if key_name in ns.keys.get('nonced_keys', {}):
-            ns.remove_key(key_name)
+        if key_name in namespace_from_db.keys.get('nonced_keys', {}):
+            namespace_from_db.remove_key(key_name)
         else:
             return sf_api.error(404, 'key name not found in namespace')
 
@@ -277,52 +295,51 @@ class AuthNamespaceKeyEndpoint(sf_api.Resource):
 class AuthMetadatasEndpoint(sf_api.Resource):
     @api_base.verify_token
     @sf_api.caller_is_admin
-    @api_base.requires_namespace_exist
+    @arg_is_namespace
     @api_base.log_token_use
-    def get(self, namespace=None):
-        md = db.get_metadata('namespace', namespace)
-        if not md:
-            return {}
-        return md
+    def get(self, namespace=None, namespace_from_db=None):
+        return namespace_from_db.metadata
 
     @api_base.verify_token
     @sf_api.caller_is_admin
+    @arg_is_namespace
     @api_base.requires_namespace_exist
     @api_base.log_token_use
-    def post(self, namespace=None, key=None, value=None):
-        return api_util.metadata_putpost('namespace', namespace, key, value)
+    def post(self, namespace=None, key=None, value=None, namespace_from_db=None):
+        if not key:
+            return sf_api.error(400, 'no key specified')
+        if not value:
+            return sf_api.error(400, 'no value specified')
+        namespace_from_db.add_metadata_key(key, value)
 
 
 class AuthMetadataEndpoint(sf_api.Resource):
     @api_base.verify_token
     @sf_api.caller_is_admin
-    @api_base.requires_namespace_exist
+    @arg_is_namespace
     @api_base.log_token_use
-    def put(self, namespace=None, key=None, value=None):
-        return api_util.metadata_putpost('namespace', namespace, key, value)
+    def put(self, namespace=None, key=None, value=None, namespace_from_db=None):
+        if not key:
+            return sf_api.error(400, 'no key specified')
+        if not value:
+            return sf_api.error(400, 'no value specified')
+        namespace_from_db.add_metadata_key(key, value)
 
     @api_base.verify_token
     @sf_api.caller_is_admin
-    @api_base.requires_namespace_exist
+    @arg_is_namespace
     @api_base.log_token_use
-    def delete(self, namespace=None, key=None, value=None):
+    def delete(self, namespace=None, key=None, value=None, namespace_from_db=None):
         if not key:
             return sf_api.error(400, 'no key specified')
-
-        md = db.get_metadata('namespace', namespace)
-        if md is None or key not in md:
-            return sf_api.error(404, 'key not found')
-        del md[key]
-        db.persist_metadata('namespace', namespace, md)
+        namespace_from_db.remove_metadata_key(key)
 
 
 class AuthNamespaceTrustsEndpoint(sf_api.Resource):
     @api_base.verify_token
-    @api_base.requires_namespace_exist
+    @arg_is_namespace
     @api_base.log_token_use
-    def post(self, namespace=None, external_namespace=None):
-        if not namespace:
-            return sf_api.error(400, 'missing namespace in request')
+    def post(self, namespace=None, external_namespace=None, namespace_from_db=None):
         if not external_namespace:
             return sf_api.error(400, 'no external namespace specified')
 
@@ -331,18 +348,15 @@ class AuthNamespaceTrustsEndpoint(sf_api.Resource):
                 'Namespace not found, trust test failed')
             return sf_api.error(404, 'namespace not found')
 
-        ns = Namespace.from_db(namespace)
-        ns.add_trust(external_namespace)
-        return ns.external_view()
+        namespace_from_db.add_trust(external_namespace)
+        return namespace_from_db.external_view()
 
 
 class AuthNamespaceTrustEndpoint(sf_api.Resource):
     @api_base.verify_token
-    @api_base.requires_namespace_exist
+    @arg_is_namespace
     @api_base.log_token_use
-    def delete(self, namespace=None, external_namespace=None):
-        if not namespace:
-            return sf_api.error(400, 'missing namespace in request')
+    def delete(self, namespace=None, external_namespace=None, namespace_from_db=None):
         if not external_namespace:
             return sf_api.error(400, 'no external namespace specified')
 
@@ -351,6 +365,5 @@ class AuthNamespaceTrustEndpoint(sf_api.Resource):
                 'Namespace not found, trust test failed')
             return sf_api.error(404, 'namespace not found')
 
-        ns = Namespace.from_db(namespace)
-        ns.remove_trust(external_namespace)
-        return ns.external_view()
+        namespace_from_db.remove_trust(external_namespace)
+        return namespace_from_db.external_view()

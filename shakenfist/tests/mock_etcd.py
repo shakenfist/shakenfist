@@ -10,8 +10,6 @@ import json
 import mock
 import time
 
-from shakenfist import db
-from shakenfist.baseobject import DatabaseBackedObject
 from shakenfist.instance import Instance
 from shakenfist.namespace import Namespace
 from shakenfist.network import Network
@@ -112,13 +110,6 @@ class MockEtcd():
     # DB operations - Utilising SF DB functionality
     #
 
-    def persist_metadata(self, dbo_type, uuid, metadata):
-        """Set metadata for a specified object"""
-        if not DatabaseBackedObject.__subclasscheck__(dbo_type):
-            raise NotImplementedError(
-                'Objects must be subclasses of DatabaseBackedObject')
-        db.persist_metadata(dbo_type.object_type, uuid, metadata)
-
     def set_node_metrics_same(self, metrics=None):
         if not metrics:
             metrics = {
@@ -148,7 +139,6 @@ class MockEtcd():
     def create_namespace(self, namespace, key_name, key):
         ns = Namespace.new(namespace)
         ns.add_key(key_name, key)
-        db.persist_metadata('namespace', namespace, {})
 
     # Find a path through the allowed states which gets us to the requested state
     @staticmethod
@@ -173,7 +163,7 @@ class MockEtcd():
                         video='cirrus',
                         uefi=False,
                         configdrive='openstack-disk',
-                        metadata={},
+                        metadata=None,
                         set_state=Instance.STATE_CREATED,
                         place_on_node='',
                         ):
@@ -194,7 +184,9 @@ class MockEtcd():
                             uefi=uefi,
                             configdrive=configdrive,
                             )
-        self.persist_metadata(Instance, inst.uuid, metadata)
+
+        if metadata:
+            inst._db_set_attribute('metadata', metadata)
 
         state_path = defaultdict(set)
         for initial, allowed in Instance.state_targets.items():
@@ -217,7 +209,7 @@ class MockEtcd():
                        provide_dhcp=False,
                        provide_nat=False,
                        vxid=None,
-                       metadata={},
+                       metadata=None,
                        set_state=Network.STATE_CREATED,
                        ):
 
@@ -233,7 +225,8 @@ class MockEtcd():
                               vxid=vxid,
                               )
 
-        self.persist_metadata(Network, network.uuid, metadata)
+        if metadata:
+            network._db_set_attribute('metadata', metadata)
 
         state_path = defaultdict(set)
         for initial, allowed in Network.state_targets.items():

@@ -2,7 +2,6 @@ from flask_jwt_extended import get_jwt_identity
 from shakenfist_utilities import api as sf_api, logs
 
 from shakenfist.daemons import daemon
-from shakenfist import db
 from shakenfist.instance import Instance
 from shakenfist import network
 from shakenfist.networkinterface import NetworkInterface
@@ -10,23 +9,6 @@ from shakenfist.networkinterface import NetworkInterface
 
 LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
-
-
-def metadata_putpost(meta_type, owner, key, value):
-    if meta_type not in ['namespace', 'instance', 'network']:
-        return sf_api.error(500, 'invalid meta_type %s' % meta_type)
-    if not key:
-        return sf_api.error(400, 'no key specified')
-    if not value:
-        return sf_api.error(400, 'no value specified')
-
-    with db.get_lock('metadata', meta_type, owner,
-                     op='Metadata update'):
-        md = db.get_metadata(meta_type, owner)
-        if md is None:
-            md = {}
-        md[key] = value
-        db.persist_metadata(meta_type, owner, md)
 
 
 def assign_floating_ip(ni):
