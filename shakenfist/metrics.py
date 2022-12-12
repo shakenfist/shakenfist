@@ -46,23 +46,22 @@ def get_minimum_object_version(objname):
     global VERSION_CACHE
     global VERSION_CACHE_AGE
 
-    with etcd.get_lock('get_minimum_object_versions', None, None):
-        if not VERSION_CACHE:
-            VERSION_CACHE = {}
-        elif time.time() - VERSION_CACHE_AGE > 300:
-            VERSION_CACHE = {}
-        elif objname in VERSION_CACHE:
-            return VERSION_CACHE[objname]
-
-        metrics = get_node_metrics([])
-        for possible_objname in OBJECT_NAMES:
-            minimum = inf
-            for entry in metrics:
-                ver = metrics[entry].get(
-                    'object_version_%s' % possible_objname)
-                if ver:
-                    minimum = min(minimum, ver)
-            VERSION_CACHE[possible_objname] = minimum
-
-        VERSION_CACHE_AGE = time.time()
+    if not VERSION_CACHE:
+        VERSION_CACHE = {}
+    elif time.time() - VERSION_CACHE_AGE > 300:
+        VERSION_CACHE = {}
+    elif objname in VERSION_CACHE:
         return VERSION_CACHE[objname]
+
+    metrics = get_node_metrics([])
+    for possible_objname in OBJECT_NAMES:
+        minimum = inf
+        for entry in metrics:
+            ver = metrics[entry].get(
+                'object_version_%s' % possible_objname)
+            if ver:
+                minimum = min(minimum, ver)
+        VERSION_CACHE[possible_objname] = minimum
+
+    VERSION_CACHE_AGE = time.time()
+    return VERSION_CACHE[objname]
