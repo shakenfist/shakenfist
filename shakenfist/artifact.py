@@ -198,16 +198,15 @@ class Artifact(dbo):
         self._db_set_attribute('shared', {'shared': value})
 
     def external_view_without_index(self):
-        return {
-            'uuid': self.uuid,
+        out = self._external_view()
+        out.update({
             'artifact_type': self.artifact_type,
-            'state': self.state.value,
             'source_url': self.source_url,
-            'version': self.version,
             'max_versions': self.max_versions,
             'namespace': self.namespace,
             'shared': self.shared
-        }
+        })
+        return out
 
     def external_view(self):
         # If this is an external view, then mix back in attributes that users

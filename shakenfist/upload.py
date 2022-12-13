@@ -85,11 +85,12 @@ class Upload(dbo):
         return self.__created_at
 
     def external_view(self):
-        return {
-            'uuid': self.uuid,
+        retval = self._external_view()
+        retval.update({
             'node': self.node,
             'created_at': self.created_at
-        }
+        })
+        return retval
 
 
 class Uploads(dbo_iter):

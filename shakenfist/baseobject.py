@@ -295,6 +295,14 @@ class DatabaseBackedObject(object):
                 del md[key]
                 self._db_set_attribute('metadata', md)
 
+    def _external_view(self):
+        return {
+            'uuid': self.uuid,
+            'state': self.state.value,
+            'metadata': self.metadata,
+            'version': self.version
+        }
+
     def hard_delete(self):
         etcd.delete(self.object_type, None, self.uuid)
         etcd.delete_all('attribute/%s' % self.object_type, self.uuid)

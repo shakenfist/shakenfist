@@ -92,14 +92,12 @@ class Node(dbo):
     def external_view(self):
         # If this is an external view, then mix back in attributes that users
         # expect
-        retval = {
-            'uuid': self.uuid,
+        retval = self._external_view()
+        retval.update({
             'fqdn': self.fqdn,
             'ip': self.ip,
-            'state': self.state.value,
-            'lastseen': self.last_seen,
-            'version': self.installed_version
-        }
+            'lastseen': self.last_seen
+        })
         retval.update(self._db_get_attribute('roles', {}))
         return retval
 
