@@ -192,6 +192,9 @@ class SFConfig(BaseSettings):
     BLOB_REPLICATION_FACTOR: int = Field(
         2, description='How many copies of each blob we like to have.'
     )
+    CHECKSUM_VERIFICATION_FREQUENCY: int = Field(
+        24 * 3600, description='How often we verify blob checksums, in seconds.'
+    )
     MAX_CONCURRENT_BLOB_TRANSFERS: int = Field(
         20, description='How many concurrent blob transfers we can have queued.'
     )
