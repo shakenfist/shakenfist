@@ -1,5 +1,6 @@
 # Copyright 2021 Michael Still
 
+from functools import partial
 import magic
 import numbers
 import os
@@ -25,6 +26,7 @@ from shakenfist.node import (Node, Nodes, nodes_by_free_disk_descending,
                              inactive_states_filter as node_inactive_states_filter)
 from shakenfist.tasks import FetchBlobTask
 from shakenfist.util import general as util_general
+from shakenfist.util import process as util_process
 from shakenfist.util import image as util_image
 
 
@@ -192,13 +194,13 @@ class Blob(dbo):
 
     def add_transcode(self, style, blob_uuid):
         self.record_usage()
-        with self.get_lock(op='Update trancoded versions'):
+        with self.get_lock(op='Update transcoded versions'):
             transcoded = self.transcoded
             transcoded[style] = blob_uuid
             self._db_set_attribute('transcoded', transcoded)
 
     def remove_transcodes(self):
-        with self.get_lock(op='Remove trancoded versions'):
+        with self.get_lock(op='Remove transcoded versions'):
             self._db_set_attribute('transcoded', {})
 
     @property
@@ -211,13 +213,17 @@ class Blob(dbo):
 
     # Derived values
     @property
-    def instances(self):
+    def instances(self, node=None):
         """Build a list of instances that are using the blob as a block device.
 
         Returns a list of instance UUIDs.
         """
+        filters = [instance.healthy_states_filter]
+        if node:
+            filters.append(partial(placement_filter, node))
+
         instance_uuids = []
-        for inst in instance.Instances([instance.healthy_states_filter]):
+        for inst in instance.Instances(filters):
             # inst.block_devices isn't populated until the instance is created,
             # so it may not be ready yet. This means we will miss instances
             # which have been requested but not yet started.
@@ -508,19 +514,48 @@ class Blob(dbo):
     def checksums(self):
         return self._db_get_attribute('checksums')
 
+    def _remove_if_idle(self, msg):
+        if len(self.instances(config.NODE_NAME)) == 0:
+            os.unlink(Blob.filepath(self.uuid))
+            self.remove_location(config.NODE_NAME)
+            self.log.error('Removed idle blob %s' % msg)
+        else:
+            self.log.error('Not removing in-use blob %s' % msg)
+
+    def verify_size(self):
+        st = os.stat(Blob.filepath(self.uuid))
+        if self.size != st.st_size:
+            self.add_event('blob failed checksum validation',
+                           extra={
+                               'stored_size': self.size,
+                               'node_size': st.st_size,
+                               'node': config.NODE_NAME
+                           })
+            self._remove_if_idle('with incorrect size')
+            return False
+        return True
+
     def update_checksum(self, hash):
+        hash_out, _ = util_process.execute(
+            None,
+            'sha512sum %s' % Blob.filepath(self.uuid),
+            iopriority=util_process.PRIORITY_LOW)
+        hash = hash_out.split(' ')[0]
+        self.log.with_fields({'sha512': hash}).info('Validated checksum')
+
         with self.get_lock_attr('checksums', op='update checksums'):
             c = self.checksums
             if 'sha512' not in c:
                 c['sha512'] = hash
             else:
                 if c['sha512'] != hash:
-                    # TODO(mikal): we should probably remove this replica of the
-                    # blob unless its the only one we have.
                     self.add_event('blob failed checksum validation',
                                    extra={
                                        'stored_hash': c['sha512'],
-                                       'node_hash': hash})
+                                       'node_hash': hash,
+                                       'node': config.NODE_NAME
+                                   })
+                    self._remove_if_idle('with incorrect checksum')
 
             if 'nodes' not in c:
                 c['nodes'] = {config.NODE_NAME: time.time()}
