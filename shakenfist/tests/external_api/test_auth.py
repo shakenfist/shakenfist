@@ -305,7 +305,8 @@ class AuthKeysTestCase(base.ShakenFistTestCase):
             'metadata': {},
             'name': 'foo',
             'state': 'created',
-            'trust': {'full': ['system']}
+            'trust': {'full': ['system']},
+            'version': 5
         }, resp.get_json())
 
     def test_auth_add_key_missing_key(self):
@@ -426,35 +427,40 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
                 'metadata': {},
                 'name': 'banana',
                 'state': 'created',
-                'trust': {'full': ['system']}
+                'trust': {'full': ['system']},
+                'version': 5
             },
             {
                 'keys': ['key1'],
                 'metadata': {},
                 'name': 'foo',
                 'state': 'created',
-                'trust': {'full': ['system']}
+                'trust': {'full': ['system']},
+                'version': 5
             },
             {
                 'keys': ['key1'],
                 'metadata': {},
                 'name': 'system',
                 'state': 'created',
-                'trust': {'full': ['system']}
+                'trust': {'full': ['system']},
+                'version': 5
             },
             {
                 'keys': ['key1'],
                 'metadata': {},
                 'name': 'three',
                 'state': 'created',
-                'trust': {'full': ['system']}
+                'trust': {'full': ['system']},
+                'version': 5
             },
             {
                 'keys': ['key1'],
                 'metadata': {},
                 'name': 'two',
                 'state': 'created',
-                'trust': {'full': ['system']}
+                'trust': {'full': ['system']},
+                'version': 5
             }
         ], resp.get_json())
 
@@ -604,5 +610,6 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
             'metadata': {},
             'name': 'foo',
             'state': 'created',
-            'trust': {'full': ['system']}
+            'trust': {'full': ['system']},
+            'version': 5
         }, resp.get_json())

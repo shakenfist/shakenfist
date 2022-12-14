@@ -114,17 +114,15 @@ class NetworkInterface(dbo):
     def external_view(self):
         # If this is an external view, then mix back in attributes that users
         # expect
-        n = {
-            'uuid': self.uuid,
+        n = self._external_view()
+        n.update({
             'network_uuid': self.network_uuid,
             'instance_uuid': self.instance_uuid,
             'macaddr': self.macaddr,
             'ipv4': self.ipv4,
             'order': self.order,
-            'model': self.model,
-            'state': self.state.value,
-            'version': self.version
-        }
+            'model': self.model
+        })
 
         n['floating'] = self._db_get_attribute(
             'floating').get('floating_address')

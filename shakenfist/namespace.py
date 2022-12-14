@@ -220,23 +220,20 @@ class Namespace(dbo):
     def external_view(self):
         # If this is an external view, then mix back in attributes that users
         # expect
-        retval = {
+        retval = self._external_view()
+        del retval['uuid']
+        retval.update({
             'name': self.uuid,
-            'state': self.state.value,
             'keys': [],
-            'metadata': {},
             'trust': {
                 'full': self.trust
             }
-        }
+        })
 
         # Mix in key names
         keys = self.keys
         for k in keys.get('nonced_keys', {}):
             retval['keys'].append(k)
-
-        # Mix in metadata
-        retval['metadata'] = self.metadata
 
         return retval
 

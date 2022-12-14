@@ -151,18 +151,16 @@ class Network(dbo):
     def external_view(self):
         # If this is an external view, then mix back in attributes that users
         # expect
-        n = {
-            'uuid': self.uuid,
+        n = self._external_view()
+        n.update({
             'name': self.__name,
             'namespace': self.__namespace,
             'netblock': self.__netblock,
             'provide_dhcp': self.__provide_dhcp,
             'provide_nat': self.__provide_nat,
             'floating_gateway': self.floating_gateway,
-            'state': self.state.value,
-            'vxid': self.__vxid,
-            'version': self.version
-        }
+            'vxid': self.__vxid
+        })
 
         for attrname in ['routing']:
             d = self._db_get_attribute(attrname)

@@ -128,9 +128,8 @@ class Blob(dbo):
     def external_view(self):
         # If this is an external view, then mix back in attributes that users
         # expect
-        out = {
-            'uuid': self.uuid,
-            'state': self.state.value,
+        out = self._external_view()
+        out.update({
             'size': self.size,
             'modified': self.modified,
             'fetched_at': self.fetched_at,
@@ -138,7 +137,7 @@ class Blob(dbo):
             'transcodes': self.transcoded,
             'locations': self.locations,
             'reference_count': self.ref_count
-        }
+        })
 
         # The order of these two calls matters, as instances updates last_used
         # if there are instances using the blob

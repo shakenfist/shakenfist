@@ -239,15 +239,14 @@ class Instance(dbo):
     def external_view(self):
         # If this is an external view, then mix back in attributes that users
         # expect
-        i = {
-            'uuid': self.uuid,
+        i = self._external_view()
+        i.update({
             'cpus': self.cpus,
             'disk_spec': self.disk_spec,
             'memory': self.memory,
             'name': self.name,
             'namespace': self.namespace,
             'ssh_key': self.ssh_key,
-            'state': self.state.value,
             'user_data': self.user_data,
             'video': self.video,
             'uefi': self.uefi,
@@ -259,10 +258,8 @@ class Instance(dbo):
             'agent_state': self.agent_state.value,
             'agent_start_time': self.agent_start_time,
             'agent_system_boot_time': self.agent_system_boot_time,
-
-            'version': self.version,
             'error_message': self.error,
-        }
+        })
 
         if self.requested_placement:
             i['requested_placement'] = self.requested_placement
