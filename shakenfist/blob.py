@@ -1,6 +1,7 @@
 # Copyright 2021 Michael Still
 
 from functools import partial
+import hashlib
 import magic
 import numbers
 import os
@@ -18,8 +19,8 @@ from shakenfist import db
 from shakenfist import etcd
 from shakenfist.exceptions import (BlobMissing, BlobDeleted, BlobFetchFailed,
                                    BlobDependencyMissing, BlobsMustHaveContent,
-                                   BlobAlreadyBeingTransferred,
-                                   BlobTransferSetupFailed)
+                                   BlobAlreadyBeingTransferred, BadCheckSum,
+                                   BlobTransferSetupFailed, UnknownChecksumType)
 from shakenfist import instance
 from shakenfist.metrics import get_minimum_object_version as gmov
 from shakenfist.node import (Node, Nodes, nodes_by_free_disk_descending,
@@ -580,8 +581,8 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
     depends_on = None
     with util_general.RecordedOperation('snapshot %s' % disk['device'], related_object):
         depends_on = util_image.snapshot(
-            None, disk['path'], dest_path, thin=thin)
-        st = os.stat(dest_path)
+            None, disk['path'], dest_path + '.partial', thin=thin)
+        st = os.stat(dest_path + '.partial')
 
     # Check that the dependency (if any) actually exists. This test can fail when
     # the blob used to start an instance has been deleted already.
@@ -594,6 +595,7 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
         dep_blob.ref_count_inc()
 
     # And make the associated blob
+    os.rename(dest_path + '.partial', dest_path)
     b = Blob.new(blob_uuid, st.st_size, time.time(), time.time(),
                  depends_on=depends_on)
     b.state = Blob.STATE_CREATED
@@ -602,8 +604,34 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
     return b
 
 
-def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
+def http_fetch(url, resp, blob_uuid, locks, logs, checksum, checksum_type,
+               instance_object=None):
     ensure_blob_path()
+
+    def verify_checksum(logs, image_path, checksum, checksum_type):
+        if not checksum:
+            logs.info('No checksum comparison available')
+            return True
+
+        if not os.path.exists(image_path):
+            return False
+
+        if checksum_type == 'md5':
+            # MD5 chosen because cirros 90% of the time has MD5SUMS available...
+            md5_hash = hashlib.md5()
+            with open(image_path, 'rb') as f:
+                for byte_block in iter(lambda: f.read(4096), b''):
+                    md5_hash.update(byte_block)
+            calc = md5_hash.hexdigest()
+
+            correct = calc == checksum
+            logs.with_fields({
+                'calculated': calc,
+                'correct': correct}).info('Image checksum verification')
+            return correct
+
+        else:
+            raise UnknownChecksumType(checksum_type)
 
     fetched = 0
     if resp.headers.get('Content-Length'):
@@ -615,7 +643,7 @@ def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
     last_refresh = 0
     dest_path = Blob.filepath(blob_uuid)
 
-    with open(dest_path, 'wb') as f:
+    with open(dest_path + '.partial', 'wb') as f:
         for chunk in resp.iter_content(chunk_size=8192):
             fetched += len(chunk)
             f.write(chunk)
@@ -625,7 +653,8 @@ def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
                 if (percentage - previous_percentage) > 10.0:
                     if instance_object:
                         instance_object.add_event(
-                            'Fetching required HTTP resource %s into blob %s, %d%% complete'
+                            'Fetching required HTTP resource %s into blob %s, '
+                            '%d%% complete'
                             % (url, blob_uuid, percentage))
 
                     logs.with_fields({'bytes_fetched': fetched}).debug(
@@ -642,13 +671,14 @@ def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
             % (url, blob_uuid))
     logs.with_fields({'bytes_fetched': fetched}).info('Fetch complete')
 
-    # We really should verify the checksum here before we commit the blob to the
-    # database.
+    if not verify_checksum(logs, dest_path + '.partial', checksum, checksum_type):
+        raise BadCheckSum('url=%s' % url)
 
     # And make the associated blob
     if not total_size:
         total_size = fetched
 
+    os.rename(dest_path + '.partial', dest_path)
     b = Blob.new(blob_uuid, total_size, resp.headers.get('Last-Modified'),
                  time.time())
     b.state = Blob.STATE_CREATED
