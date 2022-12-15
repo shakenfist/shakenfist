@@ -1,4 +1,3 @@
-import hashlib
 import os
 import pathlib
 import re
@@ -325,20 +324,16 @@ class ImageFetchHelper(object):
                 'artifact': self.artifact,
                 'blob': blob_uuid,
                 'url': url}).info('Commencing HTTP fetch to blob')
-            b = blob.http_fetch(url, resp, blob_uuid, [lock], self.log,
-                                instance_object=instance_object)
 
-            # Ensure checksum is correct
-            if not verify_checksum(
-                    os.path.join(config.STORAGE_PATH, 'blobs', b.uuid),
-                    checksum, checksum_type):
+            try:
+                b = blob.http_fetch(
+                    url, resp, blob_uuid, [lock], self.log, checksum,
+                    checksum_type, instance_object=instance_object)
+            except exceptions.BadChecksum as e:
                 self.instance.add_event('fetched image had bad checksum')
                 self.artifact.add_event('fetched image had bad checksum')
-                raise exceptions.BadCheckSum('url=%s' % url)
+                raise e
 
-            # Only persist values after the file has been verified.
-            b.observe()
-            b.request_replication()
             return b
 
     def _open_connection(self, url):
@@ -355,32 +350,3 @@ class ImageFetchHelper(object):
                 'Failed to fetch HEAD of %s (status code %d)'
                 % (url, resp.status_code))
         return resp
-
-
-def verify_checksum(image_name, checksum, checksum_type):
-    log = LOG.with_fields({'image': image_name})
-
-    if not checksum:
-        log.info('No checksum comparison available')
-        return True
-
-    if not os.path.exists(image_name):
-        return False
-
-    if checksum_type == 'md5':
-        # MD5 chosen because cirros 90% of the time has MD5SUMS available...
-        md5_hash = hashlib.md5()
-        with open(image_name, 'rb') as f:
-            for byte_block in iter(lambda: f.read(4096), b''):
-                md5_hash.update(byte_block)
-        calc = md5_hash.hexdigest()
-
-        correct = calc == checksum
-        log.with_fields({
-            'calculated': calc,
-            'correct': correct,
-            'equal': correct}).info('Image checksum verification')
-        return correct
-
-    else:
-        raise exceptions.UnknownChecksumType(checksum_type)

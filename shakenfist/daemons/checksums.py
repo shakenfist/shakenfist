@@ -6,7 +6,6 @@ from shakenfist import blob
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
-from shakenfist.util import process as util_process
 
 
 LOG, _ = logs.setup(__name__)
@@ -23,6 +22,11 @@ class Monitor(daemon.Daemon):
 
             with etcd.ThreadLocalReadOnlyCache():
                 for ent in os.listdir(blob_path):
+                    st = os.stat(os.path.join(blob_path, ent))
+                    if time.time() - st.st_mtime < 60:
+                        # File is too new to verify
+                        continue
+
                     b = blob.Blob.from_db(ent)
                     if not b:
                         continue
@@ -34,6 +38,8 @@ class Monitor(daemon.Daemon):
                         # This node has either not recently checked this blob, or
                         # has never checked it. Generate a checksum.
                         check_this_pass.append(b.uuid)
+                        if len(check_this_pass) > 50:
+                            break
 
                     if self.exit.is_set():
                         break
@@ -42,17 +48,10 @@ class Monitor(daemon.Daemon):
                 b = blob.Blob.from_db(blob_uuid)
                 # TODO(mikal): we should not do this if the node is really
                 # busy.
-                hash_out, _ = util_process.execute(
-                    None,
-                    'sha512sum %s/%s' % (blob_path, ent),
-                    iopriority=util_process.PRIORITY_LOW)
-                hash = hash_out.split(' ')[0]
-                LOG.with_fields({
-                    'blob': b.uuid,
-                    'sha512': hash}).info('Checksum')
-                b.update_checksum(hash)
+                if b.verify_size():
+                    b.verify_checksum()
 
-                self.exit.wait(60)
+                self.exit.wait(5)
                 if self.exit.is_set():
                     break
 

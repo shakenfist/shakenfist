@@ -1,5 +1,7 @@
 # Copyright 2021 Michael Still
 
+from functools import partial
+import hashlib
 import magic
 import numbers
 import os
@@ -17,14 +19,15 @@ from shakenfist import db
 from shakenfist import etcd
 from shakenfist.exceptions import (BlobMissing, BlobDeleted, BlobFetchFailed,
                                    BlobDependencyMissing, BlobsMustHaveContent,
-                                   BlobAlreadyBeingTransferred,
-                                   BlobTransferSetupFailed)
+                                   BlobAlreadyBeingTransferred, BadCheckSum,
+                                   BlobTransferSetupFailed, UnknownChecksumType)
 from shakenfist import instance
 from shakenfist.metrics import get_minimum_object_version as gmov
 from shakenfist.node import (Node, Nodes, nodes_by_free_disk_descending,
                              inactive_states_filter as node_inactive_states_filter)
 from shakenfist.tasks import FetchBlobTask
 from shakenfist.util import general as util_general
+from shakenfist.util import process as util_process
 from shakenfist.util import image as util_image
 
 
@@ -192,13 +195,13 @@ class Blob(dbo):
 
     def add_transcode(self, style, blob_uuid):
         self.record_usage()
-        with self.get_lock(op='Update trancoded versions'):
+        with self.get_lock(op='Update transcoded versions'):
             transcoded = self.transcoded
             transcoded[style] = blob_uuid
             self._db_set_attribute('transcoded', transcoded)
 
     def remove_transcodes(self):
-        with self.get_lock(op='Remove trancoded versions'):
+        with self.get_lock(op='Remove transcoded versions'):
             self._db_set_attribute('transcoded', {})
 
     @property
@@ -211,13 +214,17 @@ class Blob(dbo):
 
     # Derived values
     @property
-    def instances(self):
+    def instances(self, node=None):
         """Build a list of instances that are using the blob as a block device.
 
         Returns a list of instance UUIDs.
         """
+        filters = [instance.healthy_states_filter]
+        if node:
+            filters.append(partial(placement_filter, node))
+
         instance_uuids = []
-        for inst in instance.Instances([instance.healthy_states_filter]):
+        for inst in instance.Instances(filters):
             # inst.block_devices isn't populated until the instance is created,
             # so it may not be ready yet. This means we will miss instances
             # which have been requested but not yet started.
@@ -407,10 +414,12 @@ class Blob(dbo):
             client.connect((locations[0], data['port']))
             client.send(token.encode('utf-8'))
 
+            sha512_hash = hashlib.sha512()
             with open(partial_path, 'wb') as f:
                 d = client.recv(8000)
                 while d:
                     f.write(d)
+                    sha512_hash.update(d)
                     total_bytes_received += len(d)
 
                     if time.time() - last_refresh > LOCK_REFRESH_SECONDS:
@@ -437,6 +446,7 @@ class Blob(dbo):
                     os.unlink(partial_path)
                 raise BlobFetchFailed('Did not fetch enough data')
 
+            self.verify_checksum(sha512_hash.hexdigest())
             os.rename(partial_path, blob_path)
             if instance_object:
                 instance_object.add_event(
@@ -508,19 +518,54 @@ class Blob(dbo):
     def checksums(self):
         return self._db_get_attribute('checksums')
 
-    def update_checksum(self, hash):
+    def _remove_if_idle(self, msg):
+        if len(self.instances(config.NODE_NAME)) == 0:
+            blob_path = Blob.filepath(self.uuid)
+            if os.path.exists(blob_path):
+                os.unlink(blob_path)
+            if os.path.exists(blob_path + '.partial'):
+                os.unlink(blob_path + '.partial')
+
+            self.remove_location(config.NODE_NAME)
+            self.log.error('Removed idle blob %s' % msg)
+        else:
+            self.log.error('Not removing in-use blob %s' % msg)
+
+    def verify_size(self):
+        st = os.stat(Blob.filepath(self.uuid))
+        if self.size != st.st_size:
+            self.add_event('blob failed checksum validation',
+                           extra={
+                               'stored_size': self.size,
+                               'node_size': st.st_size,
+                               'node': config.NODE_NAME
+                           })
+            self._remove_if_idle('with incorrect size')
+            return False
+        return True
+
+    def verify_checksum(self, hash=None):
+        if not hash:
+            hash_out, _ = util_process.execute(
+                None,
+                'sha512sum %s' % Blob.filepath(self.uuid),
+                iopriority=util_process.PRIORITY_LOW)
+            hash = hash_out.split(' ')[0]
+        self.log.with_fields({'sha512': hash}).info('Local checksum')
+
         with self.get_lock_attr('checksums', op='update checksums'):
             c = self.checksums
             if 'sha512' not in c:
                 c['sha512'] = hash
             else:
                 if c['sha512'] != hash:
-                    # TODO(mikal): we should probably remove this replica of the
-                    # blob unless its the only one we have.
                     self.add_event('blob failed checksum validation',
                                    extra={
                                        'stored_hash': c['sha512'],
-                                       'node_hash': hash})
+                                       'node_hash': hash,
+                                       'node': config.NODE_NAME
+                                   })
+                    self._remove_if_idle('with incorrect checksum')
 
             if 'nodes' not in c:
                 c['nodes'] = {config.NODE_NAME: time.time()}
@@ -545,8 +590,8 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
     depends_on = None
     with util_general.RecordedOperation('snapshot %s' % disk['device'], related_object):
         depends_on = util_image.snapshot(
-            None, disk['path'], dest_path, thin=thin)
-        st = os.stat(dest_path)
+            None, disk['path'], dest_path + '.partial', thin=thin)
+        st = os.stat(dest_path + '.partial')
 
     # Check that the dependency (if any) actually exists. This test can fail when
     # the blob used to start an instance has been deleted already.
@@ -559,15 +604,18 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
         dep_blob.ref_count_inc()
 
     # And make the associated blob
+    os.rename(dest_path + '.partial', dest_path)
     b = Blob.new(blob_uuid, st.st_size, time.time(), time.time(),
                  depends_on=depends_on)
     b.state = Blob.STATE_CREATED
     b.observe()
+    b.verify_checksum()
     b.request_replication()
     return b
 
 
-def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
+def http_fetch(url, resp, blob_uuid, locks, logs, checksum, checksum_type,
+               instance_object=None):
     ensure_blob_path()
 
     fetched = 0
@@ -580,17 +628,23 @@ def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
     last_refresh = 0
     dest_path = Blob.filepath(blob_uuid)
 
-    with open(dest_path, 'wb') as f:
+    md5_hash = hashlib.md5()
+    sha512_hash = hashlib.sha512()
+
+    with open(dest_path + '.partial', 'wb') as f:
         for chunk in resp.iter_content(chunk_size=8192):
             fetched += len(chunk)
             f.write(chunk)
+            md5_hash.update(chunk)
+            sha512_hash.update(chunk)
 
             if total_size:
                 percentage = fetched / total_size * 100.0
                 if (percentage - previous_percentage) > 10.0:
                     if instance_object:
                         instance_object.add_event(
-                            'Fetching required HTTP resource %s into blob %s, %d%% complete'
+                            'Fetching required HTTP resource %s into blob %s, '
+                            '%d%% complete'
                             % (url, blob_uuid, percentage))
 
                     logs.with_fields({'bytes_fetched': fetched}).debug(
@@ -607,17 +661,26 @@ def http_fetch(url, resp, blob_uuid, locks, logs, instance_object=None):
             % (url, blob_uuid))
     logs.with_fields({'bytes_fetched': fetched}).info('Fetch complete')
 
-    # We really should verify the checksum here before we commit the blob to the
-    # database.
+    # Verify the downloaded checksum, if we were given one
+    if checksum:
+        if checksum_type == 'md5':
+            calc = md5_hash.hexdigest()
+            correct = calc == checksum
+            logs.with_fields({
+                'calculated': calc,
+                'correct': correct}).info('Image checksum verification')
+            if not correct:
+                raise BadCheckSum('url=%s' % url)
+        else:
+            raise UnknownChecksumType(checksum_type)
 
-    # And make the associated blob
-    if not total_size:
-        total_size = fetched
-
-    b = Blob.new(blob_uuid, total_size, resp.headers.get('Last-Modified'),
+    # Make the associated blob
+    os.rename(dest_path + '.partial', dest_path)
+    b = Blob.new(blob_uuid, fetched, resp.headers.get('Last-Modified'),
                  time.time())
     b.state = Blob.STATE_CREATED
     b.observe()
+    b.verify_checksum(sha512_hash.hexdigest())
     b.request_replication()
     return b
 
