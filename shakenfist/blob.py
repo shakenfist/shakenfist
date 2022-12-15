@@ -414,10 +414,12 @@ class Blob(dbo):
             client.connect((locations[0], data['port']))
             client.send(token.encode('utf-8'))
 
+            sha512_hash = hashlib.sha512()
             with open(partial_path, 'wb') as f:
                 d = client.recv(8000)
                 while d:
                     f.write(d)
+                    sha512_hash.update(d)
                     total_bytes_received += len(d)
 
                     if time.time() - last_refresh > LOCK_REFRESH_SECONDS:
@@ -444,6 +446,7 @@ class Blob(dbo):
                     os.unlink(partial_path)
                 raise BlobFetchFailed('Did not fetch enough data')
 
+            self.verify_checksum(sha512_hash.hexdigest())
             os.rename(partial_path, blob_path)
             if instance_object:
                 instance_object.add_event(
@@ -517,7 +520,12 @@ class Blob(dbo):
 
     def _remove_if_idle(self, msg):
         if len(self.instances(config.NODE_NAME)) == 0:
-            os.unlink(Blob.filepath(self.uuid))
+            blob_path = Blob.filepath(self.uuid)
+            if os.path.exists(blob_path):
+                os.unlink(blob_path)
+            if os.path.exists(blob_path + '.partial'):
+                os.unlink(blob_path + '.partial')
+
             self.remove_location(config.NODE_NAME)
             self.log.error('Removed idle blob %s' % msg)
         else:
@@ -536,13 +544,14 @@ class Blob(dbo):
             return False
         return True
 
-    def update_checksum(self, hash):
-        hash_out, _ = util_process.execute(
-            None,
-            'sha512sum %s' % Blob.filepath(self.uuid),
-            iopriority=util_process.PRIORITY_LOW)
-        hash = hash_out.split(' ')[0]
-        self.log.with_fields({'sha512': hash}).info('Validated checksum')
+    def verify_checksum(self, hash=None):
+        if not hash:
+            hash_out, _ = util_process.execute(
+                None,
+                'sha512sum %s' % Blob.filepath(self.uuid),
+                iopriority=util_process.PRIORITY_LOW)
+            hash = hash_out.split(' ')[0]
+        self.log.with_fields({'sha512': hash}).info('Local checksum')
 
         with self.get_lock_attr('checksums', op='update checksums'):
             c = self.checksums
@@ -600,6 +609,7 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
                  depends_on=depends_on)
     b.state = Blob.STATE_CREATED
     b.observe()
+    b.verify_checksum()
     b.request_replication()
     return b
 
@@ -607,31 +617,6 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
 def http_fetch(url, resp, blob_uuid, locks, logs, checksum, checksum_type,
                instance_object=None):
     ensure_blob_path()
-
-    def verify_checksum(logs, image_path, checksum, checksum_type):
-        if not checksum:
-            logs.info('No checksum comparison available')
-            return True
-
-        if not os.path.exists(image_path):
-            return False
-
-        if checksum_type == 'md5':
-            # MD5 chosen because cirros 90% of the time has MD5SUMS available...
-            md5_hash = hashlib.md5()
-            with open(image_path, 'rb') as f:
-                for byte_block in iter(lambda: f.read(4096), b''):
-                    md5_hash.update(byte_block)
-            calc = md5_hash.hexdigest()
-
-            correct = calc == checksum
-            logs.with_fields({
-                'calculated': calc,
-                'correct': correct}).info('Image checksum verification')
-            return correct
-
-        else:
-            raise UnknownChecksumType(checksum_type)
 
     fetched = 0
     if resp.headers.get('Content-Length'):
@@ -643,10 +628,15 @@ def http_fetch(url, resp, blob_uuid, locks, logs, checksum, checksum_type,
     last_refresh = 0
     dest_path = Blob.filepath(blob_uuid)
 
+    md5_hash = hashlib.md5()
+    sha512_hash = hashlib.sha512()
+
     with open(dest_path + '.partial', 'wb') as f:
         for chunk in resp.iter_content(chunk_size=8192):
             fetched += len(chunk)
             f.write(chunk)
+            md5_hash.update(chunk)
+            sha512_hash.update(chunk)
 
             if total_size:
                 percentage = fetched / total_size * 100.0
@@ -671,18 +661,26 @@ def http_fetch(url, resp, blob_uuid, locks, logs, checksum, checksum_type,
             % (url, blob_uuid))
     logs.with_fields({'bytes_fetched': fetched}).info('Fetch complete')
 
-    if not verify_checksum(logs, dest_path + '.partial', checksum, checksum_type):
-        raise BadCheckSum('url=%s' % url)
+    # Verify the downloaded checksum, if we were given one
+    if checksum:
+        if checksum_type == 'md5':
+            calc = md5_hash.hexdigest()
+            correct = calc == checksum
+            logs.with_fields({
+                'calculated': calc,
+                'correct': correct}).info('Image checksum verification')
+            if not correct:
+                raise BadCheckSum('url=%s' % url)
+        else:
+            raise UnknownChecksumType(checksum_type)
 
-    # And make the associated blob
-    if not total_size:
-        total_size = fetched
-
+    # Make the associated blob
     os.rename(dest_path + '.partial', dest_path)
-    b = Blob.new(blob_uuid, total_size, resp.headers.get('Last-Modified'),
+    b = Blob.new(blob_uuid, fetched, resp.headers.get('Last-Modified'),
                  time.time())
     b.state = Blob.STATE_CREATED
     b.observe()
+    b.verify_checksum(sha512_hash.hexdigest())
     b.request_replication()
     return b
 

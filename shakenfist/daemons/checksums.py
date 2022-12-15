@@ -49,7 +49,7 @@ class Monitor(daemon.Daemon):
                 # TODO(mikal): we should not do this if the node is really
                 # busy.
                 if b.verify_size():
-                    b.update_checksum(hash)
+                    b.verify_checksum()
 
                 self.exit.wait(5)
                 if self.exit.is_set():
