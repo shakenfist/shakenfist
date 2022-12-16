@@ -404,6 +404,7 @@ class ArtifactUploadEndpoint(sf_api.Resource):
                 time.time())
             b.state = Blob.STATE_CREATED
             b.observe()
+            b.verify_checksum()
             b.request_replication()
 
             a.add_event('upload complete')

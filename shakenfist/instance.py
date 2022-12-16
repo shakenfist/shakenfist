@@ -1318,6 +1318,7 @@ class Instance(dbo):
                 b = blob.Blob.new(blob_uuid, st.st_size,
                                   time.time(), time.time())
                 b.observe()
+                b.verify_checksum()
                 a.state = artifact.Artifact.STATE_CREATED
 
             else:
