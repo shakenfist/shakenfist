@@ -213,12 +213,7 @@ class Blob(dbo):
         self._db_set_attribute('last_used', {'last_used': time.time()})
 
     # Derived values
-    @property
-    def instances(self, node=None):
-        """Build a list of instances that are using the blob as a block device.
-
-        Returns a list of instance UUIDs.
-        """
+    def _instance_usage(self, node=None):
         filters = [instance.healthy_states_filter]
         if node:
             filters.append(partial(placement_filter, node))
@@ -250,6 +245,14 @@ class Blob(dbo):
                         break
 
         return instance_uuids
+
+    @property
+    def instances(self):
+        return self._instance_usage()
+
+    @property
+    def instances_on_this_node(self):
+        return self._instance_usage(node=config.NODE_NAME)
 
     # Operations
     def add_node_location(self):
@@ -519,7 +522,7 @@ class Blob(dbo):
         return self._db_get_attribute('checksums')
 
     def _remove_if_idle(self, msg):
-        if len(self.instances(config.NODE_NAME)) == 0:
+        if len(self.instances_on_this_node) == 0:
             blob_path = Blob.filepath(self.uuid)
             if os.path.exists(blob_path):
                 os.unlink(blob_path)
