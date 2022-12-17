@@ -607,13 +607,14 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
                 % depends_on)
         dep_blob.ref_count_inc()
 
-    # And make the associated blob
+    # And make the associated blob. Note that we deliberately don't calculate the
+    # snapshot checksum here, as this makes large snapshots even slower for users.
+    # The checksum will "catch up" when the scheduled verification occurs.
     os.rename(dest_path + '.partial', dest_path)
     b = Blob.new(blob_uuid, st.st_size, time.time(), time.time(),
                  depends_on=depends_on)
     b.state = Blob.STATE_CREATED
     b.observe()
-    b.verify_checksum()
     b.request_replication()
     return b
 
@@ -678,13 +679,14 @@ def http_fetch(url, resp, blob_uuid, locks, logs, checksum, checksum_type,
         else:
             raise UnknownChecksumType(checksum_type)
 
-    # Make the associated blob
+    # Make the associated blob. Note that we deliberately don't calculate the
+    # artifact checksum here, as this makes large snapshots even slower for users.
+    # The checksum will "catch up" when the scheduled verification occurs.
     os.rename(dest_path + '.partial', dest_path)
     b = Blob.new(blob_uuid, fetched, resp.headers.get('Last-Modified'),
                  time.time())
     b.state = Blob.STATE_CREATED
     b.observe()
-    b.verify_checksum(sha512_hash.hexdigest())
     b.request_replication()
     return b
 

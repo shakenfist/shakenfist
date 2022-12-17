@@ -3,13 +3,18 @@
 As of Shaken Fist v0.7, blobs are regularly checksumed to verify that data loss
 has not occurred. The following events imply a checksum operation:
 
-* download of a new blob from an external source (artifact fetch for example).
-* snapshotting a disk or NVRAM template.
+* snapshotting an NVRAM template.
 * transfer of a blob from another machine in the cluster (the destination is
   checksumed to verify the transfer).
 * transcode of a blob into a new format (the new format is stored as a
   separate blob).
 * conversion of an upload to an artifact.
+
+The following events _should_ imply an artifact checksum, but we found that
+performance suffered too much:
+
+* download of a new blob from an external source (artifact fetch for example).
+* snapshotting a disk.
 
 Additionally, all blob copies are regularly checksumed and compared with what
 the record in etcd believes the correct value should be. These comparisons are
