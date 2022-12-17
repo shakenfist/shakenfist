@@ -139,7 +139,8 @@ class Blob(dbo):
             'depends_on': self.depends_on,
             'transcodes': self.transcoded,
             'locations': self.locations,
-            'reference_count': self.ref_count
+            'reference_count': self.ref_count,
+            'sha512': self.checksums.get('sha512')
         })
 
         # The order of these two calls matters, as instances updates last_used
