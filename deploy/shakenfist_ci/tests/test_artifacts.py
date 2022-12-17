@@ -1,3 +1,4 @@
+import random
 import time
 
 from shakenfist_client import apiclient
@@ -160,7 +161,7 @@ class TestImages(base.BaseNamespacedTestCase):
         img_del = self.test_client.get_artifact(img['uuid'])
         self.assertEqual(0, img_del['blobs'][1]['reference_count'])
 
-    def test_artifact_max_versions(self):
+    def test_artifact_ignores_duplicate_blobs(self):
         url = ('https://sfcbr.shakenfist.com/gw-basic/gwbasic.qcow2')
 
         img = self.system_client.cache_artifact(url)
@@ -170,29 +171,52 @@ class TestImages(base.BaseNamespacedTestCase):
         self.assertIn('blob_uuid', results[0])
         blob_uuid = results[0]['blob_uuid']
 
+        # Create a label artifact pointing at the blob and try to use the
+        # same blob twice.
+        label_name = 'test_duplicate_blobs'
+        lbl = self.test_client.update_label(label_name, blob_uuid)
+        lbl = self.test_client.update_label(label_name, blob_uuid)
+        self.assertEqual(1, len(lbl.get('blobs')))
+
+    def test_artifact_max_versions(self):
+        def _fetch_to_blob():
+            img = self.system_client.cache_artifact(
+                'https://sfcbr.shakenfist.com/cgi-bin/uuid.cgi?uniq=%06d'
+                % random.randint(-999999, 999999))
+            results = self._await_artifacts_ready([img['uuid']])
+            self.assertEqual('created', results[0].get('state'))
+            self.assertIn('blob_uuid', results[0])
+            return results[0]['blob_uuid']
+
         # Create a label artifact pointing at the blob
         label_name = 'test_label_max_versions'
-        lbl = self.test_client.update_label(label_name, blob_uuid)
-        self.assertIsNot(0, lbl.get('max_versions'))
+        lbl = self.test_client.update_label(label_name, _fetch_to_blob())
+        self.assertIsNot(
+            0, lbl.get('max_versions'),
+            'Artifact uuid %s should have a version' % lbl['uuid'])
 
         expected_versions = lbl.get('max_versions')
-        for i in range(expected_versions-1):
-            lbl = self.test_client.update_label(label_name, blob_uuid)
-            self.assertEqual(i + 2, len(lbl.get('blobs')))
+        for i in range(expected_versions - 1):
+            lbl = self.test_client.update_label(label_name, _fetch_to_blob())
+            self.assertEqual(
+                i + 2, len(lbl.get('blobs')),
+                'Artifact uuid %s should have %d versions' % (lbl['uuid'], i + 2))
 
         self.assertEqual(expected_versions, len(lbl.get('blobs')))
         for i in range(expected_versions):
-            self.assertIn(i + 1, lbl['blobs'])
+            self.assertIn(
+                i + 1, lbl['blobs'],
+                'Artifact uuid %s is missing blob %d' % (lbl['uuid'], i + 1))
 
         # Check that the blob count remains static
-        lbl = self.test_client.update_label(label_name, blob_uuid)
+        lbl = self.test_client.update_label(label_name, _fetch_to_blob())
         self.assertEqual(expected_versions, len(lbl.get('blobs')))
         for i in range(expected_versions):
             self.assertIn(i + 2, lbl['blobs'])
         self.assertNotIn(1, lbl['blobs'])
 
         # Again, check that the blob count remains static
-        lbl = self.test_client.update_label(label_name, blob_uuid)
+        lbl = self.test_client.update_label(label_name, _fetch_to_blob())
         self.assertEqual(expected_versions, len(lbl.get('blobs')))
         for i in range(expected_versions):
             self.assertIn(i + 3, lbl['blobs'])
@@ -207,7 +231,7 @@ class TestImages(base.BaseNamespacedTestCase):
             self.assertEqual(expected_versions-1, len(img['blobs']))
 
             # Add extra version
-            lbl = self.test_client.update_label(label_name, blob_uuid)
+            lbl = self.test_client.update_label(label_name, _fetch_to_blob())
             self.assertEqual(expected_versions, len(lbl.get('blobs')))
             self.assertIn(3, lbl['blobs'])
 
