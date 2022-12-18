@@ -139,7 +139,8 @@ class Blob(dbo):
             'depends_on': self.depends_on,
             'transcodes': self.transcoded,
             'locations': self.locations,
-            'reference_count': self.ref_count
+            'reference_count': self.ref_count,
+            'sha512': self.checksums.get('sha512')
         })
 
         # The order of these two calls matters, as instances updates last_used
@@ -213,12 +214,7 @@ class Blob(dbo):
         self._db_set_attribute('last_used', {'last_used': time.time()})
 
     # Derived values
-    @property
-    def instances(self, node=None):
-        """Build a list of instances that are using the blob as a block device.
-
-        Returns a list of instance UUIDs.
-        """
+    def _instance_usage(self, node=None):
         filters = [instance.healthy_states_filter]
         if node:
             filters.append(partial(placement_filter, node))
@@ -250,6 +246,14 @@ class Blob(dbo):
                         break
 
         return instance_uuids
+
+    @property
+    def instances(self):
+        return self._instance_usage()
+
+    @property
+    def instances_on_this_node(self):
+        return self._instance_usage(node=config.NODE_NAME)
 
     # Operations
     def add_node_location(self):
@@ -519,7 +523,7 @@ class Blob(dbo):
         return self._db_get_attribute('checksums')
 
     def _remove_if_idle(self, msg):
-        if len(self.instances(config.NODE_NAME)) == 0:
+        if len(self.instances_on_this_node) == 0:
             blob_path = Blob.filepath(self.uuid)
             if os.path.exists(blob_path):
                 os.unlink(blob_path)
@@ -603,13 +607,14 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
                 % depends_on)
         dep_blob.ref_count_inc()
 
-    # And make the associated blob
+    # And make the associated blob. Note that we deliberately don't calculate the
+    # snapshot checksum here, as this makes large snapshots even slower for users.
+    # The checksum will "catch up" when the scheduled verification occurs.
     os.rename(dest_path + '.partial', dest_path)
     b = Blob.new(blob_uuid, st.st_size, time.time(), time.time(),
                  depends_on=depends_on)
     b.state = Blob.STATE_CREATED
     b.observe()
-    b.verify_checksum()
     b.request_replication()
     return b
 
@@ -674,13 +679,14 @@ def http_fetch(url, resp, blob_uuid, locks, logs, checksum, checksum_type,
         else:
             raise UnknownChecksumType(checksum_type)
 
-    # Make the associated blob
+    # Make the associated blob. Note that we deliberately don't calculate the
+    # artifact checksum here, as this makes large snapshots even slower for users.
+    # The checksum will "catch up" when the scheduled verification occurs.
     os.rename(dest_path + '.partial', dest_path)
     b = Blob.new(blob_uuid, fetched, resp.headers.get('Last-Modified'),
                  time.time())
     b.state = Blob.STATE_CREATED
     b.observe()
-    b.verify_checksum(sha512_hash.hexdigest())
     b.request_replication()
     return b
 

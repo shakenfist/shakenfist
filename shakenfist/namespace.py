@@ -1,7 +1,5 @@
 import base64
 import bcrypt
-import json
-import requests
 import secrets
 from shakenfist_utilities import logs, random as sfrandom
 import string
@@ -12,7 +10,7 @@ from shakenfist.baseobject import (
     DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist import etcd
 from shakenfist.metrics import get_minimum_object_version as gmov
-from shakenfist.util import general as util_general
+from shakenfist.util import access_tokens
 
 
 LOG, _ = logs.setup(__name__)
@@ -173,16 +171,19 @@ class Namespace(dbo):
     def add_key(self, name, value, expiry=None):
         encoded = str(base64.b64encode(bcrypt.hashpw(
             value.encode('utf-8'), bcrypt.gensalt())), 'utf-8')
+        nonce = sfrandom.random_id()
 
         with self.get_lock_attr('keys', 'Add key'):
             k = self.keys
             k['nonced_keys'][name] = {
                 'key': encoded,
-                'nonce': sfrandom.random_id()
+                'nonce': nonce
             }
             if expiry:
                 k['nonced_keys'][name]['expiry'] = expiry
             self._db_set_attribute('keys', k)
+
+        return nonce
 
     def remove_key(self, name):
         with self.get_lock_attr('keys', 'Remove key'):
@@ -256,25 +257,34 @@ class Namespaces(dbo_iter):
                 yield out
 
 
+CACHED_TOKENS = {}
+
+
 def get_api_token(base_url, namespace='system'):
+    global CACHED_TOKENS
+
+    if namespace in CACHED_TOKENS:
+        expiry, access_token = CACHED_TOKENS[namespace]
+        if expiry - time.time() > 15:
+            return 'Bearer %s' % access_token
+
     auth_url = base_url + '/auth'
     LOG.info('Fetching %s auth token from %s', namespace, auth_url)
 
     ns = Namespace.from_db(namespace)
+
     key = ''.join(secrets.choice(string.ascii_letters) for i in range(50))
     unique = ''.join(secrets.choice(string.ascii_letters) for i in range(5))
-    ns.add_key('_service_key_%s' % unique, key, expiry=(time.time() + 300))
+    keyname = '_service_key_%s' % unique
+    expiry = time.time() + 300
+    nonce = ns.add_key(keyname, key, expiry=expiry)
 
-    r = requests.request('POST', auth_url,
-                         data=json.dumps({
-                             'namespace': namespace,
-                             'key': key
-                         }),
-                         headers={'Content-Type': 'application/json',
-                                  'User-Agent': util_general.get_user_agent()})
-    if r.status_code != 200:
-        raise Exception('Unauthorized')
-    return 'Bearer %s' % r.json()['access_token']
+    # Cheat and don't actually call the auth API to create a token, just call its
+    # underlying code, thus saving a network round trip.
+    token = access_tokens.create_token(ns, keyname, nonce, duration=5)
+
+    CACHED_TOKENS[namespace] = (expiry, token['access_token'])
+    return 'Bearer %s' % token['access_token']
 
 
 def namespace_is_trusted(namespace, requestor):

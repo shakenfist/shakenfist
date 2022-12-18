@@ -251,9 +251,30 @@ class Artifact(dbo):
 
     def add_index(self, blob_uuid):
         with self.get_lock_attr('index', 'Artifact index creation'):
-            b = blob.Blob.from_db(blob_uuid)
-            if not b:
+            mri = self.most_recent_index
+            if 'blob_uuid' in mri:
+                old_blob = blob.Blob.from_db(mri['blob_uuid'])
+                if not old_blob:
+                    raise exceptions.BlobMissing()
+                old_checksums = old_blob.checksums
+                old_blob_uuid = old_blob.uuid
+            else:
+                old_checksums = {}
+                old_blob_uuid = None
+
+            if old_blob_uuid and old_blob_uuid == blob_uuid:
+                # Skip using the same blob UUID as two consecutive indexes
+                return mri
+
+            new_blob = blob.Blob.from_db(blob_uuid)
+            if not new_blob:
                 raise exceptions.BlobMissing()
+            new_checksums = new_blob.checksums
+
+            if old_checksums.get('sha512') and new_checksums.get('sha512'):
+                if old_checksums.get('sha512') == new_checksums.get('sha512'):
+                    # Skipping the update, the blobs have the same content...
+                    return mri
 
             highest_index = self._db_get_attribute(
                 'highest_index', {'index': 0})
@@ -266,7 +287,7 @@ class Artifact(dbo):
             }
             self._db_set_attribute('index_%012d' % index, entry)
             self.add_event('Added index %d to artifact' % index)
-            b.ref_count_inc()
+            new_blob.ref_count_inc()
             self.delete_old_versions()
             return entry
 

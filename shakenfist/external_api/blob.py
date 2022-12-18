@@ -101,3 +101,18 @@ class BlobsEndpoint(sf_api.Resource):
                     retval.append(b.external_view())
 
         return retval
+
+
+class BlobChecksumsEndpoint(sf_api.Resource):
+    @api_base.verify_token
+    @api_base.log_token_use
+    def get(self, hash=None):
+        if not hash:
+            return sf_api.error(400, 'you must specify a hash')
+
+        with etcd.ThreadLocalReadOnlyCache():
+            for b in Blobs(filters=[baseobject.active_states_filter]):
+                if b.checksums.get('sha512') == hash:
+                    return b.external_view()
+
+        return None
