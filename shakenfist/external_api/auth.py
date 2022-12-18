@@ -1,47 +1,22 @@
 import base64
 import bcrypt
-import datetime
 import flask
-from flask_jwt_extended import create_access_token, get_jwt_identity
+from flask_jwt_extended import get_jwt_identity
 from flasgger import swag_from
 from shakenfist_utilities import api as sf_api, logs
 
 from shakenfist import artifact
-from shakenfist.baseobject import (
-    DatabaseBackedObject as dbo,
-    active_states_filter)
-from shakenfist.config import config
+from shakenfist.baseobject import DatabaseBackedObject as dbo, active_states_filter
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist import instance
 from shakenfist.namespace import Namespace, Namespaces, namespace_is_trusted
 from shakenfist import network
+from shakenfist.util import access_tokens
 
 
 LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
-
-
-def _create_token(ns, keyname, nonce):
-    token = create_access_token(
-        identity=[ns.uuid, keyname],
-        additional_claims={
-            'iss': config.ZONE,
-            'nonce': nonce
-        },
-        expires_delta=datetime.timedelta(minutes=config.API_TOKEN_DURATION))
-    ns.add_event(
-        'Token created from key',
-        extra={
-            'keyname': keyname,
-            'nonce': nonce,
-            'token': token
-        })
-    return {
-        'access_token': token,
-        'token_type': 'Bearer',
-        'expires_in': config.API_TOKEN_DURATION * 60
-    }
 
 
 def arg_is_namespace(func):
@@ -90,7 +65,7 @@ class AuthEndpoint(sf_api.Resource):
         for keyname in keys:
             possible_key = base64.b64decode(keys[keyname]['key'])
             if bcrypt.checkpw(key.encode('utf-8'), possible_key):
-                return _create_token(
+                return access_tokens.create_token(
                     namespace_from_db, keyname, keys[keyname]['nonce'])
 
         namespace_from_db.add_event('Attempt to use incorrect namespace key')
