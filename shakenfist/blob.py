@@ -217,7 +217,7 @@ class Blob(dbo):
     def _instance_usage(self, node=None):
         filters = [instance.healthy_states_filter]
         if node:
-            filters.append(partial(placement_filter, node))
+            filters.append(partial(instance.placement_filter, node))
 
         instance_uuids = []
         for inst in instance.Instances(filters):
