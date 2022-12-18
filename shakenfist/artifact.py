@@ -257,8 +257,14 @@ class Artifact(dbo):
                 if not old_blob:
                     raise exceptions.BlobMissing()
                 old_checksums = old_blob.checksums
+                old_blob_uuid = old_blob.uuid
             else:
                 old_checksums = {}
+                old_blob_uuid = None
+
+            if old_blob_uuid and old_blob_uuid == blob_uuid:
+                # Skip using the same blob UUID as two consecutive indexes
+                return mri
 
             new_blob = blob.Blob.from_db(blob_uuid)
             if not new_blob:
