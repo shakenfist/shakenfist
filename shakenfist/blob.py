@@ -450,7 +450,26 @@ class Blob(dbo):
                     os.unlink(partial_path)
                 raise BlobFetchFailed('Did not fetch enough data')
 
-            self.verify_checksum(sha512_hash.hexdigest())
+            if not self.verify_size(partial=True):
+                if instance_object:
+                    instance_object.add_event(
+                        'Fetching required blob %s failed (incorrect size)'
+                        % self.uuid)
+                self.log.with_fields({
+                    'bytes_fetched': total_bytes_received,
+                    'size': int(self.size)
+                }).info('Fetch failed with incorrect size')
+
+            if not self.verify_checksum(sha512_hash.hexdigest()):
+                if instance_object:
+                    instance_object.add_event(
+                        'Fetching required blob %s failed (incorrect checksum)'
+                        % self.uuid)
+                self.log.with_fields({
+                    'bytes_fetched': total_bytes_received,
+                    'size': int(self.size)
+                }).info('Fetch failed with incorrect checksum')
+
             os.rename(partial_path, blob_path)
             if instance_object:
                 instance_object.add_event(
@@ -535,8 +554,12 @@ class Blob(dbo):
         else:
             self.log.error('Not removing in-use blob %s' % msg)
 
-    def verify_size(self):
-        st = os.stat(Blob.filepath(self.uuid))
+    def verify_size(self, partial=False):
+        blob_path = Blob.filepath(self.uuid)
+        if partial:
+            blob_path += '.partial'
+
+        st = os.stat(blob_path)
         if self.size != st.st_size:
             self.add_event('blob failed checksum validation',
                            extra={
@@ -570,6 +593,7 @@ class Blob(dbo):
                                        'node': config.NODE_NAME
                                    })
                     self._remove_if_idle('with incorrect checksum')
+                    return False
 
             if 'nodes' not in c:
                 c['nodes'] = {config.NODE_NAME: time.time()}
@@ -577,6 +601,8 @@ class Blob(dbo):
                 c['nodes'][config.NODE_NAME] = time.time()
 
             self._db_set_attribute('checksums', c)
+
+        return True
 
 
 def ensure_blob_path():
