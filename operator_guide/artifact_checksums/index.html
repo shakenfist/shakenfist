@@ -10,14 +10,14 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/operator_guide/power_states/">
+        <link rel="canonical" href="https://shakenfist.com/operator_guide/artifact_checksums/">
       
       <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.4.2, mkdocs-material-8.5.10">
     
     
       
-        <title>Power States - Shaken Fist</title>
+        <title>Artifact checksums - Shaken Fist</title>
       
     
     
@@ -66,7 +66,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#instance-power-states" class="md-skip">
+        <a href="#artifact-checksums" class="md-skip">
           Skip to content
         </a>
       
@@ -99,7 +99,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Power States
+              Artifact checksums
             
           </span>
         </div>
@@ -531,11 +531,21 @@
               
   
   
+    
   
-    <li class="md-nav__item">
-      <a href="../artifact_checksums/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         Artifact checksums
       </a>
+      
     </li>
   
 
@@ -606,21 +616,11 @@
               
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../power_states/" class="md-nav__link">
         Power States
       </a>
-      
     </li>
   
 
@@ -664,28 +664,40 @@
                 
                   
 
-  <a href="https://github.com/shakenfist/shakenfist/edit/master/docs/operator_guide/power_states.md" title="Edit this page" class="md-content__button md-icon">
+  <a href="https://github.com/shakenfist/shakenfist/edit/master/docs/operator_guide/artifact_checksums.md" title="Edit this page" class="md-content__button md-icon">
     
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25Z"/></svg>
   </a>
 
 
-<h1 id="instance-power-states">Instance power states</h1>
-<p>Shaken Fist version 0.2.1 introduced power states for instances. Before this, you could power on or off an instance, or pause it, but you couldn't tell what power state the instance was actually in. That was pretty confusing and was therefore treated as a bug.</p>
-<p>The following power states are implemented:</p>
+<h1 id="artifact-checksums">Artifact checksums</h1>
+<p>As of Shaken Fist v0.7, blobs are regularly checksumed to verify that data loss
+has not occurred. The following events imply a checksum operation:</p>
 <ul>
-<li><strong>on</strong>: the instance is running</li>
-<li><strong>off</strong>: the instance is not running</li>
-<li><strong>paused</strong>: the instance is paused</li>
-<li><strong>crashed</strong>: the instance is crashed according to the hypervisor. Instances in this power state will also be in an instance state of "error".</li>
+<li>snapshotting an NVRAM template.</li>
+<li>transfer of a blob from another machine in the cluster (the destination is
+  checksumed to verify the transfer).</li>
+<li>transcode of a blob into a new format (the new format is stored as a
+  separate blob).</li>
+<li>conversion of an upload to an artifact.</li>
 </ul>
-<p>There are additionally a set of "transition states" which are used to indicate that you have requested a change of state that might not yet have completed. These are:</p>
+<p>The following events <em>should</em> imply an artifact checksum, but we found that
+performance suffered too much:</p>
 <ul>
-<li>transition-to-on</li>
-<li>transition-to-off</li>
-<li>transition-to-paused</li>
+<li>download of a new blob from an external source (artifact fetch for example).</li>
+<li>snapshotting a disk.</li>
 </ul>
-<p>We're hoping to not have to implement a transition-to-crashed state, but you never know.</p>
+<p>Additionally, all blob copies are regularly checksumed and compared with what
+the record in etcd believes the correct value should be. These comparisons are
+rate limited, but should happen with a maximum frequency of
+CHECKSUM_VERIFICATION_FREQUENCY seconds, which defaults to every 24 hours.</p>
+<p>If a copy of a blob fails the checksum verification <em>and is not in use on that node</em>,
+the copy is deleted and the cluster will re-replicate the blob as required. If
+the blob is in use, there isn't much Shaken Fist can do without disturbing
+running instances, so the error is ignored for now.</p>
+<p>Checksums are also used when a new version of an artifact is created. If the
+checksum of the previous version is the same as the checksum for the proposed
+new version, the proposed new version is skipped.</p>
 
 
 
@@ -706,7 +718,7 @@
     <nav class="md-footer__inner md-grid" aria-label="Footer" >
       
         
-        <a href="../networking/single_instance/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Single Instance" rel="prev">
+        <a href="../../developer_guide/workflow/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Workflow" rel="prev">
           <div class="md-footer__button md-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
           </div>
@@ -715,11 +727,26 @@
               <span class="md-footer__direction">
                 Previous
               </span>
-              Single Instance
+              Workflow
             </div>
           </div>
         </a>
       
+      
+        
+        <a href="../networking/overview/" class="md-footer__link md-footer__link--next" aria-label="Next: Overview" rel="next">
+          <div class="md-footer__title">
+            <div class="md-ellipsis">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              Overview
+            </div>
+          </div>
+          <div class="md-footer__button md-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11H4Z"/></svg>
+          </div>
+        </a>
       
     </nav>
   
