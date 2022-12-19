@@ -129,7 +129,7 @@ api.add_resource(api_blob.BlobsEndpoint, '/blobs')
 api.add_resource(api_blob.BlobEndpoint, '/blobs/<blob_uuid>')
 api.add_resource(api_blob.BlobDataEndpoint, '/blobs/<blob_uuid>/data')
 api.add_resource(api_blob.BlobChecksumsEndpoint,
-                 '/blob_checksum/sha512/<hash>')
+                 '/blob_checksums/sha512/<hash>')
 
 api.add_resource(api_instance.InstancesEndpoint, '/instances')
 api.add_resource(api_instance.InstanceEndpoint, '/instances/<instance_ref>')
