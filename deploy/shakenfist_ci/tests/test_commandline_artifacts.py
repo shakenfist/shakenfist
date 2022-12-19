@@ -102,8 +102,9 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
                 return
             time.sleep(30)
 
-        self.fail('Never received the correct number of versions. I have %d'
-                  % len(versions))
+        self.fail('Never received the correct number of versions for artifact '
+                  '%s. I have %d'
+                  % (artifact_uuid, len(versions)))
 
     def test_artifact_show(self):
         # NOTE(mikal): blobs use strings as indexes in this test as the
