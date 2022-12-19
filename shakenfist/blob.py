@@ -549,7 +549,7 @@ class Blob(dbo):
             if os.path.exists(blob_path + '.partial'):
                 os.unlink(blob_path + '.partial')
 
-            self.remove_location(config.NODE_NAME)
+            self.drop_node_location(config.NODE_NAME)
             self.log.error('Removed idle blob %s' % msg)
         else:
             self.log.error('Not removing in-use blob %s' % msg)

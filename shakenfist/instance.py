@@ -773,6 +773,7 @@ class Instance(dbo):
                                 'Image %s is missing' % disk['blob_uuid'])
 
                         b = blob.Blob.from_db(disk['blob_uuid'])
+                        b.add_event('Instance %s is using blob' % self.uuid)
                         b.ref_count_inc()
 
                         with util_general.RecordedOperation('detect cdrom images', self):
@@ -1037,6 +1038,7 @@ class Instance(dbo):
                     raise exceptions.NVRAMTemplateMissing(
                         'Blob %s does not exist' % self.nvram_template)
                 b.ensure_local([], instance_object=self)
+                b.add_event('Instance %s is using blob' % self.uuid)
                 b.ref_count_inc()
                 shutil.copyfile(
                     blob.Blob.filepath(b.uuid), os.path.join(self.instance_path, 'nvram'))

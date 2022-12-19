@@ -80,6 +80,12 @@ class Monitor(daemon.Daemon):
             per_node = defaultdict(list)
             with etcd.ThreadLocalReadOnlyCache():
                 for b in Blobs([active_states_filter]):
+                    if not b.locations:
+                        # There are no locations for this blob, delete it.
+                        b.add_event(
+                            'No locations for this blob, hard deleting.')
+                        b.hard_delete()
+
                     for node in b.locations:
                         per_node[node].append(b.uuid)
 
