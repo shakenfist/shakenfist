@@ -215,7 +215,13 @@ class ImageFetchHelper(object):
             os.path.join(config.STORAGE_PATH, 'image_cache', b.uuid),
             ['iso', 'qcow2'])
         mimetype = b.info.get('mime-type', '')
+
+        # See if we have a remotely cached transcode _which_actually_exists_.
         cached_remotely = b.transcoded.get(TRANSCODE_DESCRIPTION)
+        cached_remotely_blob = Blob.from_db(cached_remotely)
+        if not cached_remotely_blob:
+            cached_remotely = None
+
         cache_path = None
 
         if cached_locally:
