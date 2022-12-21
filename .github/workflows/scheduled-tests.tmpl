@@ -113,7 +113,7 @@ jobs:
               $source_path/shakenfist \
               {{baseuser}}@$primary:shakenfist
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              {{baseuser}}@$primary "cd shakenfist/deploy; . /etc/sf/sfrc; SHAKENFIST_CI_CONCURRENCY={{concurrency}} tox -epy3"
+              {{baseuser}}@$primary "cd shakenfist/deploy; . /etc/sf/sfrc; sudo pip3 install -r requirements.txt; stestr run --concurrency={{concurrency}}"
 
       - name: Check logs
         if: {% raw %}${{{% endraw %} ! cancelled() {% raw %}}}{% endraw %}
