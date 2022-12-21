@@ -1,9 +1,11 @@
 # With thanks to https://bluegenes.github.io/mkdocs-github-actions/
 name: Build and publish shakenfist.com
 on:
+  workflow_dispatch:
   push:
     branches:
-      - v0.6
+      - develop
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -11,18 +13,22 @@ jobs:
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0
+
       - name: Setup Python
         uses: actions/setup-python@v1
         with:
           python-version: "3.7"
           architecture: "x64"
+
       - name: Install dependencies
         run: |
           python3 -m pip install --upgrade pip
           python3 -m pip install mkdocs
           python3 -m pip install mkdocs-material
+
       - name: Build site
         run: mkdocs build
+
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         with:
