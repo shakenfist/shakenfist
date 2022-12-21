@@ -98,12 +98,6 @@ class AuthTestCase(base.ShakenFistTestCase):
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'banana', 'keyyy': 'pwd'}))
         self.assertEqual(400, resp.status_code)
-        self.assertEqual(
-            {
-                'error': "post() got an unexpected keyword argument 'keyyy'",
-                'status': 400
-            },
-            _clean_traceback(resp.get_json()))
 
     def test_post_auth_key_non_string(self):
         resp = self.client.post(

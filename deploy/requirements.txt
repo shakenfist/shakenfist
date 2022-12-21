@@ -2,7 +2,11 @@
 # breaking CI on python 3.7.
 importlib-metadata<5;python_version<"3.8"
 
+# Pin to resolve installation problems on Debian 10
+packaging==21.3
+
 prettytable                 # bsd
 oslo.concurrency            # apache2
 shakenfist-client           # apache2
 setuptools>=65.3.0          # mit
+stestr                      # apache2
