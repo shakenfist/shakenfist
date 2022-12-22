@@ -636,7 +636,7 @@ class Instance(dbo):
                 os.unlink(nvram_path)
             if self.nvram_template:
                 b = blob.Blob.from_db(self.nvram_template)
-                b.ref_count_dec()
+                b.ref_count_dec(self)
 
             with util_libvirt.LibvirtConnection() as lc:
                 inst = lc.get_domain_from_sf_uuid(self.uuid)
@@ -659,7 +659,7 @@ class Instance(dbo):
             if 'blob_uuid' in disk and disk['blob_uuid']:
                 b = blob.Blob.from_db(disk['blob_uuid'])
                 if b:
-                    b.ref_count_dec()
+                    b.ref_count_dec(self)
 
         self.deallocate_instance_ports()
 
@@ -774,7 +774,7 @@ class Instance(dbo):
 
                         b = blob.Blob.from_db(disk['blob_uuid'])
                         b.add_event('Instance %s is using blob' % self.uuid)
-                        b.ref_count_inc()
+                        b.ref_count_inc(self)
 
                         with util_general.RecordedOperation('detect cdrom images', self):
                             try:
@@ -1039,7 +1039,7 @@ class Instance(dbo):
                         'Blob %s does not exist' % self.nvram_template)
                 b.ensure_local([], instance_object=self)
                 b.add_event('Instance %s is using blob' % self.uuid)
-                b.ref_count_inc()
+                b.ref_count_inc(self)
                 shutil.copyfile(
                     blob.Blob.filepath(b.uuid), os.path.join(self.instance_path, 'nvram'))
                 nvram_template_attribute = ''

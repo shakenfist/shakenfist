@@ -293,15 +293,17 @@ class Blob(dbo):
                 info['mime-type'] = magic.Magic(mime=True).from_file(blob_path)
                 self._db_set_attribute('info', info)
 
-    def ref_count_inc(self):
+    def ref_count_inc(self, baseobject):
         with self.get_lock_attr('ref_count', 'Increase reference count'):
             if self.state.value == self.STATE_DELETED:
                 raise BlobDeleted
             new_count = self.ref_count + 1
             self._db_set_attribute('ref_count', {'ref_count': new_count})
+            self.add_event('incremented reference count',
+                           extra={baseobject.object_type: baseobject.uuid})
             return new_count
 
-    def ref_count_dec(self):
+    def ref_count_dec(self, baseobject):
         with self.get_lock_attr('ref_count', 'Decrease reference count'):
             new_count = self.ref_count - 1
             if new_count < 0:
@@ -309,6 +311,8 @@ class Blob(dbo):
                 self.log.warning('Reference count decremented below zero')
 
             self._db_set_attribute('ref_count', {'ref_count': new_count})
+            self.add_event('decremented reference count',
+                           extra={baseobject.object_type: baseobject.uuid})
 
             # If no references then the blob cannot be used, therefore delete.
             if new_count == 0:
@@ -317,13 +321,13 @@ class Blob(dbo):
                 for transcoded_blob_uuid in self.transcoded.values():
                     transcoded_blob = Blob.from_db(transcoded_blob_uuid)
                     if transcoded_blob:
-                        transcoded_blob.ref_count_dec()
+                        transcoded_blob.ref_count_dec(self)
 
                 depends_on = self.depends_on
                 if depends_on:
                     dep_blob = Blob.from_db(depends_on)
                     if dep_blob:
-                        dep_blob.ref_count_dec()
+                        dep_blob.ref_count_dec(self)
 
             return new_count
 
@@ -632,13 +636,13 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
 
     # Check that the dependency (if any) actually exists. This test can fail when
     # the blob used to start an instance has been deleted already.
+    dep_blob = None
     if depends_on:
         dep_blob = Blob.from_db(depends_on)
         if not dep_blob or dep_blob.state.value != Blob.STATE_CREATED:
             raise BlobDependencyMissing(
                 'Snapshot depends on blob UUID %s, which is missing'
                 % depends_on)
-        dep_blob.ref_count_inc()
 
     # And make the associated blob. Note that we deliberately don't calculate the
     # snapshot checksum here, as this makes large snapshots even slower for users.
@@ -647,6 +651,8 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
     b = Blob.new(blob_uuid, st.st_size, time.time(), time.time(),
                  depends_on=depends_on)
     b.state = Blob.STATE_CREATED
+    if dep_blob:
+        dep_blob.ref_count_inc(b)
     b.observe()
     b.request_replication()
     return b

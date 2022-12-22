@@ -65,6 +65,6 @@ class LabelEndpoint(sf_api.Resource):
             a.state = dbo.STATE_DELETED
             for blob_index in a.get_all_indexes():
                 b = Blob.from_db(blob_index['blob_uuid'])
-                b.ref_count_dec()
+                b.ref_count_dec(a)
 
         return a.external_view()
