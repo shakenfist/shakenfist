@@ -327,7 +327,9 @@ class ArtifactUploadEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'artifact', 'Convert an upload into an artifact.',
         [
-            ('artifact_uuid', 'query', 'uuid', 'The UUID of the artifact.', True),
+            ('artifact_name', 'query', 'uuid',
+             'The name of the artifact. This is used to construct a source url if '
+             'you do not specify one with source_url.', True),
             ('upload_uuid', 'body', 'uuid', 'The UUID of the upload.', True),
             ('source_url', 'body', 'url',
              'The URL the artifact should claim to be downloaded from.', False),
@@ -340,7 +342,7 @@ class ArtifactUploadEndpoint(sf_api.Resource):
     @api_base.verify_token
     @api_base.log_token_use
     @api_base.requires_namespace_exist
-    def post(self, artifact_uuid=None, upload_uuid=None, source_url=None,
+    def post(self, artifact_name=None, upload_uuid=None, source_url=None,
              shared=False, namespace=None):
         u = Upload.from_db(upload_uuid)
         if not u:
@@ -367,7 +369,7 @@ class ArtifactUploadEndpoint(sf_api.Resource):
 
         if not source_url:
             source_url = ('%s%s/%s'
-                          % (UPLOAD_URL, get_jwt_identity()[0], artifact_uuid))
+                          % (UPLOAD_URL, get_jwt_identity()[0], artifact_name))
 
         if not namespace:
             namespace = get_jwt_identity()[0]

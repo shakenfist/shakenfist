@@ -542,6 +542,12 @@ class Blob(dbo):
         return self._db_get_attribute('checksums')
 
     def _remove_if_idle(self, msg):
+        if not config.CHECKSUM_ENFORCEMENT:
+            self.log.error(
+                'Blob checksum enforcement is disabled. If it was enabled, we would '
+                'remove blob replica %s' % msg)
+            return
+
         if len(self.instances_on_this_node) == 0:
             blob_path = Blob.filepath(self.uuid)
             if os.path.exists(blob_path):
@@ -550,9 +556,10 @@ class Blob(dbo):
                 os.unlink(blob_path + '.partial')
 
             self.drop_node_location(config.NODE_NAME)
-            self.log.error('Removed idle blob %s' % msg)
+            self.log.error('Removed idle blob replica %s' % msg)
+
         else:
-            self.log.error('Not removing in-use blob %s' % msg)
+            self.log.error('Not removing in-use blob replica %s' % msg)
 
     def verify_size(self, partial=False):
         blob_path = Blob.filepath(self.uuid)
@@ -571,10 +578,10 @@ class Blob(dbo):
             return False
         return True
 
-    def verify_checksum(self, hash=None):
+    def verify_checksum(self, hash=None, locks=None):
         if not hash:
             hash_out, _ = util_process.execute(
-                None,
+                locks,
                 'sha512sum %s' % Blob.filepath(self.uuid),
                 iopriority=util_process.PRIORITY_LOW)
             hash = hash_out.split(' ')[0]

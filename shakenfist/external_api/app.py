@@ -168,7 +168,7 @@ api.add_resource(api_interface.InterfaceDefloatEndpoint,
 api.add_resource(api_artifact.ArtifactEndpoint, '/artifacts/<artifact_uuid>')
 api.add_resource(api_artifact.ArtifactsEndpoint, '/artifacts')
 api.add_resource(api_artifact.ArtifactUploadEndpoint,
-                 '/artifacts/upload/<artifact_uuid>')
+                 '/artifacts/upload/<artifact_name>')
 api.add_resource(api_artifact.ArtifactEventsEndpoint,
                  '/artifacts/<artifact_uuid>/events')
 api.add_resource(api_artifact.ArtifactVersionsEndpoint,

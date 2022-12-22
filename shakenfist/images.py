@@ -290,7 +290,7 @@ class ImageFetchHelper(object):
                 transcode_blob_uuid, st.st_size, time.time(), time.time())
             transcode_blob.state = Blob.STATE_CREATED
             transcode_blob.observe()
-            transcode_blob.verify_checksum()
+            transcode_blob.verify_checksum(locks=[lock])
             transcode_blob.request_replication()
             self.log.with_fields({
                 'blob': b,
