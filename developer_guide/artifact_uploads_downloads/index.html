@@ -439,18 +439,12 @@
     Uploads
   </a>
   
-    <nav class="md-nav" aria-label="Uploads">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
+</li>
+      
+        <li class="md-nav__item">
   <a href="#downloads" class="md-nav__link">
     Downloads
   </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -707,18 +701,12 @@
     Uploads
   </a>
   
-    <nav class="md-nav" aria-label="Uploads">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
+</li>
+      
+        <li class="md-nav__item">
   <a href="#downloads" class="md-nav__link">
     Downloads
   </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -765,8 +753,16 @@ similar. Each call will return the new size of the object.</p>
 example if you are unsure that a POST operation completed correctly. You do this
 by sending a POST to <code>/upload/...uuid.../truncate/...desired.length...</code>.</p>
 <p>Once your upload is complete, you convert it to an artifact by calling
-<code>/artifacts/upload/...uuid...</code> to convert it to an artifact.</p>
-<h3 id="downloads">Downloads</h3>
+<code>/artifacts/upload/...name...</code> to convert it to an artifact.</p>
+<p>There is one final optimization to uploads, which is implemented in the python
+API and command line clients. If before upload you calculate a sha512 of the
+object to be uploaded, you can then search for that checksum with the
+<code>/blob_checksums/sha512/...hash...</code> endpoint. If a blob is returned then you
+don't need to actually upload and can instead pass that blob uuid (with a POST
+argument named <code>blob_uuid</code>) instead of an upload uuid to the
+<code>/artifacts/upload/...name...</code> endpoint. See the swagger documentation for more
+details.</p>
+<h2 id="downloads">Downloads</h2>
 <p>Artifact downloads are implemented as fetching the data for the desired blob. You
 therefore must first lookup the versions for a given artifact and select a version
 that you wish to download. You can then fetch the data for the relevant blob by
