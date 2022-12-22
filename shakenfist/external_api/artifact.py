@@ -330,7 +330,14 @@ class ArtifactUploadEndpoint(sf_api.Resource):
             ('artifact_name', 'query', 'uuid',
              'The name of the artifact. This is used to construct a source url if '
              'you do not specify one with source_url.', True),
-            ('upload_uuid', 'body', 'uuid', 'The UUID of the upload.', True),
+            ('upload_uuid', 'body', 'uuid',
+             'The UUID of an upload to convert to an artifact. You must either '
+             'specify this or blob_uuid.', False),
+            ('blob_uuid', 'body', 'uuid',
+             'The UUID of a blob to convert to an artifact. This is used by the '
+             'command line client if an upload would have created a duplicate '
+             'blob to one already in existence. You must specify either this '
+             'or upload_uuid.', False),
             ('source_url', 'body', 'url',
              'The URL the artifact should claim to be downloaded from.', False),
             ('shared', 'body', 'boolean',
@@ -342,30 +349,36 @@ class ArtifactUploadEndpoint(sf_api.Resource):
     @api_base.verify_token
     @api_base.log_token_use
     @api_base.requires_namespace_exist
-    def post(self, artifact_name=None, upload_uuid=None, source_url=None,
-             shared=False, namespace=None):
-        u = Upload.from_db(upload_uuid)
-        if not u:
-            return sf_api.error(404, 'upload not found')
+    def post(self, artifact_name=None, upload_uuid=None, blob_uuid=None,
+             source_url=None, shared=False, namespace=None):
+        if upload_uuid and blob_uuid:
+            return sf_api.error(400, 'only specify one of upload_uuid and blob_uuid')
 
-        if u.node != config.NODE_NAME:
-            url = 'http://%s:%d%s' % (u.node, config.API_PORT,
-                                      flask.request.environ['PATH_INFO'])
-            api_token = get_api_token(
-                'http://%s:%d' % (u.node, config.API_PORT),
-                namespace=get_jwt_identity()[0])
-            r = requests.request(
-                flask.request.environ['REQUEST_METHOD'], url,
-                data=json.dumps(sf_api.flask_get_post_body()),
-                headers={'Authorization': api_token,
-                         'User-Agent': util_general.get_user_agent()})
+        u = None
+        if upload_uuid:
+            # Proxy to the correct node and continue there.
+            u = Upload.from_db(upload_uuid)
+            if not u:
+                return sf_api.error(404, 'upload not found')
 
-            LOG.info('Proxied %s %s returns: %d, %s' % (
-                     flask.request.environ['REQUEST_METHOD'], url,
-                     r.status_code, r.text))
-            resp = flask.Response(r.text,  mimetype='application/json')
-            resp.status_code = r.status_code
-            return resp
+            if u.node != config.NODE_NAME:
+                url = 'http://%s:%d%s' % (u.node, config.API_PORT,
+                                          flask.request.environ['PATH_INFO'])
+                api_token = get_api_token(
+                    'http://%s:%d' % (u.node, config.API_PORT),
+                    namespace=get_jwt_identity()[0])
+                r = requests.request(
+                    flask.request.environ['REQUEST_METHOD'], url,
+                    data=json.dumps(sf_api.flask_get_post_body()),
+                    headers={'Authorization': api_token,
+                             'User-Agent': util_general.get_user_agent()})
+
+                LOG.info('Proxied %s %s returns: %d, %s' % (
+                        flask.request.environ['REQUEST_METHOD'], url,
+                        r.status_code, r.text))
+                resp = flask.Response(r.text,  mimetype='application/json')
+                resp.status_code = r.status_code
+                return resp
 
         if not source_url:
             source_url = ('%s%s/%s'
@@ -389,31 +402,39 @@ class ArtifactUploadEndpoint(sf_api.Resource):
 
         with a.get_lock(ttl=(12 * constants.LOCK_REFRESH_SECONDS),
                         timeout=config.MAX_IMAGE_TRANSFER_SECONDS):
-            blob_uuid = str(uuid.uuid4())
-            blob_dir = os.path.join(config.STORAGE_PATH, 'blobs')
-            blob_path = os.path.join(blob_dir, blob_uuid)
+            if not blob_uuid:
+                # Convert upload to a blob
+                blob_uuid = str(uuid.uuid4())
+                blob_dir = os.path.join(config.STORAGE_PATH, 'blobs')
+                blob_path = os.path.join(blob_dir, blob_uuid)
 
-            upload_dir = os.path.join(config.STORAGE_PATH, 'uploads')
-            upload_path = os.path.join(upload_dir, u.uuid)
+                upload_dir = os.path.join(config.STORAGE_PATH, 'uploads')
+                upload_path = os.path.join(upload_dir, u.uuid)
 
-            # NOTE(mikal): we can't use os.rename() here because these paths
-            # might be on different filesystems.
-            shutil.move(upload_path, blob_path)
-            st = os.stat(blob_path)
-            b = Blob.new(
-                blob_uuid, st.st_size,
-                time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime()),
-                time.time())
-            b.state = Blob.STATE_CREATED
-            b.observe()
-            b.verify_checksum()
-            b.request_replication()
+                # NOTE(mikal): we can't use os.rename() here because these paths
+                # might be on different filesystems.
+                shutil.move(upload_path, blob_path)
+                st = os.stat(blob_path)
+                b = Blob.new(
+                    blob_uuid, st.st_size,
+                    time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime()),
+                    time.time())
+                b.state = Blob.STATE_CREATED
+                b.observe()
+                b.verify_checksum()
+                b.request_replication()
+
+            else:
+                b = Blob.from_db(blob_uuid)
+                if not b:
+                    return sf_api.error(404, 'blob not found')
 
             a.add_event('upload complete')
             a.add_index(b.uuid)
             a.state = Artifact.STATE_CREATED
 
-            u.hard_delete()
+            if upload_uuid:
+                u.hard_delete()
             return a.external_view()
 
 
