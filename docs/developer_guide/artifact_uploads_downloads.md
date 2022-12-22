@@ -29,9 +29,18 @@ example if you are unsure that a POST operation completed correctly. You do this
 by sending a POST to `/upload/...uuid.../truncate/...desired.length...`.
 
 Once your upload is complete, you convert it to an artifact by calling
-`/artifacts/upload/...uuid...` to convert it to an artifact.
+`/artifacts/upload/...name...` to convert it to an artifact.
 
-### Downloads
+There is one final optimization to uploads, which is implemented in the python
+API and command line clients. If before upload you calculate a sha512 of the
+object to be uploaded, you can then search for that checksum with the
+`/blob_checksums/sha512/...hash...` endpoint. If a blob is returned then you
+don't need to actually upload and can instead pass that blob uuid (with a POST
+argument named `blob_uuid`) instead of an upload uuid to the
+`/artifacts/upload/...name...` endpoint. See the swagger documentation for more
+details.
+
+## Downloads
 
 Artifact downloads are implemented as fetching the data for the desired blob. You
 therefore must first lookup the versions for a given artifact and select a version
