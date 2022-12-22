@@ -372,16 +372,18 @@ def instance_delete(inst):
         # Check each network used by the deleted instance
         for network_uuid in instance_networks:
             n = network.Network.from_db(network_uuid)
-            if n:
-                # If network used by another instance, only update
-                if network_uuid in host_networks:
-                    if n.state.value == dbo.STATE_DELETE_WAIT:
-                        # Do not update a network about to be deleted
-                        continue
-                    n.update_dhcp()
-                else:
-                    # Network not used by any other instance therefore delete
-                    n.delete_on_hypervisor()
+            if not n:
+                continue
+
+            if n.state.value == dbo.STATE_DELETE_WAIT:
+                continue
+
+            n.update_dhcp()
+
+            if not config.NODE_IS_NETWORK_NODE and network_uuid not in host_networks:
+                # We are not the network node and the network not used by any
+                # other instance on this hypervisor, therefore clean it up
+                n.delete_on_hypervisor()
 
 
 def snapshot(inst, disk, artifact_uuid, blob_uuid, thin=False):
