@@ -29,8 +29,21 @@
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/srv/github/id_ci"
+        ansible_python_interpreter: "/usr/bin/python3"
         sf_instance_uuid: "{{imagerebuild['meta']['uuid']}}"
         groups: sfall
+      when: "{{base_image}}" == "debian:11"
+
+    - name: Add to ansible
+      add_host:
+        hostname: imagerebuild
+        ansible_ssh_host: "{{imagerebuild['meta']['network_interfaces'][0]['ipv4']}}"
+        ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
+        ansible_ssh_user: "{{base_image_user}}"
+        ansible_ssh_private_key_file: "/srv/github/id_ci"
+        sf_instance_uuid: "{{imagerebuild['meta']['uuid']}}"
+        groups: sfall
+      when: "{{base_image}}" != "debian:11"
 
     - name: Log instance
       debug:
@@ -222,8 +235,21 @@
         ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
         ansible_ssh_user: "{{base_image_user}}"
         ansible_ssh_private_key_file: "/srv/github/id_ci"
+        ansible_python_interpreter: /usr/bin/python3
         sf_instance_uuid: "{{imagetest['meta']['uuid']}}"
         groups: sfall
+      when: "{{base_image}}" == "debian:11"
+
+    - name: Add to ansible
+      add_host:
+        hostname: imagetest
+        ansible_ssh_host: "{{imagetest['meta']['network_interfaces'][0]['ipv4']}}"
+        ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
+        ansible_ssh_user: "{{base_image_user}}"
+        ansible_ssh_private_key_file: "/srv/github/id_ci"
+        sf_instance_uuid: "{{imagetest['meta']['uuid']}}"
+        groups: sfall
+      when: "{{base_image}}" != "debian:11"
 
     - name: Log instance
       debug:
