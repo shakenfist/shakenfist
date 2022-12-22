@@ -164,7 +164,8 @@ class DatabaseBackedObject(object):
         # as an event.
         if (self.object_type, attribute) not in [('node', 'blobs'),
                                                  ('node', 'observed'),
-                                                 ('blob', 'ref_count')]:
+                                                 ('blob', 'ref_count'),
+                                                 ('blob', 'last_used')]:
             # Coerce the value into a dictionary.
             if type(value) is State:
                 event_values = value.obj_dict()
