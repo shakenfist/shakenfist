@@ -287,7 +287,7 @@ class Monitor(daemon.Daemon):
 
             for transcode in transcodes:
                 tb = Blob.from_db(transcodes[transcode])
-                tb.ref_count_dec()
+                tb.ref_count_dec(b)
 
         # Node management
         for n in Nodes([]):

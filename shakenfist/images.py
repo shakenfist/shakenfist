@@ -298,7 +298,7 @@ class ImageFetchHelper(object):
                 'Recorded transcode')
 
             b.add_transcode(TRANSCODE_DESCRIPTION, transcode_blob_uuid)
-            transcode_blob.ref_count_inc()
+            transcode_blob.ref_count_inc(b)
 
         shutil.chown(cache_path, config.LIBVIRT_USER,
                      config.LIBVIRT_GROUP)
