@@ -578,10 +578,10 @@ class Blob(dbo):
             return False
         return True
 
-    def verify_checksum(self, hash=None):
+    def verify_checksum(self, hash=None, locks=None):
         if not hash:
             hash_out, _ = util_process.execute(
-                None,
+                locks,
                 'sha512sum %s' % Blob.filepath(self.uuid),
                 iopriority=util_process.PRIORITY_LOW)
             hash = hash_out.split(' ')[0]
