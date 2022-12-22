@@ -52,6 +52,10 @@ class DatabaseBackedObject(object):
     def version(self):
         return self.__version
 
+    @property
+    def in_memory_only(self):
+        return self.__in_memory_only
+
     def __str__(self):
         return '%s(%s)' % (self.object_type, self.__uuid)
 
