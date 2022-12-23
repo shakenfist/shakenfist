@@ -32,7 +32,7 @@
         ansible_python_interpreter: "/usr/bin/python3"
         sf_instance_uuid: "{{imagerebuild_instance['meta']['uuid']}}"
         groups: sfall
-      when: "{{base_image}}" == "debian:11"
+      when: base_image == "debian:11"
 
     - name: Add to ansible (detect system python)
       add_host:
@@ -43,7 +43,7 @@
         ansible_ssh_private_key_file: "/srv/github/id_ci"
         sf_instance_uuid: "{{imagerebuild_instance['meta']['uuid']}}"
         groups: sfall
-      when: "{{base_image}}" != "debian:11"
+      when: base_image != "debian:11"
 
     - name: Log instance
       debug:
@@ -238,7 +238,7 @@
         ansible_python_interpreter: /usr/bin/python3
         sf_instance_uuid: "{{imagetest_instance['meta']['uuid']}}"
         groups: sfall
-      when: "{{base_image}}" == "debian:11"
+      when: base_image == "debian:11"
 
     - name: Add to ansible (detect system python)
       add_host:
@@ -249,7 +249,7 @@
         ansible_ssh_private_key_file: "/srv/github/id_ci"
         sf_instance_uuid: "{{imagetest_instance['meta']['uuid']}}"
         groups: sfall
-      when: "{{base_image}}" != "debian:11"
+      when: base_image != "debian:11"
 
     - name: Log instance
       debug:
