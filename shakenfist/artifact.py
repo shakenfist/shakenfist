@@ -287,7 +287,8 @@ class Artifact(dbo):
             }
             self._db_set_attribute('index_%012d' % index, entry)
             self.add_event('Added index %d to artifact' % index)
-            new_blob.ref_count_inc(self)
+            if not self.in_memory_only:
+                new_blob.ref_count_inc(self)
             self.delete_old_versions()
             return entry
 
@@ -309,7 +310,7 @@ class Artifact(dbo):
         self.add_event('Deleted index %d from artifact' % index)
         self._db_delete_attribute('index_%012d' % index)
         b = blob.Blob.from_db(index_data['blob_uuid'])
-        if b:
+        if b and not self.in_memory_only:
             b.ref_count_dec(self)
 
     def delete(self):
@@ -317,7 +318,7 @@ class Artifact(dbo):
 
         for blob_index in self.get_all_indexes():
             b = blob.Blob.from_db(blob_index['blob_uuid'])
-            if b:
+            if b and not self.in_memory_only:
                 b.ref_count_dec(self)
 
     def resolve_to_blob(self):
