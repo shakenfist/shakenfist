@@ -32,3 +32,18 @@ jobs:
             --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
               base_image={{baseimage}} base_image_user={{baseuser}} label={{outputlabel}}" \
             deploy/ansible/ci-image.yml
+
+      - uses: JasonEtco/create-an-issue@v2
+        if: failure()
+        id: create-issue
+        env:
+          GITHUB_TOKEN: {% raw %}${{{% endraw %} secrets.GITHUB_TOKEN {% raw %}}}{% endraw %}
+          SF_CI_NAME: {{name}}
+          SF_ACTION_RUN: {% raw %}${{{% endraw %} github.server_url {% raw %}}}{% endraw %}/{% raw %}${{{% endraw %} github.repository {% raw %}}}{% endraw %}/actions/runs/{% raw %}${{{% endraw %} github.run_id {% raw %}}}{% endraw %}
+        with:
+          filename: shakenfist/.github/workflows/ci-images-failure.md
+          update_existing: true
+          search_existing: open
+
+      - if: failure()
+        run: 'echo Created {% raw %}${{{% endraw %} steps.create-issue.outputs.url {% raw %}}}{% endraw %}'
