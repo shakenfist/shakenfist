@@ -32,3 +32,18 @@ jobs:
             --extra-vars "identifier=${SHAKENFIST_NAMESPACE} source_path=${GITHUB_WORKSPACE} \
               base_image=debian:11 base_image_user=debian label=ci-images/debian-11" \
             deploy/ansible/ci-image.yml
+
+      - uses: JasonEtco/create-an-issue@v2
+        if: failure()
+        id: create-issue
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SF_CI_NAME: debian-11
+          SF_ACTION_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          filename: shakenfist/.github/workflows/ci-images-failure.md
+          update_existing: true
+          search_existing: open
+
+      - if: failure()
+        run: 'echo Created ${{ steps.create-issue.outputs.url }}'
