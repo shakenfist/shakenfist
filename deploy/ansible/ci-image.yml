@@ -47,7 +47,7 @@
 
     - name: Log instance
       debug:
-        msg: "{{imagerebuild}}"
+        msg: "{{hostvars['imagerebuild']}}"
 
     - name: Wait for instance to present an "OpenSSH" prompt
       wait_for:
@@ -253,7 +253,7 @@
 
     - name: Log instance
       debug:
-        msg: "{{imagetest}}"
+        msg: "{{hostvars['imagetest']}}"
 
     - name: Wait for test instance to present an "OpenSSH" prompt
       wait_for:
