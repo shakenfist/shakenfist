@@ -389,7 +389,8 @@ class Monitor(daemon.Daemon):
 
             for blob_uuid in discovered_blob_references:
                 b = Blob.from_db(blob_uuid)
-                b.ref_count_set(discovered_blob_references[blob_uuid])
+                if b:
+                    b.ref_count_set(discovered_blob_references[blob_uuid])
 
             # Infrequently ensure we have no blobs with a reference count of zero
             orphan_blobs = []
