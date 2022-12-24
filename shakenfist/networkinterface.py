@@ -171,11 +171,9 @@ class NetworkInterface(dbo):
                 DefloatNetworkInterfaceTask(self.network_uuid, self.uuid))
 
         n = network.Network.from_db(self.network_uuid)
-        if not n:
-            raise exceptions.NetworkMissing(
-                'No such network: %s' % self.network_uuid)
-        n.release(self.ipv4)
-        n.remove_networkinterface(self.uuid)
+        if n:
+            n.release(self.ipv4)
+            n.remove_networkinterface(self.uuid)
 
         self.state = dbo.STATE_DELETED
 
