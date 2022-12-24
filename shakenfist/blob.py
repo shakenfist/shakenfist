@@ -303,6 +303,22 @@ class Blob(dbo):
                            extra={baseobject.object_type: baseobject.uuid})
             return new_count
 
+    def _delete_unused(self, new_count):
+        # If no references then the blob cannot be used, therefore delete.
+        if new_count == 0:
+            self.state = self.STATE_DELETED
+
+            for transcoded_blob_uuid in self.transcoded.values():
+                transcoded_blob = Blob.from_db(transcoded_blob_uuid)
+                if transcoded_blob:
+                    transcoded_blob.ref_count_dec(self)
+
+            depends_on = self.depends_on
+            if depends_on:
+                dep_blob = Blob.from_db(depends_on)
+                if dep_blob:
+                    dep_blob.ref_count_dec(self)
+
     def ref_count_dec(self, baseobject):
         with self.get_lock_attr('ref_count', 'Decrease reference count'):
             new_count = self.ref_count - 1
@@ -314,22 +330,18 @@ class Blob(dbo):
             self.add_event('decremented reference count',
                            extra={baseobject.object_type: baseobject.uuid})
 
-            # If no references then the blob cannot be used, therefore delete.
-            if new_count == 0:
-                self.state = self.STATE_DELETED
-
-                for transcoded_blob_uuid in self.transcoded.values():
-                    transcoded_blob = Blob.from_db(transcoded_blob_uuid)
-                    if transcoded_blob:
-                        transcoded_blob.ref_count_dec(self)
-
-                depends_on = self.depends_on
-                if depends_on:
-                    dep_blob = Blob.from_db(depends_on)
-                    if dep_blob:
-                        dep_blob.ref_count_dec(self)
-
+            self._delete_unused(new_count)
             return new_count
+
+    def ref_count_set(self, new_count):
+        with self.get_lock_attr('ref_count', 'Decrease reference count'):
+            if new_count == self.ref_count:
+                return
+
+            self.log.error('Over riding blob reference count with new value!')
+            self._db_set_attribute('ref_count', {'ref_count': new_count})
+            self.add_event('set reference count to %d' % new_count)
+            self._delete_unused(new_count)
 
     def ensure_local(self, locks, instance_object=None,
                      wait_for_other_transfers=True):

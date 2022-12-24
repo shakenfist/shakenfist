@@ -361,6 +361,37 @@ class Monitor(daemon.Daemon):
             setproctitle.setproctitle(daemon.process_name('cluster') + ' idle')
             self._await_election()
 
+            # Infrequently audit blob references and correct errors
+            with etcd.ThreadLocalReadOnlyCache():
+                discovered_blob_references = defaultdict(int)
+                for b in Blobs([active_states_filter]):
+                    discovered_blob_references[b.uuid] = 0
+
+                for i in instance.Instances([instance.active_states_filter]):
+                    for d in i.disk_spec:
+                        blob_uuid = d.get('blob_uuid')
+                        if blob_uuid:
+                            discovered_blob_references[blob_uuid] += 1
+
+                for a in artifact.Artifacts(filters=[active_states_filter]):
+                    for blob_index in a.get_all_indexes():
+                        blob_uuid = blob_index['blob_uuid']
+                        discovered_blob_references[blob_uuid] += 1
+
+                for b in Blobs([active_states_filter]):
+                    dep_blob_uuid = b.depends_on
+                    if dep_blob_uuid:
+                        discovered_blob_references[dep_blob_uuid] += 1
+
+                    transcodes = b.transcoded
+                    for t in transcodes:
+                        discovered_blob_references[transcodes[t]] += 1
+
+            for blob_uuid in discovered_blob_references:
+                b = Blob.from_db(blob_uuid)
+                b.ref_count_set(discovered_blob_references[blob_uuid])
+
+            # And then do regular cluster maintenance things
             while self.is_elected and not self.exit.is_set():
                 self.lock.refresh()
 
