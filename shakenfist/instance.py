@@ -94,6 +94,7 @@ class Instance(dbo):
                          dbo.STATE_CREATING,
                          STATE_CREATING_ERROR,
                          dbo.STATE_CREATED,
+                         dbo.STATE_DELETE_WAIT,
                          STATE_CREATED_ERROR,
                          dbo.STATE_ERROR
                          ])
