@@ -391,6 +391,18 @@ class Monitor(daemon.Daemon):
                 b = Blob.from_db(blob_uuid)
                 b.ref_count_set(discovered_blob_references[blob_uuid])
 
+            # Infrequently ensure we have no blobs with a reference count of zero
+            orphan_blobs = []
+            with etcd.ThreadLocalReadOnlyCache():
+                for b in Blobs([active_states_filter]):
+                    if b.ref_count == 0:
+                        orphan_blobs.append(b)
+
+            for b in orphan_blobs:
+                self.log.with_fields({'blob': b}).error(
+                    'Blob has zero references, deleting')
+                b.state == Blob.STATE_DELETED
+
             # And then do regular cluster maintenance things
             while self.is_elected and not self.exit.is_set():
                 self.lock.refresh()
