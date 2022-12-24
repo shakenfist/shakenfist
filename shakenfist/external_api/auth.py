@@ -182,8 +182,8 @@ class AuthNamespaceEndpoint(sf_api.Resource):
             if i.state.value in [dbo.STATE_DELETED, dbo.STATE_ERROR]:
                 deleted_instances.append(i.uuid)
             else:
-                LOG.withFields({'instance': i.uuid,
-                                'state': i.state}).info('Blocks namespace delete')
+                LOG.with_fields({'instance': i.uuid,
+                                 'state': i.state}).info('Blocks namespace delete')
                 instances.append(i.uuid)
         if len(instances) > 0:
             return sf_api.error(400, 'you cannot delete a namespace with instances')
@@ -191,8 +191,8 @@ class AuthNamespaceEndpoint(sf_api.Resource):
         networks = []
         for n in network.networks_in_namespace(namespace):
             if not n.is_dead():
-                LOG.withFields({'network': n.uuid,
-                                'state': n.state}).info('Blocks namespace delete')
+                LOG.with_fields({'network': n.uuid,
+                                 'state': n.state}).info('Blocks namespace delete')
                 networks.append(n.uuid)
         if len(networks) > 0:
             return sf_api.error(400, 'you cannot delete a namespace with networks')

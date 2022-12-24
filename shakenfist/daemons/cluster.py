@@ -388,8 +388,11 @@ class Monitor(daemon.Daemon):
                         discovered_blob_references[transcodes[t]] += 1
 
             for blob_uuid in discovered_blob_references:
+                # If the blob still exists, and is more than five minutes old,
+                # we should correct the reference count.
                 b = Blob.from_db(blob_uuid)
-                b.ref_count_set(discovered_blob_references[blob_uuid])
+                if b and (time.time() - b.fetched_at > 300):
+                    b.ref_count_set(discovered_blob_references[blob_uuid])
 
             # Infrequently ensure we have no blobs with a reference count of zero
             orphan_blobs = []

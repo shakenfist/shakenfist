@@ -338,7 +338,7 @@ class Blob(dbo):
             if new_count == self.ref_count:
                 return
 
-            self.log.error('Over riding blob reference count with new value!')
+            self.log.error('Overriding blob reference count with new value!')
             self._db_set_attribute('ref_count', {'ref_count': new_count})
             self.add_event('set reference count to %d' % new_count)
             self._delete_unused(new_count)
