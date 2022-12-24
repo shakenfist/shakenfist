@@ -404,7 +404,7 @@ class Monitor(daemon.Daemon):
             for b in orphan_blobs:
                 self.log.with_fields({'blob': b}).error(
                     'Blob has zero references, deleting')
-                b.state == Blob.STATE_DELETED
+                b.state = Blob.STATE_DELETED
 
             # And then do regular cluster maintenance things
             while self.is_elected and not self.exit.is_set():
