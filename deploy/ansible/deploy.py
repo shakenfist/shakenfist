@@ -52,7 +52,7 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
     variables['ksm_enabled'] = os.environ.get('KSM_ENABLED', 1)
     variables['deploy_name'] = os.environ.get('DEPLOY_NAME', 'sf')
     variables['restore_backup'] = os.environ.get('RESTORE_BACKUP', '')
-    variables['ignore_mtu'] = (os.environ.get('IGNORE_MTU', 0) == 1)
+    variables['ignore_mtu'] = (int(os.environ.get('IGNORE_MTU', '0')) == 1)
     variables['dns_server'] = os.environ.get('DNS_SERVER', '8.8.8.8')
     variables['http_proxy'] = os.environ.get('HTTP_PROXY', '')
 
