@@ -88,7 +88,7 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.etcd.create')
     @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get_attribute',
                 return_value={'value': None, 'update_time': 0})
-    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.etcd.get_lock')
     @mock.patch('time.time', return_value=1234)
     def test_instance_new(self, mock_time, mock_get_lock, mock_get_attribute,
                           mock_create, mock_put, mock_get):
@@ -196,7 +196,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
 
     @mock.patch('shakenfist.instance.Instance.error',
                 new_callable=mock.PropertyMock)
-    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.etcd.get_lock')
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 side_effect=[
                     {'value': None, 'update_time': 0},
@@ -214,7 +214,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
         self.assertTrue(time.time() - etcd_write[1][1].update_time < 3)
         self.assertEqual('preflight', etcd_write[1][1].value)
 
-    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.etcd.get_lock')
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 side_effect=[
                     {'value': None, 'update_time': 0},
@@ -244,7 +244,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
         i.state = instance.Instance.STATE_ERROR
         i.state = instance.Instance.STATE_DELETED
 
-    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.etcd.get_lock')
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 side_effect=[
                     {'value': None, 'update_time': 0},
@@ -263,7 +263,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
         with testtools.ExpectedException(exceptions.InvalidStateException):
             i.state = instance.Instance.STATE_CREATED
 
-    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.etcd.get_lock')
     @mock.patch('shakenfist.instance.Instance.power_state',
                 new_callable=mock.PropertyMock)
     @mock.patch('shakenfist.instance.Instance._db_set_attribute')
@@ -285,7 +285,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
         self.assertEqual('off', etcd_write[1]['power_state'])
         self.assertEqual('on', etcd_write[1]['power_state_previous'])
 
-    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.etcd.get_lock')
     @mock.patch('shakenfist.instance.Instance.power_state',
                 new_callable=mock.PropertyMock)
     @mock.patch('shakenfist.instance.Instance._db_set_attribute')
@@ -306,7 +306,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
                        'power_state': instance.Instance.STATE_INITIAL})],
             mock_attribute_set.mock_calls)
 
-    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.etcd.get_lock')
     @mock.patch('shakenfist.instance.Instance.power_state',
                 new_callable=mock.PropertyMock)
     @mock.patch('shakenfist.instance.Instance._db_set_attribute')
@@ -328,7 +328,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
                        'power_state': instance.Instance.STATE_INITIAL})],
             mock_attribute_set.mock_calls)
 
-    @mock.patch('shakenfist.db.get_lock')
+    @mock.patch('shakenfist.etcd.get_lock')
     @mock.patch('shakenfist.instance.Instance.power_state',
                 new_callable=mock.PropertyMock)
     @mock.patch('shakenfist.instance.Instance._db_set_attribute')
