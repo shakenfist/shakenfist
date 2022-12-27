@@ -101,6 +101,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://shakenfist.com/user_guide/objects/</loc>
+         <lastmod>2022-12-27</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://shakenfist.com/user_guide/usage/</loc>
          <lastmod>2022-12-27</lastmod>
          <changefreq>daily</changefreq>
