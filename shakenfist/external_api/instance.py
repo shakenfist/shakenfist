@@ -195,7 +195,7 @@ class InstancesEndpoint(sf_api.Resource):
                 a = Artifact.from_url(
                     Artifact.TYPE_LABEL,
                     '%s%s/%s' % (LABEL_URL, get_jwt_identity()[0], label),
-                    namespace=namespace)
+                    name=label, namespace=namespace)
                 err = _artifact_safety_checks(a, instance_uuid=instance_uuid)
                 if err:
                     return err
@@ -253,8 +253,8 @@ class InstancesEndpoint(sf_api.Resource):
             if nvram_template.startswith('label:'):
                 label = nvram_template[len('label:'):]
                 url = '%s%s/%s' % (LABEL_URL, get_jwt_identity()[0], label)
-                a = Artifact.from_url(
-                    Artifact.TYPE_LABEL, url, namespace=namespace)
+                a = Artifact.from_url(Artifact.TYPE_LABEL, url, name=label,
+                                      namespace=namespace)
                 err = _artifact_safety_checks(a, instance_uuid=instance_uuid)
                 if err:
                     return err
