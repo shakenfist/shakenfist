@@ -31,8 +31,8 @@ class LabelEndpoint(sf_api.Resource):
     @api_base.log_token_use
     def post(self, label_name=None, blob_uuid=None, max_versions=0):
         namespace, label_url = _label_url(label_name)
-        a = Artifact.from_url(Artifact.TYPE_LABEL, label_url,
-                              max_versions, namespace=namespace,
+        a = Artifact.from_url(Artifact.TYPE_LABEL, label_url, name=label_name,
+                              max_versions=max_versions, namespace=namespace,
                               create_if_new=True)
         a.add_index(blob_uuid)
         a.state = dbo.STATE_CREATED

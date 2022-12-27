@@ -164,7 +164,6 @@ def log_token_use(func):
 
 
 def arg_is_instance_ref(func):
-    # Method uses the instance from the db
     def wrapper(*args, **kwargs):
         with ThreadLocalReadOnlyCache():
             try:

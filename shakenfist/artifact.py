@@ -31,7 +31,7 @@ UPLOAD_URL = 'sf://upload/'
 
 class Artifact(dbo):
     object_type = 'artifact'
-    current_version = 5
+    current_version = 6
     upgrade_supported = True
 
     state_targets = {
@@ -68,6 +68,7 @@ class Artifact(dbo):
 
         self.__artifact_type = static_values['artifact_type']
         self.__source_url = static_values['source_url']
+        self.__name = static_values['name']
         self.__namespace = static_values.get('namespace')
 
     @classmethod
@@ -95,6 +96,11 @@ class Artifact(dbo):
             static_values['version'] = 5
             changed = True
 
+        if static_values.get('version') == 5:
+            static_values['name'] = static_values['source_url'].split('/')[-1]
+            static_values['version'] = 6
+            changed = True
+
         if changed:
             LOG.with_fields({
                 cls.object_type: static_values['uuid'],
@@ -104,9 +110,13 @@ class Artifact(dbo):
         return changed, static_values
 
     @classmethod
-    def new(cls, artifact_type, source_url, max_versions=0, namespace=None):
+    def new(cls, artifact_type, source_url, name=None, max_versions=0,
+            namespace=None):
         if namespace is None:
             raise exceptions.ArtifactHasNoNamespace()
+
+        if not name:
+            name = source_url.split('/')[-1]
 
         artifact_uuid = str(uuid4())
         if not max_versions:
@@ -116,6 +126,7 @@ class Artifact(dbo):
             'uuid': artifact_uuid,
             'artifact_type': artifact_type,
             'source_url': source_url,
+            'name': name,
             'namespace': namespace,
 
             'version': cls.current_version
@@ -137,7 +148,8 @@ class Artifact(dbo):
         return a
 
     @staticmethod
-    def from_url(artifact_type, url, max_versions=0, namespace=None, create_if_new=False):
+    def from_url(artifact_type, url, name=None, max_versions=0, namespace=None,
+                 create_if_new=False):
         with etcd.get_lock('artifact_from_url', None, url):
             artifacts = list(Artifacts([
                 partial(url_filter, url),
@@ -146,7 +158,10 @@ class Artifact(dbo):
                 partial(namespace_or_shared_filter, namespace)]))
             if len(artifacts) == 0:
                 if create_if_new:
-                    return Artifact.new(artifact_type, url, max_versions=max_versions,
+                    if not name:
+                        name = url.split('/')[-1]
+                    return Artifact.new(artifact_type, url, name=name,
+                                        max_versions=max_versions,
                                         namespace=namespace)
                 return None
             if len(artifacts) == 1:
@@ -161,6 +176,10 @@ class Artifact(dbo):
     @property
     def source_url(self):
         return self.__source_url
+
+    @property
+    def name(self):
+        return self.__name
 
     @property
     def namespace(self):

@@ -1301,7 +1301,9 @@ class Instance(dbo):
             a = artifact.Artifact.from_url(
                 artifact.Artifact.TYPE_SNAPSHOT,
                 '%s%s/%s' % (artifact.INSTANCE_URL, self.uuid, disk['device']),
-                max_versions, namespace=self.namespace, create_if_new=True)
+                name='%s/%s' % (self.uuid, disk['device']),
+                max_versions=max_versions, namespace=self.namespace,
+                create_if_new=True)
 
             blob_uuid = str(uuid4())
             out[disk['device']] = {
