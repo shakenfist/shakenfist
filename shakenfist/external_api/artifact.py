@@ -162,20 +162,20 @@ class ArtifactEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'artifact', 'Get artifact information.',
         [('artifact_ref', 'query', 'string',
-          'The string of the artifact.', True)],
+          'The UUID or name of the artifact.', True)],
         [(200, 'Information about a single artifact.', artifact_get_example)]))
     @api_base.verify_token
     @arg_is_artifact_ref
     @requires_artifact_access
     @api_base.log_token_use
-    def get(self, artifact_uuid=None, artifact_ref=None, artifact_from_db=None):
+    def get(self, artifact_ref=None, artifact_from_db=None):
         with etcd.ThreadLocalReadOnlyCache():
             return artifact_from_db.external_view()
 
     @swag_from(api_base.swagger_helper(
         'artifact', 'Delete an artifact.',
         [('artifact_ref', 'query', 'string',
-          'The string of the artifact.', True)],
+          'The UUID or name of the artifact.', True)],
         [(200, ('The artifact has been deleted. The final state of the '
                 'artifact is returned.'),
           artifact_delete_example)]))
@@ -183,7 +183,7 @@ class ArtifactEndpoint(sf_api.Resource):
     @arg_is_artifact_ref
     @requires_artifact_ownership
     @api_base.log_token_use
-    def delete(self, artifact_uuid=None, artifact_ref=None, artifact_from_db=None):
+    def delete(self, artifact_ref=None, artifact_from_db=None):
         if artifact_from_db.state.value == Artifact.STATE_DELETED:
             return
         artifact_from_db.delete()
@@ -508,15 +508,15 @@ class ArtifactEventsEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'artifact', 'Get artifact event information.',
         [('artifact_ref', 'query', 'string',
-          'The string of the artifact.', True)],
+          'The UUID or name of the artifact.', True)],
         [(200, 'Event information about a single artifact.', artifact_events_example)]))
     @api_base.verify_token
     @arg_is_artifact_ref
     @requires_artifact_access
     @api_base.log_token_use
     @api_base.redirect_to_eventlog_node
-    def get(self, artifact_uuid=None, artifact_ref=None, artifact_from_db=None):
-        with eventlog.EventLog('artifact', artifact_uuid) as eventdb:
+    def get(self, artifact_ref=None, artifact_from_db=None):
+        with eventlog.EventLog('artifact', artifact_from_db.uuid) as eventdb:
             return list(eventdb.read_events())
 
 
@@ -560,12 +560,12 @@ class ArtifactVersionsEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'artifact', 'Get artifact version information.',
         [('artifact_ref', 'query', 'string',
-          'The string of the artifact.', True)],
+          'The UUID or name of the artifact.', True)],
         [(200, 'A list of the blobs which form the artifact versions.', artifact_versions_example)]))
     @api_base.verify_token
     @arg_is_artifact_ref
     @requires_artifact_access
-    def get(self, artifact_uuid=None, artifact_ref=None, artifact_from_db=None):
+    def get(self, artifact_ref=None, artifact_from_db=None):
         retval = []
         for idx in artifact_from_db.get_all_indexes():
             b = Blob.from_db(idx['blob_uuid'])
@@ -577,7 +577,8 @@ class ArtifactVersionsEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'artifact', 'Set the maximum number of versions for an artifact.',
         [
-            ('artifact_uuid', 'query', 'uuid', 'The UUID of the artifact.', True),
+            ('artifact_ref', 'query', 'string',
+             'The UUID or name of the artifact.', True),
             ('max_versions', 'post', 'integer',
              'The maximum number of versions, or revert to the default it not set.',
              False)
@@ -587,7 +588,7 @@ class ArtifactVersionsEndpoint(sf_api.Resource):
     @arg_is_artifact_ref
     @requires_artifact_ownership
     @api_base.log_token_use
-    def post(self, artifact_uuid=None, artifact_ref=None, artifact_from_db=None,
+    def post(self, artifact_ref=None, artifact_from_db=None,
              max_versions=config.ARTIFACT_MAX_VERSIONS_DEFAULT):
         try:
             mv = int(max_versions)
@@ -603,7 +604,8 @@ class ArtifactVersionEndpoint(sf_api.Resource):
          'remove the blob if its reference count reaches zero. If the artifact '
          'has no remaining versions, it will have its state set to deleted.'),
         [
-            ('artifact_uuid', 'query', 'uuid', 'The UUID of the artifact.', True),
+            ('artifact_ref', 'query', 'string',
+             'The UUID or name of the artifact.', True),
             ('version_id', 'query', 'integer', 'The version number to remove.', False)
         ],
         [(200, 'Information about a single artifact.', artifact_get_example)]))
@@ -611,7 +613,7 @@ class ArtifactVersionEndpoint(sf_api.Resource):
     @arg_is_artifact_ref
     @requires_artifact_ownership
     @api_base.log_token_use
-    def delete(self, artifact_uuid=None, artifact_ref=None, artifact_from_db=None, version_id=0):
+    def delete(self, artifact_ref=None, artifact_from_db=None, version_id=0):
         try:
             ver_index = int(version_id)
         except ValueError:
@@ -632,13 +634,13 @@ class ArtifactShareEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'artifact', 'Share the specified artifact with all namespaces.',
         [('artifact_ref', 'query', 'string',
-          'The string of the artifact.', True)],
+          'The UUID or name of the artifact.', True)],
         [(200, 'Information about a single artifact.', artifact_get_example)]))
     @api_base.verify_token
     @arg_is_artifact_ref
     @requires_artifact_ownership
     @api_base.log_token_use
-    def post(self, artifact_uuid=None, artifact_ref=None, artifact_from_db=None):
+    def post(self, artifact_ref=None, artifact_from_db=None):
         if artifact_from_db.namespace != 'system':
             return sf_api.error(
                 403, 'only artifacts in the system namespace can be shared')
@@ -650,13 +652,13 @@ class ArtifactUnshareEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'artifact', 'Unshare the specified artifact with all namespaces.',
         [('artifact_ref', 'query', 'string',
-          'The string of the artifact.', True)],
+          'The UUID or name of the artifact.', True)],
         [(200, 'Information about a single artifact.', artifact_get_example)]))
     @api_base.verify_token
     @arg_is_artifact_ref
     @requires_artifact_ownership
     @api_base.log_token_use
-    def post(self, artifact_uuid=None, artifact_ref=None, artifact_from_db=None):
+    def post(self, artifact_ref=None, artifact_from_db=None):
         if not artifact_from_db.shared:
             return sf_api.error(403, 'artifact not shared')
         artifact_from_db.shared = False

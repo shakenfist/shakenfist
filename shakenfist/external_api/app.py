@@ -165,20 +165,20 @@ api.add_resource(api_interface.InterfaceFloatEndpoint,
 api.add_resource(api_interface.InterfaceDefloatEndpoint,
                  '/interfaces/<interface_uuid>/defloat')
 
-api.add_resource(api_artifact.ArtifactEndpoint, '/artifacts/<artifact_uuid>')
+api.add_resource(api_artifact.ArtifactEndpoint, '/artifacts/<artifact_ref>')
 api.add_resource(api_artifact.ArtifactsEndpoint, '/artifacts')
 api.add_resource(api_artifact.ArtifactUploadEndpoint,
                  '/artifacts/upload/<artifact_name>')
 api.add_resource(api_artifact.ArtifactEventsEndpoint,
-                 '/artifacts/<artifact_uuid>/events')
+                 '/artifacts/<artifact_ref>/events')
 api.add_resource(api_artifact.ArtifactVersionsEndpoint,
-                 '/artifacts/<artifact_uuid>/versions')
+                 '/artifacts/<artifact_ref>/versions')
 api.add_resource(api_artifact.ArtifactVersionEndpoint,
-                 '/artifacts/<artifact_uuid>/versions/<version_id>')
+                 '/artifacts/<artifact_ref>/versions/<version_id>')
 api.add_resource(api_artifact.ArtifactShareEndpoint,
-                 '/artifacts/<artifact_uuid>/share')
+                 '/artifacts/<artifact_ref>/share')
 api.add_resource(api_artifact.ArtifactUnshareEndpoint,
-                 '/artifacts/<artifact_uuid>/unshare')
+                 '/artifacts/<artifact_ref>/unshare')
 
 api.add_resource(api_label.LabelEndpoint, '/label/<path:label_name>')
 
