@@ -19,6 +19,7 @@ nav:
         - "Usage": user_guide/usage.md
         - "Artifacts": user_guide/artifacts.md
         - "Events": user_guide/events.md
+        - "Objects": user_guide/objects.md
     - Developer Guide:
         - "Authentication": developer_guide/authentication.md
         - "Artifact uploads and downloads": developer_guide/artifact_uploads_downloads.md
