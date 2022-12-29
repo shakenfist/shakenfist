@@ -95,8 +95,13 @@ def log_response_info(response):
 class Root(sf_api.Resource):
     def get(self):
         resp = flask.Response(
-            'Shaken Fist REST API service',
-            mimetype='text/plain')
+            ('<html><head><title>Shaken Fist REST API service</title></head>'
+             '<body><h1>Shaken Fist REST API service</h1>'
+             '<p>You might be interested in the <a href="/apidocs">apidocs</a>.</p>'
+             '<p>Machine searchable API capabilities:</p><ul>'
+             '<li>blob-search-by-hash</li>'
+             '</ul></p></body></html>'),
+            mimetype='text/html')
         resp.status_code = 200
         return resp
 
