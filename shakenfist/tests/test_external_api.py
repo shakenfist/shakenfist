@@ -203,10 +203,10 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
 
     def test_get_root(self):
         resp = self.client.get('/')
-        self.assertEqual('Shaken Fist REST API service',
-                         resp.get_data().decode('utf-8'))
+        self.assertTrue('Shaken Fist REST API service' in
+                        resp.get_data().decode('utf-8'))
         self.assertEqual(200, resp.status_code)
-        self.assertEqual('text/plain; charset=utf-8', resp.content_type)
+        self.assertEqual('text/html; charset=utf-8', resp.content_type)
 
     def test_get_instance(self):
         self.mock_etcd.create_instance('barry')
