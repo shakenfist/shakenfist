@@ -300,9 +300,10 @@ class InstancesEndpoint(sf_api.Resource):
                 # Allow network to be specified by name or UUID (and error early
                 # if not found)
                 try:
-                    n = sfnet.Network.from_db_by_ref(netdesc['network_uuid'])
+                    n = sfnet.Network.from_db_by_ref(netdesc['network_uuid'],
+                                                     get_jwt_identity()[0])
                 except exceptions.MultipleObjects as e:
-                    return sf_api.error(400, str(e))
+                    return sf_api.error(400, str(e), suppress_traceback=True)
 
                 if not n:
                     return sf_api.error(
@@ -402,7 +403,7 @@ class InstancesEndpoint(sf_api.Resource):
                 except exceptions.CongestedNetwork as e:
                     inst.enqueue_delete_due_error(
                         'cannot allocate address: %s' % e)
-                    return sf_api.error(507, str(e))
+                    return sf_api.error(507, str(e), suppress_traceback=True)
 
                 if 'model' not in netdesc or not netdesc['model']:
                     netdesc['model'] = 'virtio'
@@ -430,7 +431,7 @@ class InstancesEndpoint(sf_api.Resource):
                 except exceptions.CongestedNetwork as e:
                     inst.enqueue_delete_due_error(
                         'cannot allocate address: %s' % e)
-                    return sf_api.error(507, str(e))
+                    return sf_api.error(507, str(e), suppress_traceback=True)
 
                 # Include the interface uuid in the network description we
                 # pass through to the instance start task.

@@ -45,7 +45,7 @@ def arg_is_artifact_ref(func):
                     kwargs['artifact_from_db'] = Artifact.from_db_by_ref(
                         kwargs.get('artifact_ref'), get_jwt_identity()[0])
                 except exceptions.MultipleObjects as e:
-                    return sf_api.error(400, str(e))
+                    return sf_api.error(400, str(e), suppress_traceback=True)
 
         if not kwargs.get('artifact_from_db'):
             return sf_api.error(404, 'artifact not found')
