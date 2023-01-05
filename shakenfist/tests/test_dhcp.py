@@ -1,10 +1,12 @@
 import jinja2
 import mock
 import os
+from pydantic import AnyHttpUrl, IPvAnyAddress
 import signal
 import six
+import tempfile
 import testtools
-from pydantic import AnyHttpUrl, IPvAnyAddress
+import time
 
 from shakenfist.config import BaseSettings
 from shakenfist.ipmanager import IPManager
@@ -60,7 +62,6 @@ class DHCPTestCase(testtools.TestCase):
             ETCD_HOST: str = '127.0.0.1'
 
         fake_config = FakeConfig()
-
         self.config = mock.patch('shakenfist.dhcp.config',
                                  fake_config)
         self.mock_config = self.config.start()
@@ -92,8 +93,8 @@ class DHCPTestCase(testtools.TestCase):
         s = str(d)
         self.assertEqual('dhcp(notauuid)', s)
 
-    @mock.patch('os.path.exists', return_value=True)
-    def test_make_config(self, mock_exists):
+    @mock.patch('os.makedirs')
+    def test_make_config(self, mock_makedir):
         d = dhcp.DHCP(FakeNetwork(), 'eth0')
 
         mock_open = mock.mock_open()
@@ -131,7 +132,7 @@ class DHCPTestCase(testtools.TestCase):
             ])
         )
 
-    @mock.patch('os.path.exists', return_value=True)
+    @mock.patch('os.makedirs')
     @mock.patch('shakenfist.networkinterface.NetworkInterface._db_get',
                 side_effect=[
                     {
@@ -169,7 +170,7 @@ class DHCPTestCase(testtools.TestCase):
                         'disk_spec': [{'size': 4, 'base': 'foo'}],
                         'version': Instance.current_version
                     }])
-    def test_make_hosts(self, mock_instances, mock_interfaces, mock_exists):
+    def test_make_hosts(self, mock_instances, mock_interfaces, mock_makedir):
         d = dhcp.DHCP(FakeNetwork(), 'eth0')
 
         mock_open = mock.mock_open()
@@ -236,15 +237,90 @@ class DHCPTestCase(testtools.TestCase):
         mock_signal.assert_called_with(signal.SIGKILL)
 
     @mock.patch('os.path.exists', return_value=True)
+    @mock.patch('os.makedirs')
     @mock.patch('shakenfist.dhcp.DHCP._send_signal', return_value=False)
     @mock.patch('shakenfist.dhcp.DHCP._make_config')
     @mock.patch('shakenfist.dhcp.DHCP._make_hosts')
     @mock.patch('shakenfist.util.process.execute')
     def test_restart_dhcpd(self, mock_execute, mock_hosts, mock_config,
+                           mock_signal, mock_makedirs, mock_exists):
+        with tempfile.TemporaryDirectory() as dir:
+            with open(os.path.join(dir, 'leases'), 'w') as f:
+                f.write('')
+
+            d = dhcp.DHCP(FakeNetwork(), 'eth0')
+            d.subst['config_dir'] = dir
+            d.restart_dhcpd()
+            mock_signal.assert_called_with(signal.SIGHUP)
+            mock_execute.assert_called_with(
+                None, 'dnsmasq --conf-file=%s/config' % dir,
+                namespace='notauuid')
+
+    @mock.patch('os.path.exists', return_value=True)
+    @mock.patch('shakenfist.dhcp.DHCP._send_signal', return_value=False)
+    @mock.patch('shakenfist.dhcp.DHCP._make_config')
+    @mock.patch('shakenfist.dhcp.DHCP._make_hosts',
+                return_value={
+                    '02:00:00:55:04:a2': '172.10.0.8',
+                    '1a:91:64:d2:15:39': '127.0.0.5'
+                })
+    @mock.patch('shakenfist.util.process.execute')
+    def test_remove_leases(self, mock_execute, mock_hosts, mock_config,
                            mock_signal, mock_exists):
-        d = dhcp.DHCP(FakeNetwork(), 'eth0')
-        d.restart_dhcpd()
-        mock_signal.assert_called_with(signal.SIGHUP)
-        mock_execute.assert_called_with(
-            None, 'dnsmasq --conf-file=/a/b/c/dhcp/notauuid/config',
-            namespace='notauuid')
+        with tempfile.TemporaryDirectory() as dir:
+            with open(os.path.join(dir, 'leases'), 'w') as f:
+                f.write('%d 02:00:00:55:04:a2 172.10.0.8 client *\n'
+                        % (time.time() - 3600))
+                f.write('%d 02:00:00:55:04:a3 172.10.0.9 client2 *\n'
+                        % (time.time() + 3600))
+                f.write('%d 1a:91:64:d2:15:39 127.0.0.5 client3 *'
+                        % (time.time() + 3600))
+
+            d = dhcp.DHCP(FakeNetwork(), 'eth0')
+            d.subst['config_dir'] = dir
+
+            d.restart_dhcpd()
+
+            mock_signal.assert_called_with(signal.SIGKILL)
+            mock_execute.assert_called_with(
+                None, 'dnsmasq --conf-file=%s/config' % dir,
+                namespace='notauuid')
+
+            with open(os.path.join(dir, 'leases'), 'r') as f:
+                leases = f.read()
+
+            # Expired lease stays
+            self.assertTrue('02:00:00:55:04:a2' in leases)
+
+            # Invalid lease removed
+            self.assertFalse('02:00:00:55:04:a3' in leases)
+
+            # Valid lease stays
+            self.assertTrue('1a:91:64:d2:15:39' in leases)
+
+    @mock.patch('os.path.exists', return_value=True)
+    @mock.patch('shakenfist.dhcp.DHCP._send_signal', return_value=True)
+    @mock.patch('shakenfist.dhcp.DHCP._make_config')
+    @mock.patch('shakenfist.dhcp.DHCP._make_hosts',
+                return_value={
+                    '02:00:00:55:04:a2': '172.10.0.8',
+                    '1a:91:64:d2:15:39': '127.0.0.5'
+                })
+    @mock.patch('shakenfist.util.process.execute')
+    def test_remove_no_leases(self, mock_execute, mock_hosts, mock_config,
+                              mock_signal, mock_exists):
+        with tempfile.TemporaryDirectory() as dir:
+            with open(os.path.join(dir, 'leases'), 'w') as f:
+                f.write('%d 1a:91:64:d2:15:39 127.0.0.5 client3 *'
+                        % (time.time() + 3600))
+
+            d = dhcp.DHCP(FakeNetwork(), 'eth0')
+            d.subst['config_dir'] = dir
+
+            d.restart_dhcpd()
+
+            mock_signal.assert_called_with(signal.SIGHUP)
+
+            with open(os.path.join(dir, 'leases'), 'r') as f:
+                leases = f.read()
+            self.assertTrue('1a:91:64:d2:15:39' in leases)

@@ -5,6 +5,7 @@ import os
 import psutil
 import shutil
 import signal
+import time
 
 from shakenfist.config import config
 from shakenfist import instance
@@ -43,23 +44,21 @@ class DHCP(object):
             return jinja2.Template(f.read())
 
     def _make_config(self):
-        if not os.path.exists(self.subst['config_dir']):
-            os.makedirs(self.subst['config_dir'], exist_ok=True)
+        os.makedirs(self.subst['config_dir'], exist_ok=True)
 
         t = self._read_template('dhcp.tmpl')
         c = t.render(self.subst)
 
-        with open(os.path.join(self.subst['config_dir'],
-                               'config'), 'w') as f:
+        with open(os.path.join(self.subst['config_dir'], 'config'), 'w') as f:
             f.write(c)
 
     def _make_hosts(self):
-        if not os.path.exists(self.subst['config_dir']):
-            os.makedirs(self.subst['config_dir'], exist_ok=True)
-
+        os.makedirs(self.subst['config_dir'], exist_ok=True)
         t = self._read_template('dhcphosts.tmpl')
 
         instances = []
+        allowed_leases = {}
+
         for ni_uuid in self.network.networkinterfaces:
             ni = networkinterface.NetworkInterface.from_db(ni_uuid)
             if not ni:
@@ -75,14 +74,45 @@ class DHCP(object):
                     'macaddr': ni.macaddr,
                     'ipv4': ni.ipv4,
                     'name': inst.name.replace(',', '')
-                }
-            )
+                })
+            allowed_leases[ni.macaddr] = ni.ipv4
+
         self.subst['instances'] = instances
         c = t.render(self.subst)
 
-        with open(os.path.join(self.subst['config_dir'],
-                               'hosts'), 'w') as f:
+        with open(os.path.join(self.subst['config_dir'], 'hosts'), 'w') as f:
             f.write(c)
+
+        return allowed_leases
+
+    def _remove_invalid_leases(self, allowed_leases):
+        leases_file = os.path.join(self.subst['config_dir'], 'leases')
+        if not os.path.exists(leases_file):
+            return False
+
+        needs_restart = False
+        with open(leases_file + '.new', 'w') as leases_out:
+            with open(leases_file, 'r') as leases_in:
+                for line in leases_in.readlines():
+                    # 1672899136 02:00:00:55:04:a2 172.10.0.8 client *
+                    # ^--expiry  ^--mac            ^--ip      ^-- hostname
+                    elems = line.split(' ')
+
+                    # The lease is expired, so we don't care
+                    if time.time() > int(elems[0]):
+                        leases_out.write(line)
+                        continue
+
+                    # The lease is valid, so keep it
+                    if elems[1] in allowed_leases:
+                        leases_out.write(line)
+                        continue
+
+                    # Otherwise, this lease is invalid and we'll need to do a
+                    # hard restart
+                    needs_restart = True
+
+        return needs_restart
 
     def _remove_config(self):
         if os.path.exists(self.subst['config_dir']):
@@ -119,8 +149,23 @@ class DHCP(object):
             return
 
         self._make_config()
-        self._make_hosts()
-        if not self._send_signal(signal.SIGHUP):
+        allowed_leases = self._make_hosts()
+
+        needs_start = False
+        if self._remove_invalid_leases(allowed_leases):
+            # We found invalid leases and need to do a hard restart of dnsmasq
+            self._send_signal(signal.SIGKILL)
+            leases_file = os.path.join(self.subst['config_dir'], 'leases')
+            os.unlink(leases_file)
+            os.rename(leases_file + '.new', leases_file)
+            needs_start = True
+
+        elif not self._send_signal(signal.SIGHUP):
+            # We failed to find a PID to SIGHUP and therefore must start
+            # dnsmasq
+            needs_start = True
+
+        if needs_start:
             util_process.execute(
                 None, 'dnsmasq --conf-file=%(config_dir)s/config' % self.subst,
                 namespace=self.network.uuid)

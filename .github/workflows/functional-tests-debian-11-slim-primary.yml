@@ -181,6 +181,13 @@ jobs:
             exit 1
           fi
 
+          # Ensure we didn't see invalid leases causing DHCP failures
+          if [ `grep -c "not using configured address" ${GITHUB_WORKSPACE}/syslog` -gt 0 ]
+          then
+            echo "DHCP is failing, probably due to invalid leases!"
+            exit 1
+          fi
+
       - name: Gather logs
         if: ${{ ! cancelled() }}
         run: |
