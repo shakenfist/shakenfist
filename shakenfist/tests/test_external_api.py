@@ -656,5 +656,5 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
             }))
         self.assertEqual(400, resp.status_code)
         self.assertEqual(
-            'multiple networks have the name "betsy" in namespace "None"',
+            'multiple networks have the name "betsy" in namespace "two"',
             resp.get_json().get('error'))

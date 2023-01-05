@@ -170,7 +170,7 @@ def arg_is_instance_ref(func):
                 inst = Instance.from_db_by_ref(kwargs.get('instance_ref'),
                                                get_jwt_identity()[0])
             except exceptions.MultipleObjects as e:
-                return sf_api.error(400, str(e))
+                return sf_api.error(400, str(e), suppress_traceback=True)
 
             if not inst:
                 LOG.with_fields({'instance': kwargs.get('instance_ref')}).info(
@@ -263,7 +263,7 @@ def arg_is_network_ref(func):
                 n = network.Network.from_db_by_ref(kwargs.get('network_ref'),
                                                    get_jwt_identity()[0])
             except exceptions.MultipleObjects as e:
-                return sf_api.error(400, str(e))
+                return sf_api.error(400, str(e), suppress_traceback=True)
 
             if not n:
                 LOG.with_fields({'network': kwargs.get('network_ref')}).info(

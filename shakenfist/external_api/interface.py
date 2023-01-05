@@ -38,7 +38,7 @@ class InterfaceFloatEndpoint(sf_api.Resource):
         try:
             api_util.assign_floating_ip(ni)
         except exceptions.CongestedNetwork as e:
-            return sf_api.error(507, str(e))
+            return sf_api.error(507, str(e), suppress_traceback=True)
 
         etcd.enqueue('networknode',
                      FloatNetworkInterfaceTask(n.uuid, interface_uuid))
