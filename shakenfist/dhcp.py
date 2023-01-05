@@ -1,5 +1,6 @@
 # Copyright 2020 Michael Still
 
+import copy
 import jinja2
 import os
 import psutil
@@ -139,6 +140,16 @@ class DHCP(object):
                 pid = int(f.read())
                 return pid
         return None
+
+    def remove_lease(self, ipv4, macaddr):
+        subst = copy.copy(self.subst)
+        subst.update({
+            'ipv4': ipv4,
+            'macaddr': macaddr
+        })
+        util_process.execute(
+                None, 'dhcp_release %(interface)s %(ipv4)s %(macaddr)s' % subst,
+                namespace=self.network.uuid)
 
     def remove_dhcpd(self):
         self._send_signal(signal.SIGKILL)
