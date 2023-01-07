@@ -212,6 +212,23 @@
         sysctl -w net.ipv4.ip_forward=1
       ignore_errors: True
 
+    - name: Disable system suspend
+      copy:
+        content: |
+          [Sleep]
+          AllowSuspend=no
+          AllowHibernation=no
+          AllowSuspendThenHibernate=no
+          AllowHybridSleep=no
+        dest: /etc/systemd/sleep.conf
+        owner: root
+        mode: u=r,g=r,o=r
+
+    - name: Restart systemd-logind to disable system suspend
+      service:
+        name: systemd-logind
+        state: restarted
+
 - hosts: hypervisors
   any_errors_fatal: true
   become: yes
