@@ -129,6 +129,25 @@ class RemoveDHCPNetworkTask(NetworkTask):
     _name = 'network_remove_dhcp'
 
 
+class RemoveDHCPLeaseNetworkTask(NetworkTask):
+    _name = 'network_remove_dhcp_lease'
+
+    def __init__(self, network_uuid, ipv4, macaddr):
+        super(RemoveDHCPLeaseNetworkTask, self).__init__(network_uuid)
+        self._ipv4 = ipv4
+        self._macaddr = macaddr
+
+    def ipv4(self):
+        return self._ipv4
+
+    def macaddr(self):
+        return self._macaddr
+
+    def obj_dict(self):
+        return {**super(RemoveDHCPLeaseNetworkTask, self).obj_dict(),
+                'ipv4': self._ipv4, 'macaddr': self._macaddr}
+
+
 class RemoveNATNetworkTask(NetworkTask):
     _name = 'network_remove_nat'
 

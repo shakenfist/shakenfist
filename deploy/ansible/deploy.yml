@@ -108,6 +108,7 @@
           - build-essential
           - cpu-checker
           - dnsmasq
+          - dnsmasq-utils
           - dnsutils
           - git
           - hddtemp

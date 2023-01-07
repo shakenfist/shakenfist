@@ -31,6 +31,7 @@ from shakenfist.tasks import (
     HypervisorDestroyNetworkTask,
     UpdateDHCPNetworkTask,
     RemoveDHCPNetworkTask,
+    RemoveDHCPLeaseNetworkTask,
     RemoveNATNetworkTask)
 from shakenfist.util import network as util_network
 from shakenfist.util import process as util_process
@@ -255,16 +256,22 @@ class Network(dbo):
             return nis
 
     def add_networkinterface(self, ni):
-        self._add_item_in_attribute_list('networkinterfaces', ni)
+        self._add_item_in_attribute_list('networkinterfaces', ni.uuid)
 
     def remove_networkinterface(self, ni):
-        self._remove_item_in_attribute_list('networkinterfaces', ni)
+        if ni.ipv4:
+            self.remove_dhcp_lease(ni.ipv4, ni.macaddr)
+        self._remove_item_in_attribute_list('networkinterfaces', ni.uuid)
 
     def update_floating_gateway(self, gateway):
         with self.get_lock_attr('routing', 'Update floating gateway'):
             routing = self.routing
             routing['floating_gateway'] = gateway
             self._db_set_attribute('routing', routing)
+
+    @property
+    def _vx_veth_inner(self):
+        return 'veth-%06x-i' % self.vxid
 
     def subst_dict(self):
         # NOTE(mikal): it should be noted that the maximum interface name length
@@ -277,7 +284,7 @@ class Network(dbo):
             'vx_interface': 'vxlan-%06x' % self.vxid,
             'vx_bridge': 'br-vxlan-%06x' % self.vxid,
             'vx_veth_outer': 'veth-%06x-o' % self.vxid,
-            'vx_veth_inner': 'veth-%06x-i' % self.vxid,
+            'vx_veth_inner': self._vx_veth_inner,
 
             'egress_bridge': 'egr-br-%s' % config.NODE_EGRESS_NIC,
             'egress_veth_outer': 'egr-%06x-o' % self.vxid,
@@ -548,8 +555,7 @@ class Network(dbo):
 
     def is_dnsmasq_running(self):
         """Determine if dnsmasq process is running for this network"""
-        subst = self.subst_dict()
-        d = dhcp.DHCP(self, subst['vx_veth_inner'])
+        d = dhcp.DHCP(self, self._vx_veth_inner)
         pid = d.get_pid()
         if pid and psutil.pid_exists(pid):
             return True
@@ -557,23 +563,33 @@ class Network(dbo):
         self.log.warning('dnsmasq is not running')
         return False
 
+    def remove_dhcp_lease(self, ipv4, macaddr):
+        if not self.provide_dhcp:
+            return
+
+        if config.NODE_IS_NETWORK_NODE:
+            with self.get_lock(op='Network update DHCP'):
+                d = dhcp.DHCP(self, self._vx_veth_inner)
+                d.remove_lease(ipv4, macaddr)
+        else:
+            etcd.enqueue('networknode',
+                         RemoveDHCPLeaseNetworkTask(self.uuid, ipv4, macaddr))
+
     def update_dhcp(self):
         if not self.provide_dhcp:
             return
 
         if config.NODE_IS_NETWORK_NODE:
-            subst = self.subst_dict()
             with self.get_lock(op='Network update DHCP'):
-                d = dhcp.DHCP(self, subst['vx_veth_inner'])
+                d = dhcp.DHCP(self, self._vx_veth_inner)
                 d.restart_dhcpd()
         else:
             etcd.enqueue('networknode', UpdateDHCPNetworkTask(self.uuid))
 
     def remove_dhcp(self):
         if config.NODE_IS_NETWORK_NODE:
-            subst = self.subst_dict()
             with self.get_lock(op='Network remove DHCP'):
-                d = dhcp.DHCP(self, subst['vx_veth_inner'])
+                d = dhcp.DHCP(self, self._vx_veth_inner)
                 d.remove_dhcpd()
         else:
             etcd.enqueue('networknode', RemoveDHCPNetworkTask(self.uuid))

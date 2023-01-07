@@ -107,7 +107,7 @@ class NetworkInterface(dbo):
         if not n:
             raise exceptions.NetworkMissing(
                 'No such network: %s' % netdesc['network_uuid'])
-        n.add_networkinterface(interface_uuid)
+        n.add_networkinterface(ni)
 
         return ni
 
@@ -173,7 +173,7 @@ class NetworkInterface(dbo):
         n = network.Network.from_db(self.network_uuid)
         if n:
             n.release(self.ipv4)
-            n.remove_networkinterface(self.uuid)
+            n.remove_networkinterface(self)
 
         self.state = dbo.STATE_DELETED
 

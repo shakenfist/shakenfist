@@ -22,6 +22,7 @@ from shakenfist.tasks import (
     RemoveDHCPNetworkTask,
     RemoveNATNetworkTask,
     UpdateDHCPNetworkTask,
+    RemoveDHCPLeaseNetworkTask,
     NetworkInterfaceTask,
     FloatNetworkInterfaceTask,
     DefloatNetworkInterfaceTask)
@@ -252,6 +253,14 @@ class Monitor(daemon.WorkerPoolDaemon):
             except exceptions.DeadNetwork as e:
                 log_ctx.with_fields({'exception': e}).warning(
                     'UpdateDHCPNetworkTask on dead network')
+            return
+
+        elif isinstance(workitem, RemoveDHCPLeaseNetworkTask):
+            try:
+                n.remove_dhcp_lease(workitem.ipv4(), workitem.macaddr())
+            except exceptions.DeadNetwork as e:
+                log_ctx.with_fields({'exception': e}).warning(
+                    'RemoveDHCPLeaseNetworkTask on dead network')
             return
 
     def _process_networkinterface_workitem(self, log_ctx, workitem):
