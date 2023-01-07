@@ -225,6 +225,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             except exceptions.DeadNetwork as e:
                 log_ctx.with_fields({'exception': e}).warning(
                     'DestroyNetworkTask on dead network')
+            return
 
         #
         # Tasks that should NOT operate on a DEAD or DELETE_WAIT network
@@ -242,6 +243,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             except exceptions.DeadNetwork as e:
                 log_ctx.with_fields({'exception': e}).warning(
                     'DeployNetworkTask on dead network')
+            return
 
         elif isinstance(workitem, UpdateDHCPNetworkTask):
             try:
@@ -250,6 +252,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             except exceptions.DeadNetwork as e:
                 log_ctx.with_fields({'exception': e}).warning(
                     'UpdateDHCPNetworkTask on dead network')
+            return
 
     def _process_networkinterface_workitem(self, log_ctx, workitem):
         log_ctx = log_ctx.with_fields({
@@ -277,6 +280,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             fn = network.floating_network()
             fn.release(ni.floating.get('floating_address'))
             ni.floating = None
+            return
 
         # Tasks that should not operate on a dead network
         if n.is_dead():
