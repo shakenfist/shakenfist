@@ -22,6 +22,12 @@ JOBS = {
             'baseuser': 'ubuntu',
             'outputlabel': 'ci-images/ubuntu-2004'
         },
+        {
+            'name': 'ubuntu-2204',
+            'baseimage': 'ubuntu:22.04',
+            'baseuser': 'ubuntu',
+            'outputlabel': 'ci-images/ubuntu-2204'
+        },
     ],
     'functional-tests': [
         {
