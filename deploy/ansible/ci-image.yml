@@ -106,7 +106,6 @@
           - dnsmasq
           - dnsutils
           - git
-          - hddtemp
           - libffi-dev
           - libmagic-dev
           - libssl-dev
@@ -117,7 +116,6 @@
           - ovmf
           - prometheus-node-exporter
           - pwgen
-          - python
           - python3
           - python3-cffi
           - python3-dev
