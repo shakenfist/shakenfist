@@ -80,6 +80,7 @@ Note that networks exist in namespaces. This means that your networks are privat
 Instances are the primary reason that you'd run Shaken Fist, so there's a lot to cover in their implementation. Obviously instances can be created, deleted, listed, and shown. Additionally, you can list the network interfaces on an instance, track and change metadata on a given instance (a simple key value store similar to OpenStack tags), request the current serial console output; and see events related to the instance. Instances can also have their power state managed: soft (ACPI) reboots; hard (power cycle) reboots; powered off; powered on; and paused.
 
 When creating an instance you can configure:
+
 * the name of the instance
 * how many vCPUs the instance has
 * how much memory the instance has
