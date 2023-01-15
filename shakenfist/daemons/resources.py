@@ -18,6 +18,7 @@ from shakenfist.node import Node
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
 from shakenfist.util import network as util_network
+from shakenfist.util import process as util_process
 
 
 LOG, _ = logs.setup(__name__)
@@ -186,8 +187,18 @@ def _get_stats():
             retval['object_version_%s' % obj] = \
                 OBJECT_NAMES_TO_CLASSES[obj].current_version
 
+        # What package versions do we have?
         n = Node.from_db(config.NODE_NAME)
-        n.add_event('Updated node resources', extra=retval,
+
+        vers_out, _ = util_process.execute(
+            None, 'dpkg-query --show --showformat=\'${Package}==${Version}\\n\' --no-pager')
+        versions = {}
+        for line in vers_out.split():
+            package, version = line.split('==')
+            versions[package] = version
+        n.dependency_versions = versions
+
+        n.add_event('Updated node resources and package versions', extra=retval,
                     suppress_event_logging=True)
         return retval
 

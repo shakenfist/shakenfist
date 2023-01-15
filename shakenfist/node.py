@@ -133,6 +133,15 @@ class Node(dbo):
     def remove_blob(self, blob):
         self._remove_item_in_attribute_list('blobs', blob)
 
+    @property
+    def dependency_versions(self):
+        return self._db_get_attribute('dependency_versions')
+
+    @dependency_versions.setter
+    def dependency_versions(self, value):
+        if value != self.dependency_versions:
+            self._db_set_attribute('dependency_versions', value)
+
     def delete(self):
         self.state = self.STATE_DELETED
 
