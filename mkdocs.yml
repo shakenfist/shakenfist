@@ -18,6 +18,7 @@ nav:
         - "Installation": user_guide/installation.md
         - "Usage": user_guide/usage.md
         - "Artifacts": user_guide/artifacts.md
+        - "Consoles": user_guide/consoles.md
         - "Events": user_guide/events.md
         - "Objects": user_guide/objects.md
     - Developer Guide:
