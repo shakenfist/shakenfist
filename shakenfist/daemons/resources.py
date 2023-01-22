@@ -191,7 +191,8 @@ def _get_stats():
         n = Node.from_db(config.NODE_NAME)
 
         vers_out, _ = util_process.execute(
-            None, 'dpkg-query --show --showformat=\'${Package}==${Version}\\n\' --no-pager')
+            None, 'dpkg-query --show --showformat=\'${Package}==${Version}\\n\' --no-pager',
+            suppress_command_logging=True)
         versions = {}
         for line in vers_out.split():
             package, version = line.split('==')
