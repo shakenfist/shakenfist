@@ -10,20 +10,20 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/developer_guide/release_process/">
+        <link rel="canonical" href="https://shakenfist.com/user_guide/consoles/">
       
       
-        <link rel="prev" href="../ci_api_coverage/">
+        <link rel="prev" href="../artifacts/">
       
       
-        <link rel="next" href="../standards/">
+        <link rel="next" href="../events/">
       
       <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.4.2, mkdocs-material-9.0.6">
     
     
       
-        <title>Release process - Shaken Fist</title>
+        <title>Consoles - Shaken Fist</title>
       
     
     
@@ -71,7 +71,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#shaken-fists-release-process" class="md-skip">
+        <a href="#consoles" class="md-skip">
           Skip to content
         </a>
       
@@ -104,7 +104,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Release process
+              Consoles
             
           </span>
         </div>
@@ -272,18 +272,20 @@
 
   
   
+    
+  
   
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
       
       
       
-      <input class="md-nav__toggle md-toggle " data-md-toggle="__nav_5" type="checkbox" id="__nav_5" >
+      <input class="md-nav__toggle md-toggle " data-md-toggle="__nav_5" type="checkbox" id="__nav_5" checked>
       
       
       
-        <label class="md-nav__link" for="__nav_5" tabindex="0" aria-expanded="false">
+        <label class="md-nav__link" for="__nav_5" tabindex="0" aria-expanded="true">
           User Guide
           <span class="md-nav__icon md-icon"></span>
         </label>
@@ -301,7 +303,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/installation/" class="md-nav__link">
+      <a href="../installation/" class="md-nav__link">
         Installation
       </a>
     </li>
@@ -315,7 +317,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/usage/" class="md-nav__link">
+      <a href="../usage/" class="md-nav__link">
         Usage
       </a>
     </li>
@@ -329,129 +331,8 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/artifacts/" class="md-nav__link">
+      <a href="../artifacts/" class="md-nav__link">
         Artifacts
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../user_guide/consoles/" class="md-nav__link">
-        Consoles
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../user_guide/events/" class="md-nav__link">
-        Events
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../user_guide/objects/" class="md-nav__link">
-        Objects
-      </a>
-    </li>
-  
-
-            
-          
-        </ul>
-      </nav>
-    </li>
-  
-
-    
-      
-      
-      
-
-  
-  
-    
-  
-  
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
-      
-      
-      
-      
-      <input class="md-nav__toggle md-toggle " data-md-toggle="__nav_6" type="checkbox" id="__nav_6" checked>
-      
-      
-      
-        <label class="md-nav__link" for="__nav_6" tabindex="0" aria-expanded="true">
-          Developer Guide
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <nav class="md-nav" aria-label="Developer Guide" data-md-level="1">
-        <label class="md-nav__title" for="__nav_6">
-          <span class="md-nav__icon md-icon"></span>
-          Developer Guide
-        </label>
-        <ul class="md-nav__list" data-md-scrollfix>
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../authentication/" class="md-nav__link">
-        Authentication
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../artifact_uploads_downloads/" class="md-nav__link">
-        Artifact uploads and downloads
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../ci_api_coverage/" class="md-nav__link">
-        CI API coverage
       </a>
     </li>
   
@@ -474,12 +355,12 @@
       
       
         <label class="md-nav__link md-nav__link--active" for="__toc">
-          Release process
+          Consoles
           <span class="md-nav__icon md-icon"></span>
         </label>
       
       <a href="./" class="md-nav__link md-nav__link--active">
-        Release process
+        Consoles
       </a>
       
         
@@ -498,15 +379,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#testing" class="md-nav__link">
-    Testing
+  <a href="#read-only-serial-console" class="md-nav__link">
+    Read only serial console
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#for-reach-repository-to-be-released" class="md-nav__link">
-    For reach repository to be released
+  <a href="#interactive-serial-console" class="md-nav__link">
+    Interactive serial console
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#interactive-vdi-console" class="md-nav__link">
+    Interactive VDI console
   </a>
   
 </li>
@@ -526,7 +414,126 @@
   
   
     <li class="md-nav__item">
-      <a href="../standards/" class="md-nav__link">
+      <a href="../events/" class="md-nav__link">
+        Events
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../objects/" class="md-nav__link">
+        Objects
+      </a>
+    </li>
+  
+
+            
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+      
+      
+      
+      <input class="md-nav__toggle md-toggle " data-md-toggle="__nav_6" type="checkbox" id="__nav_6" >
+      
+      
+      
+        <label class="md-nav__link" for="__nav_6" tabindex="0" aria-expanded="false">
+          Developer Guide
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <nav class="md-nav" aria-label="Developer Guide" data-md-level="1">
+        <label class="md-nav__title" for="__nav_6">
+          <span class="md-nav__icon md-icon"></span>
+          Developer Guide
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer_guide/authentication/" class="md-nav__link">
+        Authentication
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer_guide/artifact_uploads_downloads/" class="md-nav__link">
+        Artifact uploads and downloads
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer_guide/ci_api_coverage/" class="md-nav__link">
+        CI API coverage
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer_guide/release_process/" class="md-nav__link">
+        Release process
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer_guide/standards/" class="md-nav__link">
         Standards
       </a>
     </li>
@@ -540,7 +547,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../state_machine/" class="md-nav__link">
+      <a href="../../developer_guide/state_machine/" class="md-nav__link">
         State machine
       </a>
     </li>
@@ -554,7 +561,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../updating_docs/" class="md-nav__link">
+      <a href="../../developer_guide/updating_docs/" class="md-nav__link">
         Updating docs
       </a>
     </li>
@@ -568,7 +575,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../workflow/" class="md-nav__link">
+      <a href="../../developer_guide/workflow/" class="md-nav__link">
         Workflow
       </a>
     </li>
@@ -734,15 +741,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#testing" class="md-nav__link">
-    Testing
+  <a href="#read-only-serial-console" class="md-nav__link">
+    Read only serial console
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#for-reach-repository-to-be-released" class="md-nav__link">
-    For reach repository to be released
+  <a href="#interactive-serial-console" class="md-nav__link">
+    Interactive serial console
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#interactive-vdi-console" class="md-nav__link">
+    Interactive VDI console
   </a>
   
 </li>
@@ -766,20 +780,54 @@
 
 
 
-<h1 id="shaken-fists-release-process">Shaken Fist's release process</h1>
-<p>Shaken Fist is now split across a number of repositories to simplify development
-and usage. Unfortunately, that complicated the release process. This page
-documents the current release process although the reality is that only Michael
-can do a release right now because of the requirement to sign releases with his
-GPG key.</p>
-<h2 id="testing">Testing</h2>
-<p>We only release things which have passed CI testing, and preferably have had a
-period running as the underlying cloud for the CI cluster as well. Sometimes in
-an emergency we will bend the rules for a hotfix, but we should try and avoid
-doing that.</p>
-<h2 id="for-reach-repository-to-be-released">For reach repository to be released</h2>
-<p>Checkout the repository and ensure you're in the right branch. Then just run
-<code>release.sh</code> and follow the bounching ball.</p>
+<h1 id="consoles">Consoles</h1>
+<p>Shaken Fist supports three types of instance consoles. This page describes each
+of those consoles and their functionality.</p>
+<h2 id="read-only-serial-console">Read only serial console</h2>
+<p>Similarly to OpenStack, we support requesting a read only copy of the content
+of the serial console via our REST API. This console is based off a log of
+console activity, so can return events which have already occurred. You can
+access the console information from the command line like this:</p>
+<pre><code>sf-client instance consoledata ca8b3e3b-f681-47a2-99c5-6ddea00cc49f 1000
+[530]: |                       Self-hosted runner registration                        |
+[   74.594732] cloud-init[530]: |                                                                              |
+[   74.596442] cloud-init[530]: --------------------------------------------------------------------------------
+[   74.602452] cloud-init[530]: # Authentication
+[   79.099457] cloud-init[530]: √ Connected to GitHub
+[   79.184807] cloud-init[530]: # Runner Registration
+[   80.283666] cloud-init[530]: √ Runner successfully added
+[   83.608069] cloud-init[530]: √ Runner connection is good
+[   83.609389] cloud-init[530]: # Runner settings
+[   83.615351] cloud-init[530]: √ Settings Saved.
+[   86.194598] cloud-init[530]: √ Connected to GitHub
+[   87.331467] cloud-init[530]: Current runner version: '2.299.1'
+[   87.333703] cloud-init[530]: 2023-01-21 06:54:11Z: Listening for Jobs
+[   91.102179] cloud-init[530]: 2023-01-21 06:54:15Z: Running job: ubuntu-2004-slim-primary
+</code></pre>
+<p>The final argument is optional. In this example we are requesting the final
+1,000 bytes of console output.</p>
+<h2 id="interactive-serial-console">Interactive serial console</h2>
+<p>There is also interactive access to that same serial console, although it
+requires direct network access to the hypervisor node at the moment. If you lookup
+the instance with a show command, you'll see a "console port" listed:</p>
+<pre><code>sf-client instance show c301ad4a-1ad4-49d7-b1e7-cb08ad3bf23d
+uuid          : c301ad4a-1ad4-49d7-b1e7-cb08ad3bf23d
+name          : sfcbr-s2SXNcZGKaJMywSd
+...
+node          : sf-2
+console port  : 30049
+vdi port      : 37804
+...
+</code></pre>
+<p>If you telnet to the console port on the hypervisor node's IP, you'll land in
+an interactive console for the instance. So in this example:</p>
+<pre><code>telnet sf-2 30049
+</code></pre>
+<h2 id="interactive-vdi-console">Interactive VDI console</h2>
+<p>There is also a graphical console. Similarly to the telnet console, it requires
+direct network access to the hypervisor node, and is accessed at the "vdi port"
+TCP port. By default this console is VNC, although SPICE was added as an
+option in v0.7.</p>
 
 
 
