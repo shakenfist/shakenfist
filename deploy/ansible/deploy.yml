@@ -142,6 +142,165 @@
         /srv/shakenfist/venv/bin/pip install -U pip
         /srv/shakenfist/venv/bin/pip install {{pip_extra}} {{agent_package}} {{server_package}} {{client_package}}
 
+# Setup the TLS CA on the primary
+- hosts: localhost
+  gather_facts: yes
+  connection: ssh
+  become: yes
+  vars:
+    ram_system_reservation: 5.0
+    dns_server: 8.8.8.8
+    http_proxy:
+
+  tasks:
+    - name: Install CA setup tools
+      apt:
+        name:
+          - gnutls-bin
+        state: latest
+
+    - name: Make /etc/pki/CA
+      file:
+        path: /etc/pki/CA
+        state: directory
+        mode: "0755"
+
+    - name: Make /etc/pki/qemu
+      file:
+        path: /etc/pki/qemu
+        state: directory
+        mode: "0755"
+
+    - name: Check if the CA is already setup
+      stat:
+        path: /etc/pki/CA/ca-cert.pem
+      register: ca_cert
+
+    - name: Setup CA template
+      copy:
+        content: |
+          cn = Shaken Fist CA for {{deploy_name}}
+          ca
+          cert_signing_key
+          expiration_days = 3650
+        dest: /etc/pki/CA/certificate_authority_template.info
+        owner: root
+        mode: u=r
+      when: not ca_cert.stat.exists
+
+    - name: Create CA authority key
+      shell:
+        umask 277 && certtool --generate-privkey > /etc/pki/CA/certificate_authority_key.pem
+      when: not ca_cert.stat.exists
+
+    - name: Set permissions on the CA authority key
+      file:
+        path: /etc/pki/CA/certificate_authority_key.pem
+        mode: '0400'
+
+    - name: Create CA certificate
+      shell:
+        certtool --generate-self-signed \
+            --template /etc/pki/CA/certificate_authority_template.info \
+            --load-privkey /etc/pki/CA/certificate_authority_key.pem \
+            --outfile /etc/pki/CA/ca-cert.pem
+      when: not ca_cert.stat.exists
+
+    - name: Set permissions on the CA certificate
+      file:
+        path: /etc/pki/CA/ca-cert.pem
+        mode: '0444'
+
+# Generate certificates for all hosts
+- hosts: sfall
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - name: Write host certificate template
+      copy:
+        content: |
+          organization = Shaken Fist CA for {{deploy_name}}
+          cn = {{ansible_host}}
+          tls_www_server
+          encryption_key
+          signing_key
+        dest: /etc/pki/CA/{{ansible_host}}_server_template.info
+        owner: root
+        mode: u=r
+      delegate_to: localhost
+      delegate_facts: true
+
+    - name: Create host certificate
+      shell:
+        if [ ! -e {{ansible_host}}_server_key.pem ]; then
+          umask 277 && certtool --generate-privkey > {{ansible_host}}_server_key.pem
+          certtool --generate-certificate \
+            --template /etc/pki/CA/{{ansible_host}}_server_template.info \
+            --load-privkey /etc/pki/CA/{{ansible_host}}_server_key.pem \
+            --load-ca-certificate /etc/pki/CA/certificate_authority_certificate.pem \
+            --load-ca-privkey /etc/pki/CA/certificate_authority_key.pem \
+            --outfile /etc/pki/CA/{{ansible_host}}_server_certificate.pem
+        fi
+      delegate_to: localhost
+      delegate_facts: true
+
+# Distribute the CA certificate to all hosts
+- hosts: sfall
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - name: Make /etc/pki/CA
+      file:
+        path: /etc/pki/CA
+        state: directory
+        mode: "0755"
+
+    - name: Make /etc/pki/qemu
+      file:
+        path: /etc/pki/qemu
+        state: directory
+        mode: "0755"
+
+    - name: Check if the CA is already setup
+      stat:
+        path: /etc/pki/CA/ca-cert.pem
+      register: ca_cert
+
+    - name: Copy CA certificate to host
+      copy:
+        src: /etc/pki/CA/ca-cert.pem
+        dest: /etc/pki/qemu/ca-cert.pem
+        owner: root
+        group: root
+        mode: '0444'
+      when: not ca_cert.stat.exists
+
+    - name: Copy host key to host
+      copy:
+        src: /etc/pki/CA/{{ansible_host}}_server_key.pem
+        dest: /etc/pki/qemu/server-key.pem
+        owner: root
+        group: root
+        mode: '0444'
+      when: not ca_cert.stat.exists
+
+    - name: Copy host certificate to host
+      copy:
+        src: /etc/pki/CA/{{ansible_host}}_server_certificate.pem
+        dest: /etc/pki/qemu/server-cert.pem
+        owner: root
+        group: root
+        mode: '0444'
+      when: not ca_cert.stat.exists
+
 - hosts: hypervisors, network_node, eventlog_node
   any_errors_fatal: true
   become: yes
