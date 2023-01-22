@@ -76,7 +76,7 @@ def _safe_int_cast(i):
 
 class Instance(dbo):
     object_type = 'instance'
-    current_version = 8
+    current_version = 9
     upgrade_supported = True
 
     # docs/development/state_machine.md has a description of these states.
@@ -153,6 +153,7 @@ class Instance(dbo):
         self.__secure_boot = static_values.get('secure_boot', False)
         self.__machine_type = static_values.get('machine_type', 'pc')
         self.__side_channels = static_values.get('side_channels', [])
+        self.__vdi_type = static_values.get('vdi_type', 'vnc')
 
         if not self.__disk_spec:
             # This should not occur since the API will filter for zero disks.
@@ -189,6 +190,11 @@ class Instance(dbo):
             static_values['version'] = 8
             changed = True
 
+        if static_values.get('version') == 8:
+            static_values['vdi_type'] = 'vnc'
+            static_values['version'] = 9
+            changed = True
+
         if changed:
             LOG.with_fields({
                 cls.object_type: static_values['uuid'],
@@ -201,7 +207,8 @@ class Instance(dbo):
     def new(cls, name=None, cpus=None, memory=None, namespace=None, ssh_key=None,
             disk_spec=None, user_data=None, video=None, requested_placement=None,
             instance_uuid=None, uefi=False, configdrive=None, nvram_template=None,
-            secure_boot=False, machine_type='pc', side_channels=None):
+            secure_boot=False, machine_type='pc', side_channels=None,
+            vdi_type='vnc'):
         if not configdrive:
             configdrive = 'openstack-disk'
 
@@ -225,6 +232,7 @@ class Instance(dbo):
             'secure_boot': secure_boot,
             'machine_type': machine_type,
             'side_channels': side_channels,
+            'vdi_type': vdi_type,
 
             'version': cls.current_version
         }
@@ -256,6 +264,7 @@ class Instance(dbo):
             'secure_boot': self.secure_boot,
             'machine_type': self.machine_type,
             'side_channels': self.side_channels,
+            'vdi_type': self.vdi_type,
             'agent_state': self.agent_state.value,
             'agent_start_time': self.agent_start_time,
             'agent_system_boot_time': self.agent_system_boot_time,
@@ -269,7 +278,8 @@ class Instance(dbo):
             'console_port',
             'node',
             'power_state',
-            'vdi_port'
+            'vdi_port',
+            'vdi_tls_port'
         ]
 
         # Ensure that missing attributes still get reported
@@ -374,6 +384,10 @@ class Instance(dbo):
     @property
     def side_channels(self):
         return self.__side_channels
+
+    @property
+    def vdi_type(self):
+        return self.__vdi_type
 
     @property
     def instance_path(self):
@@ -715,12 +729,16 @@ class Instance(dbo):
                     'console_port': self._allocate_console_port(),
                     'vdi_port': self._allocate_console_port()
                 }
+                if self.vdi_type == 'spice':
+                    p['vdi_tls_port'] = self._allocate_console_port()
+
                 self.ports = p
 
     def deallocate_instance_ports(self):
         ports = self.ports
         self._free_console_port(ports.get('console_port'))
         self._free_console_port(ports.get('vdi_port'))
+        self._free_console_port(ports.get('vdi_tls_port'))
         self._db_delete_attribute('ports')
 
     def _configure_block_devices(self, lock):
@@ -1073,6 +1091,7 @@ class Instance(dbo):
             instance_path=self.instance_path,
             console_port=ports.get('console_port'),
             vdi_port=ports.get('vdi_port'),
+            vdi_tls_port=ports.get('vdi_tls_port'),
             video_model=self.video['model'],
             video_memory=self.video['memory'],
             uefi=self.uefi,
@@ -1080,6 +1099,7 @@ class Instance(dbo):
             nvram_template_attribute=nvram_template_attribute,
             extracommands=block_devices.get('extracommands', []),
             machine_type=self.machine_type,
+            vdi_type=self.vdi_type,
             extradevices=extradevices
         )
 

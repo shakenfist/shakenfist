@@ -100,6 +100,7 @@ class Root(sf_api.Resource):
              '<p>You might be interested in the <a href="/apidocs">apidocs</a>.</p>'
              '<p>Machine searchable API capabilities:</p><ul>'
              '<li>blob-search-by-hash</li>'
+             '<li>spice-vdi-console</li>'
              '</ul></p></body></html>'),
             mimetype='text/html')
         resp.status_code = 200

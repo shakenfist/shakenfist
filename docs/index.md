@@ -1,8 +1,8 @@
 # Introduction
 
-## Shaken Fist, a minimal cloud aimed at small and edge deployments
+## Shaken Fist, an open cloud aimed at small and edge deployments
 
-Shaken Fist is a deliberately minimal cloud intended for small deployments. We
+Shaken Fist is a deliberately opinionated cloud intended for small deployments. We
 spend a lot of time trying to do the simplest possible thing well, and keep our
 resource usage on idle deployments as low as possible. Shaken Fist has progressed
 from being a proof of concept to being a functional cloud, although the release

@@ -152,9 +152,23 @@
       <target port='1'/>
     </console>
 
+    {%- if vdi_type == 'vnc' -%}
     <graphics type='vnc' port='{{vdi_port}}' listen='0.0.0.0'>
       <listen type='address' address='0.0.0.0'/>
     </graphics>
+    {%- else -%}
+    <graphics type='spice' port='{{vdi_port}}' tlsPort='{{vdi_tls_port}}' listen='0.0.0.0'>
+      <listen type='address' address='0.0.0.0'/>
+      <channel name='main' mode='secure'/>
+      <channel name='display' mode='secure'/>
+      <channel name='inputs' mode='secure'/>
+      <channel name='cursor' mode='secure'/>
+      <channel name='playback' mode='secure'/>
+      <channel name='record' mode='secure'/>
+      <channel name='smartcard' mode='secure'/>
+      <channel name='usbredir' mode='secure'/>
+    </graphics>
+    {%- endif %}
 
     <!-- NOTE(mikal): we use this sound device because the default resulted in
          very poor performance on Windows 10. -->
