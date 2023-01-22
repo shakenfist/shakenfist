@@ -38,28 +38,32 @@ EXTRA_VLANS_HISTORY = {}
 class Monitor(daemon.WorkerPoolDaemon):
     def _remove_stray_interfaces(self):
         for n in network.Networks([baseobject.active_states_filter]):
-            t = time.time()
-            for ni_uuid in n.networkinterfaces:
-                ni = NetworkInterface.from_db(ni_uuid)
-                if not ni:
-                    continue
+            try:
+                t = time.time()
+                for ni_uuid in n.networkinterfaces:
+                    ni = NetworkInterface.from_db(ni_uuid)
+                    if not ni:
+                        continue
 
-                inst = instance.Instance.from_db(ni.instance_uuid)
-                if not inst:
-                    ni.delete()
-                    LOG.with_fields({
-                        'networkinterface': ni,
-                        'instance': ni.instance_uuid}).info(
-                        'Deleted stray network interface for missing instance')
-                else:
-                    s = inst.state
-                    if (s.update_time + 30 < t and
-                            s.value in [dbo.STATE_DELETED, dbo.STATE_ERROR, 'unknown']):
+                    inst = instance.Instance.from_db(ni.instance_uuid)
+                    if not inst:
                         ni.delete()
                         LOG.with_fields({
                             'networkinterface': ni,
                             'instance': ni.instance_uuid}).info(
-                            'Deleted stray network interface')
+                            'Deleted stray network interface for missing instance')
+                    else:
+                        s = inst.state
+                        if (s.update_time + 30 < t and
+                                s.value in [dbo.STATE_DELETED, dbo.STATE_ERROR, 'unknown']):
+                            ni.delete()
+                            LOG.with_fields({
+                                'networkinterface': ni,
+                                'instance': ni.instance_uuid}).info(
+                                'Deleted stray network interface')
+
+            except exceptions.LockException:
+                pass
 
     def _maintain_networks(self):
         LOG.info('Maintaining networks')
