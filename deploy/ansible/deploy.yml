@@ -212,7 +212,7 @@
         mode: '0444'
 
 # Generate certificates for all hosts
-- hosts: sfall
+- hosts: allsf
   any_errors_fatal: true
   become: yes
   become_method: sudo
@@ -224,32 +224,42 @@
       copy:
         content: |
           organization = Shaken Fist CA for {{deploy_name}}
-          cn = {{ansible_host}}
+          cn = {{inventory_hostname}}
           tls_www_server
           encryption_key
           signing_key
-        dest: /etc/pki/CA/{{ansible_host}}_server_template.info
+        dest: /etc/pki/CA/{{inventory_hostname}}_server_template.info
         owner: root
         mode: u=r
       delegate_to: localhost
       delegate_facts: true
 
-    - name: Create host certificate
+    - name: Check if the host certificate is already created
+      stat:
+        path: /etc/pki/CA/{{inventory_hostname}}_server_cert.pem
+      register: host_cert
+
+    - name: Create host key
       shell:
-        if [ ! -e {{ansible_host}}_server_key.pem ]; then
-          umask 277 && certtool --generate-privkey > {{ansible_host}}_server_key.pem
-          certtool --generate-certificate \
-            --template /etc/pki/CA/{{ansible_host}}_server_template.info \
-            --load-privkey /etc/pki/CA/{{ansible_host}}_server_key.pem \
-            --load-ca-certificate /etc/pki/CA/certificate_authority_certificate.pem \
-            --load-ca-privkey /etc/pki/CA/certificate_authority_key.pem \
-            --outfile /etc/pki/CA/{{ansible_host}}_server_certificate.pem
-        fi
+        umask 277 && certtool --generate-privkey > /etc/pki/CA/{{inventory_hostname}}_server_key.pem
       delegate_to: localhost
       delegate_facts: true
+      when: not host_cert.stat.exists
+
+    - name: Create host certificate
+      shell:
+        certtool --generate-certificate \
+          --template /etc/pki/CA/{{inventory_hostname}}_server_template.info \
+          --load-privkey /etc/pki/CA/{{inventory_hostname}}_server_key.pem \
+          --load-ca-certificate /etc/pki/CA/ca-cert.pem \
+          --load-ca-privkey /etc/pki/CA/certificate_authority_key.pem \
+          --outfile /etc/pki/CA/{{inventory_hostname}}_server_cert.pem
+      delegate_to: localhost
+      delegate_facts: true
+      when: not host_cert.stat.exists
 
 # Distribute the CA certificate to all hosts
-- hosts: sfall
+- hosts: allsf
   any_errors_fatal: true
   become: yes
   become_method: sudo
@@ -263,9 +273,9 @@
         state: directory
         mode: "0755"
 
-    - name: Make /etc/pki/qemu
+    - name: Make /etc/pki/libvirt-spice
       file:
-        path: /etc/pki/qemu
+        path: /etc/pki/libvirt-spice
         state: directory
         mode: "0755"
 
@@ -277,7 +287,7 @@
     - name: Copy CA certificate to host
       copy:
         src: /etc/pki/CA/ca-cert.pem
-        dest: /etc/pki/qemu/ca-cert.pem
+        dest: /etc/pki/libvirt-spice/ca-cert.pem
         owner: root
         group: root
         mode: '0444'
@@ -285,8 +295,8 @@
 
     - name: Copy host key to host
       copy:
-        src: /etc/pki/CA/{{ansible_host}}_server_key.pem
-        dest: /etc/pki/qemu/server-key.pem
+        src: /etc/pki/CA/{{inventory_hostname}}_server_key.pem
+        dest: /etc/pki/libvirt-spice/server-key.pem
         owner: root
         group: root
         mode: '0444'
@@ -294,8 +304,8 @@
 
     - name: Copy host certificate to host
       copy:
-        src: /etc/pki/CA/{{ansible_host}}_server_certificate.pem
-        dest: /etc/pki/qemu/server-cert.pem
+        src: /etc/pki/CA/{{inventory_hostname}}_server_cert.pem
+        dest: /etc/pki/libvirt-spice/server-cert.pem
         owner: root
         group: root
         mode: '0444'
@@ -488,8 +498,19 @@
     - name: Enable SPICE TLS
       lineinfile:
         path: /etc/libvirt/qemu.conf
-        regexp: "spice_tls = "
+        regexp: "#spice_tls = "
         line: 'spice_tls = 1'
+
+    - name: Configure SPICE TLS PKI directory
+      lineinfile:
+        path: /etc/libvirt/qemu.conf
+        regexp: "#spice_tls_x509_cert_dir = "
+        line: 'spice_tls_x509_cert_dir = "/etc/pki/libvirt-spice"'
+
+    - name: Restart libvirt
+      service:
+        name: libvirtd
+        state: restarted
 
 - hosts: primary_node
   any_errors_fatal: true
