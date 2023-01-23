@@ -485,6 +485,12 @@
       ignore_errors: True
       when: ksm_enabled != "1"
 
+    - name: Enable SPICE TLS
+      lineinfile:
+        path: /etc/libvirt/qemu.conf
+        regexp: "spice_tls = "
+        line: 'spice_tls = 1'
+
 - hosts: primary_node
   any_errors_fatal: true
   become: yes
