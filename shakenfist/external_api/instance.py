@@ -779,7 +779,7 @@ class InstanceVDIConsoleHelperEndpoint(sf_api.Resource):
     @api_base.redirect_instance_request
     @api_base.log_token_use
     def get(self, instance_ref=None, length=None, instance_from_db=None):
-        p = self.ports
+        p = instance_from_db.ports
 
         cacert = ''
         if os.path.exists('/etc/pki/libvirt-spice/ca-cert.pem'):
@@ -789,7 +789,7 @@ class InstanceVDIConsoleHelperEndpoint(sf_api.Resource):
 
         config = VIRTVIEWER_TEMPLATE % {
             'vdi_type': instance_from_db.vdi_type,
-            'host': instance_from_db.placement['node'],
+            'node': instance_from_db.placement.get('node'),
             'vdi_port': p.get('vdi_port'),
             'vdi_tls_port': p.get('vdi_tls_port', 0),
             'ca_cert': cacert
