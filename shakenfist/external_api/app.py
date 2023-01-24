@@ -101,6 +101,7 @@ class Root(sf_api.Resource):
              '<p>Machine searchable API capabilities:</p><ul>'
              '<li>blob-search-by-hash</li>'
              '<li>spice-vdi-console</li>'
+             '<li>vdi-console-helper</li>'
              '</ul></p></body></html>'),
             mimetype='text/html')
         resp.status_code = 200
