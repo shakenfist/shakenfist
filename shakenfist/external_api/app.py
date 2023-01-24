@@ -163,6 +163,8 @@ api.add_resource(api_instance.InstanceMetadataEndpoint,
                  '/instances/<instance_ref>/metadata/<key>')
 api.add_resource(api_instance.InstanceConsoleDataEndpoint,
                  '/instances/<instance_ref>/consoledata')
+api.add_resource(api_instance.InstanceVDIConsoleHelperEndpoint,
+                 '/instances/<instance_ref>/vdiconsolehelper')
 
 api.add_resource(api_interface.InterfaceEndpoint,
                  '/interfaces/<interface_uuid>')
