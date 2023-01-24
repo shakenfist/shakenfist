@@ -2,6 +2,7 @@ from collections import defaultdict
 from functools import partial
 import flask
 from flask_jwt_extended import get_jwt_identity
+import os
 import re
 from shakenfist_utilities import api as sf_api, logs
 import uuid
@@ -759,3 +760,42 @@ class InstanceConsoleDataEndpoint(sf_api.Resource):
     @api_base.log_token_use
     def delete(self, instance_ref=None, instance_from_db=None):
         instance_from_db.delete_console_data()
+
+
+VIRTVIEWER_TEMPLATE = """[virt-viewer]
+type=%(vdi_type)s
+host=%(node)s
+port=%(vdi_port)s
+tls-port=%(vdi_tls_port)s
+delete-this-file=1
+ca=%(ca_cert)s
+"""
+
+
+class InstanceVDIConsoleHelperEndpoint(sf_api.Resource):
+    @api_base.verify_token
+    @api_base.arg_is_instance_ref
+    @api_base.requires_instance_ownership
+    @api_base.redirect_instance_request
+    @api_base.log_token_use
+    def get(self, instance_ref=None, length=None, instance_from_db=None):
+        p = self.ports
+
+        cacert = ''
+        if os.path.exists('/etc/pki/libvirt-spice/ca-cert.pem'):
+            with open('/etc/pki/libvirt-spice/ca-cert.pem') as f:
+                cacert = f.read()
+            cacert = cacert.replace('\n', '\\n')
+
+        config = VIRTVIEWER_TEMPLATE % {
+            'vdi_type': instance_from_db.vdi_type,
+            'host': instance_from_db.placement['node'],
+            'vdi_port': p.get('vdi_port'),
+            'vdi_tls_port': p.get('vdi_tls_port', 0),
+            'ca_cert': cacert
+        }
+
+        resp = flask.Response(
+            config, mimetype='application/x-virt-viewer')
+        resp.status_code = 200
+        return resp

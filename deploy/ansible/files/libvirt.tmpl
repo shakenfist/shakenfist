@@ -157,6 +157,13 @@
       <listen type='address' address='0.0.0.0'/>
     </graphics>
     {%- else -%}
+    <!-- NOTE(mikal): this is required for the SPICE in guest agent to work -->
+    <channel type='spicevmc'>
+      <target type='virtio' name='com.redhat.spice.0' state='disconnected'/>
+      <alias name='channel2'/>
+      <address type='virtio-serial' controller='0' bus='0' port='3'/>
+    </channel>
+    
     <graphics type='spice' port='{{vdi_port}}' tlsPort='{{vdi_tls_port}}' listen='0.0.0.0'>
       <listen type='address' address='0.0.0.0'/>
       <channel name='main' mode='secure'/>
