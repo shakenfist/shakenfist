@@ -202,6 +202,9 @@
   {%- if secure_boot -%}
     <qemu:arg value='-global'/><qemu:arg value='ICH9-LPC.disable_s3=1'/>
   {%- endif -%}
+  {%- if spice_concurrent -%}
+    <qemu:env name='SPICE_DEBUG_ALLOW_MC' value='1'/>
+  {%- endif -%}
   {%- for extra in extracommands %}
     <qemu:arg value='{{extra}}'/>
   {%- endfor %}
