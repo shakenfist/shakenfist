@@ -31,6 +31,14 @@ class Monitor(daemon.Daemon):
         if os.path.exists(instance_path):
             shutil.rmtree(instance_path)
 
+        # And possibly an apparmor profile?
+        libvirt_profile_path = '/etc/apparmor.d/libvirt/libvirt-' + instance_uuid
+        if os.path.exists(libvirt_profile_path):
+            os.unlink(libvirt_profile_path)
+        libvirt_profile_path += '.files'
+        if os.path.exists(libvirt_profile_path):
+            os.unlink(libvirt_profile_path)
+
     def _update_power_states(self):
         with util_libvirt.LibvirtConnection() as lc:
             try:
@@ -169,7 +177,8 @@ class Monitor(daemon.Daemon):
             # libvirt on Debian 11 fails to clean up apparmor profiles for VMs
             # which are no longer running, so we do that here. Note that this list
             # of UUIDs is _libvirt_ UUIDs, not SF UUIDs and includes _all_ VMs
-            # defined on the hypervisor.
+            # defined on the hypervisor. SF _does_ however set the libvirt UUID
+            # to match the SF UUID in libvirt.tmpl.
             libvirt_profile_path = '/etc/apparmor.d/libvirt'
             if os.path.exists(libvirt_profile_path):
                 for ent in os.listdir(libvirt_profile_path):
@@ -184,7 +193,8 @@ class Monitor(daemon.Daemon):
                         continue
 
                     u = ent.replace('libvirt-', '').replace('.files', '')
-                    if u not in all_libvirt_uuids:
+                    if (u not in all_libvirt_uuids and
+                            not os.path.exists(config.STORAGE_PATH, 'instances', u)):
                         if os.path.isdir(entpath):
                             shutil.rmtree(entpath)
                         else:
