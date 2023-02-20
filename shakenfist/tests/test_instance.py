@@ -119,14 +119,15 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
                  'ssh_key': 'sshkey',
                  'user_data': 'userdata',
                  'uuid': 'uuid42',
-                 'version': 9,
+                 'version': 10,
                  'video': {'memory': 16384, 'model': 'cirrus'},
                  'uefi': False,
                  'configdrive': 'openstack-disk',
                  'nvram_template': None,
                  'secure_boot': False,
                  'side_channels': None,
-                 'vdi_type': 'vnc'
+                 'vdi_type': 'vnc',
+                 'spice_concurrent': False
              }),
             mock_create.mock_calls[0][1])
 

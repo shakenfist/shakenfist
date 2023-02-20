@@ -61,3 +61,10 @@ There is also a graphical console. Similarly to the telnet console, it requires
 direct network access to the hypervisor node, and is accessed at the "vdi port"
 TCP port. By default this console is VNC, although SPICE was added as an
 option in v0.7.
+
+You can select from 'vnc' or 'spice' by passing the `--vdi-type` argument on the
+command line when creating an instance, or using the equivalent API argument.
+Additionally, if you add `--spice-concurrent` to your command line, then
+experimental support for multiple users accessing the same SPICE console at the
+same time is enabled. For more details about the experimental nature of concurrent
+SPICE consoles, see https://www.spice-space.org/multiple-clients.html.

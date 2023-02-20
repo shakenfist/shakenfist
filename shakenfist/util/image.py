@@ -116,7 +116,7 @@ def create_qcow2(locks, cache_file, disk_file, disk_size=None):
 
     util_process.execute(
         locks,
-        'qemu-img convert -t none -o cluster_size=%s -O qcow2 %s %s'
+        'qemu-img convert -t none -o cluster_size=%s -O qcow2 %s %s -c'
         % (constants.QCOW2_CLUSTER_SIZE, cache_file, disk_file),
         iopriority=util_process.PRIORITY_LOW)
     if disk_size:

@@ -76,7 +76,7 @@ def _safe_int_cast(i):
 
 class Instance(dbo):
     object_type = 'instance'
-    current_version = 9
+    current_version = 10
     upgrade_supported = True
 
     # docs/development/state_machine.md has a description of these states.
@@ -154,6 +154,7 @@ class Instance(dbo):
         self.__machine_type = static_values.get('machine_type', 'pc')
         self.__side_channels = static_values.get('side_channels', [])
         self.__vdi_type = static_values.get('vdi_type', 'vnc')
+        self.__spice_concurrent = static_values.get('spice_concurrent', False)
 
         if not self.__disk_spec:
             # This should not occur since the API will filter for zero disks.
@@ -195,6 +196,11 @@ class Instance(dbo):
             static_values['version'] = 9
             changed = True
 
+        if static_values.get('version') == 9:
+            static_values['spice_concurrent'] = False
+            static_values['version'] = 10
+            changed = True
+
         if changed:
             LOG.with_fields({
                 cls.object_type: static_values['uuid'],
@@ -208,7 +214,7 @@ class Instance(dbo):
             disk_spec=None, user_data=None, video=None, requested_placement=None,
             instance_uuid=None, uefi=False, configdrive=None, nvram_template=None,
             secure_boot=False, machine_type='pc', side_channels=None,
-            vdi_type='vnc'):
+            vdi_type='vnc', spice_concurrent=False):
         if not configdrive:
             configdrive = 'openstack-disk'
 
@@ -233,6 +239,7 @@ class Instance(dbo):
             'machine_type': machine_type,
             'side_channels': side_channels,
             'vdi_type': vdi_type,
+            'spice_concurrent': spice_concurrent,
 
             'version': cls.current_version
         }
@@ -265,6 +272,7 @@ class Instance(dbo):
             'machine_type': self.machine_type,
             'side_channels': self.side_channels,
             'vdi_type': self.vdi_type,
+            'spice_concurrent': self.__spice_concurrent,
             'agent_state': self.agent_state.value,
             'agent_start_time': self.agent_start_time,
             'agent_system_boot_time': self.agent_system_boot_time,
@@ -388,6 +396,10 @@ class Instance(dbo):
     @property
     def vdi_type(self):
         return self.__vdi_type
+
+    @property
+    def spice_concurrent(self):
+        return self.__spice_concurrent
 
     @property
     def instance_path(self):
@@ -1100,6 +1112,7 @@ class Instance(dbo):
             extracommands=block_devices.get('extracommands', []),
             machine_type=self.machine_type,
             vdi_type=self.vdi_type,
+            spice_concurrent=self.spice_concurrent,
             extradevices=extradevices
         )
 
