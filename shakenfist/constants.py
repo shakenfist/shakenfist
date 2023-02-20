@@ -37,4 +37,4 @@ QCOW2_CLUSTER_SIZE = '2048K'
 
 # This description is used to uniquely identify transcoded versions of images.
 # It is important that it be bumped when the transcode format changes.
-TRANSCODE_DESCRIPTION = 'gunzip;qcow2;cluster_size'
+TRANSCODE_DESCRIPTION = 'zlib;qcow2;cluster_size'
