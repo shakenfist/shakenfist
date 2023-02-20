@@ -827,6 +827,12 @@ an interactive console for the instance. So in this example:</p>
 direct network access to the hypervisor node, and is accessed at the "vdi port"
 TCP port. By default this console is VNC, although SPICE was added as an
 option in v0.7.</p>
+<p>You can select from 'vnc' or 'spice' by passing the <code>--vdi-type</code> argument on the
+command line when creating an instance, or using the equivalent API argument.
+Additionally, if you add <code>--spice-concurrent</code> to your command line, then
+experimental support for multiple users accessing the same SPICE console at the
+same time is enabled. For more details about the experimental nature of concurrent
+SPICE consoles, see <a href="https://www.spice-space.org/multiple-clients.html">https://www.spice-space.org/multiple-clients.html</a>.</p>
 
 
 
