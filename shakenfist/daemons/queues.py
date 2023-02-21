@@ -152,13 +152,20 @@ def handle(jobname, workitem):
                     }).info('Cannot replicate blob, insufficient space')
 
                 else:
-                    log.with_fields({'blob': b}).info('Replicating blob')
-                    size = b.ensure_local([], wait_for_other_transfers=False)
-                    log.with_fields({
-                        'blob': b,
-                        'transferred': size,
-                        'expected': b.size
-                    }).info('Replicating blob complete')
+                    try:
+                        log.with_fields({'blob': b}).info('Replicating blob')
+                        size = b.ensure_local([], wait_for_other_transfers=False)
+                        log.with_fields({
+                            'blob': b,
+                            'transferred': size,
+                            'expected': b.size
+                        }).info('Replicating blob complete')
+                    except exceptions.BlobMissing:
+                        log.with_fields({
+                            'blob': b,
+                            'transferred': size,
+                            'expected': b.size
+                        }).info('Cannot replicate blob, no online sources')
 
             elif isinstance(task, ArchiveTranscodeTask):
                 if os.path.exists(task.cache_path()):
