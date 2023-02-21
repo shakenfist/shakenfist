@@ -1,6 +1,10 @@
+
+import os
 import requests
 import setproctitle
 from shakenfist_utilities import logs
+import time
+import uuid
 
 from shakenfist.artifact import Artifact
 from shakenfist import blob
@@ -22,12 +26,14 @@ from shakenfist.tasks import (QueueTask,
                               DeleteNetworkWhenClean,
                               FloatNetworkInterfaceTask,
                               SnapshotTask,
-                              FetchBlobTask)
+                              FetchBlobTask,
+                              ArchiveTranscodeTask)
 from shakenfist import network
 from shakenfist import networkinterface
 from shakenfist import scheduler
 from shakenfist.util import general as util_general
 from shakenfist.util import libvirt as util_libvirt
+from shakenfist.util import process as util_process
 
 
 LOG, _ = logs.setup(__name__)
@@ -146,13 +152,47 @@ def handle(jobname, workitem):
                     }).info('Cannot replicate blob, insufficient space')
 
                 else:
-                    log.with_fields({'blob': b}).info('Replicating blob')
-                    size = b.ensure_local([], wait_for_other_transfers=False)
+                    try:
+                        log.with_fields({'blob': b}).info('Replicating blob')
+                        size = b.ensure_local([], wait_for_other_transfers=False)
+                        log.with_fields({
+                            'blob': b,
+                            'transferred': size,
+                            'expected': b.size
+                        }).info('Replicating blob complete')
+                    except exceptions.BlobMissing:
+                        log.with_fields({
+                            'blob': b,
+                            'transferred': size,
+                            'expected': b.size
+                        }).info('Cannot replicate blob, no online sources')
+
+            elif isinstance(task, ArchiveTranscodeTask):
+                if os.path.exists(task.cache_path()):
+                    b = blob.Blob.from_db(task.blob_uuid())
+
+                    transcode_blob_uuid = str(uuid.uuid4())
+                    transcode_blob_path = os.path.join(
+                        config.STORAGE_PATH, 'blobs', transcode_blob_uuid)
+                    util_process.execute(
+                        [], 'cp %s %s' % (task.cache_path(), transcode_blob_path))
+                    st = os.stat(transcode_blob_path)
+
+                    transcode_blob = blob.Blob.new(
+                        transcode_blob_uuid, st.st_size, time.time(), time.time())
+                    transcode_blob.state = blob.Blob.STATE_CREATED
+                    transcode_blob.observe()
+                    transcode_blob.verify_checksum(locks=[])
+                    transcode_blob.request_replication()
                     log.with_fields({
                         'blob': b,
-                        'transferred': size,
-                        'expected': b.size
-                    }).info('Replicating blob complete')
+                        'transcode_blob_uuid': transcode_blob_uuid,
+                        'description': task.transcode_description()}).info(
+                        'Recorded transcode')
+
+                    b.add_transcode(task.transcode_description(),
+                                    transcode_blob_uuid)
+                    transcode_blob.ref_count_inc(b)
 
             else:
                 log_i.with_fields({'task': task}).error(

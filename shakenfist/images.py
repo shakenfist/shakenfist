@@ -4,16 +4,16 @@ import re
 import requests
 from shakenfist_utilities import logs
 import shutil
-import time
 import uuid
 
 from shakenfist.artifact import Artifact, BLOB_URL
 from shakenfist import blob
-from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist.constants import (QCOW2_CLUSTER_SIZE, LOCK_REFRESH_SECONDS,
                                   TRANSCODE_DESCRIPTION)
+from shakenfist import etcd
 from shakenfist import exceptions
+from shakenfist.tasks import ArchiveTranscodeTask
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
 from shakenfist.util import process as util_process
@@ -152,10 +152,10 @@ class ImageFetchHelper(object):
                 self.log.info('Cluster does not have a copy of image')
                 dirty = True
             else:
-                most_recent_blob = Blob.from_db(most_recent['blob_uuid'])
+                most_recent_blob = blob.Blob.from_db(most_recent['blob_uuid'])
                 resp = self._open_connection(url)
 
-                normalized_new_timestamp = Blob.normalize_timestamp(
+                normalized_new_timestamp = blob.Blob.normalize_timestamp(
                     resp.headers.get('Last-Modified'))
 
                 if not most_recent_blob.modified:
@@ -218,7 +218,7 @@ class ImageFetchHelper(object):
 
         # See if we have a remotely cached transcode _which_actually_exists_.
         cached_remotely = b.transcoded.get(TRANSCODE_DESCRIPTION)
-        cached_remotely_blob = Blob.from_db(cached_remotely)
+        cached_remotely_blob = blob.Blob.from_db(cached_remotely)
         if not cached_remotely_blob:
             cached_remotely = None
 
@@ -237,9 +237,9 @@ class ImageFetchHelper(object):
                 util_general.link(blob_path, cache_path)
 
         elif cached_remotely:
-            remote_blob = Blob.from_db(cached_remotely)
+            remote_blob = blob.Blob.from_db(cached_remotely)
             if not remote_blob:
-                raise exceptions.BlobMissing(cached_remotely)
+                raise exceptions.blob.BlobMissing(cached_remotely)
             remote_blob.ensure_local([lock], instance_object=self.instance)
 
             cache_path = os.path.join(
@@ -276,29 +276,15 @@ class ImageFetchHelper(object):
                         'Transcoding %s -> %s' % (blob_path, cache_path))
                     util_image.create_qcow2([lock], blob_path, cache_path)
 
-            # Now create the cache of the transcode output, we exec 'cp' here
-            # because it might take a long time and we therefore want a lock
-            # refresher to be running.
-            transcode_blob_uuid = str(uuid.uuid4())
-            transcode_blob_path = os.path.join(
-                config.STORAGE_PATH, 'blobs', transcode_blob_uuid)
-            util_process.execute(
-                [lock], 'cp %s %s' % (cache_path, transcode_blob_path))
-            st = os.stat(transcode_blob_path)
-
-            transcode_blob = Blob.new(
-                transcode_blob_uuid, st.st_size, time.time(), time.time())
-            transcode_blob.state = Blob.STATE_CREATED
-            transcode_blob.observe()
-            transcode_blob.verify_checksum(locks=[lock])
-            transcode_blob.request_replication()
-            self.log.with_fields({
-                'blob': b,
-                'transcode_blob_uuid': transcode_blob_uuid}).info(
-                'Recorded transcode')
-
-            b.add_transcode(TRANSCODE_DESCRIPTION, transcode_blob_uuid)
-            transcode_blob.ref_count_inc(b)
+            # We will cache this transcode, but we do it later as part of a
+            # task so the instance isn't waiting for it.
+            etcd.enqueue(
+                config.NODE_NAME,
+                {
+                    'tasks': [
+                        ArchiveTranscodeTask(
+                            b.uuid, cache_path, TRANSCODE_DESCRIPTION)]
+                })
 
         shutil.chown(cache_path, config.LIBVIRT_USER,
                      config.LIBVIRT_GROUP)
@@ -313,9 +299,9 @@ class ImageFetchHelper(object):
 
         blob_uuid = url[len(BLOB_URL):]
 
-        b = Blob.from_db(blob_uuid)
+        b = blob.Blob.from_db(blob_uuid)
         if not b:
-            raise exceptions.BlobMissing(blob_uuid)
+            raise exceptions.blob.BlobMissing(blob_uuid)
 
         b.ensure_local([lock], instance_object=self.instance)
         return b
