@@ -26,6 +26,9 @@ class TestDiskSpecifications(base.BaseNamespacedTestCase):
             self.fail('Disk is not virtio!\n\n%s' % out)
 
     def test_ide(self):
+        # Booting an IDE based VM is incredibly slow, even on real hardware.
+        # In my tests on a physical cluster it was taking ten minutes to finish
+        # the initrd stage. We need to be patient with this test.
         inst = self.test_client.create_instance(
             'test-ide-disk', 1, 1024, None,
             [
@@ -38,7 +41,7 @@ class TestDiskSpecifications(base.BaseNamespacedTestCase):
             ], None, None, side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst['uuid'])
-        self._await_instance_ready(inst['uuid'])
+        self._await_instance_ready(inst['uuid'], timeout=15)
 
         console = base.LoggingSocket(self.test_client, inst)
         out = console.execute('df -h')
@@ -59,6 +62,9 @@ class TestDiskSpecifications(base.BaseNamespacedTestCase):
         self._await_instance_ready(inst['uuid'])
 
     def test_complex(self):
+        # Booting an IDE based VM is incredibly slow, even on real hardware.
+        # In my tests on a physical cluster it was taking ten minutes to finish
+        # the initrd stage. We need to be patient with this test.
         inst = self.test_client.create_instance(
             'test-complex-disk', 1, 1024, None,
             [
@@ -78,7 +84,7 @@ class TestDiskSpecifications(base.BaseNamespacedTestCase):
             ], None, None, side_channels=['sf-agent'])
 
         self.assertIsNotNone(inst['uuid'])
-        self._await_instance_ready(inst['uuid'])
+        self._await_instance_ready(inst['uuid'], timeout=15)
 
         console = base.LoggingSocket(self.test_client, inst)
 
