@@ -194,7 +194,8 @@ class Monitor(daemon.Daemon):
 
                     u = ent.replace('libvirt-', '').replace('.files', '')
                     if (u not in all_libvirt_uuids and
-                            not os.path.exists(config.STORAGE_PATH, 'instances', u)):
+                            not os.path.exists(os.path.join(
+                                config.STORAGE_PATH, 'instances', u))):
                         if os.path.isdir(entpath):
                             shutil.rmtree(entpath)
                         else:
