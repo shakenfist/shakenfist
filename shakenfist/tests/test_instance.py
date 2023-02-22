@@ -77,7 +77,7 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
                     'ssh_key': 'thisisasshkey',
                     'user_data': str(base64.b64encode(
                         'thisisuserdata'.encode('utf-8')), 'utf-8'),
-                    'video': {'model': 'cirrus', 'memory': 16384},
+                    'video': {'model': 'cirrus', 'memory': 16384, 'vdi': 'spice'},
                     'uefi': False,
                     'configdrive': 'openstack-disk',
                     'version': 6,
@@ -92,10 +92,10 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
     @mock.patch('time.time', return_value=1234)
     def test_instance_new(self, mock_time, mock_get_lock, mock_get_attribute,
                           mock_create, mock_put, mock_get):
-        instance.Instance.new('barry', 1, 2048, 'namespace', 'sshkey',
-                              [{}], 'userdata', {
-                                  'memory': 16384, 'model': 'cirrus'},
-                              instance_uuid='uuid42',)
+        instance.Instance.new(
+            'barry', 1, 2048, 'namespace', 'sshkey',
+            [{}], 'userdata', {'memory': 16384, 'model': 'cirrus', 'vdi': 'spice'},
+            instance_uuid='uuid42',)
 
         self.assertEqual(
             ('attribute/instance', 'uuid42', 'state',
@@ -120,14 +120,12 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
                  'user_data': 'userdata',
                  'uuid': 'uuid42',
                  'version': 10,
-                 'video': {'memory': 16384, 'model': 'cirrus'},
+                 'video': {'memory': 16384, 'model': 'cirrus', 'vdi': 'spice'},
                  'uefi': False,
                  'configdrive': 'openstack-disk',
                  'nvram_template': None,
                  'secure_boot': False,
-                 'side_channels': None,
-                 'vdi_type': 'vnc',
-                 'spice_concurrent': False
+                 'side_channels': None
              }),
             mock_create.mock_calls[0][1])
 
@@ -176,7 +174,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
                     'ssh_key': 'thisisasshkey',
                     'user_data': str(base64.b64encode(
                         'thisisuserdata'.encode('utf-8')), 'utf-8'),
-                    'video': {'model': 'cirrus', 'memory': 16384},
+                    'video': {'model': 'cirrus', 'memory': 16384, 'vdi': 'spice'},
                     'uefi': False,
                     'configdrive': 'openstack-disk',
                     'version': 6,
@@ -524,7 +522,7 @@ GET_ALL_INSTANCES = [
         'requested_placement': None,
         'ssh_key': 'thisisasshkey',
         'user_data': None,
-        'video': {'model': 'cirrus', 'memory': 16384},
+        'video': {'model': 'cirrus', 'memory': 16384, 'vdi': 'spice'},
         'uefi': False,
         'configdrive': 'openstack-disk',
         'version': 6,
@@ -545,7 +543,7 @@ GET_ALL_INSTANCES = [
         'requested_placement': None,
         'ssh_key': 'thisisasshkey',
         'user_data': None,
-        'video': {'model': 'cirrus', 'memory': 16384},
+        'video': {'model': 'cirrus', 'memory': 16384, 'vdi': 'spice'},
         'uefi': False,
         'configdrive': 'openstack-disk',
         'version': 6,
@@ -565,7 +563,7 @@ GET_ALL_INSTANCES = [
         'requested_placement': None,
         'ssh_key': 'thisisasshkey',
         'user_data': None,
-        'video': {'model': 'cirrus', 'memory': 16384},
+        'video': {'model': 'cirrus', 'memory': 16384, 'vdi': 'spice'},
         'uefi': False,
         'configdrive': 'openstack-disk',
         'version': 6,

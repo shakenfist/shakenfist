@@ -153,8 +153,6 @@ class Instance(dbo):
         self.__secure_boot = static_values.get('secure_boot', False)
         self.__machine_type = static_values.get('machine_type', 'pc')
         self.__side_channels = static_values.get('side_channels', [])
-        self.__vdi_type = static_values.get('vdi_type', 'vnc')
-        self.__spice_concurrent = static_values.get('spice_concurrent', False)
 
         if not self.__disk_spec:
             # This should not occur since the API will filter for zero disks.
@@ -201,6 +199,14 @@ class Instance(dbo):
             static_values['version'] = 10
             changed = True
 
+        if static_values.get('version') == 10:
+            video = static_values['video']
+            video['vdi'] = static_values.get('vdi_type', 'vnc')
+            if 'vdi_type' in static_values:
+                del static_values['vdi_type']
+            static_values['version'] = 11
+            changed = True
+
         if changed:
             LOG.with_fields({
                 cls.object_type: static_values['uuid'],
@@ -213,8 +219,7 @@ class Instance(dbo):
     def new(cls, name=None, cpus=None, memory=None, namespace=None, ssh_key=None,
             disk_spec=None, user_data=None, video=None, requested_placement=None,
             instance_uuid=None, uefi=False, configdrive=None, nvram_template=None,
-            secure_boot=False, machine_type='pc', side_channels=None,
-            vdi_type='vnc', spice_concurrent=False):
+            secure_boot=False, machine_type='pc', side_channels=None):
         if not configdrive:
             configdrive = 'openstack-disk'
 
@@ -238,8 +243,6 @@ class Instance(dbo):
             'secure_boot': secure_boot,
             'machine_type': machine_type,
             'side_channels': side_channels,
-            'vdi_type': vdi_type,
-            'spice_concurrent': spice_concurrent,
 
             'version': cls.current_version
         }
@@ -271,8 +274,6 @@ class Instance(dbo):
             'secure_boot': self.secure_boot,
             'machine_type': self.machine_type,
             'side_channels': self.side_channels,
-            'vdi_type': self.vdi_type,
-            'spice_concurrent': self.__spice_concurrent,
             'agent_state': self.agent_state.value,
             'agent_start_time': self.agent_start_time,
             'agent_system_boot_time': self.agent_system_boot_time,
@@ -392,14 +393,6 @@ class Instance(dbo):
     @property
     def side_channels(self):
         return self.__side_channels
-
-    @property
-    def vdi_type(self):
-        return self.__vdi_type
-
-    @property
-    def spice_concurrent(self):
-        return self.__spice_concurrent
 
     @property
     def instance_path(self):
@@ -741,7 +734,7 @@ class Instance(dbo):
                     'console_port': self._allocate_console_port(),
                     'vdi_port': self._allocate_console_port()
                 }
-                if self.vdi_type == 'spice':
+                if self.video['vdi'].startswith('spice'):
                     p['vdi_tls_port'] = self._allocate_console_port()
 
                 self.ports = p
@@ -1094,6 +1087,8 @@ class Instance(dbo):
         # I hadn't spent _ages_ finding a bug related to it.
         block_devices = self.block_devices
         ports = self.ports
+        vdi_type = self.video['vdi']
+
         x = t.render(
             uuid=self.uuid,
             memory=self.memory * 1024,
@@ -1111,8 +1106,8 @@ class Instance(dbo):
             nvram_template_attribute=nvram_template_attribute,
             extracommands=block_devices.get('extracommands', []),
             machine_type=self.machine_type,
-            vdi_type=self.vdi_type,
-            spice_concurrent=self.spice_concurrent,
+            vdi_type=vdi_type,
+            spice_concurrent=(vdi_type == 'spiceconcurrent'),
             extradevices=extradevices
         )
 
