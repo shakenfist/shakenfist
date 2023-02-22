@@ -1,5 +1,7 @@
 # Ansible galaxy roles
 
+- src: andrewrothstein.unarchive-deps
+
 # - src: andrewrothstein.etcd
 - src: https://github.com/mikalstill/ansible-etcd
   version: master
