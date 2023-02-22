@@ -581,6 +581,7 @@
         etcd_master_group_name: etcd_master
         etcd_iface_public: "{{node_mesh_nic}}"
         etcd_iface_cluster: "{{node_mesh_nic}}"
+        etcd_address_cluster: "{{node_mesh_ip}}"
 
 - hosts: allsf
   any_errors_fatal: true

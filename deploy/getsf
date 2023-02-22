@@ -824,12 +824,6 @@ status "Terminal blocking status:"
 python3 /tmp/getsf_blocking_test.py
 echo
 
-# NOTE(mikal): I also don't love how we do this, but it will do until I have time
-# to rework the etcd installation.
-status "Installing ansible-galaxy requirements."
-ansible-galaxy install --force -r /srv/shakenfist/venv/share/shakenfist/installer/requirements.yml | cat -
-echo
-
 status "Creating /root/sf-deploy script"
 if [ -z ${GETSF_ADMIN_PASSWORD} ]; then
     apt-get install pwgen
@@ -839,6 +833,9 @@ fi
 
 cat - > /root/sf-deploy << DEPLOYEOF
 #!/bin/bash
+
+echo "Upgrading ansible-galaxy dependancies..."
+ansible-galaxy install --force -r /srv/shakenfist/venv/share/shakenfist/installer/requirements.yml | cat -
 
 export ADMIN_PASSWORD=${GETSF_ADMIN_PASSWORD}
 export FLOATING_IP_BLOCK="${GETSF_FLOATING_BLOCK}"
