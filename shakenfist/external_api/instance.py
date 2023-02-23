@@ -335,12 +335,14 @@ class InstancesEndpoint(sf_api.Resource):
                     return sf_api.error(404, 'network %s does not exist' % n.uuid)
 
         if not video:
-            video = {'model': 'cirrus', 'memory': 16384}
+            video = {'model': 'cirrus', 'memory': 16384, 'vdi': 'spice'}
         else:
             if 'model' not in video:
                 return sf_api.error(400, 'video specification requires "model"')
             if 'memory' not in video:
                 return sf_api.error(400, 'video specification requires "memory"')
+            if 'vdi' not in video:
+                video['vdi'] = 'spice'
 
         # Validate metadata before instance creation
         if metadata:
@@ -368,9 +370,7 @@ class InstancesEndpoint(sf_api.Resource):
             nvram_template=nvram_template,
             secure_boot=secure_boot,
             machine_type=machine_type,
-            side_channels=side_channels,
-            vdi_type=vdi_type,
-            spice_concurrent=spice_concurrent
+            side_channels=side_channels
         )
 
         # Initialise metadata
