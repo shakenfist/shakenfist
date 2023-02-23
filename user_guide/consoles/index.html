@@ -19,7 +19,7 @@
         <link rel="next" href="../events/">
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.4.2, mkdocs-material-9.0.13">
+      <meta name="generator" content="mkdocs-1.4.2, mkdocs-material-9.0.14">
     
     
       
@@ -27,7 +27,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.ffa9267a.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.113286f1.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.a0c5b2b5.min.css">
@@ -825,14 +825,16 @@ an interactive console for the instance. So in this example:</p>
 <h2 id="interactive-vdi-console">Interactive VDI console</h2>
 <p>There is also a graphical console. Similarly to the telnet console, it requires
 direct network access to the hypervisor node, and is accessed at the "vdi port"
-TCP port. By default this console is VNC, although SPICE was added as an
-option in v0.7.</p>
-<p>You can select from 'vnc' or 'spice' by passing the <code>--vdi-type</code> argument on the
-command line when creating an instance, or using the equivalent API argument.
-Additionally, if you add <code>--spice-concurrent</code> to your command line, then
+TCP port. By default this console is SPICE since v0.7, although VNC is also
+available.</p>
+<p>You can select from 'vnc' or 'spice' by setting the <code>vdi</code> argument in your video
+specification for the instance. If you set <code>vdi=spice-concurrent</code>, then
 experimental support for multiple users accessing the same SPICE console at the
 same time is enabled. For more details about the experimental nature of concurrent
 SPICE consoles, see <a href="https://www.spice-space.org/multiple-clients.html">https://www.spice-space.org/multiple-clients.html</a>.</p>
+<p>And example video specification would be:</p>
+<pre><code>--video model=qxl,memory=65536,vdi=spiceconcurrent
+</code></pre>
 
 
 
