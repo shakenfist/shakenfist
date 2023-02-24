@@ -125,8 +125,7 @@ class InstancesEndpoint(sf_api.Resource):
     def post(self, name=None, cpus=None, memory=None, network=None, disk=None,
              ssh_key=None, user_data=None, placed_on=None, namespace=None,
              video=None, uefi=False, configdrive=None, metadata=None,
-             nvram_template=None, secure_boot=False, side_channels=None,
-             vdi_type='vnc', spice_concurrent=False):
+             nvram_template=None, secure_boot=False, side_channels=None):
         # NOTE(mikal): if we cleaned this up to have less business logic in it,
         # then that would also mean that we could reduce the amount of duplicated
         # logic in mock_etcd.create_instance().
@@ -142,13 +141,6 @@ class InstancesEndpoint(sf_api.Resource):
         # more explicit in case we want to add other machine types later (microvm
         # for example).
         machine_type = 'pc'
-
-        # The VDI type must be valid
-        if vdi_type not in ['vnc', 'spice']:
-            return sf_api.error(400, 'invalid vdi_type "%s"' % vdi_type)
-
-        if spice_concurrent and vdi_type != 'spice':
-            return sf_api.error(400, 'only spice consoles can be spice_concurrent')
 
         if not namespace:
             namespace = get_jwt_identity()[0]
@@ -792,7 +784,7 @@ class InstanceVDIConsoleHelperEndpoint(sf_api.Resource):
             cacert = cacert.replace('\n', '\\n')
 
         config = VIRTVIEWER_TEMPLATE % {
-            'vdi_type': instance_from_db.vdi_type,
+            'vdi_type': instance_from_db.video['vdi'],
             'node': instance_from_db.placement.get('node'),
             'vdi_port': p.get('vdi_port'),
             'vdi_tls_port': p.get('vdi_tls_port', 0),
