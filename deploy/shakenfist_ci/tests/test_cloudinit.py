@@ -49,8 +49,7 @@ sudo echo 'banana' >  /tmp/output"""
             '9YN60gp4lZSKB19GaURxtbKWlajfEakn3mTm9JQH5eU48XIaCh+LcptKYd6lD'
             'BWeoicQzECQLMfnKuGpfoZsKbOTTeCzS0/q6guKLNgfXijpRf5uaZaTqQa18t'
             '8s= mikal@marvin"',
-            str(base64.b64encode(ud.encode('utf-8')), 'utf-8'),
-            side_channels=['sf-agent'])
+            str(base64.b64encode(ud.encode('utf-8')), 'utf-8'))
 
         self.assertIsNotNone(inst['uuid'])
         self._await_instance_ready(inst['uuid'])
@@ -82,7 +81,7 @@ sudo echo 'banana' >  /tmp/output"""
                     'base': 'sf://upload/system/ubuntu-2004',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self.assertIsNotNone(inst['uuid'])
 

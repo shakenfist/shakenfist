@@ -26,7 +26,7 @@ class TestUbuntu(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/ubuntu-1804',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self._await_instance_ready(inst['uuid'])
 

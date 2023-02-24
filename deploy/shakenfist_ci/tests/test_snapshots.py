@@ -28,7 +28,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self.assertIsNotNone(inst1['uuid'])
         self.assertIsNotNone(inst1['node'])
@@ -102,7 +102,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                     'base': 'sf://blob/%s' % snap2['vda']['blob_uuid'],
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self.assertIsNotNone(inst2['uuid'])
         self.assertIsNotNone(inst2['node'])
@@ -122,7 +122,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                     'base': 'sf://snapshot/%s' % snap2['vda']['artifact_uuid'],
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self.assertIsNotNone(inst3['uuid'])
         self.assertIsNotNone(inst3['node'])
@@ -187,7 +187,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'cdrom'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self.assertIsNotNone(inst['uuid'])
         self.assertIsNotNone(inst['node'])
@@ -242,7 +242,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self.assertIsNotNone(inst1['uuid'])
         self.assertIsNotNone(inst1['node'])
@@ -268,7 +268,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                     'base': 'label:testlabel',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self.assertIsNotNone(inst2['uuid'])
         self.assertIsNotNone(inst2['node'])
@@ -291,7 +291,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self.assertIsNotNone(inst1['uuid'])
         self.assertIsNotNone(inst1['node'])
@@ -348,7 +348,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self.assertIsNotNone(inst['uuid'])
         self.assertIsNotNone(inst['node'])
@@ -404,7 +404,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/ubuntu-2004',
                     'type': 'disk'
                 }
-            ], None, base.load_userdata('writedata'), side_channels=['sf-agent'])
+            ], None, base.load_userdata('writedata'))
 
         self.assertIsNotNone(inst1['uuid'])
         self.assertIsNotNone(inst1['node'])
@@ -464,7 +464,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                     'base': 'sf://blob/%s' % inst1['disks'][0]['blob_uuid'],
                     'type': 'disk'
                 }
-            ], None, base.load_userdata('writedata'), side_channels=['sf-agent'])
+            ], None, base.load_userdata('writedata'))
 
         self.assertIsNotNone(inst2['uuid'])
         self.assertIsNotNone(inst2['node'])

@@ -26,7 +26,7 @@ class TestSerialConsole(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self.assertIsNotNone(inst['uuid'])
         self.assertIsNotNone(inst['node'])

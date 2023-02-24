@@ -15,7 +15,7 @@ class TestDiskSpecifications(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self.assertIsNotNone(inst['uuid'])
         self._await_instance_ready(inst['uuid'])
@@ -38,7 +38,7 @@ class TestDiskSpecifications(base.BaseNamespacedTestCase):
                     'type': 'disk',
                     'bus': 'ide'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self.assertIsNotNone(inst['uuid'])
         self._await_instance_ready(inst['uuid'], timeout=15)
@@ -57,7 +57,7 @@ class TestDiskSpecifications(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
         self.assertIsNotNone(inst['uuid'])
         self._await_instance_ready(inst['uuid'])
 
@@ -81,7 +81,7 @@ class TestDiskSpecifications(base.BaseNamespacedTestCase):
                 {
                     'base': ('https://sfcbr.shakenfist.com/focal-mini.iso')
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self.assertIsNotNone(inst['uuid'])
         self._await_instance_ready(inst['uuid'], timeout=15)

@@ -345,6 +345,10 @@ class InstancesEndpoint(sf_api.Resource):
                 if err:
                     return err
 
+        # If no preference for side channels is expressed, then use the default
+        if side_channels is None:
+            side_channels = ['sf-agent']
+
         # Create instance object
         inst = instance.Instance.new(
             instance_uuid=instance_uuid,

@@ -30,8 +30,7 @@ class TestConsoleLog(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, base.load_userdata('console_scribbler'),
-            side_channels=['sf-agent'])
+            ], None, base.load_userdata('console_scribbler'))
 
         # Wait for our test instance to boot
         self.assertIsNotNone(inst['uuid'])

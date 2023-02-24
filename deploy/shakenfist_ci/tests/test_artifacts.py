@@ -69,7 +69,7 @@ class TestImages(base.BaseNamespacedTestCase):
                     'base': 'https://nosuch.shakenfist.com/foo',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self.assertRaises(base.StartException,
                           self._await_instance_ready, inst['uuid'])
@@ -86,7 +86,7 @@ class TestImages(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/ubuntu-2004',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self.assertIsNotNone(inst['uuid'])
 
@@ -325,4 +325,4 @@ class TestTypoedLabel(base.BaseNamespacedTestCase):
                                   'type': 'disk'
                               }
                           ],
-                          None, None, side_channels=['sf-agent'])
+                          None, None)
