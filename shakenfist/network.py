@@ -20,7 +20,7 @@ from shakenfist.config import config
 from shakenfist import db
 from shakenfist import dhcp
 from shakenfist import etcd
-from shakenfist.exceptions import DeadNetwork, CongestedNetwork
+from shakenfist.exceptions import DeadNetwork, CongestedNetwork, IPManagerMissing
 from shakenfist import instance
 from shakenfist.ipmanager import IPManager
 from shakenfist.metrics import get_minimum_object_version as gmov
@@ -849,9 +849,13 @@ class Networks(dbo_iter):
         for _, n in etcd.get_all('network', None):
             if n['uuid'] == 'floating':
                 continue
-            out = self.apply_filters(Network(n))
-            if out:
-                yield out
+
+            try:
+                out = self.apply_filters(Network(n))
+                if out:
+                    yield out
+            except IPManagerMissing:
+                pass
 
 
 # Convenience helpers

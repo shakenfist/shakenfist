@@ -184,6 +184,10 @@ class NetworkMissing(NetworkException):
     ...
 
 
+class IPManagerMissing(NetworkException):
+    ...
+
+
 # NetworkInterface
 class NetworkInterfaceException(Exception):
     ...
