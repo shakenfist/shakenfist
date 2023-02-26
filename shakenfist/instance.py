@@ -1156,8 +1156,9 @@ class Instance(dbo):
                 if str(e).startswith('Requested operation is not valid: '
                                      'domain is already running'):
                     pass
-                elif str(e).find('Failed to find an available port: '
-                                 'Address already in use') != -1:
+                elif (str(e).find('Failed to find an available port: '
+                                  'Address already in use') != -1 or
+                      str(e).find('reds_init_socket: binding socket') != -1):
                     self.add_event(
                         'instance ports clash during boot attempt: %s' % e)
 
@@ -1165,6 +1166,7 @@ class Instance(dbo):
                     ports = self.ports
                     self._free_console_port(ports['console_port'])
                     self._free_console_port(ports['vdi_port'])
+                    self._free_console_port(ports['vdi_tls_port'])
 
                     # We need to delete the nvram file before we can undefine
                     # the domain. This will be recreated by libvirt on the next
