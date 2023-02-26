@@ -30,7 +30,7 @@ class TestDisks(base.BaseNamespacedTestCase):
                     'type': 'disk',
                     'bus': 'nvme'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self._await_instance_ready(inst['uuid'])
         inst = self.test_client.get_instance(inst['uuid'])

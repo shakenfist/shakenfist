@@ -120,7 +120,7 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
         self._await_instances_ready([inst1['uuid']])
 
         # Take a snapshot
@@ -157,7 +157,7 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
                     'base': 'sf://snapshot/%s' % snap_uuid,
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
         self._await_instances_ready([inst2['uuid']])
 
         # Test instance is listed against blob in snapshot listing

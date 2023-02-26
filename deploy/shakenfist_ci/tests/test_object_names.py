@@ -42,7 +42,7 @@ class TestObjectNames(base.BaseNamespacedTestCase):
                         'base': 'sf://upload/system/debian-11',
                         'type': 'disk'
                     }
-                ], None, None, namespace=self.namespace, side_channels=['sf-agent'])
+                ], None, None, namespace=self.namespace)
             inst_uuids[name] = new_inst['uuid']
 
         # Get instance by name

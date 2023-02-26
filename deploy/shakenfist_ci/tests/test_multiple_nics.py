@@ -44,8 +44,7 @@ sudo /etc/init.d/S40network restart"""
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, str(base64.b64encode(ud.encode('utf-8')), 'utf-8'),
-            side_channels=['sf-agent'])
+            ], None, str(base64.b64encode(ud.encode('utf-8')), 'utf-8'))
 
         self.assertIsNotNone(inst['uuid'])
         self._await_instance_ready(inst['uuid'])

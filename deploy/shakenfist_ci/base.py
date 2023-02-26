@@ -433,7 +433,7 @@ class TestDistroBoots(BaseNamespacedTestCase):
                     'base': base_image,
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self._await_instance_ready(inst['uuid'])
 

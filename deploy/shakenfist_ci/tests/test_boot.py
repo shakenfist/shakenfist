@@ -28,7 +28,7 @@ class TestBoot(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self._await_instance_ready(inst['uuid'])
 
@@ -52,7 +52,7 @@ class TestBoot(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self._await_instance_ready(inst['uuid'])
 
@@ -71,6 +71,6 @@ class TestBoot(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self._await_instance_ready(inst['uuid'])

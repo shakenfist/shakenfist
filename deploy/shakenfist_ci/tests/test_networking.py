@@ -50,7 +50,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         inst2 = self.test_client.create_instance(
             'test-networks-separate-1', 1, 1024,
@@ -65,7 +65,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self.assertIsNotNone(inst1['uuid'])
         self.assertIsNotNone(inst2['uuid'])
@@ -98,7 +98,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         inst2 = self.test_client.create_instance(
             'test-overlap-cidr-1', 1, 1024,
@@ -113,7 +113,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self.assertIsNotNone(inst1['uuid'])
         self.assertIsNotNone(inst2['uuid'])
@@ -146,7 +146,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         inst2 = self.test_client.create_instance(
             'test-networks-2', 1, 1024,
@@ -161,7 +161,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self.assertIsNotNone(inst1['uuid'])
         self.assertIsNotNone(inst2['uuid'])
@@ -201,7 +201,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self._await_instances_ready([inst['uuid']])
 
@@ -234,7 +234,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
     def test_specific_macaddress_request(self):
         inst = self.test_client.create_instance(
@@ -251,7 +251,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self._await_instances_ready([inst['uuid']])
 
@@ -274,7 +274,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
 
         self.assertIsNotNone(inst1['uuid'])
         self._await_instance_ready(inst1['uuid'])
@@ -319,7 +319,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                         'base': 'sf://upload/system/debian-11',
                         'type': 'disk'
                     }
-                ], None, None, force_placement='sf-2', side_channels=['sf-agent'])
+                ], None, None, force_placement='sf-2')
 
             inst_hyp1_vm2 = self.test_client.create_instance(
                 'dup2', 1, 1024,
@@ -334,7 +334,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                         'base': 'sf://upload/system/ubuntu-2004',
                         'type': 'disk'
                     }
-                ], None, None, force_placement='sf-2', side_channels=['sf-agent'])
+                ], None, None, force_placement='sf-2')
 
             inst_hyp2_vm1 = self.test_client.create_instance(
                 'dup3', 1, 1024,
@@ -349,7 +349,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                         'base': 'sf://upload/system/ubuntu-2004',
                         'type': 'disk'
                     }
-                ], None, None, force_placement='sf-3', side_channels=['sf-agent'])
+                ], None, None, force_placement='sf-3')
 
         except apiclient.ResourceNotFoundException as e:
             self.skip('Target node does not exist. %s' % e)

@@ -33,8 +33,7 @@ class TestPlacement(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/ubuntu-1804',
                     'type': 'disk'
                 }
-            ], None, None, force_placement='sf-nosuchnode',
-            side_channels=['sf-agent'])
+            ], None, None, force_placement='sf-nosuchnode')
 
     def test_local_placement_works(self):
         # Create an instance, force it to be on the name node as us.
@@ -52,8 +51,7 @@ class TestPlacement(base.BaseNamespacedTestCase):
                         'base': 'sf://upload/system/ubuntu-1804',
                         'type': 'disk'
                     }
-                ], None, None, force_placement=socket.getfqdn(),
-                side_channels=['sf-agent'])
+                ], None, None, force_placement=socket.getfqdn())
         except apiclient.ResourceNotFoundException as e:
             self.skip('Target node does not exist. %s' % e)
             return
@@ -89,7 +87,7 @@ class TestPlacement(base.BaseNamespacedTestCase):
                         'base': 'sf://upload/system/ubuntu-1804',
                         'type': 'disk'
                     }
-                ], None, None, force_placement='sf-2', side_channels=['sf-agent'])
+                ], None, None, force_placement='sf-2')
         except apiclient.ResourceNotFoundException as e:
             self.skip('Target node does not exist. %s' % e)
             return

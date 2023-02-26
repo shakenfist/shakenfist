@@ -34,7 +34,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
         LOG.info('Started keep network alive instance')
         self.node = inst['node']
 
@@ -53,7 +53,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'],
+            ], None, None,
             force_placement=self.node)
         LOG.info('Started test instance %s', inst['uuid'])
 
@@ -182,7 +182,7 @@ class TestDetectReboot(base.BaseNamespacedTestCase):
                     'base': 'sf://upload/system/debian-11',
                     'type': 'disk'
                 }
-            ], None, None, side_channels=['sf-agent'])
+            ], None, None)
         LOG.info('Started test instance %s', inst['uuid'])
 
         # Wait for our test instance to boot
