@@ -117,12 +117,12 @@ class Monitor(daemon.Daemon):
                         instance_uuid = domain_name.split(':')[1]
                         log_ctx = LOG.with_fields({'instance': instance_uuid})
                         inst = instance.Instance.from_db(instance_uuid)
+                        log_ctx.debug('Inspecting absent instance')
 
                         if not inst:
                             # Instance is SF but not in database. Kill because
                             # unknown.
-                            log_ctx.warning(
-                                'Removing unknown inactive instance')
+                            log_ctx.warning('Removing unknown inactive instance')
                             self._delete_instance_files(instance_uuid)
                             try:
                                 # TODO(mikal): work out if we can pass
@@ -158,6 +158,8 @@ class Monitor(daemon.Daemon):
                         inst.place_instance(config.NODE_NAME)
 
                         db_power = inst.power_state
+                        log_ctx.debug(
+                            'Instance expected power state %s, actually off' % db_power)
                         if not os.path.exists(inst.instance_path):
                             # If we're inactive and our files aren't on disk,
                             # we have a problem.
