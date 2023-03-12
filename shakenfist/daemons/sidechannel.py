@@ -1,3 +1,4 @@
+import base64
 import multiprocessing
 import os
 import select
@@ -5,6 +6,7 @@ import setproctitle
 from shakenfist_utilities import logs
 import signal
 from shakenfist_agent import protocol
+import tempfile
 import time
 
 from shakenfist.daemons import daemon
@@ -21,27 +23,39 @@ class ConnectionIdle(Exception):
 
 
 class SFSocketAgent(protocol.SocketAgent):
+    NEVER_TALKED = 'not ready (no contact)'
+    STOPPED_TALKING = 'not ready (unresponsive)'
+    AGENT_STARTED = 'not ready (agent startup)'
+    AGENT_STOPPED = 'not ready (agent stopped)'
+
     def __init__(self, inst, path, logger=None):
         super(SFSocketAgent, self).__init__(path, logger=logger)
+        self.log = LOG.with_fields({'instance': inst})
+
         self.instance = inst
-        self.instance_ready = None
         self.system_boot_time = 0
         self.last_response = time.time()
-
         self.poll_tasks.append(self.is_system_running)
+
+        self.incomplete_file_gets = []
 
         self.add_command('agent-start', self.agent_start)
         self.add_command('agent-stop', self.agent_start)
         self.add_command('is-system-running-response',
                          self.is_system_running_response)
-        self.add_command('gather-facts-response',
-                         self.gather_facts_response)
+        self.add_command('gather-facts-response', self.gather_facts_response)
+        self.add_command('get-file-response', self.get_file_response)
+        self.add_command('watch-file-response', self.watch_file_response)
+        self.add_command('execute-response', self.execute_response)
 
-        self.instance.agent_state = 'not ready (no contact)'
+        self.instance_ready = self.NEVER_TALKED
+        self.instance.agent_state = self.NEVER_TALKED
 
     def poll(self):
         if time.time() - self.last_response > 15:
-            self.instance.agent_state = 'not ready (unresponsive)'
+            if self.instance.agent_state.value != self.NEVER_TALKED:
+                self.instance_ready = self.STOPPED_TALKING
+                self.instance.agent_state = self.STOPPED_TALKING
             self.log.debug('Not receiving traffic, aborting.')
             if self.system_boot_time != 0:
                 self.instance.add_event(
@@ -69,13 +83,18 @@ class SFSocketAgent(protocol.SocketAgent):
             self.instance.agent_system_boot_time = sbt
 
     def agent_start(self, packet):
-        self.instance.agent_state = 'not ready (agent start)'
+        self.instance_ready = self.AGENT_STARTED
+        self.instance.agent_state = self.AGENT_STARTED
         self.instance.agent_start_time = time.time()
         sbt = packet.get('system_boot_time', 0)
         self._record_system_boot_time(sbt)
 
+        if self.is_system_running not in self.poll_tasks:
+            self.poll_tasks.append(self.is_system_running)
+
     def agent_stop(self, _packet):
-        self.instance.agent_state = 'not ready (stopped)'
+        self.instance_ready = self.AGENT_STOPPED
+        self.instance.agent_state = self.AGENT_STOPPED
 
     def is_system_running(self):
         self.send_packet({'command': 'is-system-running'})
@@ -87,6 +106,8 @@ class SFSocketAgent(protocol.SocketAgent):
 
         if ready:
             new_state = 'ready'
+            if self.is_system_running in self.poll_tasks:
+                self.poll_tasks.remove(self.is_system_running)
         else:
             # Special case the degraded state here, as the system is in fact
             # as ready as it is ever going to be, but isn't entirely happy.
@@ -95,11 +116,14 @@ class SFSocketAgent(protocol.SocketAgent):
             else:
                 new_state = 'not ready (%s)' % packet.get('message', 'none')
 
+        self.log.debug('Agent state: old = %s; new = %s'
+                       % (self.instance_ready, new_state))
+
         # We cache the agent state to reduce database load, and then
         # trigger facts gathering when we transition into the 'ready' state.
         if self.instance_ready != new_state:
-            self.instance.agent_state = new_state
             self.instance_ready = new_state
+            self.instance.agent_state = new_state
             if new_state == 'ready':
                 self.gather_facts()
 
@@ -109,6 +133,66 @@ class SFSocketAgent(protocol.SocketAgent):
     def gather_facts_response(self, packet):
         self.instance.add_event('received system facts')
         self.instance.agent_facts = packet.get('result', {})
+
+    def get_file(self, path):
+        self.incomplete_file_gets.append({
+            'flo': tempfile.NamedTemporaryFile(),
+            'source_path': path,
+            'callback': self.get_file_complete,
+            'callback_args': {}
+        })
+        self.send_packet({
+            'command': 'get-file',
+            'path': path
+            })
+
+    def get_file_response(self, packet):
+        if not self.incomplete_file_gets:
+            self.log.with_fields(packet).warning('Unexpected file response')
+            return
+
+        if not packet['result']:
+            self.log.with_fields(packet).warning('File get failed')
+            return
+
+        if 'chunk' not in packet:
+            # A metadata packet
+            self.incomplete_file_gets[0].update(packet['stat_result'])
+            return
+
+        if packet['chunk'] is None:
+            self.incomplete_file_gets[0]['flo'].close()
+            self.incomplete_file_gets[0]['callback'](
+                **self.incomplete_file_gets[0]['callback_args']
+            )
+            self.incomplete_file_gets.pop(0)
+            self.log.with_fields(packet).info('File get complete')
+            return
+
+        d = base64.b64decode(packet['chunk'])
+        self.incomplete_file_gets[0]['flo'].write(d)
+
+    def get_file_complete(self):
+        pass
+
+    def watch_file(self, path):
+        self.send_packet({
+            'command': 'watch-file',
+            'path': path
+            })
+
+    def watch_file_response(self, packet):
+        self.log.info('Received watch content for %s' % packet['path'])
+
+    def execute(self, command):
+        self.send_packet({
+            'command': 'execute',
+            'command-line': command,
+            'block-for-result': False
+            })
+
+    def execute_response(self, packet):
+        self.log.info('Received execute response')
 
 
 class Monitor(daemon.Daemon):
@@ -167,17 +251,13 @@ class Monitor(daemon.Daemon):
                 if chan:
                     try:
                         for packet in sc_clients[chan].find_packets():
-                            try:
-                                if not sc_connected.get(chan, False):
-                                    inst.add_event(
-                                        'sidechannel %s connected' % chan)
-                                    sc_connected[chan] = True
+                            if not sc_connected.get(chan, False):
+                                inst.add_event(
+                                    'sidechannel %s connected' % chan)
+                                sc_connected[chan] = True
 
-                                sc_clients[chan].dispatch_packet(
-                                    packet)
-                            except protocol.UnknownCommand:
-                                log_ctx.with_fields({'sidechannel': chan}).info(
-                                    'Ignored sidechannel packet: %s' % packet)
+                            sc_clients[chan].dispatch_packet(
+                                packet)
 
                     except (BrokenPipeError,
                             ConnectionRefusedError,
