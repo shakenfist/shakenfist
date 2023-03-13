@@ -167,17 +167,11 @@ class Monitor(daemon.Daemon):
                 if chan:
                     try:
                         for packet in sc_clients[chan].find_packets():
-                            try:
-                                if not sc_connected.get(chan, False):
-                                    inst.add_event2(
-                                        'sidechannel %s connected' % chan)
-                                    sc_connected[chan] = True
+                            if not sc_connected.get(chan, False):
+                                inst.add_event2('sidechannel %s connected' % chan)
+                                sc_connected[chan] = True
 
-                                sc_clients[chan].dispatch_packet(
-                                    packet)
-                            except protocol.UnknownCommand:
-                                log_ctx.with_field('sidechannel', chan).info(
-                                    'Ignored sidechannel packet: %s' % packet)
+                            sc_clients[chan].dispatch_packet(packet)
 
                     except (BrokenPipeError,
                             ConnectionRefusedError,
