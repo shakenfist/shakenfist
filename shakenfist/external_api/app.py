@@ -102,6 +102,7 @@ class Root(sf_api.Resource):
              '<li>blob-search-by-hash</li>'
              '<li>spice-vdi-console</li>'
              '<li>vdi-console-helper</li>'
+             '<li>artifact-upload-types</li>'
              '</ul></p></body></html>'),
             mimetype='text/html')
         resp.status_code = 200

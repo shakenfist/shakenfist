@@ -51,6 +51,7 @@ class Artifact(dbo):
     TYPE_SNAPSHOT = 'snapshot'
     TYPE_LABEL = 'label'
     TYPE_IMAGE = 'image'
+    TYPE_OTHER = 'other'
 
     def __init__(self, static_values):
         if static_values['version'] != self.current_version:
