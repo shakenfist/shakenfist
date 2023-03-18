@@ -126,7 +126,7 @@ class Instance(dbo):
 
     def __init__(self, static_values):
         if static_values.get('version', self.initial_version) != self.current_version:
-            upgraded, static_values = self.upgrade(static_values)
+            upgraded = self.upgrade(static_values)
 
             if upgraded and gmov(self.object_type) == self.current_version:
                 etcd.put(self.object_type, None,
@@ -159,61 +159,40 @@ class Instance(dbo):
             raise exceptions.InstanceBadDiskSpecification()
 
     @classmethod
-    def upgrade(cls, static_values):
-        changed = False
-        starting_version = static_values.get('version')
+    def _upgrade_step_3_to_4(cls, static_values):
+        static_values['configdrive'] = 'openstack-disk'
 
-        if static_values.get('version') == 3:
-            static_values['configdrive'] = 'openstack-disk'
-            static_values['version'] = 4
-            changed = True
+    @classmethod
+    def _upgrade_step_4_to_5(cls, static_values):
+        static_values['nvram_template'] = None
+        static_values['secure_boot'] = False
 
-        if static_values.get('version') == 4:
-            static_values['nvram_template'] = None
-            static_values['secure_boot'] = False
-            static_values['version'] = 5
-            changed = True
+    @classmethod
+    def _upgrade_step_5_to_6(cls, static_values):
+        static_values['machine_type'] = 'pc'
 
-        if static_values.get('version') == 5:
-            static_values['machine_type'] = 'pc'
-            static_values['version'] = 6
-            changed = True
+    @classmethod
+    def _upgrade_step_6_to_7(cls, static_values):
+        static_values['side_channels'] = []
 
-        if static_values.get('version') == 6:
-            static_values['side_channels'] = []
-            static_values['version'] = 7
-            changed = True
+    @classmethod
+    def _upgrade_step_7_to_8(cls, static_values):
+        cls._upgrade_metadata_to_attribute(static_values['uuid'])
 
-        if static_values.get('version') == 7:
-            cls._upgrade_metadata_to_attribute(static_values['uuid'])
-            static_values['version'] = 8
-            changed = True
+    @classmethod
+    def _upgrade_step_8_to_9(cls, static_values):
+        static_values['vdi_type'] = 'vnc'
 
-        if static_values.get('version') == 8:
-            static_values['vdi_type'] = 'vnc'
-            static_values['version'] = 9
-            changed = True
+    @classmethod
+    def _upgrade_step_9_to_10(cls, static_values):
+        static_values['spice_concurrent'] = False
 
-        if static_values.get('version') == 9:
-            static_values['spice_concurrent'] = False
-            static_values['version'] = 10
-            changed = True
-
-        if static_values.get('version') == 10:
-            video = static_values['video']
-            video['vdi'] = static_values.get('vdi_type', 'vnc')
-            if 'vdi_type' in static_values:
-                del static_values['vdi_type']
-            static_values['version'] = 11
-            changed = True
-
-        if changed:
-            LOG.with_fields({
-                cls.object_type: static_values['uuid'],
-                'start_version': starting_version,
-                'final_version': static_values.get('version')
-            }).info('Object online upgraded')
-        return changed, static_values
+    @classmethod
+    def _upgrade_step_10_to_11(cls, static_values):
+        video = static_values['video']
+        video['vdi'] = static_values.get('vdi_type', 'vnc')
+        if 'vdi_type' in static_values:
+            del static_values['vdi_type']
 
     @classmethod
     def new(cls, name=None, cpus=None, memory=None, namespace=None, ssh_key=None,

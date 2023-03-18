@@ -57,6 +57,32 @@ class DatabaseBackedObject(object):
 
         self.log = LOG.with_fields({self.object_type: self.__uuid})
 
+    def upgrade(cls, static_values):
+        changed = False
+        if 'version' not in static_values:
+            static_values['version'] = cls.initial_version
+        starting_version = static_values['version']
+
+        while static_values['version'] != cls.current_version:
+            step = '_upgrade_step_%d_to_%d' % (static_values['version'],
+                                               static_values['version'] + 1)
+            step_func = getattr(cls, step)
+            if not step_func:
+                raise exceptions.UpgradeException(
+                    'Upgrade step %s is missing for object %s'
+                    % (step, cls.object_type))
+            step_func(static_values)
+            static_values['version'] += 1
+            changed = True
+
+        if changed:
+            LOG.with_fields({
+                cls.object_type: static_values['uuid'],
+                'start_version': starting_version,
+                'final_version': static_values['version']
+            }).info('Object online upgraded')
+        return changed
+
     @property
     def uuid(self):
         return self.__uuid

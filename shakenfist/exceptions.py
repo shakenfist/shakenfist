@@ -32,6 +32,10 @@ class MultipleObjects(ObjectException):
     ...
 
 
+class UpgradeException(ObjectException):
+    ...
+
+
 # Instance
 class InstanceException(Exception):
     ...

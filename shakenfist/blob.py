@@ -49,7 +49,7 @@ class Blob(dbo):
 
     def __init__(self, static_values):
         if static_values.get('version', self.initial_version) != self.current_version:
-            upgraded, static_values = self.upgrade(static_values)
+            upgraded = self.upgrade(static_values)
 
             if upgraded and gmov(self.object_type) == self.current_version:
                 etcd.put(self.object_type, None,
@@ -67,28 +67,13 @@ class Blob(dbo):
         self.__depends_on = static_values.get('depends_on')
 
     @classmethod
-    def upgrade(cls, static_values):
-        changed = False
-        starting_version = static_values.get('version')
-
-        if static_values.get('version') == 3:
-            static_values['modified'] = cls.normalize_timestamp(
+    def _upgrade_step_3_to_4(cls, static_values):
+        static_values['modified'] = cls.normalize_timestamp(
                 static_values['modified'])
-            static_values['version'] = 4
-            changed = True
 
-        if static_values.get('version') == 4:
-            cls._upgrade_metadata_to_attribute(static_values['uuid'])
-            static_values['version'] = 5
-            changed = True
-
-        if changed:
-            LOG.with_fields({
-                cls.object_type: static_values['uuid'],
-                'start_version': starting_version,
-                'final_version': static_values.get('version')
-            }).info('Object online upgraded')
-        return changed, static_values
+    @classmethod
+    def _upgrade_step_4_to_5(cls, static_values):
+        cls._upgrade_metadata_to_attribute(static_values['uuid'])
 
     @classmethod
     def normalize_timestamp(cls, timestamp):

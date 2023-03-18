@@ -28,7 +28,7 @@ class Upload(dbo):
 
     def __init__(self, static_values):
         if static_values.get('version', self.initial_version) != self.current_version:
-            upgraded, static_values = self.upgrade(static_values)
+            upgraded = self.upgrade(static_values)
 
             if upgraded and gmov(self.object_type) == self.current_version:
                 etcd.put(
@@ -44,22 +44,8 @@ class Upload(dbo):
         self.__created_at = static_values['created_at']
 
     @classmethod
-    def upgrade(cls, static_values):
-        changed = False
-        starting_version = static_values.get('version', cls.initial_version)
-
-        if static_values.get('version') == 2:
-            cls._upgrade_metadata_to_attribute(static_values['uuid'])
-            static_values['version'] = 3
-            changed = True
-
-        if changed:
-            LOG.with_fields({
-                cls.object_type: static_values['uuid'],
-                'start_version': starting_version,
-                'final_version': static_values.get('version')
-            }).info('Object online upgraded')
-        return changed, static_values
+    def _upgrade_step_2_to_3(cls, static_values):
+        cls._upgrade_metadata_to_attribute(static_values['uuid'])
 
     @classmethod
     def new(cls, upload_uuid, node):
