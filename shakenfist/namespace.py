@@ -19,7 +19,6 @@ LOG, _ = logs.setup(__name__)
 class Namespace(dbo):
     object_type = 'namespace'
     current_version = 5
-    upgrade_supported = True
 
     ACTIVE_STATES = set([dbo.STATE_CREATED])
 

@@ -24,6 +24,7 @@ LOG, _ = logs.setup(__name__)
 class Node(dbo):
     object_type = 'node'
     current_version = 2
+    upgrade_supported = False
 
     # docs/development/state_machine.md has a description of these states.
     STATE_MISSING = 'missing'

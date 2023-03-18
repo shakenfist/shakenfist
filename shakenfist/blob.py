@@ -38,7 +38,6 @@ LOG, _ = logs.setup(__name__)
 class Blob(dbo):
     object_type = 'blob'
     current_version = 5
-    upgrade_supported = True
 
     state_targets = {
         None: (dbo.STATE_INITIAL),

@@ -44,7 +44,6 @@ LOG, _ = logs.setup(__name__)
 class Network(dbo):
     object_type = 'network'
     current_version = 3
-    upgrade_supported = True
 
     state_targets = {
         None: (dbo.STATE_INITIAL, ),

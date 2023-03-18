@@ -16,7 +16,6 @@ LOG, _ = logs.setup(__name__)
 class Upload(dbo):
     object_type = 'upload'
     current_version = 3
-    upgrade_supported = True
 
     state_targets = {
         None: (dbo.STATE_CREATED),

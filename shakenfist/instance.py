@@ -78,7 +78,6 @@ def _safe_int_cast(i):
 class Instance(dbo):
     object_type = 'instance'
     current_version = 10
-    upgrade_supported = True
 
     # docs/development/state_machine.md has a description of these states.
     STATE_INITIAL_ERROR = 'initial-error'
