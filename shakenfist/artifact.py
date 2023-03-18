@@ -53,7 +53,7 @@ class Artifact(dbo):
     TYPE_OTHER = 'other'
 
     def __init__(self, static_values):
-        if static_values['version'] != self.current_version:
+        if static_values.get('version', self.initial_version) != self.current_version:
             upgraded, static_values = self.upgrade(static_values)
 
             if upgraded and gmov(self.object_type) == self.current_version:

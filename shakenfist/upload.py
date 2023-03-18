@@ -15,6 +15,7 @@ LOG, _ = logs.setup(__name__)
 
 class Upload(dbo):
     object_type = 'upload'
+    initial_version = 2
     current_version = 3
 
     state_targets = {
@@ -26,7 +27,7 @@ class Upload(dbo):
     ACTIVE_STATES = set([dbo.STATE_CREATED])
 
     def __init__(self, static_values):
-        if static_values.get('version', 2) != self.current_version:
+        if static_values.get('version', self.initial_version) != self.current_version:
             upgraded, static_values = self.upgrade(static_values)
 
             if upgraded and gmov(self.object_type) == self.current_version:
@@ -45,7 +46,7 @@ class Upload(dbo):
     @classmethod
     def upgrade(cls, static_values):
         changed = False
-        starting_version = static_values.get('version', 2)
+        starting_version = static_values.get('version', cls.initial_version)
 
         if static_values.get('version') == 2:
             cls._upgrade_metadata_to_attribute(static_values['uuid'])

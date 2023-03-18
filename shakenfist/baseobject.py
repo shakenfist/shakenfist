@@ -28,6 +28,7 @@ class NoopLock(Lock):
 
 class DatabaseBackedObject(object):
     object_type = 'unknown'
+    initial_version = 1
     current_version = None
     upgrade_supported = True
     state_targets = None
