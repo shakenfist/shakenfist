@@ -22,7 +22,7 @@ LOG, _ = logs.setup(__name__)
 class NetworkInterface(dbo):
     object_type = 'networkinterface'
     current_version = 3
-    supports_upgrade = True
+    upgrade_supported = True
 
     state_targets = {
         None: (dbo.STATE_INITIAL, ),
