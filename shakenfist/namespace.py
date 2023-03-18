@@ -32,7 +32,7 @@ class Namespace(dbo):
         if static_values.get('version', 1) != self.current_version:
             upgraded, static_values = self.upgrade(static_values)
 
-            if upgraded and gmov('namespace') == self.current_version:
+            if upgraded and gmov(self.object_type) == self.current_version:
                 etcd.put(self.object_type, None,
                          static_values.get('uuid'), static_values)
                 LOG.with_fields({

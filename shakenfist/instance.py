@@ -129,7 +129,7 @@ class Instance(dbo):
         if static_values['version'] != self.current_version:
             upgraded, static_values = self.upgrade(static_values)
 
-            if upgraded and gmov('instance') == self.current_version:
+            if upgraded and gmov(self.object_type) == self.current_version:
                 etcd.put(self.object_type, None,
                          static_values.get('uuid'), static_values)
                 LOG.with_fields({self.object_type: static_values['uuid']}).info(

@@ -30,7 +30,7 @@ class Upload(dbo):
         if static_values.get('version', 2) != self.current_version:
             upgraded, static_values = self.upgrade(static_values)
 
-            if upgraded and gmov('upload') == self.current_version:
+            if upgraded and gmov(self.object_type) == self.current_version:
                 etcd.put(
                     self.object_type, None, static_values.get('uuid'),
                     static_values)
