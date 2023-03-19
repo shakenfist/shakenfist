@@ -1,6 +1,11 @@
 # yaml-language-server: $schema=https://json.schemastore.org/ansible-playbook.json
 
-# Install shakenfist on a series of Ubuntu or Debian machines
+# Install shakenfist on a series of Ubuntu or Debian machines. Some parts of this
+# ansible playbook contain tags, but not all. Currently available tags are:
+#   etcd: tasks associated with setup or upgrade of etcd itself
+#   pki: tasks associated with setup of certifying authorities or PKI certificate
+#     (for example those for the SPICE console).
+
 - hosts: localhost
   gather_facts: yes
   connection: ssh
@@ -147,6 +152,7 @@
   gather_facts: yes
   connection: ssh
   become: yes
+  tags: pki
   vars:
     ram_system_reservation: 5.0
     dns_server: 8.8.8.8
@@ -216,6 +222,7 @@
   any_errors_fatal: true
   become: yes
   become_method: sudo
+  tags: pki
   gather_facts: no
   connection: ssh
 
@@ -263,6 +270,7 @@
   any_errors_fatal: true
   become: yes
   become_method: sudo
+  tags: pki
   gather_facts: no
   connection: ssh
 
@@ -620,6 +628,7 @@
 
 # Install etcd
 - hosts: etcd
+  tags: etcd
   roles:
     - role: andrewrothstein.etcd-cluster
       vars:
