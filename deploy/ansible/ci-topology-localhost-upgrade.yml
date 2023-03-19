@@ -1,0 +1,116 @@
+- hosts: localhost
+  gather_facts: yes
+  connection: ssh
+  vars:
+    identifier: unknown
+    source_path: "/srv/github/src/shakenfist/"
+    base_image: "https://sfcbr.shakenfist.com/static/ubuntu2004-ci-template.qcow2"
+    base_image_user: "ubuntu"
+
+  tasks:
+    - name: Create a primary instance
+      sf_instance:
+        name: "primary"
+        cpu: 12
+        ram: 32768
+        disks:
+          - "100@{{base_image}}"
+        networkspecs:
+          - network_uuid="{{identifier}}"
+        ssh_key: "{{ lookup('file', '/srv/github/id_ci.pub') }}"
+        namespace: "{{identifier}}"
+        state: present
+      register: primary
+
+    - name: Add primary node to ansible
+      add_host:
+        hostname: primary
+        egress_ip: "{{primary['meta']['network_interfaces'][0]['ipv4']}}"
+        ansible_ssh_host: "{{primary['meta']['network_interfaces'][0]['ipv4']}}"
+        ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null"
+        ansible_ssh_user: "{{base_image_user}}"
+        ansible_ssh_private_key_file: "/srv/github/id_ci"
+        sf_uuid: "{{primary['meta']['uuid']}}"
+        groups: sfall
+
+    - name: Log instance details
+      debug:
+        msg:
+          - "Primary: is {{primary['meta']['uuid']}} at {{primary['meta']['network_interfaces'][0]['ipv4']}}"
+
+    - include_tasks: ci-include-common-localhost.yml
+
+- hosts: primary
+  gather_facts: yes
+  become: true
+  vars:
+    source_path: "/srv/github/src/shakenfist/"
+
+  tasks:
+    - name: Disable logrotate
+      service:
+        name: logrotate
+        enabled: no
+        state: stopped
+
+    - name: Disable logrotate.timer
+      service:
+        name: logrotate.timer
+        enabled: no
+        state: stopped
+
+    - name: Use CI package cache to speed things up
+      copy:
+        content: |
+          Acquire::http::Proxy "http://192.168.1.50:8000";
+        dest: /etc/apt/apt.conf.d/00proxy
+        owner: root
+        group: root
+        mode: u=r,g=r,o=r
+
+    - name: Copy getsf
+      copy:
+        src: "{{source_path}}/shakenfist/deploy/getsf"
+        dest: "/tmp/getsf"
+        mode: ugo+rwx
+
+    - name: Copy server wheel file
+      copy:
+        src: "{{source_path}}/shakenfist/dist/{{hostvars['localhost']['server_wheel_file']}}"
+        dest: "/root/{{hostvars['localhost']['server_wheel_file']}}"
+
+    - name: Copy client wheel file
+      copy:
+        src: "{{source_path}}/client-python/dist/{{hostvars['localhost']['client_wheel_file']}}"
+        dest: "/root/{{hostvars['localhost']['client_wheel_file']}}"
+
+    - name: Copy agent wheel file
+      copy:
+        src: "{{source_path}}/agent-python/dist/{{hostvars['localhost']['agent_wheel_file']}}"
+        dest: "/root/{{hostvars['localhost']['agent_wheel_file']}}"
+
+    - name: Create a RAM disk for etcd to make it more reliable in CI
+      shell: |
+        mkdir -p /var/lib/etcd
+        mount -t tmpfs -o rw,size=2G tmpfs /var/lib/etcd
+
+    - name: Write a simple getsf wrapper
+      copy:
+        content: |
+          export GETSF_FLOATING_BLOCK=192.168.230.0/24
+          export GETSF_DNS_SERVER=8.8.8.8
+          export GETSF_DEPLOY_NAME=bonkerslab
+          export GETSF_RELEASE=local
+          export GETSF_LOCAL_SOURCE=static
+          export GETSF_NODES=localhost
+          export GETSF_WARNING=yes
+
+          export GETSF_SERVER_PACKAGE="/root/{{hostvars['localhost']['server_wheel_file']}}"
+          export GETSF_CLIENT_PACKAGE="/root/{{hostvars['localhost']['client_wheel_file']}}"
+          export GETSF_AGENT_PACKAGE="/root/{{hostvars['localhost']['agent_wheel_file']}}"
+
+          export GETSF_SKIP_COMMON_IMAGES=1
+
+          sudo --preserve-env --set-home /tmp/getsf $@
+        dest: "/tmp/getsf-wrapper"
+        mode: ugo+rwx

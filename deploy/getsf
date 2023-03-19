@@ -974,31 +974,39 @@ status "Running the installer."
 /root/sf-deploy
 echo
 
-status "Write a .shakenfist file to the current user's home directory."
-homedir=$(getent passwd ${SUDO_USER} | cut -d ":" -f 6)
-cp /etc/sf/shakenfist.json $(home_dir)/.shakenfist
-chown ${SUDO_USER}.${SUDO_USER} $(home_dir)/.shakenfist
+if [ -z $1 ]; then
+    status "Write a .shakenfist file to the current user's home directory."
+    homedir=$(getent passwd ${SUDO_USER} | cut -d ":" -f 6)
+    cp /etc/sf/shakenfist.json ${home_dir}/.shakenfist
+    chown ${SUDO_USER}.${SUDO_USER} ${home_dir}/.shakenfist
 
-status "Pause briefly to let Shaken Fist settle."
-sleep 5
+    status "Pause briefly to let Shaken Fist settle."
+    sleep 5
 
-status "Pre-fetching common images."
-. /etc/sf/sfrc
+    status "Pre-fetching common images."
+    . /etc/sf/sfrc
 
-if [ -z GETSF_SKIP_COMMON_IMAGES ]; then
-    sf-client artifact cache ubuntu:20.04 --shared
-    sf-client artifact cache cirros --shared
+    if [ -z GETSF_SKIP_COMMON_IMAGES ]; then
+        sf-client artifact cache ubuntu:20.04 --shared
+        sf-client artifact cache cirros --shared
+    fi
+
+    question_start
+    echo "A default configuration including deployment topology has"
+    echo "been written to /root/sf-deploy. There's a lot you can change"
+    echo "with this configuration, but your current configuration should"
+    echo "be good enough for an initial play."
+    question_end
+
+    echo
+    status "Install completed successfully."
+else
+    question_start
+    echo "The installer has completed, but as you specified a constrained"
+    echo "install a complete Shaken Fist might not have been configured."
+    echo "We assume in this case that you know what you're doing."
+    question_end
 fi
-
-question_start
-echo "A default configuration including deployment topology has"
-echo "been written to /root/sf-deploy. There's a lot you can change"
-echo "with this configuration, but your current configuration should"
-echo "be good enough for an initial play."
-question_end
-
-echo
-status "Install completed successfully."
 
 # Remove our scary failure message
 trap - EXIT

@@ -51,7 +51,6 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
         'FLOATING_IP_BLOCK', '10.10.0.0/24')
     variables['ksm_enabled'] = os.environ.get('KSM_ENABLED', '1')
     variables['deploy_name'] = os.environ.get('DEPLOY_NAME', 'sf')
-    variables['restore_backup'] = os.environ.get('RESTORE_BACKUP', '')
     variables['ignore_mtu'] = {True: '1', False: '0'}[
         int(os.environ.get('IGNORE_MTU', '0')) == 1]
     variables['dns_server'] = os.environ.get('DNS_SERVER', '8.8.8.8')
