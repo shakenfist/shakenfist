@@ -472,7 +472,7 @@ else
     for node in ${GETSF_NODES[@]}; do
         safe_node=$(echo ${node} | tr "-" "_")
         status "*** ${node} ***"
-        
+
         question_start
         echo "What is the ${node} egress NIC named?"
         calc_var_name="GETSF_NODE_EGRESS_NIC_${safe_node}"
@@ -496,7 +496,7 @@ else
             echo "(an IPv4 address) >> ${!calc_var_name}"
         fi
         question_end
-        
+
         question_start
         echo "What is the ${node} mesh NIC named?"
         calc_var_name="GETSF_NODE_MESH_NIC_${safe_node}"
@@ -717,7 +717,7 @@ if [ "${GETSF_NODES}" == "localhost" ]; then
             cp ${GETSF_AGENT_PACKAGE} "/tmp/"$(basename ${GETSF_AGENT_PACKAGE})
         fi
     fi
-    
+
     status "        ...bootstrapping"
     /tmp/sf-per-node-primary
 else
@@ -966,7 +966,7 @@ cat - >> /root/sf-deploy << DEPLOYEOF
 EOF
 )
 
-/srv/shakenfist/venv/share/shakenfist/installer/install
+/srv/shakenfist/venv/share/shakenfist/installer/install $@
 DEPLOYEOF
 chmod u+rx /root/sf-deploy
 

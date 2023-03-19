@@ -356,6 +356,6 @@
 
           export GETSF_SKIP_COMMON_IMAGES=1
 
-          sudo --preserve-env --set-home /tmp/getsf
+          sudo --preserve-env --set-home /tmp/getsf $@
         dest: "/tmp/getsf-wrapper"
         mode: ugo+rwx

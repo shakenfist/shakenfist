@@ -69,7 +69,8 @@ with open('/etc/sf/deploy-log', 'w') as logfile:
 
     obj = subprocess.Popen(
         ('ansible-playbook -i hosts --extra-vars "@/etc/sf/deploy-vars.json" '
-         'deploy.yml'),
+         '%s deploy.yml'
+         % ' '.join(sys.argv[1:])),
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

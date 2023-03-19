@@ -9,7 +9,7 @@ mkdir -p /tmp/shakenfist_install_$$
 cd /tmp/shakenfist_install_$$
 tar xzf $DIR/deploy.tgz --directory .
 cd deploy/ansible/
-python3 deploy.py
+python3 deploy.py $@
 
 cd "$CWD"
 rm -rf /tmp/shakenfist_install_$$
