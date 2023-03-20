@@ -762,13 +762,14 @@ class InstanceConsoleDataEndpoint(sf_api.Resource):
         instance_from_db.delete_console_data()
 
 
+# The best documentation I can find for the format of this file and the various
+# fields is this source code:
+# https://gitlab.com/virt-viewer/virt-viewer/-/blob/master/src/virt-viewer-file.c
 VIRTVIEWER_TEMPLATE = """[virt-viewer]
 type=%(vdi_type)s
 host=%(node)s
-port=%(vdi_port)s
-tls-port=%(vdi_tls_port)s
-delete-this-file=1
-ca=%(ca_cert)s
+port=%(vdi_port)s%(vdi_tls_port)s
+delete-this-file=1%(ca_cert)s
 """
 
 
@@ -785,13 +786,17 @@ class InstanceVDIConsoleHelperEndpoint(sf_api.Resource):
         if os.path.exists('/etc/pki/libvirt-spice/ca-cert.pem'):
             with open('/etc/pki/libvirt-spice/ca-cert.pem') as f:
                 cacert = f.read()
-            cacert = cacert.replace('\n', '\\n')
+            cacert = '\nca=%s' % cacert.replace('\n', '\\n')
+
+        tls_port = ''
+        if p.get('vdi_tls_port'):
+            tls_port = '\ntls-port=%s' % p['vdi_tls_port']
 
         config = VIRTVIEWER_TEMPLATE % {
             'vdi_type': instance_from_db.video['vdi'],
             'node': instance_from_db.placement.get('node'),
             'vdi_port': p.get('vdi_port'),
-            'vdi_tls_port': p.get('vdi_tls_port', 0),
+            'vdi_tls_port': tls_port,
             'ca_cert': cacert
         }
 
