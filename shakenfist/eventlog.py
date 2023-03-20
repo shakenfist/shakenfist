@@ -131,7 +131,8 @@ class EventLog(object):
                         'ALTER TABLE events ADD COLUMN extra text')
                     self.con.execute(
                         'INSERT INTO events(timestamp, message) '
-                        'VALUES (unixepoch(), "Upgraded database to version 2");')
+                        'VALUES (%f, "Upgraded database to version 2");'
+                        % time.time())
                     self.log.info('Upgraded database from v1 to v2')
 
                 if ver == 2:
@@ -146,7 +147,8 @@ class EventLog(object):
                     self.con.execute('VACUUM;')
                     self.con.execute(
                         'INSERT INTO events(timestamp, message) '
-                        'VALUES (unixepoch(), "Upgraded database to version 3");')
+                        'VALUES (%f, "Upgraded database to version 3");'
+                        % time.time())
                     self.log.info('Upgraded database from v2 to v3')
 
                 self.con.execute('UPDATE version SET version = ?', (ver,))
