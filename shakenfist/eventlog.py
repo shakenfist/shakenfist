@@ -159,7 +159,6 @@ class EventLog(object):
                             'message = "Updated node resources and package versions";'
                             % (time.time() - config.MAX_NODE_RESOURCE_EVENT_AGE))
 
-                    self.con.execute('VACUUM;')
                     self.con.execute(
                         'INSERT INTO events(timestamp, message) '
                         'VALUES (%f, "Upgraded database to version 4");'
@@ -236,8 +235,9 @@ class EventLog(object):
         if changes > 0:
             self.log.with_fields({'message': message}).info(
                 'Removed %d old events' % changes)
+        self.con.commit()
         if changes == limit:
             self.log.info('Vacuuming event database')
             cur.execute('VACUUM')
 
-        self.con.commit()
+
