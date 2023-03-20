@@ -55,16 +55,16 @@ class Monitor(daemon.WorkerPoolDaemon):
                             'failed to write event for %s %s' % (objtype, objuuid), e)
 
                 if not results:
-                        start_prune = time.time()
+                    start_prune = time.time()
 
-                        if time.time() - last_prune > 3600:
-                            # Prune old metrics events from nodes
-                            for n in node.Nodes([]):
-                                with eventlog.EventLog(n.object_type, n.uuid) as eventdb:
-                                    eventdb.prune_old_events(
-                                        time.time() - config.MAX_NODE_RESOURCE_EVENT_AGE,
-                                        message='Updated node resources')
-                            last_prune = time.time()
+                    if time.time() - last_prune > 3600:
+                        # Prune old metrics events from nodes
+                        for n in node.Nodes([]):
+                            with eventlog.EventLog(n.object_type, n.uuid) as eventdb:
+                                eventdb.prune_old_events(
+                                    time.time() - config.MAX_NODE_RESOURCE_EVENT_AGE,
+                                    message='Updated node resources')
+                        last_prune = time.time()
 
                     # Have a nap if pruning was quick
                     if time.time() - start_prune < 1:
