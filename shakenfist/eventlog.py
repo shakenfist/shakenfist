@@ -119,10 +119,11 @@ class EventLog(object):
                 self.con.commit()
 
             else:
-                # Upgrade
+                # Open an existing database, which _might_ require upgrade
                 start_upgrade = time.time()
                 cur.execute('SELECT * FROM version')
                 ver = cur.fetchone()['version']
+                start_ver = ver
 
                 if ver == 1:
                     ver = 2
@@ -166,15 +167,16 @@ class EventLog(object):
                         % time.time())
                     self.log.info('Upgraded database from v3 to v4')
 
-                self.con.execute('UPDATE version SET version = ?', (ver,))
-                self.con.commit()
-                self.con.execute('VACUUM')
-                self.con.execute(
-                        'INSERT INTO events(timestamp, message) '
-                        'VALUES (%f, "Compacted database")'
-                        % time.time())
-                self.log.info('Database upgrade took %.02f seconds'
-                              % (time.time() - start_upgrade))
+                if start_ver != ver:
+                    self.con.execute('UPDATE version SET version = ?', (ver,))
+                    self.con.commit()
+                    self.con.execute('VACUUM')
+                    self.con.execute(
+                            'INSERT INTO events(timestamp, message) '
+                            'VALUES (%f, "Compacted database")'
+                            % time.time())
+                    self.log.info('Database upgrade took %.02f seconds'
+                                % (time.time() - start_upgrade))
 
     def write_event(self, timestamp, fqdn, duration, message, extra=None):
         if not self.con:
