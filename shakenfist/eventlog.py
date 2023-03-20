@@ -14,7 +14,7 @@ from shakenfist import etcd
 LOG, _ = logs.setup(__name__)
 
 
-VERSION = 2
+VERSION = 3
 CREATE_EVENT_TABLE = """CREATE TABLE IF NOT EXISTS events(
     timestamp real PRIMARY KEY, fqdn text,
     operation text, phase text, duration float, message text,
@@ -79,6 +79,7 @@ class EventLog(object):
     def __init__(self, objtype, objuuid):
         self.objtype = objtype
         self.objuuid = objuuid
+        self.log = LOG.with_fields({self.objtype: self.objuuid})
         self.lock = lockutils.external_lock(
             '%s.lock' % self.objuuid,
             lock_path='/srv/shakenfist/events/%s' % self.objtype)
@@ -101,8 +102,7 @@ class EventLog(object):
     def _bootstrap(self):
         with self.lock:
             if not os.path.exists(self.dbpath):
-                LOG.with_fields({self.objtype: self.objuuid}).info(
-                    'Creating event log')
+                self.log.info('Creating event log')
 
             self.con = sqlite3.connect(self.dbpath)
             self.con.row_factory = sqlite3.Row
@@ -120,16 +120,39 @@ class EventLog(object):
 
             else:
                 # Upgrade
+                start_upgrade = time.time()
                 cur.execute('SELECT * FROM version;')
                 ver = cur.fetchone()['version']
 
                 if ver == 1:
                     ver = 2
+                    self.log.info('Upgrading database from v1 to v2')
                     self.con.execute(
                         'ALTER TABLE events ADD COLUMN extra text')
                     self.con.execute(
-                        'UPDATE version SET version = ?', (ver,))
-                    self.con.commit()
+                        'INSERT INTO events(timestamp, message) '
+                        'VALUES (unixepoch(), "Upgraded database to version 2");')
+                    self.log.info('Upgraded database from v1 to v2')
+
+                if ver == 2:
+                    ver = 3
+                    self.log.info('Upgrading database from v2 to v3')
+                    if self.objtype == 'node':
+                        self.con.execute(
+                            'DELETE FROM events WHERE timestamp < %d AND '
+                            'message = "Updated node resources" LIMIT;'
+                            % (time.time() - config.MAX_NODE_RESOURCE_EVENT_AGE))
+
+                    self.con.execute('VACUUM;')
+                    self.con.execute(
+                        'INSERT INTO events(timestamp, message) '
+                        'VALUES (unixepoch(), "Upgraded database to version 3");')
+                    self.log.info('Upgraded database from v2 to v3')
+
+                self.con.execute('UPDATE version SET version = ?', (ver,))
+                self.con.commit()
+                self.log.info('Database upgrade took %.02f seconds'
+                              % (time.time() - start_upgrade))
 
     def write_event(self, timestamp, fqdn, duration, message, extra=None):
         if not self.con:
@@ -151,8 +174,7 @@ class EventLog(object):
                 timestamp += 0.00001
                 attempts += 1
 
-        LOG.with_fields({
-            self.objtype: self.objuuid,
+        self.log.with_fields({
             'timestamp': timestamp,
             'fqdn': fqdn,
             'duration': duration,
@@ -176,4 +198,24 @@ class EventLog(object):
         if os.path.exists(self.dbpath):
             os.unlink(self.dbpath)
 
-        LOG.with_fields({self.objtype: self.objuuid}).info('Removed event log')
+        self.log.info('Removed event log')
+
+    def prune_old_events(self, before_timestamp, message=None, limit=10000):
+        sql = 'DELETE FROM EVENTS WHERE timestamp < %s' % before_timestamp
+        if message:
+            sql += ' AND MESSAGE="%s"' % message
+        sql += ' LIMIT %d;' % limit
+
+        cur = self.con.cursor()
+        cur.execute(sql)
+
+        cur.execute('SELECT CHANGES();')
+        changes = cur.fetchone()[0]
+        if changes > 0:
+            self.log.with_fields({'message': message}).info(
+                'Removed %d old events' % changes)
+        if changes == limit:
+            self.log.info('Vacuuming event database')
+            cur.execute('VACUUM;')
+
+        self.con.commit()

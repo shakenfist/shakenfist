@@ -187,6 +187,9 @@ class SFConfig(BaseSettings):
     USAGE_EVENT_FREQUENCY: int = Field(
         60, description='How frequently to collect usage events.'
     )
+    MAX_NODE_RESOURCE_EVENT_AGE: int = Field(
+        3600 * 24 * 7, description='How long to retain node resource events.'
+    )
 
     # Blob options
     BLOB_REPLICATION_FACTOR: int = Field(
