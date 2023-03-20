@@ -140,7 +140,7 @@ class EventLog(object):
                     if self.objtype == 'node':
                         self.con.execute(
                             'DELETE FROM events WHERE timestamp < %d AND '
-                            'message = "Updated node resources" LIMIT;'
+                            'message = "Updated node resources";'
                             % (time.time() - config.MAX_NODE_RESOURCE_EVENT_AGE))
 
                     self.con.execute('VACUUM;')
