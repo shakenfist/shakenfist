@@ -14,7 +14,7 @@ from shakenfist import etcd
 LOG, _ = logs.setup(__name__)
 
 
-VERSION = 3
+VERSION = 4
 CREATE_EVENT_TABLE = """CREATE TABLE IF NOT EXISTS events(
     timestamp real PRIMARY KEY, fqdn text,
     operation text, phase text, duration float, message text,
@@ -149,6 +149,22 @@ class EventLog(object):
                         'VALUES (%f, "Upgraded database to version 3")'
                         % time.time())
                     self.log.info('Upgraded database from v2 to v3')
+
+                if ver == 3:
+                    ver = 4
+                    self.log.info('Upgrading database from v3 to v4')
+                    if self.objtype == 'node':
+                        self.con.execute(
+                            'DELETE FROM events WHERE timestamp < %d AND '
+                            'message = "Updated node resources and package versions";'
+                            % (time.time() - config.MAX_NODE_RESOURCE_EVENT_AGE))
+
+                    self.con.execute('VACUUM;')
+                    self.con.execute(
+                        'INSERT INTO events(timestamp, message) '
+                        'VALUES (%f, "Upgraded database to version 4");'
+                        % time.time())
+                    self.log.info('Upgraded database from v3 to v4')
 
                 self.con.execute('UPDATE version SET version = ?', (ver,))
                 self.con.commit()

@@ -61,6 +61,9 @@ class Monitor(daemon.WorkerPoolDaemon):
                             eventdb.prune_old_events(
                                 time.time() - config.MAX_NODE_RESOURCE_EVENT_AGE,
                                 message='Updated node resources')
+                            eventdb.prune_old_events(
+                                time.time() - config.MAX_NODE_RESOURCE_EVENT_AGE,
+                                message='Updated node resources and package versions')
 
                     # Have a nap if pruning was quick
                     if time.time() - start_prune < 1:
