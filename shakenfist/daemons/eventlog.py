@@ -16,6 +16,7 @@ LOG, _ = logs.setup(__name__)
 class Monitor(daemon.WorkerPoolDaemon):
     def run(self):
         LOG.info('Starting')
+        last_prune = 0
 
         # This dance forces all node databases to be opened and possibly upgraded
         # before we start processing events. We do this because the v3 upgrade
@@ -54,16 +55,16 @@ class Monitor(daemon.WorkerPoolDaemon):
                             'failed to write event for %s %s' % (objtype, objuuid), e)
 
                 if not results:
-                    # Prune old metrics events from nodes
-                    start_prune = time.time()
-                    for n in node.Nodes([]):
-                        with eventlog.EventLog(n.object_type, n.uuid) as eventdb:
-                            eventdb.prune_old_events(
-                                time.time() - config.MAX_NODE_RESOURCE_EVENT_AGE,
-                                message='Updated node resources')
-                            eventdb.prune_old_events(
-                                time.time() - config.MAX_NODE_RESOURCE_EVENT_AGE,
-                                message='Updated node resources and package versions')
+                        start_prune = time.time()
+
+                        if time.time() - last_prune > 3600:
+                        # Prune old metrics events from nodes
+                        for n in node.Nodes([]):
+                            with eventlog.EventLog(n.object_type, n.uuid) as eventdb:
+                                eventdb.prune_old_events(
+                                    time.time() - config.MAX_NODE_RESOURCE_EVENT_AGE,
+                                    message='Updated node resources')
+                        last_prune = time.time()
 
                     # Have a nap if pruning was quick
                     if time.time() - start_prune < 1:
