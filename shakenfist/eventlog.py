@@ -121,7 +121,7 @@ class EventLog(object):
             else:
                 # Upgrade
                 start_upgrade = time.time()
-                cur.execute('SELECT * FROM version;')
+                cur.execute('SELECT * FROM version')
                 ver = cur.fetchone()['version']
 
                 if ver == 1:
@@ -131,7 +131,7 @@ class EventLog(object):
                         'ALTER TABLE events ADD COLUMN extra text')
                     self.con.execute(
                         'INSERT INTO events(timestamp, message) '
-                        'VALUES (%f, "Upgraded database to version 2");'
+                        'VALUES (%f, "Upgraded database to version 2")'
                         % time.time())
                     self.log.info('Upgraded database from v1 to v2')
 
@@ -141,18 +141,22 @@ class EventLog(object):
                     if self.objtype == 'node':
                         self.con.execute(
                             'DELETE FROM events WHERE timestamp < %d AND '
-                            'message = "Updated node resources";'
+                            'message = "Updated node resources"'
                             % (time.time() - config.MAX_NODE_RESOURCE_EVENT_AGE))
 
-                    self.con.execute('VACUUM;')
                     self.con.execute(
                         'INSERT INTO events(timestamp, message) '
-                        'VALUES (%f, "Upgraded database to version 3");'
+                        'VALUES (%f, "Upgraded database to version 3")'
                         % time.time())
                     self.log.info('Upgraded database from v2 to v3')
 
                 self.con.execute('UPDATE version SET version = ?', (ver,))
                 self.con.commit()
+                self.con.execute('VACUUM')
+                self.con.execute(
+                        'INSERT INTO events(timestamp, message) '
+                        'VALUES (%f, "Compacted database")'
+                        % time.time())
                 self.log.info('Database upgrade took %.02f seconds'
                               % (time.time() - start_upgrade))
 
@@ -189,7 +193,7 @@ class EventLog(object):
             return
 
         cur = self.con.cursor()
-        cur.execute('SELECT * FROM events ORDER BY TIMESTAMP ASC;')
+        cur.execute('SELECT * FROM events ORDER BY TIMESTAMP ASC')
         for row in cur.fetchall():
             yield dict(row)
 
@@ -206,18 +210,18 @@ class EventLog(object):
         sql = 'DELETE FROM EVENTS WHERE timestamp < %s' % before_timestamp
         if message:
             sql += ' AND MESSAGE="%s"' % message
-        sql += ' LIMIT %d;' % limit
+        sql += ' LIMIT %d' % limit
 
         cur = self.con.cursor()
         cur.execute(sql)
 
-        cur.execute('SELECT CHANGES();')
+        cur.execute('SELECT CHANGES()')
         changes = cur.fetchone()[0]
         if changes > 0:
             self.log.with_fields({'message': message}).info(
                 'Removed %d old events' % changes)
         if changes == limit:
             self.log.info('Vacuuming event database')
-            cur.execute('VACUUM;')
+            cur.execute('VACUUM')
 
         self.con.commit()
