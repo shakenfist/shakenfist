@@ -112,11 +112,12 @@ class ThreadLocalReadOnlyCache():
         return False
 
     def _find_prefix(self, key):
-        # Special cases for namespaces
-        if key.startswith('/sf/namespace'):
-            return '/sf/namespace'
-        if key.startswith('/sf/attribute/namespace'):
-            return '/sf/attribute/namespace'
+        # Special cases for namespaces, nodes, and metrics
+        for special in ['namespace', 'node', 'metrics']:
+            if key.startswith('/sf/%s' % special):
+                return '/sf/%s' % special
+            if key.startswith('/sf/attribute/%s' % special):
+                return '/sf/attribute/%s' % special
 
         uuid_regex = re.compile('.{8}-.{4}-.{4}-.{4}-.{12}')
 
