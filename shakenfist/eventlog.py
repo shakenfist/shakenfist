@@ -75,6 +75,12 @@ def add_event(object_type, object_uuid, message, duration=None,
                  })
 
 
+def _shard_db_path(objtype, objuuid):
+    path = os.path.join(config.STORAGE_PATH, 'events', objtype, objuuid[0:2])
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
 class EventLog(object):
     def __init__(self, objtype, objuuid):
         self.objtype = objtype
@@ -82,10 +88,10 @@ class EventLog(object):
         self.log = LOG.with_fields({self.objtype: self.objuuid})
         self.lock = lockutils.external_lock(
             '%s.lock' % self.objuuid,
-            lock_path='/srv/shakenfist/events/%s' % self.objtype)
+            lock_path=_shard_db_path(self.objtype, self.objuuid))
 
     def __enter__(self):
-        self.dbpath = os.path.join(config.STORAGE_PATH, 'events', self.objtype,
+        self.dbpath = os.path.join(_shard_db_path(self.objtype, self.objuuid),
                                    self.objuuid)
         if not os.path.exists(self.dbpath):
             self.con = None
@@ -175,7 +181,7 @@ class EventLog(object):
                             'VALUES (%f, "Compacted database")'
                             % time.time())
                     self.log.info('Database upgrade took %.02f seconds'
-                                % (time.time() - start_upgrade))
+                                  % (time.time() - start_upgrade))
 
     def write_event(self, timestamp, fqdn, duration, message, extra=None):
         if not self.con:
@@ -241,5 +247,3 @@ class EventLog(object):
         if changes == limit:
             self.log.info('Vacuuming event database')
             cur.execute('VACUUM')
-
-

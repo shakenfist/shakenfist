@@ -1,7 +1,9 @@
 from collections import defaultdict
 from shakenfist_utilities import logs
+import os
 import time
 
+from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
@@ -17,6 +19,31 @@ class Monitor(daemon.WorkerPoolDaemon):
     def run(self):
         LOG.info('Starting')
         last_prune = 0
+
+        # Ensure that all event databases are in their new sharded paths
+        count = 0
+        for objtype in OBJECT_NAMES_TO_CLASSES:
+            objroot = os.path.join(config.STORAGE_PATH, 'events', objtype)
+            if os.path.exists(objroot):
+                for ent in os.listdir(objroot):
+                    entpath = os.path.join(objroot, ent)
+                    if os.path.isdir(entpath):
+                        continue
+                    if ent.endswith('.lock'):
+                        continue
+                    if len(ent) != 37:
+                        continue
+
+                    newdir = eventlog._shard_db_path(objtype, ent)
+                    os.makedirs(newdir, exist_ok=True)
+                    os.rename(entpath, os.path.join(newdir, ent))
+                    if os.path.exists(entpath + '.lock'):
+                        os.rename(entpath + '.lock',
+                                  os.path.join(newdir, ent + '.lock'))
+                    count += 0
+
+        if count > 0:
+            LOG.info('Resharded %d event log databases' % count)
 
         # This dance forces all node databases to be opened and possibly upgraded
         # before we start processing events. We do this because the v3 upgrade
