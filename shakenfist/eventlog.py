@@ -56,23 +56,18 @@ def add_event(object_type, object_uuid, message, duration=None,
                 'message': message
             }).info('Added event')
 
-    if config.NODE_MESH_IP == config.EVENTLOG_NODE_IP:
-        with EventLog(object_type, object_uuid) as eventdb:
-            eventdb.write_event(timestamp, config.NODE_NAME,
-                                duration, message, extra=extra)
-    else:
-        # We use the old eventlog mechanism as a queueing system to get the logs
-        # to the eventlog node.
-        etcd.put('event/%s' % object_type, object_uuid, timestamp,
-                 {
-                     'timestamp': timestamp,
-                     'object_type': object_type,
-                     'object_uuid': object_uuid,
-                     'fqdn': config.NODE_NAME,
-                     'duration': duration,
-                     'message': message,
-                     'extra': extra
-                 })
+    # We use the old eventlog mechanism as a queueing system to get the logs
+    # to the eventlog node.
+    etcd.put('event/%s' % object_type, object_uuid, timestamp,
+             {
+                 'timestamp': timestamp,
+                 'object_type': object_type,
+                 'object_uuid': object_uuid,
+                 'fqdn': config.NODE_NAME,
+                 'duration': duration,
+                 'message': message,
+                 'extra': extra
+             })
 
 
 def _shard_db_path(objtype, objuuid):
