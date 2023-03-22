@@ -14,16 +14,9 @@ from shakenfist import etcd
 LOG, _ = logs.setup(__name__)
 
 
-VERSION = 4
-CREATE_EVENT_TABLE = """CREATE TABLE IF NOT EXISTS events(
-    timestamp real PRIMARY KEY, fqdn text,
-    operation text, phase text, duration float, message text,
-    extra text)"""
-CREATE_VERSION_TABLE = """CREATE TABLE IF NOT EXISTS version(version int primary key)"""
-
-
 def add_event(object_type, object_uuid, message, duration=None,
               extra=None, suppress_event_logging=False):
+    # Queue an event in etcd to get shuffled over to the long term data store
     timestamp = time.time()
 
     if not object_type or not object_uuid:
@@ -68,6 +61,68 @@ def add_event(object_type, object_uuid, message, duration=None,
                  'message': message,
                  'extra': extra
              })
+
+
+def upgrade_data_store():
+    # Upgrades for the actual underlying data store
+    version_path = os.path.join(config.STORAGE_PATH, 'events', '_version')
+    if os.path.exists(version_path):
+        with open(version_path) as f:
+            version = json.loads(f.read())['version']
+    else:
+        version = 1
+    start_version = version
+    start_time = time.time()
+
+    if version == 1:
+        # Ensure that all event databases are in their new sharded paths
+        version = 2
+        count = 0
+        for objtype in ['artifact', 'blob', 'instance', 'namespace', 'network',
+                        'networkinterface', 'node']:
+            objroot = os.path.join(config.STORAGE_PATH, 'events', objtype)
+            if os.path.exists(objroot):
+                for ent in os.listdir(objroot):
+                    entpath = os.path.join(objroot, ent)
+                    if os.path.isdir(entpath):
+                        continue
+                    if ent.endswith('.lock'):
+                        continue
+
+                    if len(ent) == 2:
+                        # A special case -- very short namespace and node
+                        # names upset the system by clashing with the shard
+                        # directory name.
+                        os.rename(entpath, entpath + '.mv')
+                        if os.path.exists(entpath + '.lock'):
+                            os.rename(entpath + '.lock', entpath + '.mv.lock')
+                        entpath += '.mv'
+
+                    newdir = _shard_db_path(objtype, ent)
+                    os.makedirs(newdir, exist_ok=True)
+                    os.rename(entpath, os.path.join(newdir, ent))
+                    if os.path.exists(entpath + '.lock'):
+                        os.rename(entpath + '.lock',
+                                  os.path.join(newdir, ent + '.lock'))
+                    count += 0
+
+        if count > 0:
+            LOG.info('Resharded %d event log databases' % count)
+
+    if start_version != version:
+        with open(version_path, 'w') as f:
+            f.write(json.dumps({'version': version}, indent=4, sort_keys=True))
+        LOG.info('Event datastore upgrade took %.02f seconds'
+                 % (time.time() - start_time))
+
+
+# This is the version for an individual sqlite file
+VERSION = 4
+CREATE_EVENT_TABLE = """CREATE TABLE IF NOT EXISTS events(
+    timestamp real PRIMARY KEY, fqdn text,
+    operation text, phase text, duration float, message text,
+    extra text)"""
+CREATE_VERSION_TABLE = """CREATE TABLE IF NOT EXISTS version(version int primary key)"""
 
 
 def _shard_db_path(objtype, objuuid):
