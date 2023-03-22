@@ -18,6 +18,7 @@ from shakenfist import baseobject
 from shakenfist import constants
 from shakenfist.daemons import daemon
 from shakenfist import eventlog
+from shakenfist.eventlog import EVENT_TYPE_AUDIT
 from shakenfist.external_api import base as api_base
 from shakenfist.config import config
 from shakenfist import etcd
@@ -436,7 +437,7 @@ class ArtifactUploadEndpoint(sf_api.Resource):
                 if not b:
                     return sf_api.error(404, 'blob not found')
 
-            a.add_event('upload complete')
+            a.add_event(EVENT_TYPE_AUDIT, 'upload complete')
             a.add_index(b.uuid)
             a.state = Artifact.STATE_CREATED
 

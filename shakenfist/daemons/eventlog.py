@@ -2,7 +2,6 @@ from collections import defaultdict
 from shakenfist_utilities import logs
 import time
 
-from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import eventlog
@@ -49,8 +48,8 @@ class Monitor(daemon.WorkerPoolDaemon):
                         with eventlog.EventLog(objtype, objuuid) as eventdb:
                             for k, v in results[(objtype, objuuid)]:
                                 eventdb.write_event(
-                                    v['timestamp'], v['fqdn'], v['duration'],
-                                    v['message'], extra=v.get('extra'))
+                                    v['event_type'], v['timestamp'], v['fqdn'],
+                                    v['duration'], v['message'], extra=v.get('extra'))
                                 etcd.WrappedEtcdClient().delete(k)
                     except Exception as e:
                         util_general.ignore_exception(
@@ -60,12 +59,8 @@ class Monitor(daemon.WorkerPoolDaemon):
                     start_prune = time.time()
 
                     if time.time() - last_prune > 3600:
-                        # Prune old metrics events from nodes
-                        for n in node.Nodes([]):
-                            with eventlog.EventLog(n.object_type, n.uuid) as eventdb:
-                                eventdb.prune_old_events(
-                                    time.time() - config.MAX_NODE_RESOURCE_EVENT_AGE,
-                                    message='Updated node resources')
+                        # Prune old events from nodes
+                        # TODO(mikal)
                         last_prune = time.time()
 
                     # Have a nap if pruning was quick

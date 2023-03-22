@@ -12,6 +12,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
+from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS
 from shakenfist import exceptions
 from shakenfist import images
 from shakenfist import instance
@@ -244,7 +245,7 @@ def image_fetch(url, namespace, inst):
         # the required image. This will be changed to queue on a
         # "waiting_image_fetch" queue but this works now.
         images.ImageFetchHelper(inst, a).get_image()
-        a.add_event('artifact fetch complete')
+        a.add_event(EVENT_TYPE_AUDIT, 'artifact fetch complete')
 
     except (exceptions.HTTPError, requests.exceptions.RequestException,
             requests.exceptions.ConnectionError) as e:
@@ -266,8 +267,9 @@ def image_fetch(url, namespace, inst):
             raise exceptions.ImageFetchTaskFailedException(
                 'Failed to fetch image: %s Exception: %s' % (url, e))
         else:
-            a.add_event('Updating image failed, using already cached version',
-                        extra={'message': msg})
+            a.add_event(
+                EVENT_TYPE_AUDIT, 'updating image failed, using already cached version',
+                extra={'message': msg})
 
 
 def instance_preflight(inst, netdescs):
@@ -280,7 +282,8 @@ def instance_preflight(inst, netdescs):
         return None
 
     except exceptions.LowResourceException as e:
-        inst.add_event('schedule failed, insufficient resources: ' + str(e))
+        inst.add_event(EVENT_TYPE_AUDIT, 'schedule failed, insufficient resources',
+                       extra={'message': str(e)})
 
     # Unsuccessful placement, check if reached placement attempt limit
     db_placement = inst.placement
@@ -304,7 +307,8 @@ def instance_preflight(inst, netdescs):
         return candidates[0]
 
     except exceptions.LowResourceException as e:
-        inst.add_event('schedule failed, insufficient resources: ' + str(e))
+        inst.add_event(EVENT_TYPE_AUDIT, 'schedule failed, insufficient resources',
+                       extra={'message': str(e)})
         # This raise implies delete above
         raise exceptions.AbortInstanceStartException(
             'Unable to find suitable node')
@@ -312,10 +316,12 @@ def instance_preflight(inst, netdescs):
 
 def instance_start(inst, netdescs):
     if inst.state.value.endswith('-error'):
-        inst.add_event('You cannot start an instance in an error state.')
+        inst.add_event(
+            EVENT_TYPE_STATUS, 'you cannot start an instance in an error state.')
         return
     if inst.state.value in (dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED):
-        inst.add_event('You cannot start an instance which has been deleted.')
+        inst.add_event(
+            EVENT_TYPE_STATUS, 'you cannot start an instance which has been deleted.')
         return
 
     with inst.get_lock(ttl=900, op='Instance start') as lock:
@@ -341,7 +347,8 @@ def instance_start(inst, netdescs):
                     netdesc['iface_uuid'])
                 if ni.state.value not in dbo.ACTIVE_STATES:
                     inst.add_event(
-                        'You cannot start an instance with an inactive network '
+                        EVENT_TYPE_STATUS,
+                        'you cannot start an instance with an inactive network '
                         'interface.', extra={
                             'networkinterface': ni.uuid,
                             'state': ni.state.value

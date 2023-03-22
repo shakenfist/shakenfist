@@ -9,6 +9,7 @@ from shakenfist_utilities import api as sf_api, logs
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
+from shakenfist.eventlog import EVENT_TYPE_AUDIT
 from shakenfist import exceptions
 from shakenfist.etcd import ThreadLocalReadOnlyCache
 from shakenfist.instance import Instance
@@ -150,7 +151,7 @@ def log_token_use(func):
         if not ns:
             return sf_api.error(401, 'authenticated namespace not known')
         ns.add_event(
-            'Token used to authenticate request',
+            EVENT_TYPE_AUDIT, 'token used to authenticate request',
             extra={
                 'token': token,
                 'keyname': keyname,

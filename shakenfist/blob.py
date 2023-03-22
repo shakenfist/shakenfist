@@ -17,6 +17,7 @@ from shakenfist.config import config
 from shakenfist.constants import LOCK_REFRESH_SECONDS, GiB
 from shakenfist import db
 from shakenfist import etcd
+from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS, EVENT_TYPE_MUTATE
 from shakenfist.exceptions import (BlobMissing, BlobDeleted, BlobFetchFailed,
                                    BlobDependencyMissing, BlobsMustHaveContent,
                                    BlobAlreadyBeingTransferred, BadCheckSum,
@@ -299,7 +300,7 @@ class Blob(dbo):
                 raise BlobDeleted
             new_count = self.ref_count + 1
             self._db_set_attribute('ref_count', {'ref_count': new_count})
-            self.add_event('incremented reference count',
+            self.add_event(EVENT_TYPE_MUTATE, 'incremented reference count',
                            extra={baseobject.object_type: baseobject.uuid})
             return new_count
 
@@ -327,7 +328,7 @@ class Blob(dbo):
                 self.log.warning('Reference count decremented below zero')
 
             self._db_set_attribute('ref_count', {'ref_count': new_count})
-            self.add_event('decremented reference count',
+            self.add_event(EVENT_TYPE_MUTATE, 'decremented reference count',
                            extra={baseobject.object_type: baseobject.uuid})
 
             self._delete_unused(new_count)
@@ -340,7 +341,7 @@ class Blob(dbo):
 
             self.log.error('Overriding blob reference count with new value!')
             self._db_set_attribute('ref_count', {'ref_count': new_count})
-            self.add_event('set reference count to %d' % new_count)
+            self.add_event(EVENT_TYPE_MUTATE, 'set reference count to %d' % new_count)
             self._delete_unused(new_count)
 
     def ensure_local(self, locks, instance_object=None,
@@ -451,6 +452,7 @@ class Blob(dbo):
                     if (percentage - previous_percentage) > 10.0:
                         if instance_object:
                             instance_object.add_event(
+                                EVENT_TYPE_STATUS,
                                 'Fetching required blob %s, %d%% complete'
                                 % (self.uuid, percentage))
                         self.log.with_fields({
@@ -469,6 +471,7 @@ class Blob(dbo):
             if not self.verify_size(partial=True):
                 if instance_object:
                     instance_object.add_event(
+                        EVENT_TYPE_AUDIT,
                         'Fetching required blob %s failed (incorrect size)'
                         % self.uuid)
                 self.log.with_fields({
@@ -479,6 +482,7 @@ class Blob(dbo):
             if not self.verify_checksum(sha512_hash.hexdigest()):
                 if instance_object:
                     instance_object.add_event(
+                        EVENT_TYPE_AUDIT,
                         'Fetching required blob %s failed (incorrect checksum)'
                         % self.uuid)
                 self.log.with_fields({
@@ -489,6 +493,7 @@ class Blob(dbo):
             os.rename(partial_path, blob_path)
             if instance_object:
                 instance_object.add_event(
+                    EVENT_TYPE_STATUS,
                     'Fetching required blob %s, complete' % self.uuid)
             self.log.with_fields({
                 'bytes_fetched': total_bytes_received,
@@ -584,7 +589,8 @@ class Blob(dbo):
 
         st = os.stat(blob_path)
         if self.size != st.st_size:
-            self.add_event('blob failed checksum validation',
+            self.add_event(EVENT_TYPE_AUDIT,
+                           'blob failed checksum validation',
                            extra={
                                'stored_size': self.size,
                                'node_size': st.st_size,
@@ -609,7 +615,8 @@ class Blob(dbo):
                 c['sha512'] = hash
             else:
                 if c['sha512'] != hash:
-                    self.add_event('blob failed checksum validation',
+                    self.add_event(EVENT_TYPE_AUDIT,
+                                   'blob failed checksum validation',
                                    extra={
                                        'stored_hash': c['sha512'],
                                        'node_hash': hash,
@@ -699,6 +706,7 @@ def http_fetch(url, resp, blob_uuid, locks, logs, checksum, checksum_type,
                 if (percentage - previous_percentage) > 10.0:
                     if instance_object:
                         instance_object.add_event(
+                            EVENT_TYPE_STATUS,
                             'Fetching required HTTP resource %s into blob %s, '
                             '%d%% complete'
                             % (url, blob_uuid, percentage))
@@ -713,6 +721,7 @@ def http_fetch(url, resp, blob_uuid, locks, logs, checksum, checksum_type,
 
     if instance_object:
         instance_object.add_event(
+            EVENT_TYPE_STATUS,
             'Fetching required HTTP resource %s into blob %s, complete'
             % (url, blob_uuid))
     logs.with_fields({'bytes_fetched': fetched}).info('Fetch complete')

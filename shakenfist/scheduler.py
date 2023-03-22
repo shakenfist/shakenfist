@@ -9,6 +9,7 @@ import uuid
 
 from shakenfist.config import config
 from shakenfist.constants import GiB
+from shakenfist.eventlog import EVENT_TYPE_AUDIT
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist.metrics import get_active_node_metrics
@@ -206,7 +207,7 @@ class Scheduler(object):
                               len(self.metrics))
 
             if candidates:
-                inst.add_event('schedule forced candidates',
+                inst.add_event(EVENT_TYPE_AUDIT, 'schedule forced candidates',
                                extra={'candidates': candidates})
                 for n in candidates:
                     if n not in self.metrics:
@@ -215,14 +216,14 @@ class Scheduler(object):
                 candidates = []
                 for n in self.metrics.keys():
                     candidates.append(n)
-            inst.add_event('schedule initial candidates',
+            inst.add_event(EVENT_TYPE_AUDIT, 'schedule initial candidates',
                            extra={'candidates': candidates})
 
             # Ensure all specified nodes are hypervisors
             for n in list(candidates):
                 if not self.metrics[n].get('is_hypervisor', False):
                     candidates.remove(n)
-            inst.add_event('schedule are hypervisors',
+            inst.add_event(EVENT_TYPE_AUDIT, 'schedule are hypervisors',
                            extra={'candidates': candidates})
 
             if not candidates:
@@ -232,7 +233,7 @@ class Scheduler(object):
             for n in list(candidates):
                 if not self._has_reasonable_queue_state(log_ctx, n):
                     candidates.remove(n)
-            inst.add_event('schedule have reasonable queue state',
+            inst.add_event(EVENT_TYPE_AUDIT, 'schedule have reasonable queue state',
                            extra={'candidates': candidates})
 
             # Can we host that many vCPUs?
@@ -240,7 +241,7 @@ class Scheduler(object):
                 max_cpu = self.metrics[n].get('cpu_max_per_instance', 0)
                 if inst.cpus > max_cpu:
                     candidates.remove(n)
-            inst.add_event('schedule have enough actual cpu',
+            inst.add_event(EVENT_TYPE_AUDIT, 'schedule have enough actual cpu',
                            extra={'candidates': candidates})
             if not candidates:
                 raise exceptions.LowResourceException(
@@ -250,7 +251,7 @@ class Scheduler(object):
             for n in list(candidates):
                 if not self._has_sufficient_cpu(log_ctx, inst.cpus, n):
                     candidates.remove(n)
-            inst.add_event('schedule have enough idle cpu',
+            inst.add_event(EVENT_TYPE_AUDIT, 'schedule have enough idle cpu',
                            extra={'candidates': candidates})
             if not candidates:
                 raise exceptions.LowResourceException(
@@ -260,7 +261,7 @@ class Scheduler(object):
             for n in list(candidates):
                 if not self._has_sufficient_ram(log_ctx, inst.memory, n):
                     candidates.remove(n)
-            inst.add_event('schedule have enough idle ram',
+            inst.add_event(EVENT_TYPE_AUDIT, 'schedule have enough idle ram',
                            extra={'candidates': candidates})
             if not candidates:
                 raise exceptions.LowResourceException(
@@ -270,7 +271,7 @@ class Scheduler(object):
             for n in list(candidates):
                 if not self._has_sufficient_disk(log_ctx, inst, n):
                     candidates.remove(n)
-            inst.add_event('schedule have enough idle disk',
+            inst.add_event(EVENT_TYPE_AUDIT, 'schedule have enough idle disk',
                            extra={'candidates': candidates})
             if not candidates:
                 raise exceptions.LowResourceException(
@@ -290,7 +291,7 @@ class Scheduler(object):
                             if n:
                                 pseudo_load[n] += int(val)
 
-                inst.add_event('schedule pseudo load',
+                inst.add_event(EVENT_TYPE_AUDIT, 'schedule pseudo load',
                                extra=dict(pseudo_load))
 
             # Order candidates by current CPU load
@@ -302,11 +303,11 @@ class Scheduler(object):
 
             lowest_load = sorted(by_load)[0]
             candidates = by_load[lowest_load]
-            inst.add_event('schedule have lowest cpu load',
+            inst.add_event(EVENT_TYPE_AUDIT, 'schedule have lowest cpu load',
                            extra={'candidates': candidates})
 
             # Return a shuffled list of options
             random.shuffle(candidates)
-            inst.add_event('schedule final candidates',
+            inst.add_event(EVENT_TYPE_AUDIT, 'schedule final candidates',
                            extra={'candidates': candidates})
             return candidates

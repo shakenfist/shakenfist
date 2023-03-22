@@ -15,6 +15,7 @@ from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import eventlog
+from shakenfist.eventlog import EVENT_TYPE_AUDIT
 from shakenfist import exceptions
 from shakenfist.external_api import (
     base as api_base,
@@ -399,6 +400,7 @@ class InstancesEndpoint(sf_api.Resource):
                             netdesc['address'] = n.reserve_random_free_address(
                                 inst.unique_label())
                             inst.add_event(
+                                EVENT_TYPE_AUDIT,
                                 'allocated ip address', extra=netdesc)
                         else:
                             if not n.reserve(netdesc['address'], inst.unique_label()):
@@ -464,12 +466,14 @@ class InstancesEndpoint(sf_api.Resource):
 
         except exceptions.LowResourceException as e:
             inst.add_event(
-                'schedule failed, insufficient resources: %s' % str(e))
+                EVENT_TYPE_AUDIT, 'schedule failed, insufficient resources',
+                extra={'message': str(e)})
             inst.enqueue_delete_due_error('scheduling failed')
             return sf_api.error(507, str(e), suppress_traceback=True)
 
         except exceptions.CandidateNodeNotFoundException as e:
-            inst.add_event('schedule failed, node not found: %s' % str(e))
+            inst.add_event(EVENT_TYPE_AUDIT, 'schedule failed, node not found',
+                           extra={'message': str(e)})
             inst.enqueue_delete_due_error('scheduling failed')
             return sf_api.error(404, 'node not found: %s' % e, suppress_traceback=True)
 

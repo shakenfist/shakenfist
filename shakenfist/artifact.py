@@ -13,6 +13,7 @@ from shakenfist.baseobject import (
 from shakenfist import blob
 from shakenfist.config import config
 from shakenfist import etcd
+from shakenfist.eventlog import EVENT_TYPE_AUDIT
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist.metrics import get_minimum_object_version as gmov
@@ -305,9 +306,10 @@ class Artifact(dbo):
                 'blob_uuid': blob_uuid
             }
             self._db_set_attribute('index_%012d' % index, entry)
-            self.add_event('Added index %d to artifact' % index)
             if not self.in_memory_only:
                 new_blob.ref_count_inc(self)
+            self.add_event(EVENT_TYPE_AUDIT, 'Added index %d to artifact' % index)
+
             self.delete_old_versions()
             return entry
 
@@ -318,7 +320,6 @@ class Artifact(dbo):
         if len(indexes) > max:
             for i in sorted(indexes)[:-max]:
                 self.del_index(i)
-                self.add_event('Deleted index %d from artifact' % i)
 
     def del_index(self, index):
         index_data = self._db_get_attribute('index_%012d' % index)
@@ -326,11 +327,11 @@ class Artifact(dbo):
             self.log.withField('index', index).warn('Cannot find index in DB')
             return
 
-        self.add_event('Deleted index %d from artifact' % index)
         self._db_delete_attribute('index_%012d' % index)
         b = blob.Blob.from_db(index_data['blob_uuid'])
         if b and not self.in_memory_only:
             b.ref_count_dec(self)
+        self.add_event(EVENT_TYPE_AUDIT, 'Deleted index %d from artifact' % index)
 
     def delete(self):
         self.state = self.STATE_DELETED

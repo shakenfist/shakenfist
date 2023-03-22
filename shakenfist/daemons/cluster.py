@@ -17,6 +17,7 @@ from shakenfist.blob import Blob, Blobs, placement_filter
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
+from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_USAGE
 from shakenfist import instance
 from shakenfist import namespace
 from shakenfist import network
@@ -65,7 +66,8 @@ class Monitor(daemon.Daemon):
                         # the owner of the blob makes.
                         total_used_storage += int(b.size)
 
-                a.add_event('usage', extra={'bytes': total_used_storage},
+                a.add_event(EVENT_TYPE_USAGE, 'usage',
+                            extra={'bytes': total_used_storage},
                             suppress_event_logging=True)
 
             return True
@@ -83,7 +85,7 @@ class Monitor(daemon.Daemon):
                     if not b.locations:
                         # There are no locations for this blob, delete it.
                         b.add_event(
-                            'No locations for this blob, hard deleting.')
+                            EVENT_TYPE_AUDIT, 'No locations for this blob, hard deleting.')
                         b.hard_delete()
 
                     for node in b.locations:
@@ -305,17 +307,18 @@ class Monitor(daemon.Daemon):
             if n.state.value == Node.STATE_CREATED:
                 if age > config.NODE_CHECKIN_MAXIMUM:
                     n.state = Node.STATE_MISSING
-                    n.add_event('Node has gone missing')
+                    n.add_event(EVENT_TYPE_AUDIT, 'node has gone missing')
             elif n.state.value == Node.STATE_MISSING:
                 if age < config.NODE_CHECKIN_MAXIMUM:
                     n.state = Node.STATE_CREATED
-                    n.add_event('Node returned from being missing')
+                    n.add_event(EVENT_TYPE_AUDIT, 'node returned from being missing')
             elif n.state.value == Node.STATE_DELETED:
                 # Find instances on deleted nodes
                 for i in instance.healthy_instances_on_node(n):
-                    i.add_event('Instance is on deleted node, deleting.')
-                    n.add_event('Deleting instance %s as node as been deleted'
-                                % i.uuid)
+                    i.add_event(EVENT_TYPE_AUDIT, 'instance is on deleted node, deleting.')
+                    n.add_event(
+                        EVENT_TYPE_AUDIT,
+                        'deleting instance %s as node as been deleted' % i.uuid)
                     i.delete(global_only=True)
 
                     # Cleanup the instance's interfaces
@@ -331,11 +334,11 @@ class Monitor(daemon.Daemon):
 
                 for b in blobs_to_remove:
                     n.add_event(
-                        'Deleting blob %s location as hosting node has been deleted'
-                        % b.uuid)
+                        EVENT_TYPE_AUDIT,
+                        'deleting blob %s location as hosting node has been deleted' % b.uuid)
                     b.add_event(
-                        'Deleting blob location as hosting node %s has been deleted'
-                        % n.uuid)
+                        EVENT_TYPE_AUDIT,
+                        'deleting blob location as hosting node %s has been deleted' % n.uuid)
                     b.remove_location(n.fqdn)
                     b.request_replication()
 

@@ -12,6 +12,7 @@ from shakenfist.config import config
 from shakenfist.constants import (QCOW2_CLUSTER_SIZE, LOCK_REFRESH_SECONDS,
                                   TRANSCODE_DESCRIPTION)
 from shakenfist import etcd
+from shakenfist.eventlog import EVENT_TYPE_AUDIT
 from shakenfist import exceptions
 from shakenfist.tasks import ArchiveTranscodeTask
 from shakenfist.util import general as util_general
@@ -160,10 +161,12 @@ class ImageFetchHelper(object):
 
                 if not most_recent_blob.modified:
                     self.artifact.add_event(
+                        EVENT_TYPE_AUDIT,
                         'image requires fetch, no Last-Modified recorded')
                     dirty = True
                 elif most_recent_blob.modified != normalized_new_timestamp:
                     self.artifact.add_event(
+                        EVENT_TYPE_AUDIT,
                         'image requires fetch, Last-Modified: %s -> %s'
                         % (most_recent_blob.modified, normalized_new_timestamp))
                     dirty = True
@@ -174,10 +177,12 @@ class ImageFetchHelper(object):
 
                 if not most_recent_blob.size:
                     self.artifact.add_event(
+                        EVENT_TYPE_AUDIT,
                         'image requires fetch, no Content-Length recorded')
                     dirty = True
                 elif most_recent_blob.size != response_size:
                     self.artifact.add_event(
+                        EVENT_TYPE_AUDIT,
                         'image requires fetch, Content-Length: %s -> %s'
                         % (most_recent_blob.size, response_size))
                     dirty = True
@@ -323,8 +328,10 @@ class ImageFetchHelper(object):
                     url, resp, blob_uuid, [lock], self.log, checksum,
                     checksum_type, instance_object=instance_object)
             except exceptions.BadChecksum as e:
-                self.instance.add_event('fetched image had bad checksum')
-                self.artifact.add_event('fetched image had bad checksum')
+                self.instance.add_event(
+                    EVENT_TYPE_AUDIT, 'fetched image had bad checksum')
+                self.artifact.add_event(
+                    EVENT_TYPE_AUDIT, 'fetched image had bad checksum')
                 raise e
 
             return b
