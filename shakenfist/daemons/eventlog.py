@@ -8,6 +8,7 @@ from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import eventlog
+from shakenfist.eventlog import EVENT_TYPE_HISTORIC
 from shakenfist import node
 from shakenfist.util import general as util_general
 
@@ -51,8 +52,9 @@ class Monitor(daemon.WorkerPoolDaemon):
                         with eventlog.EventLog(objtype, objuuid) as eventdb:
                             for k, v in results[(objtype, objuuid)]:
                                 eventdb.write_event(
-                                    v['event_type'], v['timestamp'], v['fqdn'],
-                                    v['duration'], v['message'], extra=v.get('extra'))
+                                    v.get('event_type', EVENT_TYPE_HISTORIC),
+                                    v['timestamp'], v['fqdn'], v['duration'],
+                                    v['message'], extra=v.get('extra'))
                                 etcd.WrappedEtcdClient().delete(k)
                     except Exception as e:
                         util_general.ignore_exception(
