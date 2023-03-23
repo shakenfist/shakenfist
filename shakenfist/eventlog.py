@@ -82,7 +82,7 @@ def upgrade_data_store():
         version = 2
         count = 0
         for objtype in ['artifact', 'blob', 'instance', 'namespace', 'network',
-                        'networkinterface', 'node']:
+                        'networkinterface', 'node', 'upload']:
             objroot = os.path.join(config.STORAGE_PATH, 'events', objtype)
             if os.path.exists(objroot):
                 for ent in os.listdir(objroot):
@@ -92,7 +92,7 @@ def upgrade_data_store():
                     if ent.endswith('.lock'):
                         continue
 
-                    if len(ent) == 2:
+                    if len(ent) < 3:
                         # A special case -- very short namespace and node
                         # names upset the system by clashing with the shard
                         # directory name.
