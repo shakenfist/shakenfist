@@ -77,9 +77,13 @@ class Monitor(daemon.WorkerPoolDaemon):
                                                    'historic']:
                                     max_age = getattr(
                                         config, 'MAX_%s_EVENT_AGE' % event_type.upper())
+                                    if max_age == -1:
+                                        continue
+
                                     eventdb.prune_old_events(
                                         time.time() - max_age, event_type)
 
+                        self.log.info('Prune complete')
                         last_prune = time.time()
 
                     # Have a nap if pruning was quick

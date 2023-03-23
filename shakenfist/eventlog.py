@@ -189,7 +189,7 @@ class EventLog(object):
             try:
                 elc.write_event(event_type, timestamp, fqdn, duration, message,
                                 extra=extra)
-            except sqlite3.DatabaseError as e:
+            except sqlite3.DatabaseError:
                 self.log.with_fields({'chunk': '%04d%02d' % (year, month)}).error(
                     'Chunk corrupt, moving aside.')
                 os.rename(elc.dbpath, elc.dbpath + '.corrupt')
@@ -227,7 +227,7 @@ class EventLog(object):
                     elc = EventLogChunk(self.objtype, self.objuuid, year, month)
                     events.append(elc.read_events(limit=(limit - len(events))))
                     elc.close()
-                except sqlite3.DatabaseError as e:
+                except sqlite3.DatabaseError:
                     self.log.with_fields({'chunk': '%04d%02d' % (year, month)}).error(
                         'Chunk corrupt, moving aside.')
                     os.rename(elc.dbpath, elc.dbpath + '.corrupt')
@@ -258,7 +258,7 @@ class EventLog(object):
                     this_chunk_removed = elc.prune_old_events(
                         before_timestamp, event_type, limit=(limit - removed))
                     removed += this_chunk_removed
-                except sqlite3.DatabaseError as e:
+                except sqlite3.DatabaseError:
                     self.log.with_fields({'chunk': '%04d%02d' % (year, month)}).error(
                         'Chunk corrupt, moving aside.')
                     os.rename(elc.dbpath, elc.dbpath + '.corrupt')
@@ -283,8 +283,11 @@ class EventLog(object):
                     elc.close()
 
                 if removed >= limit:
+                    self.log.info('Pruned %d events' % removed)
                     return removed
 
+            if removed > 0:
+                self.log.info('Pruned %d events' % removed)
             return removed
 
 
