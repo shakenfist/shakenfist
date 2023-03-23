@@ -68,7 +68,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                         event_path = os.path.join(config.STORAGE_PATH, 'events')
                         p = pathlib.Path(event_path)
                         for entpath in p.glob('**/*.lock'):
-                            entpath = entpath[len(event_path) + 1:-5]
+                            entpath = str(entpath)[len(event_path) + 1:-5]
                             objtype, _, objuuid = entpath.split('/')
 
                             with eventlog.EventLog(objtype, objuuid) as eventdb:
