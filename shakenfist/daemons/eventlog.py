@@ -1,7 +1,10 @@
 from collections import defaultdict
 from shakenfist_utilities import logs
+import os
+import pathlib
 import time
 
+from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import eventlog
@@ -59,8 +62,22 @@ class Monitor(daemon.WorkerPoolDaemon):
                     start_prune = time.time()
 
                     if time.time() - last_prune > 3600:
-                        # Prune old events from nodes
-                        # TODO(mikal)
+                        # Prune old events
+                        event_path = os.path.join(config.STORAGE_PATH, 'events')
+                        p = pathlib.Path(event_path)
+                        for entpath in p.glob('**/*.lock'):
+                            entpath = entpath[len(event_path) + 1:-5]
+                            objtype, _, objuuid = entpath.split('/')
+
+                            with eventlog.EventLog(objtype, objuuid) as eventdb:
+                                for event_type in ['audit', 'mutate', 'status',
+                                                   'usage', 'resources', 'prune',
+                                                   'historic']:
+                                    max_age = getattr(
+                                        config, 'MAX_%s_EVENT_AGE' % event_type)
+                                    eventdb.prune_old_events(
+                                        time.time() - max_age, event_type)
+
                         last_prune = time.time()
 
                     # Have a nap if pruning was quick

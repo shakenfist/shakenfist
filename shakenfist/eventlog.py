@@ -16,6 +16,8 @@ from shakenfist import etcd
 LOG, _ = logs.setup(__name__)
 
 
+# NOTE(mikal): if you add to this list, you must also update the MAX_AGE config
+# options, and the pruner at the end of daemons.eventlog.Monitor.run.
 EVENT_TYPE_AUDIT = 'audit'
 EVENT_TYPE_MUTATE = 'mutate'
 EVENT_TYPE_STATUS = 'status'
