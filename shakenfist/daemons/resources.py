@@ -25,191 +25,194 @@ from shakenfist.util import process as util_process
 LOG, _ = logs.setup(__name__)
 
 
-def _get_stats():
-    with util_libvirt.LibvirtConnection() as lc:
-        # What's special about this node?
-        retval = {
-            'is_etcd_master': config.NODE_IS_ETCD_MASTER,
-            'is_hypervisor': config.NODE_IS_HYPERVISOR,
-            'is_network_node': config.NODE_IS_NETWORK_NODE,
-            'is_eventlog_node': config.NODE_IS_EVENTLOG_NODE,
-        }
-
-        # CPU info
-        present_cpus, _, available_cpus = lc.get_cpu_map()
-        retval.update({
-            'cpu_max': present_cpus,
-            'cpu_available': available_cpus,
-        })
-
-        retval['cpu_max_per_instance'] = lc.get_max_vcpus()
-
-        # This is disabled as data we don't currently use
-        # for i in range(present_cpus):
-        #    per_cpu_stats = conn.getCPUStats(i)
-        #    for key in per_cpu_stats:
-        #        retval['cpu_core%d_%s' % (i, key)] = per_cpu_stats[key]
-
-        try:
-            load_1, load_5, load_15 = psutil.getloadavg()
-            retval.update({
-                'cpu_load_1': load_1,
-                'cpu_load_5': load_5,
-                'cpu_load_15': load_15,
-            })
-        except Exception as e:
-            util_general.ignore_exception('load average', e)
-
-        # System memory info, converting bytes to mb
-        stats = psutil.virtual_memory()
-        retval.update({
-            'memory_max': stats.total // 1024 // 1024,
-            'memory_available': stats.available // 1024 // 1024
-        })
-
-        # libvirt memory info, converting kb to mb
-        memory_stats = lc.get_memory_stats()
-        retval.update({
-            'memory_max_libvirt': memory_stats['total'] // 1024,
-            'memory_available_libvirt': memory_stats['free'] // 1024,
-        })
-
-        # Kernel Shared Memory (KSM) information
-        ksm_details = {}
-        for ent in os.listdir('/sys/kernel/mm/ksm'):
-            with open('/sys/kernel/mm/ksm/%s' % ent) as f:
-                ksm_details['memory_ksm_%s' % ent] = int(f.read().rstrip())
-        retval.update(ksm_details)
-
-        # Disk info. There could be more than one filesystem here, so we track
-        # all of the paths we're fond of.
-        fsids = []
-        minimum = -1
-        total = 0
-        used = 0
-
-        for path in ['', 'blobs', 'events', 'image_cache', 'instances', 'uploads']:
-            # We need to make the paths we check if they don't exist, otherwise
-            # they wont be included in the metrics and things get confused.
-            fullpath = os.path.join(config.STORAGE_PATH, path)
-            os.makedirs(fullpath, exist_ok=True)
-            s = os.statvfs(fullpath)
-            free = s.f_frsize * s.f_bavail
-
-            if s.f_fsid not in fsids:
-                total += s.f_frsize * s.f_blocks
-                used += s.f_frsize * (s.f_blocks - s.f_bfree)
-                if minimum == -1 or free < minimum:
-                    minimum = free
-
-            if path == '':
-                path = 'sfroot'
-            retval['disk_free_%s' % path] = free
-
-        retval.update({
-            'disk_total': total,
-            'disk_free': minimum,
-            'disk_used': used
-        })
-
-        disk_counters = psutil.disk_io_counters()
-        retval.update({
-            'disk_read_bytes': disk_counters.read_bytes,
-            'disk_write_bytes': disk_counters.write_bytes,
-        })
-
-        # Network info
-        net_counters = psutil.net_io_counters()
-        retval.update({
-            'network_read_bytes': net_counters.bytes_recv,
-            'network_write_bytes': net_counters.bytes_sent,
-        })
-
-        # Virtual machine consumption info
-        total_instances = 0
-        total_active_instances = 0
-        total_instance_max_memory = 0
-        total_instance_actual_memory = 0
-        total_instance_vcpus = 0
-        total_instance_cpu_time = 0
-
-        for domain in lc.get_all_domains():
-            try:
-                active = domain.isActive() == 1
-                if active:
-                    _, maxmem, mem, cpus, cpu_time = domain.info()
-
-                if active:
-                    total_instances += 1
-                    total_active_instances += 1
-                    total_instance_max_memory += maxmem
-                    total_instance_actual_memory += mem
-                    total_instance_vcpus += cpus
-                    total_instance_cpu_time += cpu_time
-
-            except lc.libvirt.libvirtError:
-                # The domain has likely been deleted.
-                pass
-
-        # Queue health statistics
-        with etcd.ThreadLocalReadOnlyCache():
-            node_queue_processing, node_queue_waiting, node_queue_deferred = \
-                etcd.get_queue_length(config.NODE_NAME)
-
-        retval.update({
-            'cpu_total_instance_vcpus': total_instance_vcpus,
-            'cpu_total_instance_cpu_time': total_instance_cpu_time,
-            'memory_total_instance_max': total_instance_max_memory // 1024,
-            'memory_total_instance_actual': total_instance_actual_memory // 1024,
-            'instances_total': total_instances,
-            'instances_active': total_active_instances,
-            'node_queue_processing': node_queue_processing,
-            'node_queue_waiting': node_queue_waiting,
-            'node_queue_deferred': node_queue_deferred
-        })
-
-        if config.NODE_IS_NETWORK_NODE:
-            network_queue_processing, network_queue_waiting, node_queue_deferred = \
-                etcd.get_queue_length('networknode')
-
-            retval.update({
-                'network_queue_processing': network_queue_processing,
-                'network_queue_waiting': network_queue_waiting,
-            })
-
-        if config.NODE_IS_EVENTLOG_NODE:
-            queued = len(list(etcd.get_all('event', None, limit=10000)))
-            retval.update({
-                'events_waiting': queued,
-            })
-
-        # What object versions do we support?
-        for obj in OBJECT_NAMES_TO_CLASSES:
-            retval['object_version_%s' % obj] = \
-                OBJECT_NAMES_TO_CLASSES[obj].current_version
-
-        # What package versions do we have?
-        n = Node.from_db(config.NODE_NAME)
-
-        vers_out, _ = util_process.execute(
-            None, 'dpkg-query --show --showformat=\'${Package}==${Version}\\n\' --no-pager',
-            suppress_command_logging=True)
-        versions = {}
-        for line in vers_out.split():
-            package, version = line.split('==')
-            versions[package] = version
-        n.dependency_versions = versions
-
-        n.add_event(
-            EVENT_TYPE_RESOURCES, 'updated node resources and package versions',
-            extra=retval, suppress_event_logging=True)
-        return retval
-
-
 class Monitor(daemon.Daemon):
     def __init__(self, id):
         super(Monitor, self).__init__(id)
         start_http_server(config.PROMETHEUS_METRICS_PORT)
+
+        self.last_logged_resources = 0
+
+    def _get_stats(self):
+        with util_libvirt.LibvirtConnection() as lc:
+            # What's special about this node?
+            retval = {
+                'is_etcd_master': config.NODE_IS_ETCD_MASTER,
+                'is_hypervisor': config.NODE_IS_HYPERVISOR,
+                'is_network_node': config.NODE_IS_NETWORK_NODE,
+                'is_eventlog_node': config.NODE_IS_EVENTLOG_NODE,
+            }
+
+            # CPU info
+            present_cpus, _, available_cpus = lc.get_cpu_map()
+            retval.update({
+                'cpu_max': present_cpus,
+                'cpu_available': available_cpus,
+            })
+
+            retval['cpu_max_per_instance'] = lc.get_max_vcpus()
+
+            # This is disabled as data we don't currently use
+            # for i in range(present_cpus):
+            #    per_cpu_stats = conn.getCPUStats(i)
+            #    for key in per_cpu_stats:
+            #        retval['cpu_core%d_%s' % (i, key)] = per_cpu_stats[key]
+
+            try:
+                load_1, load_5, load_15 = psutil.getloadavg()
+                retval.update({
+                    'cpu_load_1': load_1,
+                    'cpu_load_5': load_5,
+                    'cpu_load_15': load_15,
+                })
+            except Exception as e:
+                util_general.ignore_exception('load average', e)
+
+            # System memory info, converting bytes to mb
+            stats = psutil.virtual_memory()
+            retval.update({
+                'memory_max': stats.total // 1024 // 1024,
+                'memory_available': stats.available // 1024 // 1024
+            })
+
+            # libvirt memory info, converting kb to mb
+            memory_stats = lc.get_memory_stats()
+            retval.update({
+                'memory_max_libvirt': memory_stats['total'] // 1024,
+                'memory_available_libvirt': memory_stats['free'] // 1024,
+            })
+
+            # Kernel Shared Memory (KSM) information
+            ksm_details = {}
+            for ent in os.listdir('/sys/kernel/mm/ksm'):
+                with open('/sys/kernel/mm/ksm/%s' % ent) as f:
+                    ksm_details['memory_ksm_%s' % ent] = int(f.read().rstrip())
+            retval.update(ksm_details)
+
+            # Disk info. There could be more than one filesystem here, so we track
+            # all of the paths we're fond of.
+            fsids = []
+            minimum = -1
+            total = 0
+            used = 0
+
+            for path in ['', 'blobs', 'events', 'image_cache', 'instances', 'uploads']:
+                # We need to make the paths we check if they don't exist, otherwise
+                # they wont be included in the metrics and things get confused.
+                fullpath = os.path.join(config.STORAGE_PATH, path)
+                os.makedirs(fullpath, exist_ok=True)
+                s = os.statvfs(fullpath)
+                free = s.f_frsize * s.f_bavail
+
+                if s.f_fsid not in fsids:
+                    total += s.f_frsize * s.f_blocks
+                    used += s.f_frsize * (s.f_blocks - s.f_bfree)
+                    if minimum == -1 or free < minimum:
+                        minimum = free
+
+                if path == '':
+                    path = 'sfroot'
+                retval['disk_free_%s' % path] = free
+
+            retval.update({
+                'disk_total': total,
+                'disk_free': minimum,
+                'disk_used': used
+            })
+
+            disk_counters = psutil.disk_io_counters()
+            retval.update({
+                'disk_read_bytes': disk_counters.read_bytes,
+                'disk_write_bytes': disk_counters.write_bytes,
+            })
+
+            # Network info
+            net_counters = psutil.net_io_counters()
+            retval.update({
+                'network_read_bytes': net_counters.bytes_recv,
+                'network_write_bytes': net_counters.bytes_sent,
+            })
+
+            # Virtual machine consumption info
+            total_instances = 0
+            total_active_instances = 0
+            total_instance_max_memory = 0
+            total_instance_actual_memory = 0
+            total_instance_vcpus = 0
+            total_instance_cpu_time = 0
+
+            for domain in lc.get_all_domains():
+                try:
+                    active = domain.isActive() == 1
+                    if active:
+                        _, maxmem, mem, cpus, cpu_time = domain.info()
+
+                    if active:
+                        total_instances += 1
+                        total_active_instances += 1
+                        total_instance_max_memory += maxmem
+                        total_instance_actual_memory += mem
+                        total_instance_vcpus += cpus
+                        total_instance_cpu_time += cpu_time
+
+                except lc.libvirt.libvirtError:
+                    # The domain has likely been deleted.
+                    pass
+
+            # Queue health statistics
+            with etcd.ThreadLocalReadOnlyCache():
+                node_queue_processing, node_queue_waiting, node_queue_deferred = \
+                    etcd.get_queue_length(config.NODE_NAME)
+
+            retval.update({
+                'cpu_total_instance_vcpus': total_instance_vcpus,
+                'cpu_total_instance_cpu_time': total_instance_cpu_time,
+                'memory_total_instance_max': total_instance_max_memory // 1024,
+                'memory_total_instance_actual': total_instance_actual_memory // 1024,
+                'instances_total': total_instances,
+                'instances_active': total_active_instances,
+                'node_queue_processing': node_queue_processing,
+                'node_queue_waiting': node_queue_waiting,
+                'node_queue_deferred': node_queue_deferred
+            })
+
+            if config.NODE_IS_NETWORK_NODE:
+                network_queue_processing, network_queue_waiting, node_queue_deferred = \
+                    etcd.get_queue_length('networknode')
+
+                retval.update({
+                    'network_queue_processing': network_queue_processing,
+                    'network_queue_waiting': network_queue_waiting,
+                })
+
+            if config.NODE_IS_EVENTLOG_NODE:
+                queued = len(list(etcd.get_all('event', None, limit=10000)))
+                retval.update({
+                    'events_waiting': queued,
+                })
+
+            # What object versions do we support?
+            for obj in OBJECT_NAMES_TO_CLASSES:
+                retval['object_version_%s' % obj] = \
+                    OBJECT_NAMES_TO_CLASSES[obj].current_version
+
+            # What package versions do we have?
+            n = Node.from_db(config.NODE_NAME)
+
+            vers_out, _ = util_process.execute(
+                None, 'dpkg-query --show --showformat=\'${Package}==${Version}\\n\' --no-pager',
+                suppress_command_logging=True)
+            versions = {}
+            for line in vers_out.split():
+                package, version = line.split('==')
+                versions[package] = version
+            n.dependency_versions = versions
+
+            if time.time() - self.last_logged_resources > 60:
+                n.add_event(
+                    EVENT_TYPE_RESOURCES, 'updated node resources and package versions',
+                    extra=retval, suppress_event_logging=True)
+                self.last_logged_resources = time.time()
+            return retval
 
     def run(self):
         LOG.info('Starting')
@@ -221,7 +224,7 @@ class Monitor(daemon.Daemon):
         last_billing = 0
 
         def update_metrics():
-            stats = _get_stats()
+            stats = self._get_stats()
             for metric in stats:
                 if metric not in gauges:
                     gauges[metric] = Gauge(metric, '')
