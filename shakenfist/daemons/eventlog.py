@@ -76,7 +76,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                                                    'usage', 'resources', 'prune',
                                                    'historic']:
                                     max_age = getattr(
-                                        config, 'MAX_%s_EVENT_AGE' % event_type)
+                                        config, 'MAX_%s_EVENT_AGE' % event_type.upper())
                                     eventdb.prune_old_events(
                                         time.time() - max_age, event_type)
 
