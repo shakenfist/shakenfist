@@ -8,6 +8,7 @@ from shakenfist_utilities import api as sf_api, logs
 from shakenfist import artifact
 from shakenfist.baseobject import DatabaseBackedObject as dbo, active_states_filter
 from shakenfist.daemons import daemon
+from shakenfist.eventlog import EVENT_TYPE_AUDIT
 from shakenfist.external_api import base as api_base
 from shakenfist import instance
 from shakenfist.namespace import Namespace, Namespaces, namespace_is_trusted
@@ -68,7 +69,8 @@ class AuthEndpoint(sf_api.Resource):
                 return access_tokens.create_token(
                     namespace_from_db, keyname, keys[keyname]['nonce'])
 
-        namespace_from_db.add_event('Attempt to use incorrect namespace key')
+        namespace_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'attempt to use incorrect namespace key')
         return sf_api.error(401, 'unauthorized')
 
 
@@ -119,7 +121,7 @@ class AuthNamespacesEndpoint(sf_api.Resource):
         parent_ns = Namespace.from_db(invoking_namespace)
         if parent_ns:
             parent_ns.add_event(
-                'Token used to create namespace %s' % namespace,
+                EVENT_TYPE_AUDIT, 'token used to create namespace %s' % namespace,
                 extra={
                     'token': token,
                     'keyname': keyname,
@@ -129,7 +131,7 @@ class AuthNamespacesEndpoint(sf_api.Resource):
                     'created-namespace': namespace
                 })
         ns.add_event(
-            'Token used to create namespace',
+            EVENT_TYPE_AUDIT, 'token used to create namespace',
             extra={
                 'token': token,
                 'keyname': keyname,

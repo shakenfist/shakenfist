@@ -11,6 +11,7 @@ from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons import daemon
 from shakenfist.config import config
 from shakenfist import etcd
+from shakenfist.eventlog import EVENT_TYPE_RESOURCES, EVENT_TYPE_USAGE
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import network
@@ -199,8 +200,9 @@ def _get_stats():
             versions[package] = version
         n.dependency_versions = versions
 
-        n.add_event('Updated node resources and package versions', extra=retval,
-                    suppress_event_logging=True)
+        n.add_event(
+            EVENT_TYPE_RESOURCES, 'updated node resources and package versions',
+            extra=retval, suppress_event_logging=True)
         return retval
 
 
@@ -261,7 +263,7 @@ class Monitor(daemon.Daemon):
 
                             if inst:
                                 inst.add_event(
-                                    'usage', extra=statistics,
+                                    EVENT_TYPE_USAGE, 'usage', extra=statistics,
                                     suppress_event_logging=True)
 
                 except lc.libvirt.libvirtError as e:
@@ -277,7 +279,8 @@ class Monitor(daemon.Daemon):
                 interface = 'egr-%06x-o' % n.vxid
                 try:
                     n.add_event(
-                        'usage', extra=util_network.get_interface_statistics(interface),
+                        EVENT_TYPE_USAGE, 'usage',
+                        extra=util_network.get_interface_statistics(interface),
                         suppress_event_logging=True)
                 except exceptions.NoInterfaceStatistics as e:
                     LOG.with_fields({'network': n}).info(

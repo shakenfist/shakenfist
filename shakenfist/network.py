@@ -20,6 +20,7 @@ from shakenfist.config import config
 from shakenfist import db
 from shakenfist import dhcp
 from shakenfist import etcd
+from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_MUTATE
 from shakenfist.exceptions import DeadNetwork, CongestedNetwork, IPManagerMissing
 from shakenfist import instance
 from shakenfist.ipmanager import IPManager
@@ -709,10 +710,11 @@ class Network(dbo):
                 added.append(n)
 
             if removed:
-                self.add_event('remove mesh elements',
+                self.add_event(EVENT_TYPE_MUTATE, 'remove mesh elements',
                                extra={'removed': removed})
             if added:
-                self.add_event('add mesh elements', extra={'added': added})
+                self.add_event(EVENT_TYPE_MUTATE, 'add mesh elements',
+                               extra={'added': added})
 
     def _add_mesh_element(self, n):
         subst = self.subst_dict()
@@ -722,7 +724,7 @@ class Network(dbo):
             util_process.execute(None,
                                  'bridge fdb append to 00:00:00:00:00:00 '
                                  'dst %(node)s dev %(vx_interface)s' % subst)
-            self.add_event('added new mesh element', extra={'ip': n})
+            self.add_event(EVENT_TYPE_MUTATE, 'added new mesh element', extra={'ip': n})
         except processutils.ProcessExecutionError as e:
             self.log.with_fields({
                 'node': n,
@@ -736,7 +738,8 @@ class Network(dbo):
             util_process.execute(None,
                                  'bridge fdb del to 00:00:00:00:00:00 dst %(node)s '
                                  'dev %(vx_interface)s' % subst)
-            self.add_event('removed excess mesh element', extra={'ip': n})
+            self.add_event(EVENT_TYPE_MUTATE, 'removed excess mesh element',
+                           extra={'ip': n})
         except processutils.ProcessExecutionError as e:
             self.log.with_fields({
                 'node': n,
@@ -745,7 +748,7 @@ class Network(dbo):
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.
     def add_floating_ip(self, floating_address, inner_address):
-        self.add_event('adding floating ip %s -> %s'
+        self.add_event(EVENT_TYPE_AUDIT, 'adding floating ip %s -> %s'
                        % (floating_address, inner_address))
         subst = self.subst_dict()
         subst['floating_address'] = floating_address
@@ -772,7 +775,7 @@ class Network(dbo):
     # NOTE(mikal): this call only works on the network node, the API
     # server redirects there.
     def remove_floating_ip(self, floating_address, inner_address):
-        self.add_event('removing floating ip %s -> %s'
+        self.add_event(EVENT_TYPE_AUDIT, 'removing floating ip %s -> %s'
                        % (floating_address, inner_address))
         subst = self.subst_dict()
         subst['floating_address'] = floating_address

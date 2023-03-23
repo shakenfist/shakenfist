@@ -16,7 +16,22 @@ from shakenfist import etcd
 LOG, _ = logs.setup(__name__)
 
 
-def add_event(object_type, object_uuid, message, duration=None,
+EVENT_TYPE_AUDIT = 'audit'
+EVENT_TYPE_MUTATE = 'mutate'
+EVENT_TYPE_STATUS = 'status'
+EVENT_TYPE_USAGE = 'usage'
+EVENT_TYPE_RESOURCES = 'resources'
+EVENT_TYPE_PRUNE = 'prune'
+
+
+OBJECT_TYPES = ['artifact', 'blob', 'instance', 'namespace', 'network',
+                'networkinterface', 'node', 'upload']
+
+# Use only for events which pre-date the type system
+EVENT_TYPE_HISTORIC = 'historic'
+
+
+def add_event(event_type, object_type, object_uuid, message, duration=None,
               extra=None, suppress_event_logging=False):
     # Queue an event in etcd to get shuffled over to the long term data store
     timestamp = time.time()
@@ -46,6 +61,7 @@ def add_event(object_type, object_uuid, message, duration=None,
         log.with_fields(
             {
                 object_type: object_uuid,
+                'event_type': event_type,
                 'fqdn': config.NODE_NAME,
                 'duration': duration,
                 'message': message
@@ -56,6 +72,7 @@ def add_event(object_type, object_uuid, message, duration=None,
     etcd.put('event/%s' % object_type, object_uuid, timestamp,
              {
                  'timestamp': timestamp,
+                 'event_type': event_type,
                  'object_type': object_type,
                  'object_uuid': object_uuid,
                  'fqdn': config.NODE_NAME,
@@ -149,18 +166,25 @@ class EventLog(object):
         self.lock = lockutils.external_lock(
             '%s.lock' % self.objuuid, lock_path=self.dbdir)
 
+        self.write_elc_cache = {}
+
     def __enter__(self):
         return self
 
     def __exit__(self, *_args):
-        ...
+        for (year, month) in self.write_elc_cache:
+            self.write_elc_cache[(year, month)].close()
 
-    def write_event(self, timestamp, fqdn, duration, message, extra=None):
+    def write_event(self, event_type, timestamp, fqdn, duration, message, extra=None):
         with self.lock:
             year, month = _timestamp_to_year_month(timestamp)
-            elc = EventLogChunk(self.objtype, self.objuuid, year, month)
-            elc.write_event(timestamp, fqdn, duration, message, extra=extra)
-            elc.close()
+            if (year, month) in self.write_elc_cache:
+                elc = self.write_elc_cache[(year, month)]
+            else:
+                elc = EventLogChunk(self.objtype, self.objuuid, year, month)
+                self.write_elc_cache[(year, month)] = elc
+
+            elc.write_event(event_type, timestamp, fqdn, duration, message, extra=extra)
 
     def _get_all_chunks(self):
         p = pathlib.Path()
@@ -204,15 +228,33 @@ class EventLog(object):
         if os.path.exists(lockpath):
             os.remove(lockpath)
 
-    def prune_old_events(self, before_timestamp, message=None, limit=10000):
+    def prune_old_events(self, before_timestamp, event_type, limit=10000):
         with self.lock:
             removed = 0
 
             for year, month in self._get_all_chunks():
                 elc = EventLogChunk(self.objtype, self.objuuid, year, month)
-                removed += elc.prune_old_events(
-                    before_timestamp, message=message, limit=(limit - removed))
-                elc.close()
+                this_chunk_removed = elc.prune_old_events(
+                    before_timestamp, event_type, limit=(limit - removed))
+                removed += this_chunk_removed
+
+                if this_chunk_removed > 0:
+                    if event_type != EVENT_TYPE_PRUNE:
+                        self.write_event(
+                            EVENT_TYPE_PRUNE, time.time(), config.NODE_NAME, 0,
+                            'pruned %d events of type %s from before %f from chunk '
+                            '%04d%02d'
+                            % (removed, event_type, before_timestamp, year, month))
+
+                if elc.count_events() == 0:
+                    elc.delete()
+                    if event_type != EVENT_TYPE_PRUNE:
+                        self.write_event(
+                            EVENT_TYPE_PRUNE, time.time(), config.NODE_NAME, 0,
+                            'deleted event log chunk %04d%02d as it is now empty'
+                            % (year, month))
+                else:
+                    elc.close()
 
                 if removed >= limit:
                     return removed
@@ -221,9 +263,9 @@ class EventLog(object):
 
 
 # This is the version for an individual sqlite file
-VERSION = 4
+VERSION = 5
 CREATE_EVENT_TABLE = """CREATE TABLE IF NOT EXISTS events(
-    timestamp real PRIMARY KEY, fqdn text,
+    type text, timestamp real PRIMARY KEY, fqdn text,
     operation text, phase text, duration float, message text,
     extra text)"""
 CREATE_VERSION_TABLE = """CREATE TABLE IF NOT EXISTS version(version int primary key)"""
@@ -315,13 +357,25 @@ class EventLogChunk(object):
                     % time.time())
                 self.log.info('Upgraded database from v3 to v4')
 
+            if ver == 4:
+                ver = 5
+                self.log.info('Upgrading database from v4 to v5')
+                self.con.execute(
+                    'ALTER TABLE events ADD COLUMN type text')
+                self.con.execute('UPDATE events SET type="historic"')
+                self.con.execute(
+                    'INSERT INTO events(type, timestamp, message) '
+                    'VALUES ("audit", %f, "Upgraded database to version 2")'
+                    % time.time())
+                self.log.info('Upgraded database from v1 to v2')
+
             if start_ver != ver:
                 self.con.execute('UPDATE version SET version = ?', (ver,))
                 self.con.commit()
                 self.con.execute('VACUUM')
                 self.con.execute(
-                        'INSERT INTO events(timestamp, message) '
-                        'VALUES (%f, "Compacted database")'
+                        'INSERT INTO events(type, timestamp, message) '
+                        'VALUES ("audit", %f, "Compacted database")'
                         % time.time())
                 self.log.info('Database upgrade took %.02f seconds'
                               % (time.time() - start_upgrade))
@@ -329,14 +383,14 @@ class EventLogChunk(object):
     def close(self):
         self.con.close()
 
-    def write_event(self, timestamp, fqdn, duration, message, extra=None):
+    def write_event(self, event_type, timestamp, fqdn, duration, message, extra=None):
         attempts = 0
         while attempts < 3:
             try:
                 self.con.execute(
-                    'INSERT INTO events(timestamp, fqdn, duration, message, extra) '
-                    'VALUES (?, ?, ?, ?, ?)',
-                    (timestamp, fqdn, duration, message,
+                    'INSERT INTO events(type, timestamp, fqdn, duration, message, extra) '
+                    'VALUES (?, ?, ?, ?, ?, ?)',
+                    (event_type, timestamp, fqdn, duration, message,
                      json.dumps(extra, cls=etcd.JSONEncoderCustomTypes)))
                 self.con.commit()
                 return
@@ -370,11 +424,9 @@ class EventLogChunk(object):
             os.unlink(self.dbpath)
         self.log.info('Removed event log chunk')
 
-    def prune_old_events(self, before_timestamp, message=None, limit=10000):
-        sql = 'DELETE FROM EVENTS WHERE timestamp < %s' % before_timestamp
-        if message:
-            sql += ' AND MESSAGE="%s"' % message
-        sql += ' LIMIT %d' % limit
+    def prune_old_events(self, before_timestamp, event_type, limit=10000):
+        sql = ('DELETE FROM EVENTS WHERE timestamp < %s AND TYPE="%s" LIMIT %d'
+               % (before_timestamp, event_type, limit))
 
         cur = self.con.cursor()
         cur.execute(sql)
@@ -382,8 +434,10 @@ class EventLogChunk(object):
         cur.execute('SELECT CHANGES()')
         changes = cur.fetchone()[0]
         if changes > 0:
-            self.log.with_fields({'message': message}).info(
-                'Removed %d old events' % changes)
+            self.log.with_fields({
+                'before_timestamp': before_timestamp,
+                'event_type': event_type
+                }).info('Removed %d old events' % changes)
         self.con.commit()
         if changes == limit:
             self.log.info('Vacuuming event database')

@@ -3,6 +3,7 @@ from shakenfist_utilities import logs
 import time
 
 from shakenfist import etcd
+from shakenfist.eventlog import EVENT_TYPE_AUDIT
 from shakenfist import exceptions
 from shakenfist.node import (
     Nodes, active_states_filter as node_active_states_filter)
@@ -20,12 +21,12 @@ def get_node_metrics(filters):
             if new_metrics:
                 new_metrics = new_metrics.get('metrics', {})
             else:
-                n.add_event('empty metrics from database for node')
+                n.add_event(EVENT_TYPE_AUDIT, 'empty metrics from database for node')
                 new_metrics = {}
             metrics[n.uuid] = new_metrics
 
         except exceptions.ReadException:
-            n.add_event('refreshing metrics for node failed')
+            n.add_event(EVENT_TYPE_AUDIT, 'refreshing metrics for node failed')
 
     return metrics
 

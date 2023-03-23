@@ -187,8 +187,27 @@ class SFConfig(BaseSettings):
     USAGE_EVENT_FREQUENCY: int = Field(
         60, description='How frequently to collect usage events.'
     )
-    MAX_NODE_RESOURCE_EVENT_AGE: int = Field(
-        3600 * 24 * 7, description='How long to retain node resource events.'
+
+    MAX_AUDIT_EVENT_AGE: int = Field(
+        3600 * 24 * 90, description='How long to retain audit events.'
+    )
+    MAX_MUTATE_EVENT_AGE: int = Field(
+        3600 * 24 * 90, description='How long to retain mutate events.'
+    )
+    MAX_STATUS_EVENT_AGE: int = Field(
+        3600 * 24 * 7, description='How long to retain status events.'
+    )
+    MAX_USAGE_EVENT_AGE: int = Field(
+        3600 * 24 * 30, description='How long to retain usage events.'
+    )
+    MAX_RESOURCES_EVENT_AGE: int = Field(
+        3600 * 24 * 7, description='How long to retain resources events.'
+    )
+    MAX_PRUNE_EVENT_AGE: int = Field(
+        3600 * 24 * 30, description='How long to retain prune events.'
+    )
+    MAX_HISTORIC_EVENT_AGE: int = Field(
+        3600 * 24 * 90, description='How long to retain historic events.'
     )
 
     # Blob options

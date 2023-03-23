@@ -24,6 +24,7 @@ from shakenfist import blob
 from shakenfist.config import config
 from shakenfist import constants
 from shakenfist import etcd
+from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS
 from shakenfist import exceptions
 from shakenfist.metrics import get_minimum_object_version as gmov
 from shakenfist import network
@@ -633,7 +634,7 @@ class Instance(dbo):
         if self.is_powered_on():
             self.state = self.STATE_CREATED
         else:
-            self.add_event('instance failed to power on')
+            self.add_event(EVENT_TYPE_AUDIT, 'instance failed to power on')
             self.enqueue_delete_due_error('Instance failed to power on')
 
     def _delete_on_hypervisor(self):
@@ -797,7 +798,8 @@ class Instance(dbo):
                                 'Image %s is missing' % disk['blob_uuid'])
 
                         b = blob.Blob.from_db(disk['blob_uuid'])
-                        b.add_event('Instance %s is using blob' % self.uuid)
+                        b.add_event(
+                            EVENT_TYPE_AUDIT, 'instance %s is using blob' % self.uuid)
                         b.ref_count_inc(self)
 
                         with util_general.RecordedOperation('detect cdrom images', self):
@@ -1062,7 +1064,8 @@ class Instance(dbo):
                     raise exceptions.NVRAMTemplateMissing(
                         'Blob %s does not exist' % self.nvram_template)
                 b.ensure_local([], instance_object=self)
-                b.add_event('Instance %s is using blob' % self.uuid)
+                b.add_event(
+                    EVENT_TYPE_AUDIT, 'instance %s is using blob' % self.uuid)
                 b.ref_count_inc(self)
                 shutil.copyfile(
                     blob.Blob.filepath(b.uuid), os.path.join(self.instance_path, 'nvram'))
@@ -1160,7 +1163,9 @@ class Instance(dbo):
                                   'Address already in use') != -1 or
                       str(e).find('reds_init_socket: binding socket') != -1):
                     self.add_event(
-                        'instance ports clash during boot attempt: %s' % e)
+                        EVENT_TYPE_STATUS,
+                        'instance ports clash during boot attempt',
+                        extra={'message': str(e)})
 
                     # Free those ports and pick some new ones
                     ports = self.ports
@@ -1181,13 +1186,14 @@ class Instance(dbo):
                     self.allocate_instance_ports()
                     return False
                 else:
-                    self.add_event('instance start error',
-                                   extra={'message': str(e)})
+                    self.add_event(
+                        EVENT_TYPE_AUDIT, 'instance start error',
+                        extra={'message': str(e)})
                     return False
 
             inst.setAutostart(1)
             self.update_power_state(lc.extract_power_state(inst))
-            self.add_event('poweron')
+            self.add_event(EVENT_TYPE_AUDIT, 'poweron')
             return True
 
     def power_off(self):
@@ -1205,7 +1211,7 @@ class Instance(dbo):
 
             self.agent_state = 'not ready (instance powered off)'
             self.update_power_state('off')
-            self.add_event('poweroff')
+            self.add_event(EVENT_TYPE_AUDIT, 'poweroff')
 
     def reboot(self, hard=False):
         with util_libvirt.LibvirtConnection() as lc:
@@ -1219,10 +1225,10 @@ class Instance(dbo):
 
             if not hard:
                 inst.reboot(flags=lc.libvirt.VIR_DOMAIN_REBOOT_ACPI_POWER_BTN)
-                self.add_event('soft reboot')
+                self.add_event(EVENT_TYPE_AUDIT, 'soft reboot')
             else:
                 inst.reset()
-                self.add_event('hard reboot')
+                self.add_event(EVENT_TYPE_AUDIT, 'hard reboot')
 
     def pause(self):
         with util_libvirt.LibvirtConnection() as lc:
@@ -1237,7 +1243,7 @@ class Instance(dbo):
             inst.suspend()
             self.agent_state = 'not ready (instance paused)'
             self.update_power_state(lc.extract_power_state(inst))
-            self.add_event('pause')
+            self.add_event(EVENT_TYPE_AUDIT, 'pause')
 
     def unpause(self):
         with util_libvirt.LibvirtConnection() as lc:
@@ -1251,7 +1257,7 @@ class Instance(dbo):
 
             inst.resume()
             self.update_power_state(lc.extract_power_state(inst))
-            self.add_event('unpause')
+            self.add_event(EVENT_TYPE_AUDIT, 'unpause')
 
     def get_console_data(self, length):
         console_path = os.path.join(self.instance_path, 'console.log')
@@ -1272,7 +1278,7 @@ class Instance(dbo):
         if not os.path.exists(console_path):
             return
         os.truncate(console_path, 0)
-        self.add_event('console log cleared')
+        self.add_event(EVENT_TYPE_AUDIT, 'console log cleared')
 
     def enqueue_delete_remote(self, node):
         etcd.enqueue(node, {
@@ -1362,7 +1368,7 @@ class Instance(dbo):
                                            thin=thin)],
                 })
 
-        self.add_event('snapshot', extra=out)
+        self.add_event(EVENT_TYPE_AUDIT, 'snapshot', extra=out)
         return out
 
 

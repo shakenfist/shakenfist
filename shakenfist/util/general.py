@@ -15,6 +15,7 @@ import uuid
 # set of shakenfist modules, mainly exceptions, and specific
 # other util modules.
 from shakenfist import eventlog
+from shakenfist.eventlog import EVENT_TYPE_STATUS
 
 
 LOG, _ = logs.setup(__name__)
@@ -34,7 +35,7 @@ class RecordedOperation():
         object_type, object_uuid = self.unique_label()
         if object_uuid:
             if object_type:
-                eventlog.add_event(object_type, object_uuid,
+                eventlog.add_event(EVENT_TYPE_STATUS, object_type, object_uuid,
                                    '%s complete' % self.operation, duration)
             else:
                 LOG.with_fields({

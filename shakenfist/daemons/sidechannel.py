@@ -11,6 +11,7 @@ import time
 
 from shakenfist.daemons import daemon
 from shakenfist import eventlog
+from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS
 from shakenfist import instance
 from shakenfist.util import libvirt as util_libvirt
 
@@ -59,7 +60,7 @@ class SFSocketAgent(protocol.SocketAgent):
             self.log.debug('Not receiving traffic, aborting.')
             if self.system_boot_time != 0:
                 self.instance.add_event(
-                    'agent has gone silent, restarting channel')
+                    EVENT_TYPE_STATUS, 'agent has gone silent, restarting channel')
 
             # Attempt to close, but the OS might already think its closed
             try:
@@ -78,7 +79,7 @@ class SFSocketAgent(protocol.SocketAgent):
     def _record_system_boot_time(self, sbt):
         if sbt != self.system_boot_time:
             if self.system_boot_time != 0:
-                self.instance.add_event('reboot detected')
+                self.instance.add_event(EVENT_TYPE_AUDIT, 'reboot detected')
             self.system_boot_time = sbt
             self.instance.agent_system_boot_time = sbt
 
@@ -131,7 +132,7 @@ class SFSocketAgent(protocol.SocketAgent):
         self.send_packet({'command': 'gather-facts'})
 
     def gather_facts_response(self, packet):
-        self.instance.add_event('received system facts')
+        self.instance.add_event(EVENT_TYPE_AUDIT, 'received system facts')
         self.instance.agent_facts = packet.get('result', {})
 
     def get_file(self, path):
@@ -208,7 +209,7 @@ class Monitor(daemon.Daemon):
         console_path = os.path.join(inst.instance_path, 'console.log')
         while not os.path.exists(console_path):
             time.sleep(1)
-        inst.add_event('detected console log')
+        inst.add_event(EVENT_TYPE_STATUS, 'detected console log')
 
         sc_clients = {}
         sc_connected = {}
@@ -253,7 +254,7 @@ class Monitor(daemon.Daemon):
                         for packet in sc_clients[chan].find_packets():
                             if not sc_connected.get(chan, False):
                                 inst.add_event(
-                                    'sidechannel %s connected' % chan)
+                                    EVENT_TYPE_AUDIT, 'sidechannel %s connected' % chan)
                                 sc_connected[chan] = True
 
                             sc_clients[chan].dispatch_packet(
@@ -300,7 +301,8 @@ class Monitor(daemon.Daemon):
                         # Reap process
                         monitors[instance_uuid].join(1)
                         eventlog.add_event(
-                            'instance', instance_uuid, 'sidechannel monitor crashed')
+                            EVENT_TYPE_AUDIT, 'instance', instance_uuid,
+                            'sidechannel monitor crashed')
                         del monitors[instance_uuid]
 
                 # Audit desired monitors
@@ -337,7 +339,8 @@ class Monitor(daemon.Daemon):
 
                     monitors[instance_uuid] = p
                     eventlog.add_event(
-                        'instance', instance_uuid, 'sidechannel monitor started')
+                        EVENT_TYPE_AUDIT, 'instance', instance_uuid,
+                        'sidechannel monitor started')
 
                 # Cleanup extra monitors
                 for instance_uuid in extra_instances:
@@ -350,7 +353,8 @@ class Monitor(daemon.Daemon):
 
                     del monitors[instance_uuid]
                     eventlog.add_event(
-                        'instance', instance_uuid, 'sidechannel monitor finished')
+                        EVENT_TYPE_AUDIT, 'instance', instance_uuid,
+                        'sidechannel monitor finished')
 
                 self.exit.wait(1)
 

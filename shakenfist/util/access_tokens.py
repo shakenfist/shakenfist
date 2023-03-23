@@ -2,6 +2,7 @@ import datetime
 from flask_jwt_extended import create_access_token
 
 from shakenfist.config import config
+from shakenfist.eventlog import EVENT_TYPE_AUDIT
 
 
 def create_token(ns, keyname, nonce, duration=config.API_TOKEN_DURATION):
@@ -13,7 +14,7 @@ def create_token(ns, keyname, nonce, duration=config.API_TOKEN_DURATION):
         },
         expires_delta=datetime.timedelta(minutes=duration))
     ns.add_event(
-        'Token created from key',
+        EVENT_TYPE_AUDIT, 'token created from key',
         extra={
             'keyname': keyname,
             'nonce': nonce,
