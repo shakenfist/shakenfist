@@ -710,7 +710,7 @@
 <h1 id="events">Events</h1>
 <p>Events are Shaken Fist's audit log mechanism. Many operations, ranging from
 creation and subsequent use of an authentication token, to any change in the data
-for an object, will result in an event being created in the audit log for the
+for an object, will result in an event being created in the event log for the
 relevant object. Importantly, regular "usage events" are also emitted, which we
 expect would form the basis for a consumption based billing system.</p>
 <p>Events may be requested using the <code>sf-client ...object... events</code> command, for
@@ -720,6 +720,30 @@ relevant artifact.</p>
 systems which consume events. This will remain true until we are more confident
 that all relevant audit lock events are being collected. At that point we will
 standardize and stabilize the interface.</p>
+<p>As of v0.7, each event log entry has a type. The currently implemented types
+are:</p>
+<ul>
+<li>audit: audit log entries such as object creation or deletion, and authentication.</li>
+<li>mutate: object modifications which are not an audit log entry, such as minor updates.</li>
+<li>status: status messages useful to a user, such as progress of fetching an image.</li>
+<li>usage: billing information.</li>
+<li>resources: cluster resource usage information of interest to an operator.</li>
+<li>prune: messages relating to pruning of other message types.</li>
+<li>historic: events from before the type system was introduced.</li>
+</ul>
+<p>For each of these types, an operator can configure a retention period. The
+default periods are:</p>
+<ul>
+<li>audit (MAX_AUDIT_EVENT_AGE): 90 days.</li>
+<li>mutate (MAX_MUTATE_EVENT_AGE): 90 days.</li>
+<li>status (MAX_STATUS_EVENT_AGE): 7 days.</li>
+<li>usage (MAX_USAGE_EVENT_AGE): 30 days.</li>
+<li>resources (MAX_RESOURCES_EVENT_AGE): 7 days.</li>
+<li>prune (MAX_PRUNE_EVENT_AGE): 30 days.</li>
+<li>historic (MAX_HISTORIC_EVENT_AGE): 90 days.</li>
+</ul>
+<p>To permanently retain a type of event log entry, set the corresponding configuration
+value to -1.</p>
 
 
 
