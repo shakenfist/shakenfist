@@ -1,10 +1,14 @@
 from collections import defaultdict
 from shakenfist_utilities import logs
+import os
+import pathlib
 import time
 
+from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import eventlog
+from shakenfist.eventlog import EVENT_TYPE_HISTORIC
 from shakenfist import node
 from shakenfist.util import general as util_general
 
@@ -48,8 +52,9 @@ class Monitor(daemon.WorkerPoolDaemon):
                         with eventlog.EventLog(objtype, objuuid) as eventdb:
                             for k, v in results[(objtype, objuuid)]:
                                 eventdb.write_event(
-                                    v['event_type'], v['timestamp'], v['fqdn'],
-                                    v['duration'], v['message'], extra=v.get('extra'))
+                                    v.get('event_type', EVENT_TYPE_HISTORIC),
+                                    v['timestamp'], v['fqdn'], v['duration'],
+                                    v['message'], extra=v.get('extra'))
                                 etcd.WrappedEtcdClient().delete(k)
                     except Exception as e:
                         util_general.ignore_exception(
@@ -59,8 +64,26 @@ class Monitor(daemon.WorkerPoolDaemon):
                     start_prune = time.time()
 
                     if time.time() - last_prune > 3600:
-                        # Prune old events from nodes
-                        # TODO(mikal)
+                        # Prune old events
+                        event_path = os.path.join(config.STORAGE_PATH, 'events')
+                        p = pathlib.Path(event_path)
+                        for entpath in p.glob('**/*.lock'):
+                            entpath = str(entpath)[len(event_path) + 1:-5]
+                            objtype, _, objuuid = entpath.split('/')
+
+                            with eventlog.EventLog(objtype, objuuid) as eventdb:
+                                for event_type in ['audit', 'mutate', 'status',
+                                                   'usage', 'resources', 'prune',
+                                                   'historic']:
+                                    max_age = getattr(
+                                        config, 'MAX_%s_EVENT_AGE' % event_type.upper())
+                                    if max_age == -1:
+                                        continue
+
+                                    eventdb.prune_old_events(
+                                        time.time() - max_age, event_type)
+
+                        self.log.info('Prune complete')
                         last_prune = time.time()
 
                     # Have a nap if pruning was quick
