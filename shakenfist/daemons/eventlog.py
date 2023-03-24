@@ -78,8 +78,8 @@ class Monitor(daemon.WorkerPoolDaemon):
                             with eventlog.EventLog(objtype, objuuid) as eventdb:
                                 count = 0
                                 for event_type in ['audit', 'mutate', 'status',
-                                                    'usage', 'resources', 'prune',
-                                                    'historic']:
+                                                   'usage', 'resources', 'prune',
+                                                   'historic']:
                                     max_age = getattr(
                                         config, 'MAX_%s_EVENT_AGE' % event_type.upper())
                                     if max_age == -1:

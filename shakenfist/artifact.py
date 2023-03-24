@@ -13,7 +13,7 @@ from shakenfist.baseobject import (
 from shakenfist import blob
 from shakenfist.config import config
 from shakenfist import etcd
-from shakenfist.eventlog import EVENT_TYPE_AUDIT
+from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_USAGE
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist.metrics import get_minimum_object_version as gmov
@@ -269,6 +269,21 @@ class Artifact(dbo):
         for key in sorted(indices):
             yield indices[key]
 
+    def update_billing(self):
+        total_used_storage = 0
+        for blob_index in self.get_all_indexes():
+            blob_uuid = blob_index['blob_uuid']
+            b = blob.Blob.from_db(blob_uuid)
+            if b:
+                # NOTE(mikal): I've decided not to include blob replication
+                # cost in this number, as that is a decision the cluster
+                # deployer machines (its a config option), not a decision
+                # the owner of the blob makes.
+                total_used_storage += int(b.size)
+
+        self.add_event(EVENT_TYPE_USAGE, 'usage', extra={'bytes': total_used_storage},
+                       suppress_event_logging=True)
+
     def add_index(self, blob_uuid):
         with self.get_lock_attr('index', 'Artifact index creation'):
             mri = self.most_recent_index
@@ -310,6 +325,8 @@ class Artifact(dbo):
                 new_blob.ref_count_inc(self)
             self.add_event(EVENT_TYPE_AUDIT, 'Added index %d to artifact' % index)
 
+            # There is an implied billing update in delete_old_versions, so we
+            # don't need one of our own here.
             self.delete_old_versions()
             return entry
 
@@ -319,9 +336,10 @@ class Artifact(dbo):
         max = self.max_versions
         if len(indexes) > max:
             for i in sorted(indexes)[:-max]:
-                self.del_index(i)
+                self.del_index(i, update_billing=False)
+        self.update_billing()
 
-    def del_index(self, index):
+    def del_index(self, index, update_billing=True):
         index_data = self._db_get_attribute('index_%012d' % index)
         if not index_data:
             self.log.withField('index', index).warn('Cannot find index in DB')
@@ -331,7 +349,10 @@ class Artifact(dbo):
         b = blob.Blob.from_db(index_data['blob_uuid'])
         if b and not self.in_memory_only:
             b.ref_count_dec(self)
+
         self.add_event(EVENT_TYPE_AUDIT, 'Deleted index %d from artifact' % index)
+        if update_billing:
+            self.update_billing()
 
     def delete(self):
         self.state = self.STATE_DELETED
