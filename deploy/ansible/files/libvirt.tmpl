@@ -163,7 +163,7 @@
       <alias name='channel2'/>
       <address type='virtio-serial' controller='0' bus='0' port='3'/>
     </channel>
-    
+
     <graphics type='spice' port='{{vdi_port}}' tlsPort='{{vdi_tls_port}}' listen='0.0.0.0'>
       <listen type='address' address='0.0.0.0'/>
       <channel name='main' mode='secure'/>
@@ -174,6 +174,12 @@
       <channel name='record' mode='secure'/>
       <channel name='smartcard' mode='secure'/>
       <channel name='usbredir' mode='secure'/>
+
+      <image compression="auto_glz"/>
+      <jpeg compression="always"/>
+      <zlib compression="always"/>
+      <playback compression="on"/>
+      <streaming mode="all"/>
     </graphics>
     {%- endif %}
 
