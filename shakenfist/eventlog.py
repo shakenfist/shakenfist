@@ -221,22 +221,23 @@ class EventLog(object):
 
     def read_events(self, limit=100):
         with self.lock:
-            events = []
+            count = 0
 
             for year, month in self._get_all_chunks():
                 try:
                     elc = EventLogChunk(self.objtype, self.objuuid, year, month)
-                    events.append(elc.read_events(limit=(limit - len(events))))
+                    for e in elc.read_events(limit=(limit - count)):
+                        count += 1
+                        yield e
                     elc.close()
+
+                    if count >= limit:
+                        break
+
                 except sqlite3.DatabaseError:
                     self.log.with_fields({'chunk': '%04d%02d' % (year, month)}).error(
                         'Chunk corrupt, moving aside.')
                     os.rename(elc.dbpath, elc.dbpath + '.corrupt')
-
-                if len(events) >= limit:
-                    return events
-
-            return events
 
     def delete(self):
         with self.lock:
