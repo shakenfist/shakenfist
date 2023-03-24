@@ -19,7 +19,6 @@ LOG, _ = logs.setup(__name__)
 class Monitor(daemon.WorkerPoolDaemon):
     def run(self):
         LOG.info('Starting')
-        last_prune = 0
         prune_targets = []
 
         eventlog.upgrade_data_store()
@@ -62,45 +61,40 @@ class Monitor(daemon.WorkerPoolDaemon):
                             'failed to write event for %s %s' % (objtype, objuuid), e)
 
                 if not results:
-                    start_prune = time.time()
+                    # Prune old events
+                    if not prune_targets:
+                        event_path = os.path.join(config.STORAGE_PATH, 'events')
+                        p = pathlib.Path(event_path)
+                        for entpath in p.glob('**/*.lock'):
+                            entpath = str(entpath)[len(event_path) + 1:-5]
+                            objtype, _, objuuid = entpath.split('/')
+                            prune_targets.append([objtype, objuuid])
 
-                    if time.time() - last_prune > 3600:
-                        # Prune old events
-                        if not prune_targets:
-                            event_path = os.path.join(config.STORAGE_PATH, 'events')
-                            p = pathlib.Path(event_path)
-                            for entpath in p.glob('**/*.lock'):
-                                entpath = str(entpath)[len(event_path) + 1:-5]
-                                objtype, _, objuuid = entpath.split('/')
-                                prune_targets.append([objtype, objuuid])
+                    else:
+                        start_prune = time.time()
+                        while time.time() - start_prune < 10 and prune_targets:
+                            objtype, objuuid = prune_targets.pop()
 
-                        else:
-                            while time.time() - start_prune < 10:
-                                objtype, objuuid = prune_targets.pop()
+                            with eventlog.EventLog(objtype, objuuid) as eventdb:
+                                count = 0
+                                for event_type in ['audit', 'mutate', 'status',
+                                                    'usage', 'resources', 'prune',
+                                                    'historic']:
+                                    max_age = getattr(
+                                        config, 'MAX_%s_EVENT_AGE' % event_type.upper())
+                                    if max_age == -1:
+                                        continue
 
-                                with eventlog.EventLog(objtype, objuuid) as eventdb:
-                                    count = 0
-                                    for event_type in ['audit', 'mutate', 'status',
-                                                       'usage', 'resources', 'prune',
-                                                       'historic']:
-                                        max_age = getattr(
-                                            config, 'MAX_%s_EVENT_AGE' % event_type.upper())
-                                        if max_age == -1:
-                                            continue
+                                    count += eventdb.prune_old_events(
+                                        time.time() - max_age, event_type)
 
-                                        count += eventdb.prune_old_events(
-                                            time.time() - max_age, event_type)
+                                if count > 0:
+                                    self.log.with_fields({objtype: objuuid}).info(
+                                        'Pruned %d events' % count)
 
-                                    if count > 0:
-                                        self.log.with_fields({objtype: objuuid}).info(
-                                            'Pruned %d events' % count)
-
-                        self.log.info('Prune complete')
-                        last_prune = time.time()
-
-                    # Have a nap if pruning was quick
-                    if time.time() - start_prune < 1:
-                        time.sleep(1)
+                        # Have a nap if pruning was quick
+                        if time.time() - start_prune < 1:
+                            time.sleep(1)
 
             except Exception as e:
                 util_general.ignore_exception('eventlog daemon', e)
