@@ -20,6 +20,7 @@ class Monitor(daemon.WorkerPoolDaemon):
     def run(self):
         LOG.info('Starting')
         last_prune = 0
+        prune_targets = []
 
         eventlog.upgrade_data_store()
 
@@ -65,28 +66,34 @@ class Monitor(daemon.WorkerPoolDaemon):
 
                     if time.time() - last_prune > 3600:
                         # Prune old events
-                        event_path = os.path.join(config.STORAGE_PATH, 'events')
-                        p = pathlib.Path(event_path)
-                        for entpath in p.glob('**/*.lock'):
-                            entpath = str(entpath)[len(event_path) + 1:-5]
-                            objtype, _, objuuid = entpath.split('/')
+                        if not prune_targets:
+                            event_path = os.path.join(config.STORAGE_PATH, 'events')
+                            p = pathlib.Path(event_path)
+                            for entpath in p.glob('**/*.lock'):
+                                entpath = str(entpath)[len(event_path) + 1:-5]
+                                objtype, _, objuuid = entpath.split('/')
+                                prune_targets.append([objtype, objuuid])
 
-                            with eventlog.EventLog(objtype, objuuid) as eventdb:
-                                count = 0
-                                for event_type in ['audit', 'mutate', 'status',
-                                                   'usage', 'resources', 'prune',
-                                                   'historic']:
-                                    max_age = getattr(
-                                        config, 'MAX_%s_EVENT_AGE' % event_type.upper())
-                                    if max_age == -1:
-                                        continue
+                        else:
+                            while time.time() - start_prune < 10:
+                                objtype, objuuid = prune_targets.pop()
 
-                                    count += eventdb.prune_old_events(
-                                        time.time() - max_age, event_type)
+                                with eventlog.EventLog(objtype, objuuid) as eventdb:
+                                    count = 0
+                                    for event_type in ['audit', 'mutate', 'status',
+                                                       'usage', 'resources', 'prune',
+                                                       'historic']:
+                                        max_age = getattr(
+                                            config, 'MAX_%s_EVENT_AGE' % event_type.upper())
+                                        if max_age == -1:
+                                            continue
 
-                                if count > 0:
-                                    self.log.with_fields({objtype: objuuid}).info(
-                                        'Pruned %d events' % count)
+                                        count += eventdb.prune_old_events(
+                                            time.time() - max_age, event_type)
+
+                                    if count > 0:
+                                        self.log.with_fields({objtype: objuuid}).info(
+                                            'Pruned %d events' % count)
 
                         self.log.info('Prune complete')
                         last_prune = time.time()
