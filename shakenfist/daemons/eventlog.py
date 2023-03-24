@@ -72,6 +72,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                             objtype, _, objuuid = entpath.split('/')
 
                             with eventlog.EventLog(objtype, objuuid) as eventdb:
+                                count = 0
                                 for event_type in ['audit', 'mutate', 'status',
                                                    'usage', 'resources', 'prune',
                                                    'historic']:
@@ -80,8 +81,12 @@ class Monitor(daemon.WorkerPoolDaemon):
                                     if max_age == -1:
                                         continue
 
-                                    eventdb.prune_old_events(
+                                    count += eventdb.prune_old_events(
                                         time.time() - max_age, event_type)
+
+                                if count > 0:
+                                    self.log.with_fields({objtype: objuuid}).info(
+                                        'Pruned %d events' % count)
 
                         self.log.info('Prune complete')
                         last_prune = time.time()

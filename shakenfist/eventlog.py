@@ -202,9 +202,10 @@ class EventLog(object):
                                 extra=extra)
 
     def _get_all_chunks(self):
-        p = pathlib.Path()
+        p = pathlib.Path(self.dbdir)
         yearmonths = []
         for ent in p.glob('%s*' % self.objuuid):
+            ent = str(ent)
             if ent.endswith('.lock'):
                 continue
             if ent.endswith('.corrupt'):
