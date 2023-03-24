@@ -403,6 +403,49 @@
         name: systemd-logind
         state: restarted
 
+    - name: Configure journald to not consume heaps of disks
+      copy:
+        content: |
+          [Journal]
+          #Storage=auto
+          #Compress=yes
+          #Seal=yes
+          #SplitMode=uid
+          #SyncIntervalSec=5m
+          #RateLimitIntervalSec=30s
+          #RateLimitBurst=10000
+          #SystemMaxUse=
+          #SystemKeepFree=
+          SystemMaxFileSize=1000M
+          #SystemMaxFiles=100
+          #RuntimeMaxUse=
+          #RuntimeKeepFree=
+          #RuntimeMaxFileSize=
+          #RuntimeMaxFiles=100
+          #MaxRetentionSec=
+          #MaxFileSec=1month
+          #ForwardToSyslog=yes
+          #ForwardToKMsg=no
+          #ForwardToConsole=no
+          #ForwardToWall=yes
+          #TTYPath=/dev/console
+          #MaxLevelStore=debug
+          #MaxLevelSyslog=debug
+          #MaxLevelKMsg=notice
+          #MaxLevelConsole=info
+          #MaxLevelWall=emerg
+          #LineMax=48K
+          #ReadKMsg=yes
+          #Audit=no
+        dest: /etc/systemd/journald.conf
+        owner: root
+        mode: u=r,g=r,o=r
+
+    - name: Restart journald
+      service:
+        name: systemd-journald
+        state: restarted
+
 - hosts: hypervisors
   any_errors_fatal: true
   become: yes
