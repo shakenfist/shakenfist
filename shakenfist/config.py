@@ -50,11 +50,6 @@ class SFConfig(BaseSettings):
         description='How long we wait for an async operation to complete '
                     'before returning to the user'
     )
-    PROMETHEUS_METRICS_PORT: int = Field(
-        13001,
-        description='Where to expose internal metrics. Do not allow '
-                    'access from untrusted clients!'
-    )
     AUTH_SECRET_SEED: SecretStr = Field(
         'foo', description='A random string to seed auth secrets with'
     )
@@ -81,6 +76,16 @@ class SFConfig(BaseSettings):
     API_ADVERTISED_HTTP_SCHEMES: str = Field(
         'http',
         description='Space separated list of schemes (http, https) for the API'
+    )
+
+    # Monitoring Options
+    EVENTLOG_METRICS_PORT: int = Field(
+        13002,
+        description='Where to expose internal metrics from the eventlog daemon.'
+    )
+    RESOURCES_METRICS_PORT: int = Field(
+        13001,
+        description='Where to expose internal metrics from the resources daemon.'
     )
 
     # Scheduler Options

@@ -17,7 +17,7 @@ LOG, _ = logs.setup(__name__)
 
 
 # NOTE(mikal): if you add to this list, you must also update the MAX_AGE config
-# options, and the pruner at the end of daemons.eventlog.Monitor.run.
+# options.
 EVENT_TYPE_AUDIT = 'audit'
 EVENT_TYPE_MUTATE = 'mutate'
 EVENT_TYPE_STATUS = 'status'
@@ -25,12 +25,14 @@ EVENT_TYPE_USAGE = 'usage'
 EVENT_TYPE_RESOURCES = 'resources'
 EVENT_TYPE_PRUNE = 'prune'
 
-
-OBJECT_TYPES = ['artifact', 'blob', 'instance', 'namespace', 'network',
-                'networkinterface', 'node', 'upload']
-
 # Use only for events which pre-date the type system
 EVENT_TYPE_HISTORIC = 'historic'
+
+EVENT_TYPES = [EVENT_TYPE_AUDIT, EVENT_TYPE_MUTATE, EVENT_TYPE_STATUS,
+               EVENT_TYPE_USAGE, EVENT_TYPE_RESOURCES, EVENT_TYPE_PRUNE,
+               EVENT_TYPE_HISTORIC]
+OBJECT_TYPES = ['artifact', 'blob', 'instance', 'namespace', 'network',
+                'networkinterface', 'node', 'upload']
 
 
 def add_event(event_type, object_type, object_uuid, message, duration=None,

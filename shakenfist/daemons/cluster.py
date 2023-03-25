@@ -17,7 +17,7 @@ from shakenfist.blob import Blob, Blobs, placement_filter
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
-from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_USAGE
+from shakenfist.eventlog import EVENT_TYPE_AUDIT
 from shakenfist import instance
 from shakenfist import namespace
 from shakenfist import network
@@ -50,29 +50,6 @@ class Monitor(daemon.Daemon):
                 self.is_elected = True
                 return
             self.exit.wait(10)
-
-    def _cluster_wide_billing(self, last_billing):
-        # Emit billing statistics for artifacts in namespaces
-        if time.time() - last_billing > config.USAGE_EVENT_FREQUENCY:
-            for a in artifact.Artifacts([active_states_filter]):
-                total_used_storage = 0
-                for blob_index in a.get_all_indexes():
-                    blob_uuid = blob_index['blob_uuid']
-                    b = Blob.from_db(blob_uuid)
-                    if b:
-                        # NOTE(mikal): I've decided not to include blob replication
-                        # cost in this number, as that is a decision the cluster
-                        # deployer machines (its a config option), not a decision
-                        # the owner of the blob makes.
-                        total_used_storage += int(b.size)
-
-                a.add_event(EVENT_TYPE_USAGE, 'usage',
-                            extra={'bytes': total_used_storage},
-                            suppress_event_logging=True)
-
-            return True
-
-        return False
 
     def _cluster_wide_cleanup(self, last_loop_run):
         LOG.info('Running cluster maintenance')
@@ -359,7 +336,6 @@ class Monitor(daemon.Daemon):
         LOG.info('Starting')
 
         last_loop_run = 0
-        last_billing = 0
         while not self.exit.is_set():
             setproctitle.setproctitle(daemon.process_name('cluster') + ' idle')
             self._await_election()
@@ -415,10 +391,6 @@ class Monitor(daemon.Daemon):
 
                 setproctitle.setproctitle(
                     daemon.process_name('cluster') + ' active')
-                self.lock.refresh()
-
-                if self._cluster_wide_billing(last_billing):
-                    last_billing = time.time()
                 self.lock.refresh()
 
                 self._cluster_wide_cleanup(last_loop_run)
