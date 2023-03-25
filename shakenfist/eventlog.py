@@ -228,7 +228,8 @@ class EventLog(object):
 
     def read_events(self, limit=100):
         with self.lock:
-            self._read_events_inner(limit=limit)
+            for e in self._read_events_inner(limit=limit):
+                yield e
 
     def _read_events_inner(self, limit=100):
         count = 0
