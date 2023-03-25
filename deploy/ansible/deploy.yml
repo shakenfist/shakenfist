@@ -718,14 +718,14 @@
               static_configs:
                 - targets: [
                       {% for svr in groups.allsf %}
-                        '{{hostvars[svr]['node_mesh_ip']}}:9100',
+                        '{{hostvars[svr]['node_name']}}:9100',
                      {% endfor %}
                     ]
             - job_name: 'shakenfist'
               static_configs:
                 - targets: [
                       {% for svr in groups.sf_prometheus_exporters %}
-                        '{{hostvars[svr]['node_mesh_ip']}}:13001',
+                        '{{hostvars[svr]['node_name']}}:13001',
                       {% endfor %}
                     ]
                 # metric_relabel_configs:
@@ -736,7 +736,7 @@
               static_configs:
                 - targets: [
                       {% for svr in groups.eventlog_node %}
-                        '{{hostvars[svr]['node_mesh_ip']}}:13002',
+                        '{{hostvars[svr]['node_name']}}:13002',
                       {% endfor %}
                     ]
                 # metric_relabel_configs:
@@ -747,7 +747,7 @@
               static_configs:
                 - targets: [
                       {% for svr in groups.etcd_master %}
-                        '{{hostvars[svr]['node_mesh_ip']}}:2379',
+                        '{{hostvars[svr]['node_name']}}:2379',
                       {% endfor %}
                     ]
                 # metric_relabel_configs:
