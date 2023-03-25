@@ -234,8 +234,8 @@ class EventLog(object):
         count = 0
 
         for year, month in self._get_all_chunks():
+            elc = EventLogChunk(self.objtype, self.objuuid, year, month)
             try:
-                elc = EventLogChunk(self.objtype, self.objuuid, year, month)
                 for e in elc.read_events(limit=(limit - count)):
                     count += 1
                     yield e
@@ -270,8 +270,8 @@ class EventLog(object):
             removed = 0
 
             for year, month in self._get_all_chunks():
+                elc = EventLogChunk(self.objtype, self.objuuid, year, month)
                 try:
-                    elc = EventLogChunk(self.objtype, self.objuuid, year, month)
                     this_chunk_removed = elc.prune_old_events(
                         before_timestamp, event_type, limit=(limit - removed))
                     removed += this_chunk_removed
@@ -334,7 +334,7 @@ class EventLogChunk(object):
 
         self.dbdir = _shard_db_path(self.objtype, self.objuuid)
         self.dbpath = os.path.join(self.dbdir, self.objuuid + '.' + self.chunk)
-        self._bootstrap()
+        self.bootstrapped = False
 
     def _bootstrap(self):
         os.makedirs(self.dbdir, exist_ok=True)
@@ -427,9 +427,13 @@ class EventLogChunk(object):
                               % (time.time() - start_upgrade))
 
     def close(self):
-        self.con.close()
+        if self.bootstrapped:
+            self.con.close()
 
     def write_event(self, event_type, timestamp, fqdn, duration, message, extra=None):
+        if not self.bootstrapped:
+            self._bootstrap()
+
         attempts = 0
         while attempts < 3:
             try:
@@ -453,6 +457,9 @@ class EventLogChunk(object):
         }).error('Failed to record event after 3 retries')
 
     def read_events(self, limit=100):
+        if not self.bootstrapped:
+            self._bootstrap()
+
         cur = self.con.cursor()
         cur.execute('SELECT * FROM events ORDER BY TIMESTAMP DESC LIMIT %d'
                     % limit)
@@ -460,6 +467,9 @@ class EventLogChunk(object):
             yield dict(row)
 
     def count_events(self):
+        if not self.bootstrapped:
+            self._bootstrap()
+
         cur = self.con.cursor()
         cur.execute('SELECT COUNT(*) FROM events')
         return cur.fetchone()[0]
@@ -471,6 +481,9 @@ class EventLogChunk(object):
         self.log.info('Removed event log chunk')
 
     def prune_old_events(self, before_timestamp, event_type, limit=10000):
+        if not self.bootstrapped:
+            self._bootstrap()
+
         sql = ('DELETE FROM EVENTS WHERE timestamp < %s AND TYPE="%s" LIMIT %d'
                % (before_timestamp, event_type, limit))
 
