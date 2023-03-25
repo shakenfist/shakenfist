@@ -256,8 +256,8 @@ class EventLog(object):
 
     def _delete_inner(self):
         for year, month in self._get_all_chunks():
-                elc = EventLogChunk(self.objtype, self.objuuid, year, month)
-                elc.delete()
+            elc = EventLogChunk(self.objtype, self.objuuid, year, month)
+            elc.delete()
         self.log.info('Removed event log')
 
     def _delete_lock_file(self):
@@ -357,7 +357,6 @@ class EventLogChunk(object):
 
         else:
             # Open an existing database, which _might_ require upgrade
-            start_upgrade = time.time()
             cur.execute('SELECT * FROM version')
             ver = cur.fetchone()['version']
             start_ver = ver
@@ -371,7 +370,6 @@ class EventLogChunk(object):
                     'INSERT INTO events(timestamp, message) '
                     'VALUES (%f, "Upgraded database to version 2")'
                     % time.time())
-                self.log.info('Upgraded database from v1 to v2')
 
             if ver == 2:
                 ver = 3
@@ -386,7 +384,6 @@ class EventLogChunk(object):
                     'INSERT INTO events(timestamp, message) '
                     'VALUES (%f, "Upgraded database to version 3")'
                     % time.time())
-                self.log.info('Upgraded database from v2 to v3')
 
             if ver == 3:
                 ver = 4
@@ -401,7 +398,6 @@ class EventLogChunk(object):
                     'INSERT INTO events(timestamp, message) '
                     'VALUES (%f, "Upgraded database to version 4");'
                     % time.time())
-                self.log.info('Upgraded database from v3 to v4')
 
             if ver == 4:
                 ver = 5
@@ -413,7 +409,6 @@ class EventLogChunk(object):
                     'INSERT INTO events(type, timestamp, message) '
                     'VALUES ("audit", %f, "Upgraded database to version 2")'
                     % time.time())
-                self.log.info('Upgraded database from v1 to v2')
 
             if start_ver != ver:
                 self.con.execute('UPDATE version SET version = ?', (ver,))
@@ -423,8 +418,6 @@ class EventLogChunk(object):
                         'INSERT INTO events(type, timestamp, message) '
                         'VALUES ("audit", %f, "Compacted database")'
                         % time.time())
-                self.log.info('Database upgrade took %.02f seconds'
-                              % (time.time() - start_upgrade))
 
     def close(self):
         if self.bootstrapped:
