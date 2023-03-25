@@ -490,8 +490,6 @@ class EventLogChunk(object):
                 'before_timestamp': before_timestamp,
                 'event_type': event_type
                 }).info('Removed %d old events' % changes)
-        self.con.commit()
-        if changes == limit:
-            self.log.info('Vacuuming event database')
+            self.con.commit()
             cur.execute('VACUUM')
         return changes
