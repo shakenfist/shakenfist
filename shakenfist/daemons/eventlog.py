@@ -4,11 +4,14 @@ import os
 import pathlib
 import time
 
+from prometheus_client import Counter
+from prometheus_client import start_http_server
+
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist import eventlog
-from shakenfist.eventlog import EVENT_TYPE_HISTORIC
+from shakenfist.eventlog import EVENT_TYPES, EVENT_TYPE_HISTORIC
 from shakenfist import node
 from shakenfist.util import general as util_general
 
@@ -17,9 +20,21 @@ LOG, _ = logs.setup(__name__)
 
 
 class Monitor(daemon.WorkerPoolDaemon):
+    def __init__(self, id):
+        super(Monitor, self).__init__(id)
+        start_http_server(config.EVENTLOG_METRICS_PORT)
+
     def run(self):
         LOG.info('Starting')
         prune_targets = []
+
+        counters = {
+            'pruned_events': Counter('pruned_events', 'Number of pruned events')
+        }
+        for event_type in EVENT_TYPES:
+            counters[event_type] = Counter(
+                '%s_events' % event_type,
+                'Number of %s events seen' % event_type)
 
         eventlog.upgrade_data_store()
 
@@ -51,10 +66,12 @@ class Monitor(daemon.WorkerPoolDaemon):
                     try:
                         with eventlog.EventLog(objtype, objuuid) as eventdb:
                             for k, v in results[(objtype, objuuid)]:
+                                event_type = v.get('event_type', EVENT_TYPE_HISTORIC)
                                 eventdb.write_event(
-                                    v.get('event_type', EVENT_TYPE_HISTORIC),
+                                    event_type,
                                     v['timestamp'], v['fqdn'], v['duration'],
                                     v['message'], extra=v.get('extra'))
+                                counters[event_type].inc()
                                 etcd.WrappedEtcdClient().delete(k)
                     except Exception as e:
                         util_general.ignore_exception(
@@ -77,16 +94,16 @@ class Monitor(daemon.WorkerPoolDaemon):
 
                             with eventlog.EventLog(objtype, objuuid) as eventdb:
                                 count = 0
-                                for event_type in ['audit', 'mutate', 'status',
-                                                   'usage', 'resources', 'prune',
-                                                   'historic']:
+                                for event_type in EVENT_TYPES:
                                     max_age = getattr(
                                         config, 'MAX_%s_EVENT_AGE' % event_type.upper())
                                     if max_age == -1:
                                         continue
 
-                                    count += eventdb.prune_old_events(
+                                    c = eventdb.prune_old_events(
                                         time.time() - max_age, event_type)
+                                    counters['pruned_events'].inc(c)
+                                    count += c
 
                                 if count > 0:
                                     self.log.with_fields({objtype: objuuid}).info(

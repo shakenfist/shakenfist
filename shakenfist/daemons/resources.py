@@ -28,7 +28,7 @@ LOG, _ = logs.setup(__name__)
 class Monitor(daemon.Daemon):
     def __init__(self, id):
         super(Monitor, self).__init__(id)
-        start_http_server(config.PROMETHEUS_METRICS_PORT)
+        start_http_server(config.RESOURCES_METRICS_PORT)
 
         self.last_logged_resources = 0
 
