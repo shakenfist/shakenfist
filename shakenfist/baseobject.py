@@ -52,7 +52,7 @@ def get_minimum_object_version(objname):
         if state and state['value'] != DatabaseBackedObject.STATE_DELETED:
             metrics[node_name] = d
 
-    for possible_objname in constants.OBJECT_NAMES:
+    for possible_objname in OBJECT_NAMES:
         minimum = inf
         for entry in metrics:
             ver = metrics[entry].get(
@@ -63,6 +63,11 @@ def get_minimum_object_version(objname):
 
     VERSION_CACHE_AGE = time.time()
     return VERSION_CACHE[objname]
+
+
+# The names of our objects
+OBJECT_NAMES = ['artifact', 'blob', 'instance', 'namespace', 'network',
+                'networkinterface', 'node', 'upload']
 
 
 class DatabaseBackedObject(object):
