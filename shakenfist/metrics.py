@@ -2,6 +2,7 @@ from math import inf
 from shakenfist_utilities import logs
 import time
 
+from shakenfist import constants
 from shakenfist import etcd
 from shakenfist.eventlog import EVENT_TYPE_AUDIT
 from shakenfist import exceptions
@@ -38,10 +39,6 @@ def get_active_node_metrics():
 VERSION_CACHE = None
 VERSION_CACHE_AGE = 0
 
-# This doesn't use OBJECT_NAME_TO_CLASSES because of circular imports.
-OBJECT_NAMES = ['artifact', 'blob', 'instance', 'namespace', 'network',
-                'networkinterface', 'node']
-
 
 def get_minimum_object_version(objname):
     global VERSION_CACHE
@@ -55,7 +52,7 @@ def get_minimum_object_version(objname):
         return VERSION_CACHE[objname]
 
     metrics = get_node_metrics([])
-    for possible_objname in OBJECT_NAMES:
+    for possible_objname in constants.OBJECT_NAMES:
         minimum = inf
         for entry in metrics:
             ver = metrics[entry].get(
