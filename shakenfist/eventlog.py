@@ -218,8 +218,14 @@ class EventLog(object):
             if ent.endswith('.corrupt'):
                 continue
 
-            _, yearmonth = ent.split('.')
-            yearmonths.append(yearmonth)
+            try:
+                _, yearmonth = ent.split('.')
+                if '-' in yearmonth:
+                    # Entries like -journal, -wal, -shm that internals of sqlite
+                    continue
+                yearmonths.append(yearmonth)
+            except ValueError:
+                self.log.error('Could not parse yearmonth from chunk %s' % ent)
 
         for yearmonth in sorted(yearmonths, reverse=True):
             year = int(yearmonth[0:4])
