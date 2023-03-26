@@ -272,7 +272,7 @@ class EventLog(object):
         if os.path.exists(lockpath):
             os.remove(lockpath)
 
-    def prune_old_events(self, before_timestamp, event_type, limit=10000):
+    def prune_old_events(self, before_timestamp, event_type):
         with self.lock:
             removed = 0
 
@@ -280,7 +280,7 @@ class EventLog(object):
                 elc = EventLogChunk(self.objtype, self.objuuid, year, month)
                 try:
                     this_chunk_removed = elc.prune_old_events(
-                        before_timestamp, event_type, limit=(limit - removed))
+                        before_timestamp, event_type)
                     removed += this_chunk_removed
 
                     if this_chunk_removed > 0:
@@ -305,10 +305,6 @@ class EventLog(object):
                         'Chunk corrupt, moving aside.')
                     os.rename(elc.dbpath, elc.dbpath + '.corrupt')
                     this_chunk_removed = 0
-
-                if removed >= limit:
-                    self.log.info('Pruned %d events' % removed)
-                    return removed
 
             if removed > 0:
                 self.log.info('Pruned %d events' % removed)
@@ -480,12 +476,12 @@ class EventLogChunk(object):
             os.unlink(self.dbpath)
         self.log.info('Removed event log chunk')
 
-    def prune_old_events(self, before_timestamp, event_type, limit=10000):
+    def prune_old_events(self, before_timestamp, event_type):
         if not self.bootstrapped:
             self._bootstrap()
 
-        sql = ('DELETE FROM EVENTS WHERE timestamp < %s AND TYPE="%s" LIMIT %d'
-               % (before_timestamp, event_type, limit))
+        sql = ('DELETE FROM EVENTS WHERE timestamp < %s AND TYPE="%s"'
+               % (before_timestamp, event_type))
 
         cur = self.con.cursor()
         cur.execute(sql)
