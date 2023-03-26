@@ -10,9 +10,9 @@ import uuid
 from shakenfist.config import config
 from shakenfist.constants import GiB
 from shakenfist.eventlog import EVENT_TYPE_AUDIT
+from shakenfist import etcd
 from shakenfist import exceptions
 from shakenfist import instance
-from shakenfist.metrics import get_active_node_metrics
 from shakenfist import networkinterface
 from shakenfist.node import (
     Nodes, active_states_filter as node_active_states_filter)
@@ -41,6 +41,25 @@ def get_network_node():
             return CACHED_NETWORK_NODE
 
     raise exceptions.NoNetworkNode('Cannot find network node')
+
+
+def get_active_node_metrics():
+    metrics = {}
+
+    for n in Nodes([node_active_states_filter]):
+        try:
+            new_metrics = etcd.get('metrics', n.uuid, None)
+            if new_metrics:
+                new_metrics = new_metrics.get('metrics', {})
+            else:
+                n.add_event(EVENT_TYPE_AUDIT, 'empty metrics from database for node')
+                new_metrics = {}
+            metrics[n.uuid] = new_metrics
+
+        except exceptions.ReadException:
+            n.add_event(EVENT_TYPE_AUDIT, 'refreshing metrics for node failed')
+
+    return metrics
 
 
 class Scheduler(object):
