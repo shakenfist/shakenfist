@@ -28,7 +28,7 @@ class Namespace(dbo):
     }
 
     def __init__(self, static_values):
-        if static_values.get('version', 1) != self.current_version:
+        if static_values.get('version', self.initial_version) != self.current_version:
             upgraded = self.upgrade(static_values)
 
             if upgraded and gmov(self.object_type) == self.current_version:
