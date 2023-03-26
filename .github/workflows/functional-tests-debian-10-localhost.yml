@@ -14,17 +14,15 @@ jobs:
   debian-10-localhost:
     runs-on: self-hosted
     timeout-minutes: 120
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
 
     # NOTE(mikal): git repos are checked out to /srv/github/_work/{repo}/{repo}
     # which is available as GITHUB_WORKSPACE. You can find other environment
     # variables at https://docs.github.com/en/actions/learn-github-actions/environment-variables
 
     steps:
-      - name: Remove previous unfinished runs
-        uses: n1hility/cancel-previous-runs@v2
-        with: 
-          token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Set environment variables
         run: |
           echo "SF_HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV

@@ -14,17 +14,15 @@ jobs:
   {{name}}:
     runs-on: self-hosted
     timeout-minutes: 120
+    concurrency:
+      group: {% raw %}${{ github.workflow }}-${{ github.ref }}{% endraw %}
+      cancel-in-progress: true
 
     # NOTE(mikal): git repos are checked out to /srv/github/_work/{repo}/{repo}
     # which is available as GITHUB_WORKSPACE. You can find other environment
     # variables at https://docs.github.com/en/actions/learn-github-actions/environment-variables
 
     steps:
-      - name: Remove previous unfinished runs
-        uses: n1hility/cancel-previous-runs@v2
-        with: 
-          token: {% raw %}${{{% endraw %} secrets.GITHUB_TOKEN {% raw %}}}{% endraw %}
-
       - name: Set environment variables
         run: |
           echo "SF_HEAD_SHA={% raw %}${{{% endraw %} github.event.pull_request.head.sha {% raw %}}}{% endraw %}" >> $GITHUB_ENV
