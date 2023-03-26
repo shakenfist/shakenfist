@@ -16,6 +16,9 @@ on:
 jobs:
   lint:
     runs-on: self-hosted
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-lint
+      cancel-in-progress: true
 
     steps:
       - name: Checkout code with two commits
@@ -36,6 +39,9 @@ jobs:
 
   build38:
     runs-on: self-hosted
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-build38
+      cancel-in-progress: true
 
     steps:
       - name: Checkout code with two commits
