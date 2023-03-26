@@ -10,6 +10,15 @@ it is safe to perform a rollout across a cluster without downtime, although
 you might see small transient failures such as single API requests failing
 as processes restart.
 
+You should note however that "all nodes" includes nodes in non-running states
+such as ERROR and MISSING. The only state which is excluded from the check is
+DELETED. Therefore, in order for online upgrades to work correctly, it is
+important that you delete nodes in an ERROR or MISSING state that you are
+confident will not return to the cluster. This is because nodes can return
+from ERROR or MISSING at the end of planned maintenance, and might be running
+and older version of Shaken Fist upon their return than other members of the
+cluster.
+
 ## Upgrade process
 
 First off, upgrade the python packages in each node's virtualenv manually. This
