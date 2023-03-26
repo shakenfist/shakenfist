@@ -9,6 +9,9 @@ jobs:
   {{name}}:
     runs-on: self-hosted
     timeout-minutes: 120
+    concurrency:
+      group: {% raw %}${{ github.workflow }}-${{ github.ref }}{% endraw %}
+      cancel-in-progress: true
 
     # NOTE(mikal): git repos are checked out to /srv/github/_work/{repo}/{repo}
     # which is available as GITHUB_WORKSPACE. You can find other environment

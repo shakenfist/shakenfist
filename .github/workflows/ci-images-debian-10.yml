@@ -9,6 +9,9 @@ jobs:
   debian-10:
     runs-on: self-hosted
     timeout-minutes: 120
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
 
     # NOTE(mikal): git repos are checked out to /srv/github/_work/{org}/{repo}
     # which is available as GITHUB_WORKSPACE. You can find other environment
