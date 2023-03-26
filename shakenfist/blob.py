@@ -23,7 +23,6 @@ from shakenfist.exceptions import (BlobMissing, BlobDeleted, BlobFetchFailed,
                                    BlobAlreadyBeingTransferred, BadCheckSum,
                                    BlobTransferSetupFailed, UnknownChecksumType)
 from shakenfist import instance
-from shakenfist.metrics import get_minimum_object_version as gmov
 from shakenfist.node import (Node, Nodes, nodes_by_free_disk_descending,
                              inactive_states_filter as node_inactive_states_filter)
 from shakenfist.tasks import FetchBlobTask
@@ -48,15 +47,7 @@ class Blob(dbo):
     }
 
     def __init__(self, static_values):
-        if static_values.get('version', self.initial_version) != self.current_version:
-            upgraded = self.upgrade(static_values)
-
-            if upgraded and gmov(self.object_type) == self.current_version:
-                etcd.put(self.object_type, None,
-                         static_values.get('uuid'), static_values)
-                LOG.with_fields({
-                    self.object_type: static_values['uuid']}).info(
-                        'Online upgrade committed')
+        self.upgrade(static_values)
 
         super(Blob, self).__init__(static_values.get('uuid'),
                                    static_values.get('version'))

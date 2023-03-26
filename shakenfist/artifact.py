@@ -16,7 +16,6 @@ from shakenfist import etcd
 from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_USAGE
 from shakenfist import exceptions
 from shakenfist import instance
-from shakenfist.metrics import get_minimum_object_version as gmov
 from shakenfist.namespace import namespace_is_trusted
 
 
@@ -53,15 +52,7 @@ class Artifact(dbo):
     TYPE_OTHER = 'other'
 
     def __init__(self, static_values):
-        if static_values.get('version', self.initial_version) != self.current_version:
-            upgraded = self.upgrade(static_values)
-
-            if upgraded and gmov(self.object_type) == self.current_version:
-                etcd.put(self.object_type, None,
-                         static_values.get('uuid'), static_values)
-                LOG.with_fields({
-                    self.object_type: static_values['uuid']}).info(
-                        'Online upgrade committed')
+        self.upgrade(static_values)
 
         super(Artifact, self).__init__(static_values.get('uuid'),
                                        static_values.get('version'),

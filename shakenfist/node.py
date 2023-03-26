@@ -16,15 +16,9 @@ from shakenfist.util import general as util_general
 LOG, _ = logs.setup(__name__)
 
 
-# NOTE(mikal): nodes are the only base object which don't support online
-# upgrades. That's because the online upgrade code relies on the Node object
-# in order to decide when to commit an upgrade to the database.
-
-
 class Node(dbo):
     object_type = 'node'
     current_version = 2
-    upgrade_supported = False
 
     # docs/development/state_machine.md has a description of these states.
     STATE_MISSING = 'missing'
@@ -43,10 +37,15 @@ class Node(dbo):
 
         # A node can return from the dead...
         dbo.STATE_ERROR: (dbo.STATE_CREATED, dbo.STATE_DELETED),
-        STATE_MISSING: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR)
+        STATE_MISSING: (dbo.STATE_CREATED, dbo.STATE_DELETED, dbo.STATE_ERROR),
+
+        # But not from being deleted.
+        dbo.STATE_DELETED: None,
     }
 
     def __init__(self, static_values):
+        self.upgrade(static_values)
+
         # We treat a node name as a UUID here for historical reasons
         super(Node, self).__init__(static_values['fqdn'],
                                    static_values.get('version'))

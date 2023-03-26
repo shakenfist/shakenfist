@@ -10,6 +10,7 @@ import json
 import mock
 import time
 
+from shakenfist import baseobject
 from shakenfist.instance import Instance
 from shakenfist.namespace import Namespace
 from shakenfist.network import Network
@@ -140,17 +141,6 @@ class MockEtcd():
         ns = Namespace.new(namespace)
         ns.add_key(key_name, key)
 
-    # Find a path through the allowed states which gets us to the requested state
-    @staticmethod
-    def _find_start(obj, state_path, initial, dest):
-        for s in state_path[dest]:
-            if initial == s:
-                return True
-            if MockEtcd._find_start(obj, state_path, initial, s):
-                obj.state = s
-                return True
-        return False
-
     def create_instance(self, name,
                         uuid=None,
                         cpus=1,
@@ -194,8 +184,9 @@ class MockEtcd():
                 for a in allowed:
                     state_path[a].add(initial)
 
-        self._find_start(inst, state_path, Instance.STATE_INITIAL, set_state)
-        inst.state = set_state
+        # We just smash the requested state into the object, we don't attempt
+        # to find a valid path to that state.
+        inst._db_set_attribute('state', baseobject.State(set_state, time.time()))
 
         if place_on_node:
             inst.place_instance(place_on_node)
@@ -234,8 +225,9 @@ class MockEtcd():
                 for a in allowed:
                     state_path[a].add(initial)
 
-        self._find_start(network, state_path, Network.STATE_INITIAL, set_state)
-        network.state = set_state
+        # We just smash the requested state into the object, we don't attempt
+        # to find a valid path to that state.
+        network._db_set_attribute('state', baseobject.State(set_state, time.time()))
 
         return network
 
@@ -271,8 +263,8 @@ class MockEtcd():
                 for a in allowed:
                     state_path[a].add(initial)
 
-        self._find_start(net_iface, state_path, NetworkInterface.STATE_INITIAL,
-                         set_state)
-        net_iface.state = set_state
+        # We just smash the requested state into the object, we don't attempt
+        # to find a valid path to that state.
+        net_iface._db_set_attribute('state', baseobject.State(set_state, time.time()))
 
         return net_iface

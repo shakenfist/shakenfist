@@ -1,6 +1,7 @@
 from etcd3gw.lock import Lock
 from functools import partial
 import json
+from math import inf
 import time
 from shakenfist_utilities import logs
 
@@ -24,6 +25,44 @@ class NoopLock(Lock):
 
     def __exit__(self, _exception_type, _exception_value, _traceback):
         pass
+
+
+VERSION_CACHE = None
+VERSION_CACHE_AGE = 0
+
+
+def get_minimum_object_version(objname):
+    global VERSION_CACHE
+    global VERSION_CACHE_AGE
+
+    if not VERSION_CACHE:
+        VERSION_CACHE = {}
+    elif time.time() - VERSION_CACHE_AGE > 300:
+        VERSION_CACHE = {}
+    elif objname in VERSION_CACHE:
+        return VERSION_CACHE[objname]
+
+    metrics = []
+
+    # Ignore metrics for deleted nodes, but include nodes in an error state
+    # as they may return.
+    for _, d in etcd.get_all('metrics', None):
+        node_name = d['fqdn']
+        state = etcd.get('attribute/node', 'state', node_name)
+        if state and state['value'] != DatabaseBackedObject.STATE_DELETED:
+            metrics[node_name] = d
+
+    for possible_objname in constants.OBJECT_NAMES:
+        minimum = inf
+        for entry in metrics:
+            ver = metrics[entry].get(
+                'object_version_%s' % possible_objname)
+            if ver:
+                minimum = min(minimum, ver)
+        VERSION_CACHE[possible_objname] = minimum
+
+    VERSION_CACHE_AGE = time.time()
+    return VERSION_CACHE[objname]
 
 
 class DatabaseBackedObject(object):
@@ -57,31 +96,38 @@ class DatabaseBackedObject(object):
 
         self.log = LOG.with_fields({self.object_type: self.__uuid})
 
-    def upgrade(cls, static_values):
-        changed = False
-        if 'version' not in static_values:
-            static_values['version'] = cls.initial_version
-        starting_version = static_values['version']
+    def upgrade(self, static_values):
+        if static_values.get('version', self.initial_version) != self.current_version:
+            changed = False
+            if 'version' not in static_values:
+                static_values['version'] = self.initial_version
+            starting_version = static_values['version']
 
-        while static_values['version'] != cls.current_version:
-            step = '_upgrade_step_%d_to_%d' % (static_values['version'],
-                                               static_values['version'] + 1)
-            step_func = getattr(cls, step)
-            if not step_func:
-                raise exceptions.UpgradeException(
-                    'Upgrade step %s is missing for object %s'
-                    % (step, cls.object_type))
-            step_func(static_values)
-            static_values['version'] += 1
-            changed = True
+            while static_values['version'] != self.current_version:
+                step = '_upgrade_step_%d_to_%d' % (static_values['version'],
+                                                   static_values['version'] + 1)
+                step_func = getattr(self, step)
+                if not step_func:
+                    raise exceptions.UpgradeException(
+                        'Upgrade step %s is missing for object %s'
+                        % (step, self.object_type))
+                step_func(static_values)
+                static_values['version'] += 1
+                changed = True
 
-        if changed:
-            LOG.with_fields({
-                cls.object_type: static_values['uuid'],
-                'start_version': starting_version,
-                'final_version': static_values['version']
-            }).info('Object online upgraded')
-        return changed
+            if changed:
+                LOG.with_fields({
+                    self.object_type: static_values['uuid'],
+                    'start_version': starting_version,
+                    'final_version': static_values['version']
+                }).info('Object online upgraded')
+
+                if get_minimum_object_version(self.object_type) == self.current_version:
+                    etcd.put(self.object_type, None, static_values.get('uuid'),
+                             static_values)
+                    LOG.with_fields({
+                        self.object_type: static_values['uuid']}).info(
+                            'Online upgrade committed')
 
     @property
     def uuid(self):

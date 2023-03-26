@@ -10,7 +10,6 @@ from shakenfist.baseobject import (
     DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist import etcd
 from shakenfist import exceptions
-from shakenfist.metrics import get_minimum_object_version as gmov
 from shakenfist import network
 from shakenfist.tasks import DefloatNetworkInterfaceTask
 from shakenfist.util import network as util_network
@@ -33,16 +32,7 @@ class NetworkInterface(dbo):
     }
 
     def __init__(self, static_values):
-        if static_values.get('version', self.initial_version) != self.current_version:
-            upgraded = self.upgrade(static_values)
-
-            if upgraded and gmov(self.object_type) == self.current_version:
-                etcd.put(
-                    self.object_type, None, static_values.get('uuid'),
-                    static_values)
-                LOG.with_fields({
-                    self.object_type: static_values['uuid']}).info(
-                        'Online upgrade committed')
+        self.upgrade(static_values)
 
         super(NetworkInterface, self).__init__(static_values.get('uuid'),
                                                static_values.get('version'))
