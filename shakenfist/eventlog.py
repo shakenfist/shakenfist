@@ -181,27 +181,32 @@ class EventLog(object):
 
     def write_event(self, event_type, timestamp, fqdn, duration, message, extra=None):
         with self.lock:
-            year, month = _timestamp_to_year_month(timestamp)
-            if (year, month) in self.write_elc_cache:
-                elc = self.write_elc_cache[(year, month)]
-            else:
-                elc = EventLogChunk(self.objtype, self.objuuid, year, month)
-                self.write_elc_cache[(year, month)] = elc
+            self._write_event_inner(event_type, timestamp, fqdn, duration, message,
+                                    extra=extra)
 
-            try:
-                elc.write_event(event_type, timestamp, fqdn, duration, message,
-                                extra=extra)
-            except sqlite3.DatabaseError:
-                self.log.with_fields({'chunk': '%04d%02d' % (year, month)}).error(
-                    'Chunk corrupt, moving aside.')
-                os.rename(elc.dbpath, elc.dbpath + '.corrupt')
-                del self.write_elc_cache[(year, month)]
+    def _write_event_inner(self, event_type, timestamp, fqdn, duration, message,
+                           extra=None):
+        year, month = _timestamp_to_year_month(timestamp)
+        if (year, month) in self.write_elc_cache:
+            elc = self.write_elc_cache[(year, month)]
+        else:
+            elc = EventLogChunk(self.objtype, self.objuuid, year, month)
+            self.write_elc_cache[(year, month)] = elc
 
-                # Make a new chunk for this event
-                elc = EventLogChunk(self.objtype, self.objuuid, year, month)
-                self.write_elc_cache[(year, month)] = elc
-                elc.write_event(event_type, timestamp, fqdn, duration, message,
-                                extra=extra)
+        try:
+            elc.write_event(event_type, timestamp, fqdn, duration, message,
+                            extra=extra)
+        except sqlite3.DatabaseError:
+            self.log.with_fields({'chunk': '%04d%02d' % (year, month)}).error(
+                'Chunk corrupt, moving aside.')
+            os.rename(elc.dbpath, elc.dbpath + '.corrupt')
+            del self.write_elc_cache[(year, month)]
+
+            # Make a new chunk for this event
+            elc = EventLogChunk(self.objtype, self.objuuid, year, month)
+            self.write_elc_cache[(year, month)] = elc
+            elc.write_event(event_type, timestamp, fqdn, duration, message,
+                            extra=extra)
 
     def _get_all_chunks(self):
         p = pathlib.Path(self.dbdir)
@@ -223,31 +228,40 @@ class EventLog(object):
 
     def read_events(self, limit=100):
         with self.lock:
-            count = 0
+            for e in self._read_events_inner(limit=limit):
+                yield e
 
-            for year, month in self._get_all_chunks():
-                try:
-                    elc = EventLogChunk(self.objtype, self.objuuid, year, month)
-                    for e in elc.read_events(limit=(limit - count)):
-                        count += 1
-                        yield e
-                    elc.close()
+    def _read_events_inner(self, limit=100):
+        count = 0
 
-                    if count >= limit:
-                        break
+        for year, month in self._get_all_chunks():
+            elc = EventLogChunk(self.objtype, self.objuuid, year, month)
+            try:
+                for e in elc.read_events(limit=(limit - count)):
+                    count += 1
+                    yield e
+                elc.close()
 
-                except sqlite3.DatabaseError:
-                    self.log.with_fields({'chunk': '%04d%02d' % (year, month)}).error(
-                        'Chunk corrupt, moving aside.')
-                    os.rename(elc.dbpath, elc.dbpath + '.corrupt')
+                if count >= limit:
+                    break
+
+            except sqlite3.DatabaseError:
+                self.log.with_fields({'chunk': '%04d%02d' % (year, month)}).error(
+                    'Chunk corrupt, moving aside.')
+                os.rename(elc.dbpath, elc.dbpath + '.corrupt')
 
     def delete(self):
         with self.lock:
-            for year, month in self._get_all_chunks():
-                elc = EventLogChunk(self.objtype, self.objuuid, year, month)
-                elc.delete()
-            self.log.info('Removed event log')
+            self._delete_inner()
+        self._delete_lock_file()
 
+    def _delete_inner(self):
+        for year, month in self._get_all_chunks():
+            elc = EventLogChunk(self.objtype, self.objuuid, year, month)
+            elc.delete()
+        self.log.info('Removed event log')
+
+    def _delete_lock_file(self):
         lockpath = os.path.join(self.dbdir, self.objuuid + '.lock')
         if os.path.exists(lockpath):
             os.remove(lockpath)
@@ -257,34 +271,34 @@ class EventLog(object):
             removed = 0
 
             for year, month in self._get_all_chunks():
+                elc = EventLogChunk(self.objtype, self.objuuid, year, month)
                 try:
-                    elc = EventLogChunk(self.objtype, self.objuuid, year, month)
                     this_chunk_removed = elc.prune_old_events(
                         before_timestamp, event_type, limit=(limit - removed))
                     removed += this_chunk_removed
+
+                    if this_chunk_removed > 0:
+                        if event_type != EVENT_TYPE_PRUNE:
+                            self._write_event_inner(
+                                EVENT_TYPE_PRUNE, time.time(), config.NODE_NAME, 0,
+                                'pruned %d events of type %s from before %f from chunk '
+                                '%04d%02d'
+                                % (removed, event_type, before_timestamp, year, month))
+
+                    if elc.count_events() == 0:
+                        elc.delete()
+                        if event_type != EVENT_TYPE_PRUNE:
+                            self._write_event_inner(
+                                EVENT_TYPE_PRUNE, time.time(), config.NODE_NAME, 0,
+                                'deleted event log chunk %04d%02d as it is now empty'
+                                % (year, month))
+                    else:
+                        elc.close()
                 except sqlite3.DatabaseError:
                     self.log.with_fields({'chunk': '%04d%02d' % (year, month)}).error(
                         'Chunk corrupt, moving aside.')
                     os.rename(elc.dbpath, elc.dbpath + '.corrupt')
                     this_chunk_removed = 0
-
-                if this_chunk_removed > 0:
-                    if event_type != EVENT_TYPE_PRUNE:
-                        self.write_event(
-                            EVENT_TYPE_PRUNE, time.time(), config.NODE_NAME, 0,
-                            'pruned %d events of type %s from before %f from chunk '
-                            '%04d%02d'
-                            % (removed, event_type, before_timestamp, year, month))
-
-                if elc.count_events() == 0:
-                    elc.delete()
-                    if event_type != EVENT_TYPE_PRUNE:
-                        self.write_event(
-                            EVENT_TYPE_PRUNE, time.time(), config.NODE_NAME, 0,
-                            'deleted event log chunk %04d%02d as it is now empty'
-                            % (year, month))
-                else:
-                    elc.close()
 
                 if removed >= limit:
                     self.log.info('Pruned %d events' % removed)
@@ -321,7 +335,7 @@ class EventLogChunk(object):
 
         self.dbdir = _shard_db_path(self.objtype, self.objuuid)
         self.dbpath = os.path.join(self.dbdir, self.objuuid + '.' + self.chunk)
-        self._bootstrap()
+        self.bootstrapped = False
 
     def _bootstrap(self):
         os.makedirs(self.dbdir, exist_ok=True)
@@ -344,7 +358,6 @@ class EventLogChunk(object):
 
         else:
             # Open an existing database, which _might_ require upgrade
-            start_upgrade = time.time()
             cur.execute('SELECT * FROM version')
             ver = cur.fetchone()['version']
             start_ver = ver
@@ -358,7 +371,6 @@ class EventLogChunk(object):
                     'INSERT INTO events(timestamp, message) '
                     'VALUES (%f, "Upgraded database to version 2")'
                     % time.time())
-                self.log.info('Upgraded database from v1 to v2')
 
             if ver == 2:
                 ver = 3
@@ -373,7 +385,6 @@ class EventLogChunk(object):
                     'INSERT INTO events(timestamp, message) '
                     'VALUES (%f, "Upgraded database to version 3")'
                     % time.time())
-                self.log.info('Upgraded database from v2 to v3')
 
             if ver == 3:
                 ver = 4
@@ -388,7 +399,6 @@ class EventLogChunk(object):
                     'INSERT INTO events(timestamp, message) '
                     'VALUES (%f, "Upgraded database to version 4");'
                     % time.time())
-                self.log.info('Upgraded database from v3 to v4')
 
             if ver == 4:
                 ver = 5
@@ -400,7 +410,6 @@ class EventLogChunk(object):
                     'INSERT INTO events(type, timestamp, message) '
                     'VALUES ("audit", %f, "Upgraded database to version 2")'
                     % time.time())
-                self.log.info('Upgraded database from v1 to v2')
 
             if start_ver != ver:
                 self.con.execute('UPDATE version SET version = ?', (ver,))
@@ -410,13 +419,15 @@ class EventLogChunk(object):
                         'INSERT INTO events(type, timestamp, message) '
                         'VALUES ("audit", %f, "Compacted database")'
                         % time.time())
-                self.log.info('Database upgrade took %.02f seconds'
-                              % (time.time() - start_upgrade))
 
     def close(self):
-        self.con.close()
+        if self.bootstrapped:
+            self.con.close()
 
     def write_event(self, event_type, timestamp, fqdn, duration, message, extra=None):
+        if not self.bootstrapped:
+            self._bootstrap()
+
         attempts = 0
         while attempts < 3:
             try:
@@ -440,6 +451,9 @@ class EventLogChunk(object):
         }).error('Failed to record event after 3 retries')
 
     def read_events(self, limit=100):
+        if not self.bootstrapped:
+            self._bootstrap()
+
         cur = self.con.cursor()
         cur.execute('SELECT * FROM events ORDER BY TIMESTAMP DESC LIMIT %d'
                     % limit)
@@ -447,6 +461,9 @@ class EventLogChunk(object):
             yield dict(row)
 
     def count_events(self):
+        if not self.bootstrapped:
+            self._bootstrap()
+
         cur = self.con.cursor()
         cur.execute('SELECT COUNT(*) FROM events')
         return cur.fetchone()[0]
@@ -458,6 +475,9 @@ class EventLogChunk(object):
         self.log.info('Removed event log chunk')
 
     def prune_old_events(self, before_timestamp, event_type, limit=10000):
+        if not self.bootstrapped:
+            self._bootstrap()
+
         sql = ('DELETE FROM EVENTS WHERE timestamp < %s AND TYPE="%s" LIMIT %d'
                % (before_timestamp, event_type, limit))
 
@@ -471,8 +491,6 @@ class EventLogChunk(object):
                 'before_timestamp': before_timestamp,
                 'event_type': event_type
                 }).info('Removed %d old events' % changes)
-        self.con.commit()
-        if changes == limit:
-            self.log.info('Vacuuming event database')
+            self.con.commit()
             cur.execute('VACUUM')
         return changes
