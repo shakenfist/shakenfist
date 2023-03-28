@@ -349,7 +349,8 @@ class JSONEncoderCustomTypes(json.JSONEncoder):
 
 @retry_etcd_forever
 def put(objecttype, subtype, name, data, ttl=None):
-    if read_only_cache():
+    # Its ok to create events while using a read only cache
+    if read_only_cache() and not objecttype.startswith('event/'):
         raise exceptions.ForbiddenWhileUsingReadOnlyCache(
             'You cannot change data while using a read only cache')
 
