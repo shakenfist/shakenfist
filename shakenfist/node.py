@@ -96,7 +96,8 @@ class Node(dbo):
         retval.update({
             'fqdn': self.fqdn,
             'ip': self.ip,
-            'lastseen': self.last_seen
+            'lastseen': self.last_seen,
+            'release': self.installed_version
         })
         retval.update(self._db_get_attribute('roles', {}))
         return retval
