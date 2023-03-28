@@ -9,9 +9,7 @@ import testtools
 import time
 
 from shakenfist import baseobject
-from shakenfist.baseobject import (
-    DatabaseBackedObject as dbo,
-    State)
+from shakenfist.baseobject import State
 from shakenfist import exceptions
 from shakenfist.ipmanager import IPManager
 from shakenfist import instance
@@ -154,7 +152,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
         self.addCleanup(self.put.stop)
 
         self.gmov = mock.patch(
-            'shakenfist.instance.gmov', return_value=6)
+            'shakenfist.baseobject.get_minimum_object_version', return_value=6)
         self.mock_gmov = self.gmov.start()
         self.addCleanup(self.gmov.stop)
 
@@ -507,72 +505,6 @@ class InstanceTestCase(base.ShakenFistTestCase):
                 os.unlink(cd_file)
 
 
-GET_ALL_INSTANCES = [
-    # Present here, and in the get
-    (None, {
-        'uuid': '373a165e-9720-4e14-bd0e-9612de79ff15',
-        'cpus': 1,
-        'disk_spec': [{
-            'base': 'cirros',
-            'size': 8
-        }],
-        'memory': 1024,
-        'name': 'cirros',
-        'namespace': 'gerkin',
-        'requested_placement': None,
-        'ssh_key': 'thisisasshkey',
-        'user_data': None,
-        'video': {'model': 'cirrus', 'memory': 16384, 'vdi': 'spice'},
-        'uefi': False,
-        'configdrive': 'openstack-disk',
-        'version': 6,
-        'nvram_template': None,
-        'secure_boot': False
-    }),
-    # Present here, but not in the get (a race?)
-    (None, {
-        'uuid': 'b078cb4e-857c-4f04-b011-751742ef5817',
-        'cpus': 1,
-        'disk_spec': [{
-            'base': 'cirros',
-            'size': 8
-        }],
-        'memory': 1024,
-        'name': 'cirros',
-        'namespace': 'namespace',
-        'requested_placement': None,
-        'ssh_key': 'thisisasshkey',
-        'user_data': None,
-        'video': {'model': 'cirrus', 'memory': 16384, 'vdi': 'spice'},
-        'uefi': False,
-        'configdrive': 'openstack-disk',
-        'version': 6,
-        'nvram_template': None,
-        'secure_boot': False
-    }),
-    (None, {
-        'uuid': 'a7c5ecec-c3a9-4774-ad1b-249d9e90e806',
-        'cpus': 1,
-        'disk_spec': [{
-            'base': 'cirros',
-            'size': 8
-        }],
-        'memory': 1024,
-        'name': 'cirros',
-        'namespace': 'namespace',
-        'requested_placement': None,
-        'ssh_key': 'thisisasshkey',
-        'user_data': None,
-        'video': {'model': 'cirrus', 'memory': 16384, 'vdi': 'spice'},
-        'uefi': False,
-        'configdrive': 'openstack-disk',
-        'version': 6,
-        'nvram_template': None,
-        'secure_boot': False
-    })
-]
-
-
 class InstancesTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super(InstancesTestCase, self).setUp()
@@ -580,75 +512,54 @@ class InstancesTestCase(base.ShakenFistTestCase):
         self.mock_etcd = MockEtcd(self, node_count=4)
         self.mock_etcd.setup()
 
-    @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
-    def test_base_iteration(self, mock_get_all):
+        self.mock_etcd.create_instance(
+            name='cirros', uuid='373a165e-9720-4e14-bd0e-9612de79ff15',
+            namespace='gerkin', set_state=instance.Instance.STATE_DELETED,
+            place_on_node='node1')
+        self.mock_etcd.create_instance(
+            name='cirros', uuid='b078cb4e-857c-4f04-b011-751742ef5817',
+            namespace='namespace', set_state=instance.Instance.STATE_CREATED,
+            place_on_node='node1')
+        self.mock_etcd.create_instance(
+            name='cirros', uuid='a7c5ecec-c3a9-4774-ad1b-249d9e90e806',
+            namespace='namespace', set_state=instance.Instance.STATE_DELETED,
+            place_on_node='node1')
+
+    def test_base_iteration(self):
         uuids = []
         for i in instance.Instances([]):
             uuids.append(i.uuid)
 
-        self.assertEqual(['373a165e-9720-4e14-bd0e-9612de79ff15',
-                          'b078cb4e-857c-4f04-b011-751742ef5817',
-                          'a7c5ecec-c3a9-4774-ad1b-249d9e90e806'], uuids)
+        self.assertEqual(3, len(uuids))
+        self.assertTrue('373a165e-9720-4e14-bd0e-9612de79ff15' in uuids)
+        self.assertTrue('b078cb4e-857c-4f04-b011-751742ef5817' in uuids)
+        self.assertTrue('a7c5ecec-c3a9-4774-ad1b-249d9e90e806' in uuids)
 
-    @mock.patch('shakenfist.instance.Instance._db_get_attribute',
-                return_value={'node': 'node1'})
-    @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
-    def test_placement_filter_all(self, mock_get_all, mock_attr):
+    def test_placement_filter_all(self):
         uuids = []
         for i in instance.Instances([partial(instance.placement_filter, 'node1')]):
             uuids.append(i.uuid)
 
-        self.assertEqual(['373a165e-9720-4e14-bd0e-9612de79ff15',
-                          'b078cb4e-857c-4f04-b011-751742ef5817',
-                          'a7c5ecec-c3a9-4774-ad1b-249d9e90e806'], uuids)
+        self.assertEqual(3, len(uuids))
+        self.assertTrue('373a165e-9720-4e14-bd0e-9612de79ff15' in uuids)
+        self.assertTrue('b078cb4e-857c-4f04-b011-751742ef5817' in uuids)
+        self.assertTrue('a7c5ecec-c3a9-4774-ad1b-249d9e90e806' in uuids)
 
-    @mock.patch('shakenfist.instance.Instance._db_get_attribute',
-                return_value={'node': 'node2'})
-    @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
-    def test_placement_filter_none(self, mock_get_all, mock_attr):
+    def test_placement_filter_none(self):
         uuids = []
-        for i in instance.Instances([partial(instance.placement_filter, 'node1')]):
+        for i in instance.Instances([partial(instance.placement_filter, 'node2')]):
             uuids.append(i.uuid)
 
         self.assertEqual([], uuids)
 
-    @mock.patch('shakenfist.instance.Instance._db_get_attribute',
-                return_value={'value': dbo.STATE_CREATED, 'update_time': 1})
-    @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
-    def test_state_filter_all(self, mock_get_all, mock_attr):
-        uuids = []
-        for i in instance.Instances([partial(baseobject.state_filter, dbo.STATE_CREATED)]):
-            uuids.append(i.uuid)
-
-        self.assertEqual(['373a165e-9720-4e14-bd0e-9612de79ff15',
-                          'b078cb4e-857c-4f04-b011-751742ef5817',
-                          'a7c5ecec-c3a9-4774-ad1b-249d9e90e806'], uuids)
-
-    @mock.patch('shakenfist.instance.Instance._db_get_attribute',
-                return_value={'value': instance.Instance.STATE_DELETED, 'update_time': 1})
-    @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
-    def test_state_filter_none(self, mock_get_all, mock_attr):
-        uuids = []
-        for i in instance.Instances([partial(baseobject.state_filter, dbo.STATE_CREATED)]):
-            uuids.append(i.uuid)
-
-        self.assertEqual([], uuids)
-
-    @mock.patch('shakenfist.instance.Instance._db_get_attribute',
-                side_effect=[{'value': instance.Instance.STATE_DELETED, 'update_time': 1},
-                             {'value': instance.Instance.STATE_DELETED,
-                                 'update_time': 1},
-                             {'value': instance.Instance.STATE_INITIAL, 'update_time': 1}])
-    @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
-    def test_state_filter_active(self, mock_get_all, mock_attr):
+    def test_state_filter_active(self):
         uuids = []
         for i in instance.Instances([instance.active_states_filter]):
             uuids.append(i.uuid)
 
-        self.assertEqual(['a7c5ecec-c3a9-4774-ad1b-249d9e90e806'], uuids)
+        self.assertEqual(['b078cb4e-857c-4f04-b011-751742ef5817'], uuids)
 
-    @mock.patch('shakenfist.etcd.get_all', return_value=GET_ALL_INSTANCES)
-    def test_namespace_filter(self, mock_get_all):
+    def test_namespace_filter(self):
         uuids = []
         for i in instance.Instances([partial(baseobject.namespace_filter, 'gerkin')]):
             uuids.append(i.uuid)

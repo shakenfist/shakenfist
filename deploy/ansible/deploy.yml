@@ -1,10 +1,18 @@
 # yaml-language-server: $schema=https://json.schemastore.org/ansible-playbook.json
 
-# Install shakenfist on a series of Ubuntu or Debian machines
+# Install Shaken Fist on a series of Ubuntu or Debian machines. Some parts of this
+# ansible playbook contain tags, but not all. Currently available tags are:
+#
+#   bootstrap: bootstrap the installer, you must always run this tag.
+#   etcd: tasks associated with setup or upgrade of etcd itself.
+#   pki: tasks associated with setup of certifying authorities or PKI certificate
+#     (for example those for the SPICE console).
+
 - hosts: localhost
   gather_facts: yes
   connection: ssh
   become: yes
+  tags: bootstrap
   vars:
     ram_system_reservation: 5.0
     dns_server: 8.8.8.8
@@ -50,6 +58,7 @@
   any_errors_fatal: true
   become: yes
   become_method: sudo
+  tags: bootstrap
   gather_facts: no
   connection: ssh
   vars:
@@ -147,6 +156,7 @@
   gather_facts: yes
   connection: ssh
   become: yes
+  tags: pki
   vars:
     ram_system_reservation: 5.0
     dns_server: 8.8.8.8
@@ -216,6 +226,7 @@
   any_errors_fatal: true
   become: yes
   become_method: sudo
+  tags: pki
   gather_facts: no
   connection: ssh
 
@@ -263,6 +274,7 @@
   any_errors_fatal: true
   become: yes
   become_method: sudo
+  tags: pki
   gather_facts: no
   connection: ssh
 
@@ -620,6 +632,7 @@
 
 # Install etcd
 - hosts: etcd
+  tags: etcd
   roles:
     - role: andrewrothstein.etcd-cluster
       vars:
@@ -649,6 +662,7 @@
   any_errors_fatal: true
   become: yes
   become_method: sudo
+  tags: bootstrap
   gather_facts: no
   connection: ssh
 
@@ -658,10 +672,6 @@
         path: /etc/sf
         state: directory
         mode: "0755"
-
-    - name: Restore from backup, if there is one specified
-      shell: "{{hostvars['localhost']['utility_path']}}/sf-backup restore {{restore_backup}}"
-      when: restore_backup | length > 0
 
     - name: Set system key from extra-vars
       set_fact:
@@ -700,6 +710,14 @@
         group: sudo
         mode: u=r,g=r,o=
 
+- hosts: primary_node
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  connection: ssh
+
+  tasks:
     - name: Install prometheus
       apt:
         name: prometheus
@@ -937,6 +955,7 @@
   any_errors_fatal: true
   become: yes
   become_method: sudo
+  tags: bootstrap
   gather_facts: no
   connection: ssh
 

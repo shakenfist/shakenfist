@@ -254,8 +254,8 @@ class Monitor(daemon.Daemon):
                         b = Blob.from_db(ent)
                         if (not b or b.state.value == Blob.STATE_DELETED
                                 or config.NODE_NAME not in b.locations):
-                            LOG.with_fields({
-                                'blob': ent}).warning('Deleting orphaned blob')
+                            LOG.with_fields({'blob': ent}).debug(
+                                'Removing deleted blob from disk')
                             os.unlink(entpath)
                             cached = util_general.file_permutation_exists(
                                 os.path.join(cache_path, ent),
@@ -298,13 +298,7 @@ class Monitor(daemon.Daemon):
                     os.unlink(entpath)
                     continue
 
-                this_node = 0
-                for instance_uuid in b.instances:
-                    i = instance.Instance.from_db(instance_uuid)
-                    if i:
-                        if i.placement.get('node') == config.NODE_NAME:
-                            this_node += 1
-
+                this_node = len(b.instances_on_this_node)
                 LOG.with_fields(
                     {
                         'blob': blob_uuid,

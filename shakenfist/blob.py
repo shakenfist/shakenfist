@@ -23,7 +23,6 @@ from shakenfist.exceptions import (BlobMissing, BlobDeleted, BlobFetchFailed,
                                    BlobAlreadyBeingTransferred, BadCheckSum,
                                    BlobTransferSetupFailed, UnknownChecksumType)
 from shakenfist import instance
-from shakenfist.metrics import get_minimum_object_version as gmov
 from shakenfist.node import (Node, Nodes, nodes_by_free_disk_descending,
                              inactive_states_filter as node_inactive_states_filter)
 from shakenfist.tasks import FetchBlobTask
@@ -38,7 +37,6 @@ LOG, _ = logs.setup(__name__)
 class Blob(dbo):
     object_type = 'blob'
     current_version = 5
-    upgrade_supported = True
 
     state_targets = {
         None: (dbo.STATE_INITIAL),
@@ -49,15 +47,7 @@ class Blob(dbo):
     }
 
     def __init__(self, static_values):
-        if static_values['version'] != self.current_version:
-            upgraded, static_values = self.upgrade(static_values)
-
-            if upgraded and gmov('blob') == self.current_version:
-                etcd.put(self.object_type, None,
-                         static_values.get('uuid'), static_values)
-                LOG.with_fields({
-                    self.object_type: static_values['uuid']}).info(
-                        'Online upgrade committed')
+        self.upgrade(static_values)
 
         super(Blob, self).__init__(static_values.get('uuid'),
                                    static_values.get('version'))
@@ -68,28 +58,13 @@ class Blob(dbo):
         self.__depends_on = static_values.get('depends_on')
 
     @classmethod
-    def upgrade(cls, static_values):
-        changed = False
-        starting_version = static_values.get('version')
-
-        if static_values.get('version') == 3:
-            static_values['modified'] = cls.normalize_timestamp(
+    def _upgrade_step_3_to_4(cls, static_values):
+        static_values['modified'] = cls.normalize_timestamp(
                 static_values['modified'])
-            static_values['version'] = 4
-            changed = True
 
-        if static_values.get('version') == 4:
-            cls._upgrade_metadata_to_attribute(static_values['uuid'])
-            static_values['version'] = 5
-            changed = True
-
-        if changed:
-            LOG.with_fields({
-                cls.object_type: static_values['uuid'],
-                'start_version': starting_version,
-                'final_version': static_values.get('version')
-            }).info('Object online upgraded')
-        return changed, static_values
+    @classmethod
+    def _upgrade_step_4_to_5(cls, static_values):
+        cls._upgrade_metadata_to_attribute(static_values['uuid'])
 
     @classmethod
     def normalize_timestamp(cls, timestamp):

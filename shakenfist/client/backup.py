@@ -3,6 +3,7 @@
 import click
 import importlib
 import io
+import json
 import logging
 import os
 from shakenfist_utilities import logs
@@ -46,10 +47,18 @@ def cli(ctx, verbose=None):
 
 @click.command()
 @click.argument('output', type=click.Path(exists=False))
+@click.option('-a', '--anonymise', is_flag=True,
+              help='Remove authentication details from backup')
 @click.pass_context
-def backup(ctx, output):
+def backup(ctx, output, anonymise=False):
     with tarfile.open(output, 'w:gz') as tar:
         for data, metadata in etcd.WrappedEtcdClient().get_prefix('/'):
+            if metadata['key'].startswith('/sf/namespace'.encode('utf-8')):
+                d = json.loads(data)
+                for k in d['keys']:
+                    d['keys'][k] = '...'
+                data = json.dumps(d, indent=4, sort_keys=True).encode('utf-8')
+
             info = tarfile.TarInfo(metadata['key'].decode('utf-8').rstrip('/'))
             info.size = len(data)
             tar.addfile(info, io.BytesIO(data))

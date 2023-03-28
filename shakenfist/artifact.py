@@ -16,7 +16,6 @@ from shakenfist import etcd
 from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_USAGE
 from shakenfist import exceptions
 from shakenfist import instance
-from shakenfist.metrics import get_minimum_object_version as gmov
 from shakenfist.namespace import namespace_is_trusted
 
 
@@ -33,7 +32,6 @@ UPLOAD_URL = 'sf://upload/'
 class Artifact(dbo):
     object_type = 'artifact'
     current_version = 6
-    upgrade_supported = True
 
     state_targets = {
         None: (dbo.STATE_INITIAL),
@@ -51,17 +49,10 @@ class Artifact(dbo):
     TYPE_SNAPSHOT = 'snapshot'
     TYPE_LABEL = 'label'
     TYPE_IMAGE = 'image'
+    TYPE_OTHER = 'other'
 
     def __init__(self, static_values):
-        if static_values['version'] != self.current_version:
-            upgraded, static_values = self.upgrade(static_values)
-
-            if upgraded and gmov('artifact') == self.current_version:
-                etcd.put(self.object_type, None,
-                         static_values.get('uuid'), static_values)
-                LOG.with_fields({
-                    self.object_type: static_values['uuid']}).info(
-                        'Online upgrade committed')
+        self.upgrade(static_values)
 
         super(Artifact, self).__init__(static_values.get('uuid'),
                                        static_values.get('version'),
@@ -73,42 +64,24 @@ class Artifact(dbo):
         self.__namespace = static_values.get('namespace')
 
     @classmethod
-    def upgrade(cls, static_values):
-        changed = False
-        starting_version = static_values.get('version')
+    def _upgrade_step_2_to_3(cls, static_values):
+        static_values['namespace'] = 'sharedwithall'
 
-        if static_values.get('version') == 2:
-            static_values['namespace'] = 'sharedwithall'
-            static_values['version'] = 3
-            changed = True
+    @classmethod
+    def _upgrade_step_3_to_4(cls, static_values):
+        if static_values['namespace'] == 'sharedwithall':
+            static_values['namespace'] = 'system'
+            etcd.put(
+                'attribute/artifact',  static_values['uuid'], 'shared',
+                {'shared': True})
 
-        if static_values.get('version') == 3:
-            if static_values['namespace'] == 'sharedwithall':
-                static_values['namespace'] = 'system'
-                etcd.put(
-                    'attribute/artifact',  static_values['uuid'], 'shared',
-                    {'shared': True})
+    @classmethod
+    def _upgrade_step_4_to_5(cls, static_values):
+        cls._upgrade_metadata_to_attribute(static_values['uuid'])
 
-            static_values['version'] = 4
-            changed = True
-
-        if static_values.get('version') == 4:
-            cls._upgrade_metadata_to_attribute(static_values['uuid'])
-            static_values['version'] = 5
-            changed = True
-
-        if static_values.get('version') == 5:
-            static_values['name'] = static_values['source_url'].split('/')[-1]
-            static_values['version'] = 6
-            changed = True
-
-        if changed:
-            LOG.with_fields({
-                cls.object_type: static_values['uuid'],
-                'start_version': starting_version,
-                'final_version': static_values.get('version')
-            }).info('Object online upgraded')
-        return changed, static_values
+    @classmethod
+    def _upgrade_step_5_to_6(cls, static_values):
+        static_values['name'] = static_values['source_url'].split('/')[-1]
 
     @classmethod
     def new(cls, artifact_type, source_url, name=None, max_versions=0,

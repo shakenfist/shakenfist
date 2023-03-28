@@ -44,7 +44,7 @@ class WrappedEtcdClient(Etcd3Client):
             cert_key=cert_key, cert_cert=cert_cert, timeout=timeout,
             api_path=api_path)
 
-    # Replace the upstream implementation with one which allows for limtis on range
+    # Replace the upstream implementation with one which allows for limits on range
     # queries instead of just erroring out for big result sets.
     def get_prefix(self, key_prefix, sort_order=None, sort_target=None, limit=0):
         """Get a range of keys with a prefix.
@@ -112,11 +112,12 @@ class ThreadLocalReadOnlyCache():
         return False
 
     def _find_prefix(self, key):
-        # Special cases for namespaces
-        if key.startswith('/sf/namespace'):
-            return '/sf/namespace'
-        if key.startswith('/sf/attribute/namespace'):
-            return '/sf/attribute/namespace'
+        # Special cases for namespaces, nodes, and metrics
+        for special in ['namespace', 'node', 'metrics']:
+            if key.startswith('/sf/%s' % special):
+                return '/sf/%s' % special
+            if key.startswith('/sf/attribute/%s' % special):
+                return '/sf/attribute/%s' % special
 
         uuid_regex = re.compile('.{8}-.{4}-.{4}-.{4}-.{12}')
 
@@ -348,7 +349,8 @@ class JSONEncoderCustomTypes(json.JSONEncoder):
 
 @retry_etcd_forever
 def put(objecttype, subtype, name, data, ttl=None):
-    if read_only_cache():
+    # Its ok to create events while using a read only cache
+    if read_only_cache() and not objecttype.startswith('event/'):
         raise exceptions.ForbiddenWhileUsingReadOnlyCache(
             'You cannot change data while using a read only cache')
 

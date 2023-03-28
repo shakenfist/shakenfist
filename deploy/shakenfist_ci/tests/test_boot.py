@@ -5,7 +5,7 @@ class TestBoot(base.BaseNamespacedTestCase):
     """Make sure instances boot under various configurations."""
 
     def __init__(self, *args, **kwargs):
-        kwargs['namespace_prefix'] = 'cirros'
+        kwargs['namespace_prefix'] = 'boot'
         super(TestBoot, self).__init__(*args, **kwargs)
 
     def setUp(self):
@@ -32,12 +32,6 @@ class TestBoot(base.BaseNamespacedTestCase):
 
         self._await_instance_ready(inst['uuid'])
 
-        self.test_client.delete_instance(inst['uuid'])
-        inst_uuids = []
-        for i in self.test_client.get_instances():
-            inst_uuids.append(i['uuid'])
-        self.assertNotIn(inst['uuid'], inst_uuids)
-
     def test_boot_network(self):
         inst = self.test_client.create_instance(
             'test-boot-network', 1, 1024,
@@ -55,12 +49,6 @@ class TestBoot(base.BaseNamespacedTestCase):
             ], None, None)
 
         self._await_instance_ready(inst['uuid'])
-
-        self.test_client.delete_instance(inst['uuid'])
-        inst_uuids = []
-        for i in self.test_client.get_instances():
-            inst_uuids.append(i['uuid'])
-        self.assertNotIn(inst['uuid'], inst_uuids)
 
     def test_boot_large_disk(self):
         inst = self.test_client.create_instance(

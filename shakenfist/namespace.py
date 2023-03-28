@@ -9,7 +9,6 @@ from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist import etcd
-from shakenfist.metrics import get_minimum_object_version as gmov
 from shakenfist.util import access_tokens
 
 
@@ -19,7 +18,6 @@ LOG, _ = logs.setup(__name__)
 class Namespace(dbo):
     object_type = 'namespace'
     current_version = 5
-    upgrade_supported = True
 
     ACTIVE_STATES = set([dbo.STATE_CREATED])
 
@@ -29,115 +27,77 @@ class Namespace(dbo):
     }
 
     def __init__(self, static_values):
-        if static_values.get('version', 1) != self.current_version:
-            upgraded, static_values = self.upgrade(static_values)
-
-            if upgraded and gmov('namespace') == self.current_version:
-                etcd.put(self.object_type, None,
-                         static_values.get('uuid'), static_values)
-                LOG.with_fields({
-                    self.object_type: static_values['uuid']}).info(
-                        'Online upgrade committed')
+        self.upgrade(static_values)
 
         # We treat a namespace name as a UUID here for historical reasons
         super(Namespace, self).__init__(static_values['uuid'],
                                         static_values['version'])
 
     @classmethod
-    def upgrade(cls, static_values):
-        changed = False
-        starting_version = static_values.get('version', 1)
+    def _upgrade_step_1_to_2(cls, static_values):
+        static_values['uuid'] = static_values['name']
+        del static_values['name']
 
-        if static_values.get('version', 1) == 1:
-            static_values['uuid'] = static_values['name']
-            del static_values['name']
+        etcd.put('attribute/namespace', static_values['uuid'], 'state',
+                 {
+                     'update_time': time.time(),
+                     'value': 'created'
+                 })
 
-            etcd.put(
-                'attribute/namespace', static_values['uuid'], 'state',
-                {
-                    'update_time': time.time(),
-                    'value': 'created'
-                })
+        etcd.put('attribute/namespace', static_values['uuid'], 'keys',
+                 {'keys': static_values['keys']})
+        del static_values['keys']
 
-            etcd.put(
-                'attribute/namespace', static_values['uuid'], 'keys',
-                {
-                    'keys': static_values['keys']
-                })
-            del static_values['keys']
+        if 'service_key' in static_values:
+            etcd.put('attribute/namespace', static_values['uuid'], 'service_key',
+                     {'service_key': static_values['service_key']})
+            del static_values['service_key']
 
-            if 'service_key' in static_values:
-                etcd.put(
-                    'attribute/namespace', static_values['uuid'], 'service_key',
-                    {
-                        'service_key': static_values['service_key']
-                    })
-                del static_values['service_key']
+    @classmethod
+    def _upgrade_step_2_to_3(cls, static_values):
+        etcd.put('attribute/namespace', static_values['uuid'], 'trust',
+                 {'full_trust': ['system']})
 
-            static_values['version'] = 2
-            changed = True
+    @classmethod
+    def _upgrade_step_3_to_4(cls, static_values):
+        nonced_keys = {}
 
-        if static_values.get('version') == 2:
-            etcd.put(
-                'attribute/namespace', static_values['uuid'], 'trust',
-                {'full_trust': ['system']})
-            static_values['version'] = 3
-            changed = True
-
-        if static_values.get('version') == 3:
-            nonced_keys = {}
-
-            keys = etcd.get(
-                'attribute/namespace', static_values['uuid'], 'keys')
-            if keys:
-                # Convert across keys in the correct location
-                for k in keys.get('keys', {}):
-                    nonced_keys[k] = {
-                        'key': keys['keys'][k],
-                        'nonce': sfrandom.random_id()
-                    }
-                if 'keys' in keys:
-                    del keys['keys']
-
-                # Move across keys in the incorrect location. These override as they
-                # are how the namespace and auth code was actually using keys.
-                for k in keys:
-                    nonced_keys[k] = {
-                        'key': keys[k],
-                        'nonce': sfrandom.random_id()
-                    }
-
-            # Move across the service key
-            db_data = etcd.get(
-                'attribute/namespace', static_values['uuid'], 'service_key')
-            if db_data:
-                nonced_keys['_service_key'] = {
-                    'key': db_data['service_key'],
-                    'nonce': sfrandom.random_id(),
-                    'expiry': time.time() + 300
+        keys = etcd.get('attribute/namespace', static_values['uuid'], 'keys')
+        if keys:
+            # Convert across keys in the correct location
+            for k in keys.get('keys', {}):
+                nonced_keys[k] = {
+                    'key': keys['keys'][k],
+                    'nonce': sfrandom.random_id()
                 }
-                etcd.delete(
-                    'attribute/namespace', static_values['uuid'], 'service_key')
+            if 'keys' in keys:
+                del keys['keys']
 
-            etcd.put(
-                'attribute/namespace', static_values['uuid'], 'keys',
-                {'nonced_keys': nonced_keys})
+            # Move across keys in the incorrect location. These override as they
+            # are how the namespace and auth code was actually using keys.
+            for k in keys:
+                nonced_keys[k] = {
+                    'key': keys[k],
+                    'nonce': sfrandom.random_id()
+                }
 
-            static_values['version'] = 4
-            changed = True
+        # Move across the service key
+        db_data = etcd.get('attribute/namespace', static_values['uuid'], 'service_key')
+        if db_data:
+            nonced_keys['_service_key'] = {
+                'key': db_data['service_key'],
+                'nonce': sfrandom.random_id(),
+                'expiry': time.time() + 300
+            }
+            etcd.delete('attribute/namespace', static_values['uuid'], 'service_key')
 
-        if static_values.get('version') == 4:
-            cls._upgrade_metadata_to_attribute(static_values['uuid'])
-            static_values['version'] = 5
-            changed = True
+        etcd.put(
+            'attribute/namespace', static_values['uuid'], 'keys',
+            {'nonced_keys': nonced_keys})
 
-        if changed:
-            LOG.with_fields({
-                cls.object_type: static_values['uuid'],
-                'start_version': starting_version,
-                'final_version': static_values.get('version')
-            }).info('Object online upgraded')
-        return changed, static_values
+    @classmethod
+    def _upgrade_step_4_to_5(cls, static_values):
+        cls._upgrade_metadata_to_attribute(static_values['uuid'])
 
     @classmethod
     def new(cls, name):

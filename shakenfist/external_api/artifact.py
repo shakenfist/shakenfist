@@ -352,13 +352,16 @@ class ArtifactUploadEndpoint(sf_api.Resource):
                 'Is this artifact shared? Defaults to False.', False),
             ('namespace', 'body', 'namespace',
                 ('Which namespace to remove artifacts from. You must be authenticated '
-                 'against the system namespace to set this option.'), False)
+                 'against the system namespace to set this option.'), False),
+            ('artifact_type', 'body', 'string',
+             ('The type of the artifact. Should be one of "image" or "other". '
+              'Defaults to "image" if not specified.'), False)
         ], [(200, 'Information about a single artifact.', artifact_get_example)]))
     @api_base.verify_token
     @api_base.log_token_use
     @api_base.requires_namespace_exist
     def post(self, artifact_name=None, upload_uuid=None, blob_uuid=None,
-             source_url=None, shared=False, namespace=None):
+             source_url=None, shared=False, namespace=None, artifact_type='image'):
         if upload_uuid and blob_uuid:
             return sf_api.error(400, 'only specify one of upload_uuid and blob_uuid')
 
@@ -395,7 +398,14 @@ class ArtifactUploadEndpoint(sf_api.Resource):
         if not namespace:
             namespace = get_jwt_identity()[0]
 
-        a = Artifact.from_url(Artifact.TYPE_IMAGE, source_url, name=artifact_name,
+        if artifact_type == 'image':
+            artifact_type_value = Artifact.TYPE_IMAGE
+        elif artifact_type == 'other':
+            artifact_type_value = Artifact.TYPE_OTHER
+        else:
+            return sf_api.error(403, 'invalid artifact type specified')
+
+        a = Artifact.from_url(artifact_type_value, source_url, name=artifact_name,
                               namespace=namespace, create_if_new=True)
 
         if not namespace_is_trusted(a.namespace, get_jwt_identity()[0]):

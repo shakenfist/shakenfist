@@ -57,16 +57,19 @@ class Monitor(daemon.Daemon):
         # Recompute our cache of what blobs are on what nodes every 30 minutes
         if time.time() - last_loop_run > 1800:
             per_node = defaultdict(list)
+            hard_deletes = []
             with etcd.ThreadLocalReadOnlyCache():
                 for b in Blobs([active_states_filter]):
                     if not b.locations:
-                        # There are no locations for this blob, delete it.
-                        b.add_event(
-                            EVENT_TYPE_AUDIT, 'No locations for this blob, hard deleting.')
-                        b.hard_delete()
+                        hard_deletes.append(b)
 
                     for node in b.locations:
                         per_node[node].append(b.uuid)
+
+            for b in hard_deletes:
+                # There are no locations for this blob, delete it.
+                b.add_event(EVENT_TYPE_AUDIT, 'No locations for this blob, hard deleting.')
+                b.hard_delete()
 
             for node in Nodes([]):
                 node.blobs = per_node.get(node.uuid, [])

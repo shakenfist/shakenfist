@@ -24,7 +24,6 @@ from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_MUTATE
 from shakenfist.exceptions import DeadNetwork, CongestedNetwork, IPManagerMissing
 from shakenfist import instance
 from shakenfist.ipmanager import IPManager
-from shakenfist.metrics import get_minimum_object_version as gmov
 from shakenfist import networkinterface
 from shakenfist.node import Node, Nodes, active_states_filter as active_nodes
 from shakenfist.tasks import (
@@ -43,8 +42,8 @@ LOG, _ = logs.setup(__name__)
 
 class Network(dbo):
     object_type = 'network'
+    initial_version = 2
     current_version = 3
-    upgrade_supported = True
 
     state_targets = {
         None: (dbo.STATE_INITIAL, ),
@@ -56,16 +55,7 @@ class Network(dbo):
     }
 
     def __init__(self, static_values):
-        if static_values.get('version', 2) != self.current_version:
-            upgraded, static_values = self.upgrade(static_values)
-
-            if upgraded and gmov('network') == self.current_version:
-                etcd.put(
-                    self.object_type, None, static_values.get('uuid'),
-                    static_values)
-                LOG.with_fields({
-                    self.object_type: static_values['uuid']}).info(
-                        'Online upgrade committed')
+        self.upgrade(static_values)
 
         super(Network, self).__init__(static_values.get('uuid'),
                                       static_values.get('version'))
@@ -91,22 +81,8 @@ class Network(dbo):
         self.__network_address = ipm.network_address
 
     @classmethod
-    def upgrade(cls, static_values):
-        changed = False
-        starting_version = static_values.get('version', 2)
-
-        if static_values.get('version') == 2:
-            cls._upgrade_metadata_to_attribute(static_values['uuid'])
-            static_values['version'] = 3
-            changed = True
-
-        if changed:
-            LOG.with_fields({
-                cls.object_type: static_values['uuid'],
-                'start_version': starting_version,
-                'final_version': static_values.get('version')
-            }).info('Object online upgraded')
-        return changed, static_values
+    def _upgrade_step_2_to_3(cls, static_values):
+        cls._upgrade_metadata_to_attribute(static_values['uuid'])
 
     @staticmethod
     def allocate_vxid(net_id):

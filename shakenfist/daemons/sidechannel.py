@@ -20,7 +20,11 @@ LOG, _ = logs.setup(__name__)
 
 
 class ConnectionIdle(Exception):
-    pass
+    ...
+
+
+class PutException(Exception):
+    ...
 
 
 class SFSocketAgent(protocol.SocketAgent):
@@ -134,6 +138,12 @@ class SFSocketAgent(protocol.SocketAgent):
     def gather_facts_response(self, packet):
         self.instance.add_event(EVENT_TYPE_AUDIT, 'received system facts')
         self.instance.agent_facts = packet.get('result', {})
+
+    def put_file(self, path):
+        error = self._path_is_file('put-file', path, send_error_packets=False)
+        if error:
+            raise PutException(error)
+        self._send_file('put-file', path)
 
     def get_file(self, path):
         self.incomplete_file_gets.append({
