@@ -76,6 +76,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://shakenfist.com/operator_guide/upgrades/</loc>
+         <lastmod>2023-03-28</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://shakenfist.com/operator_guide/networking/overview/</loc>
          <lastmod>2023-03-28</lastmod>
          <changefreq>daily</changefreq>
