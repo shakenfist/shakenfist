@@ -162,11 +162,8 @@ def handle(jobname, workitem):
                             'expected': b.size
                         }).info('Replicating blob complete')
                     except exceptions.BlobMissing:
-                        log.with_fields({
-                            'blob': b,
-                            'transferred': size,
-                            'expected': b.size
-                        }).info('Cannot replicate blob, no online sources')
+                        log.with_fields({'blob': b}).info(
+                            'Cannot replicate blob, no online sources')
 
             elif isinstance(task, ArchiveTranscodeTask):
                 if os.path.exists(task.cache_path()):
