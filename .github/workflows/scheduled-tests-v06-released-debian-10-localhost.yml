@@ -231,6 +231,14 @@ jobs:
           retention-days: 14
           path: ${{ github.workspace }}/artifacts/bundle.zip
 
+      - name: Snapshot localhost builds for later upgrade testing
+        run: |
+          if [ "localhost-released" == "localhost"]; then
+            sf-client instance snapshot primary \
+              --label_name sf://label/ci-images/debian-10-${{ github.ref }} \
+              --delete-snapshot-after-label --flatten
+          fi
+
       - uses: JasonEtco/create-an-issue@v2
         if: failure()
         id: create-issue
