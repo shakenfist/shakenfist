@@ -237,28 +237,31 @@ class Monitor(daemon.Daemon):
         cache_path = os.path.join(config.STORAGE_PATH, 'image_cache')
         os.makedirs(cache_path, exist_ok=True)
 
-        for ent in os.listdir(blob_path):
-            entpath = os.path.join(blob_path, ent)
+        p = pathlib.Path(blob_path)
+        for entpath in p.glob('**/*.lock'):
+            entpath = str(entpath)
             try:
                 st = os.stat(entpath)
+                blob_uuid = entpath.split('/')[-1].replace('.partial', '')
 
                 # If we've had this file for more than two cleaner delays...
                 if time.time() - st.st_mtime > config.CLEANER_DELAY * 2:
-                    if ent.endswith('.partial'):
+                    if entpath.endswith('.partial'):
                         # ... and its a stale partial transfer
-                        LOG.with_fields({'blob': ent}).warning(
+                        LOG.with_fields({'blob': blob_uuid}).warning(
                             'Deleting stale partial transfer')
                         os.unlink(entpath)
 
                     else:
-                        b = Blob.from_db(ent)
+                        blob_uuid = entpath.split('/')[-1]
+                        b = Blob.from_db(blob_uuid)
                         if (not b or b.state.value == Blob.STATE_DELETED
                                 or config.NODE_NAME not in b.locations):
-                            LOG.with_fields({'blob': ent}).debug(
+                            LOG.with_fields({'blob': blob_uuid}).debug(
                                 'Removing deleted blob from disk')
                             os.unlink(entpath)
                             cached = util_general.file_permutation_exists(
-                                os.path.join(cache_path, ent),
+                                os.path.join(cache_path, blob_uuid),
                                 ['iso', 'qcow2'])
                             if cached:
                                 os.unlink(cached)
@@ -322,7 +325,7 @@ class Monitor(daemon.Daemon):
             return
 
         for blob_uuid in n.blobs:
-            if not os.path.exists(os.path.join(config.STORAGE_PATH, 'blobs', blob_uuid)):
+            if not os.path.exists(Blob.filepath(blob_uuid)):
                 b = Blob.from_db(blob_uuid)
                 if b:
                     LOG.with_fields({

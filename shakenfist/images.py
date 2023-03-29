@@ -235,7 +235,7 @@ class ImageFetchHelper(object):
             return
 
         elif mimetype in ['application/x-cd-image', 'application/x-iso9660-image']:
-            blob_path = os.path.join(config.STORAGE_PATH, 'blobs', b.uuid)
+            blob_path = blob.Blob.filepath(b.uuid)
             cache_path = os.path.join(
                 config.STORAGE_PATH, 'image_cache', b.uuid + '.iso')
             if not os.path.exists(cache_path):
@@ -249,13 +249,12 @@ class ImageFetchHelper(object):
 
             cache_path = os.path.join(
                 config.STORAGE_PATH, 'image_cache', b.uuid + '.qcow2')
-            remote_blob_path = os.path.join(
-                config.STORAGE_PATH, 'blobs', remote_blob.uuid)
+            remote_blob_path = blob.Blob.filepath(remote_blob.uuid)
             if not os.path.exists(cache_path):
                 util_general.link(remote_blob_path, cache_path)
 
         else:
-            blob_path = os.path.join(config.STORAGE_PATH, 'blobs', b.uuid)
+            blob_path = blob.Blob.filepath(b.uuid)
 
             if mimetype == 'application/gzip':
                 cache_path = os.path.join(

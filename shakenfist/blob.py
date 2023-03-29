@@ -255,8 +255,7 @@ class Blob(dbo):
 
         with self.get_lock_attr('info', 'Set blob info'):
             if not self.info:
-                blob_path = os.path.join(
-                    config.STORAGE_PATH, 'blobs', self.uuid)
+                blob_path = Blob.filepath(self.uuid)
 
                 # We put a bunch of information from "qemu-img info" into the
                 # blob because its helpful. However, there are some values we
@@ -333,12 +332,8 @@ class Blob(dbo):
                 raise BlobDependencyMissing(self.depends_on)
             dep_blob.ensure_local(locks, instance_object=instance_object)
 
-        # Actually replicate this blob
-        blob_dir = os.path.join(config.STORAGE_PATH, 'blobs')
-        blob_path = os.path.join(blob_dir, self.uuid)
-        os.makedirs(blob_dir, exist_ok=True)
-
         # If the blob exists already, we're done
+        blob_path = Blob.filepath(self.uuid)
         if os.path.exists(blob_path):
             self.observe()
             return
@@ -530,8 +525,14 @@ class Blob(dbo):
                         'Instructed to replicate blob')
 
     @staticmethod
+    def filedir(blob_uuid):
+        path = os.path.join(config.STORAGE_PATH, 'blobs', blob_uuid[0:2])
+        os.makedirs(path, exist_ok=True)
+        return path
+
+    @staticmethod
     def filepath(blob_uuid):
-        return os.path.join(config.STORAGE_PATH, 'blobs', blob_uuid)
+        return os.path.join(Blob.filedir(blob_uuid), blob_uuid)
 
     @property
     def checksums(self):
@@ -610,15 +611,9 @@ class Blob(dbo):
         return True
 
 
-def ensure_blob_path():
-    blobs_path = os.path.join(config.STORAGE_PATH, 'blobs')
-    os.makedirs(blobs_path, exist_ok=True)
-
-
 def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
     if not os.path.exists(disk['path']):
         return
-    ensure_blob_path()
     dest_path = Blob.filepath(blob_uuid)
 
     # Actually make the snapshot
@@ -654,8 +649,6 @@ def snapshot_disk(disk, blob_uuid, related_object=None, thin=False):
 
 def http_fetch(url, resp, blob_uuid, locks, logs, checksum, checksum_type,
                instance_object=None):
-    ensure_blob_path()
-
     fetched = 0
     if resp.headers.get('Content-Length'):
         total_size = int(resp.headers.get('Content-Length'))

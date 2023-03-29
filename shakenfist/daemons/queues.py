@@ -170,8 +170,7 @@ def handle(jobname, workitem):
                     b = blob.Blob.from_db(task.blob_uuid())
 
                     transcode_blob_uuid = str(uuid.uuid4())
-                    transcode_blob_path = os.path.join(
-                        config.STORAGE_PATH, 'blobs', transcode_blob_uuid)
+                    transcode_blob_path = blob.Blob.filepath(transcode_blob_uuid)
                     util_process.execute(
                         [], 'cp %s %s' % (task.cache_path(), transcode_blob_path))
                     st = os.stat(transcode_blob_path)

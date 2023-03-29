@@ -68,8 +68,7 @@ class BlobDataEndpoint(sf_api.Resource):
             return sf_api.error(404, 'blob not found')
 
         # Fast path if we have the blob locally
-        os.makedirs(os.path.join(config.STORAGE_PATH, 'blobs'), exist_ok=True)
-        blob_path = os.path.join(config.STORAGE_PATH, 'blobs', blob_uuid)
+        blob_path = Blob.filepath(blob_uuid)
         if os.path.exists(blob_path):
             return flask.Response(
                 flask.stream_with_context(_read_file(blob_path, offset)),
