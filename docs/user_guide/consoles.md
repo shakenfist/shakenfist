@@ -55,6 +55,20 @@ an interactive console for the instance. So in this example:
 telnet sf-2 30049
 ```
 
+## Archival of the serial console
+
+Optionally, the content of the serial console can be archived when an instance
+is deleted. This is useful for debugging ephemeral instances which might have
+been deleted by the time you notice a problem -- for example instances used for
+Continuous Integration environments.
+
+The time the serial console is kept for is configured with the
+ARCHIVE_INSTANCE_CONSOLE_DURATION configuration variable, which specifies how many
+days to keep the console for. On instance deletion, the console log is converted
+to an artifact and stored as any other. These artifacts have type 'other', and
+will have a source URL in the form of sf://instance/...uuid.../console within
+the same namespace as the instance.
+
 ## Interactive VDI console
 
 There is also a graphical console. Similarly to the telnet console, it requires

@@ -608,6 +608,9 @@ class Instance(dbo):
             self.enqueue_delete_due_error('Instance failed to power on')
 
     def _delete_on_hypervisor(self):
+        if config.ARCHIVE_INSTANCE_CONSOLE_DURATION > 0:
+            self.archive_console_log()
+
         for disk in self.block_devices.get('devices', []):
             if 'blob_uuid' in disk and disk['blob_uuid']:
                 # Mark files we used in the image cache as recently used so that
@@ -1321,7 +1324,6 @@ class Instance(dbo):
             if disk['type'] == 'nvram':
                 # These are small and don't use qemu-img to capture, so just
                 # do them now.
-                blob.ensure_blob_path()
                 dest_path = blob.Blob.filepath(blob_uuid)
                 shutil.copyfile(disk['path'], dest_path)
 
@@ -1330,6 +1332,8 @@ class Instance(dbo):
                                   time.time(), time.time())
                 b.observe()
                 b.verify_checksum()
+
+                a.add_index(blob_uuid)
                 a.state = artifact.Artifact.STATE_CREATED
 
             else:
@@ -1340,6 +1344,49 @@ class Instance(dbo):
 
         self.add_event(EVENT_TYPE_AUDIT, 'snapshot', extra=out)
         return out
+
+    def archive_console_log(self):
+        console_path = os.path.join(self.instance_path, 'console.log')
+        if not os.path.exists(console_path):
+            return
+
+        st = os.stat(console_path)
+        if st.st_size > 0:
+            artifacts = [artifact.Artifact.from_url(
+                            artifact.Artifact.TYPE_OTHER,
+                            '%s%s/console' % (artifact.INSTANCE_URL, self.uuid),
+                            name='%s/console' % self.uuid,
+                            max_versions=1, namespace=self.namespace,
+                            create_if_new=True)]
+            if self.namespace != 'system':
+                artifacts.append(artifact.Artifact.from_url(
+                                    artifact.Artifact.TYPE_OTHER,
+                                    '%s%s/console' % (artifact.INSTANCE_URL, self.uuid),
+                                    name='%s/console' % self.uuid,
+                                    max_versions=1, namespace='system',
+                                    create_if_new=True))
+
+            blob_uuid = str(uuid4())
+            dest_path = blob.Blob.filepath(blob_uuid)
+            shutil.copyfile(console_path, dest_path)
+
+            b = blob.Blob.new(blob_uuid, st.st_size, time.time(), time.time())
+            b.set_lifetime(config.ARCHIVE_INSTANCE_CONSOLE_DURATION * 3600 * 24)
+            b.observe()
+            b.verify_checksum()
+
+            for a in artifacts:
+                a.add_index(blob_uuid)
+                a.state = artifact.Artifact.STATE_CREATED
+                self.add_event(
+                    EVENT_TYPE_AUDIT,
+                    ('the console log for this instance was archived in namespace %s'
+                     % a.namespace),
+                    extra={'artifact': a.uuid, 'blob': b.uuid})
+        else:
+            self.add_event(
+                EVENT_TYPE_AUDIT,
+                'the console log for this instance was not archived as it was empty')
 
 
 class Instances(dbo_iter):

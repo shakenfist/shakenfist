@@ -184,6 +184,9 @@ class SFConfig(BaseSettings):
     ARTIFACT_MAX_VERSIONS_DEFAULT: int = Field(
         3, description='Default number of versions to keep within an artifact'
     )
+    ARCHIVE_INSTANCE_CONSOLE_DURATION: int = Field(
+        7, description='The number of days to archive instance consoles for after deletion'
+    )
 
     # Event options
     EVENTLOG_NODE_IP: str = Field(

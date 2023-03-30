@@ -199,6 +199,9 @@ class Blob(dbo):
         retention = self._db_get_attribute('retention', {'expires_at': 0})
         return retention['expires_at']
 
+    def set_lifetime(self, seconds_from_now):
+        self._db_set_attribute('retention', {'expires_at': time.time() + seconds_from_now})
+
     # Derived values
     def _instance_usage(self, node=None):
         filters = [instance.healthy_states_filter]
