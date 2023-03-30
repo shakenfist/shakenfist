@@ -96,7 +96,7 @@ def upgrade_data_store():
     start_time = time.time()
 
     if version == 1:
-        # Version two is shared, and uses an EventLog chain instead of a single
+        # Version two is sharded, and uses an EventLog chain instead of a single
         # sqlite database.
         version = 2
         count = 0

@@ -4,6 +4,7 @@ from shakenfist_utilities import logs
 import socket
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist import blob
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
@@ -41,8 +42,7 @@ def transfer_server(name, data):
             log.warning('Connection with incorrect token, aborting')
             return
 
-        blob_path = os.path.join(
-            config.STORAGE_PATH, 'blobs', data['blob_uuid'])
+        blob_path = blob.Blob.filepath(data['blob_uuid'])
         if not os.path.exists(blob_path):
             log.warning('Blob is missing, aborting')
             return

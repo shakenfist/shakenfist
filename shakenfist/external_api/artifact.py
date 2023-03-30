@@ -423,8 +423,7 @@ class ArtifactUploadEndpoint(sf_api.Resource):
             if not blob_uuid:
                 # Convert upload to a blob
                 blob_uuid = str(uuid.uuid4())
-                blob_dir = os.path.join(config.STORAGE_PATH, 'blobs')
-                blob_path = os.path.join(blob_dir, blob_uuid)
+                blob_path = Blob.filepath(blob_uuid)
 
                 upload_dir = os.path.join(config.STORAGE_PATH, 'uploads')
                 upload_path = os.path.join(upload_dir, u.uuid)
