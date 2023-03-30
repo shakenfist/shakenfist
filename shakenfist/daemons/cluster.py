@@ -112,6 +112,9 @@ class Monitor(daemon.Daemon):
                 }).warning('Cleaning up stale upload')
                 upload.hard_delete()
 
+        # Cleanup orphan artifacts, delete old versions, and record blobs used
+        # by artifacts
+        in_use_blobs = defaultdict(int)
         for a in artifact.Artifacts([]):
             # If the artifact's namespace is deleted then we should remove the
             # artifact
@@ -122,6 +125,13 @@ class Monitor(daemon.Daemon):
 
             # Prune artifacts which might have too many versions
             a.delete_old_versions()
+
+            # Record usage for blobs used by artifacts
+            for blob_index in a.get_all_indexes():
+                blob_uuid = blob_index['blob_uuid']
+                b = Blob.from_db(blob_uuid)
+                if b:
+                    in_use_blobs[b.uuid] += 1
 
         # Inspect current state of blobs, the actual changes are done below outside
         # the read only cache. We define being low on disk has having less than three
@@ -145,11 +155,10 @@ class Monitor(daemon.Daemon):
         current_fetches = etcd.get_current_blob_transfers(
             absent_nodes=absent_nodes)
 
-        in_use_blobs = []
         with etcd.ThreadLocalReadOnlyCache():
             for b in Blobs([active_states_filter]):
                 if b.instances:
-                    in_use_blobs.append(b)
+                    in_use_blobs[b.uuid] += 1
 
                 # If there is current work for a blob, we ignore it until that
                 # work completes
@@ -221,18 +230,32 @@ class Monitor(daemon.Daemon):
                             break
 
         # Record blobs in use
-        for b in in_use_blobs:
-            b.record_usage()
+        for blob_uuid in in_use_blobs:
+            b = Blob.from_db(blob_uuid)
+            if b:
+                b.record_usage()
+
+        # Find expired blobs
+        expired_blobs = []
+        with etcd.ThreadLocalReadOnlyCache():
+            for b in Blobs([active_states_filter]):
+                if b.expires_at > 0 and b.expires_at < time.time():
+                    expired_blobs.append(b)
+
+        for b in expired_blobs:
+            b.add_event(EVENT_TYPE_AUDIT, 'blob has expired')
+            b.state(dbo.STATE_DELETED)
 
         # Prune over replicated blobs
         for blob_uuid in overreplicated:
             b = Blob.from_db(blob_uuid)
-            for node in overreplicated[blob_uuid]:
-                LOG.with_fields({
-                    'blob': b,
-                    'node': node
-                }).info('Blob over replicated, removing from node with no users')
-                b.drop_node_location(node)
+            if b:
+                for node in overreplicated[blob_uuid]:
+                    LOG.with_fields({
+                        'blob': b,
+                        'node': node
+                    }).info('Blob over replicated, removing from node with no users')
+                    b.drop_node_location(node)
 
         # Replicate under replicated blobs, but only if we don't have heaps of
         # queued replications already
@@ -247,11 +270,12 @@ class Monitor(daemon.Daemon):
                 break
 
             b = Blob.from_db(blob_uuid)
-            LOG.with_fields({
-                'blob': b
-            }).info('Blob under replicated, attempting to correct')
-            b.request_replication(allow_excess=excess)
-            current_fetches[blob_uuid].append('unknown')
+            if b:
+                LOG.with_fields({
+                    'blob': b
+                }).info('Blob under replicated, attempting to correct')
+                b.request_replication(allow_excess=excess)
+                current_fetches[blob_uuid].append('unknown')
 
         # Find transcodes of not recently used blobs and reap them
         old_transcodes = []
