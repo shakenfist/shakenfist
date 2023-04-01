@@ -323,10 +323,14 @@ class Blob(dbo):
 
     def ref_count_set(self, new_count):
         with self.get_lock_attr('ref_count', 'Decrease reference count'):
-            if new_count == self.ref_count:
+            old_count = self.ref_count
+            if new_count == old_count:
                 return
 
-            self.log.error('Overriding blob reference count with new value!')
+            self.log.with_fields({
+                'old': old_count,
+                'new': new_count}).error(
+                    'Overriding blob reference count with new value!')
             self._db_set_attribute('ref_count', {'ref_count': new_count})
             self.add_event(EVENT_TYPE_MUTATE, 'set reference count to %d' % new_count)
             self._delete_unused(new_count)

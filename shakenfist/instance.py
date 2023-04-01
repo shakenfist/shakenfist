@@ -1352,12 +1352,10 @@ class Instance(dbo):
 
         st = os.stat(console_path)
         if st.st_size > 0:
-            artifacts = [artifact.Artifact.from_url(
-                            artifact.Artifact.TYPE_OTHER,
-                            '%s%s/console' % (artifact.INSTANCE_URL, self.uuid),
-                            name='%s/console' % self.uuid,
-                            max_versions=1, namespace=self.namespace,
-                            create_if_new=True)]
+            # These two artifacts need to appear in this order, or the system
+            # artifact wont be created because system can "see" the other
+            # namespace.
+            artifacts = []
             if self.namespace != 'system':
                 artifacts.append(artifact.Artifact.from_url(
                                     artifact.Artifact.TYPE_OTHER,
@@ -1365,6 +1363,12 @@ class Instance(dbo):
                                     name='%s/console' % self.uuid,
                                     max_versions=1, namespace='system',
                                     create_if_new=True))
+            artifacts.append(artifact.Artifact.from_url(
+                            artifact.Artifact.TYPE_OTHER,
+                            '%s%s/console' % (artifact.INSTANCE_URL, self.uuid),
+                            name='%s/console' % self.uuid,
+                            max_versions=1, namespace=self.namespace,
+                            create_if_new=True))
 
             blob_uuid = str(uuid4())
             dest_path = blob.Blob.filepath(blob_uuid)
