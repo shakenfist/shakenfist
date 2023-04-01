@@ -19,7 +19,7 @@
         <link rel="next" href="../events/">
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.4.2, mkdocs-material-9.1.4">
+      <meta name="generator" content="mkdocs-1.4.2, mkdocs-material-9.1.5">
     
     
       
@@ -27,7 +27,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.240905d7.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.7a7fce14.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.a0c5b2b5.min.css">
@@ -390,6 +390,13 @@
         <li class="md-nav__item">
   <a href="#interactive-serial-console" class="md-nav__link">
     Interactive serial console
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#archival-of-the-serial-console" class="md-nav__link">
+    Archival of the serial console
   </a>
   
 </li>
@@ -771,6 +778,13 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#archival-of-the-serial-console" class="md-nav__link">
+    Archival of the serial console
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#interactive-vdi-console" class="md-nav__link">
     Interactive VDI console
   </a>
@@ -838,6 +852,17 @@ vdi port      : 37804
 an interactive console for the instance. So in this example:</p>
 <pre><code>telnet sf-2 30049
 </code></pre>
+<h2 id="archival-of-the-serial-console">Archival of the serial console</h2>
+<p>Optionally, the content of the serial console can be archived when an instance
+is deleted. This is useful for debugging ephemeral instances which might have
+been deleted by the time you notice a problem -- for example instances used for
+Continuous Integration environments.</p>
+<p>The time the serial console is kept for is configured with the
+ARCHIVE_INSTANCE_CONSOLE_DURATION configuration variable, which specifies how many
+days to keep the console for. On instance deletion, the console log is converted
+to an artifact and stored as any other. These artifacts have type 'other', and
+will have a source URL in the form of sf://instance/...uuid.../console within
+the same namespace as the instance.</p>
 <h2 id="interactive-vdi-console">Interactive VDI console</h2>
 <p>There is also a graphical console. Similarly to the telnet console, it requires
 direct network access to the hypervisor node, and is accessed at the "vdi port"
@@ -891,7 +916,7 @@ SPICE consoles, see <a href="https://www.spice-space.org/multiple-clients.html">
     <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.208ed371.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.19047be9.min.js"></script>
+      <script src="../../assets/javascripts/bundle.407015b8.min.js"></script>
       
     
   </body>
