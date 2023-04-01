@@ -2,6 +2,9 @@
 # urgent. Hard deleting data for example. Its therefore pretty relaxed about
 # obtaining the lock to do work et cetera. There is only one active cluster
 # maintenance daemon per cluster.
+#
+# NOTE(mikal): do not use the etcd read only cache here -- it will cause cluster
+# wide maintenance tasks to crash, and someone has to eventually run the upgrade.
 
 from collections import defaultdict
 from functools import partial
@@ -57,19 +60,13 @@ class Monitor(daemon.Daemon):
         # Recompute our cache of what blobs are on what nodes every 30 minutes
         if time.time() - last_loop_run > 1800:
             per_node = defaultdict(list)
-            hard_deletes = []
-            with etcd.ThreadLocalReadOnlyCache():
-                for b in Blobs([active_states_filter]):
-                    if not b.locations:
-                        hard_deletes.append(b)
+            for b in Blobs([active_states_filter]):
+                if not b.locations:
+                    b.add_event(EVENT_TYPE_AUDIT, 'No locations for this blob, hard deleting.')
+                    b.hard_delete()
 
-                    for node in b.locations:
-                        per_node[node].append(b.uuid)
-
-            for b in hard_deletes:
-                # There are no locations for this blob, delete it.
-                b.add_event(EVENT_TYPE_AUDIT, 'No locations for this blob, hard deleting.')
-                b.hard_delete()
+                for node in b.locations:
+                    per_node[node].append(b.uuid)
 
             for node in Nodes([]):
                 node.blobs = per_node.get(node.uuid, [])
@@ -112,6 +109,9 @@ class Monitor(daemon.Daemon):
                 }).warning('Cleaning up stale upload')
                 upload.hard_delete()
 
+        # Cleanup orphan artifacts, delete old versions, and record blobs used
+        # by artifacts
+        in_use_blobs = defaultdict(int)
         for a in artifact.Artifacts([]):
             # If the artifact's namespace is deleted then we should remove the
             # artifact
@@ -122,6 +122,13 @@ class Monitor(daemon.Daemon):
 
             # Prune artifacts which might have too many versions
             a.delete_old_versions()
+
+            # Record usage for blobs used by artifacts
+            for blob_index in a.get_all_indexes():
+                blob_uuid = blob_index['blob_uuid']
+                b = Blob.from_db(blob_uuid)
+                if b:
+                    in_use_blobs[b.uuid] += 1
 
         # Inspect current state of blobs, the actual changes are done below outside
         # the read only cache. We define being low on disk has having less than three
@@ -145,94 +152,100 @@ class Monitor(daemon.Daemon):
         current_fetches = etcd.get_current_blob_transfers(
             absent_nodes=absent_nodes)
 
-        in_use_blobs = []
-        with etcd.ThreadLocalReadOnlyCache():
-            for b in Blobs([active_states_filter]):
-                if b.instances:
-                    in_use_blobs.append(b)
+        for b in Blobs([active_states_filter]):
+            if b.instances:
+                in_use_blobs[b.uuid] += 1
 
-                # If there is current work for a blob, we ignore it until that
-                # work completes
-                if b.uuid in current_fetches:
-                    LOG.with_fields({
-                        'blob': b.blob_uuid
-                    }).info('Blob has current fetches, ignoring')
-                    continue
+            # If there is current work for a blob, we ignore it until that
+            # work completes
+            if b.uuid in current_fetches:
+                LOG.with_fields({
+                    'blob': b.blob_uuid
+                }).info('Blob has current fetches, ignoring')
+                continue
 
-                locations = b.locations
-                ignored_locations = []
-                for n in absent_nodes:
-                    if n in locations:
-                        locations.remove(n)
-                        ignored_locations.append(n)
+            locations = b.locations
+            ignored_locations = []
+            for n in absent_nodes:
+                if n in locations:
+                    locations.remove(n)
+                    ignored_locations.append(n)
 
-                if ignored_locations:
-                    LOG.with_fields({
-                        'blob': b,
-                        'ignored_locations': ignored_locations
-                    }).info('Ignored some blob locations as nodes are absent')
+            if ignored_locations:
+                LOG.with_fields({
+                    'blob': b,
+                    'ignored_locations': ignored_locations
+                }).info('Ignored some blob locations as nodes are absent')
 
-                delta = len(locations) - config.BLOB_REPLICATION_FACTOR
-                if delta > 0:
-                    # So... The blob replication factor is a target not a limit.
-                    # Specifically, if there are more locations than the target
-                    # but we aren't low on disk, we don't clean them up. That's
-                    # because its hard for us to predict which machine will run
-                    # out of disk first, and copying a blob back to a machine if
-                    # its needed there is slow and annoying.
+            delta = len(locations) - config.BLOB_REPLICATION_FACTOR
+            if delta > 0:
+                # So... The blob replication factor is a target not a limit.
+                # Specifically, if there are more locations than the target
+                # but we aren't low on disk, we don't clean them up. That's
+                # because its hard for us to predict which machine will run
+                # out of disk first, and copying a blob back to a machine if
+                # its needed there is slow and annoying.
 
-                    # Work out where the blob is in active use.
-                    excess_locations = b.locations
-                    in_use_locations = []
+                # Work out where the blob is in active use.
+                excess_locations = b.locations
+                in_use_locations = []
 
-                    for instance_uuid in b.instances:
-                        i = instance.Instance.from_db(instance_uuid)
-                        node = i.placement.get('node')
-                        if node in excess_locations:
-                            excess_locations.remove(node)
-                            in_use_locations.append(node)
+                for instance_uuid in b.instances:
+                    i = instance.Instance.from_db(instance_uuid)
+                    node = i.placement.get('node')
+                    if node in excess_locations:
+                        excess_locations.remove(node)
+                        in_use_locations.append(node)
 
-                    # Only remove excess copies from nodes which are running
-                    # low on disk. Do not end up with too few replicas.
-                    overreplicated[b.uuid] = []
-                    target = (config.BLOB_REPLICATION_FACTOR -
-                              len(in_use_locations))
-                    for n in low_disk_nodes:
-                        if n in excess_locations:
-                            overreplicated[b.uuid].append(n)
-                        if len(overreplicated[b.uuid]) == target:
-                            break
+                # Only remove excess copies from nodes which are running
+                # low on disk. Do not end up with too few replicas.
+                overreplicated[b.uuid] = []
+                target = (config.BLOB_REPLICATION_FACTOR - len(in_use_locations))
+                for n in low_disk_nodes:
+                    if n in excess_locations:
+                        overreplicated[b.uuid].append(n)
+                    if len(overreplicated[b.uuid]) == target:
+                        break
 
-                elif delta < 0:
-                    # The tuple is blob UUID, and how much to over replicate by.
-                    underreplicated.append((b.uuid, 0))
+            elif delta < 0:
+                # The tuple is blob UUID, and how much to over replicate by.
+                underreplicated.append((b.uuid, 0))
 
-                else:
-                    # We have exactly the right number of copies, but what if
-                    # the blob is on a really full node?
-                    for n in low_disk_nodes:
-                        if n in b.locations:
-                            # We have at least one space constrained node with
-                            # this blob. Request an extra temporary copy of the
-                            # blob elsewhere so we can hopefully clean up one of
-                            # these next pass. The tuple is blob UUID, and how
-                            # much to over replicate by.
-                            underreplicated.append((b.uuid, 1))
-                            break
+            else:
+                # We have exactly the right number of copies, but what if
+                # the blob is on a really full node?
+                for n in low_disk_nodes:
+                    if n in b.locations:
+                        # We have at least one space constrained node with
+                        # this blob. Request an extra temporary copy of the
+                        # blob elsewhere so we can hopefully clean up one of
+                        # these next pass. The tuple is blob UUID, and how
+                        # much to over replicate by.
+                        underreplicated.append((b.uuid, 1))
+                        break
 
         # Record blobs in use
-        for b in in_use_blobs:
-            b.record_usage()
+        for blob_uuid in in_use_blobs:
+            b = Blob.from_db(blob_uuid)
+            if b:
+                b.record_usage()
+
+        # Find expired blobs
+        for b in Blobs([active_states_filter]):
+            if b.expires_at > 0 and b.expires_at < time.time():
+                b.add_event(EVENT_TYPE_AUDIT, 'blob has expired')
+                b.state = dbo.STATE_DELETED
 
         # Prune over replicated blobs
         for blob_uuid in overreplicated:
             b = Blob.from_db(blob_uuid)
-            for node in overreplicated[blob_uuid]:
-                LOG.with_fields({
-                    'blob': b,
-                    'node': node
-                }).info('Blob over replicated, removing from node with no users')
-                b.drop_node_location(node)
+            if b:
+                for node in overreplicated[blob_uuid]:
+                    LOG.with_fields({
+                        'blob': b,
+                        'node': node
+                    }).info('Blob over replicated, removing from node with no users')
+                    b.drop_node_location(node)
 
         # Replicate under replicated blobs, but only if we don't have heaps of
         # queued replications already
@@ -247,29 +260,24 @@ class Monitor(daemon.Daemon):
                 break
 
             b = Blob.from_db(blob_uuid)
-            LOG.with_fields({
-                'blob': b
-            }).info('Blob under replicated, attempting to correct')
-            b.request_replication(allow_excess=excess)
-            current_fetches[blob_uuid].append('unknown')
+            if b:
+                LOG.with_fields({
+                    'blob': b
+                }).info('Blob under replicated, attempting to correct')
+                b.request_replication(allow_excess=excess)
+                current_fetches[blob_uuid].append('unknown')
 
         # Find transcodes of not recently used blobs and reap them
-        old_transcodes = []
-        with etcd.ThreadLocalReadOnlyCache():
-            for b in Blobs([active_states_filter]):
-                if not b.transcoded:
-                    continue
+        for b in Blobs([active_states_filter]):
+            if not b.transcoded:
+                continue
 
-                if time.time() - b.last_used > config.BLOB_TRANSCODE_MAXIMUM_IDLE_TIME:
-                    old_transcodes.append((b.uuid, b.transcoded))
-
-        for blob_uuid, transcodes in old_transcodes:
-            b = Blob.from_db(blob_uuid)
-            b.remove_transcodes()
-
-            for transcode in transcodes:
-                tb = Blob.from_db(transcodes[transcode])
-                tb.ref_count_dec(b)
+            if time.time() - b.last_used > config.BLOB_TRANSCODE_MAXIMUM_IDLE_TIME:
+                transcoded = b.transcoded
+                b.remove_transcodes()
+                for transcode in transcoded:
+                    tb = Blob.from_db(transcoded[transcode])
+                    tb.ref_count_dec(b)
 
         # Node management
         for n in Nodes([]):
@@ -306,13 +314,7 @@ class Monitor(daemon.Daemon):
                         ni.delete()
 
                 # Cleanup any blob locations
-                blobs_to_remove = []
-                with etcd.ThreadLocalReadOnlyCache():
-                    for b in Blobs([active_states_filter,
-                                    partial(placement_filter, n.fqdn)]):
-                        blobs_to_remove.append(b)
-
-                for b in blobs_to_remove:
+                for b in Blobs([active_states_filter, partial(placement_filter, n.fqdn)]):
                     n.add_event(
                         EVENT_TYPE_AUDIT,
                         'deleting blob %s location as hosting node has been deleted' % b.uuid)
@@ -344,30 +346,29 @@ class Monitor(daemon.Daemon):
             self._await_election()
 
             # Infrequently audit blob references and correct errors
-            with etcd.ThreadLocalReadOnlyCache():
-                discovered_blob_references = defaultdict(int)
-                for b in Blobs([active_states_filter]):
-                    discovered_blob_references[b.uuid] = 0
+            discovered_blob_references = defaultdict(int)
+            for b in Blobs([active_states_filter]):
+                discovered_blob_references[b.uuid] = 0
 
-                for i in instance.Instances([instance.active_states_filter]):
-                    for d in i.disk_spec:
-                        blob_uuid = d.get('blob_uuid')
-                        if blob_uuid:
-                            discovered_blob_references[blob_uuid] += 1
-
-                for a in artifact.Artifacts(filters=[active_states_filter]):
-                    for blob_index in a.get_all_indexes():
-                        blob_uuid = blob_index['blob_uuid']
+            for i in instance.Instances([instance.active_states_filter]):
+                for d in i.disk_spec:
+                    blob_uuid = d.get('blob_uuid')
+                    if blob_uuid:
                         discovered_blob_references[blob_uuid] += 1
 
-                for b in Blobs([active_states_filter]):
-                    dep_blob_uuid = b.depends_on
-                    if dep_blob_uuid:
-                        discovered_blob_references[dep_blob_uuid] += 1
+            for a in artifact.Artifacts(filters=[active_states_filter]):
+                for blob_index in a.get_all_indexes():
+                    blob_uuid = blob_index['blob_uuid']
+                    discovered_blob_references[blob_uuid] += 1
 
-                    transcodes = b.transcoded
-                    for t in transcodes:
-                        discovered_blob_references[transcodes[t]] += 1
+            for b in Blobs([active_states_filter]):
+                dep_blob_uuid = b.depends_on
+                if dep_blob_uuid:
+                    discovered_blob_references[dep_blob_uuid] += 1
+
+                transcodes = b.transcoded
+                for t in transcodes:
+                    discovered_blob_references[transcodes[t]] += 1
 
             for blob_uuid in discovered_blob_references:
                 # If the blob still exists, and is more than five minutes old,
@@ -378,10 +379,9 @@ class Monitor(daemon.Daemon):
 
             # Infrequently ensure we have no blobs with a reference count of zero
             orphan_blobs = []
-            with etcd.ThreadLocalReadOnlyCache():
-                for b in Blobs([active_states_filter]):
-                    if b.ref_count == 0:
-                        orphan_blobs.append(b)
+            for b in Blobs([active_states_filter]):
+                if b.ref_count == 0:
+                    orphan_blobs.append(b)
 
             for b in orphan_blobs:
                 self.log.with_fields({'blob': b}).error(

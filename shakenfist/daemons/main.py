@@ -51,7 +51,7 @@ def upgrade_blob_datastore():
         for ent in os.listdir(image_cache_path):
             entpath = os.path.join(image_cache_path, ent)
             if os.path.islink(entpath):
-                dest = pathlib.Path.resolve(entpath)
+                dest = str(pathlib.Path(entpath).resolve())
                 if 'blobs' in dest:
                     blob_uuid = dest.split('/')[-1]
                     relocations[blob_uuid] = entpath
@@ -65,14 +65,17 @@ def upgrade_blob_datastore():
                     'Not moving blob %s from %s to %s as it is missing from disk'
                     % (b.uuid, old_blob_path, new_blob_path))
             else:
-                os.rename(old_blob_path, new_blob_path)
                 LOG.info('Moving blob %s from %s to %s'
                          % (b.uuid, old_blob_path, new_blob_path))
+                os.rename(old_blob_path, new_blob_path)
+
                 if b.uuid in relocations:
-                    os.unlink(entpath)
-                    os.symlink(entpath, new_blob_path)
-                    LOG.info('Relocated image cache entry %s to new blob path'
-                             % relocations[b.uuid])
+                    cache_entry = relocations[b.uuid]
+                    LOG.info('Relocating image cache entry %s to new blob path %s'
+                             % (cache_entry, new_blob_path))
+                    os.unlink(cache_entry)
+                    os.symlink(new_blob_path, cache_entry)
+
             count += 1
 
         if count > 0:

@@ -36,7 +36,7 @@ LOG, _ = logs.setup(__name__)
 
 class Blob(dbo):
     object_type = 'blob'
-    current_version = 5
+    current_version = 6
 
     state_targets = {
         None: (dbo.STATE_INITIAL),
@@ -65,6 +65,11 @@ class Blob(dbo):
     @classmethod
     def _upgrade_step_4_to_5(cls, static_values):
         cls._upgrade_metadata_to_attribute(static_values['uuid'])
+
+    @classmethod
+    def _upgrade_step_5_to_6(cls, static_values):
+        etcd.put('attribute/blob', static_values['uuid'], 'retention',
+                 {'expires_at': 0})
 
     @classmethod
     def normalize_timestamp(cls, timestamp):
@@ -188,6 +193,14 @@ class Blob(dbo):
 
     def record_usage(self):
         self._db_set_attribute('last_used', {'last_used': time.time()})
+
+    @property
+    def expires_at(self):
+        retention = self._db_get_attribute('retention', {'expires_at': 0})
+        return retention['expires_at']
+
+    def set_lifetime(self, seconds_from_now):
+        self._db_set_attribute('retention', {'expires_at': time.time() + seconds_from_now})
 
     # Derived values
     def _instance_usage(self, node=None):
