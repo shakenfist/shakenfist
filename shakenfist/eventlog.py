@@ -194,9 +194,9 @@ class EventLog(object):
         try:
             elc.write_event(event_type, timestamp, fqdn, duration, message,
                             extra=extra)
-        except sqlite3.DatabaseError:
+        except sqlite3.DatabaseError as e:
             self.log.with_fields({'chunk': '%04d%02d' % (year, month)}).error(
-                'Chunk corrupt, moving aside.')
+                'Chunk corrupt, moving aside: %s.' % e)
             os.rename(elc.dbpath, elc.dbpath + '.corrupt')
             del self.write_elc_cache[(year, month)]
 
@@ -312,8 +312,7 @@ class EventLog(object):
 # This is the version for an individual sqlite file
 VERSION = 5
 CREATE_EVENT_TABLE = """CREATE TABLE IF NOT EXISTS events(
-    type text, timestamp real PRIMARY KEY, fqdn text,
-    operation text, phase text, duration float, message text,
+    type text, timestamp real PRIMARY KEY, fqdn text, duration float, message text,
     extra text)"""
 CREATE_VERSION_TABLE = """CREATE TABLE IF NOT EXISTS version(version int primary key)"""
 
@@ -338,6 +337,7 @@ class EventLogChunk(object):
         self.bootstrapped = False
 
     def _bootstrap(self):
+        sqlite_ver = sqlite3.sqlite_version_info
         os.makedirs(self.dbdir, exist_ok=True)
         if not os.path.exists(self.dbpath):
             self.log.info('Creating event log')
@@ -408,8 +408,38 @@ class EventLogChunk(object):
                 self.con.execute('UPDATE events SET type="historic"')
                 self.con.execute(
                     'INSERT INTO events(type, timestamp, message) '
-                    'VALUES ("audit", %f, "Upgraded database to version 2")'
+                    'VALUES ("audit", %f, "Upgraded database to version 5")'
                     % time.time())
+
+            if ver == 5:
+                # Support for dropping columns in sqlite is relative recent, so
+                # we end up having to do a bit of a dance here.
+                ver = 6
+                self.log.info('Upgrading database from v5 to v6 using sqlite version %s'
+                              % str(sqlite_ver))
+                if sqlite_ver[1] >= 35:
+                    self.con.execute('ALTER TABLE events DROP COLUMN operation')
+                    self.con.execute('ALTER TABLE events DROP COLUMN phase')
+
+                    self.con.execute(
+                        'INSERT INTO events(type, timestamp, message) '
+                        'VALUES ("audit", %f, "Upgraded database to version 6 in modern mode")'
+                        % time.time())
+                else:
+                    # Older versions of sqlite don't have a drop column, so we
+                    # have to do this the hard way.
+                    self.con.execute('ALTER TABLE events RENAME TO events_old')
+                    self.con.execute(CREATE_EVENT_TABLE)
+                    self.con.execute(
+                        'INSERT INTO events (type, timestamp, fqdn, duration, message, extra) '
+                        'SELECT type, timestamp, fqdn, duration, message, extra '
+                        'FROM events_old')
+                    self.con.execute('DROP TABLE events_old')
+
+                    self.con.execute(
+                        'INSERT INTO events(type, timestamp, message) '
+                        'VALUES ("audit", %f, "Upgraded database to version 6 in compatibility mode")'
+                        % time.time())
 
             if start_ver != ver:
                 self.con.execute('UPDATE version SET version = ?', (ver,))
