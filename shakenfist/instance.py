@@ -771,8 +771,6 @@ class Instance(dbo):
                                 'Image %s is missing' % disk['blob_uuid'])
 
                         b = blob.Blob.from_db(disk['blob_uuid'])
-                        b.add_event(
-                            EVENT_TYPE_AUDIT, 'instance %s is using blob' % self.uuid)
                         b.ref_count_inc(self)
 
                         with util_general.RecordedOperation('detect cdrom images', self):

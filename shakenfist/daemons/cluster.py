@@ -346,36 +346,39 @@ class Monitor(daemon.Daemon):
             self._await_election()
 
             # Infrequently audit blob references and correct errors
-            discovered_blob_references = defaultdict(int)
+            discovered_refs = {}
             for b in Blobs([active_states_filter]):
-                discovered_blob_references[b.uuid] = 0
+                discovered_refs[b.uuid] = []
 
             for i in instance.Instances([instance.active_states_filter]):
                 for d in i.disk_spec:
                     blob_uuid = d.get('blob_uuid')
                     if blob_uuid:
-                        discovered_blob_references[blob_uuid] += 1
+                        discovered_refs[blob_uuid].append(i)
 
             for a in artifact.Artifacts(filters=[active_states_filter]):
                 for blob_index in a.get_all_indexes():
                     blob_uuid = blob_index['blob_uuid']
-                    discovered_blob_references[blob_uuid] += 1
+                    discovered_refs[blob_uuid].append(a)
 
             for b in Blobs([active_states_filter]):
                 dep_blob_uuid = b.depends_on
                 if dep_blob_uuid:
-                    discovered_blob_references[dep_blob_uuid] += 1
+                    discovered_refs[dep_blob_uuid].append(b)
 
                 transcodes = b.transcoded
                 for t in transcodes:
-                    discovered_blob_references[transcodes[t]] += 1
+                    discovered_refs[transcodes[t]].append(t)
 
-            for blob_uuid in discovered_blob_references:
+            for blob_uuid in discovered_refs:
                 # If the blob still exists, and is more than five minutes old,
                 # we should correct the reference count.
                 b = Blob.from_db(blob_uuid)
                 if b and (time.time() - b.fetched_at > 300):
-                    b.ref_count_set(discovered_blob_references[blob_uuid])
+                    b.add_event(
+                        EVENT_TYPE_AUDIT,
+                        'Discovered dependencies: %s' % discovered_refs[blob_uuid])
+                    b.ref_count_set(len(discovered_refs[blob_uuid]))
 
             # Infrequently ensure we have no blobs with a reference count of zero
             orphan_blobs = []
