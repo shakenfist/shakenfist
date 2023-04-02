@@ -310,7 +310,7 @@ class Artifact(dbo):
         if len(indexes) > max:
             for i in sorted(indexes)[:-max]:
                 self.del_index(i, update_billing=False)
-        self.update_billing()
+            self.update_billing()
 
     def del_index(self, index, update_billing=True):
         index_data = self._db_get_attribute('index_%012d' % index)

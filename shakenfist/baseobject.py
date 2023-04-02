@@ -42,21 +42,20 @@ def get_minimum_object_version(objname):
     elif objname in VERSION_CACHE:
         return VERSION_CACHE[objname]
 
-    metrics = []
+    metrics = {}
 
     # Ignore metrics for deleted nodes, but include nodes in an error state
     # as they may return.
     for _, d in etcd.get_all('metrics', None):
         node_name = d['fqdn']
-        state = etcd.get('attribute/node', 'state', node_name)
+        state = etcd.get('attribute/node', node_name, 'state')
         if state and state['value'] != DatabaseBackedObject.STATE_DELETED:
-            metrics[node_name] = d
+            metrics[node_name] = d['metrics']
 
     for possible_objname in OBJECT_NAMES:
         minimum = inf
-        for entry in metrics:
-            ver = metrics[entry].get(
-                'object_version_%s' % possible_objname)
+        for node_name in metrics:
+            ver = metrics[node_name].get('object_version_%s' % possible_objname)
             if ver:
                 minimum = min(minimum, ver)
         VERSION_CACHE[possible_objname] = minimum
@@ -121,18 +120,25 @@ class DatabaseBackedObject(object):
                 changed = True
 
             if changed:
+                cluster_minimum = get_minimum_object_version(self.object_type)
                 LOG.with_fields({
                     self.object_type: static_values['uuid'],
                     'start_version': starting_version,
-                    'final_version': static_values['version']
+                    'final_version': static_values['version'],
+                    'current_version': self.current_version,
+                    'cluster_minimum_version': cluster_minimum
                 }).info('Object online upgraded')
 
-                if get_minimum_object_version(self.object_type) == self.current_version:
+                if cluster_minimum == self.current_version:
                     etcd.put(self.object_type, None, static_values.get('uuid'),
                              static_values)
                     LOG.with_fields({
                         self.object_type: static_values['uuid']}).info(
                             'Online upgrade committed')
+                else:
+                    LOG.with_fields({
+                        self.object_type: static_values['uuid']}).warning(
+                            'Not committing online upgrade, as not all nodes are updated')
 
     @property
     def uuid(self):
