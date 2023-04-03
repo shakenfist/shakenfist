@@ -346,7 +346,7 @@ class Monitor(daemon.Daemon):
             self._await_election()
 
             # Infrequently audit blob references and correct errors
-            discovered_refs = {}
+            discovered_refs = defaultdict(list)
             for b in Blobs([active_states_filter]):
                 discovered_refs[b.uuid] = []
 
