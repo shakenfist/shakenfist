@@ -365,31 +365,29 @@ class Monitor(daemon.Daemon):
                 for d in i.disk_spec:
                     blob_uuid = d.get('blob_uuid')
                     if blob_uuid:
-                        discovered_refs[blob_uuid].append(i)
+                        discovered_refs[blob_uuid].append(str(i))
 
             for a in artifact.Artifacts(filters=[active_states_filter]):
                 for blob_index in a.get_all_indexes():
                     blob_uuid = blob_index['blob_uuid']
-                    discovered_refs[blob_uuid].append(a)
+                    discovered_refs[blob_uuid].append(str(a))
 
             for b in Blobs([active_states_filter]):
                 dep_blob_uuid = b.depends_on
                 if dep_blob_uuid:
-                    discovered_refs[dep_blob_uuid].append(b)
+                    discovered_refs[dep_blob_uuid].append(str(b))
 
                 transcodes = b.transcoded
                 for t in transcodes:
-                    discovered_refs[transcodes[t]].append(t)
+                    discovered_refs[transcodes[t]].append(str(t))
 
             for blob_uuid in discovered_refs:
                 # If the blob still exists, and is more than five minutes old,
                 # we should correct the reference count.
                 b = Blob.from_db(blob_uuid)
                 if b and (time.time() - b.fetched_at > 300):
-                    b.add_event(
-                        EVENT_TYPE_AUDIT,
-                        'Discovered dependencies: %s' % discovered_refs[blob_uuid])
-                    b.ref_count_set(len(discovered_refs[blob_uuid]))
+                    b.ref_count_set(len(discovered_refs[blob_uuid]),
+                                    discovered_refs[blob_uuid])
 
             # Infrequently ensure we have no blobs with a reference count of zero
             orphan_blobs = []
