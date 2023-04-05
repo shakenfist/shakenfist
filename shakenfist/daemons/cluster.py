@@ -70,6 +70,7 @@ class Monitor(daemon.Daemon):
 
             for node in Nodes([]):
                 node.blobs = per_node.get(node.uuid, [])
+            self.lock.refresh()
 
         # Cleanup soft deleted objects
         for objtype in OBJECT_NAMES_TO_ITERATORS:
@@ -77,6 +78,7 @@ class Monitor(daemon.Daemon):
                 if (obj.state.value == dbo.STATE_DELETED and
                         time.time() - obj.state.update_time > config.CLEANER_DELAY):
                     obj.hard_delete()
+        self.lock.refresh()
 
         # Cleanup vxids which specify a missing network
         for k, objdata in etcd.get_all('vxlan', None):
@@ -89,6 +91,7 @@ class Monitor(daemon.Daemon):
                         'network': network_uuid,
                         'vxid record': k
                     }).warning('Cleaning up leaked vxlan')
+        self.lock.refresh()
 
         # Cleanup ipmanagers whose network is absent
         for k, objdata in etcd.get_all('ipmanager', None):
@@ -100,6 +103,7 @@ class Monitor(daemon.Daemon):
                     LOG.with_fields({
                         'ipmanager': network_uuid
                     }).warning('Cleaning up leaked ipmanager')
+        self.lock.refresh()
 
         # Cleanup old uploads which were never completed
         for upload in Uploads([]):
@@ -108,6 +112,7 @@ class Monitor(daemon.Daemon):
                     'upload': upload.uuid
                 }).warning('Cleaning up stale upload')
                 upload.hard_delete()
+        self.lock.refresh()
 
         # Cleanup orphan artifacts, delete old versions, and record blobs used
         # by artifacts
@@ -129,6 +134,7 @@ class Monitor(daemon.Daemon):
                 b = Blob.from_db(blob_uuid)
                 if b:
                     in_use_blobs[b.uuid] += 1
+        self.lock.refresh()
 
         # Inspect current state of blobs, the actual changes are done below outside
         # the read only cache. We define being low on disk has having less than three
@@ -229,12 +235,14 @@ class Monitor(daemon.Daemon):
             b = Blob.from_db(blob_uuid)
             if b:
                 b.record_usage()
+        self.lock.refresh()
 
         # Find expired blobs
         for b in Blobs([active_states_filter]):
             if b.expires_at > 0 and b.expires_at < time.time():
                 b.add_event(EVENT_TYPE_AUDIT, 'blob has expired')
                 b.state = dbo.STATE_DELETED
+        self.lock.refresh()
 
         # Prune over replicated blobs
         for blob_uuid in overreplicated:
@@ -246,6 +254,7 @@ class Monitor(daemon.Daemon):
                         'node': node
                     }).info('Blob over replicated, removing from node with no users')
                     b.drop_node_location(node)
+        self.lock.refresh()
 
         # Replicate under replicated blobs, but only if we don't have heaps of
         # queued replications already
@@ -266,6 +275,7 @@ class Monitor(daemon.Daemon):
                 }).info('Blob under replicated, attempting to correct')
                 b.request_replication(allow_excess=excess)
                 current_fetches[blob_uuid].append('unknown')
+        self.lock.refresh()
 
         # Find transcodes of not recently used blobs and reap them
         for b in Blobs([active_states_filter]):
@@ -278,6 +288,7 @@ class Monitor(daemon.Daemon):
                 for transcode in transcoded:
                     tb = Blob.from_db(transcoded[transcode])
                     tb.ref_count_dec(b)
+        self.lock.refresh()
 
         # Node management
         for n in Nodes([]):
