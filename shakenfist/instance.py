@@ -1355,18 +1355,16 @@ class Instance(dbo):
             # namespace.
             artifacts = []
             if self.namespace != 'system':
-                artifacts.append(artifact.Artifact.from_url(
-                                    artifact.Artifact.TYPE_OTHER,
-                                    '%s%s/console' % (artifact.INSTANCE_URL, self.uuid),
-                                    name='%s/console' % self.uuid,
-                                    max_versions=1, namespace='system',
-                                    create_if_new=True))
-            artifacts.append(artifact.Artifact.from_url(
-                            artifact.Artifact.TYPE_OTHER,
-                            '%s%s/console' % (artifact.INSTANCE_URL, self.uuid),
-                            name='%s/console' % self.uuid,
-                            max_versions=1, namespace=self.namespace,
-                            create_if_new=True))
+                artifacts.append(artifact.Artifact.new(
+                    artifact.Artifact.TYPE_OTHER,
+                    '%s%s/console' % (artifact.INSTANCE_URL, self.uuid),
+                    name='%s/console' % self.uuid, max_versions=1,
+                    namespace='system'))
+            artifacts.append(artifact.Artifact.new(
+                    artifact.Artifact.TYPE_OTHER,
+                    '%s%s/console' % (artifact.INSTANCE_URL, self.uuid),
+                    name='%s/console' % self.uuid, max_versions=1,
+                    namespace=self.namespace))
 
             blob_uuid = str(uuid4())
             dest_path = blob.Blob.filepath(blob_uuid)
