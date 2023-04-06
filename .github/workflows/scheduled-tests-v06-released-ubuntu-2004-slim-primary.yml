@@ -232,8 +232,9 @@ jobs:
           path: ${{ github.workspace }}/artifacts/bundle.zip
 
       - name: Snapshot localhost builds for later upgrade testing
+        if: success()
         run: |
-          if [ "slim-primary-released" == "localhost"]; then
+          if [ "slim-primary-released" == "localhost" ]; then
             sf-client instance snapshot primary \
               --label_name sf://label/ci-images/ubuntu-2004-${{ github.ref }} \
               --delete-snapshot-after-label --flatten

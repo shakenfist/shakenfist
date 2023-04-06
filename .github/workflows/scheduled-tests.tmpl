@@ -232,8 +232,9 @@ jobs:
           path: {% raw %}${{{% endraw %} github.workspace {% raw %}}}{% endraw %}/artifacts/bundle.zip
 
       - name: Snapshot localhost builds for later upgrade testing
+        if: success()
         run: |
-          if [ "{{topology}}" == "localhost"]; then
+          if [ "{{topology}}" == "localhost" ]; then
             sf-client instance snapshot primary \
               --label_name {{baseimage}}-{% raw %}${{ github.ref }}{% endraw %} \
               --delete-snapshot-after-label --flatten
