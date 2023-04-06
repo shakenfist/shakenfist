@@ -159,12 +159,13 @@ class DatabaseBackedObject(object):
         return (self.object_type, self.__uuid)
 
     def add_event(self, eventtype, message, duration=None, extra=None,
-                  suppress_event_logging=False):
+                  suppress_event_logging=False, log_as_error=False):
         if not self.__in_memory_only:
             eventlog.add_event(
                 eventtype, self.object_type, self.__uuid, message,
                 duration=duration, extra=extra,
-                suppress_event_logging=suppress_event_logging)
+                suppress_event_logging=suppress_event_logging,
+                log_as_error=log_as_error)
 
     @classmethod
     def from_db(cls, object_uuid):

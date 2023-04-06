@@ -34,7 +34,7 @@ EVENT_TYPES = [EVENT_TYPE_AUDIT, EVENT_TYPE_MUTATE, EVENT_TYPE_STATUS,
 
 
 def add_event(event_type, object_type, object_uuid, message, duration=None,
-              extra=None, suppress_event_logging=False):
+              extra=None, suppress_event_logging=False, log_as_error=False):
     # Queue an event in etcd to get shuffled over to the long term data store
     timestamp = time.time()
 
@@ -60,14 +60,17 @@ def add_event(event_type, object_type, object_uuid, message, duration=None,
         log = LOG
         if extra:
             log = log.with_fields(extra)
-        log.with_fields(
-            {
+        log = log.with_fields({
                 object_type: object_uuid,
                 'event_type': event_type,
                 'fqdn': config.NODE_NAME,
                 'duration': duration,
                 'message': message
-            }).info('Added event')
+            })
+        if log_as_error:
+            log.error('Added event')
+        else:
+            log.info('Added event')
 
     # We use the old eventlog mechanism as a queueing system to get the logs
     # to the eventlog node.
@@ -304,8 +307,6 @@ class EventLog(object):
                     os.rename(elc.dbpath, elc.dbpath + '.corrupt')
                     this_chunk_removed = 0
 
-            if removed > 0:
-                self.log.info('Pruned %d events' % removed)
             return removed
 
 
