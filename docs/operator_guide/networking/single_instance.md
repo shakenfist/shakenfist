@@ -1,6 +1,6 @@
 # Networking Explained - Single Node
 
-This page is [part of a series explaining how Shaken Fist networking works](overview.md). You might want to check out the other pages as well.
+This page is [part of a series explaining how Shaken Fist networking works](overview/). You might want to check out the other pages as well.
 
 ## The simplest case: a virtual network with no DHCP and no NAT, and a single remote instance
 
@@ -71,19 +71,19 @@ You can see here that the network node (sf-1) has created some network elements,
 sf-1 # ip addr show vxlan-2
 287: vxlan-2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 8950 qdisc noqueue master br-vxlan-2 state UNKNOWN group default qlen 1000
     link/ether de:c4:ab:3d:79:fb brd ff:ff:ff:ff:ff:ff
-    inet6 fe80::dcc4:abff:fe3d:79fb/64 scope link 
+    inet6 fe80::dcc4:abff:fe3d:79fb/64 scope link
        valid_lft forever preferred_lft forever
 
 sf-1 # ip addr show br-vxlan-2
 288: br-vxlan-2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
     link/ether be:c1:1b:20:b8:f7 brd ff:ff:ff:ff:ff:ff
-    inet6 fe80::bcc1:1bff:fe20:b8f7/64 scope link 
+    inet6 fe80::bcc1:1bff:fe20:b8f7/64 scope link
        valid_lft forever preferred_lft forever
 
 sf-1 # ip addr show veth-2-o
 290: veth-2-o@if289: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master br-vxlan-2 state UP group default qlen 1000
     link/ether be:c1:1b:20:b8:f7 brd ff:ff:ff:ff:ff:ff link-netnsid 0
-    inet6 fe80::bcc1:1bff:fe20:b8f7/64 scope link 
+    inet6 fe80::bcc1:1bff:fe20:b8f7/64 scope link
        valid_lft forever preferred_lft forever
 ```
 
@@ -96,8 +96,8 @@ sf-1 # bridge fdb show brport vxlan-2
 de:c4:ab:3d:79:fb master br-vxlan-2 permanent
 de:c4:ab:3d:79:fb vlan 1 master br-vxlan-2 permanent
 00:00:00:00:00:00 dst 10.2.1.11 self permanent
-de:c4:ab:3d:79:fb dst 127.0.0.1 self 
-be:c1:1b:20:b8:f7 dst 127.0.0.1 self 
+de:c4:ab:3d:79:fb dst 127.0.0.1 self
+be:c1:1b:20:b8:f7 dst 127.0.0.1 self
 e2:2d:32:6d:95:70 dst 127.0.0.1 self
 ```
 
@@ -118,7 +118,7 @@ sf-1 # ip netns exec b41b067a-44b7-40c5-9ab8-7abdcf5fdc61 ip addr list
     link/ether e2:2d:32:6d:95:70 brd ff:ff:ff:ff:ff:ff link-netnsid 0
     inet 192.168.0.1/24 scope global veth-2-i
        valid_lft forever preferred_lft forever
-    inet6 fe80::e02d:32ff:fe6d:9570/64 scope link 
+    inet6 fe80::e02d:32ff:fe6d:9570/64 scope link
        valid_lft forever preferred_lft forever
 291: phy-2-i@if292: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group default qlen 1000
     link/ether fe:18:8e:f8:d1:5c brd ff:ff:ff:ff:ff:ff link-netnsid 0
@@ -131,16 +131,16 @@ We also do some things with iptables, especially around NAT. Here's the current 
 ```
 sf-1 # ip netns exec b41b067a-44b7-40c5-9ab8-7abdcf5fdc61 iptables -L -t nat
 Chain PREROUTING (policy ACCEPT)
-target     prot opt source               destination         
+target     prot opt source               destination
 
 Chain INPUT (policy ACCEPT)
-target     prot opt source               destination         
+target     prot opt source               destination
 
 Chain OUTPUT (policy ACCEPT)
-target     prot opt source               destination         
+target     prot opt source               destination
 
 Chain POSTROUTING (policy ACCEPT)
-target     prot opt source               destination 
+target     prot opt source               destination
 ```
 
 That's empty for now because we're not doing any NAT yet, but watch this space. Next let's now start an instance on sf-2. This instance can't use DHCP to get an address because we have that disabled for this network.
@@ -152,8 +152,8 @@ name        : inst-on-sf-2
 namespace   : system
 cpus        : 1
 memory      : 1024
-disk spec   : type=disk   bus=None  size=20  base=ubuntu:18.04  
-video       : model=cirrus  memory=16384  
+disk spec   : type=disk   bus=None  size=20  base=ubuntu:18.04
+video       : model=cirrus  memory=16384
 node        : sf-2
 power state : on
 state       : created
@@ -183,18 +183,18 @@ sf-1 # bridge fdb show brport vxlan-2
 de:c4:ab:3d:79:fb master br-vxlan-2 permanent
 de:c4:ab:3d:79:fb vlan 1 master br-vxlan-2 permanent
 00:00:00:00:00:00 dst 10.2.1.11 self permanent
-0a:ce:c4:f7:cb:dc dst 10.2.1.12 self 
-de:c4:ab:3d:79:fb dst 127.0.0.1 self 
-be:c1:1b:20:b8:f7 dst 127.0.0.1 self 
-00:00:00:34:8d:90 dst 10.2.1.12 self 
+0a:ce:c4:f7:cb:dc dst 10.2.1.12 self
+de:c4:ab:3d:79:fb dst 127.0.0.1 self
+be:c1:1b:20:b8:f7 dst 127.0.0.1 self
+00:00:00:34:8d:90 dst 10.2.1.12 self
 e2:2d:32:6d:95:70 dst 127.0.0.1 self
 ```
 
 The following entries there are new:
 
 ```
-0a:ce:c4:f7:cb:dc dst 10.2.1.12 self 
-00:00:00:34:8d:90 dst 10.2.1.12 self 
+0a:ce:c4:f7:cb:dc dst 10.2.1.12 self
+00:00:00:34:8d:90 dst 10.2.1.12 self
 ```
 
 These new entries:
@@ -208,13 +208,13 @@ To repeat some commands from above but on sf-2, we now have two new network inte
 sf-2 # ip addr list vxlan-2
 127: vxlan-2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 8950 qdisc noqueue master br-vxlan-2 state UNKNOWN group default qlen 1000
     link/ether 0a:ce:c4:f7:cb:dc brd ff:ff:ff:ff:ff:ff
-    inet6 fe80::8ce:c4ff:fef7:cbdc/64 scope link 
+    inet6 fe80::8ce:c4ff:fef7:cbdc/64 scope link
        valid_lft forever preferred_lft forever
 
 sf-2 # ip addr show br-vxlan-2
 128: br-vxlan-2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 8950 qdisc noqueue state UP group default qlen 1000
     link/ether 0a:ce:c4:f7:cb:dc brd ff:ff:ff:ff:ff:ff
-    inet6 fe80::8ce:c4ff:fef7:cbdc/64 scope link 
+    inet6 fe80::8ce:c4ff:fef7:cbdc/64 scope link
        valid_lft forever preferred_lft forever
 ```
 
@@ -226,8 +226,8 @@ sf-2 # bridge fdb show brport vxlan-2
 0a:ce:c4:f7:cb:dc vlan 1 master br-vxlan-2 permanent
 00:00:00:00:00:00 dst 10.2.1.11 self permanent
 00:00:00:00:00:00 dst 10.2.1.12 self permanent
-0a:ce:c4:f7:cb:dc dst 127.0.0.1 self 
-00:00:00:34:8d:90 dst 127.0.0.1 self 
+0a:ce:c4:f7:cb:dc dst 127.0.0.1 self
+00:00:00:34:8d:90 dst 127.0.0.1 self
 e2:2d:32:6d:95:70 dst 10.2.1.11 self
 ```
 
@@ -241,7 +241,7 @@ ls: cannot access '/var/run/netns': No such file or directory
 If we grep the console log of the instance on sf-2, we can see what cloud-init thought about the networking:
 
 ```
-sf-1 # grep ci-info /srv/shakenfist/instances/d53b345f-9d5d-493c-a1a3-7e7d6513cfa2/console.log 
+sf-1 # grep ci-info /srv/shakenfist/instances/d53b345f-9d5d-493c-a1a3-7e7d6513cfa2/console.log
 [    9.851378] cloud-init[643]: ci-info: +++++++++++++++++++++++++++++++++++++Net device info++++++++++++++++++++++++++++++++++++++
 [    9.856401] cloud-init[643]: ci-info: +--------+------+---------------------------+---------------+--------+-------------------+
 [    9.858628] cloud-init[643]: ci-info: | Device |  Up  |          Address          |      Mask     | Scope  |     Hw-Address    |

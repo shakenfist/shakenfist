@@ -1,4 +1,4 @@
-# Authentication and Namespaces 
+# Authentication and Namespaces
 
 Shaken Fist uses JWT tokens for authentication and access control. These tokens
 are created with a request to the REST API and then passed as part of subsequent
@@ -31,7 +31,7 @@ expected, it is probably undesirable for anything other than a single user
 installation.
 
 By default only requests in the system namespace are able to access resources
-in other (foreign) namespaces. Before Shaken Fist v0.7 this behaviour was hard
+in other (foreign) namespaces. Before Shaken Fist v0.7 this behavior was hard
 coded and not configurable. As of Shaken Fist v0.7, this is implemented in
 the form of "trusts", where every namespace is configured to "trust" the system
 namespace. This makes the resources visible to the system namespace. You cannot

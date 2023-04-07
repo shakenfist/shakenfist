@@ -1,3 +1,11 @@
+# Documentation state:
+#   - OpenAPI complete: yes
+#   - Covered in user or operator docs: both
+#   - API reference docs exist: yes
+#        - and link to OpenAPI docs: yes
+#        - and include examples: yes
+#   - Has complete CI coverage:
+
 import flask
 from flask_jwt_extended import get_jwt_identity
 from flasgger import swag_from
@@ -164,7 +172,8 @@ class ArtifactEndpoint(sf_api.Resource):
         'artifact', 'Get artifact information.',
         [('artifact_ref', 'query', 'string',
           'The UUID or name of the artifact.', True)],
-        [(200, 'Information about a single artifact.', artifact_get_example)]))
+        [(200, 'Information about a single artifact.', artifact_get_example),
+         (404, 'Artifact not found.', None)]))
     @api_base.verify_token
     @arg_is_artifact_ref
     @requires_artifact_access
@@ -178,8 +187,8 @@ class ArtifactEndpoint(sf_api.Resource):
         [('artifact_ref', 'query', 'string',
           'The UUID or name of the artifact.', True)],
         [(200, ('The artifact has been deleted. The final state of the '
-                'artifact is returned.'),
-          artifact_delete_example)]))
+                'artifact is returned.'), artifact_delete_example),
+         (404, 'Artifact not found.', None)]))
     @api_base.verify_token
     @arg_is_artifact_ref
     @requires_artifact_ownership
@@ -263,7 +272,8 @@ class ArtifactsEndpoint(sf_api.Resource):
              ('Which namespace to store the artifact in. You must be authenticated '
               'against the system namespace to set this option.'), False)
         ],
-        [(200, 'Information about a single artifact.', artifact_get_example)]))
+        [(200, 'Information about a single artifact.', artifact_get_example),
+         (404, 'Artifact not found.', None)]))
     @api_base.verify_token
     @api_base.log_token_use
     @api_base.requires_namespace_exist
@@ -300,14 +310,16 @@ class ArtifactsEndpoint(sf_api.Resource):
             ('namespace', 'body', 'namespace',
              ('Which namespace to remove artifacts from. You must be authenticated '
               'against the system namespace to set this option.'), False)
-        ], [(200, 'A list of artifact uuids that were deleted.',
-             artifact_uuid_list_example)]))
+        ],
+        [(200, 'A list of artifact uuids that were deleted.',
+          artifact_uuid_list_example),
+         (400, ('Confirm parameter not set, or a system user must specify a '
+                'namespace.'), None),
+         (401, 'You cannot delete other namespaces.', None)]))
     @api_base.verify_token
     @api_base.log_token_use
     @api_base.requires_namespace_exist
     def delete(self, confirm=False, namespace=None):
-        """Delete all artifacts in the namespace."""
-
         if confirm is not True:
             return sf_api.error(400, 'parameter confirm is not set true')
 
@@ -356,7 +368,10 @@ class ArtifactUploadEndpoint(sf_api.Resource):
             ('artifact_type', 'body', 'string',
              ('The type of the artifact. Should be one of "image" or "other". '
               'Defaults to "image" if not specified.'), False)
-        ], [(200, 'Information about a single artifact.', artifact_get_example)]))
+        ],
+        [(200, 'Information about a single artifact.', artifact_get_example),
+         (403, 'Invalid artifact type specified.', None),
+         (404, 'Upload, namespace, or blob not found.', None)]))
     @api_base.verify_token
     @api_base.log_token_use
     @api_base.requires_namespace_exist
@@ -519,7 +534,8 @@ class ArtifactEventsEndpoint(sf_api.Resource):
         'artifact', 'Get artifact event information.',
         [('artifact_ref', 'query', 'string',
           'The UUID or name of the artifact.', True)],
-        [(200, 'Event information about a single artifact.', artifact_events_example)]))
+        [(200, 'Event information about a single artifact.', artifact_events_example),
+         (404, 'Artifact not found.', None)]))
     @api_base.verify_token
     @arg_is_artifact_ref
     @requires_artifact_access
@@ -571,7 +587,9 @@ class ArtifactVersionsEndpoint(sf_api.Resource):
         'artifact', 'Get artifact version information.',
         [('artifact_ref', 'query', 'string',
           'The UUID or name of the artifact.', True)],
-        [(200, 'A list of the blobs which form the artifact versions.', artifact_versions_example)]))
+        [(200, 'A list of the blobs which form the artifact versions.',
+          artifact_versions_example),
+         (404, 'Artifact not found.', None)]))
     @api_base.verify_token
     @arg_is_artifact_ref
     @requires_artifact_access
@@ -593,7 +611,9 @@ class ArtifactVersionsEndpoint(sf_api.Resource):
              'The maximum number of versions, or revert to the default it not set.',
              False)
         ],
-        [(200, 'No return value', '')]))
+        [(200, 'No return value', ''),
+         (400, 'The max_versions must be an integer.', None),
+         (404, 'Artifact not found.', None)]))
     @api_base.verify_token
     @arg_is_artifact_ref
     @requires_artifact_ownership
@@ -618,7 +638,8 @@ class ArtifactVersionEndpoint(sf_api.Resource):
              'The UUID or name of the artifact.', True),
             ('version_id', 'query', 'integer', 'The version number to remove.', False)
         ],
-        [(200, 'Information about a single artifact.', artifact_get_example)]))
+        [(200, 'Information about a single artifact.', artifact_get_example),
+         (404, 'Artifact index not found.', None)]))
     @api_base.verify_token
     @arg_is_artifact_ref
     @requires_artifact_ownership
@@ -645,7 +666,9 @@ class ArtifactShareEndpoint(sf_api.Resource):
         'artifact', 'Share the specified artifact with all namespaces.',
         [('artifact_ref', 'query', 'string',
           'The UUID or name of the artifact.', True)],
-        [(200, 'Information about a single artifact.', artifact_get_example)]))
+        [(200, 'Information about a single artifact.', artifact_get_example),
+         (403, 'Only artifacts in the system namespace may be shared.', None),
+         (404, 'Artifact not found.', None)]))
     @api_base.verify_token
     @arg_is_artifact_ref
     @requires_artifact_ownership
@@ -663,7 +686,9 @@ class ArtifactUnshareEndpoint(sf_api.Resource):
         'artifact', 'Unshare the specified artifact with all namespaces.',
         [('artifact_ref', 'query', 'string',
           'The UUID or name of the artifact.', True)],
-        [(200, 'Information about a single artifact.', artifact_get_example)]))
+        [(200, 'Information about a single artifact.', artifact_get_example),
+         (403, 'Artifact not shared.', None),
+         (404, 'Artifact not found.', None)]))
     @api_base.verify_token
     @arg_is_artifact_ref
     @requires_artifact_ownership

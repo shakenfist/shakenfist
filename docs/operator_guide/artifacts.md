@@ -1,4 +1,6 @@
-# Artifact checksums
+# Artifacts
+
+## Checksums
 
 As of Shaken Fist v0.7, blob replics are regularly checksummed to verify that
 data loss has not occurred. The following events imply a checksum operation:
@@ -34,3 +36,25 @@ checksum of the previous version is the same as the checksum for the proposed
 new version, the proposed new version is skipped. Artifact uploads from v0.7 can
 also skip actual upload of the contents of the artifact if there is already a
 blob in the cluster with a matching checksum.
+
+## Sharing artifacts
+
+Artifacts in the system namespace can be shared with all other namespaces.
+Artifacts shared like this appear to the other namespaces as if they are local
+to the other namespace, although non-system namespaces should not be able to
+update such an artifact. This is useful if you have official or commonly used
+images which you want to provide all users of a cluster -- for example an
+official CentOS image that many users will want.
+
+???+ info
+
+    Another option for sharing artifacts is the "trusts" relationship between two
+    namespaces, which is discussed in the [authentication section of the operator guide](authentication.md).
+
+To share an artifact, use the command line client like this:
+
+`sf-client artifact share ...uuid...`
+
+To unshare an artifact, do this:
+
+`sf-client artifact unshare ...uuid...`

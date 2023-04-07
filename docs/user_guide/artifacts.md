@@ -1,4 +1,4 @@
-# Artifact creation
+# Artifacts
 
 Shaken Fist uses artifacts as disk templates for new instances. You therefore
 need to have a least one artifact before you can create your first instance,
@@ -14,6 +14,9 @@ The following artifact types exist:
   instance.
 * *labels*: labels are a bit like symbolic links, although they still have
   versioning like other forms of artifact.
+* *other*: a catch all for artifacts which don't fall into any of the other
+  categories. For example captured instance console output archived after an
+  instance was deleted.
 
 Behind the scenes, artifacts are references to blobs. You can think of them as
 symlinks if you'd like. All types of artifact support versioning. This is implemented
@@ -79,7 +82,7 @@ instance start), the URL is checked. If the image has changed a new version is
 downloaded, otherwise the already cached version is used.
 
 You can also create an image artifact by uploading it, but that's complicated
-enough that its covered separately in [artifact uploads and downloads](artifact_uploads_downloads.md).
+enough that its covered separately in [the developer guide section on artifacts](/developer_guide/artifacts/).
 
 ## Creating a snapshot artifact
 
@@ -134,6 +137,31 @@ $ sf-client label update my-tested-thing cc6a6a96-8182-474a-ab31-45f1f9310b44
 If the label `my-tested-thing` does not exist, it will be created the first
 time you update it.
 
+## Listing and deleting artifacts
+
+Artifacts follow the same user interface patterns as other objects. That is, you
+can list artifacts with this command:
+
+`sf-client artifact list`
+
+And you can delete artifacts with a command like this:
+
+`sf-client artifact delete ...name.or.uuid...`
+
+Note that deleting an artifact does not necessarily imply deleting the associated
+blobs. If those blobs are in use by other objects (artifacts, instances, and
+so on) then they remain stored by the cluster until there are no remaining
+references.
+
+Additionally, you can also delete _all_ artifacts in a given namespace by making
+a HTTP DELETE request to /artifacts REST API endpoint, which is also provided by
+the `delete_all_artifacts()` method in the Python API client. This functionality
+is not currently exposed in the command line client.
+
+Finally, deleting a namespace implies deleting all artifacts within that namespace,
+so show care when deleting namespaces to ensure they no longer contain any data
+you are fond of.
+
 ## Controlling the number of versions
 
 You can also control the number of versions stored by an artifact with the
@@ -154,3 +182,8 @@ or upload an image built with a tool like Hashicorp Packer.
 
 To upload an artifact, use the `sf-client artifact upload` command. To download
 an artifact, use the `sf-client artifact download` command.
+
+Shaken Fist will calculate a checksum for the new blob created by an upload, and
+if it already has a blob matching that checksum it will only store the data once.
+This makes uploading a given artifact more than once effectively free apart from
+a small amount of etcd storage.
