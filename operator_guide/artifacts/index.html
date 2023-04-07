@@ -10,20 +10,20 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/operator_guide/power_states/">
+        <link rel="canonical" href="https://shakenfist.com/operator_guide/artifacts/">
       
       
-        <link rel="prev" href="../networking/single_instance/">
+        <link rel="prev" href="../installation/">
       
       
-        <link rel="next" href="../upgrades/">
+        <link rel="next" href="../authentication/">
       
       <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.4.2, mkdocs-material-9.1.6">
     
     
       
-        <title>Power States - Shaken Fist</title>
+        <title>Artifacts - Shaken Fist</title>
       
     
     
@@ -71,7 +71,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#instance-power-states" class="md-skip">
+        <a href="#artifacts" class="md-skip">
           Skip to content
         </a>
       
@@ -106,7 +106,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Power States
+              Artifacts
             
           </span>
         </div>
@@ -631,11 +631,59 @@
               
   
   
+    
   
-    <li class="md-nav__item">
-      <a href="../artifacts/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          Artifacts
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         Artifacts
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#checksums" class="md-nav__link">
+    Checksums
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sharing-artifacts" class="md-nav__link">
+    Sharing artifacts
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -735,21 +783,11 @@
               
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../power_states/" class="md-nav__link">
         Power States
       </a>
-      
     </li>
   
 
@@ -795,6 +833,28 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#checksums" class="md-nav__link">
+    Checksums
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sharing-artifacts" class="md-nav__link">
+    Sharing artifacts
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -811,22 +871,56 @@
   
 
 
-<h1 id="instance-power-states">Instance power states</h1>
-<p>Shaken Fist version 0.2.1 introduced power states for instances. Before this, you could power on or off an instance, or pause it, but you couldn't tell what power state the instance was actually in. That was pretty confusing and was therefore treated as a bug.</p>
-<p>The following power states are implemented:</p>
+<h1 id="artifacts">Artifacts</h1>
+<h2 id="checksums">Checksums</h2>
+<p>As of Shaken Fist v0.7, blob replics are regularly checksummed to verify that
+data loss has not occurred. The following events imply a checksum operation:</p>
 <ul>
-<li><strong>on</strong>: the instance is running</li>
-<li><strong>off</strong>: the instance is not running</li>
-<li><strong>paused</strong>: the instance is paused</li>
-<li><strong>crashed</strong>: the instance is crashed according to the hypervisor. Instances in this power state will also be in an instance state of "error".</li>
+<li>snapshotting an NVRAM template.</li>
+<li>creation of a new blob replica by transfer of a blob from another machine in
+  the cluster (the destination is checksummed to verify the transfer).</li>
+<li>transcode of a blob into a new format (the new format is stored as a
+  separate blob).</li>
+<li>conversion of an upload to an artifact.</li>
 </ul>
-<p>There are additionally a set of "transition states" which are used to indicate that you have requested a change of state that might not yet have completed. These are:</p>
+<p>The following events <em>should</em> imply an artifact checksum, but we found that
+performance suffered too much for very large blobs:</p>
 <ul>
-<li>transition-to-on</li>
-<li>transition-to-off</li>
-<li>transition-to-paused</li>
+<li>download of a new blob from an external source (artifact fetch for example).</li>
+<li>snapshotting a disk.</li>
 </ul>
-<p>We're hoping to not have to implement a transition-to-crashed state, but you never know.</p>
+<p>Additionally, all blob replicas are regularly checksummed and compared with what
+the record in etcd believes the correct value should be. These comparisons are
+rate limited, but should happen with a maximum frequency of
+CHECKSUM_VERIFICATION_FREQUENCY seconds, which defaults to every 24 hours. It is
+possible if you have a large number of blob replicas on a given node that the node
+will be unable to keep up with checksum operations.</p>
+<p>If a blob replica fails the checksum verification, CHECKSUM_ENFORCEMENT is set
+to True <em>and is not in use on that node</em>, then the replica is deleted and the
+cluster will re-replicate the blob as required. If the blob replica is in use,
+there isn't much Shaken Fist can do without disturbing running instances, so the
+error is logged and then ignored for now.</p>
+<p>Checksums are also used when a new version of an artifact is created. If the
+checksum of the previous version is the same as the checksum for the proposed
+new version, the proposed new version is skipped. Artifact uploads from v0.7 can
+also skip actual upload of the contents of the artifact if there is already a
+blob in the cluster with a matching checksum.</p>
+<h2 id="sharing-artifacts">Sharing artifacts</h2>
+<p>Artifacts in the system namespace can be shared with all other namespaces.
+Artifacts shared like this appear to the other namespaces as if they are local
+to the other namespace, although non-system namespaces should not be able to
+update such an artifact. This is useful if you have official or commonly used
+images which you want to provide all users of a cluster -- for example an
+official CentOS image that many users will want.</p>
+<details class="info" open="open">
+<summary>Info</summary>
+<p>Another option for sharing artifacts is the "trusts" relationship between two
+namespaces, which is discussed in the <a href="../authentication/">authentication section of the operator guide</a>.</p>
+</details>
+<p>To share an artifact, use the command line client like this:</p>
+<p><code>sf-client artifact share ...uuid...</code></p>
+<p>To unshare an artifact, do this:</p>
+<p><code>sf-client artifact unshare ...uuid...</code></p>
 
 
 

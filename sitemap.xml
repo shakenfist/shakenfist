@@ -21,7 +21,7 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://shakenfist.com/developer_guide/artifact_uploads_downloads/</loc>
+         <loc>https://shakenfist.com/developer_guide/artifacts/</loc>
          <lastmod>2023-04-07</lastmod>
          <changefreq>daily</changefreq>
     </url>
@@ -37,6 +37,11 @@
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/io_performance_tuning/</loc>
+         <lastmod>2023-04-07</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/developer_guide/locks/</loc>
          <lastmod>2023-04-07</lastmod>
          <changefreq>daily</changefreq>
     </url>
@@ -66,7 +71,22 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://shakenfist.com/operator_guide/artifact_checksums/</loc>
+         <loc>https://shakenfist.com/operator_guide/artifacts/</loc>
+         <lastmod>2023-04-07</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/operator_guide/authentication/</loc>
+         <lastmod>2023-04-07</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/operator_guide/installation/</loc>
+         <lastmod>2023-04-07</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/operator_guide/locks/</loc>
          <lastmod>2023-04-07</lastmod>
          <changefreq>daily</changefreq>
     </url>
@@ -96,17 +116,17 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://shakenfist.com/user_guide/authentication/</loc>
+         <lastmod>2023-04-07</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://shakenfist.com/user_guide/consoles/</loc>
          <lastmod>2023-04-07</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://shakenfist.com/user_guide/events/</loc>
-         <lastmod>2023-04-07</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/user_guide/installation/</loc>
          <lastmod>2023-04-07</lastmod>
          <changefreq>daily</changefreq>
     </url>

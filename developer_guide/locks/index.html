@@ -10,24 +10,24 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/operator_guide/artifact_checksums/">
+        <link rel="canonical" href="https://shakenfist.com/developer_guide/locks/">
       
       
-        <link rel="prev" href="../../developer_guide/workflow/">
+        <link rel="prev" href="../artifacts/">
       
       
-        <link rel="next" href="../networking/overview/">
+        <link rel="next" href="../authentication/">
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.4.2, mkdocs-material-9.1.5">
+      <meta name="generator" content="mkdocs-1.4.2, mkdocs-material-9.1.6">
     
     
       
-        <title>Artifact checksums - Shaken Fist</title>
+        <title>Locks - Shaken Fist</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.7a7fce14.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ded33207.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.a0c5b2b5.min.css">
@@ -71,7 +71,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#artifact-checksums" class="md-skip">
+        <a href="#locks" class="md-skip">
           Skip to content
         </a>
       
@@ -106,7 +106,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Artifact checksums
+              Locks
             
           </span>
         </div>
@@ -153,7 +153,7 @@
         <a href="https://github.com/shakenfist/shakenfist" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.3.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.4.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
   </div>
   <div class="md-source__repository">
     GitHub
@@ -198,7 +198,7 @@
       <a href="https://github.com/shakenfist/shakenfist" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.3.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.4.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
   </div>
   <div class="md-source__repository">
     GitHub
@@ -303,8 +303,8 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/installation/" class="md-nav__link">
-        Installation
+      <a href="../../user_guide/authentication/" class="md-nav__link">
+        Authentication
       </a>
     </li>
   
@@ -393,14 +393,16 @@
 
   
   
+    
+  
   
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
       
       
       
-      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
       
       
       
@@ -409,7 +411,7 @@
           <span class="md-nav__icon md-icon"></span>
         </label>
       
-      <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+      <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
         <label class="md-nav__title" for="__nav_6">
           <span class="md-nav__icon md-icon"></span>
           Developer Guide
@@ -420,9 +422,83 @@
               
   
   
+    
+  
+  
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+      
+      
+      
+      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_1" checked>
+      
+      
+      
+        <label class="md-nav__link" for="__nav_6_1" id="__nav_6_1_label" tabindex="0">
+          API reference
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_1_label" aria-expanded="true">
+        <label class="md-nav__title" for="__nav_6_1">
+          <span class="md-nav__icon md-icon"></span>
+          API reference
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+              
+  
+  
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/authentication/" class="md-nav__link">
+      <a href="../artifacts/" class="md-nav__link">
+        Artifacts
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        Locks
+      </a>
+      
+    </li>
+  
+
+            
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../authentication/" class="md-nav__link">
         Authentication
       </a>
     </li>
@@ -436,21 +512,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/artifact_uploads_downloads/" class="md-nav__link">
-        Artifact uploads and downloads
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../developer_guide/ci_api_coverage/" class="md-nav__link">
+      <a href="../ci_api_coverage/" class="md-nav__link">
         CI API coverage
       </a>
     </li>
@@ -464,7 +526,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/release_process/" class="md-nav__link">
+      <a href="../release_process/" class="md-nav__link">
         Release process
       </a>
     </li>
@@ -478,7 +540,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/standards/" class="md-nav__link">
+      <a href="../standards/" class="md-nav__link">
         Standards
       </a>
     </li>
@@ -492,7 +554,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/state_machine/" class="md-nav__link">
+      <a href="../state_machine/" class="md-nav__link">
         State machine
       </a>
     </li>
@@ -506,7 +568,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/updating_docs/" class="md-nav__link">
+      <a href="../updating_docs/" class="md-nav__link">
         Updating docs
       </a>
     </li>
@@ -520,7 +582,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/workflow/" class="md-nav__link">
+      <a href="../workflow/" class="md-nav__link">
         Workflow
       </a>
     </li>
@@ -540,16 +602,14 @@
 
   
   
-    
-  
   
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
       
       
       
-      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
       
       
       
@@ -558,7 +618,7 @@
           <span class="md-nav__icon md-icon"></span>
         </label>
       
-      <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+      <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
         <label class="md-nav__title" for="__nav_7">
           <span class="md-nav__icon md-icon"></span>
           Operator Guide
@@ -569,21 +629,53 @@
               
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
-        Artifact checksums
+    <li class="md-nav__item">
+      <a href="../../operator_guide/installation/" class="md-nav__link">
+        Installation
       </a>
-      
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operator_guide/artifacts/" class="md-nav__link">
+        Artifacts
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operator_guide/authentication/" class="md-nav__link">
+        Authentication
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operator_guide/locks/" class="md-nav__link">
+        Locks
+      </a>
     </li>
   
 
@@ -600,17 +692,17 @@
       
       
       
-      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_2" >
+      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_5" >
       
       
       
-        <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+        <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
           Networking
           <span class="md-nav__icon md-icon"></span>
         </label>
       
-      <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
-        <label class="md-nav__title" for="__nav_7_2">
+      <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+        <label class="md-nav__title" for="__nav_7_5">
           <span class="md-nav__icon md-icon"></span>
           Networking
         </label>
@@ -622,7 +714,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../networking/overview/" class="md-nav__link">
+      <a href="../../operator_guide/networking/overview/" class="md-nav__link">
         Overview
       </a>
     </li>
@@ -636,7 +728,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../networking/single_instance/" class="md-nav__link">
+      <a href="../../operator_guide/networking/single_instance/" class="md-nav__link">
         Single Instance
       </a>
     </li>
@@ -657,7 +749,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../power_states/" class="md-nav__link">
+      <a href="../../operator_guide/power_states/" class="md-nav__link">
         Power States
       </a>
     </li>
@@ -671,7 +763,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../upgrades/" class="md-nav__link">
+      <a href="../../operator_guide/upgrades/" class="md-nav__link">
         Upgrades
       </a>
     </li>
@@ -721,39 +813,32 @@
   
 
 
-<h1 id="artifact-checksums">Artifact checksums</h1>
-<p>As of Shaken Fist v0.7, blob replics are regularly checksummed to verify that
-data loss has not occurred. The following events imply a checksum operation:</p>
+<h1 id="locks">Locks</h1>
+<p>As discussed in the <a href="/operator_guide/locks/">operator guide</a>, you can query
+what locks exist in a Shaken Fist cluster, as well as who is currently holding
+those locks (machine and process id).</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
 <ul>
-<li>snapshotting an NVRAM template.</li>
-<li>creation of a new blob replica by transfer of a blob from another machine in
-  the cluster (the destination is checksummed to verify the transfer).</li>
-<li>transcode of a blob into a new format (the new format is stored as a
-  separate blob).</li>
-<li>conversion of an upload to an artifact.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/admin/get_admin_locks">GET /admin/locks</a>: List locks currently held in the cluster.</li>
 </ul>
-<p>The following events <em>should</em> imply an artifact checksum, but we found that
-performance suffered too much for very large blobs:</p>
-<ul>
-<li>download of a new blob from an external source (artifact fetch for example).</li>
-<li>snapshotting a disk.</li>
-</ul>
-<p>Additionally, all blob replicas are regularly checksummed and compared with what
-the record in etcd believes the correct value should be. These comparisons are
-rate limited, but should happen with a maximum frequency of
-CHECKSUM_VERIFICATION_FREQUENCY seconds, which defaults to every 24 hours. It is
-possible if you have a large number of blob replicas on a given node that the node
-will be unable to keep up with checksum operations.</p>
-<p>If a blob replica fails the checksum verification, CHECKSUM_ENFORCEMENT is set
-to True <em>and is not in use on that node</em>, then the replica is deleted and the
-cluster will re-replicate the blob as required. If the blob replica is in use,
-there isn't much Shaken Fist can do without disturbing running instances, so the
-error is logged and then ignored for now.</p>
-<p>Checksums are also used when a new version of an artifact is created. If the
-checksum of the previous version is the same as the checksum for the proposed
-new version, the proposed new version is skipped. Artifact uploads from v0.7 can
-also skip actual upload of the contents of the artifact if there is already a
-blob in the cluster with a matching checksum.</p>
+</details>
+<details class="example">
+<summary>Python API client: list cluster locks</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">locks</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_existing_locks</span><span class="p">()</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;lock,pid,node,operation&#39;</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">ref</span><span class="p">,</span> <span class="n">meta</span> <span class="ow">in</span> <span class="n">locks</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%s</span><span class="s1">,</span><span class="si">%s</span><span class="s1">,</span><span class="si">%s</span><span class="s1">,</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">ref</span><span class="p">,</span> <span class="n">meta</span><span class="p">[</span><span class="s1">&#39;pid&#39;</span><span class="p">],</span> <span class="n">meta</span><span class="p">[</span><span class="s1">&#39;node&#39;</span><span class="p">],</span> <span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;operation&#39;</span><span class="p">)))</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>$ python3 example.py
+lock,pid,node,operation
+/sflocks/sf/network/d2950d74-50c7-4790-a985-c43d9eb9bad9,2834066,sf-3,Network ensure mesh
+</code></pre></div>
+</details>
 
 
 
@@ -794,7 +879,7 @@ blob in the cluster with a matching checksum.</p>
     <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.208ed371.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.407015b8.min.js"></script>
+      <script src="../../assets/javascripts/bundle.51198bba.min.js"></script>
       
     
   </body>
