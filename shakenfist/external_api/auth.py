@@ -1,6 +1,6 @@
 # Documentation state:
 #   - OpenAPI complete: yes
-#   - Covered in user or operator docs: operator guide
+#   - Covered in user or operator docs: both
 #   - API reference docs exist:
 #        - and link to OpenAPI docs:
 #        - and include examples:
@@ -35,7 +35,7 @@ def arg_is_namespace(func):
 
         ns = Namespace.from_db(kwargs.get('namespace'))
         if not ns:
-            LOG.with_fields({'namesapace': kwargs.get('namespace')}).info(
+            LOG.with_fields({'namespace': kwargs.get('namespace')}).info(
                 'Namespace not found, missing or deleted')
             return sf_api.error(404, 'namespace not found')
 

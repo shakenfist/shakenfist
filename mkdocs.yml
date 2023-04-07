@@ -25,8 +25,8 @@ nav:
         - "Objects": user_guide/objects.md
     - Developer Guide:
         - API reference:
-            - "Artifacts": developer_guide/artifacts.md
-            - "Locks": developer_guide/locks.md
+            - "Artifacts": developer_guide/api_reference/artifacts.md
+            - "Locks": developer_guide/api_reference/locks.md
         - "Authentication": developer_guide/authentication.md
         - "CI API coverage": developer_guide/ci_api_coverage.md
         - "Release process": developer_guide/release_process.md
