@@ -361,7 +361,7 @@ class Artifact(dbo):
 class Artifacts(dbo_iter):
     def __iter__(self):
         for _, a in etcd.get_all('artifact', None):
-            a = Artifact.from_db(a['uuid'])
+            a = Artifact(a)
             if not a:
                 continue
 
