@@ -1,3 +1,11 @@
+# Documentation state:
+#   - OpenAPI complete: yes
+#   - Covered in user or operator docs: operator guide
+#   - API reference docs exist:
+#        - and link to OpenAPI docs:
+#        - and include examples:
+#   - Has complete CI coverage:
+
 import base64
 import bcrypt
 import flask
@@ -54,7 +62,7 @@ class AuthEndpoint(sf_api.Resource):
              'The secret for the key you wish to use.', True)
         ],
         [(200, 'An access token.', auth_token_example),
-         (400, 'Missing key in request or key is not a string.', None),
+         (400, 'Missing namepsace or key in request or key is not a string.', None),
          (404, 'Namespace not found.', None)]))
     @arg_is_namespace
     def post(self, namespace=None, key=None, namespace_from_db=None):
@@ -178,7 +186,7 @@ class AuthNamespaceEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Delete a namespace.',
         [
-            ('namespace', 'body', 'string', 'The namespace to create.', True)
+            ('namespace', 'body', 'string', 'The namespace to delete.', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'You cannot delete a namespace with instances or networks.', None),
@@ -373,6 +381,17 @@ class AuthMetadatasEndpoint(sf_api.Resource):
 
 
 class AuthMetadataEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Update a metadata key for a namespace.',
+        [
+            ('namespace', 'body', 'string', 'The namespace to add a key to.', True),
+            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('value', 'body', 'string', 'The value of the key.', True)
+        ],
+        [(200, 'Nothing.', None),
+         (400, 'Not key or value specified.', None),
+         (404, 'Namespace not found.', None)],
+        requires_admin=True))
     @api_base.verify_token
     @sf_api.caller_is_admin
     @arg_is_namespace
@@ -384,6 +403,17 @@ class AuthMetadataEndpoint(sf_api.Resource):
             return sf_api.error(400, 'no value specified')
         namespace_from_db.add_metadata_key(key, value)
 
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Delete a metadata key for a namespace.',
+        [
+            ('namespace', 'body', 'string', 'The namespace to add a key to.', True),
+            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('value', 'body', 'string', 'The value of the key.', True)
+        ],
+        [(200, 'Nothing.', None),
+         (400, 'Not key or value specified.', None),
+         (404, 'Namespace not found.', None)],
+        requires_admin=True))
     @api_base.verify_token
     @sf_api.caller_is_admin
     @arg_is_namespace
@@ -395,6 +425,15 @@ class AuthMetadataEndpoint(sf_api.Resource):
 
 
 class AuthNamespaceTrustsEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Trust an external namespace.',
+        [
+            ('namespace', 'body', 'string', 'The namespace to trust.', True)
+        ],
+        [(200, 'The current state of the namespace.', namespace_get_example),
+         (400, 'No external namespace specified.', None),
+         (404, 'Namespace not found.', None)],
+        requires_admin=True))
     @api_base.verify_token
     @arg_is_namespace
     @api_base.log_token_use
@@ -412,6 +451,16 @@ class AuthNamespaceTrustsEndpoint(sf_api.Resource):
 
 
 class AuthNamespaceTrustEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Remove trust from an external namespace.',
+        [
+            ('namespace', 'body', 'string',
+             'The namespace to no longer trust.', True)
+        ],
+        [(200, 'The current state of the namespace.', namespace_get_example),
+         (400, 'No external namespace specified.', None),
+         (404, 'Namespace not found.', None)],
+        requires_admin=True))
     @api_base.verify_token
     @arg_is_namespace
     @api_base.log_token_use
