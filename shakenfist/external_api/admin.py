@@ -1,3 +1,8 @@
+# Documentation state:
+#   - OpenAPI complete: yes
+#   - Covered in docs: yes
+#   - Has complete CI coverage:
+
 from flasgger import swag_from
 from shakenfist_utilities import api as sf_api
 

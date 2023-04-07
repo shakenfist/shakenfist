@@ -32,6 +32,7 @@ nav:
         - "Workflow": developer_guide/workflow.md
     - Operator Guide:
        - "Artifact checksums": operator_guide/artifact_checksums.md
+       - "Locks": operator_guide/locks.md
        - "Networking":
            - "Overview": "operator_guide/networking/overview.md"
            - "Single Instance": "operator_guide/networking/single_instance.md"
