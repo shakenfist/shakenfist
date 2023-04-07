@@ -828,9 +828,12 @@ class Networks(dbo_iter):
         for _, n in etcd.get_all('network', None):
             if n['uuid'] == 'floating':
                 continue
+            n = Network(n)
+            if not n:
+                continue
 
             try:
-                out = self.apply_filters(Network(n))
+                out = self.apply_filters(n)
                 if out:
                     yield out
             except IPManagerMissing:

@@ -72,7 +72,7 @@ class Upload(dbo):
 class Uploads(dbo_iter):
     def __iter__(self):
         for _, u in etcd.get_all('upload', None):
-            u = Upload.from_db(u['uuid'])
+            u = Upload(u)
             if not u:
                 continue
 

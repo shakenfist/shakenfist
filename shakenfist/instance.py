@@ -1392,7 +1392,11 @@ class Instance(dbo):
 class Instances(dbo_iter):
     def __iter__(self):
         for _, i in etcd.get_all('instance', None):
-            out = self.apply_filters(Instance(i))
+            i = Instance(i)
+            if not i:
+                continue
+
+            out = self.apply_filters(i)
             if out:
                 yield out
 

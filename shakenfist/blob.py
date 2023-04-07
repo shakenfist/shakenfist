@@ -744,7 +744,7 @@ def http_fetch(url, resp, blob_uuid, locks, logs, checksum, checksum_type,
 class Blobs(dbo_iter):
     def __iter__(self):
         for _, b in etcd.get_all('blob', None):
-            b = Blob.from_db(b['uuid'])
+            b = Blob(b)
             if not b:
                 continue
 

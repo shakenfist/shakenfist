@@ -161,7 +161,11 @@ class NetworkInterface(dbo):
 class NetworkInterfaces(dbo_iter):
     def __iter__(self):
         for _, ni in etcd.get_all('networkinterface', None):
-            out = self.apply_filters(NetworkInterface(ni))
+            ni = NetworkInterface(ni)
+            if not ni:
+                continue
+
+            out = self.apply_filters(ni)
             if out:
                 yield out
 
