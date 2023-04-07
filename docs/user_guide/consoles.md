@@ -67,7 +67,8 @@ ARCHIVE_INSTANCE_CONSOLE_DURATION configuration variable, which specifies how ma
 days to keep the console for. On instance deletion, the console log is converted
 to an artifact and stored as any other. These artifacts have type 'other', and
 will have a source URL in the form of sf://instance/...uuid.../console within
-the same namespace as the instance.
+the same namespace as the instance. Set ARCHIVE_INSTANCE_CONSOLE_DURATION to
+0 to disable this behavior.
 
 ## Interactive VDI console
 
