@@ -1,6 +1,9 @@
 # Documentation state:
 #   - OpenAPI complete: yes
-#   - Covered in docs:
+#   - Covered in user or operator docs: both
+#   - API reference docs exist: yes
+#        - and link to OpenAPI docs: yes
+#        - and include examples: yes
 #   - Has complete CI coverage:
 
 import flask
@@ -317,8 +320,6 @@ class ArtifactsEndpoint(sf_api.Resource):
     @api_base.log_token_use
     @api_base.requires_namespace_exist
     def delete(self, confirm=False, namespace=None):
-        """Delete all artifacts in the namespace."""
-
         if confirm is not True:
             return sf_api.error(400, 'parameter confirm is not set true')
 

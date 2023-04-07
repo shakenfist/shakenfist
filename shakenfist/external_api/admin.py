@@ -1,6 +1,9 @@
 # Documentation state:
 #   - OpenAPI complete: yes
-#   - Covered in docs: yes
+#   - Covered in user or operator docs: operator
+#   - API reference docs exist: yes
+#        - and link to OpenAPI docs: yes
+#        - and include examples: yes
 #   - Has complete CI coverage:
 
 from flasgger import swag_from

@@ -6,6 +6,8 @@ theme:
     name: material
 markdown_extensions:
     - admonition
+    - pymdownx.details
+    - pymdownx.superfences
     - pymdownx.magiclink:
         repo_url_shorthand: true
         user: shakenfist
@@ -22,8 +24,10 @@ nav:
         - "Events": user_guide/events.md
         - "Objects": user_guide/objects.md
     - Developer Guide:
+        - API reference:
+            - "Artifacts": developer_guide/artifacts.md
+            - "Locks": developer_guide/locks.md
         - "Authentication": developer_guide/authentication.md
-        - "Artifact uploads and downloads": developer_guide/artifact_uploads_downloads.md
         - "CI API coverage": developer_guide/ci_api_coverage.md
         - "Release process": developer_guide/release_process.md
         - "Standards": developer_guide/standards.md
@@ -31,7 +35,7 @@ nav:
         - "Updating docs": developer_guide/updating_docs.md
         - "Workflow": developer_guide/workflow.md
     - Operator Guide:
-       - "Artifact checksums": operator_guide/artifact_checksums.md
+       - "Artifacts": operator_guide/artifacts.md
        - "Locks": operator_guide/locks.md
        - "Networking":
            - "Overview": "operator_guide/networking/overview.md"
