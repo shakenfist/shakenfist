@@ -49,7 +49,7 @@ official CentOS image that many users will want.
 ???+ info
 
     Another option for sharing artifacts is the "trusts" relationship between two
-    namespaces, which is discussed in the [developer guide](/developer_guide/authentication.md).
+    namespaces, which is discussed in the [developer guide](/developer_guide/authentication/).
 
 To share an artifact, use the command line client like this:
 

@@ -36,6 +36,7 @@ nav:
         - "Workflow": developer_guide/workflow.md
     - Operator Guide:
        - "Artifacts": operator_guide/artifacts.md
+       - "Authentication": operator_guide/authentication.md
        - "Locks": operator_guide/locks.md
        - "Networking":
            - "Overview": "operator_guide/networking/overview.md"

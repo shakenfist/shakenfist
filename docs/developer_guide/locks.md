@@ -1,6 +1,6 @@
 # Locks
 
-As discussed in the [operator guide](/operator_guide/locks.md), you can query
+As discussed in the [operator guide](/operator_guide/locks/), you can query
 what locks exist in a Shaken Fist cluster, as well as who is currently holding
 those locks (machine and process id).
 

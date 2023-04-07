@@ -1,11 +1,11 @@
 # Artifacts
 
-The general usage of artifacts is documented in the [user guide](/user_guide/artifacts.md). This page documents the API flow interacting with artifacts, as well as the
+The general usage of artifacts is documented in the [user guide](/user_guide/artifacts/). This page documents the API flow interacting with artifacts, as well as the
 multi-step process involved with uploading or downloading an artifact.
 
 ## Fetching a remote URL as an image artifact
 
-As discussed in the [user guide](/user_guide/artifacts.md), remote URLs can be
+As discussed in the [user guide](/user_guide/artifacts/), remote URLs can be
 stored within a Shaken Fist cluster as artifacts of type *image*. These artifacts
 are often used as the template for disks attached to instances and are the
 equivalent to AWS AMIs or OpenStack images in Glance.
@@ -31,7 +31,7 @@ equivalent to AWS AMIs or OpenStack images in Glance.
 
 As expected, you can use a GET REST API call to fetch information about all
 artifacts in a namespace, or a specific artifact for more detailed information.
-Artifacts also track "events" (see the [user guide](/user_guide/events.md) for
+Artifacts also track "events" (see the [user guide](/user_guide/events/) for
 a general introduction to the Shaken Fist event system).
 
 ???+ tip "REST API calls"
@@ -354,7 +354,7 @@ from. This allows recommencing failed downloads.
 
 ## Sharing and unsharing
 
-As described in the [operator guide](/operator_guide/artifacts.md), artifacts in
+As described in the [operator guide](/operator_guide/artifacts/), artifacts in
 the system namespace can be shared with all other namespaces. This is desirable
 for commonly used "official" images which many users will want to use.
 
