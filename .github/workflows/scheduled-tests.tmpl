@@ -191,6 +191,13 @@ jobs:
             exit 1
           fi
 
+          # Ensure we didn't override blob reference counts
+          if [ `grep -ci "override" ${GITHUB_WORKSPACE}/syslog` -gt 0 ]
+          then
+            echo "A blob reference count was overridden!"
+            exit 1
+          fi
+
       - name: Gather logs
         if: {% raw %}${{{% endraw %} ! cancelled() {% raw %}}}{% endraw %}
         run: |
