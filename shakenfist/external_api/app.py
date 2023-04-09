@@ -122,9 +122,9 @@ api.add_resource(api_artifact.ArtifactUploadEndpoint,
                  '/artifacts/upload/<artifact_name>')
 api.add_resource(api_artifact.ArtifactEventsEndpoint,
                  '/artifacts/<artifact_ref>/events')
-api.add_resource(api_auth.ArtifactMetadatasEndpoint,
+api.add_resource(api_artifact.ArtifactMetadatasEndpoint,
                  '/artifacts/<artifact_ref>/metadata')
-api.add_resource(api_auth.ArtifactMetadataEndpoint,
+api.add_resource(api_artifact.ArtifactMetadataEndpoint,
                  '/artifacts/<artifact_ref>/metadata/<key>')
 api.add_resource(api_artifact.ArtifactShareEndpoint,
                  '/artifacts/<artifact_ref>/share')
