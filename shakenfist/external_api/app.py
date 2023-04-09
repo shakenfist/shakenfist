@@ -116,6 +116,25 @@ api.add_resource(Root, '/')
 
 api.add_resource(api_admin.AdminLocksEndpoint, '/admin/locks')
 
+api.add_resource(api_artifact.ArtifactEndpoint, '/artifacts/<artifact_ref>')
+api.add_resource(api_artifact.ArtifactsEndpoint, '/artifacts')
+api.add_resource(api_artifact.ArtifactUploadEndpoint,
+                 '/artifacts/upload/<artifact_name>')
+api.add_resource(api_artifact.ArtifactEventsEndpoint,
+                 '/artifacts/<artifact_ref>/events')
+api.add_resource(api_auth.ArtifactMetadatasEndpoint,
+                 '/artifacts/<artifact_ref>/metadata')
+api.add_resource(api_auth.ArtifactMetadataEndpoint,
+                 '/artifacts/<artifact_ref>/metadata/<key>')
+api.add_resource(api_artifact.ArtifactShareEndpoint,
+                 '/artifacts/<artifact_ref>/share')
+api.add_resource(api_artifact.ArtifactUnshareEndpoint,
+                 '/artifacts/<artifact_ref>/unshare')
+api.add_resource(api_artifact.ArtifactVersionsEndpoint,
+                 '/artifacts/<artifact_ref>/versions')
+api.add_resource(api_artifact.ArtifactVersionEndpoint,
+                 '/artifacts/<artifact_ref>/versions/<version_id>')
+
 api.add_resource(api_auth.AuthEndpoint, '/auth')
 api.add_resource(api_auth.AuthNamespacesEndpoint, '/auth/namespaces')
 api.add_resource(api_auth.AuthNamespaceEndpoint,
@@ -174,21 +193,6 @@ api.add_resource(api_interface.InterfaceFloatEndpoint,
                  '/interfaces/<interface_uuid>/float')
 api.add_resource(api_interface.InterfaceDefloatEndpoint,
                  '/interfaces/<interface_uuid>/defloat')
-
-api.add_resource(api_artifact.ArtifactEndpoint, '/artifacts/<artifact_ref>')
-api.add_resource(api_artifact.ArtifactsEndpoint, '/artifacts')
-api.add_resource(api_artifact.ArtifactUploadEndpoint,
-                 '/artifacts/upload/<artifact_name>')
-api.add_resource(api_artifact.ArtifactEventsEndpoint,
-                 '/artifacts/<artifact_ref>/events')
-api.add_resource(api_artifact.ArtifactVersionsEndpoint,
-                 '/artifacts/<artifact_ref>/versions')
-api.add_resource(api_artifact.ArtifactVersionEndpoint,
-                 '/artifacts/<artifact_ref>/versions/<version_id>')
-api.add_resource(api_artifact.ArtifactShareEndpoint,
-                 '/artifacts/<artifact_ref>/share')
-api.add_resource(api_artifact.ArtifactUnshareEndpoint,
-                 '/artifacts/<artifact_ref>/unshare')
 
 api.add_resource(api_label.LabelEndpoint, '/label/<path:label_name>')
 

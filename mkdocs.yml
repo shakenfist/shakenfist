@@ -25,8 +25,17 @@ nav:
         - "Objects": user_guide/objects.md
     - Developer Guide:
         - API reference:
-            - "Artifacts": developer_guide/api_reference/artifacts.md
-            - "Locks": developer_guide/api_reference/locks.md
+            - "Admin (/admin/)": developer_guide/api_reference/admin.md
+            - "Artifacts (/artifacts/)": developer_guide/api_reference/artifacts.md
+            - "Authentication (/auth/)": developer_guide/api_reference/authentication.md
+            - "Blob Checksums (/blob_checksums/)": developer_guide/api_reference/blob_checksums.md
+            - "Blobs (/blobs/)": developer_guide/api_reference/blobs.md
+            - "Instances (/instances/)": developer_guide/api_reference/instances.md
+            - "Interfaces (/interfaces/)": developer_guide/api_reference/interfaces.md
+            - "Label (/label/)": developer_guide/api_reference/label.md
+            - "Networks (/networks/)": developer_guide/api_reference/networks.md
+            - "Nodes (/nodes/)": developer_guide/api_reference/nodes.md
+            - "Upload (/upload/)": developer_guide/api_reference/upload.md
         - "Authentication": developer_guide/authentication.md
         - "CI API coverage": developer_guide/ci_api_coverage.md
         - "Release process": developer_guide/release_process.md

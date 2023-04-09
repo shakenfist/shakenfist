@@ -1,4 +1,4 @@
-# Artifacts
+# Artifacts (/artifacts/)
 
 The general usage of artifacts is documented in the [user guide](/user_guide/artifacts/). This page documents the API flow interacting with artifacts, as well as the
 multi-step process involved with uploading or downloading an artifact.

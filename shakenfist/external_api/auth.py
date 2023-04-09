@@ -1,4 +1,5 @@
 # Documentation state:
+#   - Has metadata calls: yes
 #   - OpenAPI complete: yes
 #   - Covered in user or operator docs: both
 #   - API reference docs exist:
@@ -344,7 +345,7 @@ class AuthMetadatasEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Fetch metadata for a namespace.',
         [
-            ('namespace', 'body', 'string', 'The namespace to add a key to.', True)
+            ('namespace', 'body', 'string', 'The namespace to fetch metadata for.', True)
         ],
         [(200, 'Namespace metadata, if any.', None),
          (404, 'Namespace not found.', None)],
@@ -406,7 +407,7 @@ class AuthMetadataEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Delete a metadata key for a namespace.',
         [
-            ('namespace', 'body', 'string', 'The namespace to add a key to.', True),
+            ('namespace', 'body', 'string', 'The namespace to remove a key from.', True),
             ('key', 'body', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
