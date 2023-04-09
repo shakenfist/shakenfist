@@ -191,6 +191,13 @@ jobs:
             exit 1
           fi
 
+          # Ensure we didn't override blob reference counts
+          if [ `grep -ci "override" ${GITHUB_WORKSPACE}/syslog` -gt 0 ]
+          then
+            echo "A blob reference count was overridden!"
+            exit 1
+          fi
+
       - name: Gather logs
         if: ${{ ! cancelled() }}
         run: |
@@ -235,8 +242,9 @@ jobs:
         if: success()
         run: |
           if [ "slim-primary" == "localhost" ]; then
+            ref=$(echo "${{ github.ref }}" | cut -f 1 -d "/")
             sf-client instance snapshot primary \
-              --label_name sf://label/ci-images/ubuntu-2004-${{ github.ref }} \
+              --label_name sf://label/ci-images/ubuntu-2004-$ref \
               --delete-snapshot-after-label --flatten
           fi
 
