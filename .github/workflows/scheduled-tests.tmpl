@@ -242,7 +242,7 @@ jobs:
         if: success()
         run: |
           if [ "{{topology}}" == "localhost" ]; then
-            ref=$(echo "{% raw %}${{ github.ref }}{% endraw %}" | cut -f 1 -d "/")
+            ref=$(echo "{% raw %}${{ github.ref }}{% endraw %}" | cut -f 3 -d "/")
             sf-client instance snapshot primary \
               --label_name {{baseimage}}-$ref \
               --delete-snapshot-after-label --flatten
