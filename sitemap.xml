@@ -21,11 +21,6 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://shakenfist.com/developer_guide/artifacts/</loc>
-         <lastmod>2023-04-10</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
          <loc>https://shakenfist.com/developer_guide/authentication/</loc>
          <lastmod>2023-04-10</lastmod>
          <changefreq>daily</changefreq>
@@ -37,11 +32,6 @@
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/io_performance_tuning/</loc>
-         <lastmod>2023-04-10</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/developer_guide/locks/</loc>
          <lastmod>2023-04-10</lastmod>
          <changefreq>daily</changefreq>
     </url>
@@ -67,6 +57,61 @@
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/workflow/</loc>
+         <lastmod>2023-04-10</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/developer_guide/api_reference/admin/</loc>
+         <lastmod>2023-04-10</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/developer_guide/api_reference/artifacts/</loc>
+         <lastmod>2023-04-10</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/developer_guide/api_reference/authentication/</loc>
+         <lastmod>2023-04-10</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/developer_guide/api_reference/blob_checksums/</loc>
+         <lastmod>2023-04-10</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/developer_guide/api_reference/blobs/</loc>
+         <lastmod>2023-04-10</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/developer_guide/api_reference/instances/</loc>
+         <lastmod>2023-04-10</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/developer_guide/api_reference/interfaces/</loc>
+         <lastmod>2023-04-10</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/developer_guide/api_reference/label/</loc>
+         <lastmod>2023-04-10</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/developer_guide/api_reference/networks/</loc>
+         <lastmod>2023-04-10</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/developer_guide/api_reference/nodes/</loc>
+         <lastmod>2023-04-10</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/developer_guide/api_reference/upload/</loc>
          <lastmod>2023-04-10</lastmod>
          <changefreq>daily</changefreq>
     </url>
