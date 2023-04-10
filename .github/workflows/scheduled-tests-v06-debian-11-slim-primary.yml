@@ -242,9 +242,10 @@ jobs:
         if: success()
         run: |
           if [ "slim-primary" == "localhost" ]; then
+            base=$(echo "sf://label/ci-images/debian-11" | cut -f 5 -d "/")
             ref=$(echo "${{ github.ref }}" | cut -f 3 -d "/")
             sf-client instance snapshot primary \
-              --label_name sf://label/ci-images/debian-11-$ref \
+              --label_name ci-images/$base-$ref \
               --delete-snapshot-after-label --flatten
           fi
 
