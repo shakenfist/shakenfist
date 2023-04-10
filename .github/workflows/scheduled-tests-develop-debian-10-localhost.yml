@@ -242,7 +242,7 @@ jobs:
         if: success()
         run: |
           if [ "localhost" == "localhost" ]; then
-            ref=$(echo "${{ github.ref }}" | cut -f 1 -d "/")
+            ref=$(echo "${{ github.ref }}" | cut -f 3 -d "/")
             sf-client instance snapshot primary \
               --label_name sf://label/ci-images/debian-10-$ref \
               --delete-snapshot-after-label --flatten
