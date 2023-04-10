@@ -1,4 +1,5 @@
 # Documentation state:
+#   - Has metadata calls:
 #   - OpenAPI complete: yes
 #   - Covered in user or operator docs: both
 #   - API reference docs exist: yes
@@ -698,3 +699,86 @@ class ArtifactUnshareEndpoint(sf_api.Resource):
             return sf_api.error(403, 'artifact not shared')
         artifact_from_db.shared = False
         return artifact_from_db.external_view()
+
+
+class ArtifactMetadatasEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Fetch metadata for an artifact.',
+        [
+            ('artifact_ref', 'body', 'string', 'The artifact to add a key to.', True)
+        ],
+        [(200, 'Artifact metadata, if any.', None),
+         (404, 'Artifact not found.', None)],
+        requires_admin=True))
+    @api_base.verify_token
+    @arg_is_artifact_ref
+    @requires_artifact_ownership
+    @api_base.log_token_use
+    def get(self, artifact_ref=None, artifact_from_db=None):
+        return artifact_from_db.metadata
+
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Add metadata for an artifact.',
+        [
+            ('artifact_ref', 'body', 'string', 'The artifact to add a key to.', True),
+            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('value', 'body', 'string', 'The value of the key.', True)
+        ],
+        [(200, 'Nothing.', None),
+         (400, 'Not key or value specified.', None),
+         (404, 'Artifact not found.', None)],
+        requires_admin=True))
+    @api_base.verify_token
+    @arg_is_artifact_ref
+    @requires_artifact_ownership
+    @api_base.log_token_use
+    def post(self, artifact_ref=None, key=None, value=None, artifact_from_db=None):
+        if not key:
+            return sf_api.error(400, 'no key specified')
+        if not value:
+            return sf_api.error(400, 'no value specified')
+        artifact_from_db.add_metadata_key(key, value)
+
+
+class ArtifactMetadataEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Update a metadata key for an artifact.',
+        [
+            ('artifact_ref', 'body', 'string', 'The artifact to add a key to.', True),
+            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('value', 'body', 'string', 'The value of the key.', True)
+        ],
+        [(200, 'Nothing.', None),
+         (400, 'Not key or value specified.', None),
+         (404, 'Artifact not found.', None)],
+        requires_admin=True))
+    @api_base.verify_token
+    @arg_is_artifact_ref
+    @requires_artifact_ownership
+    @api_base.log_token_use
+    def put(self, artifact_ref=None, key=None, value=None, artifact_from_db=None):
+        if not key:
+            return sf_api.error(400, 'no key specified')
+        if not value:
+            return sf_api.error(400, 'no value specified')
+        artifact_from_db.add_metadata_key(key, value)
+
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Delete a metadata key for an artifact.',
+        [
+            ('artifact_ref', 'body', 'string', 'The artifact to remove a key from.', True),
+            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('value', 'body', 'string', 'The value of the key.', True)
+        ],
+        [(200, 'Nothing.', None),
+         (400, 'Not key or value specified.', None),
+         (404, 'Artifact not found.', None)],
+        requires_admin=True))
+    @api_base.verify_token
+    @arg_is_artifact_ref
+    @requires_artifact_ownership
+    @api_base.log_token_use
+    def delete(self, artifact=None, key=None, value=None, artifact_from_db=None):
+        if not key:
+            return sf_api.error(400, 'no key specified')
+        artifact_from_db.remove_metadata_key(key)

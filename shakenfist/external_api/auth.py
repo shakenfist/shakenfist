@@ -1,6 +1,7 @@
 # Documentation state:
+#   - Has metadata calls: yes
 #   - OpenAPI complete: yes
-#   - Covered in user or operator docs: operator guide
+#   - Covered in user or operator docs: both
 #   - API reference docs exist:
 #        - and link to OpenAPI docs:
 #        - and include examples:
@@ -35,7 +36,7 @@ def arg_is_namespace(func):
 
         ns = Namespace.from_db(kwargs.get('namespace'))
         if not ns:
-            LOG.with_fields({'namesapace': kwargs.get('namespace')}).info(
+            LOG.with_fields({'namespace': kwargs.get('namespace')}).info(
                 'Namespace not found, missing or deleted')
             return sf_api.error(404, 'namespace not found')
 
@@ -344,7 +345,7 @@ class AuthMetadatasEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Fetch metadata for a namespace.',
         [
-            ('namespace', 'body', 'string', 'The namespace to add a key to.', True)
+            ('namespace', 'body', 'string', 'The namespace to fetch metadata for.', True)
         ],
         [(200, 'Namespace metadata, if any.', None),
          (404, 'Namespace not found.', None)],
@@ -406,7 +407,7 @@ class AuthMetadataEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Delete a metadata key for a namespace.',
         [
-            ('namespace', 'body', 'string', 'The namespace to add a key to.', True),
+            ('namespace', 'body', 'string', 'The namespace to remove a key from.', True),
             ('key', 'body', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],

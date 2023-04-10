@@ -118,9 +118,11 @@ There can be more than one key for a namespace. The key name is not used as part
 of the authentication process, and is largely used for key management (deleting
 the key) and logging which access token was used in the event logs.
 
-Please note the key prefix "_service_key" is reserved for internal use within
-Shaken Fist. This usage is discussed in the *Inter-node Authentication* section
-below.
+???+ info
+
+    Please note the key prefix "_service_key" is reserved for internal use within
+    Shaken Fist. This usage is discussed in the *Inter-node Authentication* section
+    below.
 
 ## Authenticating directly to the REST API
 
@@ -174,7 +176,9 @@ curl -X GET https://shakenfist/api/auth/namespaces \
 
 The JSON response here has been formatted for readability.
 
-***Note the word "Bearer" before the access token in the Authorization header.***
+???+ info
+
+    Note the word "Bearer" before the access token in the Authorization header.
 
 ## Contents of the JWT tokens
 

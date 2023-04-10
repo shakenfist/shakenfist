@@ -82,7 +82,7 @@ instance start), the URL is checked. If the image has changed a new version is
 downloaded, otherwise the already cached version is used.
 
 You can also create an image artifact by uploading it, but that's complicated
-enough that its covered separately in [the developer guide section on artifacts](/developer_guide/artifacts/).
+enough that its covered separately in [the developer guide section on artifacts](/developer_guide/api_reference/artifacts/).
 
 ## Creating a snapshot artifact
 
