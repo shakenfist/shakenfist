@@ -563,6 +563,13 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#metadata" class="md-nav__link">
+    Metadata
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1079,6 +1086,13 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#metadata" class="md-nav__link">
+    Metadata
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1108,7 +1122,7 @@ equivalent to AWS AMIs or OpenStack images in Glance.</p>
 <details class="tip" open="open">
 <summary>REST API calls</summary>
 <ul>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/artifact/post_artifacts">POST /artifacts</a>: Fetch an image artifact into the cluster.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/post_artifacts">POST /artifacts</a>: Fetch an image artifact into the cluster.</li>
 </ul>
 </details>
 <details class="example">
@@ -1130,9 +1144,9 @@ a general introduction to the Shaken Fist event system).</p>
 <details class="tip" open="open">
 <summary>REST API calls</summary>
 <ul>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/artifact/get_artifacts">GET /artifacts</a>: List artifacts for a namespace.</li>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/artifact/get_artifacts__artifact_ref_">GET /artifacts/{artifact_ref}</a>: Get information about a specific artifact.</li>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/artifact/get_artifacts__artifact_ref__events">GET /artifacts/{artifact_ref}/events</a>: Fetch events for a specific artifact.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/get_artifacts">GET /artifacts</a>: List artifacts for a namespace.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/get_artifacts__artifact_ref_">GET /artifacts/{artifact_ref}</a>: Get information about a specific artifact.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/get_artifacts__artifact_ref__events">GET /artifacts/{artifact_ref}/events</a>: Fetch events for a specific artifact.</li>
 </ul>
 </details>
 <details class="example">
@@ -1225,8 +1239,8 @@ uuid,namespace,type,source_url,versions,state,shared
 <details class="tip" open="open">
 <summary>REST API calls</summary>
 <ul>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/artifact/delete_artifacts">DELETE /artifacts</a>: Delete all artifacts within a specific namespace.</li>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/artifact/delete_artifacts__artifact_ref_">DELETE /artifacts/{artifact_ref}</a>: Delete a specific artifact.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/delete_artifacts">DELETE /artifacts</a>: Delete all artifacts within a specific namespace.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/delete_artifacts__artifact_ref_">DELETE /artifacts/{artifact_ref}</a>: Delete a specific artifact.</li>
 </ul>
 </details>
 <details class="example">
@@ -1278,8 +1292,8 @@ details.</p>
 <li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/upload/post_upload">POST /upload</a>: Create a new upload.</li>
 <li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/upload/post_upload__upload_uuid_">POST /upload/{upload_uuid}</a>: Append a new chunk to an already existing upload.</li>
 <li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/upload/post_upload__upload_uuid__truncate__offset_">POST /upload/{upload_uuid}/truncate</a>: Truncate an upload to a specific index. This can be useful as a retry operation in the case of a transmission error.</li>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/artifact/get_artifacts">GET /artifacts</a>: List artifacts.</li>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/artifact/post_artifacts_upload__artifact_name_">POST /artifacts/upload/{artifact_name}</a>: Convert a completed upload into an artifact.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/get_artifacts">GET /artifacts</a>: List artifacts.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/post_artifacts_upload__artifact_name_">POST /artifacts/upload/{artifact_name}</a>: Convert a completed upload into an artifact.</li>
 </ul>
 </details>
 <details class="example">
@@ -1370,7 +1384,7 @@ remove a specific version of an artifact as well.</p>
 <details class="tip" open="open">
 <summary>REST API calls</summary>
 <ul>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/artifact/delete_artifacts__artifact_ref__versions__version_id_">DELETE /artifacts/{artifact_ref}/versions/{version_id}</a>: Remove a specified version from an artifact.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/delete_artifacts__artifact_ref__versions__version_id_">DELETE /artifacts/{artifact_ref}/versions/{version_id}</a>: Remove a specified version from an artifact.</li>
 </ul>
 </details>
 <details class="example">
@@ -1388,7 +1402,7 @@ overridden on a per-artifact basis.</p>
 <details class="tip" open="open">
 <summary>REST API calls</summary>
 <ul>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/artifact/get_artifacts__artifact_ref__versions">POST /artifacts/{artifact_ref}/versions</a>: Set the maximum number of versions of an artifact to store.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/get_artifacts__artifact_ref__versions">POST /artifacts/{artifact_ref}/versions</a>: Set the maximum number of versions of an artifact to store.</li>
 </ul>
 </details>
 <details class="example">
@@ -1409,7 +1423,7 @@ from. This allows recommencing failed downloads.</p>
 <details class="tip" open="open">
 <summary>REST API calls</summary>
 <ul>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/artifact/get_artifacts__artifact_ref__versions">GET /artifacts/{artifact_ref}/versions</a>: List version blobs for a given artifact.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/get_artifacts__artifact_ref__versions">GET /artifacts/{artifact_ref}/versions</a>: List version blobs for a given artifact.</li>
 </ul>
 </details>
 <details class="example">
@@ -1428,8 +1442,8 @@ for commonly used "official" images which many users will want to use.</p>
 <details class="tip" open="open">
 <summary>REST API calls</summary>
 <ul>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/artifact/post_artifacts__artifact_ref__share">POST /artifacts/{artifact_ref}/share</a>: Share an artifact.</li>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/artifact/post_artifacts__artifact_ref__unshare">POST /artifacts/{artifact_ref}/unshare</a>: Unshare an artifact.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/post_artifacts__artifact_ref__share">POST /artifacts/{artifact_ref}/share</a>: Share an artifact.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/post_artifacts__artifact_ref__unshare">POST /artifacts/{artifact_ref}/unshare</a>: Unshare an artifact.</li>
 </ul>
 </details>
 <details class="example">
@@ -1446,6 +1460,11 @@ for commonly used "official" images which many users will want to use.</p>
 <span class="n">sf_client</span><span class="o">.</span><span class="n">unshare_artifact</span><span class="p">(</span><span class="s1">&#39;2d9c1d4c-3436-4ea8-9b60-833fe791eece&#39;</span><span class="p">)</span>
 </code></pre></div>
 </details>
+<h2 id="metadata">Metadata</h2>
+<p>All objects exposed by the REST API may have metadata associated with them. This
+metadata is for storing values that are of interest to the owner of the resources,
+not Shaken Fist. Shaken Fist does not attempt to interpret these values at all.
+The metadata store is in the form of a key value store.</p>
 
 
 
