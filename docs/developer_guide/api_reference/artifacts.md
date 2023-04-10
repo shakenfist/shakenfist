@@ -12,7 +12,7 @@ equivalent to AWS AMIs or OpenStack images in Glance.
 
 ???+ tip "REST API calls"
 
-    * [POST /artifacts](https://sfcbr.shakenfist.com/api/apidocs/#/artifact/post_artifacts): Fetch an image artifact into the cluster.
+    * [POST /artifacts](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/post_artifacts): Fetch an image artifact into the cluster.
 
 ??? example "Python API client: cache an artifact"
 
@@ -36,9 +36,9 @@ a general introduction to the Shaken Fist event system).
 
 ???+ tip "REST API calls"
 
-    * [GET /artifacts](https://sfcbr.shakenfist.com/api/apidocs/#/artifact/get_artifacts): List artifacts for a namespace.
-    * [GET /artifacts/{artifact_ref}](https://sfcbr.shakenfist.com/api/apidocs/#/artifact/get_artifacts__artifact_ref_): Get information about a specific artifact.
-    * [GET /artifacts/{artifact_ref}/events](https://sfcbr.shakenfist.com/api/apidocs/#/artifact/get_artifacts__artifact_ref__events): Fetch events for a specific artifact.
+    * [GET /artifacts](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/get_artifacts): List artifacts for a namespace.
+    * [GET /artifacts/{artifact_ref}](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/get_artifacts__artifact_ref_): Get information about a specific artifact.
+    * [GET /artifacts/{artifact_ref}/events](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/get_artifacts__artifact_ref__events): Fetch events for a specific artifact.
 
 ??? example "Python API client: list artifacts"
 
@@ -141,8 +141,8 @@ Artifacts may be deleted individually, or an entire namespace at a time.
 
 ???+ tip "REST API calls"
 
-    * [DELETE /artifacts](https://sfcbr.shakenfist.com/api/apidocs/#/artifact/delete_artifacts): Delete all artifacts within a specific namespace.
-    * [DELETE /artifacts/{artifact_ref}](https://sfcbr.shakenfist.com/api/apidocs/#/artifact/delete_artifacts__artifact_ref_): Delete a specific artifact.
+    * [DELETE /artifacts](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/delete_artifacts): Delete all artifacts within a specific namespace.
+    * [DELETE /artifacts/{artifact_ref}](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/delete_artifacts__artifact_ref_): Delete a specific artifact.
 
 ??? example "Python API client: delete a single artifact"
 
@@ -202,8 +202,8 @@ details.
     * [POST /upload](https://sfcbr.shakenfist.com/api/apidocs/#/upload/post_upload): Create a new upload.
     * [POST /upload/{upload_uuid}](https://sfcbr.shakenfist.com/api/apidocs/#/upload/post_upload__upload_uuid_): Append a new chunk to an already existing upload.
     * [POST /upload/{upload_uuid}/truncate](https://sfcbr.shakenfist.com/api/apidocs/#/upload/post_upload__upload_uuid__truncate__offset_): Truncate an upload to a specific index. This can be useful as a retry operation in the case of a transmission error.
-    * [GET /artifacts](https://sfcbr.shakenfist.com/api/apidocs/#/artifact/get_artifacts): List artifacts.
-    * [POST /artifacts/upload/{artifact_name}](https://sfcbr.shakenfist.com/api/apidocs/#/artifact/post_artifacts_upload__artifact_name_): Convert a completed upload into an artifact.
+    * [GET /artifacts](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/get_artifacts): List artifacts.
+    * [POST /artifacts/upload/{artifact_name}](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/post_artifacts_upload__artifact_name_): Convert a completed upload into an artifact.
 
 ??? example "Python API client: create an upload, transfer data, and convert to an artifact"
 
@@ -299,7 +299,7 @@ remove a specific version of an artifact as well.
 
 ???+ tip "REST API calls"
 
-    * [DELETE /artifacts/{artifact_ref}/versions/{version_id}](https://sfcbr.shakenfist.com/api/apidocs/#/artifact/delete_artifacts__artifact_ref__versions__version_id_): Remove a specified version from an artifact.
+    * [DELETE /artifacts/{artifact_ref}/versions/{version_id}](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/delete_artifacts__artifact_ref__versions__version_id_): Remove a specified version from an artifact.
 
 ??? example "Python API client: delete a specific version of an artifact"
 
@@ -318,7 +318,7 @@ overridden on a per-artifact basis.
 
 ???+ tip "REST API calls"
 
-    * [POST /artifacts/{artifact_ref}/versions](https://sfcbr.shakenfist.com/api/apidocs/#/artifact/get_artifacts__artifact_ref__versions): Set the maximum number of versions of an artifact to store.
+    * [POST /artifacts/{artifact_ref}/versions](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/get_artifacts__artifact_ref__versions): Set the maximum number of versions of an artifact to store.
 
 ??? example "Python API client: delete a specific version of an artifact"
 
@@ -340,7 +340,7 @@ from. This allows recommencing failed downloads.
 
 ???+ tip "REST API calls"
 
-    * [GET /artifacts/{artifact_ref}/versions](https://sfcbr.shakenfist.com/api/apidocs/#/artifact/get_artifacts__artifact_ref__versions): List version blobs for a given artifact.
+    * [GET /artifacts/{artifact_ref}/versions](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/get_artifacts__artifact_ref__versions): List version blobs for a given artifact.
 
 ??? example "Python API client: list versions of an artifact"
 
@@ -360,8 +360,8 @@ for commonly used "official" images which many users will want to use.
 
 ???+ tip "REST API calls"
 
-    * [POST /artifacts/{artifact_ref}/share](https://sfcbr.shakenfist.com/api/apidocs/#/artifact/post_artifacts__artifact_ref__share): Share an artifact.
-    * [POST /artifacts/{artifact_ref}/unshare](https://sfcbr.shakenfist.com/api/apidocs/#/artifact/post_artifacts__artifact_ref__unshare): Unshare an artifact.
+    * [POST /artifacts/{artifact_ref}/share](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/post_artifacts__artifact_ref__share): Share an artifact.
+    * [POST /artifacts/{artifact_ref}/unshare](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/post_artifacts__artifact_ref__unshare): Unshare an artifact.
 
 ??? example "Python API client: share an artifact"
 
@@ -378,3 +378,10 @@ for commonly used "official" images which many users will want to use.
 
     sf_client.unshare_artifact('2d9c1d4c-3436-4ea8-9b60-833fe791eece')
     ```
+
+## Metadata
+
+All objects exposed by the REST API may have metadata associated with them. This
+metadata is for storing values that are of interest to the owner of the resources,
+not Shaken Fist. Shaken Fist does not attempt to interpret these values at all.
+The metadata store is in the form of a key value store.

@@ -170,7 +170,7 @@ artifact_delete_example = """{
 
 class ArtifactEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
-        'artifact', 'Get artifact information.',
+        'artifacts', 'Get artifact information.',
         [('artifact_ref', 'query', 'string',
           'The UUID or name of the artifact.', True)],
         [(200, 'Information about a single artifact.', artifact_get_example),
@@ -184,7 +184,7 @@ class ArtifactEndpoint(sf_api.Resource):
             return artifact_from_db.external_view()
 
     @swag_from(api_base.swagger_helper(
-        'artifact', 'Delete an artifact.',
+        'artifacts', 'Delete an artifact.',
         [('artifact_ref', 'query', 'string',
           'The UUID or name of the artifact.', True)],
         [(200, ('The artifact has been deleted. The final state of the '
@@ -237,8 +237,8 @@ artifact_uuid_list_example = """[
 
 class ArtifactsEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
-        'artifact', ('Get all artifacts visible to the currently '
-                     'authenticated namespace.'),
+        'artifacts', ('Get all artifacts visible to the currently '
+                      'authenticated namespace.'),
         [('node', 'body', 'string',
           'Limit results to a specific hypervisor node.', False)],
         [(200, ('A list of artifact dictionaries, each containing the same '
@@ -263,7 +263,7 @@ class ArtifactsEndpoint(sf_api.Resource):
         return retval
 
     @swag_from(api_base.swagger_helper(
-        'artifact', ('Fetch an image artifact into the cluster.'),
+        'artifacts', ('Fetch an image artifact into the cluster.'),
         [
             ('url', 'body', 'url', 'The URL to fetch.', True),
             ('shared', 'body', 'boolean',
@@ -305,7 +305,7 @@ class ArtifactsEndpoint(sf_api.Resource):
         return a.external_view()
 
     @swag_from(api_base.swagger_helper(
-        'artifact', ('Delete all artifacts in a namespace.'),
+        'artifacts', ('Delete all artifacts in a namespace.'),
         [
             ('confirm', 'body', 'boolean', 'Yes I really mean it.', True),
             ('namespace', 'body', 'namespace',
@@ -346,7 +346,7 @@ class ArtifactsEndpoint(sf_api.Resource):
 
 class ArtifactUploadEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
-        'artifact', 'Convert an upload into an artifact.',
+        'artifacts', 'Convert an upload into an artifact.',
         [
             ('artifact_name', 'query', 'uuid',
              'The name of the artifact. This is used to construct a source url if '
@@ -532,7 +532,7 @@ artifact_events_example = """[
 
 class ArtifactEventsEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
-        'artifact', 'Get artifact event information.',
+        'artifacts', 'Get artifact event information.',
         [('artifact_ref', 'query', 'string',
           'The UUID or name of the artifact.', True)],
         [(200, 'Event information about a single artifact.', artifact_events_example),
@@ -585,7 +585,7 @@ artifact_versions_example = """[
 
 class ArtifactVersionsEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
-        'artifact', 'Get artifact version information.',
+        'artifacts', 'Get artifact version information.',
         [('artifact_ref', 'query', 'string',
           'The UUID or name of the artifact.', True)],
         [(200, 'A list of the blobs which form the artifact versions.',
@@ -604,7 +604,7 @@ class ArtifactVersionsEndpoint(sf_api.Resource):
         return retval
 
     @swag_from(api_base.swagger_helper(
-        'artifact', 'Set the maximum number of versions for an artifact.',
+        'artifacts', 'Set the maximum number of versions for an artifact.',
         [
             ('artifact_ref', 'query', 'string',
              'The UUID or name of the artifact.', True),
@@ -630,7 +630,7 @@ class ArtifactVersionsEndpoint(sf_api.Resource):
 
 class ArtifactVersionEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
-        'artifact',
+        'artifacts',
         ('Delete the specified artifact version. Note that this will only '
          'remove the blob if its reference count reaches zero. If the artifact '
          'has no remaining versions, it will have its state set to deleted.'),
@@ -664,7 +664,7 @@ class ArtifactVersionEndpoint(sf_api.Resource):
 
 class ArtifactShareEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
-        'artifact', 'Share the specified artifact with all namespaces.',
+        'artifacts', 'Share the specified artifact with all namespaces.',
         [('artifact_ref', 'query', 'string',
           'The UUID or name of the artifact.', True)],
         [(200, 'Information about a single artifact.', artifact_get_example),
@@ -684,7 +684,7 @@ class ArtifactShareEndpoint(sf_api.Resource):
 
 class ArtifactUnshareEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
-        'artifact', 'Unshare the specified artifact with all namespaces.',
+        'artifacts', 'Unshare the specified artifact with all namespaces.',
         [('artifact_ref', 'query', 'string',
           'The UUID or name of the artifact.', True)],
         [(200, 'Information about a single artifact.', artifact_get_example),
@@ -703,7 +703,7 @@ class ArtifactUnshareEndpoint(sf_api.Resource):
 
 class ArtifactMetadatasEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
-        'auth', 'Fetch metadata for an artifact.',
+        'artifacts', 'Fetch metadata for an artifact.',
         [
             ('artifact_ref', 'body', 'string', 'The artifact to add a key to.', True)
         ],
@@ -718,7 +718,7 @@ class ArtifactMetadatasEndpoint(sf_api.Resource):
         return artifact_from_db.metadata
 
     @swag_from(api_base.swagger_helper(
-        'auth', 'Add metadata for an artifact.',
+        'artifacts', 'Add metadata for an artifact.',
         [
             ('artifact_ref', 'body', 'string', 'The artifact to add a key to.', True),
             ('key', 'body', 'string', 'The metadata key to set', True),
@@ -742,7 +742,7 @@ class ArtifactMetadatasEndpoint(sf_api.Resource):
 
 class ArtifactMetadataEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
-        'auth', 'Update a metadata key for an artifact.',
+        'artifacts', 'Update a metadata key for an artifact.',
         [
             ('artifact_ref', 'body', 'string', 'The artifact to add a key to.', True),
             ('key', 'body', 'string', 'The metadata key to set', True),
@@ -764,7 +764,7 @@ class ArtifactMetadataEndpoint(sf_api.Resource):
         artifact_from_db.add_metadata_key(key, value)
 
     @swag_from(api_base.swagger_helper(
-        'auth', 'Delete a metadata key for an artifact.',
+        'artifacts', 'Delete a metadata key for an artifact.',
         [
             ('artifact_ref', 'body', 'string', 'The artifact to remove a key from.', True),
             ('key', 'body', 'string', 'The metadata key to set', True),
