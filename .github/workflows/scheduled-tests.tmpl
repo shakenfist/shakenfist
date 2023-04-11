@@ -241,11 +241,10 @@ jobs:
       - name: Snapshot localhost builds for later upgrade testing
         if: success()
         run: |
-          if [ "{{topology}}" == "localhost" ]; then
+          if [ $(echo "{{topology}}" | grep -c "localhost") -gt 1 ]; then
             base=$(echo "{{baseimage}}" | cut -f 5 -d "/")
-            ref=$(echo "{% raw %}${{ github.ref }}{% endraw %}" | cut -f 3 -d "/")
             sf-client instance snapshot primary \
-              --label_name ci-images/$base-$ref \
+              --label_name ci-images/$base-$GITHUB_BASE_REF \
               --delete-snapshot-after-label --flatten
           fi
 

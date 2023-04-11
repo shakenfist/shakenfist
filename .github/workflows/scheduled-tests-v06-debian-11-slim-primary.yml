@@ -241,11 +241,10 @@ jobs:
       - name: Snapshot localhost builds for later upgrade testing
         if: success()
         run: |
-          if [ "slim-primary" == "localhost" ]; then
+          if [ $(echo "slim-primary" | grep -c "localhost") -gt 1 ]; then
             base=$(echo "sf://label/ci-images/debian-11" | cut -f 5 -d "/")
-            ref=$(echo "${{ github.ref }}" | cut -f 3 -d "/")
             sf-client instance snapshot primary \
-              --label_name ci-images/$base-$ref \
+              --label_name ci-images/$base-$GITHUB_BASE_REF \
               --delete-snapshot-after-label --flatten
           fi
 
