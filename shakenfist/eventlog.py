@@ -311,7 +311,7 @@ class EventLog(object):
 
 
 # This is the version for an individual sqlite file
-VERSION = 5
+VERSION = 6
 CREATE_EVENT_TABLE = """CREATE TABLE IF NOT EXISTS events(
     type text, timestamp real PRIMARY KEY, fqdn text, duration float, message text,
     extra text)"""

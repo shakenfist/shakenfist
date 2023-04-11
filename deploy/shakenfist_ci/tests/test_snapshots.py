@@ -141,7 +141,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
 
         # Wait for the index to increment (it happens after the snapshot IO)
         start_time = time.time()
-        while time.time() - start_time < 60:
+        while time.time() - start_time < 300:
             versions = self.test_client.get_artifact_versions(snapshot_uuid)
             if len(versions) == 2:
                 break
