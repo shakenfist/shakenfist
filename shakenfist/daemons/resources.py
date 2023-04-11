@@ -7,6 +7,7 @@ from prometheus_client import Gauge
 from prometheus_client import start_http_server
 
 from shakenfist import baseobject
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons import daemon
 from shakenfist.config import config
@@ -277,6 +278,8 @@ class Monitor(daemon.Daemon):
 
             for n in network.Networks([baseobject.active_states_filter]):
                 if not n.provide_nat:
+                    continue
+                if n.state.value in [dbo.STATE_DELETED, dbo.STATE_ERROR]:
                     continue
 
                 interface = 'egr-%06x-o' % n.vxid
