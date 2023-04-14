@@ -28,6 +28,7 @@ from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS
 from shakenfist import exceptions
 from shakenfist import network
 from shakenfist import networkinterface
+from shakenfist.node import Node
 from shakenfist.tasks import DeleteInstanceTask, SnapshotTask
 from shakenfist.util import general as util_general
 from shakenfist.util import image as util_image
@@ -594,6 +595,10 @@ class Instance(dbo):
         self.state = self.STATE_CREATING
         self.interfaces = iface_uuids
 
+        # Record this instance in the cache of instances on this node
+        n = Node.from_db(config.NODE_NAME)
+        n.add_instance(self.uuid)
+
         # Ensure we have state on disk
         os.makedirs(self.instance_path, exist_ok=True)
 
@@ -656,6 +661,11 @@ class Instance(dbo):
                     b.ref_count_dec(self)
 
         self.deallocate_instance_ports()
+
+        # Remove this instance from the cache of instances on a node
+        if self.placement:
+            n = Node.from_db(self.placement)
+            n.remove_instance(self.uuid)
 
         if self.state.value.endswith('-%s' % self.STATE_ERROR):
             self.state = self.STATE_ERROR

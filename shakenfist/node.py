@@ -18,7 +18,7 @@ LOG, _ = logs.setup(__name__)
 
 class Node(dbo):
     object_type = 'node'
-    current_version = 2
+    current_version = 3
 
     # docs/development/state_machine.md has a description of these states.
     STATE_MISSING = 'missing'
@@ -52,6 +52,11 @@ class Node(dbo):
 
         self.__ip = static_values['ip']
         self.__fqdn = static_values['fqdn']
+
+    @classmethod
+    def _upgrade_step_2_to_3(cls, static_values):
+        etcd.put('attribute/node',  static_values['fqdn'], 'instances-active',
+                 {'instances': []})
 
     @classmethod
     def new(cls, name, ip):
@@ -133,6 +138,20 @@ class Node(dbo):
 
     def remove_blob(self, blob):
         self._remove_item_in_attribute_list('blobs', blob)
+
+    @property
+    def instances(self):
+        return self._db_get_attribute('instances').get('instances', [])
+
+    @instances.setter
+    def instances(self, value):
+        self._db_set_attribute('instances', {'instances': value})
+
+    def add_instance(self, instance_uuid):
+        self._add_item_in_attribute_list('instances', instance_uuid)
+
+    def remove_instance(self, instance_uuid):
+        self._remove_item_in_attribute_list('instances', instance_uuid)
 
     @property
     def dependency_versions(self):
