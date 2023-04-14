@@ -21,7 +21,7 @@ class TestPlacement(base.BaseNamespacedTestCase):
         self.assertRaises(
             apiclient.ResourceNotFoundException,
             self.test_client.create_instance,
-            'cirros', 1, 1024,
+            'ubuntu-1804', 1, 1024,
             [
                 {
                     'network_uuid': self.net['uuid']
@@ -39,7 +39,7 @@ class TestPlacement(base.BaseNamespacedTestCase):
         # Create an instance, force it to be on the name node as us.
         try:
             inst = self.test_client.create_instance(
-                'cirros', 1, 1024,
+                'ubuntu-1804', 1, 1024,
                 [
                     {
                         'network_uuid': self.net['uuid']
@@ -75,7 +75,7 @@ class TestPlacement(base.BaseNamespacedTestCase):
         # Create another instance, force it to be on a remote node.
         try:
             inst = self.test_client.create_instance(
-                'cirros', 1, 1024,
+                'ubuntu-1804', 1, 1024,
                 [
                     {
                         'network_uuid': self.net['uuid']

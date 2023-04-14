@@ -154,8 +154,7 @@ class BaseTestCase(testtools.TestCase):
             'in %d minutes. Agent state is %s.'
             % (instance_uuid, desired, timeout, i['agent_state']))
 
-    def _await_instance_event(
-            self, instance_uuid, operation, message=None, after=None):
+    def _await_instance_create(self, instance_uuid):
         # Wait up to 5 minutes for the instance to be created. On a slow
         # morning it can take over 2 minutes to download a Ubuntu image.
         start_time = time.time()
@@ -176,6 +175,10 @@ class BaseTestCase(testtools.TestCase):
             raise TimeoutException(
                 'Instance %s was not created in a reasonable time (%s)'
                 % (instance_uuid, i))
+
+    def _await_instance_event(
+            self, instance_uuid, operation, message=None, after=None):
+        self._await_instance_create(instance_uuid)
 
         # Once created, we shouldn't need more than another 5 minutes for boot.
         start_time = time.time()
