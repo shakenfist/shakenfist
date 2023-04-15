@@ -665,7 +665,8 @@ class Instance(dbo):
         # Remove this instance from the cache of instances on a node
         if self.placement:
             n = Node.from_db(self.placement)
-            n.remove_instance(self.uuid)
+            if n:
+                n.remove_instance(self.uuid)
 
         if self.state.value.endswith('-%s' % self.STATE_ERROR):
             self.state = self.STATE_ERROR
