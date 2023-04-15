@@ -41,9 +41,9 @@ means you'd be very unhappy to be on the same hypervisor.
 
 ???+ info
 
-    Under the hood, Shaken Fist uses the affinity preferences to "tweak" the
-    measured CPU load of a given hypervisor to make it more likely to be selected
-    during the scheduling decision for an instance. This decision is of course only
+    Under the hood, Shaken Fist filters possible candidate hypervisors based on
+    the affinity coefficients specified. Only tags from within your namespace are
+    considered for this filtration.This decision is of course only
     made on the original start up of an instance, and does not apply later. That
     is, if you change the tags or affinity of an instance after instance creation
     it will not affect that instance in any way, although it might affect

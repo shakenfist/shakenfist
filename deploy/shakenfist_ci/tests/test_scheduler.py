@@ -86,5 +86,11 @@ class TestAffinity(base.BaseNamespacedTestCase):
         inst3 = self.test_client.get_instance(inst3['uuid'])
 
         # inst1 and inst2 should share a node, inst3 should not
-        self.assertEqual(inst1['node'], inst2['node'])
-        self.assertNotEqual(inst1['node'], inst3['node'])
+        self.assertEqual(
+            inst1['node'], inst2['node'],
+            'Instances %s and %s should be on the same node but are not'
+            % (inst1['uuid'], inst2['uuid']))
+        self.assertNotEqual(
+            inst1['node'], inst3['node'],
+            'Instances %s and %s should not be on the same node but are'
+            % (inst1['uuid'], inst3['uuid']))

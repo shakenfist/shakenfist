@@ -549,13 +549,24 @@ class Instance(dbo):
         with self.get_lock_attr('placement', 'Instance placement'):
             # We don't write unchanged things to the database
             placement = self.placement
-            if placement.get('node') == location:
+            old_location = placement.get('node')
+            if old_location == location:
                 return
 
             placement['node'] = location
             placement['placement_attempts'] = placement.get(
                 'placement_attempts', 0) + 1
             self._db_set_attribute('placement', placement)
+
+            # Record instance in node caches
+            if old_location:
+                n = Node.from_db(old_location)
+                if n:
+                    n.remove_instance(self.uuid)
+            if location:
+                n = Node.from_db(location)
+                if n:
+                    n.add_instance(self.uuid)
 
     def enforced_deletes_increment(self):
         with self.get_lock_attr('enforced_deletes',
@@ -594,10 +605,6 @@ class Instance(dbo):
     def create(self, iface_uuids, lock=None):
         self.state = self.STATE_CREATING
         self.interfaces = iface_uuids
-
-        # Record this instance in the cache of instances on this node
-        n = Node.from_db(config.NODE_NAME)
-        n.add_instance(self.uuid)
 
         # Ensure we have state on disk
         os.makedirs(self.instance_path, exist_ok=True)
