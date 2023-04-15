@@ -239,9 +239,9 @@ class Scheduler(object):
                            extra={'candidates': candidates})
 
             # Ensure all specified nodes are hypervisors
-            for n in list(candidates):
-                if not self.metrics[n].get('is_hypervisor', False):
-                    candidates.remove(n)
+            for c in list(candidates):
+                if not self.metrics[c].get('is_hypervisor', False):
+                    candidates.remove(c)
             inst.add_event(EVENT_TYPE_AUDIT, 'schedule are hypervisors',
                            extra={'candidates': candidates})
 
@@ -249,17 +249,17 @@ class Scheduler(object):
                 raise exceptions.LowResourceException('No nodes with metrics')
 
             # Don't use nodes which aren't keeping up with queue jobs
-            for n in list(candidates):
-                if not self._has_reasonable_queue_state(log_ctx, n):
-                    candidates.remove(n)
+            for c in list(candidates):
+                if not self._has_reasonable_queue_state(log_ctx, c):
+                    candidates.remove(c)
             inst.add_event(EVENT_TYPE_AUDIT, 'schedule have reasonable queue state',
                            extra={'candidates': candidates})
 
             # Can we host that many vCPUs?
-            for n in list(candidates):
-                max_cpu = self.metrics[n].get('cpu_max_per_instance', 0)
+            for c in list(candidates):
+                max_cpu = self.metrics[c].get('cpu_max_per_instance', 0)
                 if inst.cpus > max_cpu:
-                    candidates.remove(n)
+                    candidates.remove(c)
             inst.add_event(EVENT_TYPE_AUDIT, 'schedule have enough actual cpu',
                            extra={'candidates': candidates})
             if not candidates:
@@ -267,9 +267,9 @@ class Scheduler(object):
                     'Requested vCPUs exceeds vCPU limit')
 
             # Do we have enough idle CPU?
-            for n in list(candidates):
-                if not self._has_sufficient_cpu(log_ctx, inst.cpus, n):
-                    candidates.remove(n)
+            for c in list(candidates):
+                if not self._has_sufficient_cpu(log_ctx, inst.cpus, c):
+                    candidates.remove(c)
             inst.add_event(EVENT_TYPE_AUDIT, 'schedule have enough idle cpu',
                            extra={'candidates': candidates})
             if not candidates:
@@ -277,9 +277,9 @@ class Scheduler(object):
                     'No nodes with enough idle CPU')
 
             # Do we have enough idle RAM?
-            for n in list(candidates):
-                if not self._has_sufficient_ram(log_ctx, inst.memory, n):
-                    candidates.remove(n)
+            for c in list(candidates):
+                if not self._has_sufficient_ram(log_ctx, inst.memory, c):
+                    candidates.remove(c)
             inst.add_event(EVENT_TYPE_AUDIT, 'schedule have enough idle ram',
                            extra={'candidates': candidates})
             if not candidates:
@@ -287,9 +287,9 @@ class Scheduler(object):
                     'No nodes with enough idle RAM')
 
             # Do we have enough idle disk?
-            for n in list(candidates):
-                if not self._has_sufficient_disk(log_ctx, inst, n):
-                    candidates.remove(n)
+            for c in list(candidates):
+                if not self._has_sufficient_disk(log_ctx, inst, c):
+                    candidates.remove(c)
             inst.add_event(EVENT_TYPE_AUDIT, 'schedule have enough idle disk',
                            extra={'candidates': candidates})
             if not candidates:
@@ -315,10 +315,10 @@ class Scheduler(object):
 
             # Order candidates by current CPU load
             by_load = defaultdict(list)
-            for n in list(candidates):
-                load = math.floor(self.metrics[n].get('cpu_load_1', 0))
+            for c in list(candidates):
+                load = math.floor(self.metrics[c].get('cpu_load_1', 0))
                 load -= pseudo_load.get(n, 0)
-                by_load[load].append(n)
+                by_load[load].append(c)
 
             lowest_load = sorted(by_load)[0]
             candidates = by_load[lowest_load]
