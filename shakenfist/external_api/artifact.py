@@ -269,7 +269,8 @@ class ArtifactVersionsEndpoint(api_base.Resource):
         retval = []
         for idx in artifact_from_db.get_all_indexes():
             b = Blob.from_db(idx['blob_uuid'])
-            bout = b.external_view()
+            if b:
+                bout = b.external_view()
             bout['index'] = idx['index']
             retval.append(bout)
         return retval

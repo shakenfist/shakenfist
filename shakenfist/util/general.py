@@ -149,7 +149,15 @@ def link(source, destination):
     try:
         os.link(source, destination)
     except OSError:
-        os.symlink(source, destination)
+        try:
+            os.symlink(source, destination)
+        except FileExistsError as e:
+            # We should have checked if the destination existed before we were
+            # called, so this implies we raced through just this method. Make
+            # sure the destination points to the right place and if it does
+            # just shrug and keep going.
+            if os.realpath(destination) != source:
+                raise e
 
     pathlib.Path(destination).touch(exist_ok=True)
 

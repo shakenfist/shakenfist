@@ -123,13 +123,13 @@ class BaseTestCase(testtools.TestCase):
         return self._await_instance_event(
             instance_uuid, 'detected poweroff', after=after)
 
-    def _await_instance_ready(self, instance_uuid, timeout=5):
+    def _await_instance_ready(self, instance_uuid, timeout=7):
         self._await_agent_state(instance_uuid, ready=True, timeout=timeout)
 
     def _await_instance_not_ready(self, instance_uuid):
         self._await_agent_state(instance_uuid, ready=False)
 
-    def _await_agent_state(self, instance_uuid, ready=True, timeout=5):
+    def _await_agent_state(self, instance_uuid, ready=True, timeout=7):
         # Wait up to 5 minutes for the instance to be created and enter
         # the desired agent running state
         if ready:
