@@ -159,6 +159,13 @@ def restore_instances():
             inst.etcd.enqueue_delete_due_error(
                 'exception while restoring instance on daemon restart')
 
+    # Ensure we have a cache of the instances on this machine
+    instance_uuids = []
+    for inst in instances:
+        instance_uuids.append(inst.uuid)
+    n = Node.from_db(config.NODE_NAME)
+    n.instances = instance_uuids
+
 
 DAEMON_PROCS = {}
 
