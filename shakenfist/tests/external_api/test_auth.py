@@ -17,7 +17,7 @@ def _clean_traceback(resp):
 
 
 class FakeScheduler(object):
-    def place_instance(self, *args, **kwargs):
+    def find_candidates(self, *args, **kwargs):
         return config.NODE_NAME
 
 
