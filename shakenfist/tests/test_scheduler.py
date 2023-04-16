@@ -222,7 +222,7 @@ class MetricsRefreshTestCase(SchedulerTestCase):
         self.assertEqual(11000, s.metrics['node1_net']['memory_available'])
 
 
-class CPUloadAffinityTestCase(SchedulerTestCase):
+class AffinityTestCase(SchedulerTestCase):
     """Test CPU load affinity."""
 
     def setUp(self):

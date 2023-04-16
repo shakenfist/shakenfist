@@ -108,7 +108,7 @@ class MockEtcd():
         print('MockEtcd.put() %s: %s' % (path, encoded))
 
     #
-    # DB operations - Utilising SF DB functionality
+    # DB operations - Utilizing SF DB functionality
     #
 
     def set_node_metrics_same(self, metrics=None):

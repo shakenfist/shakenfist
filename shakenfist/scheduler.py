@@ -15,7 +15,7 @@ from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import networkinterface
 from shakenfist.node import (
-    Nodes, active_states_filter as node_active_states_filter)
+    Node, Nodes, active_states_filter as node_active_states_filter)
 from shakenfist.util import general as util_general
 
 
@@ -239,9 +239,9 @@ class Scheduler(object):
                            extra={'candidates': candidates})
 
             # Ensure all specified nodes are hypervisors
-            for n in list(candidates):
-                if not self.metrics[n].get('is_hypervisor', False):
-                    candidates.remove(n)
+            for c in list(candidates):
+                if not self.metrics[c].get('is_hypervisor', False):
+                    candidates.remove(c)
             inst.add_event(EVENT_TYPE_AUDIT, 'schedule are hypervisors',
                            extra={'candidates': candidates})
 
@@ -249,17 +249,17 @@ class Scheduler(object):
                 raise exceptions.LowResourceException('No nodes with metrics')
 
             # Don't use nodes which aren't keeping up with queue jobs
-            for n in list(candidates):
-                if not self._has_reasonable_queue_state(log_ctx, n):
-                    candidates.remove(n)
+            for c in list(candidates):
+                if not self._has_reasonable_queue_state(log_ctx, c):
+                    candidates.remove(c)
             inst.add_event(EVENT_TYPE_AUDIT, 'schedule have reasonable queue state',
                            extra={'candidates': candidates})
 
             # Can we host that many vCPUs?
-            for n in list(candidates):
-                max_cpu = self.metrics[n].get('cpu_max_per_instance', 0)
+            for c in list(candidates):
+                max_cpu = self.metrics[c].get('cpu_max_per_instance', 0)
                 if inst.cpus > max_cpu:
-                    candidates.remove(n)
+                    candidates.remove(c)
             inst.add_event(EVENT_TYPE_AUDIT, 'schedule have enough actual cpu',
                            extra={'candidates': candidates})
             if not candidates:
@@ -267,9 +267,9 @@ class Scheduler(object):
                     'Requested vCPUs exceeds vCPU limit')
 
             # Do we have enough idle CPU?
-            for n in list(candidates):
-                if not self._has_sufficient_cpu(log_ctx, inst.cpus, n):
-                    candidates.remove(n)
+            for c in list(candidates):
+                if not self._has_sufficient_cpu(log_ctx, inst.cpus, c):
+                    candidates.remove(c)
             inst.add_event(EVENT_TYPE_AUDIT, 'schedule have enough idle cpu',
                            extra={'candidates': candidates})
             if not candidates:
@@ -277,9 +277,9 @@ class Scheduler(object):
                     'No nodes with enough idle CPU')
 
             # Do we have enough idle RAM?
-            for n in list(candidates):
-                if not self._has_sufficient_ram(log_ctx, inst.memory, n):
-                    candidates.remove(n)
+            for c in list(candidates):
+                if not self._has_sufficient_ram(log_ctx, inst.memory, c):
+                    candidates.remove(c)
             inst.add_event(EVENT_TYPE_AUDIT, 'schedule have enough idle ram',
                            extra={'candidates': candidates})
             if not candidates:
@@ -287,38 +287,55 @@ class Scheduler(object):
                     'No nodes with enough idle RAM')
 
             # Do we have enough idle disk?
-            for n in list(candidates):
-                if not self._has_sufficient_disk(log_ctx, inst, n):
-                    candidates.remove(n)
+            for c in list(candidates):
+                if not self._has_sufficient_disk(log_ctx, inst, c):
+                    candidates.remove(c)
             inst.add_event(EVENT_TYPE_AUDIT, 'schedule have enough idle disk',
                            extra={'candidates': candidates})
             if not candidates:
                 raise exceptions.LowResourceException(
                     'No nodes with enough disk space')
 
-            # Calc pseudo CPU load from inst affinity
-            pseudo_load = defaultdict(int)
+            # Filter by affinity, if any has been specified
+            by_affinity = defaultdict(list)
             cpu_affinity = inst.affinity.get('cpu')
-            if cpu_affinity:
-                for i in instance.Instances([instance.healthy_states_filter]):
-                    if i.uuid == inst.uuid or not i.tags:
-                        continue
-                    for tag, val in cpu_affinity.items():
-                        if tag in i.tags:
-                            # Allow for unplaced healthy instances
-                            n = i.placement.get('node')
-                            if n:
-                                pseudo_load[n] += int(val)
 
-                inst.add_event(EVENT_TYPE_AUDIT, 'schedule pseudo load',
-                               extra=dict(pseudo_load))
+            for c in list(candidates):
+                n = Node.from_db(c)
+                if n:
+                    affinity = 0
+                    instances = n.instances
+                    node_ctx = log_ctx.with_fields({'node': c})
+                    node_ctx.with_fields({'instances': instances}).info(
+                        'Considering instances for affinity')
+                    for instance_uuid in instances:
+                        i = instance.Instance.from_db(instance_uuid)
+                        if not i:
+                            continue
+                        if i.uuid == inst.uuid:
+                            continue
+                        if not i.tags:
+                            continue
+                        if i.namespace != inst.namespace:
+                            continue
+
+                        for tag, val in cpu_affinity.items():
+                            if tag in i.tags:
+                                affinity += int(val)
+
+                    node_ctx.info('Affinity score is %d' % affinity)
+                    by_affinity[affinity].append(c)
+
+            highest_affinity = sorted(by_affinity, reverse=True)[0]
+            candidates = by_affinity[highest_affinity]
+            inst.add_event(EVENT_TYPE_AUDIT, 'schedule have highest affinity',
+                           extra={'candidates': candidates})
 
             # Order candidates by current CPU load
             by_load = defaultdict(list)
-            for n in list(candidates):
-                load = math.floor(self.metrics[n].get('cpu_load_1', 0))
-                load -= pseudo_load.get(n, 0)
-                by_load[load].append(n)
+            for c in list(candidates):
+                load = math.floor(self.metrics[c].get('cpu_load_1', 0))
+                by_load[load].append(c)
 
             lowest_load = sorted(by_load)[0]
             candidates = by_load[lowest_load]
