@@ -274,7 +274,7 @@ def instance_preflight(inst, netdescs):
     # Try to place on this node
     s = scheduler.Scheduler()
     try:
-        s.place_instance(inst, netdescs, candidates=[config.NODE_NAME])
+        s.find_candidates(inst, netdescs, candidates=[config.NODE_NAME])
         return None
 
     except exceptions.LowResourceException as e:
@@ -298,7 +298,7 @@ def instance_preflight(inst, netdescs):
                 if node != config.NODE_NAME:
                     candidates.append(node)
 
-        candidates = s.place_instance(inst, netdescs, candidates=candidates)
+        candidates = s.find_candidates(inst, netdescs, candidates=candidates)
         inst.place_instance(candidates[0])
         return candidates[0]
 

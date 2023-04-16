@@ -456,12 +456,11 @@ class InstancesEndpoint(sf_api.Resource):
         try:
             # Have we been placed?
             if not placed_on:
-                candidates = SCHEDULER.place_instance(inst, updated_networks)
+                candidates = SCHEDULER.find_candidates(inst, updated_networks)
                 placement = candidates[0]
 
             else:
-                SCHEDULER.place_instance(inst, network,
-                                         candidates=[placed_on])
+                SCHEDULER.find_candidates(inst, network, candidates=[placed_on])
                 placement = placed_on
 
         except exceptions.LowResourceException as e:

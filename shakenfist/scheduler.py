@@ -211,7 +211,7 @@ class Scheduler(object):
         # Return list of candidates that has maximum networks
         return candidates_by_network_matches[max_matches]
 
-    def place_instance(self, inst, network, candidates=None):
+    def find_candidates(self, inst, network, candidates=None):
         with util_general.RecordedOperation('schedule', inst):
             log_ctx = self.log.with_fields({'instance': inst})
 
