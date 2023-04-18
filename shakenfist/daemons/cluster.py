@@ -362,7 +362,7 @@ class Monitor(daemon.Daemon):
                 discovered_refs[b.uuid] = []
 
             for i in instance.Instances([instance.active_states_filter]):
-                for d in i.disk_spec:
+                for d in i.block_devices.get('devices', []):
                     blob_uuid = d.get('blob_uuid')
                     if blob_uuid:
                         discovered_refs[blob_uuid].append(str(i))
