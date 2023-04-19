@@ -27,9 +27,12 @@ class Monitor(daemon.WorkerPoolDaemon):
     def run(self):
         LOG.info('Starting')
         prune_targets = []
+        prune_sweep_started = 0
 
         counters = {
-            'pruned_events': Counter('pruned_events', 'Number of pruned events')
+            'pruned_events': Counter('pruned_events', 'Number of pruned events'),
+            'pruned_sweep': Counter('pruned_sweep',
+                                    'Number of databases checked for pruning')
         }
         for event_type in EVENT_TYPES:
             counters[event_type] = Counter(
@@ -80,12 +83,15 @@ class Monitor(daemon.WorkerPoolDaemon):
                 if not results:
                     # Prune old events
                     if not prune_targets:
-                        event_path = os.path.join(config.STORAGE_PATH, 'events')
-                        p = pathlib.Path(event_path)
-                        for entpath in p.glob('**/*.lock'):
-                            entpath = str(entpath)[len(event_path) + 1:-5]
-                            objtype, _, objuuid = entpath.split('/')
-                            prune_targets.append([objtype, objuuid])
+                        # Only sweep all databases once a day
+                        if time.time() - prune_sweep_started > 24 * 3600:
+                            event_path = os.path.join(config.STORAGE_PATH, 'events')
+                            p = pathlib.Path(event_path)
+                            for entpath in p.glob('**/*.lock'):
+                                entpath = str(entpath)[len(event_path) + 1:-5]
+                                objtype, _, objuuid = entpath.split('/')
+                                prune_targets.append([objtype, objuuid])
+                            prune_sweep_started = time.time()
 
                     else:
                         start_prune = time.time()
@@ -108,6 +114,8 @@ class Monitor(daemon.WorkerPoolDaemon):
                                 if count > 0:
                                     self.log.with_fields({objtype: objuuid}).info(
                                         'Pruned %d events' % count)
+
+                            counters['pruned_sweep'].inc()
 
                         # Have a nap if pruning was quick
                         if time.time() - start_prune < 1:
