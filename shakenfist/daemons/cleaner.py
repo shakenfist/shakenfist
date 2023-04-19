@@ -238,7 +238,7 @@ class Monitor(daemon.Daemon):
         os.makedirs(cache_path, exist_ok=True)
 
         p = pathlib.Path(blob_path)
-        for entpath in p.glob('**/*.lock'):
+        for entpath in p.glob('**/*'):
             entpath = str(entpath)
             try:
                 st = os.stat(entpath)
