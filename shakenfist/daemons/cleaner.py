@@ -241,6 +241,9 @@ class Monitor(daemon.Daemon):
         for entpath in p.glob('**/*'):
             entpath = str(entpath)
             try:
+                if not os.path.isfile(entpath):
+                    continue
+
                 st = os.stat(entpath)
                 blob_uuid = entpath.split('/')[-1].replace('.partial', '')
 
@@ -376,10 +379,8 @@ class Monitor(daemon.Daemon):
 
         while not self.exit.is_set():
             # Update power state of all instances on this hypervisor
-            LOG.info('Updating power states')
             self._update_power_states()
 
-            LOG.info('Maintaining blobs')
             self._maintain_blobs()
 
             if time.time() - last_missing_blob_check > 300:
