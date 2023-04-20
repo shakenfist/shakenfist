@@ -359,8 +359,8 @@ class Monitor(daemon.Daemon):
                     if state:
                         by_state[state] = {}
 
-                with etcd.ThreadLocalReadOnlyCache():
-                    for obj in OBJECT_NAMES_TO_ITERATORS[object_type]([]):
+                for obj in OBJECT_NAMES_TO_ITERATORS[object_type]([]):
+                    if obj.state.value:
                         by_state[obj.state.value][obj.uuid] = time.time()
 
                 for state in by_state:
