@@ -5,6 +5,7 @@ from math import inf
 import time
 from shakenfist_utilities import logs
 
+from shakenfist import cache
 from shakenfist import constants
 from shakenfist import etcd
 from shakenfist import eventlog
@@ -83,12 +84,8 @@ class DatabaseBackedObject(object):
     STATE_DELETE_WAIT = 'delete-wait'
     STATE_ERROR = 'error'
 
-    ACTIVE_STATES = set([STATE_INITIAL,
-                         STATE_CREATING,
-                         STATE_CREATED,
-                         STATE_ERROR,
-                         STATE_DELETE_WAIT
-                         ])
+    ACTIVE_STATES = {STATE_INITIAL, STATE_CREATING, STATE_CREATED, STATE_ERROR,
+                     STATE_DELETE_WAIT}
 
     def __init__(self, object_uuid, version=None, in_memory_only=False):
         self.__uuid = object_uuid
@@ -374,6 +371,9 @@ class DatabaseBackedObject(object):
 
             new_state = State(new_value, time.time())
             self._db_set_attribute('state', new_state)
+
+            cache.update_object_state_cache(
+                self.object_type, self.uuid, orig.value, new_value)
 
     @property
     def error(self):

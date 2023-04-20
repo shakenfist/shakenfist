@@ -23,7 +23,7 @@ class Upload(dbo):
         dbo.STATE_DELETED: (),
     }
 
-    ACTIVE_STATES = set([dbo.STATE_CREATED])
+    ACTIVE_STATES = {dbo.STATE_CREATED}
 
     def __init__(self, static_values):
         self.upgrade(static_values)

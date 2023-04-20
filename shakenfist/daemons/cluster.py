@@ -15,8 +15,10 @@ import time
 from shakenfist import artifact
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo, active_states_filter)
-from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_ITERATORS
+from shakenfist.baseobjectmapping import (
+    OBJECT_NAMES_TO_CLASSES, OBJECT_NAMES_TO_ITERATORS)
 from shakenfist.blob import Blob, Blobs, placement_filter
+from shakenfist import cache
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
@@ -348,8 +350,26 @@ class Monitor(daemon.Daemon):
         # And we're done
         LOG.info('Cluster maintenance loop complete')
 
+    def refresh_object_state_caches(self):
+        for object_type in OBJECT_NAMES_TO_ITERATORS:
+            with etcd.get_lock('cache', None, object_type, op='Cache update'):
+                by_state = {'deleted': {}}
+
+                for state in OBJECT_NAMES_TO_CLASSES[object_type].state_targets:
+                    if state:
+                        by_state[state] = {}
+
+                with etcd.ThreadLocalReadOnlyCache():
+                    for obj in OBJECT_NAMES_TO_ITERATORS[object_type]([]):
+                        by_state[obj.state.value][obj.uuid] = time.time()
+
+                for state in by_state:
+                    etcd.put('cache', object_type, state, by_state[state])
+
     def run(self):
         LOG.info('Starting')
+
+        self.refresh_object_state_caches()
 
         last_loop_run = 0
         while not self.exit.is_set():

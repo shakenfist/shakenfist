@@ -13,6 +13,7 @@ import time
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
+from shakenfist import cache
 from shakenfist.config import config
 from shakenfist.constants import LOCK_REFRESH_SECONDS, GiB
 from shakenfist import db
@@ -755,3 +756,9 @@ class Blobs(dbo_iter):
 
 def placement_filter(node, b):
     return node in b.locations
+
+
+def all_active_blob_uuids():
+    for active_state in Blob.ACTIVE_STATES:
+        for object_uuid in cache.read_object_state_cache(Blob.object_type, active_state):
+            yield object_uuid

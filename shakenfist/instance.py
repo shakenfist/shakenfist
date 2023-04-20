@@ -87,17 +87,10 @@ class Instance(dbo):
     STATE_CREATED_ERROR = 'created-error'
     STATE_DELETE_WAIT_ERROR = 'delete-wait-error'
 
-    ACTIVE_STATES = set([dbo.STATE_INITIAL,
-                         STATE_INITIAL_ERROR,
-                         STATE_PREFLIGHT,
-                         STATE_PREFLIGHT_ERROR,
-                         dbo.STATE_CREATING,
-                         STATE_CREATING_ERROR,
-                         dbo.STATE_CREATED,
-                         dbo.STATE_DELETE_WAIT,
-                         STATE_CREATED_ERROR,
-                         dbo.STATE_ERROR
-                         ])
+    ACTIVE_STATES = {dbo.STATE_INITIAL, STATE_INITIAL_ERROR, STATE_PREFLIGHT,
+                     STATE_PREFLIGHT_ERROR, dbo.STATE_CREATING, STATE_CREATING_ERROR,
+                     dbo.STATE_CREATED, dbo.STATE_DELETE_WAIT, STATE_CREATED_ERROR,
+                     dbo.STATE_ERROR}
 
     state_targets = {
         None: (dbo.STATE_INITIAL, dbo.STATE_ERROR),
