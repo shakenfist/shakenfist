@@ -178,6 +178,10 @@ def network_filter(network, ni):
     return network.uuid == ni.network_uuid
 
 
+def network_uuid_filter(network_uuid, ni):
+    return network_uuid == ni.network_uuid
+
+
 # Convenience helpers
 def interfaces_for_instance(instance):
     nis = {}

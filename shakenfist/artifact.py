@@ -69,7 +69,7 @@ class Artifact(dbo):
         if static_values['namespace'] == 'sharedwithall':
             static_values['namespace'] = 'system'
             etcd.put(
-                'attribute/artifact',  static_values['uuid'], 'shared',
+                'attribute/artifact', static_values['uuid'], 'shared',
                 {'shared': True})
 
     @classmethod
