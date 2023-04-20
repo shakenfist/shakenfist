@@ -196,19 +196,20 @@ class Monitor(daemon.Daemon):
                 retval['object_version_%s' % obj] = \
                     OBJECT_NAMES_TO_CLASSES[obj].current_version
 
-            # What package versions do we have?
-            n = Node.from_db(config.NODE_NAME)
-
-            vers_out, _ = util_process.execute(
-                None, 'dpkg-query --show --showformat=\'${Package}==${Version}\\n\' --no-pager',
-                suppress_command_logging=True)
-            versions = {}
-            for line in vers_out.split():
-                package, version = line.split('==')
-                versions[package] = version
-            n.dependency_versions = versions
-
             if time.time() - self.last_logged_resources > 60:
+                # What package versions do we have?
+                n = Node.from_db(config.NODE_NAME)
+
+                vers_out, _ = util_process.execute(
+                    None, 'dpkg-query --show --showformat=\'${Package}==${Version}\\n\' --no-pager',
+                    suppress_command_logging=True)
+                versions = {}
+                for line in vers_out.split():
+                    package, version = line.split('==')
+                    versions[package] = version
+                n.dependency_versions = versions
+
+                # Log resources
                 n.add_event(
                     EVENT_TYPE_RESOURCES, 'updated node resources and package versions',
                     extra=retval, suppress_event_logging=True)
