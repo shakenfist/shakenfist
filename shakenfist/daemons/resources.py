@@ -196,7 +196,7 @@ class Monitor(daemon.Daemon):
                 retval['object_version_%s' % obj] = \
                     OBJECT_NAMES_TO_CLASSES[obj].current_version
 
-            if time.time() - self.last_logged_resources > 60:
+            if time.time() - self.last_logged_resources > 300:
                 # What package versions do we have?
                 n = Node.from_db(config.NODE_NAME)
 
