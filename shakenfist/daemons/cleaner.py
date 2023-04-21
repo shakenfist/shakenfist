@@ -242,7 +242,7 @@ class Monitor(daemon.Daemon):
         all_node_blobs = n.blobs
 
         p = pathlib.Path(blob_path)
-        for entpath in p.glob('**/*'):
+        for entpath in p.glob('**/*.nosuch'):
             entpath = str(entpath)
             try:
                 if not os.path.isfile(entpath):
