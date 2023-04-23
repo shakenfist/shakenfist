@@ -45,7 +45,7 @@ class MockEtcd():
         self.node_names = [n[0] for n in self.nodes]
 
     def setup(self):
-        # Mock WrappedEtcdClient
+        # Mock WrappedEtcdClient()
         self.etcd_create = mock.patch('shakenfist.etcd.WrappedEtcdClient.create',
                                       side_effect=self.create)
         self.etcd_create.start()

@@ -87,7 +87,7 @@ class Monitor(daemon.Daemon):
             if network_uuid:
                 n = network.Network.from_db(network_uuid)
                 if not n:
-                    etcd.WrappedEtcdClient().delete(k)
+                    etcd.get_etcd_client().delete(k)
                     LOG.with_fields({
                         'network': network_uuid,
                         'vxid record': k
@@ -100,7 +100,7 @@ class Monitor(daemon.Daemon):
             if network_uuid:
                 n = network.Network.from_db(network_uuid)
                 if not n:
-                    etcd.WrappedEtcdClient().delete(k)
+                    etcd.get_etcd_client().delete(k)
                     LOG.with_fields({
                         'ipmanager': network_uuid
                     }).warning('Cleaning up leaked ipmanager')
