@@ -18,7 +18,6 @@ from shakenfist.baseobject import (
 from shakenfist.baseobjectmapping import (
     OBJECT_NAMES_TO_CLASSES, OBJECT_NAMES_TO_ITERATORS)
 from shakenfist.blob import Blob, Blobs, placement_filter
-from shakenfist import cache
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
