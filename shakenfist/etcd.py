@@ -56,8 +56,25 @@ class WrappedEtcdClient(Etcd3Client):
                         limit=limit)
 
 
+# This module stores some state in thread local storage.
+local = threading.local()
+local.sf_etcd_client = None
+
+
 def get_etcd_client():
-    return WrappedEtcdClient()
+    c = getattr(local, 'sf_etcd_client', None)
+    if not c:
+        LOG.info('Building new etcd connection')
+        c = local.sf_etcd_client = WrappedEtcdClient()
+
+    # Test the connection
+    try:
+        c.status()
+    except Exception as e:
+        LOG.info('Rebuilding etcd connection due to error on status check: %s' % e)
+        c = local.sf_etcd_client = WrappedEtcdClient()
+
+    return c
 
 
 # This read only cache is thread local, a bit like Flask's request object. Given
@@ -69,7 +86,6 @@ def get_etcd_client():
 # using one of these caches, so it is possible to write a loop which does the
 # expensive analysis of state while using one of these caches, and then
 # enqueues work to change the database while a cache is not being used.
-local = threading.local()
 local.sf_etcd_statistics = defaultdict(int)
 
 
