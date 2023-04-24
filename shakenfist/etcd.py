@@ -33,6 +33,7 @@ class WrappedEtcdClient(Etcd3Client):
         if api_path == '/v3alpha':
             raise Exception('etcd3 v3alpha endpoint is known not to work')
 
+        LOG.info('Building new etcd connection')
         return super(WrappedEtcdClient, self).__init__(
             host=host, port=port, protocol=protocol, ca_cert=ca_cert,
             cert_key=cert_key, cert_cert=cert_cert, timeout=timeout,
@@ -64,7 +65,6 @@ local.sf_etcd_client = None
 def get_etcd_client():
     c = getattr(local, 'sf_etcd_client', None)
     if not c:
-        LOG.info('Building new etcd connection')
         c = local.sf_etcd_client = WrappedEtcdClient()
 
     # Test the connection
@@ -202,8 +202,13 @@ class ActualLock(Lock):
         self.objecttype = objecttype
         self.objectname = name
         self.timeout = min(timeout, 1000000000)
-        self.log_ctx = log_ctx.with_fields({'lock': self.path})
         self.operation = op
+
+        self.log_ctx = log_ctx.with_fields({
+            'lock': self.path,
+            'node': config.NODE_NAME,
+            'pid': os.getpid(),
+            'operation': self.operation})
 
         # We override the UUID of the lock with something more helpful to debugging
         self._uuid = json.dumps(
@@ -241,7 +246,9 @@ class ActualLock(Lock):
                 duration = time.time() - start_time
                 if duration > threshold:
                     self.log_ctx.with_fields({
-                        'duration': duration}).info('Acquiring a lock was slow')
+                        'duration': duration}).info('Acquired lock, but it was slow')
+                else:
+                    self.log_ctx.debug('Acquired lock')
                 return self
 
             duration = time.time() - start_time
@@ -252,7 +259,7 @@ class ActualLock(Lock):
                                           'holder-pid': pid,
                                           'holder-node': node,
                                           'requesting-op': self.operation,
-                                          }).info('Waiting for lock')
+                                          }).info('Waiting to acquire lock')
                 slow_warned = True
 
             time.sleep(1)
@@ -278,6 +285,7 @@ class ActualLock(Lock):
                                       }).error('Cannot release lock')
             raise exceptions.LockException(
                 'Cannot release lock: %s' % self.name)
+        self.log_ctx.debug('Released lock')
 
 
 def get_lock(objecttype, subtype, name, ttl=60, timeout=10, log_ctx=LOG,
@@ -288,8 +296,11 @@ def get_lock(objecttype, subtype, name, ttl=60, timeout=10, log_ctx=LOG,
     acquired on entry and released on exit. Note that the lock acquire process
     will have no timeout.
     """
+    # FIXME(mikal): excluded from using the thread local etcd client because
+    # it is causing locking errors for reasons that are not currently clear to
+    # me.
     return ActualLock(objecttype, subtype, name, ttl=ttl,
-                      client=get_etcd_client(),
+                      client=WrappedEtcdClient(),
                       log_ctx=log_ctx, timeout=timeout, op=op)
 
 
