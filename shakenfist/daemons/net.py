@@ -312,22 +312,23 @@ class Monitor(daemon.WorkerPoolDaemon):
                 time.sleep(0.2)
             else:
                 jobname, workitem = etcd.dequeue('networknode')
-                setproctitle.setproctitle(
-                    '%s-%s' % (daemon.process_name('net'), jobname))
+                if workitem:
+                    setproctitle.setproctitle(
+                        '%s-%s' % (daemon.process_name('net'), jobname))
 
-                try:
-                    log_ctx = LOG.with_fields({'workitem': workitem})
-                    if NetworkTask.__subclasscheck__(type(workitem)):
-                        self._process_network_workitem(log_ctx, workitem)
-                    elif NetworkInterfaceTask.__subclasscheck__(type(workitem)):
-                        self._process_networkinterface_workitem(
-                            log_ctx, workitem)
-                    else:
-                        raise exceptions.UnknownTaskException(
-                            'Network workitem was not decoded: %s' % workitem)
+                    try:
+                        log_ctx = LOG.with_fields({'workitem': workitem})
+                        if NetworkTask.__subclasscheck__(type(workitem)):
+                            self._process_network_workitem(log_ctx, workitem)
+                        elif NetworkInterfaceTask.__subclasscheck__(type(workitem)):
+                            self._process_networkinterface_workitem(
+                                log_ctx, workitem)
+                        else:
+                            raise exceptions.UnknownTaskException(
+                                'Network workitem was not decoded: %s' % workitem)
 
-                finally:
-                    etcd.resolve('networknode', jobname)
+                    finally:
+                        etcd.resolve('networknode', jobname)
 
     def _reap_leaked_floating_ips(self):
         # Block until the network node queue is idle to avoid races
