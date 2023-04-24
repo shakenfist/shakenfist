@@ -1,6 +1,7 @@
 from collections import defaultdict
 import itertools
 from oslo_concurrency import processutils
+import setproctitle
 from shakenfist_utilities import logs
 import time
 
@@ -311,6 +312,9 @@ class Monitor(daemon.WorkerPoolDaemon):
             if not workitem:
                 return
             else:
+                setproctitle.setproctitle(
+                    '%s-%s' % (daemon.process_name('net'), jobname))
+
                 try:
                     log_ctx = LOG.with_fields({'workitem': workitem})
                     if NetworkTask.__subclasscheck__(type(workitem)):
