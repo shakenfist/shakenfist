@@ -334,6 +334,8 @@ class Monitor(daemon.WorkerPoolDaemon):
 
                     try:
                         log_ctx = LOG.with_fields({'workitem': workitem})
+                        log_ctx.info('Starting work item')
+
                         if NetworkTask.__subclasscheck__(type(workitem)):
                             self._process_network_workitem(log_ctx, workitem)
                         elif NetworkInterfaceTask.__subclasscheck__(type(workitem)):
