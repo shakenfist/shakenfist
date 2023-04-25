@@ -83,11 +83,10 @@ def handle(jobname, workitem):
                 image_fetch(task.url(), n, inst)
 
             elif isinstance(task, PreflightInstanceTask):
-                if (inst.state.value == dbo.STATE_DELETED or
-                        inst.state.value.endswith('-error')):
+                s = inst.state.value
+                if s == dbo.STATE_DELETED or s.endswith('-error'):
                     log_i.warning(
-                        'You cannot preflight an instance in state %s, skipping task'
-                        % inst.state.value)
+                        'You cannot preflight an instance in state %s, skipping task' % s)
                     continue
 
                 redirect_to = instance_preflight(inst, task.network())
@@ -98,11 +97,10 @@ def handle(jobname, workitem):
                     return
 
             elif isinstance(task, StartInstanceTask):
-                if (inst.state.value == dbo.STATE_DELETED or
-                        inst.state.value.endswith('-error')):
+                s = inst.state.value
+                if s == dbo.STATE_DELETED or s.endswith('-error'):
                     log_i.warning(
-                        'You cannot start an instance in state %s, skipping task'
-                        % inst.state.value)
+                        'You cannot start an instance in state %s, skipping task' % s)
                     continue
 
                 instance_start(inst, task.network())
@@ -126,8 +124,7 @@ def handle(jobname, workitem):
                 # This is a historical concept, it turns out the network node
                 # now just defers the delete task until there are no interfaces,
                 # so we don't need this at all.
-                etcd.enqueue(
-                    'networknode', DestroyNetworkTask(task.network_uuid()))
+                etcd.enqueue('networknode', DestroyNetworkTask(task.network_uuid()))
 
             elif isinstance(task, HypervisorDestroyNetworkTask):
                 n = network.Network.from_db(task.network_uuid())

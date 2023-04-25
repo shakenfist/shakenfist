@@ -7,6 +7,7 @@ import json
 import os
 import psutil
 import re
+import requests
 from shakenfist_utilities import (logs, random as util_random)
 import threading
 import time
@@ -33,6 +34,12 @@ class WrappedEtcdClient(Etcd3Client):
         if api_path == '/v3alpha':
             raise Exception('etcd3 v3alpha endpoint is known not to work')
 
+        # Cache config options so we can reuse them when we rebuild connections.
+        self.ca_cert = ca_cert
+        self.cert_key = cert_key
+        self.cert_cert = cert_cert
+        self.timeout = timeout
+
         LOG.info('Building new etcd connection')
         return super(WrappedEtcdClient, self).__init__(
             host=host, port=port, protocol=protocol, ca_cert=ca_cert,
@@ -55,6 +62,23 @@ class WrappedEtcdClient(Etcd3Client):
                         sort_order=sort_order,
                         sort_target=sort_target,
                         limit=limit)
+
+    # Wrap post() to retry on errors. These errors are caused by our long lived
+    # connections sometimes being dropped.
+    def post(self, *args, **kwargs):
+        try:
+            return super(WrappedEtcdClient, self).post(*args, **kwargs)
+        except Exception as e:
+            LOG.info('Retrying after receiving etcd error: %s' % e)
+
+            self.session = requests.Session()
+            if self.timeout is not None:
+                self.session.timeout = self.timeout
+            if self.ca_cert is not None:
+                self.session.verify = self.ca_cert
+            if self.cert_cert is not None and self.cert_key is not None:
+                self.session.cert = (self.cert_cert, self.cert_key)
+            return super(WrappedEtcdClient, self).post(*args, **kwargs)
 
 
 # This module stores some state in thread local storage.
