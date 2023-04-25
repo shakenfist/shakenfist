@@ -18,6 +18,7 @@ LOG, _ = logs.setup(__name__)
 
 class Node(dbo):
     object_type = 'node'
+    initial_version = 2
     current_version = 3
 
     # docs/development/state_machine.md has a description of these states.
