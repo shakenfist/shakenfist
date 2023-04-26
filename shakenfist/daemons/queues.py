@@ -165,28 +165,28 @@ def handle(jobname, workitem):
             elif isinstance(task, ArchiveTranscodeTask):
                 if os.path.exists(task.cache_path()):
                     b = blob.Blob.from_db(task.blob_uuid())
+                    if b:
+                        transcode_blob_uuid = str(uuid.uuid4())
+                        transcode_blob_path = blob.Blob.filepath(transcode_blob_uuid)
+                        util_process.execute(
+                            [], 'cp %s %s' % (task.cache_path(), transcode_blob_path))
+                        st = os.stat(transcode_blob_path)
 
-                    transcode_blob_uuid = str(uuid.uuid4())
-                    transcode_blob_path = blob.Blob.filepath(transcode_blob_uuid)
-                    util_process.execute(
-                        [], 'cp %s %s' % (task.cache_path(), transcode_blob_path))
-                    st = os.stat(transcode_blob_path)
+                        transcode_blob = blob.Blob.new(
+                            transcode_blob_uuid, st.st_size, time.time(), time.time())
+                        transcode_blob.state = blob.Blob.STATE_CREATED
+                        transcode_blob.observe()
+                        transcode_blob.verify_checksum(locks=[])
+                        transcode_blob.request_replication()
+                        log.with_fields({
+                            'blob': b,
+                            'transcode_blob_uuid': transcode_blob_uuid,
+                            'description': task.transcode_description()}).info(
+                            'Recorded transcode')
 
-                    transcode_blob = blob.Blob.new(
-                        transcode_blob_uuid, st.st_size, time.time(), time.time())
-                    transcode_blob.state = blob.Blob.STATE_CREATED
-                    transcode_blob.observe()
-                    transcode_blob.verify_checksum(locks=[])
-                    transcode_blob.request_replication()
-                    log.with_fields({
-                        'blob': b,
-                        'transcode_blob_uuid': transcode_blob_uuid,
-                        'description': task.transcode_description()}).info(
-                        'Recorded transcode')
-
-                    b.add_transcode(task.transcode_description(),
-                                    transcode_blob_uuid)
-                    transcode_blob.ref_count_inc(b)
+                        b.add_transcode(task.transcode_description(),
+                                        transcode_blob_uuid)
+                        transcode_blob.ref_count_inc(b)
 
             else:
                 log_i.with_fields({'task': task}).error(
