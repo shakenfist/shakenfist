@@ -223,7 +223,7 @@ def retry_etcd_forever(func):
 
 class ActualLock(Lock):
     def __init__(self, objecttype, subtype, name, ttl=120,
-                 client=None, timeout=1000000000, log_ctx=LOG,
+                 client=None, timeout=120, log_ctx=LOG,
                  op=None):
         if read_only_cache():
             raise exceptions.ForbiddenWhileUsingReadOnlyCache(
@@ -234,7 +234,7 @@ class ActualLock(Lock):
 
         self.objecttype = objecttype
         self.objectname = name
-        self.timeout = min(timeout, 1000000000)
+        self.timeout = timeout
         self.operation = op
 
         self.log_ctx = log_ctx.with_fields({
@@ -562,7 +562,7 @@ def dequeue(queuename):
         if not client.get_prefix(queue_path):
             return None, None
 
-        with get_lock('queue', None, queuename, op='Dequeue'):
+        with get_lock('queue', None, queuename, op='Dequeue', timeout=1):
             # NOTE(mikal): limit is here to stop us returning with an unfinished
             # iterator.
             for data, metadata in client.get_prefix(queue_path, sort_order='ascend',
@@ -577,17 +577,19 @@ def dequeue(queuename):
                 put('processing', queuename, jobname, workitem)
                 client.delete(metadata['key'])
                 LOG.with_fields({'jobname': jobname,
-                                 'queuename': queuename,
-                                 'workitem': workitem,
-                                 }).info('Moved workitem from queue to processing')
+                                'queuename': queuename,
+                                'workitem': workitem,
+                                }).info('Moved workitem from queue to processing')
 
                 return jobname, workitem
 
-        return None, None
     except exceptions.LockException:
         # We didn't acquire the lock, we should just try again later. This probably
         # indicates congestion.
-        return None, None
+        LOG.with_fields({'queue': queuename}).info(
+                'Failed to acquire queue lock while dequeueing work')
+
+    return None, None
 
 
 def resolve(queuename, jobname):
