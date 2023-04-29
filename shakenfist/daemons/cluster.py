@@ -247,7 +247,7 @@ class Monitor(daemon.Daemon):
 
         # Prune over replicated blobs
         for blob_uuid in overreplicated:
-            b = Blob.from_db(blob_uuid)
+            b = Blob.from_db(blob_uuid, suppress_failure_audit=True)
             if b:
                 for node in overreplicated[blob_uuid]:
                     LOG.with_fields({
@@ -269,7 +269,7 @@ class Monitor(daemon.Daemon):
                     'Too many concurrent blob transfers queued, not queueing more')
                 break
 
-            b = Blob.from_db(blob_uuid)
+            b = Blob.from_db(blob_uuid, suppress_failure_audit=True)
             if b:
                 LOG.with_fields({
                     'blob': b

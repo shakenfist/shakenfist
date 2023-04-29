@@ -165,12 +165,18 @@ class DatabaseBackedObject(object):
                 log_as_error=log_as_error)
 
     @classmethod
-    def from_db(cls, object_uuid):
+    def from_db(cls, object_uuid, suppress_failure_audit=False):
         if not object_uuid:
             return None
 
         static_values = cls._db_get(object_uuid)
         if not static_values:
+            if not suppress_failure_audit:
+                eventlog.add_event(
+                    EVENT_TYPE_AUDIT, cls.object_type, object_uuid,
+                    ('attempt to lookup non-existent object in %s'
+                     % util_callstack.get_caller(offset=-3)),
+                    log_as_error=True)
             return None
 
         return cls(static_values)
