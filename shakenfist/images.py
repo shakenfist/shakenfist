@@ -247,7 +247,7 @@ class ImageFetchHelper(object):
         elif cached_remotely:
             remote_blob = blob.Blob.from_db(cached_remotely)
             if not remote_blob:
-                raise exceptions.blob.BlobMissing(cached_remotely)
+                raise exceptions.BlobMissing(cached_remotely)
             remote_blob.ensure_local([lock], instance_object=self.instance)
 
             cache_path = os.path.join(
@@ -308,7 +308,7 @@ class ImageFetchHelper(object):
 
         b = blob.Blob.from_db(blob_uuid)
         if not b:
-            raise exceptions.blob.BlobMissing(blob_uuid)
+            raise exceptions.BlobMissing(blob_uuid)
 
         b.ensure_local([lock], instance_object=self.instance)
         return b
@@ -329,7 +329,7 @@ class ImageFetchHelper(object):
                 b = blob.http_fetch(
                     url, resp, blob_uuid, [lock], self.log, checksum,
                     checksum_type, instance_object=instance_object)
-            except exceptions.BadChecksum as e:
+            except exceptions.BadCheckSum as e:
                 self.instance.add_event(
                     EVENT_TYPE_AUDIT, 'fetched image had bad checksum')
                 self.artifact.add_event(

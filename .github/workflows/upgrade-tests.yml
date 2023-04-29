@@ -77,7 +77,7 @@ jobs:
               debian@$primary \
               'sudo rm /etc/apache2/sites-enabled/*; sudo a2ensite sf-example.conf; sudo apachectl graceful'
 
-      - name: Wait for a five minutes
+      - name: Wait for five minutes
         run: sleep 300
 
       - name: Check logs

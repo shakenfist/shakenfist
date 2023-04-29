@@ -37,6 +37,7 @@ LOG, _ = logs.setup(__name__)
 
 class Blob(dbo):
     object_type = 'blob'
+    initial_version = 3
     current_version = 6
 
     state_targets = {

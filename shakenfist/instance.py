@@ -664,7 +664,7 @@ class Instance(dbo):
 
         # Remove this instance from the cache of instances on a node
         if self.placement:
-            n = Node.from_db(self.placement)
+            n = Node.from_db(self.placement['node'])
             if n:
                 n.remove_instance(self.uuid)
 
