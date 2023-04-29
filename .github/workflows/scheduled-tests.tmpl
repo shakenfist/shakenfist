@@ -147,56 +147,27 @@ jobs:
               {{baseuser}}@$primary:/var/log/syslog \
               ${GITHUB_WORKSPACE}/syslog
 
-          # Ensure we don't have any tracebacks
-          if [ `grep -c "Traceback (most recent call last):" ${GITHUB_WORKSPACE}/syslog` -gt 0 ]
-          then
-            echo "We have tracebacks in the logs!"
-            exit 1
-          fi
-
-          # Ensure we didn't log any errors -- note the inclusion of the start
-          # of the process name here to avoid errors from things like prometheus
-          # node exporter.
-          if [ `grep -c "ERROR sf" ${GITHUB_WORKSPACE}/syslog` -gt 0 ]
-          then
-            echo "Errors were logged!"
-            exit 1
-          fi
-
-          # Ensure nothing died
-          if [ `grep -c " died" ${GITHUB_WORKSPACE}/syslog` -gt 0 ]
-          then
-            echo "A process died!"
-            exit 1
-          fi
-
-          # Ensure no leaked vxlans
-          if [ `grep -c "Extra vxlan present" ${GITHUB_WORKSPACE}/syslog` -gt 0 ]
-          then
-            echo "vxlans leaked!"
-            exit 1
-          fi
-
-          # Ensure grpc isn't misconfigured, or being used after a fork
-          if [ `grep -c "Fork support is only compatible with the epoll1 and poll polling strategies" ${GITHUB_WORKSPACE}/syslog` -gt 0 ]
-          then
-            echo "grpc called after a fork!"
-            exit 1
-          fi
-
-          # Ensure we didn't see invalid leases causing DHCP failures
-          if [ `grep -c "not using configured address" ${GITHUB_WORKSPACE}/syslog` -gt 0 ]
-          then
-            echo "DHCP is failing, probably due to invalid leases!"
-            exit 1
-          fi
-
-          # Ensure we didn't override blob reference counts
-          if [ `grep -ci "override" ${GITHUB_WORKSPACE}/syslog` -gt 0 ]
-          then
-            echo "A blob reference count was overridden!"
-            exit 1
-          fi
+          FORBIDDEN=("Traceback (most recent call last):"
+                     "ERROR sf"
+                     " died"
+                     "Extra vxlan present"
+                     "Fork support is only compatible with the epoll1 and poll polling strategies"
+                     "not using configured address"
+                     "override"
+                     "Dumping thread traces"
+                     "because it is leased to"
+                     "not committing online upgrade"
+                     "Received a GOAWAY with error code ENHANCE_YOUR_CALM"
+                     "ConnectionFailedError")
+          IFS=""
+          for forbid in ${FORBIDDEN[*]}
+          do
+            if [ `grep -c "$forbid" ${GITHUB_WORKSPACE}/syslog` -gt 0 ]
+            then
+              echo "Forbidden string found in logs: $forbid"
+              exit 1
+            fi
+          done
 
       - name: Gather logs
         if: {% raw %}${{{% endraw %} ! cancelled() {% raw %}}}{% endraw %}
