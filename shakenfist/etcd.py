@@ -22,6 +22,15 @@ LOG, _ = logs.setup(__name__)
 LOCK_PREFIX = '/sflocks'
 
 
+# NOTE(mikal): it is a limitation of the client that you can't interleave read
+# operations -- for example, if you're reading one item at a time from an
+# iterator and you yield a result that might cause the caller to want to read
+# something else in the same thread, then the etcd client gets confused and
+# instead returns the data from the iterator. For now we just jump through some
+# hoops to try and ensure that doesn't happen, but we should probably be better
+# than that.
+
+
 class WrappedEtcdClient(Etcd3Client):
     def __init__(self, host=None, port=2379, protocol='http',
                  ca_cert=None, cert_key=None, cert_cert=None, timeout=None,
@@ -554,8 +563,10 @@ def dequeue(queuename):
             return None, None
 
         with get_lock('queue', None, queuename, op='Dequeue'):
+            # NOTE(mikal): limit is here to stop us returning with an unfinished
+            # iterator.
             for data, metadata in client.get_prefix(queue_path, sort_order='ascend',
-                                                    sort_target='key'):
+                                                    sort_target='key', limit=1):
                 jobname = str(metadata['key']).split('/')[-1].rstrip("'")
 
                 # Ensure that this task isn't in the future
@@ -608,7 +619,10 @@ def get_queue_length(queuename):
 def _restart_queue(queuename):
     queue_path = _construct_key('processing', queuename, None)
     with get_lock('queue', None, queuename, op='Restart'):
-        for data, metadata in get_etcd_client().get_prefix(
+        # FIXME(mikal): excluded from using the thread local etcd client because
+        # the iterator call interleaves with other etcd requests and causes the wrong
+        # data to be handed to the wrong caller.
+        for data, metadata in WrappedEtcdClient().get_prefix(
                 queue_path, sort_order='ascend'):
             jobname = str(metadata['key']).split('/')[-1].rstrip("'")
             workitem = json.loads(data)
