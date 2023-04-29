@@ -499,14 +499,13 @@ def delete_all(objecttype, subtype):
 
 
 def enqueue(queuename, workitem, delay=0):
-    with get_lock('queue', None, queuename, op='Enqueue'):
-        entry_time = time.time() + delay
-        jobname = '%s-%s' % (entry_time, util_random.random_id())
-        put('queue', queuename, jobname, workitem)
-        LOG.with_fields({'jobname': jobname,
-                         'queuename': queuename,
-                         'workitem': workitem,
-                         }).info('Enqueued workitem')
+    entry_time = time.time() + delay
+    jobname = '%s-%s' % (entry_time, util_random.random_id())
+    put('queue', queuename, jobname, workitem)
+    LOG.with_fields({'jobname': jobname,
+                        'queuename': queuename,
+                        'workitem': workitem,
+                        }).info('Enqueued workitem')
 
 
 def _all_subclasses(cls):
@@ -554,40 +553,28 @@ def dequeue(queuename):
         raise exceptions.ForbiddenWhileUsingReadOnlyCache(
             'You cannot consume queue work items while using a read only cache')
 
-    try:
-        queue_path = _construct_key('queue', queuename, None)
-        client = get_etcd_client()
+    queue_path = _construct_key('queue', queuename, None)
+    client = get_etcd_client()
 
-        # We only hold the lock if there is anything in the queue
-        if not client.get_prefix(queue_path):
+    # NOTE(mikal): limit is here to stop us returning with an unfinished
+    # iterator.
+    for data, metadata in client.get_prefix(queue_path, sort_order='ascend',
+                                            sort_target='key', limit=1):
+        jobname = str(metadata['key']).split('/')[-1].rstrip("'")
+
+        # Ensure that this task isn't in the future
+        if float(jobname.split('-')[0]) > time.time():
             return None, None
 
-        with get_lock('queue', None, queuename, op='Dequeue', timeout=1):
-            # NOTE(mikal): limit is here to stop us returning with an unfinished
-            # iterator.
-            for data, metadata in client.get_prefix(queue_path, sort_order='ascend',
-                                                    sort_target='key', limit=1):
-                jobname = str(metadata['key']).split('/')[-1].rstrip("'")
+        workitem = json.loads(data, object_hook=decodeTasks)
+        put('processing', queuename, jobname, workitem)
+        client.delete(metadata['key'])
+        LOG.with_fields({'jobname': jobname,
+                            'queuename': queuename,
+                            'workitem': workitem,
+                            }).info('Moved workitem from queue to processing')
 
-                # Ensure that this task isn't in the future
-                if float(jobname.split('-')[0]) > time.time():
-                    return None, None
-
-                workitem = json.loads(data, object_hook=decodeTasks)
-                put('processing', queuename, jobname, workitem)
-                client.delete(metadata['key'])
-                LOG.with_fields({'jobname': jobname,
-                                'queuename': queuename,
-                                'workitem': workitem,
-                                }).info('Moved workitem from queue to processing')
-
-                return jobname, workitem
-
-    except exceptions.LockException:
-        # We didn't acquire the lock, we should just try again later. This probably
-        # indicates congestion.
-        LOG.with_fields({'queue': queuename}).info(
-                'Failed to acquire queue lock while dequeueing work')
+        return jobname, workitem
 
     return None, None
 
@@ -597,11 +584,10 @@ def resolve(queuename, jobname):
         raise exceptions.ForbiddenWhileUsingReadOnlyCache(
             'You cannot resolve queue work items while using a read only cache')
 
-    with get_lock('queue', None, queuename, op='Resolve'):
-        delete('processing', queuename, jobname)
-        LOG.with_fields({'jobname': jobname,
-                         'queuename': queuename,
-                         }).info('Resolved workitem')
+    delete('processing', queuename, jobname)
+    LOG.with_fields({'jobname': jobname,
+                        'queuename': queuename,
+                        }).info('Resolved workitem')
 
 
 def get_queue_length(queuename):
@@ -620,19 +606,19 @@ def get_queue_length(queuename):
 @retry_etcd_forever
 def _restart_queue(queuename):
     queue_path = _construct_key('processing', queuename, None)
-    with get_lock('queue', None, queuename, op='Restart'):
-        # FIXME(mikal): excluded from using the thread local etcd client because
-        # the iterator call interleaves with other etcd requests and causes the wrong
-        # data to be handed to the wrong caller.
-        for data, metadata in WrappedEtcdClient().get_prefix(
-                queue_path, sort_order='ascend'):
-            jobname = str(metadata['key']).split('/')[-1].rstrip("'")
-            workitem = json.loads(data)
-            put('queue', queuename, jobname, workitem)
-            delete('processing', queuename, jobname)
-            LOG.with_fields({'jobname': jobname,
-                             'queuename': queuename,
-                             }).warning('Reset workitem')
+
+    # FIXME(mikal): excluded from using the thread local etcd client because
+    # the iterator call interleaves with other etcd requests and causes the wrong
+    # data to be handed to the wrong caller.
+    for data, metadata in WrappedEtcdClient().get_prefix(
+            queue_path, sort_order='ascend'):
+        jobname = str(metadata['key']).split('/')[-1].rstrip("'")
+        workitem = json.loads(data)
+        put('queue', queuename, jobname, workitem)
+        delete('processing', queuename, jobname)
+        LOG.with_fields({'jobname': jobname,
+                            'queuename': queuename,
+                            }).warning('Reset workitem')
 
 
 def get_outstanding_jobs():
