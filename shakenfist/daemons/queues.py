@@ -46,8 +46,7 @@ def handle(jobname, workitem):
     log = LOG.with_fields({'workitem': jobname})
     log.info('Processing workitem')
 
-    setproctitle.setproctitle(
-        '%s-%s' % (daemon.process_name('queues'), jobname))
+    setproctitle.setproctitle('%s-%s' % (daemon.process_name('queues'), jobname))
 
     inst = None
     task = None
@@ -469,16 +468,19 @@ class Monitor(daemon.WorkerPoolDaemon):
     def run(self):
         LOG.info('Starting')
 
+        last_worker_count_emitted = 0
         while not self.exit.is_set():
             try:
                 self.reap_workers()
+                if time.time() - last_worker_count_emitted > 10:
+                    LOG.info('Have %d workers' % len(self.workers))
+                    last_worker_count_emitted = time.time()
 
                 if not self.exit.is_set():
                     if not self.dequeue_work_item(config.NODE_NAME, handle):
                         self.exit.wait(0.2)
                 elif len(self.workers) > 0:
-                    LOG.info('Waiting for %d workers to finish'
-                             % len(self.workers))
+                    LOG.info('Waiting for %d workers to finish' % len(self.workers))
                     self.exit.wait(0.2)
                 else:
                     return
