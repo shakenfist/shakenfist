@@ -132,7 +132,7 @@ class Monitor(daemon.Daemon):
             # Record usage for blobs used by artifacts
             for blob_index in a.get_all_indexes():
                 blob_uuid = blob_index['blob_uuid']
-                b = Blob.from_db(blob_uuid)
+                b = Blob.from_db(blob_uuid, suppress_failure_audit=True)
                 if b:
                     in_use_blobs[b.uuid] += 1
         self.lock.refresh()

@@ -502,10 +502,11 @@ def enqueue(queuename, workitem, delay=0):
     entry_time = time.time() + delay
     jobname = '%s-%s' % (entry_time, util_random.random_id())
     put('queue', queuename, jobname, workitem)
-    LOG.with_fields({'jobname': jobname,
-                        'queuename': queuename,
-                        'workitem': workitem,
-                        }).info('Enqueued workitem')
+    LOG.with_fields({
+        'jobname': jobname,
+        'queuename': queuename,
+        'workitem': workitem,
+        }).info('Enqueued workitem')
 
 
 def _all_subclasses(cls):
@@ -554,7 +555,11 @@ def dequeue(queuename):
             'You cannot consume queue work items while using a read only cache')
 
     queue_path = _construct_key('queue', queuename, None)
-    client = get_etcd_client()
+
+    # FIXME(mikal): excluded from using the thread local etcd client because
+    # the iterator call interleaves with other etcd requests and causes the wrong
+    # data to be handed to the wrong caller.
+    client = WrappedEtcdClient()
 
     # NOTE(mikal): limit is here to stop us returning with an unfinished
     # iterator.
@@ -569,10 +574,11 @@ def dequeue(queuename):
         workitem = json.loads(data, object_hook=decodeTasks)
         put('processing', queuename, jobname, workitem)
         client.delete(metadata['key'])
-        LOG.with_fields({'jobname': jobname,
-                            'queuename': queuename,
-                            'workitem': workitem,
-                            }).info('Moved workitem from queue to processing')
+        LOG.with_fields({
+            'jobname': jobname,
+            'queuename': queuename,
+            'workitem': workitem,
+            }).info('Moved workitem from queue to processing')
 
         return jobname, workitem
 
@@ -585,9 +591,10 @@ def resolve(queuename, jobname):
             'You cannot resolve queue work items while using a read only cache')
 
     delete('processing', queuename, jobname)
-    LOG.with_fields({'jobname': jobname,
-                        'queuename': queuename,
-                        }).info('Resolved workitem')
+    LOG.with_fields({
+        'jobname': jobname,
+        'queuename': queuename,
+        }).info('Resolved workitem')
 
 
 def get_queue_length(queuename):
@@ -616,9 +623,10 @@ def _restart_queue(queuename):
         workitem = json.loads(data)
         put('queue', queuename, jobname, workitem)
         delete('processing', queuename, jobname)
-        LOG.with_fields({'jobname': jobname,
-                            'queuename': queuename,
-                            }).warning('Reset workitem')
+        LOG.with_fields({
+            'jobname': jobname,
+            'queuename': queuename,
+            }).warning('Reset workitem')
 
 
 def get_outstanding_jobs():
