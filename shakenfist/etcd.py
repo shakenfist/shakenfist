@@ -620,10 +620,13 @@ def _restart_queue(queuename):
 
 
 def get_outstanding_jobs():
-    for data, metadata in get_etcd_client().get_prefix(
+    # FIXME(mikal): excluded from using the thread local etcd client because
+    # the yield call interleaves with other etcd requests and causes the wrong
+    # data to be handed to the wrong caller.
+    for data, metadata in WrappedEtcdClient().get_prefix(
             '/sf/processing'):
         yield metadata['key'].decode('utf-8'), json.loads(data, object_hook=decodeTasks)
-    for data, metadata in get_etcd_client().get_prefix(
+    for data, metadata in WrappedEtcdClient().get_prefix(
             '/sf/queued'):
         yield metadata['key'].decode('utf-8'), json.loads(data, object_hook=decodeTasks)
 
