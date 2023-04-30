@@ -15,6 +15,7 @@ LOG, _ = logs.setup(__name__)
 
 
 def transfer_server(name, data):
+    etcd.reset_client()
     log = LOG.with_fields(data).with_fields({'name': name})
     try:
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

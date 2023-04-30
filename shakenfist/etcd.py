@@ -110,6 +110,10 @@ def get_etcd_client():
     return c
 
 
+def reset_client():
+    local.sf_etcd_client = None
+
+
 # This read only cache is thread local, a bit like Flask's request object. Given
 # this is a read only cache, once you have set one of these up any attempt to
 # change or lock data will also result in an exception being raised. This is

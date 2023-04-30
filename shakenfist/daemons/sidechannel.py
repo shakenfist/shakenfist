@@ -10,6 +10,7 @@ import tempfile
 import time
 
 from shakenfist.daemons import daemon
+from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS
 from shakenfist import instance
@@ -210,6 +211,7 @@ class Monitor(daemon.Daemon):
     def monitor(self, instance_uuid):
         setproctitle.setproctitle(
             '%s-%s' % (daemon.process_name('sidechannel'), instance_uuid))
+        etcd.reset_client()
 
         inst = instance.Instance.from_db(instance_uuid)
         log_ctx = LOG.with_fields({'instance': instance_uuid})
