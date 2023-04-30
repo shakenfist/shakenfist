@@ -1,8 +1,10 @@
 from collections import defaultdict
 import itertools
+import os
 from oslo_concurrency import processutils
 import setproctitle
 from shakenfist_utilities import logs
+import signal
 import time
 
 from shakenfist import baseobject
@@ -454,7 +456,8 @@ class Monitor(daemon.WorkerPoolDaemon):
 
     def run(self):
         LOG.info('Starting')
-        last_shutdown_notification = 0
+        running = True
+        shutdown_commenced = None
 
         network_worker = None
         stray_interface_worker = None
@@ -495,10 +498,32 @@ class Monitor(daemon.WorkerPoolDaemon):
                                 self._reap_leaked_floating_ips, [], 'fip-reaper')
 
                 elif len(self.workers) > 0:
-                    if time.time() - last_shutdown_notification > 5:
-                        LOG.info('Waiting for %d workers to finish'
-                                 % len(self.workers))
-                        last_shutdown_notification = time.time()
+                    if running:
+                        shutdown_commenced = time.time()
+                        for proc in self.workers:
+                            try:
+                                os.kill(self.workers[proc].pid, signal.SIGTERM)
+                                LOG.info('Sent SIGTERM to %s (pid %s)'
+                                         % (proc, self.workers[proc].pid))
+                            except OSError as e:
+                                LOG.warn('Failed to send SIGTERM to %s: %s'
+                                         % (proc, e))
+
+                    if time.time() - shutdown_commenced > 10:
+                        LOG.warning('We have taken more than ten seconds to shut down')
+                        LOG.warning('Dumping thread traces')
+                        for proc in self.workers:
+                            LOG.warning('%s daemon still running (pid %d)'
+                                        % (proc, self.workers[proc].pid))
+                            try:
+                                os.kill(self.workers[proc].pid, signal.SIGUSR1)
+                            except ProcessLookupError:
+                                pass
+                            except OSError as e:
+                                LOG.warn('Failed to send SIGUSR1 to %s: %s'
+                                         % (proc, e))
+
+                        running = False
 
                 else:
                     return
