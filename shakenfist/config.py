@@ -320,6 +320,9 @@ class SFConfig(BaseSettings):
     EXCESSIVE_ETCD_CACHE_LOGGING: bool = Field(
         False, description='Record detailed information about etcd cache performance.'
     )
+    LOG_ETCD_CONNECTIONS: bool = Field(
+        False, description='Log when a new etcd connection is created, only useful in CI.'
+    )
 
     class Config:
         env_prefix = 'SHAKENFIST_'

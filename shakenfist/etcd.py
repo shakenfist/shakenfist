@@ -49,7 +49,8 @@ class WrappedEtcdClient(Etcd3Client):
         self.cert_cert = cert_cert
         self.timeout = timeout
 
-        LOG.info('Building new etcd connection')
+        if config.LOG_ETCD_CONNECTIONS:
+            LOG.info('Building new etcd connection')
         return super(WrappedEtcdClient, self).__init__(
             host=host, port=port, protocol=protocol, ca_cert=ca_cert,
             cert_key=cert_key, cert_cert=cert_cert, timeout=timeout,
