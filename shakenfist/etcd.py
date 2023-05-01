@@ -337,7 +337,7 @@ def get_lock(objecttype, subtype, name, ttl=60, timeout=10, log_ctx=LOG,
     # it is causing locking errors for reasons that are not currently clear to
     # me.
     return ActualLock(objecttype, subtype, name, ttl=ttl,
-                      client=WrappedEtcdClient(),
+                      client=get_etcd_client(),
                       log_ctx=log_ctx, timeout=timeout, op=op)
 
 
