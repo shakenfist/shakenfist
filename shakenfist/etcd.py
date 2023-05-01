@@ -559,14 +559,8 @@ def dequeue(queuename):
             'You cannot consume queue work items while using a read only cache')
 
     queue_path = _construct_key('queue', queuename, None)
+    client = get_etcd_client()
 
-    # FIXME(mikal): excluded from using the thread local etcd client because
-    # the iterator call interleaves with other etcd requests and causes the wrong
-    # data to be handed to the wrong caller.
-    client = WrappedEtcdClient()
-
-    # NOTE(mikal): limit is here to stop us returning with an unfinished
-    # iterator.
     for data, metadata in client.get_prefix(queue_path, sort_order='ascend',
                                             sort_target='key', limit=1):
         jobname = str(metadata['key']).split('/')[-1].rstrip("'")
