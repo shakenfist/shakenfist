@@ -41,6 +41,7 @@ class WrappedEtcdClient(Etcd3Client):
         if api_path == '/v3alpha':
             raise Exception('etcd3 v3alpha endpoint is known not to work')
 
+        LOG.info('Building new etcd connection')
         return super(WrappedEtcdClient, self).__init__(
             host=host, port=port, protocol=protocol, ca_cert=ca_cert,
             cert_key=cert_key, cert_cert=cert_cert, timeout=timeout,
