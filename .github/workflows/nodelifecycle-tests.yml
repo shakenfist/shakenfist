@@ -113,10 +113,16 @@ jobs:
         if: ${{ ! cancelled() }}
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh
+          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
+                -o UserKnownHostsFile=/dev/null \
+                debian@$primary sudo chmod ugo+r /var/log/syslog
           scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               debian@$primary:/var/log/syslog \
               ${GITHUB_WORKSPACE}/syslog
+
+          etcd_conns=`grep -c "Building new etcd connection" ${GITHUB_WORKSPACE}/syslog || true`
+          echo "This CI run created $etcd_conns etcd connections."
 
           FORBIDDEN=("Traceback (most recent call last):"
                      "ERROR sf"
@@ -133,7 +139,7 @@ jobs:
           IFS=""
           for forbid in ${FORBIDDEN[*]}
           do
-            if [ `grep -c "$forbid" ${GITHUB_WORKSPACE}/syslog` -gt 0 ]
+            if [ `grep -c "$forbid" ${GITHUB_WORKSPACE}/syslog || true` -gt 0 ]
             then
               echo "Forbidden string found in logs: $forbid"
               exit 1

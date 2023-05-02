@@ -1057,6 +1057,16 @@
       shell: |
         /srv/shakenfist/venv/bin/sf-ctl show-etcd-config
 
+    - name: Log additional config
+      debug:
+        msg: "{{extra_config}}"
+
+    - name: Apply additional config
+      shell: |
+        /srv/shakenfist/venv/bin/sf-ctl set-etcd-config \
+            "{{item['name']}}" "{{item['value']}}"
+      loop: "{{extra_config}}"
+
 - hosts: hypervisors, network_node, etcd_master, storage
   any_errors_fatal: true
   serial: 1
