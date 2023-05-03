@@ -315,11 +315,6 @@
         group: root
         mode: u=r,g=,o=
 
-    - name: Create a RAM disk for etcd to make it more reliable in CI
-      shell: |
-        mkdir -p /var/lib/etcd
-        mount -t tmpfs -o rw,size=2G tmpfs /var/lib/etcd
-
     - name: Write a simple getsf wrapper
       copy:
         content: |

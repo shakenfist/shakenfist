@@ -12,7 +12,7 @@
       sf_instance:
         name: "primary"
         cpu: 12
-        ram: 32768
+        ram: 16384
         disks:
           - "100@{{base_image}}"
         networkspecs:
@@ -88,11 +88,6 @@
       copy:
         src: "{{source_path}}/agent-python/dist/{{hostvars['localhost']['agent_wheel_file']}}"
         dest: "/root/{{hostvars['localhost']['agent_wheel_file']}}"
-
-    - name: Create a RAM disk for etcd to make it more reliable in CI
-      shell: |
-        mkdir -p /var/lib/etcd
-        mount -t tmpfs -o rw,size=2G tmpfs /var/lib/etcd
 
     - name: Write a simple getsf wrapper
       copy:
