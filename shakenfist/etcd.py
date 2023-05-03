@@ -334,9 +334,6 @@ def get_lock(objecttype, subtype, name, ttl=60, timeout=10, log_ctx=LOG,
     acquired on entry and released on exit. Note that the lock acquire process
     will have no timeout.
     """
-    # FIXME(mikal): excluded from using the thread local etcd client because
-    # it is causing locking errors for reasons that are not currently clear to
-    # me.
     return ActualLock(objecttype, subtype, name, ttl=ttl,
                       client=get_etcd_client(),
                       log_ctx=log_ctx, timeout=timeout, op=op)
@@ -613,10 +610,7 @@ def get_queue_length(queuename):
 def _restart_queue(queuename):
     queue_path = _construct_key('processing', queuename, None)
 
-    # FIXME(mikal): excluded from using the thread local etcd client because
-    # the iterator call interleaves with other etcd requests and causes the wrong
-    # data to be handed to the wrong caller.
-    for data, metadata in WrappedEtcdClient().get_prefix(
+    for data, metadata in get_etcd_client().get_prefix(
             queue_path, sort_order='ascend'):
         jobname = str(metadata['key']).split('/')[-1].rstrip("'")
         workitem = json.loads(data)
@@ -629,14 +623,9 @@ def _restart_queue(queuename):
 
 
 def get_outstanding_jobs():
-    # FIXME(mikal): excluded from using the thread local etcd client because
-    # the yield call interleaves with other etcd requests and causes the wrong
-    # data to be handed to the wrong caller.
-    for data, metadata in WrappedEtcdClient().get_prefix(
-            '/sf/processing'):
+    for data, metadata in get_etcd_client().get_prefix('/sf/processing'):
         yield metadata['key'].decode('utf-8'), json.loads(data, object_hook=decodeTasks)
-    for data, metadata in WrappedEtcdClient().get_prefix(
-            '/sf/queued'):
+    for data, metadata in get_etcd_client().get_prefix('/sf/queued'):
         yield metadata['key'].decode('utf-8'), json.loads(data, object_hook=decodeTasks)
 
 
