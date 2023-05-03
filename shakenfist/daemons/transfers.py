@@ -1,4 +1,3 @@
-import multiprocessing
 import os
 from shakenfist_utilities import logs
 import socket
@@ -9,13 +8,13 @@ from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
 from shakenfist.util import general as util_general
+from shakenfist.util import process as util_process
 
 
 LOG, _ = logs.setup(__name__)
 
 
 def transfer_server(name, data):
-    etcd.reset_client()
     log = LOG.with_fields(data).with_fields({'name': name})
     try:
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -79,10 +78,9 @@ class Monitor(daemon.WorkerPoolDaemon):
                                 missing.append((name, data))
 
                     for name, data in missing:
-                        p = multiprocessing.Process(
-                            target=transfer_server, args=(name, data),
-                            name='%s-%s' % (daemon.process_name('transfers'), name))
-                        p.start()
+                        p = util_process.fork(
+                            transfer_server, [name, data],
+                            '%s-%s' % (daemon.process_name('transfers'), name))
                         self.workers[name] = p
 
                     self.exit.wait(0.2)

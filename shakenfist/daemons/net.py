@@ -40,7 +40,6 @@ EXTRA_VLANS_HISTORY = {}
 
 class Monitor(daemon.WorkerPoolDaemon):
     def _remove_stray_interfaces(self):
-        etcd.reset_client()
         last_loop = 0
 
         while not self.exit.is_set():
@@ -79,7 +78,6 @@ class Monitor(daemon.WorkerPoolDaemon):
                     pass
 
     def _maintain_networks(self):
-        etcd.reset_client()
         last_loop = 0
 
         while not self.exit.is_set():
@@ -207,7 +205,6 @@ class Monitor(daemon.WorkerPoolDaemon):
                     LOG.with_fields({'vxid': vxid}).warning('Extra vxlan present!')
 
     def _process_network_workitem(self, log_ctx, workitem):
-        etcd.reset_client()
         log_ctx = log_ctx.with_fields({'network': workitem.network_uuid()})
         n = network.Network.from_db(workitem.network_uuid())
         if not n:
@@ -356,7 +353,6 @@ class Monitor(daemon.WorkerPoolDaemon):
                 setproctitle.setproctitle('%s-idle' % daemon.process_name('net'))
 
     def _reap_leaked_floating_ips(self):
-        etcd.reset_client()
         last_loop = 0
 
         while not self.exit.is_set():
@@ -431,7 +427,6 @@ class Monitor(daemon.WorkerPoolDaemon):
                     floating_network._release_inner(ip)
 
     def _validate_mtus(self):
-        etcd.reset_client()
         last_loop = 0
 
         while not self.exit.is_set():

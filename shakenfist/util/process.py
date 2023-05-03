@@ -8,6 +8,7 @@ import time
 # set of shakenfist modules, mainly exceptions, and specific
 # other util modules.
 from shakenfist import db
+from shakenfist import etcd
 
 
 LOG, _ = logs.setup(__name__)
@@ -46,9 +47,7 @@ def execute(locks, command, check_exit_code=[0], env_variables=None,
             env_variables=env_variables, shell=True, cwd=cwd)
 
     else:
-        p = multiprocessing.Process(
-            target=_lock_refresher, args=(locks,))
-        p.start()
+        p = fork(_lock_refresher, [locks], 'lock-refresher')
 
         try:
             return processutils.execute(
@@ -57,3 +56,22 @@ def execute(locks, command, check_exit_code=[0], env_variables=None,
         finally:
             p.kill()
             p.join()
+
+
+def _process_start_shim(*args):
+    etcd.reset_client()
+    LOG.info('Starting %s with args %s' % (args[0], args[1:]))
+    args[0](*args[1:])
+
+
+def fork(process_callback, args, process_name):
+    # We need to reset the etcd thread local cache before we start running a
+    # subprocess.
+
+    shim_args = [process_callback]
+    shim_args.extend(args)
+
+    p = multiprocessing.Process(
+        target=_process_start_shim, args=shim_args, name=process_name)
+    p.start()
+    return p

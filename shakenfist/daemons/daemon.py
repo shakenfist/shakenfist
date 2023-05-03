@@ -1,6 +1,5 @@
 import faulthandler
 import logging
-import multiprocessing
 import setproctitle
 from shakenfist_utilities import logs
 import signal
@@ -9,6 +8,7 @@ from threading import Event
 from shakenfist.config import config
 from shakenfist import etcd
 from shakenfist.util import libvirt as util_libvirt
+from shakenfist.util import process as util_process
 
 
 DAEMON_NAMES = {
@@ -79,10 +79,8 @@ class WorkerPoolDaemon(Daemon):
                 del self.workers[workname]
 
     def start_workitem(self, processing_callback, args, name):
-        p = multiprocessing.Process(
-            target=processing_callback, args=args,
-            name='%s-%s' % (process_name('queues'), name))
-        p.start()
+        p = util_process.fork(processing_callback, args,
+                              '%s-%s' % (process_name('queues'), name))
         self.workers[name] = p
         return p.pid
 

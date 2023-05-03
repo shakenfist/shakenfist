@@ -1,8 +1,6 @@
 import base64
-import multiprocessing
 import os
 import select
-import setproctitle
 from shakenfist_utilities import logs
 import signal
 from shakenfist_agent import protocol
@@ -10,11 +8,11 @@ import tempfile
 import time
 
 from shakenfist.daemons import daemon
-from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS
 from shakenfist import instance
 from shakenfist.util import libvirt as util_libvirt
+from shakenfist.util import process as util_process
 
 
 LOG, _ = logs.setup(__name__)
@@ -209,10 +207,6 @@ class SFSocketAgent(protocol.SocketAgent):
 
 class Monitor(daemon.Daemon):
     def monitor(self, instance_uuid):
-        setproctitle.setproctitle(
-            '%s-%s' % (daemon.process_name('sidechannel'), instance_uuid))
-        etcd.reset_client()
-
         inst = instance.Instance.from_db(instance_uuid)
         log_ctx = LOG.with_fields({'instance': instance_uuid})
         if inst.state.value == instance.Instance.STATE_DELETED:
@@ -343,11 +337,10 @@ class Monitor(daemon.Daemon):
 
                 # Start missing monitors
                 for instance_uuid in missing_instances:
-                    p = multiprocessing.Process(
-                        target=self.monitor, args=(instance_uuid,),
-                        name='%s-%s' % (daemon.process_name('sidechannel'),
-                                        instance_uuid))
-                    p.start()
+                    p = util_process.fork(
+                        self.monitor, [instance_uuid],
+                        '%s-%s' % (daemon.process_name('sidechannel'),
+                                   instance_uuid))
 
                     monitors[instance_uuid] = p
                     eventlog.add_event(

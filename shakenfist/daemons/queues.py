@@ -42,7 +42,6 @@ LOG, _ = logs.setup(__name__)
 
 def handle(jobname, workitem):
     libvirt = util_libvirt.get_libvirt()
-    etcd.reset_client()
 
     log = LOG.with_fields({'workitem': jobname})
     log.info('Processing workitem')
