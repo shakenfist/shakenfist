@@ -145,8 +145,15 @@ jobs:
               debian@$primary:/var/log/syslog \
               ${GITHUB_WORKSPACE}/syslog
 
+          failures=0
+
+          echo
           etcd_conns=`grep -c "Building new etcd connection" ${GITHUB_WORKSPACE}/syslog || true`
           echo "This CI run created $etcd_conns etcd connections."
+          if [ $etcd_conns -gt 5000 ]; then
+            echo "FAILURE: Too many etcd clients!"
+            failures=1
+          fi
 
           FORBIDDEN=("Traceback (most recent call last):"
                      "ERROR sf"
@@ -165,10 +172,15 @@ jobs:
           do
             if [ `grep -c "$forbid" ${GITHUB_WORKSPACE}/syslog || true` -gt 0 ]
             then
-              echo "Forbidden string found in logs: $forbid"
-              exit 1
+              echo "FAILURE: Forbidden string found in logs: $forbid"
+              failures=1
             fi
           done
+
+          if [ $failures -gt 0 ]; then
+              echo "...failures detected."
+              exit 1
+          fi
 
       - name: Gather logs
         if: ${{ ! cancelled() }}
