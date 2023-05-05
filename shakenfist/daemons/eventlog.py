@@ -75,7 +75,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                                     v['timestamp'], v['fqdn'], v['duration'],
                                     v['message'], extra=v.get('extra'))
                                 counters[event_type].inc()
-                                etcd.WrappedEtcdClient().delete(k)
+                                etcd.get_etcd_client().delete(k)
                     except Exception as e:
                         util_general.ignore_exception(
                             'failed to write event for %s %s' % (objtype, objuuid), e)

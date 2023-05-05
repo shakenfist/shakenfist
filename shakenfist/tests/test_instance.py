@@ -60,6 +60,7 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
         self.mock_etcd = MockEtcd(self, node_count=4)
         self.mock_etcd.setup()
 
+    @mock.patch('shakenfist.cache.update_object_state_cache')
     @mock.patch('shakenfist.etcd.get',
                 return_value={
                     'uuid': 'uuid42',
@@ -89,7 +90,7 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.etcd.get_lock')
     @mock.patch('time.time', return_value=1234)
     def test_instance_new(self, mock_time, mock_get_lock, mock_get_attribute,
-                          mock_create, mock_put, mock_get):
+                          mock_create, mock_put, mock_get, mock_cache_update):
         instance.Instance.new(
             'barry', 1, 2048, 'namespace', 'sshkey',
             [{}], 'userdata', {'memory': 16384, 'model': 'cirrus', 'vdi': 'spice'},
@@ -192,6 +193,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
                 'thisisuserdata'.encode('utf-8')), 'utf-8'),
         )
 
+    @mock.patch('shakenfist.cache.update_object_state_cache')
     @mock.patch('shakenfist.instance.Instance.error',
                 new_callable=mock.PropertyMock)
     @mock.patch('shakenfist.etcd.get_lock')
@@ -204,7 +206,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.etcd.put')
     def test_set_state(
             self, mock_put, mock_attribute_set, mock_state_get, mock_lock,
-            mock_error):
+            mock_error, mock_update_cache):
         i = self._make_instance()
         i.state = 'preflight'
 
@@ -212,6 +214,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
         self.assertTrue(time.time() - etcd_write[1][1].update_time < 3)
         self.assertEqual('preflight', etcd_write[1][1].value)
 
+    @mock.patch('shakenfist.cache.update_object_state_cache')
     @mock.patch('shakenfist.etcd.get_lock')
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 side_effect=[
@@ -228,7 +231,8 @@ class InstanceTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.instance.Instance._db_set_attribute')
     @mock.patch('shakenfist.etcd.put')
     def test_set_state_valid1(
-            self, mock_put, mock_attribute_set, mock_state_get, mock_lock):
+            self, mock_put, mock_attribute_set, mock_state_get, mock_lock,
+            mock_update_state):
 
         i = self._make_instance()
         i.state = 'preflight'
@@ -242,6 +246,7 @@ class InstanceTestCase(base.ShakenFistTestCase):
         i.state = instance.Instance.STATE_ERROR
         i.state = instance.Instance.STATE_DELETED
 
+    @mock.patch('shakenfist.cache.update_object_state_cache')
     @mock.patch('shakenfist.etcd.get_lock')
     @mock.patch('shakenfist.instance.Instance._db_get_attribute',
                 side_effect=[
@@ -253,7 +258,8 @@ class InstanceTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.instance.Instance._db_set_attribute')
     @mock.patch('shakenfist.etcd.put')
     def test_set_state_valid2(
-            self, mock_put, mock_attribute_set, mock_state_get, mock_lock):
+            self, mock_put, mock_attribute_set, mock_state_get, mock_lock,
+            mock_update_sate):
 
         i = self._make_instance()
         i.state = 'preflight'

@@ -15,7 +15,8 @@ import time
 from shakenfist import artifact
 from shakenfist.baseobject import (
     DatabaseBackedObject as dbo, active_states_filter)
-from shakenfist.baseobjectmapping import OBJECT_NAMES_TO_ITERATORS
+from shakenfist.baseobjectmapping import (
+    OBJECT_NAMES_TO_CLASSES, OBJECT_NAMES_TO_ITERATORS)
 from shakenfist.blob import Blob, Blobs, placement_filter
 from shakenfist.config import config
 from shakenfist.daemons import daemon
@@ -86,7 +87,7 @@ class Monitor(daemon.Daemon):
             if network_uuid:
                 n = network.Network.from_db(network_uuid)
                 if not n:
-                    etcd.WrappedEtcdClient().delete(k)
+                    etcd.get_etcd_client().delete(k)
                     LOG.with_fields({
                         'network': network_uuid,
                         'vxid record': k
@@ -99,7 +100,7 @@ class Monitor(daemon.Daemon):
             if network_uuid:
                 n = network.Network.from_db(network_uuid)
                 if not n:
-                    etcd.WrappedEtcdClient().delete(k)
+                    etcd.get_etcd_client().delete(k)
                     LOG.with_fields({
                         'ipmanager': network_uuid
                     }).warning('Cleaning up leaked ipmanager')
@@ -131,7 +132,7 @@ class Monitor(daemon.Daemon):
             # Record usage for blobs used by artifacts
             for blob_index in a.get_all_indexes():
                 blob_uuid = blob_index['blob_uuid']
-                b = Blob.from_db(blob_uuid)
+                b = Blob.from_db(blob_uuid, suppress_failure_audit=True)
                 if b:
                     in_use_blobs[b.uuid] += 1
         self.lock.refresh()
@@ -246,7 +247,7 @@ class Monitor(daemon.Daemon):
 
         # Prune over replicated blobs
         for blob_uuid in overreplicated:
-            b = Blob.from_db(blob_uuid)
+            b = Blob.from_db(blob_uuid, suppress_failure_audit=True)
             if b:
                 for node in overreplicated[blob_uuid]:
                     LOG.with_fields({
@@ -268,7 +269,7 @@ class Monitor(daemon.Daemon):
                     'Too many concurrent blob transfers queued, not queueing more')
                 break
 
-            b = Blob.from_db(blob_uuid)
+            b = Blob.from_db(blob_uuid, suppress_failure_audit=True)
             if b:
                 LOG.with_fields({
                     'blob': b
@@ -348,8 +349,26 @@ class Monitor(daemon.Daemon):
         # And we're done
         LOG.info('Cluster maintenance loop complete')
 
+    def refresh_object_state_caches(self):
+        for object_type in OBJECT_NAMES_TO_ITERATORS:
+            with etcd.get_lock('cache', None, object_type, op='Cache update'):
+                by_state = {'deleted': {}}
+
+                for state in OBJECT_NAMES_TO_CLASSES[object_type].state_targets:
+                    if state:
+                        by_state[state] = {}
+
+                for obj in OBJECT_NAMES_TO_ITERATORS[object_type]([]):
+                    if obj.state.value:
+                        by_state[obj.state.value][obj.uuid] = time.time()
+
+                for state in by_state:
+                    etcd.put('cache', object_type, state, by_state[state])
+
     def run(self):
         LOG.info('Starting')
+
+        self.refresh_object_state_caches()
 
         last_loop_run = 0
         while not self.exit.is_set():

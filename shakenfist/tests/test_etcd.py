@@ -37,7 +37,7 @@ class ActualLockTestCase(base.ShakenFistTestCase):
         self.assertEqual('/sflocks/sf/instance/auuid', al.key)
         self.assertEqual('instance', al.objecttype)
         self.assertEqual('auuid', al.objectname)
-        self.assertEqual(1000000000, al.timeout)
+        self.assertEqual(120, al.timeout)
         self.assertEqual('Test case', al.operation)
         self.assertEqual(
             json.dumps({

@@ -12,7 +12,7 @@
       sf_instance:
         name: "primary"
         cpu: 12
-        ram: 32768
+        ram: 16384
         disks:
           - "100@{{base_image}}"
         networkspecs:
@@ -74,11 +74,6 @@
         dest: "/tmp/getsf"
         mode: ugo+rwx
 
-    - name: Create a RAM disk for etcd to make it more reliable in CI
-      shell: |
-        mkdir -p /var/lib/etcd
-        mount -t tmpfs -o rw,size=2G tmpfs /var/lib/etcd
-
     - name: Write a simple getsf wrapper
       copy:
         content: |
@@ -90,6 +85,7 @@
           export GETSF_WARNING=yes
 
           export GETSF_SKIP_COMMON_IMAGES=1
+          export GETSF_EXTRA_CONFIG='[{"name": "LOG_ETCD_CONNECTIONS", "value": "true"}]'
 
           sudo --preserve-env --set-home /tmp/getsf
         dest: "/tmp/getsf-wrapper"

@@ -7,6 +7,7 @@ import json
 import os
 import psutil
 import re
+import requests
 from shakenfist_utilities import (logs, random as util_random)
 import threading
 import time
@@ -17,14 +18,17 @@ from shakenfist import exceptions
 from shakenfist.tasks import QueueTask, FetchBlobTask
 
 
-####################################################################
-# Please do not call this file directly, but instead call it via   #
-# the db.py abstraction.                                           #
-####################################################################
-
-
 LOG, _ = logs.setup(__name__)
 LOCK_PREFIX = '/sflocks'
+
+
+# NOTE(mikal): it is a limitation of the client that you can't interleave read
+# operations -- for example, if you're reading one item at a time from an
+# iterator and you yield a result that might cause the caller to want to read
+# something else in the same thread, then the etcd client gets confused and
+# instead returns the data from the iterator. For now we just jump through some
+# hoops to try and ensure that doesn't happen, but we should probably be better
+# than that.
 
 
 class WrappedEtcdClient(Etcd3Client):
@@ -39,6 +43,14 @@ class WrappedEtcdClient(Etcd3Client):
         if api_path == '/v3alpha':
             raise Exception('etcd3 v3alpha endpoint is known not to work')
 
+        # Cache config options so we can reuse them when we rebuild connections.
+        self.ca_cert = ca_cert
+        self.cert_key = cert_key
+        self.cert_cert = cert_cert
+        self.timeout = timeout
+
+        if config.LOG_ETCD_CONNECTIONS:
+            LOG.info('Building new etcd connection')
         return super(WrappedEtcdClient, self).__init__(
             host=host, port=port, protocol=protocol, ca_cert=ca_cert,
             cert_key=cert_key, cert_cert=cert_cert, timeout=timeout,
@@ -61,6 +73,47 @@ class WrappedEtcdClient(Etcd3Client):
                         sort_target=sort_target,
                         limit=limit)
 
+    # Wrap post() to retry on errors. These errors are caused by our long lived
+    # connections sometimes being dropped.
+    def post(self, *args, **kwargs):
+        try:
+            return super(WrappedEtcdClient, self).post(*args, **kwargs)
+        except Exception as e:
+            LOG.info('Retrying after receiving etcd error: %s' % e)
+
+            self.session = requests.Session()
+            if self.timeout is not None:
+                self.session.timeout = self.timeout
+            if self.ca_cert is not None:
+                self.session.verify = self.ca_cert
+            if self.cert_cert is not None and self.cert_key is not None:
+                self.session.cert = (self.cert_cert, self.cert_key)
+            return super(WrappedEtcdClient, self).post(*args, **kwargs)
+
+
+# This module stores some state in thread local storage.
+local = threading.local()
+local.sf_etcd_client = None
+
+
+def get_etcd_client():
+    c = getattr(local, 'sf_etcd_client', None)
+    if not c:
+        c = local.sf_etcd_client = WrappedEtcdClient()
+
+    # Test the connection
+    try:
+        c.status()
+    except Exception as e:
+        LOG.info('Rebuilding etcd connection due to error on status check: %s' % e)
+        c = local.sf_etcd_client = WrappedEtcdClient()
+
+    return c
+
+
+def reset_client():
+    local.sf_etcd_client = None
+
 
 # This read only cache is thread local, a bit like Flask's request object. Given
 # this is a read only cache, once you have set one of these up any attempt to
@@ -71,7 +124,6 @@ class WrappedEtcdClient(Etcd3Client):
 # using one of these caches, so it is possible to write a loop which does the
 # expensive analysis of state while using one of these caches, and then
 # enqueues work to change the database while a cache is not being used.
-local = threading.local()
 local.sf_etcd_statistics = defaultdict(int)
 
 
@@ -128,7 +180,7 @@ class ThreadLocalReadOnlyCache():
         raise ValueError('Attempt to cache etcd key without a UUID: %s' % key)
 
     def _cache_prefix(self, prefix):
-        client = WrappedEtcdClient()
+        client = get_etcd_client()
         start_time = time.time()
         for data, metadata in client.get_prefix(prefix):
             self.cache[metadata['key'].decode('utf-8')] = json.loads(data)
@@ -176,7 +228,7 @@ def retry_etcd_forever(func):
 
 class ActualLock(Lock):
     def __init__(self, objecttype, subtype, name, ttl=120,
-                 client=None, timeout=1000000000, log_ctx=LOG,
+                 client=None, timeout=120, log_ctx=LOG,
                  op=None):
         if read_only_cache():
             raise exceptions.ForbiddenWhileUsingReadOnlyCache(
@@ -187,9 +239,14 @@ class ActualLock(Lock):
 
         self.objecttype = objecttype
         self.objectname = name
-        self.timeout = min(timeout, 1000000000)
-        self.log_ctx = log_ctx.with_fields({'lock': self.path})
+        self.timeout = timeout
         self.operation = op
+
+        self.log_ctx = log_ctx.with_fields({
+            'lock': self.path,
+            'node': config.NODE_NAME,
+            'pid': os.getpid(),
+            'operation': self.operation})
 
         # We override the UUID of the lock with something more helpful to debugging
         self._uuid = json.dumps(
@@ -205,7 +262,7 @@ class ActualLock(Lock):
 
     @retry_etcd_forever
     def get_holder(self):
-        value = WrappedEtcdClient().get(
+        value = get_etcd_client().get(
             self.key, metadata=True)
         if value is None or len(value) == 0:
             return None, NotImplementedError
@@ -227,7 +284,9 @@ class ActualLock(Lock):
                 duration = time.time() - start_time
                 if duration > threshold:
                     self.log_ctx.with_fields({
-                        'duration': duration}).info('Acquiring a lock was slow')
+                        'duration': duration}).info('Acquired lock, but it was slow')
+                else:
+                    self.log_ctx.debug('Acquired lock')
                 return self
 
             duration = time.time() - start_time
@@ -238,7 +297,7 @@ class ActualLock(Lock):
                                           'holder-pid': pid,
                                           'holder-node': node,
                                           'requesting-op': self.operation,
-                                          }).info('Waiting for lock')
+                                          }).info('Waiting to acquire lock')
                 slow_warned = True
 
             time.sleep(1)
@@ -264,6 +323,7 @@ class ActualLock(Lock):
                                       }).error('Cannot release lock')
             raise exceptions.LockException(
                 'Cannot release lock: %s' % self.name)
+        self.log_ctx.debug('Released lock')
 
 
 def get_lock(objecttype, subtype, name, ttl=60, timeout=10, log_ctx=LOG,
@@ -275,7 +335,7 @@ def get_lock(objecttype, subtype, name, ttl=60, timeout=10, log_ctx=LOG,
     will have no timeout.
     """
     return ActualLock(objecttype, subtype, name, ttl=ttl,
-                      client=WrappedEtcdClient(),
+                      client=get_etcd_client(),
                       log_ctx=log_ctx, timeout=timeout, op=op)
 
 
@@ -303,7 +363,7 @@ def clear_stale_locks():
         raise exceptions.ForbiddenWhileUsingReadOnlyCache(
             'You cannot clear locks while using a read only cache')
 
-    client = WrappedEtcdClient()
+    client = get_etcd_client()
 
     for data, metadata in client.get_prefix(
             LOCK_PREFIX + '/', sort_order='ascend', sort_target='key'):
@@ -323,7 +383,7 @@ def clear_stale_locks():
 @retry_etcd_forever
 def get_existing_locks():
     key_val = {}
-    for value in WrappedEtcdClient().get_prefix(LOCK_PREFIX + '/'):
+    for value in get_etcd_client().get_prefix(LOCK_PREFIX + '/'):
         key_val[value[1]['key'].decode('utf-8')] = json.loads(value[0])
     return key_val
 
@@ -357,7 +417,7 @@ def put(objecttype, subtype, name, data, ttl=None):
     path = _construct_key(objecttype, subtype, name)
     encoded = json.dumps(data, indent=4, sort_keys=True,
                          cls=JSONEncoderCustomTypes)
-    WrappedEtcdClient().put(path, encoded, lease=None)
+    get_etcd_client().put(path, encoded, lease=None)
 
 
 @retry_etcd_forever
@@ -369,7 +429,7 @@ def create(objecttype, subtype, name, data, ttl=None):
     path = _construct_key(objecttype, subtype, name)
     encoded = json.dumps(data, indent=4, sort_keys=True,
                          cls=JSONEncoderCustomTypes)
-    return WrappedEtcdClient().create(path, encoded, lease=None)
+    return get_etcd_client().create(path, encoded, lease=None)
 
 
 @retry_etcd_forever
@@ -381,7 +441,7 @@ def get(objecttype, subtype, name):
         return cache.get(path)
     _record_uncached_read(path)
 
-    value = WrappedEtcdClient().get(path, metadata=True)
+    value = get_etcd_client().get(path, metadata=True)
     if value is None or len(value) == 0:
         return None
     return json.loads(value[0][0])
@@ -397,7 +457,7 @@ def get_all(objecttype, subtype, prefix=None, sort_order=None, limit=0):
             yield key, value
     else:
         _record_uncached_read(path)
-        for data, metadata in WrappedEtcdClient().get_prefix(
+        for data, metadata in get_etcd_client().get_prefix(
                 path, sort_order=sort_order, sort_target='key', limit=limit):
             yield str(metadata['key'].decode('utf-8')), json.loads(data)
 
@@ -413,7 +473,7 @@ def get_all_dict(objecttype, subtype=None, sort_order=None, limit=0):
             key_val[key] = value
     else:
         _record_uncached_read(path)
-        for value in WrappedEtcdClient().get_prefix(
+        for value in get_etcd_client().get_prefix(
                 path, sort_order=sort_order, sort_target='key', limit=limit):
             key_val[value[1]['key'].decode('utf-8')] = json.loads(value[0])
 
@@ -427,7 +487,7 @@ def delete(objecttype, subtype, name):
             'You cannot change data while using a read only cache')
 
     path = _construct_key(objecttype, subtype, name)
-    WrappedEtcdClient().delete(path)
+    get_etcd_client().delete(path)
 
 
 @retry_etcd_forever
@@ -437,18 +497,18 @@ def delete_all(objecttype, subtype):
             'You cannot change data while using a read only cache')
 
     path = _construct_key(objecttype, subtype, None)
-    WrappedEtcdClient().delete_prefix(path)
+    get_etcd_client().delete_prefix(path)
 
 
 def enqueue(queuename, workitem, delay=0):
-    with get_lock('queue', None, queuename, op='Enqueue'):
-        entry_time = time.time() + delay
-        jobname = '%s-%s' % (entry_time, util_random.random_id())
-        put('queue', queuename, jobname, workitem)
-        LOG.with_fields({'jobname': jobname,
-                         'queuename': queuename,
-                         'workitem': workitem,
-                         }).info('Enqueued workitem')
+    entry_time = time.time() + delay
+    jobname = '%s-%s' % (entry_time, util_random.random_id())
+    put('queue', queuename, jobname, workitem)
+    LOG.with_fields({
+        'jobname': jobname,
+        'queuename': queuename,
+        'workitem': workitem,
+        }).info('Enqueued workitem')
 
 
 def _all_subclasses(cls):
@@ -496,38 +556,29 @@ def dequeue(queuename):
         raise exceptions.ForbiddenWhileUsingReadOnlyCache(
             'You cannot consume queue work items while using a read only cache')
 
-    try:
-        queue_path = _construct_key('queue', queuename, None)
-        client = WrappedEtcdClient()
+    queue_path = _construct_key('queue', queuename, None)
+    client = get_etcd_client()
 
-        # We only hold the lock if there is anything in the queue
-        if not client.get_prefix(queue_path):
+    for data, metadata in client.get_prefix(queue_path, sort_order='ascend',
+                                            sort_target='key', limit=1):
+        jobname = str(metadata['key']).split('/')[-1].rstrip("'")
+
+        # Ensure that this task isn't in the future
+        if float(jobname.split('-')[0]) > time.time():
             return None, None
 
-        with get_lock('queue', None, queuename, op='Dequeue'):
-            for data, metadata in client.get_prefix(queue_path, sort_order='ascend',
-                                                    sort_target='key'):
-                jobname = str(metadata['key']).split('/')[-1].rstrip("'")
+        workitem = json.loads(data, object_hook=decodeTasks)
+        put('processing', queuename, jobname, workitem)
+        client.delete(metadata['key'])
+        LOG.with_fields({
+            'jobname': jobname,
+            'queuename': queuename,
+            'workitem': workitem,
+            }).info('Moved workitem from queue to processing')
 
-                # Ensure that this task isn't in the future
-                if float(jobname.split('-')[0]) > time.time():
-                    return None, None
+        return jobname, workitem
 
-                workitem = json.loads(data, object_hook=decodeTasks)
-                put('processing', queuename, jobname, workitem)
-                client.delete(metadata['key'])
-                LOG.with_fields({'jobname': jobname,
-                                 'queuename': queuename,
-                                 'workitem': workitem,
-                                 }).info('Moved workitem from queue to processing')
-
-                return jobname, workitem
-
-        return None, None
-    except exceptions.LockException:
-        # We didn't acquire the lock, we should just try again later. This probably
-        # indicates congestion.
-        return None, None
+    return None, None
 
 
 def resolve(queuename, jobname):
@@ -535,11 +586,11 @@ def resolve(queuename, jobname):
         raise exceptions.ForbiddenWhileUsingReadOnlyCache(
             'You cannot resolve queue work items while using a read only cache')
 
-    with get_lock('queue', None, queuename, op='Resolve'):
-        delete('processing', queuename, jobname)
-        LOG.with_fields({'jobname': jobname,
-                         'queuename': queuename,
-                         }).info('Resolved workitem')
+    delete('processing', queuename, jobname)
+    LOG.with_fields({
+        'jobname': jobname,
+        'queuename': queuename,
+        }).info('Resolved workitem')
 
 
 def get_queue_length(queuename):
@@ -558,24 +609,23 @@ def get_queue_length(queuename):
 @retry_etcd_forever
 def _restart_queue(queuename):
     queue_path = _construct_key('processing', queuename, None)
-    with get_lock('queue', None, queuename, op='Restart'):
-        for data, metadata in WrappedEtcdClient().get_prefix(
-                queue_path, sort_order='ascend'):
-            jobname = str(metadata['key']).split('/')[-1].rstrip("'")
-            workitem = json.loads(data)
-            put('queue', queuename, jobname, workitem)
-            delete('processing', queuename, jobname)
-            LOG.with_fields({'jobname': jobname,
-                             'queuename': queuename,
-                             }).warning('Reset workitem')
+
+    for data, metadata in get_etcd_client().get_prefix(
+            queue_path, sort_order='ascend'):
+        jobname = str(metadata['key']).split('/')[-1].rstrip("'")
+        workitem = json.loads(data)
+        put('queue', queuename, jobname, workitem)
+        delete('processing', queuename, jobname)
+        LOG.with_fields({
+            'jobname': jobname,
+            'queuename': queuename,
+            }).warning('Reset workitem')
 
 
 def get_outstanding_jobs():
-    for data, metadata in WrappedEtcdClient().get_prefix(
-            '/sf/processing'):
+    for data, metadata in get_etcd_client().get_prefix('/sf/processing'):
         yield metadata['key'].decode('utf-8'), json.loads(data, object_hook=decodeTasks)
-    for data, metadata in WrappedEtcdClient().get_prefix(
-            '/sf/queued'):
+    for data, metadata in get_etcd_client().get_prefix('/sf/queued'):
         yield metadata['key'].decode('utf-8'), json.loads(data, object_hook=decodeTasks)
 
 

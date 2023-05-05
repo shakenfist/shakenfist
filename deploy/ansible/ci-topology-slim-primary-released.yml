@@ -300,11 +300,6 @@
         group: root
         mode: u=r,g=,o=
 
-    - name: Create a RAM disk for etcd to make it more reliable in CI
-      shell: |
-        mkdir -p /var/lib/etcd
-        mount -t tmpfs -o rw,size=2G tmpfs /var/lib/etcd
-
     - name: Write a simple getsf wrapper
       copy:
         content: |
@@ -355,6 +350,7 @@
           export GETSF_NODE_MESH_ADDRESS_sf_5="{{hostvars['sf5']['mesh_ip']}}"
 
           export GETSF_SKIP_COMMON_IMAGES=1
+          export GETSF_EXTRA_CONFIG='[{"name": "LOG_ETCD_CONNECTIONS", "value": "true"}]'
 
           sudo --preserve-env --set-home /tmp/getsf $@
         dest: "/tmp/getsf-wrapper"

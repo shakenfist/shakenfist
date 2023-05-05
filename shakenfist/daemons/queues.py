@@ -46,8 +46,7 @@ def handle(jobname, workitem):
     log = LOG.with_fields({'workitem': jobname})
     log.info('Processing workitem')
 
-    setproctitle.setproctitle(
-        '%s-%s' % (daemon.process_name('queues'), jobname))
+    setproctitle.setproctitle('%s-%s' % (daemon.process_name('queues'), jobname))
 
     inst = None
     task = None
@@ -83,11 +82,10 @@ def handle(jobname, workitem):
                 image_fetch(task.url(), n, inst)
 
             elif isinstance(task, PreflightInstanceTask):
-                if (inst.state.value == dbo.STATE_DELETED or
-                        inst.state.value.endswith('-error')):
+                s = inst.state.value
+                if s == dbo.STATE_DELETED or s.endswith('-error'):
                     log_i.warning(
-                        'You cannot preflight an instance in state %s, skipping task'
-                        % inst.state.value)
+                        'You cannot preflight an instance in state %s, skipping task' % s)
                     continue
 
                 redirect_to = instance_preflight(inst, task.network())
@@ -98,11 +96,10 @@ def handle(jobname, workitem):
                     return
 
             elif isinstance(task, StartInstanceTask):
-                if (inst.state.value == dbo.STATE_DELETED or
-                        inst.state.value.endswith('-error')):
+                s = inst.state.value
+                if s == dbo.STATE_DELETED or s.endswith('-error'):
                     log_i.warning(
-                        'You cannot start an instance in state %s, skipping task'
-                        % inst.state.value)
+                        'You cannot start an instance in state %s, skipping task' % s)
                     continue
 
                 instance_start(inst, task.network())
@@ -126,8 +123,7 @@ def handle(jobname, workitem):
                 # This is a historical concept, it turns out the network node
                 # now just defers the delete task until there are no interfaces,
                 # so we don't need this at all.
-                etcd.enqueue(
-                    'networknode', DestroyNetworkTask(task.network_uuid()))
+                etcd.enqueue('networknode', DestroyNetworkTask(task.network_uuid()))
 
             elif isinstance(task, HypervisorDestroyNetworkTask):
                 n = network.Network.from_db(task.network_uuid())
@@ -168,28 +164,28 @@ def handle(jobname, workitem):
             elif isinstance(task, ArchiveTranscodeTask):
                 if os.path.exists(task.cache_path()):
                     b = blob.Blob.from_db(task.blob_uuid())
+                    if b:
+                        transcode_blob_uuid = str(uuid.uuid4())
+                        transcode_blob_path = blob.Blob.filepath(transcode_blob_uuid)
+                        util_process.execute(
+                            [], 'cp %s %s' % (task.cache_path(), transcode_blob_path))
+                        st = os.stat(transcode_blob_path)
 
-                    transcode_blob_uuid = str(uuid.uuid4())
-                    transcode_blob_path = blob.Blob.filepath(transcode_blob_uuid)
-                    util_process.execute(
-                        [], 'cp %s %s' % (task.cache_path(), transcode_blob_path))
-                    st = os.stat(transcode_blob_path)
+                        transcode_blob = blob.Blob.new(
+                            transcode_blob_uuid, st.st_size, time.time(), time.time())
+                        transcode_blob.state = blob.Blob.STATE_CREATED
+                        transcode_blob.observe()
+                        transcode_blob.verify_checksum(locks=[])
+                        transcode_blob.request_replication()
+                        log.with_fields({
+                            'blob': b,
+                            'transcode_blob_uuid': transcode_blob_uuid,
+                            'description': task.transcode_description()}).info(
+                            'Recorded transcode')
 
-                    transcode_blob = blob.Blob.new(
-                        transcode_blob_uuid, st.st_size, time.time(), time.time())
-                    transcode_blob.state = blob.Blob.STATE_CREATED
-                    transcode_blob.observe()
-                    transcode_blob.verify_checksum(locks=[])
-                    transcode_blob.request_replication()
-                    log.with_fields({
-                        'blob': b,
-                        'transcode_blob_uuid': transcode_blob_uuid,
-                        'description': task.transcode_description()}).info(
-                        'Recorded transcode')
-
-                    b.add_transcode(task.transcode_description(),
-                                    transcode_blob_uuid)
-                    transcode_blob.ref_count_inc(b)
+                        b.add_transcode(task.transcode_description(),
+                                        transcode_blob_uuid)
+                        transcode_blob.ref_count_inc(b)
 
             else:
                 log_i.with_fields({'task': task}).error(
@@ -472,16 +468,19 @@ class Monitor(daemon.WorkerPoolDaemon):
     def run(self):
         LOG.info('Starting')
 
+        last_worker_count_emitted = 0
         while not self.exit.is_set():
             try:
                 self.reap_workers()
+                if time.time() - last_worker_count_emitted > 10:
+                    LOG.info('Have %d workers' % len(self.workers))
+                    last_worker_count_emitted = time.time()
 
                 if not self.exit.is_set():
                     if not self.dequeue_work_item(config.NODE_NAME, handle):
                         self.exit.wait(0.2)
                 elif len(self.workers) > 0:
-                    LOG.info('Waiting for %d workers to finish'
-                             % len(self.workers))
+                    LOG.info('Waiting for %d workers to finish' % len(self.workers))
                     self.exit.wait(0.2)
                 else:
                     return

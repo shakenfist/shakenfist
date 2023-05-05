@@ -43,7 +43,7 @@ LOG, _ = logs.setup(__name__)
 class Network(dbo):
     object_type = 'network'
     initial_version = 2
-    current_version = 3
+    current_version = 4
 
     state_targets = {
         None: (dbo.STATE_INITIAL, ),
@@ -83,6 +83,19 @@ class Network(dbo):
     @classmethod
     def _upgrade_step_2_to_3(cls, static_values):
         cls._upgrade_metadata_to_attribute(static_values['uuid'])
+
+    @classmethod
+    def _upgrade_step_3_to_4(cls, static_values):
+        nis = []
+        for ni in networkinterface.NetworkInterfaces(
+                [baseobject.active_states_filter,
+                 partial(networkinterface.network_uuid_filter, static_values['uuid'])]):
+            nis.append(ni.uuid)
+        etcd.put('attribute/network', static_values['uuid'], 'networkinterfaces',
+                 {
+                     'networkinterfaces': nis,
+                     'initialized': True
+                 })
 
     @staticmethod
     def allocate_vxid(net_id):
@@ -212,25 +225,8 @@ class Network(dbo):
 
     @property
     def networkinterfaces(self):
-        with self.get_lock_attr('networkinterfaces', 'Get interfaces'):
-            nis_struct = self._db_get_attribute(
-                'networkinterfaces', {'initialized': False})
-
-            if nis_struct['initialized']:
-                nis = nis_struct.get('networkinterfaces', [])
-            else:
-                nis = []
-                for ni in networkinterface.NetworkInterfaces(
-                    [baseobject.active_states_filter,
-                     partial(networkinterface.network_filter, self)]):
-                    nis.append(ni.uuid)
-                self._db_set_attribute('networkinterfaces',
-                                       {
-                                           'networkinterfaces': nis,
-                                           'initialized': True
-                                       })
-
-            return nis
+        nis = self._db_get_attribute('networkinterfaces', {})
+        return nis.get('networkinterfaces', [])
 
     def add_networkinterface(self, ni):
         self._add_item_in_attribute_list('networkinterfaces', ni.uuid)

@@ -18,6 +18,7 @@ LOG, _ = logs.setup(__name__)
 
 class Node(dbo):
     object_type = 'node'
+    initial_version = 2
     current_version = 3
 
     # docs/development/state_machine.md has a description of these states.
@@ -25,7 +26,7 @@ class Node(dbo):
     STATE_STOPPING = 'stopping'
     STATE_STOPPED = 'stopped'
 
-    ACTIVE_STATES = set([dbo.STATE_CREATED])
+    ACTIVE_STATES = {dbo.STATE_CREATED}
 
     state_targets = {
         None: (dbo.STATE_CREATED, dbo.STATE_ERROR, STATE_MISSING),

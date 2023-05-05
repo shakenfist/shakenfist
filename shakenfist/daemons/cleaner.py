@@ -9,7 +9,7 @@ import shutil
 import time
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
-from shakenfist.blob import Blob
+from shakenfist.blob import Blob, all_active_blob_uuids
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
@@ -237,10 +237,17 @@ class Monitor(daemon.Daemon):
         cache_path = os.path.join(config.STORAGE_PATH, 'image_cache')
         os.makedirs(cache_path, exist_ok=True)
 
+        active_blob_uuids = set(all_active_blob_uuids())
+        n = node.Node.from_db(config.NODE_NAME)
+        all_node_blobs = n.blobs
+
         p = pathlib.Path(blob_path)
-        for entpath in p.glob('**/*'):
+        for entpath in p.glob('**/*.nosuch'):
             entpath = str(entpath)
             try:
+                if not os.path.isfile(entpath):
+                    continue
+
                 st = os.stat(entpath)
                 blob_uuid = entpath.split('/')[-1].replace('.partial', '')
 
@@ -254,9 +261,8 @@ class Monitor(daemon.Daemon):
 
                     else:
                         blob_uuid = entpath.split('/')[-1]
-                        b = Blob.from_db(blob_uuid)
-                        if (not b or b.state.value == Blob.STATE_DELETED
-                                or config.NODE_NAME not in b.locations):
+                        if (blob_uuid not in active_blob_uuids
+                                or blob_uuid not in all_node_blobs):
                             LOG.with_fields({'blob': blob_uuid}).debug(
                                 'Removing deleted blob from disk')
                             os.unlink(entpath)
@@ -376,10 +382,8 @@ class Monitor(daemon.Daemon):
 
         while not self.exit.is_set():
             # Update power state of all instances on this hypervisor
-            LOG.info('Updating power states')
             self._update_power_states()
 
-            LOG.info('Maintaining blobs')
             self._maintain_blobs()
 
             if time.time() - last_missing_blob_check > 300:

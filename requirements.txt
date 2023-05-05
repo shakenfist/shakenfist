@@ -18,6 +18,10 @@ fixtures<4.0.1              # apache2
 importlib-metadata<5;python_version<"3.8"
 
 
+flask<2.3.0                 # bsd
+                            # Version 2.3.0 has problems importing Markup from flask
+
+
 # Our requirements.
 pyyaml>=5.1                 # mit
 oslo.concurrency            # apache2
@@ -25,7 +29,6 @@ jinja2>=3.1.2               # bsd
 setproctitle                # bsd
 click>=8.0.0                # bsd
 Werkzeug                    # bsd
-flask                       # bsd
 flask_restful               # bsd
 flasgger                    # mit
 psutil>=5.9.0               # bsd

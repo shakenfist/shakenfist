@@ -41,10 +41,7 @@ class Artifact(dbo):
         dbo.STATE_DELETED: (),
     }
 
-    ACTIVE_STATES = set([dbo.STATE_INITIAL,
-                         dbo.STATE_CREATED,
-                         dbo.STATE_ERROR,
-                         ])
+    ACTIVE_STATES = {dbo.STATE_INITIAL, dbo.STATE_CREATED, dbo.STATE_ERROR}
 
     TYPE_SNAPSHOT = 'snapshot'
     TYPE_LABEL = 'label'
@@ -72,7 +69,7 @@ class Artifact(dbo):
         if static_values['namespace'] == 'sharedwithall':
             static_values['namespace'] = 'system'
             etcd.put(
-                'attribute/artifact',  static_values['uuid'], 'shared',
+                'attribute/artifact', static_values['uuid'], 'shared',
                 {'shared': True})
 
     @classmethod

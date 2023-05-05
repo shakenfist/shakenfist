@@ -537,7 +537,29 @@ else
 fi
 echo
 
-# Ask for a deploy name
+question_start
+echo "Is there any additional cluster configuration you'd like applied"
+echo "before Shaken Fist starts? This is an advanced feature used to deploy"
+echo "pre-configured clusters without an additional restart."
+echo
+echo "Its completely ok to have none, in that case just hit return below."
+echo "Otherwise, specify the configuration values in a JSON list of"
+echo "dictionaries like this:"
+echo
+echo '[{"name": "a", "value": "b"}, {"name": "c", "value": "d"}]'
+echo
+if [ -z "${GETSF_EXTRA_CONFIG}" ]; then
+    echo -n "(a JSON list of configuration dictionaries) >> "
+    read GETSF_EXTRA_CONFIG
+    if [ -z "${GETSF_EXTRA_CONFIG}" ]; then
+        GETSF_EXTRA_CONFIG="[]"
+    fi
+    record_answer GETSF_NODE_HYPERVISOR "${GETSF_EXTRA_CONFIG}"
+else
+    echo "(a JSON list of configuration dictionaries) >> ${GETSF_EXTRA_CONFIG}"
+fi
+question_end
+
 question_start
 echo "What should this deployment be called? This name is used"
 echo "for Prometheus metrics labels, as well as being visible to"
@@ -687,6 +709,7 @@ echo
 status "Updating apt database."
 eval \${APT_GET} update
 
+echo
 status "Installing cpu-checker."
 eval \${APT_GET} install cpu-checker
 echo
@@ -841,6 +864,7 @@ export ADMIN_PASSWORD=${GETSF_ADMIN_PASSWORD}
 export FLOATING_IP_BLOCK="${GETSF_FLOATING_BLOCK}"
 export DNS_SERVER="${GETSF_DNS_SERVER}"
 export DEPLOY_NAME="${GETSF_DEPLOY_NAME}"
+export EXTRA_CONFIG='${GETSF_EXTRA_CONFIG}'
 DEPLOYEOF
 
 if [ ${GETSF_RELEASE} == "local" ]; then
@@ -970,6 +994,16 @@ EOF
 DEPLOYEOF
 chmod u+rx /root/sf-deploy
 
+echo
+echo "Install script is:"
+echo
+echo "--BOF--"
+cat /root/sf-deploy
+echo "--EOF--"
+echo
+
+
+echo
 status "Running the installer."
 /root/sf-deploy
 echo

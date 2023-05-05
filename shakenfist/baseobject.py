@@ -5,11 +5,13 @@ from math import inf
 import time
 from shakenfist_utilities import logs
 
+from shakenfist import cache
 from shakenfist import constants
 from shakenfist import etcd
 from shakenfist import eventlog
 from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_MUTATE
 from shakenfist import exceptions
+from shakenfist.util import callstack as util_callstack
 from shakenfist.util import general as util_general
 
 
@@ -83,12 +85,8 @@ class DatabaseBackedObject(object):
     STATE_DELETE_WAIT = 'delete-wait'
     STATE_ERROR = 'error'
 
-    ACTIVE_STATES = set([STATE_INITIAL,
-                         STATE_CREATING,
-                         STATE_CREATED,
-                         STATE_ERROR,
-                         STATE_DELETE_WAIT
-                         ])
+    ACTIVE_STATES = {STATE_INITIAL, STATE_CREATING, STATE_CREATED, STATE_ERROR,
+                     STATE_DELETE_WAIT}
 
     def __init__(self, object_uuid, version=None, in_memory_only=False):
         self.__uuid = object_uuid
@@ -168,12 +166,18 @@ class DatabaseBackedObject(object):
                 log_as_error=log_as_error)
 
     @classmethod
-    def from_db(cls, object_uuid):
+    def from_db(cls, object_uuid, suppress_failure_audit=False):
         if not object_uuid:
             return None
 
         static_values = cls._db_get(object_uuid)
         if not static_values:
+            if not suppress_failure_audit:
+                eventlog.add_event(
+                    EVENT_TYPE_AUDIT, cls.object_type, object_uuid,
+                    ('attempt to lookup non-existent object in %s'
+                     % util_callstack.get_caller(offset=-3)),
+                    log_as_error=True)
             return None
 
         return cls(static_values)
@@ -374,6 +378,9 @@ class DatabaseBackedObject(object):
 
             new_state = State(new_value, time.time())
             self._db_set_attribute('state', new_state)
+
+            cache.update_object_state_cache(
+                self.object_type, self.uuid, orig.value, new_value)
 
     @property
     def error(self):

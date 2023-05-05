@@ -19,7 +19,7 @@ class Namespace(dbo):
     object_type = 'namespace'
     current_version = 5
 
-    ACTIVE_STATES = set([dbo.STATE_CREATED])
+    ACTIVE_STATES = {dbo.STATE_CREATED}
 
     state_targets = {
         None: (dbo.STATE_CREATED),
