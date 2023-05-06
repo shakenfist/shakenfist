@@ -160,9 +160,8 @@ class Monitor(daemon.Daemon):
                     pass
 
             # Queue health statistics
-            with etcd.ThreadLocalReadOnlyCache():
-                node_queue_processing, node_queue_waiting, node_queue_deferred = \
-                    etcd.get_queue_length(config.NODE_NAME)
+            node_queue_processing, node_queue_waiting, node_queue_deferred = \
+                etcd.get_queue_length(config.NODE_NAME)
 
             retval.update({
                 'cpu_total_instance_vcpus': total_instance_vcpus,

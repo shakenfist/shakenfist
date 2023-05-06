@@ -12,7 +12,6 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob, all_active_blob_uuids
 from shakenfist.config import config
 from shakenfist.daemons import daemon
-from shakenfist import etcd
 from shakenfist.eventlog import EVENT_TYPE_AUDIT
 from shakenfist import instance
 from shakenfist import node
@@ -340,9 +339,8 @@ class Monitor(daemon.Daemon):
     def _remove_stale_uploads(self):
         # Remove uploads which no longer exist in the database.
         uploads = []
-        with etcd.ThreadLocalReadOnlyCache():
-            for u in upload.Uploads([]):
-                uploads.append(u.uuid)
+        for u in upload.Uploads([]):
+            uploads.append(u.uuid)
 
         upload_path = os.path.join(config.STORAGE_PATH, 'uploads')
         os.makedirs(upload_path, exist_ok=True)
