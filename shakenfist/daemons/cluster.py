@@ -384,7 +384,7 @@ class Monitor(daemon.Daemon):
                 for d in i.block_devices.get('devices', []):
                     blob_uuid = d.get('blob_uuid')
                     if blob_uuid:
-                        discovered_refs[blob_uuid].append(str(i))
+                        discovered_refs[blob_uuid].append('%s device %s' % (str(i), d))
 
             for a in artifact.Artifacts(filters=[active_states_filter]):
                 for blob_index in a.get_all_indexes():
