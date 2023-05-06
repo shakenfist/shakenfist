@@ -314,12 +314,21 @@ class Blob(dbo):
             new_count = self.ref_count - 1
             if new_count < 0:
                 new_count = 0
-                self.log.warning('Reference count decremented below zero')
+                self.add_event(
+                    EVENT_TYPE_MUTATE, 'decremented reference count below zero',
+                    extra={
+                        baseobject.object_type: baseobject.uuid,
+                        'reference_count': new_count
+                        })
+            else:
+                self.add_event(
+                    EVENT_TYPE_MUTATE, 'decremented reference count',
+                    extra={
+                        baseobject.object_type: baseobject.uuid,
+                        'reference_count': new_count
+                        })
 
             self._db_set_attribute('ref_count', {'ref_count': new_count})
-            self.add_event(EVENT_TYPE_MUTATE, 'decremented reference count',
-                           extra={baseobject.object_type: baseobject.uuid})
-
             self._delete_unused(new_count)
             return new_count
 

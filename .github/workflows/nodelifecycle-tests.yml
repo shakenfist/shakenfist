@@ -137,7 +137,7 @@ jobs:
                      "Extra vxlan present"
                      "Fork support is only compatible with the epoll1 and poll polling strategies"
                      "not using configured address"
-                     "override"
+                     "Overriding blob reference count"
                      "Dumping thread traces"
                      "because it is leased to"
                      "not committing online upgrade"
