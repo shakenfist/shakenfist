@@ -772,3 +772,10 @@ def all_active_blob_uuids():
     for active_state in Blob.ACTIVE_STATES:
         for object_uuid in cache.read_object_state_cache(Blob.object_type, active_state):
             yield object_uuid
+
+
+def all_active_blobs():
+    for blob_uuid in all_active_blob_uuids():
+        b = Blob.from_db(blob_uuid)
+        if b:
+            yield b

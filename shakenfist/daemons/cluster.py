@@ -2,9 +2,6 @@
 # urgent. Hard deleting data for example. Its therefore pretty relaxed about
 # obtaining the lock to do work et cetera. There is only one active cluster
 # maintenance daemon per cluster.
-#
-# NOTE(mikal): do not use the etcd read only cache here -- it will cause cluster
-# wide maintenance tasks to crash, and someone has to eventually run the upgrade.
 
 from collections import defaultdict
 from functools import partial
@@ -17,7 +14,7 @@ from shakenfist.baseobject import (
     DatabaseBackedObject as dbo, active_states_filter)
 from shakenfist.baseobjectmapping import (
     OBJECT_NAMES_TO_CLASSES, OBJECT_NAMES_TO_ITERATORS)
-from shakenfist.blob import Blob, Blobs, placement_filter
+from shakenfist.blob import Blob, Blobs, placement_filter, all_active_blobs
 from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist import etcd
@@ -61,7 +58,7 @@ class Monitor(daemon.Daemon):
         # Recompute our cache of what blobs are on what nodes every 30 minutes
         if time.time() - last_loop_run > 1800:
             per_node = defaultdict(list)
-            for b in Blobs([active_states_filter]):
+            for b in all_active_blobs():
                 if not b.locations:
                     b.add_event(EVENT_TYPE_AUDIT, 'No locations for this blob, hard deleting.')
                     b.hard_delete()
@@ -159,7 +156,7 @@ class Monitor(daemon.Daemon):
         current_fetches = etcd.get_current_blob_transfers(
             absent_nodes=absent_nodes)
 
-        for b in Blobs([active_states_filter]):
+        for b in all_active_blobs():
             if b.instances:
                 in_use_blobs[b.uuid] += 1
 
@@ -239,7 +236,7 @@ class Monitor(daemon.Daemon):
         self.lock.refresh()
 
         # Find expired blobs
-        for b in Blobs([active_states_filter]):
+        for b in all_active_blobs():
             if b.expires_at > 0 and b.expires_at < time.time():
                 b.add_event(EVENT_TYPE_AUDIT, 'blob has expired')
                 b.state = dbo.STATE_DELETED
@@ -279,7 +276,7 @@ class Monitor(daemon.Daemon):
         self.lock.refresh()
 
         # Find transcodes of not recently used blobs and reap them
-        for b in Blobs([active_states_filter]):
+        for b in all_active_blobs():
             if not b.transcoded:
                 continue
 
@@ -352,7 +349,10 @@ class Monitor(daemon.Daemon):
     def refresh_object_state_caches(self):
         for object_type in OBJECT_NAMES_TO_ITERATORS:
             with etcd.get_lock('cache', None, object_type, op='Cache update'):
-                by_state = {'deleted': {}}
+                by_state = {
+                    '_all_': {},
+                    'deleted': {}
+                }
 
                 for state in OBJECT_NAMES_TO_CLASSES[object_type].state_targets:
                     if state:
@@ -361,6 +361,7 @@ class Monitor(daemon.Daemon):
                 for obj in OBJECT_NAMES_TO_ITERATORS[object_type]([]):
                     if obj.state.value:
                         by_state[obj.state.value][obj.uuid] = time.time()
+                        by_state['_all_'][obj.uuid] = time.time()
 
                 for state in by_state:
                     etcd.put('cache', object_type, state, by_state[state])
@@ -377,7 +378,7 @@ class Monitor(daemon.Daemon):
 
             # Infrequently audit blob references and correct errors
             discovered_refs = defaultdict(list)
-            for b in Blobs([active_states_filter]):
+            for b in all_active_blobs():
                 discovered_refs[b.uuid] = []
 
             for i in instance.Instances([instance.active_states_filter]):
@@ -391,7 +392,7 @@ class Monitor(daemon.Daemon):
                     blob_uuid = blob_index['blob_uuid']
                     discovered_refs[blob_uuid].append(str(a))
 
-            for b in Blobs([active_states_filter]):
+            for b in all_active_blobs():
                 dep_blob_uuid = b.depends_on
                 if dep_blob_uuid:
                     discovered_refs[dep_blob_uuid].append(str(b))
@@ -410,7 +411,7 @@ class Monitor(daemon.Daemon):
 
             # Infrequently ensure we have no blobs with a reference count of zero
             orphan_blobs = []
-            for b in Blobs([active_states_filter]):
+            for b in all_active_blobs():
                 if b.ref_count == 0:
                     orphan_blobs.append(b)
 

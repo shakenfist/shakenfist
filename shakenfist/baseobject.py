@@ -84,6 +84,7 @@ class DatabaseBackedObject(object):
     STATE_DELETED = 'deleted'
     STATE_DELETE_WAIT = 'delete-wait'
     STATE_ERROR = 'error'
+    STATE_HARD_DELETED = 'hard-deleted'
 
     ACTIVE_STATES = {STATE_INITIAL, STATE_CREATING, STATE_CREATED, STATE_ERROR,
                      STATE_DELETE_WAIT}
@@ -423,6 +424,8 @@ class DatabaseBackedObject(object):
         }
 
     def hard_delete(self):
+        cache.update_object_state_cache(
+            self.object_type, self.uuid, self.state.value, self.STATE_HARD_DELETED)
         etcd.delete(self.object_type, None, self.uuid)
         etcd.delete_all('attribute/%s' % self.object_type, self.uuid)
         self.add_event(EVENT_TYPE_AUDIT, 'hard deleted object')

@@ -164,7 +164,7 @@ class Scheduler(object):
         # Find number of matching networks on each node. We need to be careful
         # how we do this to avoid repeatedly scanning the etcd repository.
         per_node = defaultdict(list)
-        for inst in instance.Instances([]):
+        for inst in instance.all_instances():
             n = inst.placement
             if n.get('node'):
                 per_node[n['node']].append(inst)
