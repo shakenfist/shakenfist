@@ -213,9 +213,8 @@ class Monitor(daemon.Daemon):
         # Collect all valid instance UUIDs (that is, instances that have not
         # been hard deleted).
         all_instances = []
-        with etcd.ThreadLocalReadOnlyCache():
-            for i in instance.Instances([]):
-                all_instances.append(i.uuid)
+        for i in instance.all_instances():
+            all_instances.append(i.uuid)
 
         # Now delete all libvirt log files which look like a SF instance, but
         # where the instance doesn't exist.

@@ -533,7 +533,7 @@ class InstancesTestCase(base.ShakenFistTestCase):
 
     def test_base_iteration(self):
         uuids = []
-        for i in instance.Instances([]):
+        for i in instance.all_instances():
             uuids.append(i.uuid)
 
         self.assertEqual(3, len(uuids))

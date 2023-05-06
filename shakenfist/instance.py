@@ -21,6 +21,7 @@ from shakenfist.baseobject import (
     DatabaseBackedObject as dbo,
     DatabaseBackedObjectIterator as dbo_iter)
 from shakenfist import blob
+from shakenfist import cache
 from shakenfist.config import config
 from shakenfist import constants
 from shakenfist import etcd
@@ -1434,3 +1435,10 @@ def healthy_instances_on_node(n):
 
 def instances_in_namespace(namespace):
     return Instances([partial(baseobject.namespace_filter, namespace)])
+
+
+def all_instances():
+    for object_uuid in cache.read_object_state_cache(Instance.object_type, '_all_'):
+        i = Instance.from_db(object_uuid)
+        if i:
+            yield i
