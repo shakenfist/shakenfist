@@ -349,7 +349,10 @@ class Monitor(daemon.Daemon):
     def refresh_object_state_caches(self):
         for object_type in OBJECT_NAMES_TO_ITERATORS:
             with etcd.get_lock('cache', None, object_type, op='Cache update'):
-                by_state = {'deleted': {}}
+                by_state = {
+                    '_all_': {},
+                    'deleted': {}
+                }
 
                 for state in OBJECT_NAMES_TO_CLASSES[object_type].state_targets:
                     if state:
@@ -358,6 +361,7 @@ class Monitor(daemon.Daemon):
                 for obj in OBJECT_NAMES_TO_ITERATORS[object_type]([]):
                     if obj.state.value:
                         by_state[obj.state.value][obj.uuid] = time.time()
+                        by_state['_all_'][obj.uuid] = time.time()
 
                 for state in by_state:
                     etcd.put('cache', object_type, state, by_state[state])
