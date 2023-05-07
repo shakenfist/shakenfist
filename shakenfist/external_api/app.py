@@ -22,7 +22,6 @@ from shakenfist_utilities import api as sf_api, logs
 
 from shakenfist.config import config
 from shakenfist.daemons import daemon
-from shakenfist import etcd
 from shakenfist.external_api import (
     admin as api_admin,
     auth as api_auth,
@@ -79,16 +78,11 @@ def log_response_info(response):
     # Unfortunately the response body is too long to log here, but may be
     # obtained with flask.response.get_data() if we ever want to grow a more
     # complete tracing system.
-    log = LOG.with_fields(
+    LOG.with_fields(
         {
             'request-id': flask.request.environ.get('FLASK_REQUEST_ID', 'none'),
             'headers': response.headers
-        })
-    if config.EXCESSIVE_ETCD_CACHE_LOGGING:
-        log.with_fields(etcd.get_statistics()).info('API response sent')
-    else:
-        log.debug('API response sent')
-    etcd.reset_statistics()
+        }).debug('API response sent')
     return response
 
 
