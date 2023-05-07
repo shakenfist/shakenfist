@@ -99,10 +99,6 @@ class PreExistingReadOnlyCache(DatabaseException):
     ...
 
 
-class ForbiddenWhileUsingReadOnlyCache(DatabaseException):
-    ...
-
-
 class PrefixNotInCache(DatabaseException):
     ...
 

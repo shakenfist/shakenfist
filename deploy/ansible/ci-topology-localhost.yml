@@ -105,7 +105,18 @@
           export GETSF_AGENT_PACKAGE="/root/{{hostvars['localhost']['agent_wheel_file']}}"
 
           export GETSF_SKIP_COMMON_IMAGES=1
-          export GETSF_EXTRA_CONFIG='[{"name": "LOG_ETCD_CONNECTIONS", "value": "true"}]'
+
+          read -r -d '' GETSF_EXTRA_CONFIG <<'EOF'
+          [
+            {
+              "name": "LOG_ETCD_CONNECTIONS", "value": "true"
+            },
+            {
+              "name": "ARCHIVE_INSTANCE_CONSOLE_DURATION", "value": 1
+            }
+          ]
+          EOF
+          export GETSF_EXTRA_CONFIG
 
           sudo --preserve-env --set-home /tmp/getsf $@
         dest: "/tmp/getsf-wrapper"

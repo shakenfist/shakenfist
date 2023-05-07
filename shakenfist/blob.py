@@ -27,6 +27,7 @@ from shakenfist import instance
 from shakenfist.node import (Node, Nodes, nodes_by_free_disk_descending,
                              inactive_states_filter as node_inactive_states_filter)
 from shakenfist.tasks import FetchBlobTask
+from shakenfist.util import callstack as util_callstack
 from shakenfist.util import general as util_general
 from shakenfist.util import process as util_process
 from shakenfist.util import image as util_image
@@ -283,14 +284,20 @@ class Blob(dbo):
                 info['mime-type'] = magic.Magic(mime=True).from_file(blob_path)
                 self._db_set_attribute('info', info)
 
-    def ref_count_inc(self, baseobject):
+    def ref_count_inc(self, baseobject, count=1):
         with self.get_lock_attr('ref_count', 'Increase reference count'):
             if self.state.value == self.STATE_DELETED:
-                raise BlobDeleted
-            new_count = self.ref_count + 1
+                raise BlobDeleted(self.uuid)
+            new_count = self.ref_count + count
             self._db_set_attribute('ref_count', {'ref_count': new_count})
-            self.add_event(EVENT_TYPE_MUTATE, 'incremented reference count',
-                           extra={baseobject.object_type: baseobject.uuid})
+            self.add_event(
+                EVENT_TYPE_MUTATE, 'incremented reference count',
+                extra={
+                    baseobject.object_type: baseobject.uuid,
+                    'increment': count,
+                    'reference_count': new_count,
+                    'caller': util_callstack.get_caller(offset=-3)
+                    })
             return new_count
 
     def _delete_unused(self, new_count):
@@ -309,7 +316,7 @@ class Blob(dbo):
                 if dep_blob:
                     dep_blob.ref_count_dec(self)
 
-    def ref_count_dec(self, baseobject):
+    def ref_count_dec(self, baseobject, count=1):
         with self.get_lock_attr('ref_count', 'Decrease reference count'):
             new_count = self.ref_count - 1
             if new_count < 0:
@@ -318,6 +325,7 @@ class Blob(dbo):
                     EVENT_TYPE_MUTATE, 'decremented reference count below zero',
                     extra={
                         baseobject.object_type: baseobject.uuid,
+                        'decrement': count,
                         'reference_count': new_count
                         })
             else:
@@ -325,31 +333,13 @@ class Blob(dbo):
                     EVENT_TYPE_MUTATE, 'decremented reference count',
                     extra={
                         baseobject.object_type: baseobject.uuid,
+                        'decrement': count,
                         'reference_count': new_count
                         })
 
             self._db_set_attribute('ref_count', {'ref_count': new_count})
             self._delete_unused(new_count)
             return new_count
-
-    def ref_count_set(self, new_count, discovered_refs):
-        with self.get_lock_attr('ref_count', 'Decrease reference count'):
-            old_count = self.ref_count
-            if new_count == old_count:
-                return
-
-            self.add_event(
-                EVENT_TYPE_AUDIT,
-                'Overriding blob reference count with new value!',
-                extra={
-                    'discovered_refs': discovered_refs,
-                    'old': old_count,
-                    'new': new_count
-                },
-                log_as_error=True)
-            self._db_set_attribute('ref_count', {'ref_count': new_count})
-            self.add_event(EVENT_TYPE_MUTATE, 'set reference count to %d' % new_count)
-            self._delete_unused(new_count)
 
     def ensure_local(self, locks, instance_object=None,
                      wait_for_other_transfers=True):

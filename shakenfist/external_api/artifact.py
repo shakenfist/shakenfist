@@ -50,12 +50,11 @@ def arg_is_artifact_ref(func):
                 kwargs['artifact_uuid'])
 
         else:
-            with etcd.ThreadLocalReadOnlyCache():
-                try:
-                    kwargs['artifact_from_db'] = Artifact.from_db_by_ref(
-                        kwargs.get('artifact_ref'), get_jwt_identity()[0])
-                except exceptions.MultipleObjects as e:
-                    return sf_api.error(400, str(e), suppress_traceback=True)
+            try:
+                kwargs['artifact_from_db'] = Artifact.from_db_by_ref(
+                    kwargs.get('artifact_ref'), get_jwt_identity()[0])
+            except exceptions.MultipleObjects as e:
+                return sf_api.error(400, str(e), suppress_traceback=True)
 
         if not kwargs.get('artifact_from_db'):
             return sf_api.error(404, 'artifact not found')
@@ -180,8 +179,7 @@ class ArtifactEndpoint(sf_api.Resource):
     @requires_artifact_access
     @api_base.log_token_use
     def get(self, artifact_ref=None, artifact_from_db=None):
-        with etcd.ThreadLocalReadOnlyCache():
-            return artifact_from_db.external_view()
+        return artifact_from_db.external_view()
 
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Delete an artifact.',
@@ -248,18 +246,17 @@ class ArtifactsEndpoint(sf_api.Resource):
     @api_base.log_token_use
     def get(self, node=None):
         retval = []
-        with etcd.ThreadLocalReadOnlyCache():
-            for a in Artifacts(filters=[
-                    baseobject.active_states_filter,
-                    partial(namespace_or_shared_filter, get_jwt_identity()[0])]):
-                if node:
-                    idx = a.most_recent_index
-                    if 'blob_uuid' in idx:
-                        b = Blob.from_db(idx['blob_uuid'])
-                        if b and node in b.locations:
-                            retval.append(a.external_view())
-                else:
-                    retval.append(a.external_view())
+        for a in Artifacts(filters=[
+                baseobject.active_states_filter,
+                partial(namespace_or_shared_filter, get_jwt_identity()[0])]):
+            if node:
+                idx = a.most_recent_index
+                if 'blob_uuid' in idx:
+                    b = Blob.from_db(idx['blob_uuid'])
+                    if b and node in b.locations:
+                        retval.append(a.external_view())
+            else:
+                retval.append(a.external_view())
         return retval
 
     @swag_from(api_base.swagger_helper(

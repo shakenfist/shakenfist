@@ -11,7 +11,6 @@ from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.eventlog import EVENT_TYPE_AUDIT
 from shakenfist import exceptions
-from shakenfist.etcd import ThreadLocalReadOnlyCache
 from shakenfist.instance import Instance
 from shakenfist.namespace import Namespace, get_api_token
 from shakenfist import network
@@ -166,17 +165,16 @@ def log_token_use(func):
 
 def arg_is_instance_ref(func):
     def wrapper(*args, **kwargs):
-        with ThreadLocalReadOnlyCache():
-            try:
-                inst = Instance.from_db_by_ref(kwargs.get('instance_ref'),
-                                               get_jwt_identity()[0])
-            except exceptions.MultipleObjects as e:
-                return sf_api.error(400, str(e), suppress_traceback=True)
+        try:
+            inst = Instance.from_db_by_ref(
+                kwargs.get('instance_ref'), get_jwt_identity()[0])
+        except exceptions.MultipleObjects as e:
+            return sf_api.error(400, str(e), suppress_traceback=True)
 
-            if not inst:
-                LOG.with_fields({'instance': kwargs.get('instance_ref')}).info(
-                    'Instance not found, missing or deleted')
-                return sf_api.error(404, 'instance not found')
+        if not inst:
+            LOG.with_fields({'instance': kwargs.get('instance_ref')}).info(
+                'Instance not found, missing or deleted')
+            return sf_api.error(404, 'instance not found')
 
         kwargs['instance_from_db'] = inst
         return func(*args, **kwargs)
@@ -259,17 +257,16 @@ def requires_instance_active(func):
 def arg_is_network_ref(func):
     # Method uses the network from the db
     def wrapper(*args, **kwargs):
-        with ThreadLocalReadOnlyCache():
-            try:
-                n = network.Network.from_db_by_ref(kwargs.get('network_ref'),
-                                                   get_jwt_identity()[0])
-            except exceptions.MultipleObjects as e:
-                return sf_api.error(400, str(e), suppress_traceback=True)
+        try:
+            n = network.Network.from_db_by_ref(
+                kwargs.get('network_ref'), get_jwt_identity()[0])
+        except exceptions.MultipleObjects as e:
+            return sf_api.error(400, str(e), suppress_traceback=True)
 
-            if not n:
-                LOG.with_fields({'network': kwargs.get('network_ref')}).info(
-                    'Network not found, missing or deleted')
-                return sf_api.error(404, 'network not found')
+        if not n:
+            LOG.with_fields({'network': kwargs.get('network_ref')}).info(
+                'Network not found, missing or deleted')
+            return sf_api.error(404, 'network not found')
 
         kwargs['network_from_db'] = n
         return func(*args, **kwargs)

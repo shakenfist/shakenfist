@@ -93,17 +93,15 @@ class NetworksEndpoint(sf_api.Resource):
     @api_base.verify_token
     @api_base.log_token_use
     def get(self, all=False):
-        with etcd.ThreadLocalReadOnlyCache():
-            filters = [partial(baseobject.namespace_filter,
-                               get_jwt_identity()[0])]
-            if not all:
-                filters.append(baseobject.active_states_filter)
+        filters = [partial(baseobject.namespace_filter, get_jwt_identity()[0])]
+        if not all:
+            filters.append(baseobject.active_states_filter)
 
-            retval = []
-            for n in network.Networks(filters):
-                # This forces the network through the external view rehydration
-                retval.append(n.external_view())
-            return retval
+        retval = []
+        for n in network.Networks(filters):
+            # This forces the network through the external view rehydration
+            retval.append(n.external_view())
+        return retval
 
     @api_base.verify_token
     @api_base.requires_namespace_exist

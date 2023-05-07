@@ -70,19 +70,13 @@ class Monitor(daemon.WorkerPoolDaemon):
                 self.reap_workers()
 
                 if not self.exit.is_set():
-                    missing = []
-                    with etcd.ThreadLocalReadOnlyCache():
-                        for name, data in etcd.get_all('transfer', config.NODE_NAME):
-                            name = name.split('/')[-1]
-                            if name not in self.workers:
-                                missing.append((name, data))
-
-                    for name, data in missing:
-                        p = util_process.fork(
-                            transfer_server, [name, data],
-                            '%s-%s' % (daemon.process_name('transfers'), name))
-                        self.workers[name] = p
-
+                    for name, data in etcd.get_all('transfer', config.NODE_NAME):
+                        name = name.split('/')[-1]
+                        if name not in self.workers:
+                            p = util_process.fork(
+                                transfer_server, [name, data],
+                                '%s-%s' % (daemon.process_name('transfers'), name))
+                            self.workers[name] = p
                     self.exit.wait(0.2)
                 elif len(self.workers) > 0:
                     LOG.info('Waiting for %d workers to finish'

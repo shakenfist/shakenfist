@@ -317,9 +317,6 @@ class SFConfig(BaseSettings):
     ETCD_HOST: str = Field(
         '', description='Hostname or IP of the etcd host to query'
     )
-    EXCESSIVE_ETCD_CACHE_LOGGING: bool = Field(
-        False, description='Record detailed information about etcd cache performance.'
-    )
     LOG_ETCD_CONNECTIONS: bool = Field(
         False, description='Log when a new etcd connection is created, only useful in CI.'
     )

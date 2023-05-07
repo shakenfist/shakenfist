@@ -376,39 +376,6 @@ class Monitor(daemon.Daemon):
             setproctitle.setproctitle(daemon.process_name('cluster') + ' idle')
             self._await_election()
 
-            # Infrequently audit blob references and correct errors
-            discovered_refs = defaultdict(list)
-            for b in all_active_blobs():
-                discovered_refs[b.uuid] = []
-
-            for i in instance.Instances([instance.active_states_filter]):
-                for d in i.block_devices.get('devices', []):
-                    blob_uuid = d.get('blob_uuid')
-                    if blob_uuid:
-                        discovered_refs[blob_uuid].append('%s device %s' % (str(i), d))
-
-            for a in artifact.Artifacts(filters=[active_states_filter]):
-                for blob_index in a.get_all_indexes():
-                    blob_uuid = blob_index['blob_uuid']
-                    discovered_refs[blob_uuid].append(str(a))
-
-            for b in all_active_blobs():
-                dep_blob_uuid = b.depends_on
-                if dep_blob_uuid:
-                    discovered_refs[dep_blob_uuid].append(str(b))
-
-                transcodes = b.transcoded
-                for t in transcodes:
-                    discovered_refs[transcodes[t]].append(str(t))
-
-            for blob_uuid in discovered_refs:
-                # If the blob still exists, and is more than five minutes old,
-                # we should correct the reference count.
-                b = Blob.from_db(blob_uuid)
-                if b and (time.time() - b.fetched_at > 300):
-                    b.ref_count_set(len(discovered_refs[blob_uuid]),
-                                    discovered_refs[blob_uuid])
-
             # Infrequently ensure we have no blobs with a reference count of zero
             orphan_blobs = []
             for b in all_active_blobs():
