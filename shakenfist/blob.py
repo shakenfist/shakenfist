@@ -326,8 +326,7 @@ class Blob(dbo):
                     extra={
                         baseobject.object_type: baseobject.uuid,
                         'decrement': count,
-                        'reference_count': new_count,
-                        'caller': util_callstack.get_caller(offset=-3)
+                        'reference_count': new_count
                         })
             else:
                 self.add_event(
@@ -335,31 +334,12 @@ class Blob(dbo):
                     extra={
                         baseobject.object_type: baseobject.uuid,
                         'decrement': count,
-                        'reference_count': new_count,
-                        'caller': util_callstack.get_caller(offset=-3)
+                        'reference_count': new_count
                         })
 
             self._db_set_attribute('ref_count', {'ref_count': new_count})
             self._delete_unused(new_count)
             return new_count
-
-    def ref_count_set(self, new_count, discovered_refs):
-        with self.get_lock_attr('ref_count', 'Override reference count'):
-            old_count = self.ref_count
-            if new_count == old_count:
-                return
-
-            self.add_event(
-                EVENT_TYPE_AUDIT, 'Overriding blob reference count with new value!',
-                extra={
-                    'discovered_refs': discovered_refs,
-                    'old': old_count,
-                    'new': new_count
-                },
-                log_as_error=True)
-            self._db_set_attribute('ref_count', {'ref_count': new_count})
-            self.add_event(EVENT_TYPE_MUTATE, 'set reference count to %d' % new_count)
-            self._delete_unused(new_count)
 
     def ensure_local(self, locks, instance_object=None,
                      wait_for_other_transfers=True):
