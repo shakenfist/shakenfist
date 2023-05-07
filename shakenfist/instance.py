@@ -785,78 +785,83 @@ class Instance(dbo):
                         b = blob.Blob.from_db(disk['blob_uuid'])
                         b.ref_count_inc(self)
 
-                        with util_general.RecordedOperation('detect cdrom images', self):
-                            try:
-                                cd = pycdlib.PyCdlib()
-                                cd.open(cached_image_path)
-                                disk['present_as'] = 'cdrom'
-                            except Exception:
-                                pass
+                        try:
+                            with util_general.RecordedOperation('detect cdrom images', self):
+                                try:
+                                    cd = pycdlib.PyCdlib()
+                                    cd.open(cached_image_path)
+                                    disk['present_as'] = 'cdrom'
+                                except Exception:
+                                    pass
 
-                        if disk.get('present_as', 'cdrom') == 'cdrom':
-                            # There is no point in resizing or COW'ing a cdrom
-                            disk['path'] = disk['path'].replace(
-                                '.qcow2', '.raw')
-                            disk['type'] = 'raw'
-                            disk['snapshot_ignores'] = True
-                            util_general.link(cached_image_path, disk['path'])
+                            if disk.get('present_as', 'cdrom') == 'cdrom':
+                                # There is no point in resizing or COW'ing a cdrom
+                                disk['path'] = disk['path'].replace(
+                                    '.qcow2', '.raw')
+                                disk['type'] = 'raw'
+                                disk['snapshot_ignores'] = True
+                                util_general.link(cached_image_path, disk['path'])
 
-                            # qemu does not support removable media on virtio buses. It also
-                            # only supports one IDE bus. This is quite limiting. Instead, we
-                            # use USB for cdrom drives, unless you've specified a bus other
-                            # than virtio in the creation request.
-                            if disk['bus'] == 'virtio':
-                                disk['bus'] = 'usb'
-                                disk['device'] = _get_disk_device(
-                                    disk['bus'], LETTERS.find(disk['device'][-1]))
+                                # qemu does not support removable media on virtio buses. It also
+                                # only supports one IDE bus. This is quite limiting. Instead, we
+                                # use USB for cdrom drives, unless you've specified a bus other
+                                # than virtio in the creation request.
+                                if disk['bus'] == 'virtio':
+                                    disk['bus'] = 'usb'
+                                    disk['device'] = _get_disk_device(
+                                        disk['bus'], LETTERS.find(disk['device'][-1]))
 
-                        elif disk['bus'] == 'nvme':
-                            # NVMe disks do not currently support a COW layer for the instance
-                            # disk. This is because we don't have a libvirt <disk/> element for
-                            # them and therefore can't specify their backing store. Instead we
-                            # produce a flat layer here.
-                            util_image.create_qcow2([lock], cached_image_path,
-                                                    disk['path'], disk_size=disk['size'])
+                            elif disk['bus'] == 'nvme':
+                                # NVMe disks do not currently support a COW layer for the instance
+                                # disk. This is because we don't have a libvirt <disk/> element for
+                                # them and therefore can't specify their backing store. Instead we
+                                # produce a flat layer here.
+                                util_image.create_qcow2([lock], cached_image_path,
+                                                        disk['path'], disk_size=disk['size'])
 
-                        else:
-                            with util_general.RecordedOperation('create copy on write layer', self):
-                                util_image.create_cow([lock], cached_image_path,
-                                                      disk['path'], disk['size'])
-                            self.log.with_fields(util_general.stat_log_fields(disk['path'])).info(
-                                'COW layer %s created' % disk['path'])
+                            else:
+                                with util_general.RecordedOperation('create copy on write layer', self):
+                                    util_image.create_cow(
+                                        [lock], cached_image_path, disk['path'], disk['size'])
+                                self.log.with_fields(util_general.stat_log_fields(disk['path'])).info(
+                                    'COW layer %s created' % disk['path'])
 
-                            # Record the backing store for modern libvirt. This requires
-                            # walking the chain of dependencies. Backing chains only work
-                            # for qcow2 images. The backing image should already have been
-                            # transcoded as part of the image fetch process.
-                            backing_chain = []
-                            backing_uuid = disk['blob_uuid']
-                            while backing_uuid:
-                                backing_path = os.path.join(
-                                    config.STORAGE_PATH, 'image_cache', backing_uuid + '.qcow2')
-                                backing_chain.append(backing_path)
-                                backing_blob = blob.Blob.from_db(backing_uuid)
-                                backing_uuid = backing_blob.depends_on
+                                # Record the backing store for modern libvirt. This requires
+                                # walking the chain of dependencies. Backing chains only work
+                                # for qcow2 images. The backing image should already have been
+                                # transcoded as part of the image fetch process.
+                                backing_chain = []
+                                backing_uuid = disk['blob_uuid']
+                                while backing_uuid:
+                                    backing_path = os.path.join(
+                                        config.STORAGE_PATH, 'image_cache', backing_uuid + '.qcow2')
+                                    backing_chain.append(backing_path)
+                                    backing_blob = blob.Blob.from_db(backing_uuid)
+                                    backing_uuid = backing_blob.depends_on
 
-                            indent = '      '
-                            disk['backing'] = ''
-                            backing_chain.reverse()
+                                indent = '      '
+                                disk['backing'] = ''
+                                backing_chain.reverse()
 
-                            for backing_path in backing_chain:
-                                disk['backing'] = (
-                                    '%(indent)s<backingStore type=\'file\'>'
-                                    '%(indent)s  <format type=\'qcow2\'/>'
-                                    '%(indent)s  <source file=\'%(path)s\'/>\n'
-                                    '%(indent)s  %(chain)s\n'
-                                    '%(indent)s</backingStore>\n'
-                                    % {
-                                        'chain': disk['backing'],
-                                        'path': backing_path,
-                                        'indent': indent
-                                    })
-                                indent += '  '
+                                for backing_path in backing_chain:
+                                    disk['backing'] = (
+                                        '%(indent)s<backingStore type=\'file\'>'
+                                        '%(indent)s  <format type=\'qcow2\'/>'
+                                        '%(indent)s  <source file=\'%(path)s\'/>\n'
+                                        '%(indent)s  %(chain)s\n'
+                                        '%(indent)s</backingStore>\n'
+                                        % {
+                                            'chain': disk['backing'],
+                                            'path': backing_path,
+                                            'indent': indent
+                                        })
+                                    indent += '  '
 
-                            disk['backing'] = disk['backing'].lstrip()
+                                disk['backing'] = disk['backing'].lstrip()
+
+                        except exceptions.ImagesCannotShrinkException as e:
+                            b.ref_count_dec(self)
+                            raise e
 
                     elif not os.path.exists(disk['path']):
                         util_image.create_blank(

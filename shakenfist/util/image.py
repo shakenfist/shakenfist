@@ -86,12 +86,11 @@ def create_cow(locks, cache_file, disk_file, disk_size):
     except TypeError:
         pass
 
-    if (virtual_size and disk_size and
-            virtual_size > disk_size * 1024 * 1024 * 1024):
+    if (virtual_size and disk_size and virtual_size > disk_size * constants.GiB):
         raise exceptions.ImagesCannotShrinkException(
             'The specified size of %dgb (%d bytes) is smaller than the existing size '
             'of the image of %s bytes.'
-            % (disk_size, disk_size * 1024 * 1024 * 1024, info['virtual size']))
+            % (disk_size, disk_size * constants.GiB, info['virtual size']))
 
     if disk_size:
         util_process.execute(
