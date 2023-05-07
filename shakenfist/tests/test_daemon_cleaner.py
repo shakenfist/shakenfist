@@ -89,7 +89,7 @@ def fake_instance_get(uuid):
             'memory': 1024,
             'namespace': 'space',
             'disk_spec': [{'base': 'cirros', 'size': 8}],
-            'version': 10
+            'version': 12
         })
 
 

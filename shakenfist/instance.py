@@ -1,6 +1,7 @@
 # Copyright 2019 Michael Still
 
 import base64
+from collections import defaultdict
 from functools import partial
 import jinja2
 import io
@@ -78,7 +79,7 @@ def _safe_int_cast(i):
 
 class Instance(dbo):
     object_type = 'instance'
-    current_version = 10
+    current_version = 12
 
     # docs/development/state_machine.md has a description of these states.
     STATE_INITIAL_ERROR = 'initial-error'
@@ -182,6 +183,21 @@ class Instance(dbo):
             del static_values['vdi_type']
 
     @classmethod
+    def _upgrade_step_11_to_12(cls, static_values):
+        blob_refs = defaultdict(int)
+        bd = etcd.get('attribute/instance', static_values['uuid'], 'block_devices')
+        for d in bd.get('devices', []):
+            blob_uuid = d.get('blob_uuid')
+            if blob_uuid:
+                blob_refs[blob_uuid] += 1
+
+        if static_values['nvram_template']:
+            blob_refs[static_values['nvram_template']] += 1
+
+        etcd.put('attribute/instance', static_values['uuid'], 'blob_references',
+                 blob_refs)
+
+    @classmethod
     def new(cls, name=None, cpus=None, memory=None, namespace=None, ssh_key=None,
             disk_spec=None, user_data=None, video=None, requested_placement=None,
             instance_uuid=None, uefi=False, configdrive=None, nvram_template=None,
@@ -217,8 +233,7 @@ class Instance(dbo):
         static_values['uuid'] = instance_uuid
         i = Instance(static_values)
         i.state = cls.STATE_INITIAL
-        i._db_set_attribute(
-            'power_state', {'power_state': cls.STATE_INITIAL})
+        i._db_set_attribute('power_state', {'power_state': cls.STATE_INITIAL})
         return i
 
     def external_view(self):
@@ -463,14 +478,24 @@ class Instance(dbo):
             db_data['facts'] = new_value
             self._db_set_attribute('agent_attributes', db_data)
 
+    @property
+    def blob_references(self):
+        return self._db_get_attribute('blob_references')
+
+    @blob_references.setter
+    def blob_references(self, blob_refs):
+        self._db_set_attribute('blob_references', blob_refs)
+
     # Implementation
     def _initialize_block_devices(self):
+        blob_refs = defaultdict(int)
         bus = _get_defaulted_disk_bus(self.disk_spec[0])
         root_device = _get_disk_device(bus, 0)
         config_device = _get_disk_device(bus, 1)
 
         disk_type = 'qcow2'
 
+        blob_uuid = self.disk_spec[0].get('blob_uuid')
         block_devices = {
             'devices': [
                 {
@@ -480,7 +505,7 @@ class Instance(dbo):
                     'bus': bus,
                     'path': os.path.join(self.instance_path, root_device),
                     'base': self.disk_spec[0].get('base'),
-                    'blob_uuid': self.disk_spec[0].get('blob_uuid'),
+                    'blob_uuid': blob_uuid,
                     'present_as': _get_defaulted_disk_type(self.disk_spec[0]),
                     'snapshot_ignores': False,
                     'cache_mode': constants.DISK_CACHE_MODE
@@ -488,6 +513,8 @@ class Instance(dbo):
             ],
             'extracommands': []
         }
+        if blob_uuid:
+            blob_refs[blob_uuid] += 1
 
         i = 1
         if self.configdrive == 'openstack-disk':
@@ -508,6 +535,7 @@ class Instance(dbo):
             bus = _get_defaulted_disk_bus(d)
             device = _get_disk_device(bus, i)
             disk_path = os.path.join(self.instance_path, device)
+            blob_uuid = d.get('blob_uuid')
 
             block_devices['devices'].append({
                 'type': disk_type,
@@ -516,11 +544,14 @@ class Instance(dbo):
                 'bus': bus,
                 'path': disk_path,
                 'base': d.get('base'),
-                'blob_uuid': d.get('blob_uuid'),
+                'blob_uuid': blob_uuid,
                 'present_as': _get_defaulted_disk_type(d),
                 'snapshot_ignores': False,
                 'cache_mode': constants.DISK_CACHE_MODE
             })
+            if blob_uuid:
+                blob_refs[blob_uuid] += 1
+
             i += 1
 
         # NVME disks require a different treatment because libvirt doesn't natively
@@ -536,7 +567,18 @@ class Instance(dbo):
                                 % (nvme_counter, nvme_counter))
                 ])
 
+        nvram_template = self.nvram_template
+        if nvram_template:
+            blob_refs[nvram_template] += 1
+
         block_devices['finalized'] = False
+
+        # Increment blob references
+        self.blob_references = blob_refs
+        for blob_uuid in blob_refs:
+            b = blob.Blob.from_db(blob_uuid)
+            b.ref_count_inc(self, blob_refs[blob_uuid])
+
         return block_devices
 
     def place_instance(self, location):
@@ -634,9 +676,6 @@ class Instance(dbo):
             nvram_path = os.path.join(self.instance_path, 'nvram')
             if os.path.exists(nvram_path):
                 os.unlink(nvram_path)
-            if self.nvram_template:
-                b = blob.Blob.from_db(self.nvram_template)
-                b.ref_count_dec(self)
 
             with util_libvirt.LibvirtConnection() as lc:
                 inst = lc.get_domain_from_sf_uuid(self.uuid)
@@ -655,11 +694,12 @@ class Instance(dbo):
                     'instance delete disks %s' % self, e)
 
     def _delete_globally(self):
-        for disk in self.block_devices.get('devices', []):
-            if 'blob_uuid' in disk and disk['blob_uuid']:
-                b = blob.Blob.from_db(disk['blob_uuid'])
-                if b:
-                    b.ref_count_dec(self)
+        blob_refs = self.blob_references
+        for blob_uuid in blob_refs:
+            b = blob.Blob.from_db(blob_uuid)
+            if b:
+                b.ref_count_dec(self, blob_refs[blob_uuid])
+        self.blob_references = {}
 
         self.deallocate_instance_ports()
 
@@ -782,86 +822,77 @@ class Instance(dbo):
                             raise exceptions.ImageMissingFromCache(
                                 'Image %s is missing' % disk['blob_uuid'])
 
-                        b = blob.Blob.from_db(disk['blob_uuid'])
-                        b.ref_count_inc(self)
-
                         try:
-                            with util_general.RecordedOperation('detect cdrom images', self):
-                                try:
-                                    cd = pycdlib.PyCdlib()
-                                    cd.open(cached_image_path)
-                                    disk['present_as'] = 'cdrom'
-                                except Exception:
-                                    pass
+                            cd = pycdlib.PyCdlib()
+                            cd.open(cached_image_path)
+                            disk['present_as'] = 'cdrom'
+                        except Exception:
+                            pass
 
-                            if disk.get('present_as', 'cdrom') == 'cdrom':
-                                # There is no point in resizing or COW'ing a cdrom
-                                disk['path'] = disk['path'].replace(
-                                    '.qcow2', '.raw')
-                                disk['type'] = 'raw'
-                                disk['snapshot_ignores'] = True
-                                util_general.link(cached_image_path, disk['path'])
+                        if disk.get('present_as', 'cdrom') == 'cdrom':
+                            # There is no point in resizing or COW'ing a cdrom
+                            disk['path'] = disk['path'].replace(
+                                '.qcow2', '.raw')
+                            disk['type'] = 'raw'
+                            disk['snapshot_ignores'] = True
+                            util_general.link(cached_image_path, disk['path'])
 
-                                # qemu does not support removable media on virtio buses. It also
-                                # only supports one IDE bus. This is quite limiting. Instead, we
-                                # use USB for cdrom drives, unless you've specified a bus other
-                                # than virtio in the creation request.
-                                if disk['bus'] == 'virtio':
-                                    disk['bus'] = 'usb'
-                                    disk['device'] = _get_disk_device(
-                                        disk['bus'], LETTERS.find(disk['device'][-1]))
+                            # qemu does not support removable media on virtio buses. It also
+                            # only supports one IDE bus. This is quite limiting. Instead, we
+                            # use USB for cdrom drives, unless you've specified a bus other
+                            # than virtio in the creation request.
+                            if disk['bus'] == 'virtio':
+                                disk['bus'] = 'usb'
+                                disk['device'] = _get_disk_device(
+                                    disk['bus'], LETTERS.find(disk['device'][-1]))
 
-                            elif disk['bus'] == 'nvme':
-                                # NVMe disks do not currently support a COW layer for the instance
-                                # disk. This is because we don't have a libvirt <disk/> element for
-                                # them and therefore can't specify their backing store. Instead we
-                                # produce a flat layer here.
-                                util_image.create_qcow2([lock], cached_image_path,
-                                                        disk['path'], disk_size=disk['size'])
+                        elif disk['bus'] == 'nvme':
+                            # NVMe disks do not currently support a COW layer for the instance
+                            # disk. This is because we don't have a libvirt <disk/> element for
+                            # them and therefore can't specify their backing store. Instead we
+                            # produce a flat layer here.
+                            util_image.create_qcow2([lock], cached_image_path,
+                                                    disk['path'], disk_size=disk['size'])
 
-                            else:
-                                with util_general.RecordedOperation('create copy on write layer', self):
-                                    util_image.create_cow(
-                                        [lock], cached_image_path, disk['path'], disk['size'])
-                                self.log.with_fields(util_general.stat_log_fields(disk['path'])).info(
-                                    'COW layer %s created' % disk['path'])
+                        else:
+                            with util_general.RecordedOperation('create copy on write layer', self):
+                                util_image.create_cow(
+                                    [lock], cached_image_path, disk['path'], disk['size'])
+                            self.log.with_fields(util_general.stat_log_fields(disk['path'])).info(
+                                'COW layer %s created' % disk['path'])
 
-                                # Record the backing store for modern libvirt. This requires
-                                # walking the chain of dependencies. Backing chains only work
-                                # for qcow2 images. The backing image should already have been
-                                # transcoded as part of the image fetch process.
-                                backing_chain = []
-                                backing_uuid = disk['blob_uuid']
-                                while backing_uuid:
-                                    backing_path = os.path.join(
-                                        config.STORAGE_PATH, 'image_cache', backing_uuid + '.qcow2')
-                                    backing_chain.append(backing_path)
-                                    backing_blob = blob.Blob.from_db(backing_uuid)
-                                    backing_uuid = backing_blob.depends_on
+                            # Record the backing store for modern libvirt. This requires
+                            # walking the chain of dependencies. Backing chains only work
+                            # for qcow2 images. The backing image should already have been
+                            # transcoded as part of the image fetch process.
+                            backing_chain = []
+                            backing_uuid = disk['blob_uuid']
+                            while backing_uuid:
+                                backing_path = os.path.join(
+                                    config.STORAGE_PATH, 'image_cache', backing_uuid + '.qcow2')
+                                backing_chain.append(backing_path)
+                                backing_blob = blob.Blob.from_db(backing_uuid)
+                                backing_uuid = backing_blob.depends_on
 
-                                indent = '      '
-                                disk['backing'] = ''
-                                backing_chain.reverse()
+                            indent = '      '
+                            disk['backing'] = ''
+                            backing_chain.reverse()
 
-                                for backing_path in backing_chain:
-                                    disk['backing'] = (
-                                        '%(indent)s<backingStore type=\'file\'>'
-                                        '%(indent)s  <format type=\'qcow2\'/>'
-                                        '%(indent)s  <source file=\'%(path)s\'/>\n'
-                                        '%(indent)s  %(chain)s\n'
-                                        '%(indent)s</backingStore>\n'
-                                        % {
-                                            'chain': disk['backing'],
-                                            'path': backing_path,
-                                            'indent': indent
-                                        })
-                                    indent += '  '
+                            for backing_path in backing_chain:
+                                disk['backing'] = (
+                                    '%(indent)s<backingStore type=\'file\'>'
+                                    '%(indent)s  <format type=\'qcow2\'/>'
+                                    '%(indent)s  <source file=\'%(path)s\'/>\n'
+                                    '%(indent)s  %(chain)s\n'
+                                    '%(indent)s</backingStore>\n'
+                                    % {
+                                        'chain': disk['backing'],
+                                        'path': backing_path,
+                                        'indent': indent
+                                    })
+                                indent += '  '
 
-                                disk['backing'] = disk['backing'].lstrip()
-
-                        except exceptions.ImagesCannotShrinkException as e:
-                            b.ref_count_dec(self)
-                            raise e
+                            disk['backing'] = disk['backing'].lstrip()
 
                     elif not os.path.exists(disk['path']):
                         util_image.create_blank(
@@ -1052,9 +1083,7 @@ class Instance(dbo):
                     raise exceptions.NVRAMTemplateMissing(
                         'Blob %s does not exist' % self.nvram_template)
                 b.ensure_local([], instance_object=self)
-                b.add_event(
-                    EVENT_TYPE_AUDIT, 'instance %s is using blob' % self.uuid)
-                b.ref_count_inc(self)
+                b.add_event(EVENT_TYPE_AUDIT, 'instance %s is using blob' % self.uuid)
                 shutil.copyfile(
                     blob.Blob.filepath(b.uuid), os.path.join(self.instance_path, 'nvram'))
                 nvram_template_attribute = ''
