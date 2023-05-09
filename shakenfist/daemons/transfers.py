@@ -29,7 +29,12 @@ def transfer_server(name, data):
         log.info('Awaiting transfer connection')
         server.listen()
 
-        conn, addr = server.accept()
+        try:
+            conn, addr = server.accept()
+        except socket.timeout:
+            log.info('No connection before timeout, aborting')
+            return
+
         log = log.with_fields({'remote_ip': addr[0]})
         log.info('New transfer connection')
         if addr[0] != data['requestor']:
