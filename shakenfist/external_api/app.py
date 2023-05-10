@@ -97,6 +97,7 @@ class Root(sf_api.Resource):
              '<li>spice-vdi-console</li>'
              '<li>vdi-console-helper</li>'
              '<li>artifact-upload-types</li>'
+             '<li>pure-affinity</li>'
              '</ul></p></body></html>'),
             mimetype='text/html')
         resp.status_code = 200

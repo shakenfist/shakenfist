@@ -235,15 +235,14 @@ class AffinityTestCase(SchedulerTestCase):
                                        metadata={'tags': ['socialite']})
 
         # Start test
-        inst = self.mock_etcd.create_instance('instance-3', 'uuid-inst-3',
-                                              metadata={
-                                                 "affinity": {
-                                                     "cpu": {
-                                                         "socialite": 2,
-                                                         "nerd": -100,
-                                                     }
-                                                 },
-                                              })
+        inst = self.mock_etcd.create_instance(
+            'instance-3', 'uuid-inst-3',
+            metadata={
+                "affinity": {
+                    "socialite": 2,
+                    "nerd": -100
+                },
+            })
 
         nodes = scheduler.Scheduler().find_candidates(inst, [])
         self.assertSetEqual({'node3'}, set(nodes))
@@ -254,15 +253,14 @@ class AffinityTestCase(SchedulerTestCase):
                                        metadata={'tags': ['nerd']})
 
         # Start test
-        inst = self.mock_etcd.create_instance('instance-3', 'uuid-inst-3',
-                                              metadata={
-                                                 "affinity": {
-                                                     "cpu": {
-                                                         "socialite": 2,
-                                                         "nerd": -100,
-                                                     }
-                                                 },
-                                              })
+        inst = self.mock_etcd.create_instance(
+            'instance-3', 'uuid-inst-3',
+            metadata={
+                "affinity": {
+                    "socialite": 2,
+                    "nerd": -100
+                },
+            })
         nodes = scheduler.Scheduler().find_candidates(inst, [])
         self.assertSetEqual({'node2', 'node4'}, set(nodes))
 
@@ -276,15 +274,14 @@ class AffinityTestCase(SchedulerTestCase):
                                        metadata={'tags': ['nerd']})
 
         # Start test
-        inst = self.mock_etcd.create_instance('instance-3', 'uuid-inst-3',
-                                              metadata={
-                                                 "affinity": {
-                                                     "cpu": {
-                                                         "socialite": 2,
-                                                         "nerd": -100,
-                                                     }
-                                                 },
-                                              })
+        inst = self.mock_etcd.create_instance(
+            'instance-3', 'uuid-inst-3',
+            metadata={
+                "affinity": {
+                    "socialite": 2,
+                    "nerd": -100
+                },
+            })
         nodes = scheduler.Scheduler().find_candidates(inst, [])
         self.assertSetEqual({'node2'}, set(nodes))
 
@@ -298,14 +295,13 @@ class AffinityTestCase(SchedulerTestCase):
                                        metadata={'tags': ['nerd']})
 
         # Start test
-        inst = self.mock_etcd.create_instance('instance-3', 'uuid-inst-3',
-                                              metadata={
-                                                 "affinity": {
-                                                     "cpu": {
-                                                         "socialite": 2,
-                                                         "nerd": -100,
-                                                     }
-                                                 },
-                                              })
+        inst = self.mock_etcd.create_instance(
+            'instance-3', 'uuid-inst-3',
+            metadata={
+                "affinity": {
+                    "socialite": 2,
+                    "nerd": -100
+                },
+            })
         nodes = scheduler.Scheduler().find_candidates(inst, [])
         self.assertSetEqual({'node3'}, set(nodes))

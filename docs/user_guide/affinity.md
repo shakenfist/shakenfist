@@ -43,11 +43,11 @@ means you'd be very unhappy to be on the same hypervisor.
 
     Under the hood, Shaken Fist filters possible candidate hypervisors based on
     the affinity coefficients specified. Only tags from within your namespace are
-    considered for this filtration.This decision is of course only
-    made on the original start up of an instance, and does not apply later. That
-    is, if you change the tags or affinity of an instance after instance creation
-    it will not affect that instance in any way, although it might affect
-    scheduling decisions for future instances.
+    considered for this filtration. This decision is only made on the original
+    start up of an instance, and does not apply later. That is, if you change
+    the tags or affinity of an instance after instance creation it will not
+    affect that instance in any way, although it might affect scheduling decisions
+    for future instances.
 
 You can of course have more than one tag and affinity preference set at a time.
 So to extend our example, let's say that web servers do not prefer sharing with

@@ -298,7 +298,7 @@ class Scheduler(object):
 
             # Filter by affinity, if any has been specified
             by_affinity = defaultdict(list)
-            cpu_affinity = inst.affinity.get('cpu')
+            requested_affinity = inst.affinity
 
             for c in list(candidates):
                 n = Node.from_db(c)
@@ -319,7 +319,7 @@ class Scheduler(object):
                         if i.namespace != inst.namespace:
                             continue
 
-                        for tag, val in cpu_affinity.items():
+                        for tag, val in requested_affinity.items():
                             if tag in i.tags:
                                 affinity += int(val)
 
