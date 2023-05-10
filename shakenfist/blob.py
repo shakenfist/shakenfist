@@ -385,14 +385,27 @@ class Blob(dbo):
             self.observe()
             return
 
+        # Fetch with a few retries
+        attempts = 0
+        while attempts < 3:
+            try:
+                return self._attempt_transfer(
+                    locks, instance_object, partial_path, blob_path)
+            except (ConnectionRefusedError, BlobTransferSetupFailed,
+                    BlobFetchFailed) as e:
+                attempts += 1
+                if attempts > 3:
+                    raise e
+
+        raise BlobFetchFailed('Repeated attempts to fetch blob failed')
+
+    def _attempt_transfer(self, locks, instance_object, partial_path,
+                          blob_path):
         with open(partial_path, 'wb') as f:
             total_bytes_received = 0
             last_refresh = 0
             previous_percentage = 0
 
-            # NOTE(mikal): this port allocation scheme isn't great as it doesn't
-            # handle a port being in use already on the remote node. We should
-            # probably have a retry thing here.
             locations = self.locations
             for n in Nodes([node_inactive_states_filter]):
                 if n.uuid in locations:
@@ -421,8 +434,7 @@ class Blob(dbo):
                 time.sleep(1)
 
             if data['server_state'] != dbo.STATE_CREATED:
-                raise BlobTransferSetupFailed(
-                    'transfer %s failed to setup' % name)
+                raise BlobTransferSetupFailed('transfer %s failed to setup' % name)
 
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client.connect((locations[0], data['port']))
@@ -440,8 +452,7 @@ class Blob(dbo):
                         db.refresh_locks(locks)
                         last_refresh = time.time()
 
-                    percentage = (total_bytes_received /
-                                  int(self.size) * 100.0)
+                    percentage = total_bytes_received / int(self.size) * 100.0
                     if (percentage - previous_percentage) > 10.0:
                         if instance_object:
                             instance_object.add_event(
@@ -465,8 +476,7 @@ class Blob(dbo):
                 if instance_object:
                     instance_object.add_event(
                         EVENT_TYPE_AUDIT,
-                        'Fetching required blob %s failed (incorrect size)'
-                        % self.uuid)
+                        'Fetching required blob %s failed (incorrect size)' % self.uuid)
                 self.log.with_fields({
                     'bytes_fetched': total_bytes_received,
                     'size': int(self.size)
@@ -476,8 +486,7 @@ class Blob(dbo):
                 if instance_object:
                     instance_object.add_event(
                         EVENT_TYPE_AUDIT,
-                        'Fetching required blob %s failed (incorrect checksum)'
-                        % self.uuid)
+                        'Fetching required blob %s failed (incorrect checksum)' % self.uuid)
                 self.log.with_fields({
                     'bytes_fetched': total_bytes_received,
                     'size': int(self.size)
@@ -486,8 +495,7 @@ class Blob(dbo):
             os.rename(partial_path, blob_path)
             if instance_object:
                 instance_object.add_event(
-                    EVENT_TYPE_STATUS,
-                    'Fetching required blob %s, complete' % self.uuid)
+                    EVENT_TYPE_STATUS, 'Fetching required blob %s, complete' % self.uuid)
             self.log.with_fields({
                 'bytes_fetched': total_bytes_received,
                 'size': int(self.size)
