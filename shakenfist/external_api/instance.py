@@ -690,19 +690,10 @@ def _validate_instance_metadata(key, value):
                 400, 'value for "affinity" key should be a valid JSON dictionary')
 
         for key_type, dv in value.items():
-            if key_type not in ('cpu', 'disk', 'instance'):
-                return sf_api.error(
-                    400, 'can only set affinity for cpu, disk or instance')
-
-            if not isinstance(dv, dict):
-                return sf_api.error(
-                    400, 'value for affinity key should be a dictionary')
-            for v in dv.values():
-                try:
-                    int(v)
-                except ValueError:
-                    return sf_api.error(
-                        400, 'affinity dictionary values should be integers')
+            try:
+                int(dv)
+            except ValueError:
+                return sf_api.error(400, 'affinity dictionary values should be integers')
 
 
 class InstanceMetadataEndpoint(sf_api.Resource):

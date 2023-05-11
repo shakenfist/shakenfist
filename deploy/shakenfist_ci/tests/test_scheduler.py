@@ -53,7 +53,7 @@ class TestAffinity(base.BaseNamespacedTestCase):
                 }
             ], None, None, metadata={
                 'affinity': {
-                    'cpu': {'first-node': 100}
+                    'first-node': 100
                     }
                 }
             )
@@ -72,7 +72,7 @@ class TestAffinity(base.BaseNamespacedTestCase):
                 }
             ], None, None, metadata={
                 'affinity': {
-                    'cpu': {'first-node': -100}
+                    'first-node': -100
                     }
                 }
             )
