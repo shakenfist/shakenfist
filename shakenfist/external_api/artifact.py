@@ -1,5 +1,5 @@
 # Documentation state:
-#   - Has metadata calls:
+#   - Has metadata calls: yes
 #   - OpenAPI complete: yes
 #   - Covered in user or operator docs: both
 #   - API reference docs exist: yes
@@ -776,7 +776,7 @@ class ArtifactMetadataEndpoint(sf_api.Resource):
     @arg_is_artifact_ref
     @requires_artifact_ownership
     @api_base.log_token_use
-    def delete(self, artifact=None, key=None, value=None, artifact_from_db=None):
+    def delete(self, artifact_ref=None, key=None, value=None, artifact_from_db=None):
         if not key:
             return sf_api.error(400, 'no key specified')
         artifact_from_db.remove_metadata_key(key)

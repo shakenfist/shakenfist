@@ -1,9 +1,29 @@
+import random
+
 from shakenfist_ci import base
+
+
+class TestArtifactMetadata(base.BaseNamespacedTestCase):
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'artifact-metadata'
+        super(TestArtifactMetadata, self).__init__(*args, **kwargs)
+
+    def test_simple(self):
+        img = self.test_client.cache_artifact(
+                'https://sfcbr.shakenfist.com/cgi-bin/uuid.cgi?uniq=%06d'
+                % random.randint(-999999, 999999))
+
+        self.assertEqual({}, self.test_client.get_artifact_metadata(img['uuid']))
+        self.test_client.set_artifact_metadata_item(img['uuid'], 'foo', 'bar')
+        self.assertEqual(
+            {'foo': 'bar'}, self.test_client.get_artifact_metadata(img['uuid']))
+        self.test_client.delete_artifact_metadata_item(img['uuid'], 'foo')
+        self.assertEqual({}, self.test_client.get_artifact_metadata(img['uuid']))
 
 
 class TestInstanceMetadata(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
-        kwargs['namespace_prefix'] = 'metadata'
+        kwargs['namespace_prefix'] = 'instance-metadata'
         super(TestInstanceMetadata, self).__init__(*args, **kwargs)
 
     def setUp(self):
@@ -30,9 +50,9 @@ class TestInstanceMetadata(base.BaseNamespacedTestCase):
 
         self.assertIsNotNone(inst['uuid'])
 
-        self.assertEqual(
-            {}, self.test_client.get_instance_metadata(inst['uuid']))
-        self.test_client.set_instance_metadata_item(
-            inst['uuid'], 'foo', 'bar')
-        self.assertEqual({'foo': 'bar'},
-                         self.test_client.get_instance_metadata(inst['uuid']))
+        self.assertEqual({}, self.test_client.get_instance_metadata(inst['uuid']))
+        self.test_client.set_instance_metadata_item(inst['uuid'], 'foo', 'bar')
+        self.assertEqual({
+            'foo': 'bar'}, self.test_client.get_instance_metadata(inst['uuid']))
+        self.test_client.delete_instance_metadata_item(inst['uuid'], 'foo')
+        self.assertEqual({}, self.test_client.get_instance_metadata(inst['uuid']))
