@@ -2,10 +2,10 @@
 #   - Has metadata calls: yes
 #   - OpenAPI complete: yes
 #   - Covered in user or operator docs: both
-#   - API reference docs exist:
-#        - and link to OpenAPI docs:
-#        - and include examples:
-#   - Has complete CI coverage:
+#   - API reference docs exist: yes
+#        - and link to OpenAPI docs: yes
+#        - and include examples: yes
+#   - Has complete CI coverage: yes
 
 import base64
 import bcrypt
