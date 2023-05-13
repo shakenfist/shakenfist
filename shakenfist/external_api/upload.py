@@ -1,3 +1,12 @@
+# Documentation state:
+#   - Has metadata calls:
+#   - OpenAPI complete:
+#   - Covered in user or operator docs:
+#   - API reference docs exist:
+#        - and link to OpenAPI docs:
+#        - and include examples:
+#   - Has complete CI coverage:
+
 import flask
 from flasgger import swag_from
 import os
