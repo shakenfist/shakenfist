@@ -64,7 +64,7 @@ class InstanceEndpoint(sf_api.Resource):
     @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
-    @api_base.requires_namespace_exist
+    @api_base.requires_namespace_exist_if_specified
     @api_base.log_token_use
     def delete(self, instance_ref=None, instance_from_db=None, namespace=None):
         # Check if instance has already been deleted
@@ -128,7 +128,7 @@ class InstancesEndpoint(sf_api.Resource):
         return retval
 
     @api_base.verify_token
-    @api_base.requires_namespace_exist
+    @api_base.requires_namespace_exist_if_specified
     @api_base.log_token_use
     def post(self, name=None, cpus=None, memory=None, network=None, disk=None,
              ssh_key=None, user_data=None, placed_on=None, namespace=None,
@@ -506,7 +506,7 @@ class InstancesEndpoint(sf_api.Resource):
         return inst.external_view()
 
     @api_base.verify_token
-    @api_base.requires_namespace_exist
+    @api_base.requires_namespace_exist_if_specified
     @api_base.log_token_use
     def delete(self, confirm=False, namespace=None):
         """Delete all instances in the namespace."""

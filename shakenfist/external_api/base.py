@@ -336,7 +336,7 @@ def requires_network_active(func):
     return wrapper
 
 
-def requires_namespace_exist(func):
+def requires_namespace_exist_if_specified(func):
     def wrapper(*args, **kwargs):
         if kwargs.get('namespace'):
             if not Namespace.from_db(kwargs['namespace']):

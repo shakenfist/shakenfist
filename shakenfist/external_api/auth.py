@@ -45,6 +45,17 @@ def arg_is_namespace(func):
     return wrapper
 
 
+def requires_namespace_ownership(func):
+    def wrapper(*args, **kwargs):
+        ns = kwargs.get('namespace')
+        if not namespace_is_trusted(ns, get_jwt_identity()[0]):
+            LOG.info('Namespace not found, ownership test in decorator')
+            return sf_api.error(404, 'namespace not found')
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
 auth_token_example = """{
     "namespace": "system",
     "key": "oisoSe7T",
@@ -170,10 +181,8 @@ class AuthNamespacesEndpoint(sf_api.Resource):
 
     @swag_from(api_base.swagger_helper(
         'auth', 'List all namespaces visible to this namespace.', [],
-        [(200, 'The namespace as created.', namespace_list_example)],
-        requires_admin=True))
+        [(200, 'The namespace as created.', namespace_list_example)]))
     @api_base.verify_token
-    @sf_api.caller_is_admin
     @api_base.log_token_use
     def get(self):
         retval = []
@@ -235,10 +244,9 @@ class AuthNamespaceEndpoint(sf_api.Resource):
             ('namespace', 'body', 'string', 'The namespace to get.', True)
         ],
         [(200, 'Information about a single namespace.', namespace_get_example),
-         (404, 'Namespace not found.', None)],
-        requires_admin=True))
+         (404, 'Namespace not found.', None)]))
     @api_base.verify_token
-    @sf_api.caller_is_admin
+    @requires_namespace_ownership
     @arg_is_namespace
     @api_base.log_token_use
     def get(self, namespace=None, namespace_from_db=None):
@@ -265,10 +273,9 @@ class AuthNamespaceKeysEndpoint(sf_api.Resource):
              'The namespace to fetch authentication keys for.', True)
         ],
         [(200, 'A list of keynames for the namespace.', '["deploy", ...]'),
-         (404, 'Namespace not found.', None)],
-        requires_admin=True))
+         (404, 'Namespace not found.', None)]))
     @api_base.verify_token
-    @sf_api.caller_is_admin
+    @requires_namespace_ownership
     @arg_is_namespace
     @api_base.log_token_use
     def get(self, namespace=None, namespace_from_db=None):
@@ -285,12 +292,11 @@ class AuthNamespaceKeysEndpoint(sf_api.Resource):
             ('key', 'body', 'string', 'The authentication key.', True)
         ],
         [(200, 'The name of the created key.', 'newkey'),
-         (404, 'Namespace not found.', None)],
-        requires_admin=True))
+         (404, 'Namespace not found.', None)]))
     @api_base.verify_token
-    @sf_api.caller_is_admin
+    @requires_namespace_ownership
     @arg_is_namespace
-    @api_base.requires_namespace_exist
+    @api_base.requires_namespace_exist_if_specified
     @api_base.log_token_use
     def post(self, namespace=None, key_name=None, key=None, namespace_from_db=None):
         return _namespace_keys_putpost(namespace_from_db, key_name, key)
@@ -305,12 +311,11 @@ class AuthNamespaceKeyEndpoint(sf_api.Resource):
             ('key', 'body', 'string', 'The authentication key.', True)
         ],
         [(200, 'The name of the updated key.', 'newkey'),
-         (404, 'Namespace or key not found.', None)],
-        requires_admin=True))
+         (404, 'Namespace or key not found.', None)]))
     @api_base.verify_token
     @sf_api.caller_is_admin
-    @arg_is_namespace
-    @api_base.requires_namespace_exist
+    @requires_namespace_ownership
+    @api_base.requires_namespace_exist_if_specified
     @api_base.log_token_use
     def put(self, namespace=None, key_name=None, key=None, namespace_from_db=None):
         if key_name not in namespace_from_db.keys:
@@ -325,10 +330,9 @@ class AuthNamespaceKeyEndpoint(sf_api.Resource):
             ('key', 'body', 'string', 'The authentication key.', True)
         ],
         [(200, 'The name of the updated key.', 'newkey'),
-         (404, 'Namespace or key not found.', None)],
-        requires_admin=True))
+         (404, 'Namespace or key not found.', None)]))
     @api_base.verify_token
-    @sf_api.caller_is_admin
+    @requires_namespace_ownership
     @arg_is_namespace
     @api_base.log_token_use
     def delete(self, namespace=None, key_name=None, namespace_from_db=None):
@@ -348,10 +352,9 @@ class AuthMetadatasEndpoint(sf_api.Resource):
             ('namespace', 'body', 'string', 'The namespace to fetch metadata for.', True)
         ],
         [(200, 'Namespace metadata, if any.', None),
-         (404, 'Namespace not found.', None)],
-        requires_admin=True))
+         (404, 'Namespace not found.', None)]))
     @api_base.verify_token
-    @sf_api.caller_is_admin
+    @requires_namespace_ownership
     @arg_is_namespace
     @api_base.log_token_use
     def get(self, namespace=None, namespace_from_db=None):
@@ -366,12 +369,11 @@ class AuthMetadatasEndpoint(sf_api.Resource):
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
-         (404, 'Namespace not found.', None)],
-        requires_admin=True))
+         (404, 'Namespace not found.', None)]))
     @api_base.verify_token
-    @sf_api.caller_is_admin
+    @requires_namespace_ownership
+    @api_base.requires_namespace_exist_if_specified
     @arg_is_namespace
-    @api_base.requires_namespace_exist
     @api_base.log_token_use
     def post(self, namespace=None, key=None, value=None, namespace_from_db=None):
         if not key:
@@ -391,10 +393,10 @@ class AuthMetadataEndpoint(sf_api.Resource):
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
-         (404, 'Namespace not found.', None)],
-        requires_admin=True))
+         (404, 'Namespace not found.', None)]))
     @api_base.verify_token
-    @sf_api.caller_is_admin
+    @requires_namespace_ownership
+    @api_base.requires_namespace_exist_if_specified
     @arg_is_namespace
     @api_base.log_token_use
     def put(self, namespace=None, key=None, value=None, namespace_from_db=None):
@@ -413,10 +415,9 @@ class AuthMetadataEndpoint(sf_api.Resource):
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
-         (404, 'Namespace not found.', None)],
-        requires_admin=True))
+         (404, 'Namespace not found.', None)]))
     @api_base.verify_token
-    @sf_api.caller_is_admin
+    @requires_namespace_ownership
     @arg_is_namespace
     @api_base.log_token_use
     def delete(self, namespace=None, key=None, value=None, namespace_from_db=None):
