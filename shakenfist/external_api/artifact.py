@@ -723,7 +723,7 @@ class ArtifactMetadatasEndpoint(sf_api.Resource):
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
-         (400, 'Not key or value specified.', None),
+         (400, 'One of key or value are missing.', None),
          (404, 'Artifact not found.', None)],
         requires_admin=True))
     @api_base.verify_token
@@ -747,7 +747,7 @@ class ArtifactMetadataEndpoint(sf_api.Resource):
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
-         (400, 'Not key or value specified.', None),
+         (400, 'One of key or value are missing.', None),
          (404, 'Artifact not found.', None)],
         requires_admin=True))
     @api_base.verify_token
@@ -769,7 +769,7 @@ class ArtifactMetadataEndpoint(sf_api.Resource):
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
-         (400, 'Not key or value specified.', None),
+         (400, 'One of key or value are missing.', None),
          (404, 'Artifact not found.', None)],
         requires_admin=True))
     @api_base.verify_token

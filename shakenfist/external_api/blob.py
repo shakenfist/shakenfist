@@ -9,6 +9,7 @@
 
 import flask
 from flask_jwt_extended import get_jwt_identity
+from flasgger import swag_from
 import os
 import random
 import requests
@@ -47,15 +48,24 @@ def _read_remote(target, blob_uuid, offset=0):
         yield chunk
 
 
+def arg_is_blob_uuid(func):
+    def wrapper(*args, **kwargs):
+        if 'blob_uuid' in kwargs:
+            kwargs['blob_from_db'] = Blob.from_db(kwargs['blob_uuid'])
+
+        if not kwargs.get('blob_from_db'):
+            return sf_api.error(404, 'blob not found')
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
 class BlobEndpoint(sf_api.Resource):
     @api_base.verify_token
     @api_base.log_token_use
-    def get(self, blob_uuid=None):
-        b = Blob.from_db(blob_uuid)
-        if not b:
-            return sf_api.error(404, 'blob not found')
-
-        return b.external_view()
+    @arg_is_blob_uuid
+    def get(self, blob_uuid=None, blob_from_db=None):
+        return blob_from_db.external_view()
 
 
 class BlobDataEndpoint(sf_api.Resource):
@@ -69,12 +79,8 @@ class BlobDataEndpoint(sf_api.Resource):
     @api_base.verify_token
     @use_kwargs(get_args, location='query')
     @api_base.log_token_use
-    def get(self, blob_uuid=None, offset=0):
-        # Ensure the blob exists
-        b = Blob.from_db(blob_uuid)
-        if not b:
-            return sf_api.error(404, 'blob not found')
-
+    @arg_is_blob_uuid
+    def get(self, blob_uuid=None, offset=0, blob_from_db=None):
         # Fast path if we have the blob locally
         blob_path = Blob.filepath(blob_uuid)
         if os.path.exists(blob_path):
@@ -83,7 +89,7 @@ class BlobDataEndpoint(sf_api.Resource):
                 mimetype='text/plain', status=200)
 
         # Otherwise find a node which has the blob and proxy.
-        locations = b.locations
+        locations = blob_from_db.locations
         if not locations:
             return sf_api.error(404, 'blob missing')
 
@@ -121,3 +127,82 @@ class BlobChecksumsEndpoint(sf_api.Resource):
                 return b.external_view()
 
         return None
+
+
+class BlobMetadatasEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'blobs', 'Fetch metadata for a blob.',
+        [
+            ('blob_uuid', 'body', 'string', 'The blob to add a key to.', True)
+        ],
+        [(200, 'Blob metadata, if any.', None),
+         (404, 'Blob not found.', None)],
+        requires_admin=True))
+    @api_base.verify_token
+    @arg_is_blob_uuid
+    @api_base.log_token_use
+    def get(self, blob_uuid=None, blob_from_db=None):
+        return blob_from_db.metadata
+
+    @swag_from(api_base.swagger_helper(
+        'blobs', 'Add metadata for a blob.',
+        [
+            ('blob_uuid', 'body', 'string', 'The blob to add a key to.', True),
+            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('value', 'body', 'string', 'The value of the key.', True)
+        ],
+        [(200, 'Nothing.', None),
+         (400, 'One of key or value are missing.', None),
+         (404, 'Blob not found.', None)],
+        requires_admin=True))
+    @api_base.verify_token
+    @arg_is_blob_uuid
+    @api_base.log_token_use
+    def post(self, blob_uuid=None, key=None, value=None, blob_from_db=None):
+        if not key:
+            return sf_api.error(400, 'no key specified')
+        if not value:
+            return sf_api.error(400, 'no value specified')
+        blob_from_db.add_metadata_key(key, value)
+
+
+class BlobMetadataEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'blobs', 'Update a metadata key for an blob.',
+        [
+            ('blob_uuid', 'body', 'string', 'The blob to add a key to.', True),
+            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('value', 'body', 'string', 'The value of the key.', True)
+        ],
+        [(200, 'Nothing.', None),
+         (400, 'One of key or value are missing.', None),
+         (404, 'Blob not found.', None)],
+        requires_admin=True))
+    @api_base.verify_token
+    @arg_is_blob_uuid
+    @api_base.log_token_use
+    def put(self, blob_uuid=None, key=None, value=None, blob_from_db=None):
+        if not key:
+            return sf_api.error(400, 'no key specified')
+        if not value:
+            return sf_api.error(400, 'no value specified')
+        blob_from_db.add_metadata_key(key, value)
+
+    @swag_from(api_base.swagger_helper(
+        'blobs', 'Delete a metadata key for an blob.',
+        [
+            ('blob_uuid', 'body', 'string', 'The blob to remove a key from.', True),
+            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('value', 'body', 'string', 'The value of the key.', True)
+        ],
+        [(200, 'Nothing.', None),
+         (400, 'One of key or value are missing.', None),
+         (404, 'Blob not found.', None)],
+        requires_admin=True))
+    @api_base.verify_token
+    @arg_is_blob_uuid
+    @api_base.log_token_use
+    def delete(self, blob_uuid=None, key=None, value=None, blob_from_db=None):
+        if not key:
+            return sf_api.error(400, 'no key specified')
+        blob_from_db.remove_metadata_key(key)

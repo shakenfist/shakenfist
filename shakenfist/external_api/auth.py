@@ -365,7 +365,7 @@ class AuthMetadatasEndpoint(sf_api.Resource):
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
-         (400, 'Not key or value specified.', None),
+         (400, 'One of key or value are missing.', None),
          (404, 'Namespace not found.', None)],
         requires_admin=True))
     @api_base.verify_token
@@ -390,7 +390,7 @@ class AuthMetadataEndpoint(sf_api.Resource):
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
-         (400, 'Not key or value specified.', None),
+         (400, 'One of key or value are missing.', None),
          (404, 'Namespace not found.', None)],
         requires_admin=True))
     @api_base.verify_token
@@ -412,7 +412,7 @@ class AuthMetadataEndpoint(sf_api.Resource):
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
-         (400, 'Not key or value specified.', None),
+         (400, 'One of key or value are missing.', None),
          (404, 'Namespace not found.', None)],
         requires_admin=True))
     @api_base.verify_token
