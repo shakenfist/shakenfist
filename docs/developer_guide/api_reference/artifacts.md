@@ -348,6 +348,7 @@ from. This allows recommencing failed downloads.
     import json
     from shakenfist_client import apiclient
 
+    sf_client = apiclient.Client()
     vers = sf_client.get_artifact_versions('2d9c1d4c-3436-4ea8-9b60-833fe791eece')
     print(json.dumps(vers, indent=4, sort_keys=True))
     ```
@@ -368,6 +369,7 @@ for commonly used "official" images which many users will want to use.
     ``` python
     from shakenfist_client import apiclient
 
+    sf_client = apiclient.Client()
     sf_client.share_artifact('2d9c1d4c-3436-4ea8-9b60-833fe791eece')
     ```
 
@@ -376,6 +378,7 @@ for commonly used "official" images which many users will want to use.
     ``` python
     from shakenfist_client import apiclient
 
+    sf_client = apiclient.Client()
     sf_client.unshare_artifact('2d9c1d4c-3436-4ea8-9b60-833fe791eece')
     ```
 
@@ -383,5 +386,44 @@ for commonly used "official" images which many users will want to use.
 
 All objects exposed by the REST API may have metadata associated with them. This
 metadata is for storing values that are of interest to the owner of the resources,
-not Shaken Fist. Shaken Fist does not attempt to interpret these values at all.
-The metadata store is in the form of a key value store.
+not Shaken Fist. Shaken Fist does not attempt to interpret these values at all,
+with the exception of the [instance affinity metadata values](/user_guide/affinity/).
+The metadata store is in the form of a key value store, and a general introduction
+is available [in the user guide](/user_guide/metadata/).
+
+???+ tip "REST API calls"
+
+    * [GET ​/artifacts​/{artifact_ref}​/metadata](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/get_artifacts__artifact_ref__metadata): Get metadata for an artifact.
+    * [POST /artifacts/{artifact_ref}/metadata](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/post_artifacts__artifact_ref__metadata): Create a new metadata key for an artifact.
+    * [DELETE /artifacts/{artifact_ref}/metadata/{key}](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/delete_artifacts__artifact_ref__metadata__key_): Delete a specific metadata key for an artifact.
+    * [PUT /artifacts/{artifact_ref}/metadata/{key}](https://sfcbr.shakenfist.com/api/apidocs/#/artifacts/put_artifacts__artifact_ref__metadata__key_): Update an existing metadata key for an artifact.
+
+??? example "Python API client: set metadata on an artifact"
+
+    ``` python
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    sf_client.set_artifact_metadata_item(img_uuid, 'foo', 'bar')
+    ```
+
+??? example "Python API client: get metadata for an artifact"
+
+    ``` python
+    import json
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    md = sf_client.get_artifact_metadata(img_uuid)
+    print(json.dumps(md, indent=4, sort_keys=True))
+    ```
+
+??? example "Python API client: delete metadata for an artifact"
+
+    ``` python
+    import json
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    sf_client.delete_artifact_metadata_item(img_uuid, 'foo')
+    ```
