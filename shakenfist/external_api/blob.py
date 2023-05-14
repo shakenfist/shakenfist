@@ -60,7 +60,49 @@ def arg_is_blob_uuid(func):
     return wrapper
 
 
+blob_get_example = """{
+    "cluster_size": 2097152.0,
+    "compat": 1.1,
+    "compression type": "zlib",
+    "depends_on": null,
+    "disk size": "3.31 GiB",
+    "extended l2": "false",
+    "fetched_at": 1683995934.357137,
+    "file format": "qcow2",
+    "instances": [
+        "0a56ef2c-8331-4ed7-a443-267f53bfb24c",
+        "0d0fb7fd-bfe4-4fc4-af6d-6f0c9fe2acd9",
+        "fe55d1fd-80ab-4357-b04d-214f260a2325"
+    ],
+    "last_used": 1684054381.217045,
+    "locations": [
+        "sf-2",
+        "sf-1",
+        "sf-3",
+        "sf-4"
+    ],
+    "metadata": {},
+    "mime-type": "application/octet-stream",
+    "modified": 1683995934.357137,
+    "reference_count": 26,
+    "sha512": "e83e19c98de906...289e51a0252b0aa1b3fce",
+    "size": 3566573056,
+    "state": "created",
+    "transcodes": {
+        "zlib;qcow2;cluster_size": "ebafb833-8e7f-4df6-97b3-f1ecffd65e86"
+    },
+    "uuid": "578da8b6-eb98-4e10-bb36-e4d4d763d312",
+    "version": 6,
+    "virtual size": 32212254720.0
+}"""
+
+
 class BlobEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'blobs', 'Get blob information.',
+        [('blob_uuid', 'query', 'string', 'The UUID of the blob.', True)],
+        [(200, 'Information about a single blob.', blob_get_example),
+         (404, 'Blob not found.', None)]))
     @api_base.verify_token
     @api_base.log_token_use
     @arg_is_blob_uuid
@@ -76,6 +118,15 @@ class BlobDataEndpoint(sf_api.Resource):
         'offset': fields.Int(missing=0)
     }
 
+    @swag_from(api_base.swagger_helper(
+        'blobs', 'Get blob data.',
+        [
+            ('blob_uuid', 'query', 'string', 'The UUID of the blob.', True),
+            ('offset', 'query', 'integer',
+             'The offset into the file to start reading from.', False)
+        ],
+        [(200, 'Content of a blob as a streaming binary HTTP result.', 'n/a'),
+         (404, 'Blob not found.', None)]))
     @api_base.verify_token
     @use_kwargs(get_args, location='query')
     @api_base.log_token_use
@@ -99,7 +150,31 @@ class BlobDataEndpoint(sf_api.Resource):
             mimetype='text/plain', status=200)
 
 
+blobs_get_example = """[
+{
+    ...
+    "uuid": "578da8b6-eb98-4e10-bb36-e4d4d763d312",
+    "version": 6,
+    "virtual size": 32212254720.0
+},
+{
+    ...
+    "uuid": "bdb179a0-5c4d-42d5-8282-4653b869f430",
+    "version": 6,
+    "virtual size": 32212254720.0
+}
+]"""
+
+
 class BlobsEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'blobs', ('Get all blobs.'),
+        [('node', 'body', 'string',
+          'Limit results to a specific hypervisor node.', False)],
+        [(200, ('A list of blob dictionaries, each containing the same '
+                'output as a GET for a blob artifact would show.'),
+          blobs_get_example)],
+        requires_admin=True))
     @api_base.verify_token
     @sf_api.caller_is_admin
     @api_base.log_token_use
@@ -116,6 +191,11 @@ class BlobsEndpoint(sf_api.Resource):
 
 
 class BlobChecksumsEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'blobs', 'Search for a blob by sha512 hash.',
+        [('hash', 'query', 'string', 'The sha512 hash to search for.', True)],
+        [(200, 'Information about a single blob.', blob_get_example),
+         (404, 'Blob not found.', None)]))
     @api_base.verify_token
     @api_base.log_token_use
     def get(self, hash=None):
