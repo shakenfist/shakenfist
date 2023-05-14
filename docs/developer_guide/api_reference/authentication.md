@@ -271,3 +271,49 @@ the keys used to authenticate to a namespace.
     sf_client = apiclient.Client()
     sf_client.update_namespace_key('ci', 'newkey', 'newsecret')
     ```
+
+## Metadata
+
+All objects exposed by the REST API may have metadata associated with them. This
+metadata is for storing values that are of interest to the owner of the resources,
+not Shaken Fist. Shaken Fist does not attempt to interpret these values at all,
+with the exception of the [instance affinity metadata values](/user_guide/affinity/).
+The metadata store is in the form of a key value store, and a general introduction
+is available [in the user guide](/user_guide/metadata/).
+
+???+ tip "REST API calls"
+
+    * [GET ​/namespaces/{namespace}​/metadata](https://sfcbr.shakenfist.com/api/apidocs/#/auth/get_auth_namespaces__namespace__metadata): Get metadata for a namespace.
+    * [POST /namespaces/{namespace}/metadata](https://sfcbr.shakenfist.com/api/apidocs/#/auth/post_auth_namespaces__namespace__metadata): Create a new metadata key for a namespace.
+    * [DELETE /namespaces/{namespace}/metadata/{key}](https://sfcbr.shakenfist.com/api/apidocs/#/auth/delete_auth_namespaces__namespace__metadata__key_): Delete a specific metadata key for a namespace.
+    * [PUT /namespaces/{namespace}/metadata/{key}](https://sfcbr.shakenfist.com/api/apidocs/#/auth/delete_auth_namespaces__namespace__trust__external_namespace_): Update an existing metadata key for a namespace.
+
+??? example "Python API client: set metadata on a namespace"
+
+    ``` python
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    sf_client.set_artifact_metadata_item(img_uuid, 'foo', 'bar')
+    ```
+
+??? example "Python API client: get metadata for a namespace"
+
+    ``` python
+    import json
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    md = sf_client.get_artifact_metadata(img_uuid)
+    print(json.dumps(md, indent=4, sort_keys=True))
+    ```
+
+??? example "Python API client: delete metadata for a namespace"
+
+    ``` python
+    import json
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    sf_client.delete_artifact_metadata_item(img_uuid, 'foo')
+    ```

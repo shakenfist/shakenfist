@@ -1,3 +1,12 @@
+# Documentation state:
+#   - Has metadata calls:
+#   - OpenAPI complete:
+#   - Covered in user or operator docs:
+#   - API reference docs exist:
+#        - and link to OpenAPI docs:
+#        - and include examples:
+#   - Has complete CI coverage:
+
 from functools import partial
 from flask_jwt_extended import get_jwt_identity
 from flask_restful import fields, marshal_with
@@ -56,7 +65,7 @@ class NetworkEndpoint(sf_api.Resource):
     @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
-    @api_base.requires_namespace_exist
+    @api_base.requires_namespace_exist_if_specified
     @api_base.redirect_to_network_node
     @api_base.log_token_use
     def delete(self, network_ref=None, network_from_db=None, namespace=None):
@@ -104,7 +113,7 @@ class NetworksEndpoint(sf_api.Resource):
         return retval
 
     @api_base.verify_token
-    @api_base.requires_namespace_exist
+    @api_base.requires_namespace_exist_if_specified
     @api_base.log_token_use
     def post(self, netblock=None, provide_dhcp=None, provide_nat=None, name=None,
              namespace=None):
@@ -129,7 +138,7 @@ class NetworksEndpoint(sf_api.Resource):
         return n.external_view()
 
     @api_base.verify_token
-    @api_base.requires_namespace_exist
+    @api_base.requires_namespace_exist_if_specified
     @api_base.redirect_to_network_node
     @api_base.log_token_use
     def delete(self, confirm=False, namespace=None, clean_wait=False):

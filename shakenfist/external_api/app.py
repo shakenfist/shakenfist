@@ -99,6 +99,7 @@ class Root(sf_api.Resource):
              '<li>artifact-upload-types</li>'
              '<li>pure-affinity</li>'
              '<li>artifact-metadata</li>'
+             '<li>blob-metadata</li>'
              '</ul></p></body></html>'),
             mimetype='text/html')
         resp.status_code = 200
@@ -151,8 +152,9 @@ api.add_resource(api_auth.AuthNamespaceTrustEndpoint,
 api.add_resource(api_blob.BlobsEndpoint, '/blobs')
 api.add_resource(api_blob.BlobEndpoint, '/blobs/<blob_uuid>')
 api.add_resource(api_blob.BlobDataEndpoint, '/blobs/<blob_uuid>/data')
-api.add_resource(api_blob.BlobChecksumsEndpoint,
-                 '/blob_checksums/sha512/<hash>')
+api.add_resource(api_blob.BlobChecksumsEndpoint, '/blob_checksums/sha512/<hash>')
+api.add_resource(api_blob.BlobMetadatasEndpoint, '/blobs/<blob_uuid>/metadata')
+api.add_resource(api_blob.BlobMetadataEndpoint, '/blobs/<blob_uuid>/metadata/<key>')
 
 api.add_resource(api_instance.InstancesEndpoint, '/instances')
 api.add_resource(api_instance.InstanceEndpoint, '/instances/<instance_ref>')

@@ -1,3 +1,12 @@
+# Documentation state:
+#   - Has metadata calls:
+#   - OpenAPI complete:
+#   - Covered in user or operator docs:
+#   - API reference docs exist:
+#        - and link to OpenAPI docs:
+#        - and include examples:
+#   - Has complete CI coverage:
+
 from functools import partial
 from shakenfist_utilities import api as sf_api, logs
 

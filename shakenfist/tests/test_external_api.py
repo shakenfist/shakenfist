@@ -98,16 +98,14 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super(ExternalApiTestCase, self).setUp()
 
-        self.recorded_op = mock.patch(
-            'shakenfist.util.general.RecordedOperation')
+        self.recorded_op = mock.patch('shakenfist.util.general.RecordedOperation')
         self.recorded_op.start()
         self.addCleanup(self.recorded_op.stop)
 
         self.mock_etcd = MockEtcd(self, node_count=4)
         self.mock_etcd.setup()
 
-        self.scheduler = mock.patch(
-            'shakenfist.scheduler.Scheduler', FakeScheduler)
+        self.scheduler = mock.patch('shakenfist.scheduler.Scheduler', FakeScheduler)
         self.mock_scheduler = self.scheduler.start()
         self.addCleanup(self.scheduler.stop)
 

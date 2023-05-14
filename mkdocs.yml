@@ -24,6 +24,7 @@ nav:
         - "Consoles": user_guide/consoles.md
         - "Events": user_guide/events.md
         - "Objects": user_guide/objects.md
+        - "Object Metadata": user_guide/metadata.md
     - Developer Guide:
         - API reference:
             - "Admin (/admin/)": developer_guide/api_reference/admin.md

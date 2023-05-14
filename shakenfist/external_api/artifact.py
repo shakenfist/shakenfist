@@ -274,7 +274,7 @@ class ArtifactsEndpoint(sf_api.Resource):
          (404, 'Artifact not found.', None)]))
     @api_base.verify_token
     @api_base.log_token_use
-    @api_base.requires_namespace_exist
+    @api_base.requires_namespace_exist_if_specified
     def post(self, url=None, shared=False, namespace=None):
         # The only artifact type you can force the cluster to fetch is an
         # image, so TYPE_IMAGE is assumed here. We ensure that the image exists
@@ -316,7 +316,7 @@ class ArtifactsEndpoint(sf_api.Resource):
          (401, 'You cannot delete other namespaces.', None)]))
     @api_base.verify_token
     @api_base.log_token_use
-    @api_base.requires_namespace_exist
+    @api_base.requires_namespace_exist_if_specified
     def delete(self, confirm=False, namespace=None):
         if confirm is not True:
             return sf_api.error(400, 'parameter confirm is not set true')
@@ -372,7 +372,7 @@ class ArtifactUploadEndpoint(sf_api.Resource):
          (404, 'Upload, namespace, or blob not found.', None)]))
     @api_base.verify_token
     @api_base.log_token_use
-    @api_base.requires_namespace_exist
+    @api_base.requires_namespace_exist_if_specified
     def post(self, artifact_name=None, upload_uuid=None, blob_uuid=None,
              source_url=None, shared=False, namespace=None, artifact_type='image'):
         if upload_uuid and blob_uuid:
@@ -723,7 +723,7 @@ class ArtifactMetadatasEndpoint(sf_api.Resource):
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
-         (400, 'Not key or value specified.', None),
+         (400, 'One of key or value are missing.', None),
          (404, 'Artifact not found.', None)],
         requires_admin=True))
     @api_base.verify_token
@@ -747,7 +747,7 @@ class ArtifactMetadataEndpoint(sf_api.Resource):
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
-         (400, 'Not key or value specified.', None),
+         (400, 'One of key or value are missing.', None),
          (404, 'Artifact not found.', None)],
         requires_admin=True))
     @api_base.verify_token
@@ -769,7 +769,7 @@ class ArtifactMetadataEndpoint(sf_api.Resource):
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
-         (400, 'Not key or value specified.', None),
+         (400, 'One of key or value are missing.', None),
          (404, 'Artifact not found.', None)],
         requires_admin=True))
     @api_base.verify_token
