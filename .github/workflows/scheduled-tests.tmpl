@@ -223,19 +223,3 @@ jobs:
           name: bundle.zip
           retention-days: 14
           path: {% raw %}${{{% endraw %} github.workspace {% raw %}}}{% endraw %}/artifacts/bundle.zip
-
-      - uses: JasonEtco/create-an-issue@v2
-        if: failure()
-        id: create-issue
-        env:
-          GITHUB_TOKEN: {% raw %}${{{% endraw %} secrets.GITHUB_TOKEN {% raw %}}}{% endraw %}
-          SF_CI_NAME: {{name}}
-          SF_BRANCH: {{branch}}
-          SF_ACTION_RUN: {% raw %}${{{% endraw %} github.server_url {% raw %}}}{% endraw %}/{% raw %}${{{% endraw %} github.repository {% raw %}}}{% endraw %}/actions/runs/{% raw %}${{{% endraw %} github.run_id {% raw %}}}{% endraw %}
-        with:
-          filename: shakenfist/.github/workflows/scheduled-tests-failure.md
-          update_existing: true
-          search_existing: open
-
-      - if: failure()
-        run: 'echo Created {% raw %}${{{% endraw %} steps.create-issue.outputs.url {% raw %}}}{% endraw %}'
