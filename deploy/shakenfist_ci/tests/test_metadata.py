@@ -21,6 +21,31 @@ class TestArtifactMetadata(base.BaseNamespacedTestCase):
         self.assertEqual({}, self.test_client.get_artifact_metadata(img['uuid']))
 
 
+class TestBlobMetadata(base.BaseNamespacedTestCase):
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'blob-metadata'
+        super(TestBlobMetadata, self).__init__(*args, **kwargs)
+
+    def test_simple(self):
+        img = self.test_client.cache_artifact(
+                'https://sfcbr.shakenfist.com/cgi-bin/uuid.cgi?uniq=%06d'
+                % random.randint(-999999, 999999))
+        results = self._await_artifacts_ready([img['uuid']])
+        img = results[0]
+
+        self.assertIn('blobs', img)
+        self.assertEqual(1, len(img['blobs']))
+        self.assertIn(1, img['blobs'])
+        b = img['blobs'][1]
+
+        self.assertEqual({}, self.test_client.get_blob_metadata(b['uuid']))
+        self.test_client.set_blob_metadata_item(b['uuid'], 'foo', 'bar')
+        self.assertEqual(
+            {'foo': 'bar'}, self.test_client.get_blob_metadata(b['uuid']))
+        self.test_client.delete_blob_metadata_item(b['uuid'], 'foo')
+        self.assertEqual({}, self.test_client.get_blob_metadata(b['uuid']))
+
+
 class TestInstanceMetadata(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'instance-metadata'
