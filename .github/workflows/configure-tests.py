@@ -3,26 +3,6 @@
 import jinja2
 
 JOBS = {
-    'ci-images': [
-        {
-            'name': 'debian-10',
-            'baseimage': 'debian:10',
-            'baseuser': 'debian',
-            'outputlabel': 'ci-images/debian-10'
-        },
-        {
-            'name': 'debian-11',
-            'baseimage': 'debian:11',
-            'baseuser': 'debian',
-            'outputlabel': 'ci-images/debian-11'
-        },
-        {
-            'name': 'ubuntu-2004',
-            'baseimage': 'ubuntu:20.04',
-            'baseuser': 'ubuntu',
-            'outputlabel': 'ci-images/ubuntu-2004'
-        },
-    ],
     'functional-tests': [
         {
             'name': 'debian-10-localhost',
