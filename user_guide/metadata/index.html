@@ -10,20 +10,20 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/user_guide/events/">
+        <link rel="canonical" href="https://shakenfist.com/user_guide/metadata/">
       
       
-        <link rel="prev" href="../consoles/">
+        <link rel="prev" href="../objects/">
       
       
-        <link rel="next" href="../objects/">
+        <link rel="next" href="../../developer_guide/api_reference/admin/">
       
       <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.4.3, mkdocs-material-9.1.12">
     
     
       
-        <title>Events - Shaken Fist</title>
+        <title>Object Metadata - Shaken Fist</title>
       
     
     
@@ -65,7 +65,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#events" class="md-skip">
+        <a href="#object-metadata" class="md-skip">
           Skip to content
         </a>
       
@@ -100,7 +100,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Events
+              Object Metadata
             
           </span>
         </div>
@@ -367,21 +367,11 @@
               
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../events/" class="md-nav__link">
         Events
       </a>
-      
     </li>
   
 
@@ -405,11 +395,21 @@
               
   
   
+    
   
-    <li class="md-nav__item">
-      <a href="../metadata/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         Object Metadata
       </a>
+      
     </li>
   
 
@@ -959,43 +959,25 @@
   
 
 
-<h1 id="events">Events</h1>
-<p>Events are Shaken Fist's audit log mechanism. Many operations, ranging from
-creation and subsequent use of an authentication token, to any change in the data
-for an object, will result in an event being created in the event log for the
-relevant object. Importantly, regular "usage events" are also emitted, which we
-expect would form the basis for a consumption based billing system.</p>
-<p>Events may be requested using the <code>sf-client ...object... events</code> command, for
-example <code>sf-client artifact events ...uuid...</code> will return the events for the
-relevant artifact.</p>
-<p>The schema for events is still in flux, so be careful implementing automated
-systems which consume events. This will remain true until we are more confident
-that all relevant audit lock events are being collected. At that point we will
-standardize and stabilize the interface.</p>
-<p>As of v0.7, each event log entry has a type. The currently implemented types
-are:</p>
-<ul>
-<li>audit: audit log entries such as object creation or deletion, and authentication.</li>
-<li>mutate: object modifications which are not an audit log entry, such as minor updates.</li>
-<li>status: status messages useful to a user, such as progress of fetching an image.</li>
-<li>usage: billing information.</li>
-<li>resources: cluster resource usage information of interest to an operator.</li>
-<li>prune: messages relating to pruning of other message types.</li>
-<li>historic: events from before the type system was introduced.</li>
-</ul>
-<p>For each of these types, an operator can configure a retention period. The
-default periods are:</p>
-<ul>
-<li>audit (MAX_AUDIT_EVENT_AGE): 90 days.</li>
-<li>mutate (MAX_MUTATE_EVENT_AGE): 90 days.</li>
-<li>status (MAX_STATUS_EVENT_AGE): 7 days.</li>
-<li>usage (MAX_USAGE_EVENT_AGE): 30 days.</li>
-<li>resources (MAX_RESOURCES_EVENT_AGE): 7 days.</li>
-<li>prune (MAX_PRUNE_EVENT_AGE): 30 days.</li>
-<li>historic (MAX_HISTORIC_EVENT_AGE): 90 days.</li>
-</ul>
-<p>To permanently retain a type of event log entry, set the corresponding configuration
-value to -1.</p>
+<h1 id="object-metadata">Object metadata</h1>
+<p>All objects in Shaken Fist support a simple metadata system. This system is
+presented as a series of key, value pairs which are stored against the
+relevant object. A worked example can be seen in the <a href="/user_guide/affinity/">description of instance
+affinity</a> which requires specific keys and formats for
+their values, but you're not limited to that -- other keys can have data of any
+format that you can express in an API call.</p>
+<details class="note" open="open">
+<summary>Note</summary>
+<p>It is not intended that you store large amounts of data in a metadata key.
+If you want to store more than a couple of kilobytes in a value, then instead
+store a reference to an external system or a blob which contains the data.</p>
+</details>
+<p>You can set a metadata key's value on the command line like this:</p>
+<p><code>sf-client instance set-metadata ...uuid... key-name key-value</code></p>
+<p>Metadata values are show in the <code>show</code> output for the various object types, and
+there is no separate command to look them up. You can also delete a metadata key
+like this:</p>
+<p><code>sf-client instance delete-metadata ...uuid... key-name</code></p>
 
 
 
