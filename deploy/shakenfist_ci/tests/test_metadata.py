@@ -64,9 +64,13 @@ class TestNamespaceMetadata(base.BaseNamespacedTestCase):
         super(TestNamespaceMetadata, self).__init__(*args, **kwargs)
 
     def test_simple(self):
-        self.assertEqual({}, self.test_client.get_namespace_metadata('namespace-metadata'))
-        self.test_client.set_namespace_metadata_item('namespace-metadata', 'foo', 'bar')
+        # The name of the namespace is uniqified by the test runner, so we need
+        # to lookup what was actually created.
+        nsname = self.test_client.namespace
+
+        self.assertEqual({}, self.test_client.get_namespace_metadata(nsname))
+        self.test_client.set_namespace_metadata_item(nsname, 'foo', 'bar')
         self.assertEqual(
-            {'foo': 'bar'}, self.test_client.get_namespace_metadata('namespace-metadata'))
-        self.test_client.delete_namespace_metadata_item('namespace-metadata', 'foo')
-        self.assertEqual({}, self.test_client.get_namespace_metadata('namespace-metadata'))
+            {'foo': 'bar'}, self.test_client.get_namespace_metadata(nsname))
+        self.test_client.delete_namespace_metadata_item(nsname, 'foo')
+        self.assertEqual({}, self.test_client.get_namespace_metadata(nsname))
