@@ -1,5 +1,5 @@
 # Documentation state:
-#   - Has metadata calls:
+#   - Has metadata calls: yes
 #   - OpenAPI complete:
 #   - Covered in user or operator docs:
 #   - API reference docs exist:
@@ -11,6 +11,7 @@ from collections import defaultdict
 from functools import partial
 import flask
 from flask_jwt_extended import get_jwt_identity
+from flasgger import swag_from
 import os
 import re
 from shakenfist_utilities import api as sf_api, logs
@@ -31,8 +32,7 @@ from shakenfist.external_api import (
     util as api_util)
 from shakenfist import instance
 from shakenfist.namespace import namespace_is_trusted
-from shakenfist import network as sfnet  # Unfortunate, but we have an API arg
-# called network too.
+from shakenfist import network as sfnet
 from shakenfist.networkinterface import NetworkInterface
 from shakenfist.node import Node
 from shakenfist import scheduler
@@ -53,7 +53,120 @@ daemon.set_log_level(LOG, 'api')
 SCHEDULER = None
 
 
+instance_get_example = """{
+    "agent_start_time": null,
+    "agent_state": null,
+    "agent_system_boot_time": null,
+    "configdrive": "openstack-disk",
+    "console_port": null,
+    "cpus": 1,
+    "disk_spec": [
+        {
+            "base": "debian:11",
+            "bus": null,
+            "size": 20,
+            "type": "disk"
+        }
+    ],
+    "disks": [],
+    "error_message": null,
+    "interfaces": [],
+    "machine_type": "pc",
+    "memory": 1024,
+    "metadata": {},
+    "name": "example",
+    "namespace": "system",
+    "node": "sf-3",
+    "nvram_template": null,
+    "power_state": "initial",
+    "secure_boot": false,
+    "side_channels": [
+        "sf-agent"
+    ],
+    "ssh_key": null,
+    "state": "preflight",
+    "uefi": false,
+    "user_data": null,
+    "uuid": "d51aa352-368c-484c-9e4c-4542927b4277",
+    "vdi_port": null,
+    "vdi_tls_port": null,
+    "version": 12,
+    "video": {
+        "memory": 16384,
+        "model": "cirrus",
+        "vdi": "spice"
+    }
+}"""
+
+
+instance_get_example_deleted = """{
+    "agent_start_time": null,
+    "agent_state": "not ready (instance powered off)",
+    "agent_system_boot_time": null,
+    "configdrive": "openstack-disk",
+    "console_port": null,
+    "cpus": 1,
+    "disk_spec": [
+        {
+            "base": "debian:11",
+            "bus": null,
+            "size": 20,
+            "type": "disk"
+        }
+    ],
+    "disks": [
+        {
+            "blob_uuid": "5117f778-b214-4184-8358-f2c7376b76db",
+            "bus": "virtio",
+            "device": "vda",
+            "size": 20,
+            "snapshot_ignores": false
+        },
+        {
+            "blob_uuid": null,
+            "bus": "virtio",
+            "device": "vdb",
+            "size": null,
+            "snapshot_ignores": true
+        }
+    ],
+    "error_message": null,
+    "interfaces": [],
+    "machine_type": "pc",
+    "memory": 1024,
+    "metadata": {},
+    "name": "example",
+    "namespace": "system",
+    "node": "sf-3",
+    "nvram_template": null,
+    "power_state": "off",
+    "secure_boot": false,
+    "side_channels": [
+        "sf-agent"
+    ],
+    "ssh_key": null,
+    "state": "deleted",
+    "uefi": false,
+    "user_data": null,
+    "uuid": "d51aa352-368c-484c-9e4c-4542927b4277",
+    "vdi_port": null,
+    "vdi_tls_port": null,
+    "version": 12,
+    "video": {
+        "memory": 16384,
+        "model": "cirrus",
+        "vdi": "spice"
+    }
+}"""
+
+
 class InstanceEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'instances', 'Get instance information.',
+        [('instance_ref', 'query', 'string',
+          'The UUID or name of the instance.', True)],
+        [(200, 'Information about a single instance.', instance_get_example),
+         (404, 'Instance not found.', None)]))
     @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -61,6 +174,15 @@ class InstanceEndpoint(sf_api.Resource):
     def get(self, instance_ref=None, instance_from_db=None):
         return instance_from_db.external_view()
 
+    @swag_from(api_base.swagger_helper(
+        'instances', 'Delete an instance.',
+        [('instance_ref', 'query', 'string',
+          'The UUID or name of the instance.', True),
+         ('namespace', 'body', 'string',
+          'The namespace containing the instance', False)],
+        [(200, 'Information about the instance post delete.',
+          instance_get_example_deleted),
+         (404, 'Instance not found.', None)]))
     @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -113,7 +235,35 @@ def _artifact_safety_checks(a, instance_uuid=None):
     return sf_api.error(404, 'artifact not found')
 
 
+instances_get_example = """[
+    {
+        ...
+        "name": "sfcbr-33WgX7tS4nqGtBTO",
+        "namespace": "sfcbr-33WgX7tS4nqGtBTO",
+        "node": "sf-1",
+        ...
+        "uuid": "3de4e98a-c234-48eb-8105-cc501ff6f22c",
+        ...
+    },
+    {
+        ...
+        "name": "foo",
+        "namespace": "system",
+        "node": "sf-2",
+        ...
+        "uuid": "5c346d09-1562-4cbf-9800-c1c43192d93c",
+        ...
+    }
+]"""
+
+
 class InstancesEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'instances', 'Get all instances visible to the currently '
+                     'authenticated namespace.',
+        [('all', 'body', 'boolean',
+          'If unset or False, only active instances are shown.', False)],
+        [(200, 'Information about a single instance.', instances_get_example)]))
     @api_base.verify_token
     @api_base.log_token_use
     def get(self, all=False):
@@ -123,7 +273,6 @@ class InstancesEndpoint(sf_api.Resource):
 
         retval = []
         for i in instance.Instances(filters):
-            # This forces the instance through the external view rehydration
             retval.append(i.external_view())
         return retval
 
