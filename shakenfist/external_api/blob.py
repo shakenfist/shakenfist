@@ -100,7 +100,7 @@ blob_get_example = """{
 class BlobEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Get blob information.',
-        [('blob_uuid', 'query', 'string', 'The UUID of the blob.', True)],
+        [('blob_uuid', 'query', 'uuid', 'The UUID of the blob.', True)],
         [(200, 'Information about a single blob.', blob_get_example),
          (404, 'Blob not found.', None)]))
     @api_base.verify_token
@@ -121,7 +121,7 @@ class BlobDataEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Get blob data.',
         [
-            ('blob_uuid', 'query', 'string', 'The UUID of the blob.', True),
+            ('blob_uuid', 'query', 'uuid', 'The UUID of the blob.', True),
             ('offset', 'query', 'integer',
              'The offset into the file to start reading from.', False)
         ],
@@ -169,7 +169,7 @@ blobs_get_example = """[
 class BlobsEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', ('Get all blobs.'),
-        [('node', 'body', 'string',
+        [('node', 'body', 'node',
           'Limit results to a specific hypervisor node.', False)],
         [(200, ('A list of blob dictionaries, each containing the same '
                 'output as a GET for a blob artifact would show.'),
@@ -213,7 +213,7 @@ class BlobMetadatasEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Fetch metadata for a blob.',
         [
-            ('blob_uuid', 'body', 'string', 'The blob to add a key to.', True)
+            ('blob_uuid', 'body', 'uuid', 'The blob to add a key to.', True)
         ],
         [(200, 'Blob metadata, if any.', None),
          (404, 'Blob not found.', None)],
@@ -227,7 +227,7 @@ class BlobMetadatasEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Add metadata for a blob.',
         [
-            ('blob_uuid', 'body', 'string', 'The blob to add a key to.', True),
+            ('blob_uuid', 'body', 'uuid', 'The blob to add a key to.', True),
             ('key', 'body', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
@@ -250,7 +250,7 @@ class BlobMetadataEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Update a metadata key for an blob.',
         [
-            ('blob_uuid', 'body', 'string', 'The blob to add a key to.', True),
+            ('blob_uuid', 'body', 'uuid', 'The blob to add a key to.', True),
             ('key', 'body', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
@@ -271,7 +271,7 @@ class BlobMetadataEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Delete a metadata key for an blob.',
         [
-            ('blob_uuid', 'body', 'string', 'The blob to remove a key from.', True),
+            ('blob_uuid', 'body', 'uuid', 'The blob to remove a key from.', True),
             ('key', 'body', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
