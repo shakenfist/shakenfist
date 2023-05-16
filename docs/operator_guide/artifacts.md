@@ -2,7 +2,7 @@
 
 ## Checksums
 
-As of Shaken Fist v0.7, blob replics are regularly checksummed to verify that
+As of Shaken Fist v0.7, blob replicas are regularly checksummed to verify that
 data loss has not occurred. The following events imply a checksum operation:
 
 * snapshotting an NVRAM template.
