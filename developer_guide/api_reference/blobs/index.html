@@ -540,9 +540,47 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          Blobs (/blobs/)
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         Blobs (/blobs/)
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#fetching-information-about-a-blob" class="md-nav__link">
+    Fetching information about a blob
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metadata" class="md-nav__link">
+    Metadata
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -945,6 +983,28 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#fetching-information-about-a-blob" class="md-nav__link">
+    Fetching information about a blob
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metadata" class="md-nav__link">
+    Metadata
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -962,7 +1022,151 @@
 
 
 <h1 id="blobs-blobs">Blobs (/blobs/)</h1>
-<p>Not yet documented.</p>
+<p>In general you interact with blobs as attributes of other objects -- blobs
+being the most obvious example. However, there is limited support in the REST API
+for interacting directly with blobs as well. Blobs are also considered a special
+case in that they are not namespaced like most other objects. That is, possession
+of the UUID of a blob is considered evidence that you should have access to it.
+This is because blobs can be shared between objects if the data for those
+objects is currently the identical. This is also why only administrators can list
+all blobs in a given Shaken Fist cluster.</p>
+<h2 id="fetching-information-about-a-blob">Fetching information about a blob</h2>
+<p>If you know the UUID of a blob, then you can GET information about that blob from
+the REST API, as well as fetching the actual data the blob is storing as well.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/blobs/get_blobs">GET /blobs</a>: List all blobs in a cluster. You must be an administrator to make this call.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/blobs/get_blobs__blob_uuid_">GET /blobs/{blob_uuid}</a>: Get information about a specific blob.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/blobs/get_blobs__blob_uuid__data">GET /blobs/{blob_uuid}/data</a>: Get the stored data for a specific blob.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/blobs/get_blob_checksums_sha512__hash_">GET /blob_checksums/sha512/{hash}</a>: Find a blob with this hash.</li>
+</ul>
+</details>
+<details class="example">
+<summary>Python API client: get a specific blob</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">b</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_blob</span><span class="p">(</span><span class="s1">&#39;578da8b6-eb98-4e10-bb36-e4d4d763d312&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: download the data for a specific blob</summary>
+<p>This example requires retry logic to handle the HTTP connection dropping
+while transferring large files.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">http</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+<span class="kn">import</span> <span class="nn">requests</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">urllib3</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+
+<span class="n">total</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="n">connection_failures</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="n">done</span> <span class="o">=</span> <span class="kc">False</span>
+
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s1">&#39;output&#39;</span><span class="p">,</span> <span class="s1">&#39;wb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="k">while</span> <span class="ow">not</span> <span class="n">done</span><span class="p">:</span>
+        <span class="n">bytes_in_attempt</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_blob_data</span><span class="p">(</span>
+                    <span class="s1">&#39;578da8b6-eb98-4e10-bb36-e4d4d763d312&#39;</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="n">total</span><span class="p">):</span>
+                <span class="n">received</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
+                <span class="n">bytes_in_attempt</span> <span class="o">+=</span> <span class="n">received</span>
+                <span class="n">total</span> <span class="o">+=</span> <span class="n">received</span>
+
+            <span class="n">done</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="k">except</span> <span class="n">urllib3</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">NewConnectionError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">connection_failures</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">if</span> <span class="n">connection_failures</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;HTTP connection repeatedly failed: </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">e</span><span class="p">)</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">except</span> <span class="p">(</span><span class="ne">ConnectionResetError</span><span class="p">,</span> <span class="n">http</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">IncompleteRead</span><span class="p">,</span>
+                <span class="n">urllib3</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">ProtocolError</span><span class="p">,</span>
+                <span class="n">requests</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">ChunkedEncodingError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="c1"># An API error (or timeout) occurred. Retry unless we got nothing.</span>
+            <span class="k">if</span> <span class="n">bytes_in_attempt</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;HTTP connection dropped without transferring data: </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">e</span><span class="p">)</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: search for a blob by sha512 hash</summary>
+<p>Note that this call is not supported by older versions of the Shaken Fist
+REST API.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">hashlib</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">check_capability</span><span class="p">(</span><span class="s1">&#39;blob-search-by-hash&#39;</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Searching by hash is not supported&#39;</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">sha512_hash</span> <span class="o">=</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha512</span><span class="p">()</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s1">&#39;input&#39;</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="mi">4096</span><span class="p">)</span>
+        <span class="k">while</span> <span class="n">d</span><span class="p">:</span>
+            <span class="n">sha512_hash</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
+            <span class="n">d</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="mi">4096</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Searching for a pre-existing blob with this hash...&#39;</span><span class="p">)</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_blob_by_sha512</span><span class="p">(</span><span class="n">sha512_hash</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">())</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">b</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;No matching blob found&#39;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Blob </span><span class="si">%s</span><span class="s1"> is a match&#39;</span> <span class="o">%</span> <span class="n">b</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
+</code></pre></div>
+</details>
+<h2 id="metadata">Metadata</h2>
+<p>All objects exposed by the REST API may have metadata associated with them. This
+metadata is for storing values that are of interest to the owner of the resources,
+not Shaken Fist. Shaken Fist does not attempt to interpret these values at all,
+with the exception of the <a href="/user_guide/affinity/">instance affinity metadata values</a>.
+The metadata store is in the form of a key value store, and a general introduction
+is available <a href="/user_guide/metadata/">in the user guide</a>.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/blobs/get_blobs__blob_uuid__metadata">GET ​/blobs​/{blob_uuid}​/metadata</a>: Get metadata for a blob.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/blobs/post_blobs__blob_uuid__metadata">POST /blobs/{blob_uuid}/metadata</a>: Create a new metadata key for a blob.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/blobs/delete_blobs__blob_uuid__metadata__key_">DELETE /blobs/{blob_uuid}/metadata/{key}</a>: Delete a specific metadata key for a blob.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/blobs/put_blobs__blob_uuid__metadata__key_">PUT /blobs/{blob_uuid}/metadata/{key}</a>: Update an existing metadata key for a blob.</li>
+</ul>
+</details>
+<details class="example">
+<summary>Python API client: set metadata on a blob</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">sf_client</span><span class="o">.</span><span class="n">set_blob_metadata_item</span><span class="p">(</span><span class="n">blob_uuid</span><span class="p">,</span> <span class="s1">&#39;foo&#39;</span><span class="p">,</span> <span class="s1">&#39;bar&#39;</span><span class="p">)</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: get metadata for a blob</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">md</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_blob_metadata</span><span class="p">(</span><span class="n">blob_uuid</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">md</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: delete metadata for a blob</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">sf_client</span><span class="o">.</span><span class="n">delete_blob_metadata_item</span><span class="p">(</span><span class="n">blob_uuid</span><span class="p">,</span> <span class="s1">&#39;foo&#39;</span><span class="p">)</span>
+</code></pre></div>
+</details>
 
 
 
