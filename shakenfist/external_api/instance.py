@@ -163,7 +163,7 @@ instance_get_example_deleted = """{
 class InstanceEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Get instance information.',
-        [('instance_ref', 'query', 'string',
+        [('instance_ref', 'query', 'uuidorname',
           'The UUID or name of the instance.', True)],
         [(200, 'Information about a single instance.', instance_get_example),
          (404, 'Instance not found.', None)]))
@@ -176,9 +176,9 @@ class InstanceEndpoint(sf_api.Resource):
 
     @swag_from(api_base.swagger_helper(
         'instances', 'Delete an instance.',
-        [('instance_ref', 'query', 'string',
+        [('instance_ref', 'query', 'uuidorname',
           'The UUID or name of the instance.', True),
-         ('namespace', 'body', 'string',
+         ('namespace', 'body', 'namespace',
           'The namespace containing the instance', False)],
         [(200, 'Information about the instance post delete.',
           instance_get_example_deleted),
@@ -263,7 +263,8 @@ class InstancesEndpoint(sf_api.Resource):
                      'authenticated namespace.',
         [('all', 'body', 'boolean',
           'If unset or False, only active instances are shown.', False)],
-        [(200, 'Information about a single instance.', instances_get_example)]))
+        [(200, 'Information about a single instance.', instances_get_example),
+         (404, 'Instance not found.', None)]))
     @api_base.verify_token
     @api_base.log_token_use
     def get(self, all=False):
@@ -276,6 +277,72 @@ class InstancesEndpoint(sf_api.Resource):
             retval.append(i.external_view())
         return retval
 
+    @swag_from(api_base.swagger_helper(
+        'instances', 'Create an instance.',
+        [
+            ('name', 'body', 'string',
+             'The name of the instance, must meet the requirements of DNS RFCs.', True),
+            ('cpus', 'body', 'integer', 'The number of vCPUs', True),
+            ('memory', 'body', 'integer', 'The amount of RAM in MB.', True),
+            ('network', 'body', 'arrayofdict',
+             'A list of networkspecs defining the networking for this instance. '
+             'See https://shakenfist.com/developer_guide/api_reference/instances/ '
+             'for more details on networkspecs.', False),
+            ('disk', 'body', 'arrayofdict',
+             'A list of diskspecs defining the disk devices for this instance. '
+             'See https://shakenfist.com/developer_guide/api_reference/instances/ '
+             'for more details on diskspecs.', True),
+            ('sshkey', 'body', 'string',
+             'A ssh public key to add to the default users authorized_keys file '
+             'via cloud-init. Requires that both configdrive be enabled, and that '
+             'cloud-init be installed on the instance before boot.', False),
+            ('userdata', 'body', 'string',
+             'Other user-data to be provided to cloud-init. Requires that both '
+             'configdrive be enabled, and that cloud-init be installed on the '
+             'instance before boot.', False),
+            ('placed_on', 'body', 'node',
+             'The name of a Node to place this instance on.', False),
+            ('namespace', 'body', 'namespace',
+             'The namespace this instance should be created in, if other than '
+             'the currently authenticated namespace.', False),
+            ('video', 'body', 'dict',
+             'A single videospec describing the video configuration of this instance. '
+             'See https://shakenfist.com/developer_guide/api_reference/instances/ '
+             'for more details on videospecs.', False),
+            ('uefi', 'body', 'boolean',
+             'True if you want to boot an instance with UEFI instead of BIOS boot.',
+             False),
+            ('configdrive', 'body', 'string',
+             'A config drive type. Currently "none" and "openstack-disk" are '
+             'supported.', False),
+            ('metadata', 'body', 'arrayofdict',
+             'Any metadata to be set for the instance at creation time. See '
+             'https://shakenfist.com/developer_guide/api_reference/instances/ for '
+             'a discussion of instance metadata.', False),
+            ('nvram_template', 'body', 'url',
+             'A pointer to a template for the NVRAM image to be used for UEFI boot '
+             'configuration. This can either be of the form "label:...label...", '
+             'or "sf://blob/...blob.uuid...". URLs from the Internet are not '
+             'currently supported unless fetched separately with an artifact cache '
+             'operation.', False),
+            ('secure_boot', 'body', 'boolean',
+             'True if you would like to boot this instance with secure boot. '
+             'Note that secure boot requires that UEFI also be True.', False),
+            ('side_channels', 'body', 'arrayofstring',
+             'Either None, or an array of strings listing side channels to '
+             'connect to the instance. The only currently supported side channel '
+             'is sf-agent, which is required for the Shaken Fist in-guest agent '
+             'to function.', False)
+          ],
+        [
+            (200, 'Information about a single instance.', instances_get_example),
+            (400, 'Instance configuration error such as invalid name of boot '
+                'configuration.', None),
+            (404, 'Namespace, network, node, blob, snapshot, or label not found.', None),
+            (406, 'Network not ready.', None),
+            (409, 'Network address in use.', None),
+            (507, 'Unable to allocate resources for the instance.', None)
+         ]))
     @api_base.verify_token
     @api_base.requires_namespace_exist_if_specified
     @api_base.log_token_use

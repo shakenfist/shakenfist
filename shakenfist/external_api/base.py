@@ -44,14 +44,22 @@ def swagger_helper(section, description, parameters, responses,
 
     # Type MUST be one of "string", "number", "integer", "boolean", "array" or "file".
     argtypes = {
+        'arrayofdict': {'type': 'string', 'format': 'an array of JSON dictionaries'},
+        'arrayofstring': {'type': 'string', 'format': 'an array of strings'},
         'bearer': {'type': 'string', 'format': 'Bearer ...JWT...'},
         'binary': {'type': 'string', 'format': 'Binary data'},
-        'boolean': {'type': 'boolean', 'type': 'boolean'},
+        'boolean': {'type': 'boolean', 'format': 'boolean'},
+        'dict': {'type': 'string', 'format': 'a JSON dictionary'},
         'integer': {'type': 'integer', 'type': 'integer'},
-        'namespace': {'type': 'string', 'format': 'namespace'},
+        'namespace': {'type': 'string', 'format': 'the name of a namespace'},
+        'node': {'type': 'string', 'format': 'the name of a node'},
         'string': {'type': 'string', 'format': 'string'},
         'url': {'type': 'string', 'format': 'url'},
-        'uuid': {'type': 'string', 'format': 'uuid'}
+        'uuid': {'type': 'string', 'format': 'uuid'},
+        'uuidorname': {
+            'type': 'string',
+            'format': 'either a valid UUID or the unique name of an object'
+            }
     }
 
     if requires_auth:

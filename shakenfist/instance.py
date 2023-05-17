@@ -872,6 +872,9 @@ class Instance(dbo):
                                     config.STORAGE_PATH, 'image_cache', backing_uuid + '.qcow2')
                                 backing_chain.append(backing_path)
                                 backing_blob = blob.Blob.from_db(backing_uuid)
+                                if not backing_blob:
+                                    raise exceptions.BlobMissing(
+                                        'backing blob %s is missing' % backing_uuid)
                                 backing_uuid = backing_blob.depends_on
 
                             indent = '      '
