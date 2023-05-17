@@ -286,11 +286,11 @@ class InstancesEndpoint(sf_api.Resource):
             ('memory', 'body', 'integer', 'The amount of RAM in MB.', True),
             ('network', 'body', 'arrayofdict',
              'A list of networkspecs defining the networking for this instance. '
-             'See https://shakenfist.com/developer_guide/api_reference/instances/ '
+             'See https://shakenfist.com/developer_guide/api_reference/instances/#networkspec '
              'for more details on networkspecs.', False),
             ('disk', 'body', 'arrayofdict',
              'A list of diskspecs defining the disk devices for this instance. '
-             'See https://shakenfist.com/developer_guide/api_reference/instances/ '
+             'See https://shakenfist.com/developer_guide/api_reference/instances/#diskspec '
              'for more details on diskspecs.', True),
             ('sshkey', 'body', 'string',
              'A ssh public key to add to the default users authorized_keys file '
@@ -307,7 +307,7 @@ class InstancesEndpoint(sf_api.Resource):
              'the currently authenticated namespace.', False),
             ('video', 'body', 'dict',
              'A single videospec describing the video configuration of this instance. '
-             'See https://shakenfist.com/developer_guide/api_reference/instances/ '
+             'See https://shakenfist.com/developer_guide/api_reference/instances/#videospec '
              'for more details on videospecs.', False),
             ('uefi', 'body', 'boolean',
              'True if you want to boot an instance with UEFI instead of BIOS boot.',
@@ -721,6 +721,14 @@ class InstancesEndpoint(sf_api.Resource):
         etcd.enqueue(placement, {'tasks': tasks})
         return inst.external_view()
 
+    @swag_from(api_base.swagger_helper(
+        'instances', 'Delete all instances in a namespace.',
+        [('confirm', 'body', 'boolean', 'I really mean it.', True),
+         ('namespace', 'body', 'namespace',
+          'The namespace to delete instances from', False)],
+        [(200, 'A list of the UUIDs of instances awaiting deletion.', None),
+         (400, 'The confirm parameter is not True or a administrative user has '
+               'not specified a namespace.', None)]))
     @api_base.verify_token
     @api_base.requires_namespace_exist_if_specified
     @api_base.log_token_use
@@ -761,7 +769,31 @@ class InstancesEndpoint(sf_api.Resource):
         return waiting_for
 
 
+instance_interfaces_example = """[
+    {
+        "floating": "192.168.10.73",
+        "instance_uuid": "c0d52a77-0f8a-4f19-bec7-0c05efb03cb4",
+        "ipv4": "10.0.0.47",
+        "macaddr": "02:00:00:6d:e5:e0",
+        "metadata": {},
+        "model": "virtio",
+        "network_uuid": "1bed1aa5-10f0-45cc-ae58-4a94761bef59",
+        "order": 0,
+        "state": "created",
+        "uuid": "8e7b2f39-c652-4ec2-88ff-2791b503fc65",
+        "version": 3
+    }
+]"""
+
+
 class InstanceInterfacesEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'instances', 'List network interfaces for an instance.',
+        [('instance_ref', 'query', 'uuidorname',
+          'The UUID or name of the instance.', True)],
+        [(200, 'A list of network interfaces for an instance.',
+          instance_interfaces_example),
+         (404, 'Instance not found.', None)]))
     @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -776,7 +808,51 @@ class InstanceInterfacesEndpoint(sf_api.Resource):
         return out
 
 
+instance_events_example = """[
+    ...
+    {
+        "duration": null,
+        "extra": "{\"candidates\": [\"sf-1\", \"sf-2\", \"sf-3\", \"sf-4\"]}",
+        "fqdn": "sf-1",
+        "message": "schedule are hypervisors",
+        "timestamp": 1684299968.0741177,
+        "type": "audit"
+    },
+    {
+        "duration": null,
+        "extra": "{\"candidates\": [\"sf-1\", \"sf-2\", \"sf-3\", \"sf-4\"]}",
+        "fqdn": "sf-1",
+        "message": "schedule initial candidates",
+        "timestamp": 1684299968.0697834,
+        "type": "audit"
+    },
+    {
+        "duration": null,
+        "extra": "{\"attribute\": \"interfaces\", \"value\": []}",
+        "fqdn": "sf-1",
+        "message": "set attribute",
+        "timestamp": 1684299968.030679,
+        "type": "mutate"
+    },
+    {
+        "duration": null,
+        "extra": "{\"attribute\": \"power_state\", \"power_state\": \"initial\"}",
+        "fqdn": "sf-1",
+        "message": "set attribute",
+        "timestamp": 1684299968.020376,
+        "type": "mutate"
+    },
+    ...
+]"""
+
+
 class InstanceEventsEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'instances', 'Get instance event information.',
+        [('instance_ref', 'query', 'uuidorname',
+          'The UUID or name of the instance.', True)],
+        [(200, 'Event information about a single instance.', instance_events_example),
+         (404, 'Instance not found.', None)]))
     @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -788,6 +864,12 @@ class InstanceEventsEndpoint(sf_api.Resource):
 
 
 class InstanceRebootSoftEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'instances', 'Soft (ACPI) reboot an instance.',
+        [('instance_ref', 'query', 'uuidorname',
+          'The UUID or name of the instance.', True)],
+        [(404, 'Instance not found.', None),
+         (409, 'The instance cannot be rebooted.', None)]))
     @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -803,6 +885,12 @@ class InstanceRebootSoftEndpoint(sf_api.Resource):
 
 
 class InstanceRebootHardEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'instances', 'Hard (reset switch) reboot an instance.',
+        [('instance_ref', 'query', 'uuidorname',
+          'The UUID or name of the instance.', True)],
+        [(404, 'Instance not found.', None),
+         (409, 'The instance cannot be rebooted.', None)]))
     @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -818,6 +906,12 @@ class InstanceRebootHardEndpoint(sf_api.Resource):
 
 
 class InstancePowerOffEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'instances', 'Power off an instance.',
+        [('instance_ref', 'query', 'uuidorname',
+          'The UUID or name of the instance.', True)],
+        [(404, 'Instance not found.', None),
+         (409, 'The instance cannot be powered off.', None)]))
     @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -833,6 +927,12 @@ class InstancePowerOffEndpoint(sf_api.Resource):
 
 
 class InstancePowerOnEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'instances', 'Power on an instance.',
+        [('instance_ref', 'query', 'uuidorname',
+          'The UUID or name of the instance.', True)],
+        [(404, 'Instance not found.', None),
+         (409, 'The instance cannot be powered on.', None)]))
     @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -848,6 +948,12 @@ class InstancePowerOnEndpoint(sf_api.Resource):
 
 
 class InstancePauseEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'instances', 'Pause an instance.',
+        [('instance_ref', 'query', 'uuidorname',
+          'The UUID or name of the instance.', True)],
+        [(404, 'Instance not found.', None),
+         (409, 'The instance cannot be paused.', None)]))
     @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -863,6 +969,12 @@ class InstancePauseEndpoint(sf_api.Resource):
 
 
 class InstanceUnpauseEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'instances', 'Unpause an instance.',
+        [('instance_ref', 'query', 'uuidorname',
+          'The UUID or name of the instance.', True)],
+        [(404, 'Instance not found.', None),
+         (409, 'The instance cannot be unpaused.', None)]))
     @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
