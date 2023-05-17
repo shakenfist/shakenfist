@@ -19,7 +19,7 @@
         <link rel="next" href="../interfaces/">
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.4.3, mkdocs-material-9.1.12">
+      <meta name="generator" content="mkdocs-1.4.3, mkdocs-material-9.1.13">
     
     
       
@@ -554,9 +554,47 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          Instances (/instances/)
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         Instances (/instances/)
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#fetching-information-about-an-instance" class="md-nav__link">
+    Fetching information about an instance
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#instance-lifecycle" class="md-nav__link">
+    Instance lifecycle
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -945,6 +983,28 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#fetching-information-about-an-instance" class="md-nav__link">
+    Fetching information about an instance
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#instance-lifecycle" class="md-nav__link">
+    Instance lifecycle
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -962,38 +1022,84 @@
 
 
 <h1 id="instances-instances">Instances (/instances/)</h1>
+<p>Instances sit at the core of Shaken Fist's functionality, and are the component
+which ties most of the other concepts in the API together. Therefore, they are
+also the most complicated part of Shaken Fist to explain.</p>
+<h2 id="fetching-information-about-an-instance">Fetching information about an instance</h2>
+<p>There are two main ways to fetch information about instances -- you can list all
+instances visible to your authenticated namespace, or you can collect information
+about a specific instance by providing its UUID or name.</p>
+<details class="info" open="open">
+<summary>Info</summary>
 <p>Note that the amount of information visible in an instance response will change
 over the lifecycle of the instance -- for example when you first request the
 instance be created versus when the instance has had its disk specification
 calculated.</p>
-<p>GET instance</p>
-<p>import json
-from shakenfist_client import apiclient</p>
-<p>sf_client = apiclient.Client()
-i = sf_client.get_instance('317e9b70-8e26-46af-a1c4-76931c0da5a9')
-print(json.dumps(i, indent=4, sort_keys=True))</p>
-<p>CREATE and then DELETE instance</p>
-<p>import json
-from shakenfist_client import apiclient
-import time</p>
-<p>sf_client = apiclient.Client()
-i = sf_client.create_instance(
-    'example', 1, 1024, None,
-    [{
-        'size': 20,
-        'base': 'debian:11',
-        'bus': None,
-        'type': 'disk'
-    }],
-    None, None)</p>
-<p>time.sleep(30)</p>
-<p>i = sf_client.delete_instance(i['uuid'])</p>
-<p>GET all instances</p>
-<p>import json
-from shakenfist_client import apiclient</p>
-<p>sf_client = apiclient.Client()
-instances = sf_client.get_instances()
-print(json.dumps(instances, indent=4, sort_keys=True))</p>
+</details>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/get_instances">GET /instances</a>: List all instances visible to your authenticated namespace.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/get_instances__instance_ref_">GET /instances/{instance_ref}</a>: Get information about a specific instance.</li>
+</ul>
+</details>
+<details class="example">
+<summary>Python API client: get all visible instances</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">instances</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instances</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">instances</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: get information about a specific instance</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">i</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance</span><span class="p">(</span><span class="s1">&#39;317e9b70-8e26-46af-a1c4-76931c0da5a9&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+</details>
+<h2 id="instance-lifecycle">Instance lifecycle</h2>
+<p>Instances may be created, deleted, ...other stuff you'll enjoy...</p>
+<details class="info" open="open">
+<summary>Info</summary>
+<p>Instance creation is by far the most complicated call in Shaken Fist in terms
+of the arguments that it takes. The code in the Python command line client is
+helpful if you need a fully worked example of every possible permutation. The
+OpenAPI documentation at XXX provides comprehensive and up to date documentation
+on all the arguments to the creation call.</p>
+</details>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/delete_instances__instance_ref_">DELETE /instances/{instance_ref}</a>: Delete an instance.</li>
+</ul>
+</details>
+<details class="example">
+<summary>Python API client: create and then delete a simple instance</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+<span class="kn">import</span> <span class="nn">time</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">i</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">create_instance</span><span class="p">(</span>
+    <span class="s1">&#39;example&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1024</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">[{</span>
+        <span class="s1">&#39;size&#39;</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span>
+        <span class="s1">&#39;base&#39;</span><span class="p">:</span> <span class="s1">&#39;debian:11&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;bus&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;disk&#39;</span>
+    <span class="p">}],</span>
+    <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+<span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">30</span><span class="p">)</span>
+
+<span class="n">i</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">delete_instance</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
+</code></pre></div>
+</details>
 
 
 
@@ -1034,7 +1140,7 @@ print(json.dumps(instances, indent=4, sort_keys=True))</p>
     <script id="__config" type="application/json">{"base": "../../..", "features": [], "search": "../../../assets/javascripts/workers/search.208ed371.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.c2be25ad.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.b4d07000.min.js"></script>
       
     
   </body>
