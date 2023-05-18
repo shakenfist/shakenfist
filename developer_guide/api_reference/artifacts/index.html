@@ -1241,6 +1241,8 @@ uuid,namespace,type,source_url,versions,state,shared
 <span class="n">artifact</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_artifact_events</span><span class="p">(</span><span class="s1">&#39;05e841a7-7e13-4df6-8c04-8932b98885bd&#39;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">artifact</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
 </code></pre></div>
+<p>Note that events are returned in reverse chronological order and are limited
+to the 100 most recent events.</p>
 <div class="highlight"><pre><span></span><code>$ python3 example.py
 [
     ...

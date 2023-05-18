@@ -586,8 +586,49 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#instance-lifecycle" class="md-nav__link">
-    Instance lifecycle
+  <a href="#instance-creation" class="md-nav__link">
+    Instance creation
+  </a>
+  
+    <nav class="md-nav" aria-label="Instance creation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#diskspec" class="md-nav__link">
+    diskspec
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#networkspec" class="md-nav__link">
+    networkspec
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#videospec" class="md-nav__link">
+    videospec
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#other-instance-lifecycle-operations" class="md-nav__link">
+    Other instance lifecycle operations
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#other-instance-information" class="md-nav__link">
+    Other instance information
   </a>
   
 </li>
@@ -997,8 +1038,49 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#instance-lifecycle" class="md-nav__link">
-    Instance lifecycle
+  <a href="#instance-creation" class="md-nav__link">
+    Instance creation
+  </a>
+  
+    <nav class="md-nav" aria-label="Instance creation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#diskspec" class="md-nav__link">
+    diskspec
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#networkspec" class="md-nav__link">
+    networkspec
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#videospec" class="md-nav__link">
+    videospec
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#other-instance-lifecycle-operations" class="md-nav__link">
+    Other instance lifecycle operations
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#other-instance-information" class="md-nav__link">
+    Other instance information
   </a>
   
 </li>
@@ -1063,20 +1145,66 @@ calculated.</p>
 <span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
 </code></pre></div>
 </details>
-<h2 id="instance-lifecycle">Instance lifecycle</h2>
-<p>Instances may be created, deleted, ...other stuff you'll enjoy...</p>
-<details class="info" open="open">
-<summary>Info</summary>
+<h2 id="instance-creation">Instance creation</h2>
 <p>Instance creation is by far the most complicated call in Shaken Fist in terms
 of the arguments that it takes. The code in the Python command line client is
 helpful if you need a fully worked example of every possible permutation. The
-OpenAPI documentation at XXX provides comprehensive and up to date documentation
-on all the arguments to the creation call.</p>
-</details>
+OpenAPI documentation at <a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances">https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances</a>
+provides comprehensive and up to date documentation on all the arguments to
+the creation call.</p>
+<p>The instance creation API call also takes three data structures: the <code>diskspec</code>;
+the <code>networkspec</code>; and the <code>videospec</code>. These structures are not well documented
+in the OpenAPI interface, so are documented here instead.</p>
+<h3 id="diskspec">diskspec</h3>
+<p>A <code>diskspec</code> consists of the following fields as a JSON dictionary:</p>
+<ul>
+<li>size (integer): the size of the disk in gigabytes.</li>
+<li>base (string): the base image for the disk. This can be a variety of URL-like strings,
+  as documented on <a href="/user_guide/artifacts/">the artifacts page in the user guide</a>.
+  For a blank disk, omit this value.</li>
+<li>bus (enum): the hardware bus the disk device should be attached to on the instance.
+  In general you shouldn't care about this and can omit this value. However, in
+  some cases, such as unmodified Microsoft Windows images it is required. The options
+  available here are: ide; sata; scsi; usb; virtio (the default); and nvme.</li>
+<li>type (enum): the type of device. The default is "disk", but in some cases you might
+  want "cdrom".</li>
+</ul>
+<p>A full example of a <code>diskspec</code> is therefore:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+    <span class="s1">&#39;size&#39;</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span>
+    <span class="s1">&#39;base&#39;</span><span class="p">:</span> <span class="s1">&#39;debian:11&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;bus&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="kc">None</span>
+<span class="p">}</span>
+</code></pre></div>
+<h3 id="networkspec">networkspec</h3>
+<p>Similarly, a <code>networkspec</code> consists of the following fields in a JSON dictionary:</p>
+<ul>
+<li>network_uuid (uuid): the UUID of the network the interface should exist on.</li>
+<li>macaddress (string): the MAC address of the interface. Omit this value to be allocated
+  a MAC address automatically.</li>
+<li>model (enum): the model of the network interface card. In general you should not have
+  to set this, although it can matter in some cases, such as unmodified Microsoft
+  Windows images. The options include: i82551; i82557b; i82559er; ne2k_pci; pcnet;
+  rtl8139; e1000; and virtio (the default).</li>
+<li>float (boolean): whether to associate a floating IP with this interface to enable external
+  accessibility to the instance. Note that you can float and unfloat an interface
+  after instance creation if desired.</li>
+</ul>
+<h3 id="videospec">videospec</h3>
+<p>A <code>videospec</code> differs from a <code>diskspec</code> and a <code>networkspec</code> in that it is not
+passed as a list. You only have one <code>videospec</code> per instance. Once again, a
+<code>videospec</code> is a JSON dictionary with the following fields:</p>
+<ul>
+<li>model (enum): the model of the video card to attach to the instance. Possible
+  options include: vga; cirrus (the default); and qxl.</li>
+<li>memory (integer): the amount of video RAM the video card should have, in
+  kibibytes (blocks of 1024 bytes).</li>
+</ul>
 <details class="tip" open="open">
 <summary>REST API calls</summary>
 <ul>
-<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/delete_instances__instance_ref_">DELETE /instances/{instance_ref}</a>: Delete an instance.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances">POST /instances/</a>: Create an instance.</li>
 </ul>
 </details>
 <details class="example">
@@ -1098,6 +1226,87 @@ on all the arguments to the creation call.</p>
 <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">30</span><span class="p">)</span>
 
 <span class="n">i</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">delete_instance</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
+</code></pre></div>
+</details>
+<h2 id="other-instance-lifecycle-operations">Other instance lifecycle operations</h2>
+<p>A variety of other lifecycle operations are available on instances, including
+deletion, power management (soft reboot (ACPI), hard reboot (reset switch),
+power on, power off, pause, and unpause).</p>
+<p>MORE DETAILS HERE</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/delete_instances__instance_ref_">DELETE /instances/{instance_ref}</a>: Delete an instance.</li>
+<li><a href="XXX">DELETE /instances/</a>: Delete all instances in a namespace.</li>
+</ul>
+</details>
+<h2 id="other-instance-information">Other instance information</h2>
+<details class="example">
+<summary>Python API client: list network interfaces for an instance</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">interfaces</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance_interfaces</span><span class="p">(</span><span class="s1">&#39;c0d52a77-0f8a-4f19-bec7-0c05efb03cb4&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">interfaces</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: list events for an instance</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">interfaces</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance_events</span><span class="p">(</span><span class="s1">&#39;c0d52a77-0f8a-4f19-bec7-0c05efb03cb4&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">interfaces</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+<p>Note that events are returned in reverse chronological order and are limited
+to the 100 most recent events.</p>
+<div class="highlight"><pre><span></span><code>$python3 example.py
+[
+    ...
+    {
+        &quot;duration&quot;: null,
+        &quot;extra&quot;: &quot;{\&quot;candidates\&quot;: [\&quot;sf-1\&quot;, \&quot;sf-2\&quot;, \&quot;sf-3\&quot;, \&quot;sf-4\&quot;], \&quot;request-id\&quot;: \&quot;01afb355-fe85-4408-84f9-56c4f10a9780\&quot;}&quot;,
+        &quot;fqdn&quot;: &quot;sf-1&quot;,
+        &quot;message&quot;: &quot;schedule are hypervisors&quot;,
+        &quot;timestamp&quot;: 1684299968.0741177,
+        &quot;type&quot;: &quot;audit&quot;
+    },
+    {
+        &quot;duration&quot;: null,
+        &quot;extra&quot;: &quot;{\&quot;candidates\&quot;: [\&quot;sf-1\&quot;, \&quot;sf-2\&quot;, \&quot;sf-3\&quot;, \&quot;sf-4\&quot;], \&quot;request-id\&quot;: \&quot;01afb355-fe85-4408-84f9-56c4f10a9780\&quot;}&quot;,
+        &quot;fqdn&quot;: &quot;sf-1&quot;,
+        &quot;message&quot;: &quot;schedule initial candidates&quot;,
+        &quot;timestamp&quot;: 1684299968.0697834,
+        &quot;type&quot;: &quot;audit&quot;
+    },
+    {
+        &quot;duration&quot;: null,
+        &quot;extra&quot;: &quot;{\&quot;attribute\&quot;: \&quot;interfaces\&quot;, \&quot;request-id\&quot;: \&quot;01afb355-fe85-4408-84f9-56c4f10a9780\&quot;, \&quot;value\&quot;: []}&quot;,
+        &quot;fqdn&quot;: &quot;sf-1&quot;,
+        &quot;message&quot;: &quot;set attribute&quot;,
+        &quot;timestamp&quot;: 1684299968.030679,
+        &quot;type&quot;: &quot;mutate&quot;
+    },
+    {
+        &quot;duration&quot;: null,
+        &quot;extra&quot;: &quot;{\&quot;attribute\&quot;: \&quot;power_state\&quot;, \&quot;power_state\&quot;: \&quot;initial\&quot;, \&quot;request-id\&quot;: \&quot;01afb355-fe85-4408-84f9-56c4f10a9780\&quot;}&quot;,
+        &quot;fqdn&quot;: &quot;sf-1&quot;,
+        &quot;message&quot;: &quot;set attribute&quot;,
+        &quot;timestamp&quot;: 1684299968.020376,
+        &quot;type&quot;: &quot;mutate&quot;
+    },
+    {
+        &quot;duration&quot;: null,
+        &quot;extra&quot;: &quot;{\&quot;attribute\&quot;: \&quot;state\&quot;, \&quot;request-id\&quot;: \&quot;01afb355-fe85-4408-84f9-56c4f10a9780\&quot;, \&quot;update_time\&quot;: 1684299967.9816113, \&quot;value\&quot;: \&quot;initial\&quot;}&quot;,
+        &quot;fqdn&quot;: &quot;sf-1&quot;,
+        &quot;message&quot;: &quot;set attribute&quot;,
+        &quot;timestamp&quot;: 1684299967.9816155,
+        &quot;type&quot;: &quot;mutate&quot;
+    },
+    ...
+]
 </code></pre></div>
 </details>
 
