@@ -119,6 +119,9 @@ a general introduction to the Shaken Fist event system).
     print(json.dumps(artifact, indent=4, sort_keys=True))
     ```
 
+    Note that events are returned in reverse chronological order and are limited
+    to the 100 most recent events.
+
     ```
     $ python3 example.py
     [
