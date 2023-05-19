@@ -633,6 +633,20 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#out-of-band-interactions-with-instances" class="md-nav__link">
+    Out-of-band interactions with instances
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metadata" class="md-nav__link">
+    Metadata
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1085,6 +1099,20 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#out-of-band-interactions-with-instances" class="md-nav__link">
+    Out-of-band interactions with instances
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metadata" class="md-nav__link">
+    Metadata
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1106,7 +1134,9 @@
 <h1 id="instances-instances">Instances (/instances/)</h1>
 <p>Instances sit at the core of Shaken Fist's functionality, and are the component
 which ties most of the other concepts in the API together. Therefore, they are
-also the most complicated part of Shaken Fist to explain.</p>
+also the most complicated part of Shaken Fist to explain. This description is
+broken into basic functionality -- showing information about instances -- and then
+moves onto more advanced topics like creation, deletion, and other lifecycle events.</p>
 <h2 id="fetching-information-about-an-instance">Fetching information about an instance</h2>
 <p>There are two main ways to fetch information about instances -- you can list all
 instances visible to your authenticated namespace, or you can collect information
@@ -1230,17 +1260,217 @@ passed as a list. You only have one <code>videospec</code> per instance. Once ag
 </details>
 <h2 id="other-instance-lifecycle-operations">Other instance lifecycle operations</h2>
 <p>A variety of other lifecycle operations are available on instances, including
-deletion, power management (soft reboot (ACPI), hard reboot (reset switch),
-power on, power off, pause, and unpause).</p>
-<p>MORE DETAILS HERE</p>
+deletion, and power management.</p>
+<p>The power management actions available are:</p>
+<ul>
+<li>soft reboot: gracefully request a reboot from the instance operating system
+  via ACPI. This is not guaranteed to actually work, but if it does is much less
+  likely to cause disk corruption on the instance.</li>
+<li>hard reboot: the equivalent of holding the reset switch down on a physical machine
+  until it reboots without operating system involvement.</li>
+<li>power on: turn the instance on, as if the power switch was pressed.</li>
+<li>power off: turn the instance immediately off, as if the power switch was held
+  down on a physical machine.</li>
+<li>pause: suspend execution of the instance, but leave it hot in RAM ready to
+  restart.</li>
+<li>unpause: unsuspend execution of the instance.</li>
+</ul>
 <details class="tip" open="open">
 <summary>REST API calls</summary>
 <ul>
 <li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/delete_instances__instance_ref_">DELETE /instances/{instance_ref}</a>: Delete an instance.</li>
-<li><a href="XXX">DELETE /instances/</a>: Delete all instances in a namespace.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/delete_instances">DELETE /instances/</a>: Delete all instances in a namespace.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__rebootsoft">POST ​/instances​/{instance_ref}​/rebootsoft</a>: Soft (ACPI) reboot the instance.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__reboothard">POST ​/instances​/{instance_ref}​/reboothard</a>: Hard (reset switch) reboot the instance.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__poweron">POST /instances/{instance_ref}/poweron</a>: Power the instance on.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__poweroff">POST /instances/{instance_ref}/poweroff</a>: Power the instance off, as if holding the power switch down.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__pause">POST /instances/{instance_ref}/pause</a>: Pause an instance.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__unpause">POST /instances/{instance_ref}/unpause</a>: Unpause an instance.</li>
 </ul>
 </details>
+<details class="example">
+<summary>Python API client: create and then delete a simple instance</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+<span class="kn">import</span> <span class="nn">time</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">i</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">create_instance</span><span class="p">(</span>
+    <span class="s1">&#39;example&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1024</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">[{</span>
+        <span class="s1">&#39;size&#39;</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span>
+        <span class="s1">&#39;base&#39;</span><span class="p">:</span> <span class="s1">&#39;debian:11&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;bus&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;disk&#39;</span>
+    <span class="p">}],</span>
+    <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+<span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">30</span><span class="p">)</span>
+
+<span class="n">i</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">delete_instance</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: attempt a soft reboot, and hard reboot if required</summary>
+<p>Note that this example assumes the instance is running an image with the
+Shaken Fist in guest agent installed.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">i</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">create_instance</span><span class="p">(</span>
+    <span class="s1">&#39;example&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1024</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">[{</span>
+        <span class="s1">&#39;size&#39;</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span>
+        <span class="s1">&#39;base&#39;</span><span class="p">:</span> <span class="s1">&#39;debian:11&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;bus&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;disk&#39;</span>
+    <span class="p">}],</span>
+    <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">side_channels</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;sf-agent&#39;</span><span class="p">])</span>
+
+<span class="c1"># Wait for the instance to be created, or error out. Use instance events to</span>
+<span class="c1"># provide status updates during boot.</span>
+<span class="k">while</span> <span class="n">i</span><span class="p">[</span><span class="s1">&#39;state&#39;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;created&#39;</span><span class="p">,</span> <span class="s1">&#39;error&#39;</span><span class="p">]:</span>
+    <span class="n">events</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance_events</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Waiting for the instance to start: </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">events</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;message&#39;</span><span class="p">])</span>
+    <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+    <span class="n">i</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
+
+<span class="c1"># Check the instance is created correctly</span>
+<span class="k">if</span> <span class="n">i</span><span class="p">[</span><span class="s1">&#39;state&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;created&#39;</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Instance is not in a created state!&#39;</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Instance is created&#39;</span><span class="p">)</span>
+
+<span class="c1"># Wait for the agent to report the reboot time</span>
+<span class="k">while</span> <span class="ow">not</span> <span class="n">i</span><span class="p">[</span><span class="s1">&#39;agent_system_boot_time&#39;</span><span class="p">]:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Waiting for agent to start: </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">i</span><span class="p">[</span><span class="s1">&#39;agent_state&#39;</span><span class="p">])</span>
+    <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">20</span><span class="p">)</span>
+    <span class="n">i</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
+
+<span class="n">initial_boot</span> <span class="o">=</span> <span class="n">i</span><span class="p">[</span><span class="s1">&#39;agent_system_boot_time&#39;</span><span class="p">]</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Instance booted at </span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">initial_boot</span><span class="p">)</span>
+
+<span class="c1"># Now try to soft reboot the instance, wait up to 60 seconds for a reboot to</span>
+<span class="c1"># be detected</span>
+<span class="n">sf_client</span><span class="o">.</span><span class="n">reboot_instance</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">],</span> <span class="n">hard</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Soft rebooting instance&#39;</span><span class="p">)</span>
+<span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">60</span><span class="p">)</span>
+<span class="n">i</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
+
+<span class="c1"># Wait for the agent to report the reboot time again</span>
+<span class="k">while</span> <span class="ow">not</span> <span class="n">i</span><span class="p">[</span><span class="s1">&#39;agent_system_boot_time&#39;</span><span class="p">]:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Waiting for agent to start: </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">i</span><span class="p">[</span><span class="s1">&#39;agent_state&#39;</span><span class="p">])</span>
+    <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">20</span><span class="p">)</span>
+    <span class="n">i</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
+
+<span class="k">if</span> <span class="n">i</span><span class="p">[</span><span class="s1">&#39;agent_system_boot_time&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="n">initial_boot</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Boot time changed from </span><span class="si">%d</span><span class="s1"> to </span><span class="si">%s</span><span class="s1">&#39;</span>
+        <span class="o">%</span> <span class="p">(</span><span class="n">initial_boot</span><span class="p">,</span> <span class="n">i</span><span class="p">[</span><span class="s1">&#39;agent_system_boot_time&#39;</span><span class="p">]))</span>
+
+<span class="k">else</span><span class="p">:</span>
+    <span class="c1"># We failed to soft reboot, let&#39;s hard reboot instead</span>
+    <span class="n">sf_client</span><span class="o">.</span><span class="n">reboot_instance</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">],</span> <span class="n">hard</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Instance did not reboot, hard rebooting&#39;</span><span class="p">)</span>
+</code></pre></div>
+<p>Sample output:</p>
+<div class="highlight"><pre><span></span><code>$ python3 example.py
+Waiting for the instance to start: schedule complete
+Instance is created
+Waiting for agent to start: not ready (no contact)
+Waiting for agent to start: not ready (no contact)
+Waiting for agent to start: not ready (no contact)
+Instance booted at 1684404969
+Soft rebooting instance
+Boot time changed from 1684404969 to 1684405036.0
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: power off and then on an instance</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">i</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">create_instance</span><span class="p">(</span>
+        <span class="s1">&#39;example&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1024</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="p">[{</span>
+            <span class="s1">&#39;size&#39;</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span>
+            <span class="s1">&#39;base&#39;</span><span class="p">:</span> <span class="s1">&#39;debian:11&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;bus&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;disk&#39;</span>
+        <span class="p">}],</span>
+        <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+<span class="c1"># Wait for the instance to be created, or error out. Use instance events to</span>
+<span class="c1"># provide status updates during boot.</span>
+<span class="k">while</span> <span class="n">i</span><span class="p">[</span><span class="s1">&#39;state&#39;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;created&#39;</span><span class="p">,</span> <span class="s1">&#39;error&#39;</span><span class="p">]:</span>
+    <span class="n">events</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance_events</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Waiting for the instance to start: </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">events</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;message&#39;</span><span class="p">])</span>
+    <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+    <span class="n">i</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
+
+<span class="c1"># Check the instance is created correctly</span>
+<span class="k">if</span> <span class="n">i</span><span class="p">[</span><span class="s1">&#39;state&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;created&#39;</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Instance is not in a created state!&#39;</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Instance is created&#39;</span><span class="p">)</span>
+
+<span class="c1"># Check the instance is created correctly</span>
+<span class="k">if</span> <span class="n">i</span><span class="p">[</span><span class="s1">&#39;power_state&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;on&#39;</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Instance is not in powered on state!&#39;</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="c1"># Power the instance off</span>
+<span class="n">sf_client</span><span class="o">.</span><span class="n">power_off_instance</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
+<span class="k">while</span> <span class="n">i</span><span class="p">[</span><span class="s1">&#39;power_state&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;off&#39;</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Waiting for the instance to power off&#39;</span><span class="p">)</span>
+    <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+    <span class="n">i</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
+
+<span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">30</span><span class="p">)</span>
+
+<span class="c1"># Power the instance on</span>
+<span class="n">sf_client</span><span class="o">.</span><span class="n">power_on_instance</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
+<span class="k">while</span> <span class="n">i</span><span class="p">[</span><span class="s1">&#39;power_state&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;on&#39;</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Waiting for the instance to power on&#39;</span><span class="p">)</span>
+    <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+    <span class="n">i</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Done&#39;</span><span class="p">)</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>Waiting for the instance to start: set attribute
+Instance is created
+Waiting for the instance to power off
+Waiting for the instance to power on
+Done
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: pause and unpause an instance</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">sf_client</span><span class="o">.</span><span class="n">pause_instance</span><span class="p">(</span><span class="s1">&#39;foo&#39;</span><span class="p">)</span>
+
+<span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">30</span><span class="p">)</span>
+
+<span class="n">sf_client</span><span class="o">.</span><span class="n">unpause_instance</span><span class="p">(</span><span class="s1">&#39;foo&#39;</span><span class="p">)</span>
+</code></pre></div>
+</details>
 <h2 id="other-instance-information">Other instance information</h2>
+<p>We can also request other information for an instance. For example, we can list the
+instance's network interfaces, or the events for the instance. See the
+<a href="/user_guide/events/">user guide</a> for a general introduction to the Shaken Fist
+event system.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/get_instances__instance_ref__interfaces">GET /instances/{instance_ref}/interfaces</a>: Request information on the instance's network interfaces, if any.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/get_instances__instance_ref__events">GET /instances/{instance_ref}/events</a>: Fetch events for a specific instance.</li>
+</ul>
+</details>
 <details class="example">
 <summary>Python API client: list network interfaces for an instance</summary>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
@@ -1307,6 +1537,65 @@ to the 100 most recent events.</p>
     },
     ...
 ]
+</code></pre></div>
+</details>
+<h2 id="out-of-band-interactions-with-instances">Out-of-band interactions with instances</h2>
+<p>Shaken Fist supports three types of instance consoles, which provide out-of-band
+management of instances -- that is, the instance does not need to have functioning
+networking for these consoles to work. You can read a general introduction of
+Shaken Fist's console functionality in <a href="/user_guide/consoles/">the user guide</a>.
+This page focuses on the API calls which are used to implement the console
+functionality in the Shaken Fist client.</p>
+<p>...</p>
+<h2 id="metadata">Metadata</h2>
+<p>All objects exposed by the REST API may have metadata associated with them. This
+metadata is for storing values that are of interest to the owner of the resources,
+not Shaken Fist. Shaken Fist does not attempt to interpret these values at all,
+with the exception of the <a href="/user_guide/affinity/">instance affinity metadata values</a>.
+The metadata store is in the form of a key value store, and a general introduction
+is available <a href="/user_guide/metadata/">in the user guide</a>.</p>
+<details class="info" open="open">
+<summary>Info</summary>
+<p>Note that for affinity metadata to be processed by the scheduler, it must be
+present in the instance create API call, which is why that call takes a
+metadata argument. Adding affinity metadata after instance creation will not
+affect the placement of that instance, but would affect the placement of
+future instances.</p>
+</details>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/get_instances__instance_ref__metadata">GET ​/instances​/{instance_ref}​/metadata</a>: Get metadata for an instance.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__metadata">POST /instances/{instance_ref}/metadata</a>: Create a new metadata key for an instance.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/delete_instances__instance_ref__metadata__key_">DELETE /instances/{instance_ref}/metadata/{key}</a>: Delete a specific metadata key for an instance.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/put_instances__instance_ref__metadata__key_">PUT /instances/{instance_ref}/metadata/{key}</a>: Update an existing metadata key for an instance.</li>
+</ul>
+</details>
+<details class="example">
+<summary>Python API client: set metadata on an instance</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">sf_client</span><span class="o">.</span><span class="n">set_instance_metadata_item</span><span class="p">(</span><span class="n">instance_uuid</span><span class="p">,</span> <span class="s1">&#39;foo&#39;</span><span class="p">,</span> <span class="s1">&#39;bar&#39;</span><span class="p">)</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: get metadata for an instance</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">md</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance_metadata</span><span class="p">(</span><span class="n">instance_uuid</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">md</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: delete metadata for an instance</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">sf_client</span><span class="o">.</span><span class="n">delete_instance_metadata_item</span><span class="p">(</span><span class="n">instance_uuid</span><span class="p">,</span> <span class="s1">&#39;foo&#39;</span><span class="p">)</span>
 </code></pre></div>
 </details>
 
