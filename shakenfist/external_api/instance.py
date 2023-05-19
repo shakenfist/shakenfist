@@ -990,6 +990,12 @@ class InstanceUnpauseEndpoint(sf_api.Resource):
 
 
 class InstanceMetadatasEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'instances', 'Fetch metadata for an instance.',
+        [('instance_ref', 'body', 'uuidorname', 'The instance to add a key to.', True)],
+        [(200, 'Instance metadata, if any.', None),
+         (404, 'Instance not found.', None)],
+        requires_admin=True))
     @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -997,6 +1003,17 @@ class InstanceMetadatasEndpoint(sf_api.Resource):
     def get(self, instance_ref=None, instance_from_db=None):
         return instance_from_db.metadata
 
+    @swag_from(api_base.swagger_helper(
+        'instances', 'Add metadata for an instance.',
+        [
+            ('instance_ref', 'body', 'uuidorname', 'The instance to add a key to.', True),
+            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('value', 'body', 'string', 'The value of the key.', True)
+        ],
+        [(200, 'Nothing.', None),
+         (400, 'One of key or value are missing.', None),
+         (404, 'Instance not found.', None)],
+        requires_admin=True))
     @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -1034,6 +1051,17 @@ def _validate_instance_metadata(key, value):
 
 
 class InstanceMetadataEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'instances', 'Update a metadata key for an instance.',
+        [
+            ('instance_ref', 'body', 'uuidorname', 'The instance to add a key to.', True),
+            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('value', 'body', 'string', 'The value of the key.', True)
+        ],
+        [(200, 'Nothing.', None),
+         (400, 'One of key or value are missing.', None),
+         (404, 'Instance not found.', None)],
+        requires_admin=True))
     @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -1044,6 +1072,17 @@ class InstanceMetadataEndpoint(sf_api.Resource):
             return err
         instance_from_db.add_metadata_key(key, value)
 
+    @swag_from(api_base.swagger_helper(
+        'instances', 'Delete a metadata key for an instance.',
+        [
+            ('instance_ref', 'body', 'uuidorname', 'The instance to remove a key from.', True),
+            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('value', 'body', 'string', 'The value of the key.', True)
+        ],
+        [(200, 'Nothing.', None),
+         (400, 'One of key or value are missing.', None),
+         (404, 'Instance not found.', None)],
+        requires_admin=True))
     @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -1055,6 +1094,17 @@ class InstanceMetadataEndpoint(sf_api.Resource):
 
 
 class InstanceConsoleDataEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'instances', 'Fetch console data from an instance.',
+        [
+            ('instance_ref', 'body', 'uuidorname',
+             'The instance fetch console data for.', True),
+            ('length', 'body', 'integer',
+             'The amount of data to fetch, defaults to 10240 bytes.', False)
+        ],
+        [(200, 'The console data as an application/octet-stream.', None),
+         (404, 'Instance not found.', None)],
+        requires_admin=True))
     @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -1082,6 +1132,15 @@ class InstanceConsoleDataEndpoint(sf_api.Resource):
         resp.status_code = 200
         return resp
 
+    @swag_from(api_base.swagger_helper(
+        'instances', 'Delete console data for an instance.',
+        [
+            ('instance_ref', 'body', 'uuidorname',
+             'The instance fetch console data for.', True)
+        ],
+        [(200, 'Nothing.', None),
+         (404, 'Instance not found.', None)],
+        requires_admin=True))
     @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -1102,13 +1161,34 @@ delete-this-file=1%(ca_cert)s
 """
 
 
+instance_vv_file_example = """[virt-viewer]
+type=spice
+host=sf-3
+port=42281
+tls-port=43197
+delete-this-file=1
+ca=-----BEGIN CERTIFICATE-----\nMIIEF...16br/Fw==\n-----END CERTIFICATE-----\n"""
+
+
 class InstanceVDIConsoleHelperEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'instances',
+        ('Fetch a virt-viewer .vv file describing how to connect to the VDI console '
+         'for this instance.'),
+        [
+            ('instance_ref', 'body', 'uuidorname',
+             'The instance fetch console data for.', True)
+        ],
+        [(200, 'A .vv file to open in virt-viewer as a application/x-virt-viewer stream.',
+          instance_vv_file_example),
+         (404, 'Instance not found.', None)],
+        requires_admin=True))
     @api_base.verify_token
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
     @api_base.log_token_use
-    def get(self, instance_ref=None, length=None, instance_from_db=None):
+    def get(self, instance_ref=None, instance_from_db=None):
         p = instance_from_db.ports
 
         cacert = ''

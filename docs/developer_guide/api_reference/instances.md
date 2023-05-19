@@ -2,7 +2,9 @@
 
 Instances sit at the core of Shaken Fist's functionality, and are the component
 which ties most of the other concepts in the API together. Therefore, they are
-also the most complicated part of Shaken Fist to explain.
+also the most complicated part of Shaken Fist to explain. This description is
+broken into basic functionality -- showing information about instances -- and then
+moves onto more advanced topics like creation, deletion, and other lifecycle events.
 
 ## Fetching information about an instance
 
@@ -138,20 +140,226 @@ passed as a list. You only have one `videospec` per instance. Once again, a
 ## Other instance lifecycle operations
 
 A variety of other lifecycle operations are available on instances, including
-deletion, power management (soft reboot (ACPI), hard reboot (reset switch),
-power on, power off, pause, and unpause).
+deletion, and power management.
 
-MORE DETAILS HERE
+The power management actions available are:
+
+* soft reboot: gracefully request a reboot from the instance operating system
+  via ACPI. This is not guaranteed to actually work, but if it does is much less
+  likely to cause disk corruption on the instance.
+* hard reboot: the equivalent of holding the reset switch down on a physical machine
+  until it reboots without operating system involvement.
+* power on: turn the instance on, as if the power switch was pressed.
+* power off: turn the instance immediately off, as if the power switch was held
+  down on a physical machine.
+* pause: suspend execution of the instance, but leave it hot in RAM ready to
+  restart.
+* unpause: unsuspend execution of the instance.
 
 ???+ tip "REST API calls"
 
     * [DELETE /instances/{instance_ref}](https://sfcbr.shakenfist.com/api/apidocs/#/instances/delete_instances__instance_ref_): Delete an instance.
-    * [DELETE /instances/](XXX): Delete all instances in a namespace.
+    * [DELETE /instances/](https://sfcbr.shakenfist.com/api/apidocs/#/instances/delete_instances): Delete all instances in a namespace.
+    * [POST ​/instances​/{instance_ref}​/rebootsoft](https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__rebootsoft): Soft (ACPI) reboot the instance.
+    * [POST ​/instances​/{instance_ref}​/reboothard](https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__reboothard): Hard (reset switch) reboot the instance.
+    * [POST /instances/{instance_ref}/poweron](https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__poweron): Power the instance on.
+    * [POST /instances/{instance_ref}/poweroff](https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__poweroff): Power the instance off, as if holding the power switch down.
+    * [POST /instances/{instance_ref}/pause](https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__pause): Pause an instance.
+    * [POST /instances/{instance_ref}/unpause](https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__unpause): Unpause an instance.
 
+??? example "Python API client: create and then delete a simple instance"
+
+    ``` python
+    from shakenfist_client import apiclient
+    import time
+
+    sf_client = apiclient.Client()
+    i = sf_client.create_instance(
+        'example', 1, 1024, None,
+        [{
+            'size': 20,
+            'base': 'debian:11',
+            'bus': None,
+            'type': 'disk'
+        }],
+        None, None)
+
+    time.sleep(30)
+
+    i = sf_client.delete_instance(i['uuid'])
+    ```
+
+??? example "Python API client: attempt a soft reboot, and hard reboot if required"
+
+    Note that this example assumes the instance is running an image with the
+    Shaken Fist in guest agent installed.
+
+    ``` python
+    import time
+    from shakenfist_client import apiclient
+    import sys
+
+    sf_client = apiclient.Client()
+    i = sf_client.create_instance(
+        'example', 1, 1024, None,
+        [{
+            'size': 20,
+            'base': 'debian:11',
+            'bus': None,
+            'type': 'disk'
+        }],
+        None, None, side_channels=['sf-agent'])
+
+    # Wait for the instance to be created, or error out. Use instance events to
+    # provide status updates during boot.
+    while i['state'] not in ['created', 'error']:
+        events = sf_client.get_instance_events(i['uuid'])
+        print('Waiting for the instance to start: %s' % events[0]['message'])
+        time.sleep(5)
+        i = sf_client.get_instance(i['uuid'])
+
+    # Check the instance is created correctly
+    if i['state'] != 'created':
+        print('Instance is not in a created state!')
+        sys.exit(1)
+    print('Instance is created')
+
+    # Wait for the agent to report the reboot time
+    while not i['agent_system_boot_time']:
+        print('Waiting for agent to start: %s' % i['agent_state'])
+        time.sleep(20)
+        i = sf_client.get_instance(i['uuid'])
+
+    initial_boot = i['agent_system_boot_time']
+    print('Instance booted at %d' % initial_boot)
+
+    # Now try to soft reboot the instance, wait up to 60 seconds for a reboot to
+    # be detected
+    sf_client.reboot_instance(i['uuid'], hard=False)
+    print('Soft rebooting instance')
+    time.sleep(60)
+    i = sf_client.get_instance(i['uuid'])
+
+    # Wait for the agent to report the reboot time again
+    while not i['agent_system_boot_time']:
+        print('Waiting for agent to start: %s' % i['agent_state'])
+        time.sleep(20)
+        i = sf_client.get_instance(i['uuid'])
+
+    if i['agent_system_boot_time'] != initial_boot:
+        print('Boot time changed from %d to %s'
+            % (initial_boot, i['agent_system_boot_time']))
+
+    else:
+        # We failed to soft reboot, let's hard reboot instead
+        sf_client.reboot_instance(i['uuid'], hard=True)
+        print('Instance did not reboot, hard rebooting')
+    ```
+
+    Sample output:
+
+    ```
+    $ python3 example.py
+    Waiting for the instance to start: schedule complete
+    Instance is created
+    Waiting for agent to start: not ready (no contact)
+    Waiting for agent to start: not ready (no contact)
+    Waiting for agent to start: not ready (no contact)
+    Instance booted at 1684404969
+    Soft rebooting instance
+    Boot time changed from 1684404969 to 1684405036.0
+    ```
+
+??? example "Python API client: power off and then on an instance"
+
+    ``` python
+    import time
+    from shakenfist_client import apiclient
+    import sys
+
+    sf_client = apiclient.Client()
+    i = sf_client.create_instance(
+            'example', 1, 1024, None,
+            [{
+                'size': 20,
+                'base': 'debian:11',
+                'bus': None,
+                'type': 'disk'
+            }],
+            None, None)
+
+    # Wait for the instance to be created, or error out. Use instance events to
+    # provide status updates during boot.
+    while i['state'] not in ['created', 'error']:
+        events = sf_client.get_instance_events(i['uuid'])
+        print('Waiting for the instance to start: %s' % events[0]['message'])
+        time.sleep(5)
+        i = sf_client.get_instance(i['uuid'])
+
+    # Check the instance is created correctly
+    if i['state'] != 'created':
+        print('Instance is not in a created state!')
+        sys.exit(1)
+    print('Instance is created')
+
+    # Check the instance is created correctly
+    if i['power_state'] != 'on':
+        print('Instance is not in powered on state!')
+        sys.exit(1)
+
+    # Power the instance off
+    sf_client.power_off_instance(i['uuid'])
+    while i['power_state'] != 'off':
+        print('Waiting for the instance to power off')
+        time.sleep(5)
+        i = sf_client.get_instance(i['uuid'])
+
+    time.sleep(30)
+
+    # Power the instance on
+    sf_client.power_on_instance(i['uuid'])
+    while i['power_state'] != 'on':
+        print('Waiting for the instance to power on')
+        time.sleep(5)
+        i = sf_client.get_instance(i['uuid'])
+
+    print('Done')
+    ```
+
+    ```
+    Waiting for the instance to start: set attribute
+    Instance is created
+    Waiting for the instance to power off
+    Waiting for the instance to power on
+    Done
+    ```
+
+
+??? example "Python API client: pause and unpause an instance"
+
+    ``` python
+    import time
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    sf_client.pause_instance('foo')
+
+    time.sleep(30)
+
+    sf_client.unpause_instance('foo')
+    ```
 
 ## Other instance information
 
+We can also request other information for an instance. For example, we can list the
+instance's network interfaces, or the events for the instance. See the
+[user guide](/user_guide/events/) for a general introduction to the Shaken Fist
+event system.
 
+???+ tip "REST API calls"
+
+    * [GET /instances/{instance_ref}/interfaces](https://sfcbr.shakenfist.com/api/apidocs/#/instances/get_instances__instance_ref__interfaces): Request information on the instance's network interfaces, if any.
+    * [GET /instances/{instance_ref}/events](https://sfcbr.shakenfist.com/api/apidocs/#/instances/get_instances__instance_ref__events): Fetch events for a specific instance.
 
 ??? example "Python API client: list network interfaces for an instance"
 
@@ -224,4 +432,69 @@ MORE DETAILS HERE
         },
         ...
     ]
+    ```
+
+## Out-of-band interactions with instances
+
+Shaken Fist supports three types of instance consoles, which provide out-of-band
+management of instances -- that is, the instance does not need to have functioning
+networking for these consoles to work. You can read a general introduction of
+Shaken Fist's console functionality in [the user guide](/user_guide/consoles/).
+This page focuses on the API calls which are used to implement the console
+functionality in the Shaken Fist client.
+
+...
+
+## Metadata
+
+All objects exposed by the REST API may have metadata associated with them. This
+metadata is for storing values that are of interest to the owner of the resources,
+not Shaken Fist. Shaken Fist does not attempt to interpret these values at all,
+with the exception of the [instance affinity metadata values](/user_guide/affinity/).
+The metadata store is in the form of a key value store, and a general introduction
+is available [in the user guide](/user_guide/metadata/).
+
+???+ info
+
+    Note that for affinity metadata to be processed by the scheduler, it must be
+    present in the instance create API call, which is why that call takes a
+    metadata argument. Adding affinity metadata after instance creation will not
+    affect the placement of that instance, but would affect the placement of
+    future instances.
+
+???+ tip "REST API calls"
+
+    * [GET ​/instances​/{instance_ref}​/metadata](https://sfcbr.shakenfist.com/api/apidocs/#/instances/get_instances__instance_ref__metadata): Get metadata for an instance.
+    * [POST /instances/{instance_ref}/metadata](https://sfcbr.shakenfist.com/api/apidocs/#/instances/post_instances__instance_ref__metadata): Create a new metadata key for an instance.
+    * [DELETE /instances/{instance_ref}/metadata/{key}](https://sfcbr.shakenfist.com/api/apidocs/#/instances/delete_instances__instance_ref__metadata__key_): Delete a specific metadata key for an instance.
+    * [PUT /instances/{instance_ref}/metadata/{key}](https://sfcbr.shakenfist.com/api/apidocs/#/instances/put_instances__instance_ref__metadata__key_): Update an existing metadata key for an instance.
+
+??? example "Python API client: set metadata on an instance"
+
+    ``` python
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    sf_client.set_instance_metadata_item(instance_uuid, 'foo', 'bar')
+    ```
+
+??? example "Python API client: get metadata for an instance"
+
+    ``` python
+    import json
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    md = sf_client.get_instance_metadata(instance_uuid)
+    print(json.dumps(md, indent=4, sort_keys=True))
+    ```
+
+??? example "Python API client: delete metadata for an instance"
+
+    ``` python
+    import json
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    sf_client.delete_instance_metadata_item(instance_uuid, 'foo')
     ```
