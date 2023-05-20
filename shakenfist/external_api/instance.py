@@ -1,10 +1,10 @@
 # Documentation state:
 #   - Has metadata calls: yes
-#   - OpenAPI complete:
-#   - Covered in user or operator docs:
+#   - OpenAPI complete: yes
+#   - Covered in user or operator docs: yes
 #   - API reference docs exist:
-#        - and link to OpenAPI docs:
-#        - and include examples:
+#        - and link to OpenAPI docs: yes
+#        - and include examples: yes
 #   - Has complete CI coverage:
 
 from collections import defaultdict

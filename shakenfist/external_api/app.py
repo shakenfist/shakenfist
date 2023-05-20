@@ -100,6 +100,7 @@ class Root(sf_api.Resource):
              '<li>pure-affinity</li>'
              '<li>artifact-metadata</li>'
              '<li>blob-metadata</li>'
+             '<li>interface-metadata</li>'
              '</ul></p></body></html>'),
             mimetype='text/html')
         resp.status_code = 200

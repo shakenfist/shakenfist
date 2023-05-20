@@ -443,7 +443,73 @@ Shaken Fist's console functionality in [the user guide](/user_guide/consoles/).
 This page focuses on the API calls which are used to implement the console
 functionality in the Shaken Fist client.
 
-...
+* Read only console: to download the most recent portion of the read only text
+  serial console, or clear the console, use the
+  `/instances/{instance_ref}/consoledata` API calls below.
+* Interactive serial console: lookup the console port from the instance details
+  fetch (as described above), and then connect to that port on the hypervisor
+  node with a TCP client such as telnet.
+* Interactive VDI console: lookup the VDI console port from the instance details
+  fetch (as described above), and then connect to that port on the hypervisor
+  with the correct client (currently one of VNC or SPICE). Alternatively, use
+  the `/instances/{instance_ref}/vdiconsolehelper` API call described below to
+  download a `virt-viewer` configuration file and then connect with `virt-viewer`.
+  See the example below for more details.
+
+???+ tip "REST API calls"
+
+    * [GET /instances/{instance_ref}/consoledata](https://sfcbr.shakenfist.com/api/apidocs/#/instances/get_instances__instance_ref__consoledata): Fetch read only serial console data for an instance
+    * [DELETE /instances/{instance_ref}/consoledata](https://sfcbr.shakenfist.com/api/apidocs/#/instances/delete_instances__instance_ref__consoledata): Clear the read only serial console for an instance.
+    * [GET /instances/{instance_ref}/vdiconsolehelper](https://sfcbr.shakenfist.com/api/apidocs/#/instances/get_instances__instance_ref__vdiconsolehelper): Generate and return a `virt-viewer` configuration file for connecting to the interactive VDI console for the instance (if configured).
+
+??? example "Python API client: connect seamlessly to a VDI console using virt-viewer"
+
+    ```python
+    import os
+    from shakenfist_client import apiclient
+    import subprocess
+    import tempfile
+    import time
+
+    sf_client = apiclient.Client()
+    i = sf_client.create_instance(
+            'example', 1, 1024, None,
+            [{
+                'size': 20,
+                'base': 'debian:11',
+                'bus': None,
+                'type': 'disk'
+            }],
+            None, None)
+
+    # Wait for the instance to be created, or error out. Use instance events to
+    # provide status updates during boot.
+    while i['state'] not in ['created', 'error']:
+        events = sf_client.get_instance_events(i['uuid'])
+        print('Waiting for the instance to start: %s' % events[0]['message'])
+        time.sleep(5)
+        i = sf_client.get_instance(i['uuid'])
+
+    # Check the instance is created correctly
+    if i['state'] != 'created':
+        print('Instance is not in a created state!')
+        sys.exit(1)
+    print('Instance is created')
+
+    # We don't use NamedTemporaryFile as a context manager as the .vv file
+    # will also attempt to clean up the file.
+    (temp_handle, temp_name) = tempfile.mkstemp()
+    os.close(temp_handle)
+    try:
+        with open(temp_name, 'w') as f:
+            f.write(sf_client.get_vdi_console_helper(i['uuid']))
+
+        p = subprocess.run('remote-viewer %s' % temp_name, shell=True)
+        print('Remote viewer process exited with %d return code' % p.returncode)
+    finally:
+        if os.path.exists(temp_name):
+            os.unlink(temp_name)
+    ```
 
 ## Metadata
 

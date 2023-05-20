@@ -311,6 +311,16 @@ def main():
             _audit_daemons()
             Node.observe_this_node()
 
+            # Check if we hold any locks for processes which don't exist any
+            # more. That is, a process has ended but left a stray lock.
+            lcks = etcd.get_existing_locks()
+            for lck in lcks:
+                if lcks[lck].get('node') != config.NODE_NAME:
+                    continue
+                if psutil.pid_exists(lcks[lck].get('pid')):
+                    continue
+                LOG.with_fields(lcks[lck]).error('Lock held by missing process on this node')
+
         elif len(DAEMON_PROCS) == 0:
             n.state = Node.STATE_STOPPED
             return
