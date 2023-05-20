@@ -19,7 +19,7 @@
         <link rel="next" href="../interfaces/">
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.4.3, mkdocs-material-9.1.13">
+      <meta name="generator" content="mkdocs-1.4.3, mkdocs-material-9.1.14">
     
     
       
@@ -1546,7 +1546,76 @@ networking for these consoles to work. You can read a general introduction of
 Shaken Fist's console functionality in <a href="/user_guide/consoles/">the user guide</a>.
 This page focuses on the API calls which are used to implement the console
 functionality in the Shaken Fist client.</p>
-<p>...</p>
+<ul>
+<li>Read only console: to download the most recent portion of the read only text
+  serial console, or clear the console, use the
+  <code>/instances/{instance_ref}/consoledata</code> API calls below.</li>
+<li>Interactive serial console: lookup the console port from the instance details
+  fetch (as described above), and then connect to that port on the hypervisor
+  node with a TCP client such as telnet.</li>
+<li>Interactive VDI console: lookup the VDI console port from the instance details
+  fetch (as described above), and then connect to that port on the hypervisor
+  with the correct client (currently one of VNC or SPICE). Alternatively, use
+  the <code>/instances/{instance_ref}/vdiconsolehelper</code> API call described below to
+  download a <code>virt-viewer</code> configuration file and then connect with <code>virt-viewer</code>.
+  See the example below for more details.</li>
+</ul>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/get_instances__instance_ref__consoledata">GET /instances/{instance_ref}/consoledata</a>: Fetch read only serial console data for an instance</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/delete_instances__instance_ref__consoledata">DELETE /instances/{instance_ref}/consoledata</a>: Clear the read only serial console for an instance.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/instances/get_instances__instance_ref__vdiconsolehelper">GET /instances/{instance_ref}/vdiconsolehelper</a>: Generate and return a <code>virt-viewer</code> configuration file for connecting to the interactive VDI console for the instance (if configured).</li>
+</ul>
+</details>
+<details class="example">
+<summary>Python API client: connect seamlessly to a VDI console using virt-viewer</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+<span class="kn">import</span> <span class="nn">subprocess</span>
+<span class="kn">import</span> <span class="nn">tempfile</span>
+<span class="kn">import</span> <span class="nn">time</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">i</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">create_instance</span><span class="p">(</span>
+        <span class="s1">&#39;example&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1024</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="p">[{</span>
+            <span class="s1">&#39;size&#39;</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span>
+            <span class="s1">&#39;base&#39;</span><span class="p">:</span> <span class="s1">&#39;debian:11&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;bus&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;disk&#39;</span>
+        <span class="p">}],</span>
+        <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+<span class="c1"># Wait for the instance to be created, or error out. Use instance events to</span>
+<span class="c1"># provide status updates during boot.</span>
+<span class="k">while</span> <span class="n">i</span><span class="p">[</span><span class="s1">&#39;state&#39;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;created&#39;</span><span class="p">,</span> <span class="s1">&#39;error&#39;</span><span class="p">]:</span>
+    <span class="n">events</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance_events</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Waiting for the instance to start: </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">events</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;message&#39;</span><span class="p">])</span>
+    <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+    <span class="n">i</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
+
+<span class="c1"># Check the instance is created correctly</span>
+<span class="k">if</span> <span class="n">i</span><span class="p">[</span><span class="s1">&#39;state&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;created&#39;</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Instance is not in a created state!&#39;</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Instance is created&#39;</span><span class="p">)</span>
+
+<span class="c1"># We don&#39;t use NamedTemporaryFile as a context manager as the .vv file</span>
+<span class="c1"># will also attempt to clean up the file.</span>
+<span class="p">(</span><span class="n">temp_handle</span><span class="p">,</span> <span class="n">temp_name</span><span class="p">)</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkstemp</span><span class="p">()</span>
+<span class="n">os</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">temp_handle</span><span class="p">)</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">temp_name</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">sf_client</span><span class="o">.</span><span class="n">get_vdi_console_helper</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">]))</span>
+
+    <span class="n">p</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s1">&#39;remote-viewer </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">temp_name</span><span class="p">,</span> <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Remote viewer process exited with </span><span class="si">%d</span><span class="s1"> return code&#39;</span> <span class="o">%</span> <span class="n">p</span><span class="o">.</span><span class="n">returncode</span><span class="p">)</span>
+<span class="k">finally</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">temp_name</span><span class="p">):</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">temp_name</span><span class="p">)</span>
+</code></pre></div>
+</details>
 <h2 id="metadata">Metadata</h2>
 <p>All objects exposed by the REST API may have metadata associated with them. This
 metadata is for storing values that are of interest to the owner of the resources,
