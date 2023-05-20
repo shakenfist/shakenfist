@@ -25,7 +25,16 @@ LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 
+interface_get_example = """..."""
+
+
 class InterfaceEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'interfaces', 'Fetch details for an interface.',
+        [('interface_uuid', 'body', 'uuid', 'The interface to fetch details for.', True)],
+        [(200, 'Interface details.', interface_get_example),
+         (404, 'Interface not found.', None)],
+        requires_admin=True))
     @api_base.verify_token
     @api_base.redirect_to_network_node
     @api_base.log_token_use
@@ -37,6 +46,13 @@ class InterfaceEndpoint(sf_api.Resource):
 
 
 class InterfaceFloatEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'interfaces', 'Float (make publicly available via a floating IP) an interface.',
+        [('interface_uuid', 'body', 'uuid', 'The interface to float.', True)],
+        [(200, 'Interface float requested.', None),
+         (404, 'Interface not found.', None),
+         (507, 'Network congested and unable to allocate address.', None)],
+        requires_admin=True))
     @api_base.verify_token
     @api_base.log_token_use
     def post(self, interface_uuid=None):
@@ -53,6 +69,12 @@ class InterfaceFloatEndpoint(sf_api.Resource):
 
 
 class InterfaceDefloatEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'interfaces', 'Defloat an interface.',
+        [('interface_uuid', 'body', 'uuid', 'The interface to defloat.', True)],
+        [(200, 'Interface defloat requested.', None),
+         (404, 'Interface not found.', None)],
+        requires_admin=True))
     @api_base.verify_token
     @api_base.log_token_use
     def post(self, interface_uuid=None):
