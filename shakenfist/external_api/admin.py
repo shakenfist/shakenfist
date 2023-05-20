@@ -10,7 +10,7 @@ from flasgger import swag_from
 from shakenfist_utilities import api as sf_api
 
 
-from shakenfist import db
+from shakenfist import etcd
 from shakenfist.external_api import base as api_base
 
 
@@ -33,4 +33,4 @@ class AdminLocksEndpoint(sf_api.Resource):
     @sf_api.caller_is_admin
     @api_base.log_token_use
     def get(self):
-        return db.get_existing_locks()
+        return etcd.get_existing_locks()
