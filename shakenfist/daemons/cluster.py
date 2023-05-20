@@ -230,7 +230,7 @@ class Monitor(daemon.Daemon):
 
         # Record blobs in use
         for blob_uuid in in_use_blobs:
-            b = Blob.from_db(blob_uuid)
+            b = Blob.from_db(blob_uuid, suppress_failure_audit=True)
             if b:
                 b.record_usage()
         self.lock.refresh()
