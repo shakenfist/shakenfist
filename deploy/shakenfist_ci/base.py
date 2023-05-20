@@ -92,12 +92,10 @@ class BaseTestCase(testtools.TestCase):
 
     def _log_events(self, uuid, event_source):
         x = PrettyTable()
-        x.field_names = ['timestamp', 'node',
-                         'operation', 'phase', 'duration', 'message']
+        x.field_names = ['timestamp', 'node', 'duration', 'message']
         for e in event_source:
             e['timestamp'] = datetime.datetime.fromtimestamp(e['timestamp'])
-            x.add_row([e['timestamp'], e['fqdn'], e['operation'], e['phase'],
-                       e['duration'], e['message']])
+            x.add_row([e['timestamp'], e['fqdn'], e['duration'], e['message']])
 
         sys.stderr.write(
             '----------------------- start %s events -----------------------\n'
