@@ -191,6 +191,10 @@ api.add_resource(api_interface.InterfaceFloatEndpoint,
                  '/interfaces/<interface_uuid>/float')
 api.add_resource(api_interface.InterfaceDefloatEndpoint,
                  '/interfaces/<interface_uuid>/defloat')
+api.add_resource(api_interface.InterfaceMetadatasEndpoint,
+                 '/interfaces/<interface_uuid>/metadata')
+api.add_resource(api_interface.InterfaceMetadataEndpoint,
+                 '/interfaces/<interface_uuid>/metadata/<key>')
 
 api.add_resource(api_label.LabelEndpoint, '/label/<path:label_name>')
 
