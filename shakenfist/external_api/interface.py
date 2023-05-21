@@ -1,10 +1,10 @@
 # Documentation state:
-#   - Has metadata calls:
-#   - OpenAPI complete:
-#   - Covered in user or operator docs:
+#   - Has metadata calls: yes
+#   - OpenAPI complete: yes
+#   - Covered in user or operator docs: no
 #   - API reference docs exist:
-#        - and link to OpenAPI docs:
-#        - and include examples:
+#        - and link to OpenAPI docs: yes
+#        - and include examples: yes
 #   - Has complete CI coverage:
 
 from flasgger import swag_from
@@ -25,7 +25,19 @@ LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
 
 
-interface_get_example = """..."""
+interface_get_example = """{
+    "floating": null,
+    "instance_uuid": "d512e9f5-98d6-4c36-8520-33b6fc6de15f",
+    "ipv4": "10.0.0.6",
+    "macaddr": "02:00:00:73:18:66",
+    "metadata": {},
+    "model": "virtio",
+    "network_uuid": "6aaaf243-0406-41a1-aa13-5d79a0b8672d",
+    "order": 0,
+    "state": "created",
+    "uuid": "b1981e81-b37a-4176-ba37-b61bc7208012",
+    "version": 3
+}"""
 
 
 class InterfaceEndpoint(sf_api.Resource):

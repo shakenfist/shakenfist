@@ -363,13 +363,66 @@ event system.
 
 ??? example "Python API client: list network interfaces for an instance"
 
-    ```python
+    Note that the interface details for an instance wont be populated until the
+    instance has started being created on the hypervisor node. Specifically, this
+    can be some time later if an image needs to be fetched from the Internet and
+    transcoded. Therefore in this example we wait for the instance to be created
+    before displaying interface details.
+
+    ``` python
     import json
     from shakenfist_client import apiclient
+    import time
 
     sf_client = apiclient.Client()
-    interfaces = sf_client.get_instance_interfaces('c0d52a77-0f8a-4f19-bec7-0c05efb03cb4')
-    print(json.dumps(interfaces, indent=4, sort_keys=True))
+    i = sf_client.create_instance(
+            'example', 1, 1024, None,
+            [{
+                'size': 20,
+                'base': 'debian:11',
+                'bus': None,
+                'type': 'disk'
+            }],
+            None, None)
+
+    # Wait for the instance to be created, or error out. Use instance events to
+    # provide status updates during boot.
+    while i['state'] not in ['created', 'error']:
+        events = sf_client.get_instance_events(i['uuid'])
+        print('Waiting for the instance to start: %s' % events[0]['message'])
+        time.sleep(5)
+        i = sf_client.get_instance(i['uuid'])
+
+    # Check the instance is created correctly
+    if i['state'] != 'created':
+        print('Instance is not in a created state!')
+        sys.exit(1)
+    print('Instance is created')
+
+    # Fetch and display interface details
+    ifaces = sf_client.get_instance_interfaces(i['uuid'])[0]
+    print(json.dumps(ifaces, indent=4, sort_keys=True))
+    ```
+
+    ```
+    $ python3 example.py
+    Waiting for the instance to start: Fetching required blob ffdfce7f-728e-4b76-83c2-304e252f98b1, 30% complete
+    Instance is created
+    [
+        {
+            "floating": null,
+            "instance_uuid": "d512e9f5-98d6-4c36-8520-33b6fc6de15f",
+            "ipv4": "10.0.0.6",
+            "macaddr": "02:00:00:73:18:66",
+            "metadata": {},
+            "model": "virtio",
+            "network_uuid": "6aaaf243-0406-41a1-aa13-5d79a0b8672d",
+            "order": 0,
+            "state": "created",
+            "uuid": "b1981e81-b37a-4176-ba37-b61bc7208012",
+            "version": 3
+        }
+    ]
     ```
 
 ??? example "Python API client: list events for an instance"
