@@ -1,3 +1,3 @@
-# Interfaces (/interfaces/)
+# Network Interfaces (/interfaces/)
 
 Not yet documented.

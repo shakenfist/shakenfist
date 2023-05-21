@@ -83,6 +83,45 @@ class TestInstanceMetadata(base.BaseNamespacedTestCase):
         self.assertEqual({}, self.test_client.get_instance_metadata(inst['uuid']))
 
 
+class TestInterfaceMetadata(base.BaseNamespacedTestCase):
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'interface-metadata'
+        super(TestInterfaceMetadata, self).__init__(*args, **kwargs)
+
+    def setUp(self):
+        super(TestInterfaceMetadata, self).setUp()
+        self.net = self.test_client.allocate_network(
+            '192.168.242.0/24', True, True, '%s-net' % self.namespace)
+        self._await_networks_ready([self.net['uuid']])
+
+    def test_simple(self):
+        inst = self.test_client.create_instance(
+            'test-simple-metadata', 1, 1024,
+            [
+                {
+                    'network_uuid': self.net['uuid']
+                }
+            ],
+            [
+                {
+                    'size': 8,
+                    'base': 'sf://upload/system/debian-11',
+                    'type': 'disk'
+                }
+            ], None, None)
+
+        self.assertIsNotNone(inst['uuid'])
+
+        iface = self.test_client.get_instance_interfaces(inst['uuid'])[0]
+
+        self.assertEqual({}, self.test_client.get_interface_metadata(iface['uuid']))
+        self.test_client.set_interface_metadata_item(iface['uuid'], 'foo', 'bar')
+        self.assertEqual({
+            'foo': 'bar'}, self.test_client.get_interface_metadata(iface['uuid']))
+        self.test_client.delete_interface_metadata_item(iface['uuid'], 'foo')
+        self.assertEqual({}, self.test_client.get_interface_metadata(iface['uuid']))
+
+
 class TestNamespaceMetadata(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'namespace-metadata'
