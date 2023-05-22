@@ -176,8 +176,8 @@ class DatabaseBackedObject(object):
             if not suppress_failure_audit:
                 eventlog.add_event(
                     EVENT_TYPE_AUDIT, cls.object_type, object_uuid,
-                    ('attempt to lookup non-existent object in %s'
-                     % util_callstack.get_caller(offset=-3)),
+                    'attempt to lookup non-existent object',
+                    extra={'caller': util_callstack.get_caller(offset=-3)},
                     log_as_error=True)
             return None
 
@@ -229,7 +229,11 @@ class DatabaseBackedObject(object):
     def _db_get(cls, object_uuid):
         o = etcd.get(cls.object_type, None, object_uuid)
         if not o:
-            return None
+            # Retry with a new client just to be sure
+            etcd.reset_client()
+            o = etcd.get(cls.object_type, None, object_uuid)
+            if not o:
+                return None
 
         if o.get('version', 0) != cls.current_version:
             if not cls.upgrade_supported:
