@@ -1,7 +1,7 @@
 # Documentation state:
-#   - Has metadata calls:
-#   - OpenAPI complete:
-#   - Covered in user or operator docs:
+#   - Has metadata calls: n/a
+#   - OpenAPI complete: yes
+#   - Covered in user or operator docs: yes
 #   - API reference docs exist:
 #        - and link to OpenAPI docs:
 #        - and include examples:

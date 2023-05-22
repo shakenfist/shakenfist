@@ -1,6 +1,15 @@
 # Label (/label/)
 
-Not yet documented.
+Most interactions with labels will be to treat them as artifacts, which are
+[documented elsewhere](/developer_guide/api_reference/artifacts/). However, there
+are a small number of label specific calls which are documented here. For a general
+introduction to labels, see the [artifacts section of the user guide](/user_guide/artifacts/).
+
+???+ tip "REST API calls"
+
+    * [GET /label/{label_name}](https://sfcbr.shakenfist.com/api/apidocs/#/label/get_label__label_name_): Search for a label by name.
+    * [POST /label/{label_name}](https://sfcbr.shakenfist.com/api/apidocs/#/label/post_label__label_name_): Update the current blob for a label.
+    * [DELETE /label/{label_name}](https://sfcbr.shakenfist.com/api/apidocs/#/label/delete_label__label_name_): Delete a label by name.
 
 ??? example "Python API client: update a label"
 
