@@ -962,7 +962,18 @@
 
 
 <h1 id="label-label">Label (/label/)</h1>
-<p>Not yet documented.</p>
+<p>Most interactions with labels will be to treat them as artifacts, which are
+<a href="/developer_guide/api_reference/artifacts/">documented elsewhere</a>. However, there
+are a small number of label specific calls which are documented here. For a general
+introduction to labels, see the <a href="/user_guide/artifacts/">artifacts section of the user guide</a>.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/label/get_label__label_name_">GET /label/{label_name}</a>: Search for a label by name.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/label/post_label__label_name_">POST /label/{label_name}</a>: Update the current blob for a label.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/label/delete_label__label_name_">DELETE /label/{label_name}</a>: Delete a label by name.</li>
+</ul>
+</details>
 <details class="example">
 <summary>Python API client: update a label</summary>
 <p>A common pattern is to use generic upstream Shaken Fist images as source image,
