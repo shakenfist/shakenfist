@@ -963,6 +963,70 @@
 
 <h1 id="label-label">Label (/label/)</h1>
 <p>Not yet documented.</p>
+<details class="example">
+<summary>Python API client: update a label</summary>
+<p>A common pattern is to use generic upstream Shaken Fist images as source image,
+which you then customize and test. Once testing has passed you add the tested
+version of a label which tracks "blessed" production images.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+<span class="kn">import</span> <span class="nn">time</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+
+<span class="c1"># Download a copy of Debian 11 and wait for the download to complete</span>
+<span class="n">sf_client</span><span class="o">.</span><span class="n">cache_artifact</span><span class="p">(</span><span class="s1">&#39;debian:11&#39;</span><span class="p">)</span>
+<span class="n">a</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_artifact</span><span class="p">(</span><span class="s1">&#39;debian:11&#39;</span><span class="p">)</span>
+
+<span class="k">while</span> <span class="ow">not</span> <span class="n">a</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;blobs&#39;</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Waiting for first blob...&#39;</span><span class="p">)</span>
+    <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">30</span><span class="p">)</span>
+    <span class="n">a</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_artifact</span><span class="p">(</span><span class="s1">&#39;debian:11&#39;</span><span class="p">)</span>
+
+<span class="n">blob_index</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="s1">&#39;blobs&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">())[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+<span class="n">blob_uuid</span> <span class="o">=</span> <span class="n">a</span><span class="p">[</span><span class="s1">&#39;blobs&#39;</span><span class="p">][</span><span class="n">blob_index</span><span class="p">][</span><span class="s1">&#39;uuid&#39;</span><span class="p">]</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;The most recent blob UUID is </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">blob_uuid</span><span class="p">)</span>
+
+<span class="c1"># Let&#39;s assume we&#39;ve now tested this version and want to &quot;bless&quot; it as the</span>
+<span class="c1"># version we trust for production workloads. We would then add that blob as the</span>
+<span class="c1"># new version of our production label like this:</span>
+<span class="n">prod</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">update_label</span><span class="p">(</span><span class="s1">&#39;debian-11-production&#39;</span><span class="p">,</span> <span class="n">blob_uuid</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;The label artifact is now:&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">prod</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>$ python3 example.py
+The most recent blob UUID is ffdfce7f-728e-4b76-83c2-304e252f98b1
+
+The label artifact is now:
+{
+    &quot;artifact_type&quot;: &quot;label&quot;,
+    &quot;blob_uuid&quot;: &quot;ffdfce7f-728e-4b76-83c2-304e252f98b1&quot;,
+    &quot;blobs&quot;: {
+        &quot;1&quot;: {
+            &quot;depends_on&quot;: null,
+            &quot;instances&quot;: [
+                &quot;d512e9f5-98d6-4c36-8520-33b6fc6de15f&quot;
+            ],
+            &quot;reference_count&quot;: 2,
+            &quot;size&quot;: 403007488,
+            &quot;uuid&quot;: &quot;ffdfce7f-728e-4b76-83c2-304e252f98b1&quot;
+        }
+    },
+    &quot;index&quot;: 1,
+    &quot;max_versions&quot;: 3,
+    &quot;metadata&quot;: {},
+    &quot;namespace&quot;: &quot;system&quot;,
+    &quot;shared&quot;: false,
+    &quot;source_url&quot;: &quot;sf://label/system/debian-11-production&quot;,
+    &quot;state&quot;: &quot;created&quot;,
+    &quot;uuid&quot;: &quot;c9428ea2-a3fa-40cf-9668-61be99bb370a&quot;,
+    &quot;version&quot;: 6
+}
+</code></pre></div>
+</details>
 
 
 
