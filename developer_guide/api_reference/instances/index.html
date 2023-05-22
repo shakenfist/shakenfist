@@ -1473,12 +1473,62 @@ event system.</p>
 </details>
 <details class="example">
 <summary>Python API client: list network interfaces for an instance</summary>
+<p>Note that the interface details for an instance wont be populated until the
+instance has started being created on the hypervisor node. Specifically, this
+can be some time later if an image needs to be fetched from the Internet and
+transcoded. Therefore in this example we wait for the instance to be created
+before displaying interface details.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
 <span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+<span class="kn">import</span> <span class="nn">time</span>
 
 <span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
-<span class="n">interfaces</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance_interfaces</span><span class="p">(</span><span class="s1">&#39;c0d52a77-0f8a-4f19-bec7-0c05efb03cb4&#39;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">interfaces</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+<span class="n">i</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">create_instance</span><span class="p">(</span>
+        <span class="s1">&#39;example&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1024</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="p">[{</span>
+            <span class="s1">&#39;size&#39;</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span>
+            <span class="s1">&#39;base&#39;</span><span class="p">:</span> <span class="s1">&#39;debian:11&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;bus&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;disk&#39;</span>
+        <span class="p">}],</span>
+        <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+<span class="c1"># Wait for the instance to be created, or error out. Use instance events to</span>
+<span class="c1"># provide status updates during boot.</span>
+<span class="k">while</span> <span class="n">i</span><span class="p">[</span><span class="s1">&#39;state&#39;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;created&#39;</span><span class="p">,</span> <span class="s1">&#39;error&#39;</span><span class="p">]:</span>
+    <span class="n">events</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance_events</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Waiting for the instance to start: </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">events</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;message&#39;</span><span class="p">])</span>
+    <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+    <span class="n">i</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
+
+<span class="c1"># Check the instance is created correctly</span>
+<span class="k">if</span> <span class="n">i</span><span class="p">[</span><span class="s1">&#39;state&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;created&#39;</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Instance is not in a created state!&#39;</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Instance is created&#39;</span><span class="p">)</span>
+
+<span class="c1"># Fetch and display interface details</span>
+<span class="n">ifaces</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance_interfaces</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])[</span><span class="mi">0</span><span class="p">]</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">ifaces</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>$ python3 example.py
+Waiting for the instance to start: Fetching required blob ffdfce7f-728e-4b76-83c2-304e252f98b1, 30% complete
+Instance is created
+[
+    {
+        &quot;floating&quot;: null,
+        &quot;instance_uuid&quot;: &quot;d512e9f5-98d6-4c36-8520-33b6fc6de15f&quot;,
+        &quot;ipv4&quot;: &quot;10.0.0.6&quot;,
+        &quot;macaddr&quot;: &quot;02:00:00:73:18:66&quot;,
+        &quot;metadata&quot;: {},
+        &quot;model&quot;: &quot;virtio&quot;,
+        &quot;network_uuid&quot;: &quot;6aaaf243-0406-41a1-aa13-5d79a0b8672d&quot;,
+        &quot;order&quot;: 0,
+        &quot;state&quot;: &quot;created&quot;,
+        &quot;uuid&quot;: &quot;b1981e81-b37a-4176-ba37-b61bc7208012&quot;,
+        &quot;version&quot;: 3
+    }
+]
 </code></pre></div>
 </details>
 <details class="example">

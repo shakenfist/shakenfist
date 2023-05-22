@@ -596,9 +596,54 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          Network Interfaces (/interfaces/)
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         Network Interfaces (/interfaces/)
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#fetching-information-about-a-network-interface" class="md-nav__link">
+    Fetching information about a network interface
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#floating-network-interfaces" class="md-nav__link">
+    Floating network interfaces
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metadata" class="md-nav__link">
+    Metadata
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -945,6 +990,35 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#fetching-information-about-a-network-interface" class="md-nav__link">
+    Fetching information about a network interface
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#floating-network-interfaces" class="md-nav__link">
+    Floating network interfaces
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metadata" class="md-nav__link">
+    Metadata
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -962,7 +1036,187 @@
 
 
 <h1 id="network-interfaces-interfaces">Network Interfaces (/interfaces/)</h1>
-<p>Not yet documented.</p>
+<p>Network Interfaces (known as just "interfaces" in the REST API), are the object
+which ties an instance to the networks it is present on. There is a 1:1 mapping
+between network interface objects and NICs inside an instance, such that an
+instance with multiple interfaces on the same network would have two network
+interface objects associated with it.</p>
+<p>To lookup the network interfaces for an instance, use the
+<a href="/developer_guide/api_reference/instances/#other-instance-information">GET /instances/{instance_ref}/interfaces</a> API call as documented in the instance documentation.</p>
+<h2 id="fetching-information-about-a-network-interface">Fetching information about a network interface</h2>
+<p>As with other objects in the Shaken Fist REST API, you can fetch the details for
+a network interface from the REST API.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/interfaces/get_interfaces__interface_uuid_">GET /interfaces/{interface_uuid}</a>: Get information about a specific network interface.</li>
+</ul>
+</details>
+<details class="example">
+<summary>Python API client: fetch interface details</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">iface</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_interface</span><span class="p">(</span><span class="s1">&#39;b1981e81-b37a-4176-ba37-b61bc7208012&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">iface</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: fetch details for a network interface associated with an instance</summary>
+<p>Note that the interface details for an instance wont be populated until the
+instance has started being created on the hypervisor node. Specifically, this
+can be some time later if an image needs to be fetched from the Internet and
+transcoded. Therefore in this example we wait for the instance to be created
+before displaying interface details.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+<span class="kn">import</span> <span class="nn">time</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">i</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">create_instance</span><span class="p">(</span>
+        <span class="s1">&#39;example&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1024</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="p">[{</span>
+            <span class="s1">&#39;size&#39;</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span>
+            <span class="s1">&#39;base&#39;</span><span class="p">:</span> <span class="s1">&#39;debian:11&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;bus&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;disk&#39;</span>
+        <span class="p">}],</span>
+        <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+<span class="c1"># Wait for the instance to be created, or error out. Use instance events to</span>
+<span class="c1"># provide status updates during boot.</span>
+<span class="k">while</span> <span class="n">i</span><span class="p">[</span><span class="s1">&#39;state&#39;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;created&#39;</span><span class="p">,</span> <span class="s1">&#39;error&#39;</span><span class="p">]:</span>
+    <span class="n">events</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance_events</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Waiting for the instance to start: </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">events</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;message&#39;</span><span class="p">])</span>
+    <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+    <span class="n">i</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
+
+<span class="c1"># Check the instance is created correctly</span>
+<span class="k">if</span> <span class="n">i</span><span class="p">[</span><span class="s1">&#39;state&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;created&#39;</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Instance is not in a created state!&#39;</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Instance is created&#39;</span><span class="p">)</span>
+
+<span class="c1"># Fetch and display interface details</span>
+<span class="n">ifaces</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance_interfaces</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])[</span><span class="mi">0</span><span class="p">]</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">ifaces</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>$ python3 example.py
+Waiting for the instance to start: Fetching required blob ffdfce7f-728e-4b76-83c2-304e252f98b1, 30% complete
+Instance is created
+[
+    {
+        &quot;floating&quot;: null,
+        &quot;instance_uuid&quot;: &quot;d512e9f5-98d6-4c36-8520-33b6fc6de15f&quot;,
+        &quot;ipv4&quot;: &quot;10.0.0.6&quot;,
+        &quot;macaddr&quot;: &quot;02:00:00:73:18:66&quot;,
+        &quot;metadata&quot;: {},
+        &quot;model&quot;: &quot;virtio&quot;,
+        &quot;network_uuid&quot;: &quot;6aaaf243-0406-41a1-aa13-5d79a0b8672d&quot;,
+        &quot;order&quot;: 0,
+        &quot;state&quot;: &quot;created&quot;,
+        &quot;uuid&quot;: &quot;b1981e81-b37a-4176-ba37-b61bc7208012&quot;,
+        &quot;version&quot;: 3
+    }
+]
+</code></pre></div>
+</details>
+<h2 id="floating-network-interfaces">Floating network interfaces</h2>
+<p>Network interfaces by default have an address on the private IP range of the
+network they belong to. This is sufficient to access resources outside the
+Shaken Fist cluster, as long as the network has <code>provide_nat</code> enabled when
+created. However, a network interface is not accessible from outside the
+Shaken Fist cluster in this state.</p>
+<p>To make a network interface accessible to clients outside the Shaken Fist
+cluster, you "float" the interface. This assigns an address from the cluster's
+<code>floating</code> network, which is then DNAT'ed to the private IP address of the
+interface. As an instance it is not possible to see your floating address
+from inside the instance, as the network address translation has already
+occurred when the packets reach the instance.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/interfaces/post_interfaces__interface_uuid__float">POST /interfaces/{interface_uuid}/float</a>: Add a floating address to a network interface to make it externally accessible.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/interfaces/post_interfaces__interface_uuid__defloat">POST /interfaces/{interface_uuid}/defloat</a>: Remove a floating address from a network interface, thus making the interface not externally accessible.</li>
+</ul>
+</details>
+<details class="example">
+<summary>Python API client: float a network interface</summary>
+<p>A request to float an interface is an asynchronous operation, so we must make
+the request and then poll to learn our external address.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+<span class="kn">import</span> <span class="nn">time</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">sf_client</span><span class="o">.</span><span class="n">float_interface</span><span class="p">(</span><span class="s1">&#39;b1981e81-b37a-4176-ba37-b61bc7208012&#39;</span><span class="p">)</span>
+
+<span class="n">iface</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_interface</span><span class="p">(</span><span class="s1">&#39;b1981e81-b37a-4176-ba37-b61bc7208012&#39;</span><span class="p">)</span>
+<span class="k">while</span> <span class="ow">not</span> <span class="n">iface</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;floating&#39;</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Waiting...&#39;</span><span class="p">)</span>
+    <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+    <span class="n">iface</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_interface</span><span class="p">(</span><span class="s1">&#39;b1981e81-b37a-4176-ba37-b61bc7208012&#39;</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;The interface is externally accessible at </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">iface</span><span class="p">[</span><span class="s1">&#39;floating&#39;</span><span class="p">])</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>$ python3 example.py
+The interface is externally accessible at 192.168.10.5
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: defloat a network interface</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+<span class="kn">import</span> <span class="nn">time</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">sf_client</span><span class="o">.</span><span class="n">defloat_interface</span><span class="p">(</span><span class="s1">&#39;b1981e81-b37a-4176-ba37-b61bc7208012&#39;</span><span class="p">)</span>
+</code></pre></div>
+</details>
+<h2 id="metadata">Metadata</h2>
+<p>All objects exposed by the REST API may have metadata associated with them. This
+metadata is for storing values that are of interest to the owner of the resources,
+not Shaken Fist. Shaken Fist does not attempt to interpret these values at all,
+with the exception of the <a href="/user_guide/affinity/">instance affinity metadata values</a>.
+The metadata store is in the form of a key value store, and a general introduction
+is available <a href="/user_guide/metadata/">in the user guide</a>.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/interfaces/get_interfaces__interface_uuid__metadata">GET ​/interfaces​/{interface_uuid}​/metadata</a>: Get metadata for an interface.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/interfaces/post_interfaces__interface_uuid__metadata">POST /interfaces/{interface_uuid}/metadata</a>: Create a new metadata key for an interface.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/interfaces/delete_interfaces__interface_uuid__metadata__key_">DELETE /interfaces/{interface_uuid}/metadata/{key}</a>: Delete a specific metadata key for an interface.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/interfaces/put_interfaces__interface_uuid__metadata__key_">PUT /interfaces/{interface_uuid}/metadata/{key}</a>: Update an existing metadata key for an interface.</li>
+</ul>
+</details>
+<details class="example">
+<summary>Python API client: set metadata on an interface</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">sf_client</span><span class="o">.</span><span class="n">set_interface_metadata_item</span><span class="p">(</span><span class="n">img_uuid</span><span class="p">,</span> <span class="s1">&#39;foo&#39;</span><span class="p">,</span> <span class="s1">&#39;bar&#39;</span><span class="p">)</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: get metadata for an interface</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">md</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_interface_metadata</span><span class="p">(</span><span class="n">img_uuid</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">md</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: delete metadata for an interface</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">sf_client</span><span class="o">.</span><span class="n">delete_interface_metadata_item</span><span class="p">(</span><span class="n">img_uuid</span><span class="p">,</span> <span class="s1">&#39;foo&#39;</span><span class="p">)</span>
+</code></pre></div>
+</details>
 
 
 
