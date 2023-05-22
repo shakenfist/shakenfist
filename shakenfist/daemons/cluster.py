@@ -44,7 +44,7 @@ class Monitor(daemon.Daemon):
         # release the lock, it gets cleared on a crash. This is so that only
         # one node at a time is performing cluster maintenance.
         while not self.exit.is_set():
-            self.lock = etcd.get_lock('cluster', None, None, ttl=120, timeout=10,
+            self.lock = etcd.get_lock('cluster', None, None, ttl=300, timeout=10,
                                       op='Cluster maintenance')
             result = self.lock.acquire()
             if result:
