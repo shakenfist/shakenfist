@@ -98,8 +98,13 @@ def get_interface_statistics(name, namespace=None):
             'No statistics for interface %s in namespace %s (%s)'
             % (name, namespace, stderr))
 
-    stats = _clean_ip_json(stdout)
-    return stats[0].get('stats64')
+    try:
+        stats = _clean_ip_json(stdout)
+        return stats[0].get('stats64')
+    except IndexError:
+        raise exceptions.NoInterfaceStatistics(
+            'No statistics for interface %s in namespace %s (%s)'
+            % (name, namespace, stderr))
 
 
 def get_interface_mtus(namespace=None):
