@@ -136,11 +136,6 @@
       apt:
         name:
           - jq
-          - libjq1
-          - libonig5
-          - liblttng-ust-ctl4
-          - liblttng-ust0
-          - liburcu6
 
     - name: Install tox and dependencies via apt on Ubuntu
       apt:
