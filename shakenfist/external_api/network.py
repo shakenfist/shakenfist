@@ -9,6 +9,7 @@
 
 from functools import partial
 from flask_jwt_extended import get_jwt_identity
+from flasgger import swag_from
 from flask_restful import fields, marshal_with
 import ipaddress
 from shakenfist_utilities import api as sf_api, logs
@@ -54,7 +55,44 @@ def _delete_network(network_from_db, wait_interfaces=None):
         etcd.enqueue('networknode', DestroyNetworkTask(n.uuid))
 
 
+network_get_example = """{
+    "floating_gateway": "192.168.10.16",
+    "metadata": {},
+    "name": "example",
+    "namespace": "system",
+    "netblock": "10.0.0.0/24",
+    "provide_dhcp": true,
+    "provide_nat": true,
+    "state": "created",
+    "uuid": "1e9222c5-2d11-4ada-b258-ed1838bd774b",
+    "version": 4,
+    "vxid": 4882442
+}"""
+
+network_delete_example = """
+{
+    "floating_gateway": null,
+    "metadata": {},
+    "name": "example",
+    "namespace": "system",
+    "netblock": "10.0.0.0/24",
+    "provide_dhcp": true,
+    "provide_nat": true,
+    "state": "deleted",
+    "uuid": "d56ae6e4-2592-43cd-b614-2dc7ca04970a",
+    "version": 4,
+    "vxid": 15408371
+}
+"""
+
+
 class NetworkEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'networks', 'Get network information.',
+        [('artifact_ref', 'query', 'uuidorname',
+          'The UUID or name of the network.', True)],
+        [(200, 'Information about a single network.', network_get_example),
+         (404, 'Network not found.', None)]))
     @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
@@ -62,6 +100,14 @@ class NetworkEndpoint(sf_api.Resource):
     def get(self, network_ref=None, network_from_db=None):
         return network_from_db.external_view()
 
+    @swag_from(api_base.swagger_helper(
+        'networks', 'Delete a network.',
+        [('artifact_ref', 'query', 'uuidorname',
+          'The UUID or name of the network.', True)],
+        [(200,
+          'Information about a single network, this may not immediately indicate '
+          'the network is deleted.', network_delete_example),
+         (404, 'Network not found.', None)]))
     @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
