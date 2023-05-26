@@ -532,9 +532,6 @@ class Network(dbo):
         self.remove_dhcp()
         self.remove_nat()
 
-        ipm = IPManager.from_db(self.uuid)
-        ipm.delete()
-
     def hard_delete(self):
         etcd.delete('vxlan', None, self.vxid)
         etcd.delete('ipmanager', None, self.uuid)
