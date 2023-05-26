@@ -963,6 +963,65 @@
 
 <h1 id="networks-networks">Networks (/networks/)</h1>
 <p>Not yet documented.</p>
+<details class="example">
+<summary>Python API client: create a network</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">n</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">allocate_network</span><span class="p">(</span><span class="s1">&#39;10.0.0.0/24&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="s1">&#39;example&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>$ python3 example.py
+{
+    &quot;floating_gateway&quot;: &quot;192.168.10.16&quot;,
+    &quot;metadata&quot;: {},
+    &quot;name&quot;: &quot;example&quot;,
+    &quot;namespace&quot;: &quot;system&quot;,
+    &quot;netblock&quot;: &quot;10.0.0.0/24&quot;,
+    &quot;provide_dhcp&quot;: true,
+    &quot;provide_nat&quot;: true,
+    &quot;state&quot;: &quot;created&quot;,
+    &quot;uuid&quot;: &quot;1e9222c5-2d11-4ada-b258-ed1838bd774b&quot;,
+    &quot;version&quot;: 4,
+    &quot;vxid&quot;: 4882442
+}
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: delete a network</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+<span class="kn">import</span> <span class="nn">time</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">n</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">allocate_network</span><span class="p">(</span><span class="s1">&#39;10.0.0.0/24&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="s1">&#39;example&#39;</span><span class="p">)</span>
+
+<span class="n">n</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">delete_network</span><span class="p">(</span><span class="n">n</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
+<span class="k">while</span> <span class="n">n</span><span class="p">[</span><span class="s1">&#39;state&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;deleted&#39;</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Waiting...&#39;</span><span class="p">)</span>
+    <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_network</span><span class="p">(</span><span class="n">n</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">])</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>$ python3 example.py
+Waiting...
+{
+    &quot;floating_gateway&quot;: null,
+    &quot;metadata&quot;: {},
+    &quot;name&quot;: &quot;example&quot;,
+    &quot;namespace&quot;: &quot;system&quot;,
+    &quot;netblock&quot;: &quot;10.0.0.0/24&quot;,
+    &quot;provide_dhcp&quot;: true,
+    &quot;provide_nat&quot;: true,
+    &quot;state&quot;: &quot;deleted&quot;,
+    &quot;uuid&quot;: &quot;d56ae6e4-2592-43cd-b614-2dc7ca04970a&quot;,
+    &quot;version&quot;: 4,
+    &quot;vxid&quot;: 15408371
+}
+</code></pre></div>
+</details>
 
 
 
