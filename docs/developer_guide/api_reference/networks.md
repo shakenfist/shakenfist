@@ -67,3 +67,38 @@ Not yet documented.
         "vxid": 15408371
     }
     ```
+
+??? example "Python API client: get a single network"
+    ```python
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    n = sf_client.get_network('...uuid...')
+    ```
+
+??? example "Python API client: list networks"
+
+    ```python
+    import json
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    nets = sf_client.get_networks()
+    print(json.dumps(nets, indent=4, sort_keys=True))
+    ```
+
+    ```
+    $ python3 example.py
+    [
+        {
+            "name": "sfcbr-7YWeQo4BoqLjASDd",
+            "namespace": "sfcbr-7YWeQo4BoqLjASDd",
+            "netblock": "10.0.0.0/24",
+            "provide_dhcp": true,
+            "provide_nat": true,
+            "state": "created",
+            "uuid": "759b742d-6140-475e-9553-ac120b56c1ef",
+            "vxlan_id": 0
+        }
+    ]
+    ````
