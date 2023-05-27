@@ -134,7 +134,26 @@ class NetworkEndpoint(sf_api.Resource):
         return network_from_db.external_view()
 
 
+networks_get_example = """[
+    {
+        "name": "sfcbr-7YWeQo4BoqLjASDd",
+        "namespace": "sfcbr-7YWeQo4BoqLjASDd",
+        "netblock": "10.0.0.0/24",
+        "provide_dhcp": true,
+        "provide_nat": true,
+        "state": "created",
+        "uuid": "759b742d-6140-475e-9553-ac120b56c1ef",
+        "vxlan_id": 0
+    },
+    ...
+]"""
+
+
 class NetworksEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'networks', 'Get a list of all networks visible to the authenticated namespace.',
+        [('all', 'body', 'boolean', 'Include deleted networks.', False)],
+        [(200, 'A list of information about visible networks.', networks_get_example)]))
     @marshal_with({
         'uuid': fields.String,
         'vxlan_id': fields.Integer,
@@ -158,6 +177,20 @@ class NetworksEndpoint(sf_api.Resource):
             retval.append(n.external_view())
         return retval
 
+    @swag_from(api_base.swagger_helper(
+        'networks', 'Create a network.',
+        [
+            ('netblock', 'body', 'string',
+             'A CIDR netblock to use for address allocation on the network.', True),
+            ('provide_dhcp', 'body', 'boolean',
+             'Whether or not to provide DHCP services on the network.', True),
+            ('provide_nat', 'body', 'boolean',
+             'Whether or not to NAT for egress traffic on the network.', True),
+            ('name', 'body', 'string', 'The name of the network.', True),
+            ('namespace', 'body', 'namespace', 'The namespace to contain the network.', False)
+        ],
+        [(200, 'Information about a single network.', network_get_example),
+         (400, 'The netblock is invalid.', None)]))
     @api_base.verify_token
     @api_base.requires_namespace_exist_if_specified
     @api_base.log_token_use
@@ -183,6 +216,15 @@ class NetworksEndpoint(sf_api.Resource):
                                 provide_nat)
         return n.external_view()
 
+    @swag_from(api_base.swagger_helper(
+        'networks', 'Delete all networks in a namespace.',
+        [('confirm', 'body', 'boolean', 'I really mean it.', True),
+         ('namespace', 'body', 'namespace',
+          'The namespace to delete networks from.', False),
+         ('clean_wait', 'body', 'boolean',  'Block until complete.', False)],
+        [(200, 'A list of the UUIDs of networks awaiting deletion.', None),
+         (400, 'The confirm parameter is not True or a administrative user has '
+               'not specified a namespace.', None)]))
     @api_base.verify_token
     @api_base.requires_namespace_exist_if_specified
     @api_base.redirect_to_network_node
