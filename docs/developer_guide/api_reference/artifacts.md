@@ -115,8 +115,8 @@ a general introduction to the Shaken Fist event system).
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
-    artifact = sf_client.get_artifact_events('05e841a7-7e13-4df6-8c04-8932b98885bd')
-    print(json.dumps(artifact, indent=4, sort_keys=True))
+    events = sf_client.get_artifact_events('05e841a7-7e13-4df6-8c04-8932b98885bd')
+    print(json.dumps(events, indent=4, sort_keys=True))
     ```
 
     Note that events are returned in reverse chronological order and are limited

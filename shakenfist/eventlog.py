@@ -489,7 +489,13 @@ class EventLogChunk(object):
         cur.execute('SELECT * FROM events ORDER BY TIMESTAMP DESC LIMIT %d'
                     % limit)
         for row in cur.fetchall():
-            yield dict(row)
+            out = dict(row)
+            if out.get('extra'):
+                try:
+                    out['extra'] = json.loads(out['extra'])
+                except json.decoder.JSONDecodeError:
+                    pass
+            yield out
 
     def count_events(self):
         if not self.bootstrapped:

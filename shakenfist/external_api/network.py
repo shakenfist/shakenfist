@@ -276,7 +276,43 @@ class NetworksEndpoint(sf_api.Resource):
         return networks_del
 
 
+network_events_example = """[
+    ...
+    {
+        "duration": null,
+        "extra": "{...}",
+        "fqdn": "sf-1",
+        "message": "set attribute",
+        "timestamp": 1685157082.5911918,
+        "type": "mutate"
+    },
+    {
+        "duration": null,
+        "extra": "{\"attribute\": \"routing\", \"floating_gateway\": \"192.168.10.79\"}",
+        "fqdn": "sf-1",
+        "message": "set attribute",
+        "timestamp": 1685157082.501928,
+        "type": "mutate"
+    },
+    {
+        "duration": null,
+        "extra": "{...}",
+        "fqdn": "sf-1",
+        "message": "set attribute",
+        "timestamp": 1685157080.6169195,
+        "type": "mutate"
+    },
+    ...
+]"""
+
+
 class NetworkEventsEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'networks', 'Get network event information.',
+        [('network_ref', 'query', 'uuidorname',
+          'The UUID or name of the network.', True)],
+        [(200, 'Event information about a single network.', network_events_example),
+         (404, 'Network not found.', None)]))
     @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership

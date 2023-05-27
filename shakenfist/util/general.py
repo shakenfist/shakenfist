@@ -127,7 +127,7 @@ def link(source, destination):
             # called, so this implies we raced through just this method. Make
             # sure the destination points to the right place and if it does
             # just shrug and keep going.
-            if os.realpath(destination) != source:
+            if os.path.realpath(destination) != source:
                 raise e
 
     pathlib.Path(destination).touch(exist_ok=True)

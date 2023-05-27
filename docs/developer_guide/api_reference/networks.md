@@ -102,3 +102,53 @@ Not yet documented.
         }
     ]
     ````
+
+
+
+
+
+??? example "Python API client: list events for a network"
+
+    ``` python
+    import json
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    events = sf_client.get_network_events('2fcefe3f-17b8-4d66-8197-e91f09beb90c')
+    print(json.dumps(events, indent=4, sort_keys=True))
+    ```
+
+    Note that events are returned in reverse chronological order and are limited
+    to the 100 most recent events.
+
+    ```
+    $ python3 example.py
+    [
+        ...
+        {
+            "duration": null,
+            "extra": "{\"attribute\": \"state\", \"update_time\": 1685157082.5911841, \"value\": \"created\"}",
+            "fqdn": "sf-1",
+            "message": "set attribute",
+            "timestamp": 1685157082.5911918,
+            "type": "mutate"
+        },
+        {
+            "duration": null,
+            "extra": "{\"attribute\": \"routing\", \"floating_gateway\": \"192.168.10.79\"}",
+            "fqdn": "sf-1",
+            "message": "set attribute",
+            "timestamp": 1685157082.501928,
+            "type": "mutate"
+        },
+        {
+            "duration": null,
+            "extra": "{\"attribute\": \"state\", \"request-id\": \"74264a06-c9fa-40ea-a4be-e8595531eeba\", \"update_time\": 1685157080.616913, \"value\": \"initial\"}",
+            "fqdn": "sf-1",
+            "message": "set attribute",
+            "timestamp": 1685157080.6169195,
+            "type": "mutate"
+        },
+        ...
+    ]
+    ```
