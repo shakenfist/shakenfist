@@ -1547,43 +1547,47 @@ to the 100 most recent events.</p>
     ...
     {
         &quot;duration&quot;: null,
-        &quot;extra&quot;: &quot;{\&quot;candidates\&quot;: [\&quot;sf-1\&quot;, \&quot;sf-2\&quot;, \&quot;sf-3\&quot;, \&quot;sf-4\&quot;], \&quot;request-id\&quot;: \&quot;01afb355-fe85-4408-84f9-56c4f10a9780\&quot;}&quot;,
-        &quot;fqdn&quot;: &quot;sf-1&quot;,
-        &quot;message&quot;: &quot;schedule are hypervisors&quot;,
-        &quot;timestamp&quot;: 1684299968.0741177,
-        &quot;type&quot;: &quot;audit&quot;
-    },
-    {
-        &quot;duration&quot;: null,
-        &quot;extra&quot;: &quot;{\&quot;candidates\&quot;: [\&quot;sf-1\&quot;, \&quot;sf-2\&quot;, \&quot;sf-3\&quot;, \&quot;sf-4\&quot;], \&quot;request-id\&quot;: \&quot;01afb355-fe85-4408-84f9-56c4f10a9780\&quot;}&quot;,
-        &quot;fqdn&quot;: &quot;sf-1&quot;,
-        &quot;message&quot;: &quot;schedule initial candidates&quot;,
-        &quot;timestamp&quot;: 1684299968.0697834,
-        &quot;type&quot;: &quot;audit&quot;
-    },
-    {
-        &quot;duration&quot;: null,
-        &quot;extra&quot;: &quot;{\&quot;attribute\&quot;: \&quot;interfaces\&quot;, \&quot;request-id\&quot;: \&quot;01afb355-fe85-4408-84f9-56c4f10a9780\&quot;, \&quot;value\&quot;: []}&quot;,
-        &quot;fqdn&quot;: &quot;sf-1&quot;,
-        &quot;message&quot;: &quot;set attribute&quot;,
-        &quot;timestamp&quot;: 1684299968.030679,
-        &quot;type&quot;: &quot;mutate&quot;
-    },
-    {
-        &quot;duration&quot;: null,
-        &quot;extra&quot;: &quot;{\&quot;attribute\&quot;: \&quot;power_state\&quot;, \&quot;power_state\&quot;: \&quot;initial\&quot;, \&quot;request-id\&quot;: \&quot;01afb355-fe85-4408-84f9-56c4f10a9780\&quot;}&quot;,
-        &quot;fqdn&quot;: &quot;sf-1&quot;,
-        &quot;message&quot;: &quot;set attribute&quot;,
-        &quot;timestamp&quot;: 1684299968.020376,
-        &quot;type&quot;: &quot;mutate&quot;
-    },
-    {
-        &quot;duration&quot;: null,
-        &quot;extra&quot;: &quot;{\&quot;attribute\&quot;: \&quot;state\&quot;, \&quot;request-id\&quot;: \&quot;01afb355-fe85-4408-84f9-56c4f10a9780\&quot;, \&quot;update_time\&quot;: 1684299967.9816113, \&quot;value\&quot;: \&quot;initial\&quot;}&quot;,
-        &quot;fqdn&quot;: &quot;sf-1&quot;,
-        &quot;message&quot;: &quot;set attribute&quot;,
-        &quot;timestamp&quot;: 1684299967.9816155,
-        &quot;type&quot;: &quot;mutate&quot;
+        &quot;extra&quot;: {
+            &quot;cpu usage&quot;: {
+                &quot;cpu time ns&quot;: 357485828000,
+                &quot;system time ns&quot;: 66297716000,
+                &quot;user time ns&quot;: 291188112000
+            },
+            &quot;disk usage&quot;: {
+                &quot;vda&quot;: {
+                    &quot;actual bytes on disk&quot;: 956301312,
+                    &quot;errors&quot;: -1,
+                    &quot;read bytes&quot;: 406776320,
+                    &quot;read requests&quot;: 12225,
+                    &quot;write bytes&quot;: 2105954304,
+                    &quot;write requests&quot;: 3657
+                },
+                &quot;vdb&quot;: {
+                    &quot;actual bytes on disk&quot;: 102400,
+                    &quot;errors&quot;: -1,
+                    &quot;read bytes&quot;: 279552,
+                    &quot;read requests&quot;: 74,
+                    &quot;write bytes&quot;: 0,
+                    &quot;write requests&quot;: 0
+                }
+            },
+            &quot;network usage&quot;: {
+                &quot;02:00:00:1d:24:ae&quot;: {
+                    &quot;read bytes&quot;: 147084732,
+                    &quot;read drops&quot;: 0,
+                    &quot;read errors&quot;: 0,
+                    &quot;read packets&quot;: 16484,
+                    &quot;write bytes&quot;: 2166754,
+                    &quot;write drops&quot;: 0,
+                    &quot;write errors&quot;: 0,
+                    &quot;write packets&quot;: 13144
+                }
+            }
+        },
+        &quot;fqdn&quot;: &quot;sf-2&quot;,
+        &quot;message&quot;: &quot;usage&quot;,
+        &quot;timestamp&quot;: 1685229509.9592097,
+        &quot;type&quot;: &quot;usage&quot;
     },
     ...
 ]

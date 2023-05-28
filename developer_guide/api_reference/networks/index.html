@@ -1061,7 +1061,7 @@ $ python3 example.py
 <span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
 
 <span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
-<span class="n">events</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_network_events</span><span class="p">(</span><span class="s1">&#39;2fcefe3f-17b8-4d66-8197-e91f09beb90c&#39;</span><span class="p">)</span>
+<span class="n">events</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_network_events</span><span class="p">(</span><span class="s1">&#39;e0c2ee96-2b61-4d58-abd4-2cdef522b7a6&#39;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
 </code></pre></div>
 <p>Note that events are returned in reverse chronological order and are limited
@@ -1071,29 +1071,29 @@ to the 100 most recent events.</p>
     ...
     {
         &quot;duration&quot;: null,
-        &quot;extra&quot;: &quot;{\&quot;attribute\&quot;: \&quot;state\&quot;, \&quot;update_time\&quot;: 1685157082.5911841, \&quot;value\&quot;: \&quot;created\&quot;}&quot;,
+        &quot;extra&quot;: {
+            &quot;rx&quot;: {
+                &quot;bytes&quot;: 2146364,
+                &quot;dropped&quot;: 0,
+                &quot;errors&quot;: 0,
+                &quot;multicast&quot;: 0,
+                &quot;over_errors&quot;: 0,
+                &quot;packets&quot;: 13127
+            },
+            &quot;tx&quot;: {
+                &quot;bytes&quot;: 152367092,
+                &quot;carrier_errors&quot;: 0,
+                &quot;collisions&quot;: 0,
+                &quot;dropped&quot;: 0,
+                &quot;errors&quot;: 0,
+                &quot;packets&quot;: 96644
+            }
+        },
         &quot;fqdn&quot;: &quot;sf-1&quot;,
-        &quot;message&quot;: &quot;set attribute&quot;,
-        &quot;timestamp&quot;: 1685157082.5911918,
-        &quot;type&quot;: &quot;mutate&quot;
-    },
-    {
-        &quot;duration&quot;: null,
-        &quot;extra&quot;: &quot;{\&quot;attribute\&quot;: \&quot;routing\&quot;, \&quot;floating_gateway\&quot;: \&quot;192.168.10.79\&quot;}&quot;,
-        &quot;fqdn&quot;: &quot;sf-1&quot;,
-        &quot;message&quot;: &quot;set attribute&quot;,
-        &quot;timestamp&quot;: 1685157082.501928,
-        &quot;type&quot;: &quot;mutate&quot;
-    },
-    {
-        &quot;duration&quot;: null,
-        &quot;extra&quot;: &quot;{\&quot;attribute\&quot;: \&quot;state\&quot;, \&quot;request-id\&quot;: \&quot;74264a06-c9fa-40ea-a4be-e8595531eeba\&quot;, \&quot;update_time\&quot;: 1685157080.616913, \&quot;value\&quot;: \&quot;initial\&quot;}&quot;,
-        &quot;fqdn&quot;: &quot;sf-1&quot;,
-        &quot;message&quot;: &quot;set attribute&quot;,
-        &quot;timestamp&quot;: 1685157080.6169195,
-        &quot;type&quot;: &quot;mutate&quot;
-    },
-    ...
+        &quot;message&quot;: &quot;usage&quot;,
+        &quot;timestamp&quot;: 1685229103.9690208,
+        &quot;type&quot;: &quot;usage&quot;
+    }
 ]
 </code></pre></div>
 </details>
