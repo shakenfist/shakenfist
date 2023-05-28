@@ -1093,8 +1093,84 @@ to the 100 most recent events.</p>
         &quot;message&quot;: &quot;usage&quot;,
         &quot;timestamp&quot;: 1685229103.9690208,
         &quot;type&quot;: &quot;usage&quot;
+    },
+    ...
+]
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: list interfaces on a network</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">events</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_network_interfaces</span><span class="p">(</span><span class="s1">&#39;91b88200-ab4c-4ac4-9709-459504d1da0a&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>$ python3 example.py
+[
+    {
+        &quot;floating&quot;: &quot;192.168.10.84&quot;,
+        &quot;instance_uuid&quot;: &quot;fffaa23b-c38b-484b-b58e-22eedc6ba94f&quot;,
+        &quot;ipv4&quot;: &quot;10.0.0.20&quot;,
+        &quot;macaddr&quot;: &quot;02:00:00:19:e4:b4&quot;,
+        &quot;metadata&quot;: {},
+        &quot;model&quot;: &quot;virtio&quot;,
+        &quot;network_uuid&quot;: &quot;91b88200-ab4c-4ac4-9709-459504d1da0a&quot;,
+        &quot;order&quot;: 0,
+        &quot;state&quot;: &quot;created&quot;,
+        &quot;uuid&quot;: &quot;24e636b4-b60c-4fcc-89d3-e717667a8c83&quot;,
+        &quot;version&quot;: 3
+    },
+    {
+        &quot;floating&quot;: null,
+        &quot;instance_uuid&quot;: &quot;1762820a-1e44-41b3-9174-44412481d873&quot;,
+        &quot;ipv4&quot;: &quot;10.0.0.57&quot;,
+        &quot;macaddr&quot;: &quot;02:00:00:4b:dc:5f&quot;,
+        &quot;metadata&quot;: {},
+        &quot;model&quot;: &quot;virtio&quot;,
+        &quot;network_uuid&quot;: &quot;91b88200-ab4c-4ac4-9709-459504d1da0a&quot;,
+        &quot;order&quot;: 0,
+        &quot;state&quot;: &quot;created&quot;,
+        &quot;uuid&quot;: &quot;0c790a6e-a4de-4518-84e7-11d1421cd4df&quot;,
+        &quot;version&quot;: 3
     }
 ]
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: ping on a network.</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">events</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">ping</span><span class="p">(</span><span class="s1">&#39;55ea5f3b-d671-4d7f-9b8c-1e8f217a74f4&#39;</span><span class="p">,</span> <span class="s1">&#39;10.0.0.187&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>$ python3 example.py
+{
+    &quot;stderr&quot;: [
+        &quot;&quot;
+    ],
+    &quot;stdout&quot;: [
+        &quot;PING 10.0.0.187 (10.0.0.187) 56(84) bytes of data.&quot;,
+        &quot;64 bytes from 10.0.0.187: icmp_seq=1 ttl=64 time=0.393 ms&quot;,
+        &quot;64 bytes from 10.0.0.187: icmp_seq=2 ttl=64 time=0.273 ms&quot;,
+        &quot;64 bytes from 10.0.0.187: icmp_seq=3 ttl=64 time=0.227 ms&quot;,
+        &quot;64 bytes from 10.0.0.187: icmp_seq=4 ttl=64 time=0.252 ms&quot;,
+        &quot;64 bytes from 10.0.0.187: icmp_seq=5 ttl=64 time=0.269 ms&quot;,
+        &quot;64 bytes from 10.0.0.187: icmp_seq=6 ttl=64 time=0.252 ms&quot;,
+        &quot;64 bytes from 10.0.0.187: icmp_seq=7 ttl=64 time=0.228 ms&quot;,
+        &quot;64 bytes from 10.0.0.187: icmp_seq=8 ttl=64 time=0.265 ms&quot;,
+        &quot;64 bytes from 10.0.0.187: icmp_seq=9 ttl=64 time=0.246 ms&quot;,
+        &quot;64 bytes from 10.0.0.187: icmp_seq=10 ttl=64 time=0.257 ms&quot;,
+        &quot;&quot;,
+        &quot;--- 10.0.0.187 ping statistics ---&quot;,
+        &quot;10 packets transmitted, 10 received, 0% packet loss, time 9213ms&quot;,
+        &quot;rtt min/avg/max/mdev = 0.227/0.266/0.393/0.044 ms&quot;,
+        &quot;&quot;
+    ]
+}
 </code></pre></div>
 </details>
 
