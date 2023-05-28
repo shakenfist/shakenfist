@@ -287,7 +287,7 @@ class BaseTestCase(testtools.TestCase):
             attempts -= 1
 
             output = self.system_client.ping(network_uuid, ip)
-            for line in output.get('stdout', '').split('\n'):
+            for line in output.get('stdout', []):
                 m = packet_loss_re.match(line)
                 if m:
                     packet_loss = int(m.group(1))

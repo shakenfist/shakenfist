@@ -657,7 +657,8 @@ class ArtifactUnshareEndpoint(sf_api.Resource):
 class ArtifactMetadatasEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Fetch metadata for an artifact.',
-        [('artifact_ref', 'body', 'uuidorname', 'The artifact to add a key to.', True)],
+        [('artifact_ref', 'body', 'uuidorname',
+          'The artifact to fetch metadata for.', True)],
         [(200, 'Artifact metadata, if any.', None),
          (404, 'Artifact not found.', None)],
         requires_admin=True))
