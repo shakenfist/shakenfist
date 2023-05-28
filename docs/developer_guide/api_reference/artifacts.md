@@ -128,11 +128,11 @@ a general introduction to the Shaken Fist event system).
         ...
         {
             "duration": null,
-            "extra": "{\"bytes\": 960546304}",
-            "fqdn": "sf-4",
-            "message": "usage",
-            "timestamp": 1680429179.5936947,
-            "type": "usage"
+            "extra": {},
+            "fqdn": "sf-3",
+            "message": "artifact fetch complete",
+            "timestamp": 1684718452.2673004,
+            "type": "audit"
         },
         ...
     ]
