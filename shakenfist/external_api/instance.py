@@ -1004,7 +1004,8 @@ class InstanceUnpauseEndpoint(sf_api.Resource):
 class InstanceMetadatasEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Fetch metadata for an instance.',
-        [('instance_ref', 'body', 'uuidorname', 'The instance to add a key to.', True)],
+        [('instance_ref', 'body', 'uuidorname',
+          'The instance to fetch metadata for.', True)],
         [(200, 'Instance metadata, if any.', None),
          (404, 'Instance not found.', None)],
         requires_admin=True))

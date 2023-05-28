@@ -324,7 +324,42 @@ class NetworkEventsEndpoint(sf_api.Resource):
             return list(eventdb.read_events())
 
 
+network_interfaces_example = """{
+    "floating": "192.168.10.84",
+    "instance_uuid": "fffaa23b-c38b-484b-b58e-22eedc6ba94f",
+    "ipv4": "10.0.0.20",
+    "macaddr": "02:00:00:19:e4:b4",
+    "metadata": {},
+    "model": "virtio",
+    "network_uuid": "91b88200-ab4c-4ac4-9709-459504d1da0a",
+    "order": 0,
+    "state": "created",
+    "uuid": "24e636b4-b60c-4fcc-89d3-e717667a8c83",
+    "version": 3
+},
+{
+    "floating": null,
+    "instance_uuid": "1762820a-1e44-41b3-9174-44412481d873",
+    "ipv4": "10.0.0.57",
+    "macaddr": "02:00:00:4b:dc:5f",
+    "metadata": {},
+    "model": "virtio",
+    "network_uuid": "91b88200-ab4c-4ac4-9709-459504d1da0a",
+    "order": 0,
+    "state": "created",
+    "uuid": "0c790a6e-a4de-4518-84e7-11d1421cd4df",
+    "version": 3
+}"""
+
+
 class NetworkInterfacesEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'networks', 'Get network interface information.',
+        [('network_ref', 'query', 'uuidorname',
+          'The UUID or name of the network.', True)],
+        [(200, 'The network interfaces on a single network.',
+          network_interfaces_example),
+         (404, 'Network not found.', None)]))
     @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
@@ -340,6 +375,13 @@ class NetworkInterfacesEndpoint(sf_api.Resource):
 
 
 class NetworkMetadatasEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'networks', 'Fetch metadata for a network.',
+        [('network_ref', 'body', 'uuidorname',
+          'The network fetch metadata for.', True)],
+        [(200, 'Artifact metadata, if any.', None),
+         (404, 'Artifact not found.', None)],
+        requires_admin=True))
     @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
@@ -347,6 +389,17 @@ class NetworkMetadatasEndpoint(sf_api.Resource):
     def get(self, network_ref=None, network_from_db=None):
         return network_from_db.metadata
 
+    @swag_from(api_base.swagger_helper(
+        'networks', 'Add metadata for a network.',
+        [
+            ('network_ref', 'body', 'uuidorname', 'The network to add a key to.', True),
+            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('value', 'body', 'string', 'The value of the key.', True)
+        ],
+        [(200, 'Nothing.', None),
+         (400, 'One of key or value are missing.', None),
+         (404, 'Network not found.', None)],
+        requires_admin=True))
     @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
@@ -360,6 +413,17 @@ class NetworkMetadatasEndpoint(sf_api.Resource):
 
 
 class NetworkMetadataEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'networks', 'Update a metadata key for a network.',
+        [
+            ('network_ref', 'body', 'uuidorname', 'The network to add a key to.', True),
+            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('value', 'body', 'string', 'The value of the key.', True)
+        ],
+        [(200, 'Nothing.', None),
+         (400, 'One of key or value are missing.', None),
+         (404, 'Network not found.', None)],
+        requires_admin=True))
     @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
@@ -371,6 +435,17 @@ class NetworkMetadataEndpoint(sf_api.Resource):
             return sf_api.error(400, 'no value specified')
         network_from_db.add_metadata_key(key, value)
 
+    @swag_from(api_base.swagger_helper(
+        'networks', 'Delete a metadata key for a network.',
+        [
+            ('network_ref', 'body', 'uuidorname', 'The network to remove a key from.', True),
+            ('key', 'body', 'string', 'The metadata key to set', True),
+            ('value', 'body', 'string', 'The value of the key.', True)
+        ],
+        [(200, 'Nothing.', None),
+         (400, 'One of key or value are missing.', None),
+         (404, 'Network not found.', None)],
+        requires_admin=True))
     @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
@@ -382,6 +457,17 @@ class NetworkMetadataEndpoint(sf_api.Resource):
 
 
 class NetworkPingEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'networks', 'Send ICMP ping traffic to an address on a network.',
+        [
+            ('network_ref', 'body', 'uuidorname',
+             'The network to send traffic on.', True),
+            ('address', 'body', 'string', 'The IPv4 address to ping.', True)
+        ],
+        [(200, 'The stdout and stderr of the ping request.', None),
+         (400, 'The IPv4 address is not in the network\'s netblock.', None),
+         (404, 'Network not found.', None)],
+        requires_admin=True))
     @api_base.verify_token
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
@@ -393,8 +479,7 @@ class NetworkPingEndpoint(sf_api.Resource):
             return sf_api.error(400, 'ping request for address outside network block')
 
         out, err = util_process.execute(
-            None, 'ip netns exec %s ping -c 10 %s' % (
-                network_from_db.uuid, address),
+            None, 'ip netns exec %s ping -c 10 %s' % (network_from_db.uuid, address),
             check_exit_code=[0, 1])
         return {
             'stdout': out,

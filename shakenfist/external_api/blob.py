@@ -213,7 +213,7 @@ class BlobMetadatasEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Fetch metadata for a blob.',
         [
-            ('blob_uuid', 'body', 'uuid', 'The blob to add a key to.', True)
+            ('blob_uuid', 'body', 'uuid', 'The blob to fetch metadaa for.', True)
         ],
         [(200, 'Blob metadata, if any.', None),
          (404, 'Blob not found.', None)],
