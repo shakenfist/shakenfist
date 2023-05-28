@@ -456,6 +456,31 @@ class NetworkMetadataEndpoint(sf_api.Resource):
         network_from_db.remove_metadata_key(key)
 
 
+network_ping_example = """{
+    "stderr": [
+        ""
+    ],
+    "stdout": [
+        "PING 10.0.0.187 (10.0.0.187) 56(84) bytes of data.",
+        "64 bytes from 10.0.0.187: icmp_seq=1 ttl=64 time=0.393 ms",
+        "64 bytes from 10.0.0.187: icmp_seq=2 ttl=64 time=0.273 ms",
+        "64 bytes from 10.0.0.187: icmp_seq=3 ttl=64 time=0.227 ms",
+        "64 bytes from 10.0.0.187: icmp_seq=4 ttl=64 time=0.252 ms",
+        "64 bytes from 10.0.0.187: icmp_seq=5 ttl=64 time=0.269 ms",
+        "64 bytes from 10.0.0.187: icmp_seq=6 ttl=64 time=0.252 ms",
+        "64 bytes from 10.0.0.187: icmp_seq=7 ttl=64 time=0.228 ms",
+        "64 bytes from 10.0.0.187: icmp_seq=8 ttl=64 time=0.265 ms",
+        "64 bytes from 10.0.0.187: icmp_seq=9 ttl=64 time=0.246 ms",
+        "64 bytes from 10.0.0.187: icmp_seq=10 ttl=64 time=0.257 ms",
+        "",
+        "--- 10.0.0.187 ping statistics ---",
+        "10 packets transmitted, 10 received, 0% packet loss, time 9213ms",
+        "rtt min/avg/max/mdev = 0.227/0.266/0.393/0.044 ms",
+        ""
+    ]
+}"""
+
+
 class NetworkPingEndpoint(sf_api.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Send ICMP ping traffic to an address on a network.',
@@ -465,7 +490,8 @@ class NetworkPingEndpoint(sf_api.Resource):
             ('address', 'body', 'string', 'The IPv4 address to ping.', True)
         ],
         [(200, 'The stdout and stderr of the ping request.', None),
-         (400, 'The IPv4 address is not in the network\'s netblock.', None),
+         (400, 'The IPv4 address is not in the network\'s netblock or is invalid.',
+          None),
          (404, 'Network not found.', None)],
         requires_admin=True))
     @api_base.verify_token
@@ -475,6 +501,11 @@ class NetworkPingEndpoint(sf_api.Resource):
     @api_base.requires_network_active
     @api_base.log_token_use
     def get(self, network_ref=None, address=None, network_from_db=None):
+        try:
+            ipaddress.ip_address(address)
+        except ValueError:
+            return sf_api.error(400, 'invalid address')
+
         if not network_from_db.is_in_range(address):
             return sf_api.error(400, 'ping request for address outside network block')
 
@@ -482,6 +513,6 @@ class NetworkPingEndpoint(sf_api.Resource):
             None, 'ip netns exec %s ping -c 10 %s' % (network_from_db.uuid, address),
             check_exit_code=[0, 1])
         return {
-            'stdout': out,
-            'stderr': err
+            'stdout': out.split('\n'),
+            'stderr': err.split('\n')
         }

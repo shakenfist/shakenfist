@@ -206,14 +206,33 @@ Not yet documented.
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
-    events = sf_client.ping('91b88200-ab4c-4ac4-9709-459504d1da0a', '10.0.0.20')
+    events = sf_client.ping('55ea5f3b-d671-4d7f-9b8c-1e8f217a74f4', '10.0.0.187')
     print(json.dumps(events, indent=4, sort_keys=True))
     ```
 
     ```
     $ python3 example.py
     {
-        "stderr": "",
-        "stdout": "PING 10.0.0.20 (10.0.0.20) 56(84) bytes of data.\n64 bytes from 10.0.0.20: icmp_seq=1 ttl=64 time=0.275 ms\n64 bytes from 10.0.0.20: icmp_seq=2 ttl=64 time=0.252 ms\n64 bytes from 10.0.0.20: icmp_seq=3 ttl=64 time=0.254 ms\n64 bytes from 10.0.0.20: icmp_seq=4 ttl=64 time=0.266 ms\n64 bytes from 10.0.0.20: icmp_seq=5 ttl=64 time=0.242 ms\n64 bytes from 10.0.0.20: icmp_seq=6 ttl=64 time=0.228 ms\n64 bytes from 10.0.0.20: icmp_seq=7 ttl=64 time=0.395 ms\n64 bytes from 10.0.0.20: icmp_seq=8 ttl=64 time=0.389 ms\n64 bytes from 10.0.0.20: icmp_seq=9 ttl=64 time=0.269 ms\n64 bytes from 10.0.0.20: icmp_seq=10 ttl=64 time=0.272 ms\n\n--- 10.0.0.20 ping statistics ---\n10 packets transmitted, 10 received, 0% packet loss, time 9208ms\nrtt min/avg/max/mdev = 0.228/0.284/0.395/0.055 ms\n"
+        "stderr": [
+            ""
+        ],
+        "stdout": [
+            "PING 10.0.0.187 (10.0.0.187) 56(84) bytes of data.",
+            "64 bytes from 10.0.0.187: icmp_seq=1 ttl=64 time=0.393 ms",
+            "64 bytes from 10.0.0.187: icmp_seq=2 ttl=64 time=0.273 ms",
+            "64 bytes from 10.0.0.187: icmp_seq=3 ttl=64 time=0.227 ms",
+            "64 bytes from 10.0.0.187: icmp_seq=4 ttl=64 time=0.252 ms",
+            "64 bytes from 10.0.0.187: icmp_seq=5 ttl=64 time=0.269 ms",
+            "64 bytes from 10.0.0.187: icmp_seq=6 ttl=64 time=0.252 ms",
+            "64 bytes from 10.0.0.187: icmp_seq=7 ttl=64 time=0.228 ms",
+            "64 bytes from 10.0.0.187: icmp_seq=8 ttl=64 time=0.265 ms",
+            "64 bytes from 10.0.0.187: icmp_seq=9 ttl=64 time=0.246 ms",
+            "64 bytes from 10.0.0.187: icmp_seq=10 ttl=64 time=0.257 ms",
+            "",
+            "--- 10.0.0.187 ping statistics ---",
+            "10 packets transmitted, 10 received, 0% packet loss, time 9213ms",
+            "rtt min/avg/max/mdev = 0.227/0.266/0.393/0.044 ms",
+            ""
+        ]
     }
     ```
