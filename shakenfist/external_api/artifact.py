@@ -469,62 +469,17 @@ class ArtifactUploadEndpoint(sf_api.Resource):
 
 
 artifact_events_example = """[
-    {
-        "duration": null,
-        "extra": "{\"artifact_type\": \"label\", \"namespace\": \"ci-images\", \"request-id\": \"94a361b1-48f6-432d-83eb-45f7e01cda70\", \"source_url\": \"sf://label/ci-images/debian-11\", \"uuid\": \"3420f4ac-529a-4b34-b8d8-c05a838b9e0c\", \"version\": 4}",
-        "fqdn": "sf-3",
-        "message": "db record created",
-        "operation": null,
-        "phase": null,
-        "timestamp": 1669309125.7316115
-    },
-    {
-        "duration": null,
-        "extra": "{\"attribute\": \"state\", \"request-id\": \"94a361b1-48f6-432d-83eb-45f7e01cda70\", \"update_time\": 1669309125.7451868, \"value\": \"initial\"}",
-        "fqdn": "sf-3",
-        "message": "set attribute",
-        "operation": null,
-        "phase": null,
-        "timestamp": 1669309125.7451944
-    },
-    {
-        "duration": null,
-        "extra": "{\"attribute\": \"max_versions\", \"max_versions\": 3, \"request-id\": \"94a361b1-48f6-432d-83eb-45f7e01cda70\"}",
-        "fqdn": "sf-3",
-        "message": "set attribute",
-        "operation": null,
-        "phase": null,
-        "timestamp": 1669309125.7555978
-    },
-    {
-        "duration": null,
-        "extra": "{\"attribute\": \"highest_index\", \"index\": 1, \"request-id\": \"94a361b1-48f6-432d-83eb-45f7e01cda70\"}",
-        "fqdn": "sf-3",
-        "message": "set attribute",
-        "operation": null,
-        "phase": null,
-        "timestamp": 1669309125.7720575
-    },
-    {
-        "duration": null,
-        "extra": "{\"attribute\": \"index_000000000001\", \"blob_uuid\": \"736999e2-06cb-4329-82e7-8242878c019b\", \"index\": 1, \"request-id\": \"94a361b1-48f6-432d-83eb-45f7e01cda70\"}",
-        "fqdn": "sf-3",
-        "message": "set attribute",
-        "operation": null,
-        "phase": null,
-        "timestamp": 1669309125.776037
-    },
-    {
-        "duration": null,
-        "extra": "{\"request-id\": \"94a361b1-48f6-432d-83eb-45f7e01cda70\"}",
-        "fqdn": "sf-3",
-        "message": "Added index 1 to artifact",
-        "operation": null,
-        "phase": null,
-        "timestamp": 1669309125.780829
-    },
     ...
-]"""  # noqa
+    {
+            "duration": null,
+            "extra": {},
+            "fqdn": "sf-3",
+            "message": "artifact fetch complete",
+            "timestamp": 1684718452.2673004,
+            "type": "audit"
+        },
+    ...
+]"""
 
 
 class ArtifactEventsEndpoint(sf_api.Resource):

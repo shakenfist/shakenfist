@@ -812,35 +812,47 @@ instance_events_example = """[
     ...
     {
         "duration": null,
-        "extra": "{\"candidates\": [\"sf-1\", \"sf-2\", \"sf-3\", \"sf-4\"]}",
-        "fqdn": "sf-1",
-        "message": "schedule are hypervisors",
-        "timestamp": 1684299968.0741177,
-        "type": "audit"
-    },
-    {
-        "duration": null,
-        "extra": "{\"candidates\": [\"sf-1\", \"sf-2\", \"sf-3\", \"sf-4\"]}",
-        "fqdn": "sf-1",
-        "message": "schedule initial candidates",
-        "timestamp": 1684299968.0697834,
-        "type": "audit"
-    },
-    {
-        "duration": null,
-        "extra": "{\"attribute\": \"interfaces\", \"value\": []}",
-        "fqdn": "sf-1",
-        "message": "set attribute",
-        "timestamp": 1684299968.030679,
-        "type": "mutate"
-    },
-    {
-        "duration": null,
-        "extra": "{\"attribute\": \"power_state\", \"power_state\": \"initial\"}",
-        "fqdn": "sf-1",
-        "message": "set attribute",
-        "timestamp": 1684299968.020376,
-        "type": "mutate"
+        "extra": {
+            "cpu usage": {
+                "cpu time ns": 357485828000,
+                "system time ns": 66297716000,
+                "user time ns": 291188112000
+            },
+            "disk usage": {
+                "vda": {
+                    "actual bytes on disk": 956301312,
+                    "errors": -1,
+                    "read bytes": 406776320,
+                    "read requests": 12225,
+                    "write bytes": 2105954304,
+                    "write requests": 3657
+                },
+                "vdb": {
+                    "actual bytes on disk": 102400,
+                    "errors": -1,
+                    "read bytes": 279552,
+                    "read requests": 74,
+                    "write bytes": 0,
+                    "write requests": 0
+                }
+            },
+            "network usage": {
+                "02:00:00:1d:24:ae": {
+                    "read bytes": 147084732,
+                    "read drops": 0,
+                    "read errors": 0,
+                    "read packets": 16484,
+                    "write bytes": 2166754,
+                    "write drops": 0,
+                    "write errors": 0,
+                    "write packets": 13144
+                }
+            }
+        },
+        "fqdn": "sf-2",
+        "message": "usage",
+        "timestamp": 1685229509.9592097,
+        "type": "usage"
     },
     ...
 ]"""

@@ -114,7 +114,7 @@ Not yet documented.
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
-    events = sf_client.get_network_events('2fcefe3f-17b8-4d66-8197-e91f09beb90c')
+    events = sf_client.get_network_events('e0c2ee96-2b61-4d58-abd4-2cdef522b7a6')
     print(json.dumps(events, indent=4, sort_keys=True))
     ```
 
@@ -127,28 +127,28 @@ Not yet documented.
         ...
         {
             "duration": null,
-            "extra": "{\"attribute\": \"state\", \"update_time\": 1685157082.5911841, \"value\": \"created\"}",
+            "extra": {
+                "rx": {
+                    "bytes": 2146364,
+                    "dropped": 0,
+                    "errors": 0,
+                    "multicast": 0,
+                    "over_errors": 0,
+                    "packets": 13127
+                },
+                "tx": {
+                    "bytes": 152367092,
+                    "carrier_errors": 0,
+                    "collisions": 0,
+                    "dropped": 0,
+                    "errors": 0,
+                    "packets": 96644
+                }
+            },
             "fqdn": "sf-1",
-            "message": "set attribute",
-            "timestamp": 1685157082.5911918,
-            "type": "mutate"
-        },
-        {
-            "duration": null,
-            "extra": "{\"attribute\": \"routing\", \"floating_gateway\": \"192.168.10.79\"}",
-            "fqdn": "sf-1",
-            "message": "set attribute",
-            "timestamp": 1685157082.501928,
-            "type": "mutate"
-        },
-        {
-            "duration": null,
-            "extra": "{\"attribute\": \"state\", \"request-id\": \"74264a06-c9fa-40ea-a4be-e8595531eeba\", \"update_time\": 1685157080.616913, \"value\": \"initial\"}",
-            "fqdn": "sf-1",
-            "message": "set attribute",
-            "timestamp": 1685157080.6169195,
-            "type": "mutate"
-        },
-        ...
+            "message": "usage",
+            "timestamp": 1685229103.9690208,
+            "type": "usage"
+        }
     ]
     ```

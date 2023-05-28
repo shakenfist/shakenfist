@@ -276,31 +276,32 @@ class NetworksEndpoint(sf_api.Resource):
         return networks_del
 
 
-network_events_example = """[
+network_events_example = """    [
     ...
     {
         "duration": null,
-        "extra": "{...}",
+        "extra": {
+            "rx": {
+                "bytes": 2146364,
+                "dropped": 0,
+                "errors": 0,
+                "multicast": 0,
+                "over_errors": 0,
+                "packets": 13127
+            },
+            "tx": {
+                "bytes": 152367092,
+                "carrier_errors": 0,
+                "collisions": 0,
+                "dropped": 0,
+                "errors": 0,
+                "packets": 96644
+            }
+        },
         "fqdn": "sf-1",
-        "message": "set attribute",
-        "timestamp": 1685157082.5911918,
-        "type": "mutate"
-    },
-    {
-        "duration": null,
-        "extra": "{\"attribute\": \"routing\", \"floating_gateway\": \"192.168.10.79\"}",
-        "fqdn": "sf-1",
-        "message": "set attribute",
-        "timestamp": 1685157082.501928,
-        "type": "mutate"
-    },
-    {
-        "duration": null,
-        "extra": "{...}",
-        "fqdn": "sf-1",
-        "message": "set attribute",
-        "timestamp": 1685157080.6169195,
-        "type": "mutate"
+        "message": "usage",
+        "timestamp": 1685229103.9690208,
+        "type": "usage"
     },
     ...
 ]"""
