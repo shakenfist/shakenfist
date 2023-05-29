@@ -582,9 +582,54 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          Networks (/networks/)
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         Networks (/networks/)
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#network-lifecycle" class="md-nav__link">
+    Network lifecycle
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#other-network-information" class="md-nav__link">
+    Other network information
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metadata" class="md-nav__link">
+    Metadata
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -945,6 +990,35 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#network-lifecycle" class="md-nav__link">
+    Network lifecycle
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#other-network-information" class="md-nav__link">
+    Other network information
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metadata" class="md-nav__link">
+    Metadata
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -962,7 +1036,29 @@
 
 
 <h1 id="networks-networks">Networks (/networks/)</h1>
-<p>Not yet documented.</p>
+<p>Networks exist so that instances can have connectivity to other instances, or
+services outside the Shaken Fist cluster. Networks are implemented as a VXLAN
+mesh between the hypervisor nodes which host the instances on that network, and
+the network node. The network node exists on every VXLAN mesh, and provides
+services to the network such as DHCP, ping, and egress NAT. If a floating IP
+is assigned to a network interface, that is also implemented on the network
+node.</p>
+<details class="note" open="open">
+<summary>Note</summary>
+<p>It is not required that an instance be on any networks. However, this is
+by far the most common deployment pattern.</p>
+</details>
+<h2 id="network-lifecycle">Network lifecycle</h2>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/networks/post_networks">POST /networks</a>: Create a network.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/networks/delete_networks">DELETE /networks</a>: Delete all networks in a given namespace.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/networks/delete_networks__network_ref_">DELETE /networks/networks/{network_ref}</a>: Delete a specific network.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/networks/get_networks">GET /networks</a>: List the networks visible to the currently authenticated namespace.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/networks/get_networks__network_ref_">GET /networks/{network_ref}</a>: Get details of a single network</li>
+</ul>
+</details>
 <details class="example">
 <summary>Python API client: create a network</summary>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
@@ -1055,6 +1151,19 @@ $ python3 example.py
 ]
 ````</p>
 </details>
+<h2 id="other-network-information">Other network information</h2>
+<p>We can also request other information for a network. For example, we can list the
+networks's network interfaces, or the events for the network. See the
+<a href="/user_guide/events/">user guide</a> for a general introduction to the Shaken Fist
+event system.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/networks/get_networks__network_ref__events">GET /networks/{network_ref}/events</a>: Fetch events for a network.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/networks/get_networks__network_ref__interfaces">GET /networks/{network_ref}/interfaces</a>: Get the network interfaces present on a network.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/networks/get_networks__network_ref__ping__address_">GET /networks/{network_ref}/ping/{address}</a>: Ping an address on a network from the network node.</li>
+</ul>
+</details>
 <details class="example">
 <summary>Python API client: list events for a network</summary>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
@@ -1139,7 +1248,7 @@ to the 100 most recent events.</p>
 </code></pre></div>
 </details>
 <details class="example">
-<summary>Python API client: ping on a network.</summary>
+<summary>Python API client: ping an address on a network.</summary>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
 <span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
 
@@ -1171,6 +1280,49 @@ to the 100 most recent events.</p>
         &quot;&quot;
     ]
 }
+</code></pre></div>
+</details>
+<h2 id="metadata">Metadata</h2>
+<p>All objects exposed by the REST API may have metadata associated with them. This
+metadata is for storing values that are of interest to the owner of the resources,
+not Shaken Fist. Shaken Fist does not attempt to interpret these values at all,
+with the exception of the <a href="/user_guide/affinity/">instance affinity metadata values</a>.
+The metadata store is in the form of a key value store, and a general introduction
+is available <a href="/user_guide/metadata/">in the user guide</a>.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/networks/get_networks__network_ref__metadata">GET ​/networks/{network_ref}​/metadata</a>: Get metadata for a network.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/networks/post_networks__network_ref__metadata">POST /networks/{network_ref}/metadata</a>: Create a new metadata key for a network.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/networks/delete_networks__network_ref__metadata__key_">DELETE /networks/{network_ref}/metadata/{key}</a>: Delete a specific metadata key for a network.</li>
+<li><a href="https://sfcbr.shakenfist.com/api/apidocs/#/networks/put_networks__network_ref__metadata__key_">PUT /networks/{network_ref}/metadata/{key}</a>: Update an existing metadata key for a network.</li>
+</ul>
+</details>
+<details class="example">
+<summary>Python API client: set metadata on a network</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">sf_client</span><span class="o">.</span><span class="n">set_network_metadata_item</span><span class="p">(</span><span class="n">net_uuid</span><span class="p">,</span> <span class="s1">&#39;foo&#39;</span><span class="p">,</span> <span class="s1">&#39;bar&#39;</span><span class="p">)</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: get metadata for a network</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">md</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_network_metadata</span><span class="p">(</span><span class="n">net_uuid</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">md</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: delete metadata for a network</summary>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">shakenfist_client</span> <span class="kn">import</span> <span class="n">apiclient</span>
+
+<span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="n">sf_client</span><span class="o">.</span><span class="n">delete_network_metadata_item</span><span class="p">(</span><span class="n">net_uuid</span><span class="p">,</span> <span class="s1">&#39;foo&#39;</span><span class="p">)</span>
 </code></pre></div>
 </details>
 
