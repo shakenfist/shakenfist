@@ -138,3 +138,23 @@ class TestNamespaceMetadata(base.BaseNamespacedTestCase):
             {'foo': 'bar'}, self.test_client.get_namespace_metadata(nsname))
         self.test_client.delete_namespace_metadata_item(nsname, 'foo')
         self.assertEqual({}, self.test_client.get_namespace_metadata(nsname))
+
+
+class TestNetworkMetadata(base.BaseNamespacedTestCase):
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'network-metadata'
+        super(TestNetworkMetadata, self).__init__(*args, **kwargs)
+
+    def setUp(self):
+        super(TestNetworkMetadata, self).setUp()
+        self.net = self.test_client.allocate_network(
+            '192.168.242.0/24', True, True, '%s-net' % self.namespace)
+        self._await_networks_ready([self.net['uuid']])
+
+    def test_simple(self):
+        self.assertEqual({}, self.test_client.get_network_metadata(self.net['uuid']))
+        self.test_client.set_network_metadata_item(self.net['uuid'], 'foo', 'bar')
+        self.assertEqual({
+            'foo': 'bar'}, self.test_client.get_network_metadata(self.net['uuid']))
+        self.test_client.delete_network_metadata_item(self.net['uuid'], 'foo')
+        self.assertEqual({}, self.test_client.get_network_metadata(self.net['uuid']))

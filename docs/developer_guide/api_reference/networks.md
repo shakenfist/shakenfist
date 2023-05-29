@@ -1,8 +1,27 @@
 # Networks (/networks/)
 
-Not yet documented.
+Networks exist so that instances can have connectivity to other instances, or
+services outside the Shaken Fist cluster. Networks are implemented as a VXLAN
+mesh between the hypervisor nodes which host the instances on that network, and
+the network node. The network node exists on every VXLAN mesh, and provides
+services to the network such as DHCP, ping, and egress NAT. If a floating IP
+is assigned to a network interface, that is also implemented on the network
+node.
 
+???+ note
 
+    It is not required that an instance be on any networks. However, this is
+    by far the most common deployment pattern.
+
+## Network lifecycle
+
+???+ tip "REST API calls"
+
+    * [POST /networks](https://sfcbr.shakenfist.com/api/apidocs/#/networks/post_networks): Create a network.
+    * [DELETE /networks](https://sfcbr.shakenfist.com/api/apidocs/#/networks/delete_networks): Delete all networks in a given namespace.
+    * [DELETE /networks/networks/{network_ref}](https://sfcbr.shakenfist.com/api/apidocs/#/networks/delete_networks__network_ref_): Delete a specific network.
+    * [GET /networks](https://sfcbr.shakenfist.com/api/apidocs/#/networks/get_networks): List the networks visible to the currently authenticated namespace.
+    * [GET /networks/{network_ref}](https://sfcbr.shakenfist.com/api/apidocs/#/networks/get_networks__network_ref_): Get details of a single network
 
 ??? example "Python API client: create a network"
     ```python
@@ -103,9 +122,18 @@ Not yet documented.
     ]
     ````
 
+## Other network information
 
+We can also request other information for a network. For example, we can list the
+networks's network interfaces, or the events for the network. See the
+[user guide](/user_guide/events/) for a general introduction to the Shaken Fist
+event system.
 
+???+ tip "REST API calls"
 
+    * [GET /networks/{network_ref}/events](https://sfcbr.shakenfist.com/api/apidocs/#/networks/get_networks__network_ref__events): Fetch events for a network.
+    * [GET /networks/{network_ref}/interfaces](https://sfcbr.shakenfist.com/api/apidocs/#/networks/get_networks__network_ref__interfaces): Get the network interfaces present on a network.
+    * [GET /networks/{network_ref}/ping/{address}](https://sfcbr.shakenfist.com/api/apidocs/#/networks/get_networks__network_ref__ping__address_): Ping an address on a network from the network node.
 
 ??? example "Python API client: list events for a network"
 
@@ -154,7 +182,6 @@ Not yet documented.
     ]
     ```
 
-
 ??? example "Python API client: list interfaces on a network"
 
     ```python
@@ -198,8 +225,7 @@ Not yet documented.
     ]
     ```
 
-
-??? example "Python API client: ping on a network."
+??? example "Python API client: ping an address on a network."
 
     ```python
     import json
@@ -235,4 +261,50 @@ Not yet documented.
             ""
         ]
     }
+    ```
+
+## Metadata
+
+All objects exposed by the REST API may have metadata associated with them. This
+metadata is for storing values that are of interest to the owner of the resources,
+not Shaken Fist. Shaken Fist does not attempt to interpret these values at all,
+with the exception of the [instance affinity metadata values](/user_guide/affinity/).
+The metadata store is in the form of a key value store, and a general introduction
+is available [in the user guide](/user_guide/metadata/).
+
+???+ tip "REST API calls"
+
+    * [GET ​/networks/{network_ref}​/metadata](https://sfcbr.shakenfist.com/api/apidocs/#/networks/get_networks__network_ref__metadata): Get metadata for a network.
+    * [POST /networks/{network_ref}/metadata](https://sfcbr.shakenfist.com/api/apidocs/#/networks/post_networks__network_ref__metadata): Create a new metadata key for a network.
+    * [DELETE /networks/{network_ref}/metadata/{key}](https://sfcbr.shakenfist.com/api/apidocs/#/networks/delete_networks__network_ref__metadata__key_): Delete a specific metadata key for a network.
+    * [PUT /networks/{network_ref}/metadata/{key}](https://sfcbr.shakenfist.com/api/apidocs/#/networks/put_networks__network_ref__metadata__key_): Update an existing metadata key for a network.
+
+??? example "Python API client: set metadata on a network"
+
+    ``` python
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    sf_client.set_network_metadata_item(net_uuid, 'foo', 'bar')
+    ```
+
+??? example "Python API client: get metadata for a network"
+
+    ``` python
+    import json
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    md = sf_client.get_network_metadata(net_uuid)
+    print(json.dumps(md, indent=4, sort_keys=True))
+    ```
+
+??? example "Python API client: delete metadata for a network"
+
+    ``` python
+    import json
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    sf_client.delete_network_metadata_item(net_uuid, 'foo')
     ```
