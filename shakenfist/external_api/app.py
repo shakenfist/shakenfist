@@ -101,6 +101,8 @@ class Root(sf_api.Resource):
              '<li>artifact-metadata</li>'
              '<li>blob-metadata</li>'
              '<li>interface-metadata</li>'
+             '<li>node-get</li>'
+             '<li>node-metadata</li>'
              '</ul></p></body></html>'),
             mimetype='text/html')
         resp.status_code = 200
@@ -214,8 +216,9 @@ api.add_resource(api_network.NetworkPingEndpoint,
 
 api.add_resource(api_node.NodesEndpoint, '/nodes')
 api.add_resource(api_node.NodeEndpoint, '/nodes/<node>')
-api.add_resource(api_node.NodeEventsEndpoint,
-                 '/nodes/<node>/events')
+api.add_resource(api_node.NodeEventsEndpoint, '/nodes/<node>/events')
+api.add_resource(api_node.NodeMetadatasEndpoint, '/nodes/<node>/metadata')
+api.add_resource(api_node.NodeMetadataEndpoint, '/nodes/<node>/metadata/<key>')
 
 api.add_resource(api_upload.UploadCreateEndpoint, '/upload')
 api.add_resource(api_upload.UploadDataEndpoint, '/upload/<upload_uuid>')

@@ -158,3 +158,19 @@ class TestNetworkMetadata(base.BaseNamespacedTestCase):
             'foo': 'bar'}, self.test_client.get_network_metadata(self.net['uuid']))
         self.test_client.delete_network_metadata_item(self.net['uuid'], 'foo')
         self.assertEqual({}, self.test_client.get_network_metadata(self.net['uuid']))
+
+
+class TestNodeMetadata(base.BaseNamespacedTestCase):
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'node-metadata'
+        super(TestNodeMetadata, self).__init__(*args, **kwargs)
+
+    def test_simple(self):
+        n = self.system_client.get_nodes()[0]
+
+        self.assertEqual({}, self.system_client.get_node_metadata(n['name']))
+        self.system_client.set_node_metadata_item(n['name'], 'foo', 'bar')
+        self.assertEqual({
+            'foo': 'bar'}, self.system_client.get_node_metadata(n['name']))
+        self.system_client.delete_node_metadata_item(n['name'], 'foo')
+        self.assertEqual({}, self.system_client.get_node_metadata(n['name']))
