@@ -79,7 +79,7 @@ def _safe_int_cast(i):
 
 class Instance(dbo):
     object_type = 'instance'
-    current_version = 12
+    current_version = 13
 
     # docs/development/state_machine.md has a description of these states.
     STATE_INITIAL_ERROR = 'initial-error'
@@ -196,6 +196,10 @@ class Instance(dbo):
 
         etcd.put('attribute/instance', static_values['uuid'], 'blob_references',
                  blob_refs)
+
+    @classmethod
+    def _upgrade_step_12_to_13(cls, static_values):
+        pass
 
     @classmethod
     def new(cls, name=None, cpus=None, memory=None, namespace=None, ssh_key=None,
@@ -1436,6 +1440,29 @@ class Instance(dbo):
             self.add_event(
                 EVENT_TYPE_AUDIT,
                 'the console log for this instance was not archived as it was empty')
+
+    def agent_operation_dequeue(self):
+        with self.get_lock_attr('agent_operations', 'Dequeue agent operation'):
+            db_data = self._db_get_attribute('agent_operations')
+            if 'queue' not in db_data:
+                db_data['queue'] = []
+
+            if len(db_data['queue']) == 0:
+                return None
+
+            agentop_uuid = db_data['queue'][0]
+            db_data['queue'] = db_data['queue'][1:]
+            self._db_set_attribute('agent_operations', db_data)
+            return agentop_uuid
+
+    def agent_operation_enqueue(self, agentop_uuid):
+        with self.get_lock_attr('agent_operations', 'Enqueue agent operation'):
+            db_data = self._db_get_attribute('agent_operations')
+            if 'queue' not in db_data:
+                db_data['queue'] = []
+
+            db_data['queue'].append(agentop_uuid)
+            self._db_set_attribute('agent_operations', db_data)
 
 
 class Instances(dbo_iter):

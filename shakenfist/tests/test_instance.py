@@ -118,7 +118,7 @@ class VirtMetaTestCase(base.ShakenFistTestCase):
                  'ssh_key': 'sshkey',
                  'user_data': 'userdata',
                  'uuid': 'uuid42',
-                 'version': 12,
+                 'version': 13,
                  'video': {'memory': 16384, 'model': 'cirrus', 'vdi': 'spice'},
                  'uefi': False,
                  'configdrive': 'openstack-disk',

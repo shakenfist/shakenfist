@@ -1,4 +1,5 @@
 import os
+import time
 
 from shakenfist_ci import base
 
@@ -25,8 +26,24 @@ class TestAgentFileOperations(base.BaseNamespacedTestCase):
         test_dir = os.path.dirname(os.path.abspath(__file__))
         with open('%s/files/fibonacci.py' % test_dir, 'rb') as f:
             self.test_client.send_upload_file(upl['uuid'], f)
-        self.test_client.upload_artifact(
+        input = self.test_client.upload_artifact(
             'fibonacci', upl['uuid'], artifact_type='other')
+        input_blob = input['blob_uuid']
 
         # Wait for the instance agent to report in
         self._await_instance_ready(inst['uuid'])
+
+        # Request that the agent copy the file to the instance
+        op = self.test_client.put_instance_blob(
+            inst['uuid'], input_blob, '/tmp/fibonacci.py', 'ugo+rx')
+
+        start_time = time.time()
+        while time.time() - start_time < 60:
+            if op['state'] == 'complete':
+                break
+            time.sleep(5)
+            op = self.test_client.get_agent_operation(op['uuid'])
+
+        if op['state'] != 'complete':
+            self.fail('Agent operation %s did not complete in 60 seconds (%s)'
+                      % (op['uuid'], op['state']))

@@ -7,6 +7,8 @@ from shakenfist_agent import protocol
 import tempfile
 import time
 
+from shakenfist.agentoperation import AgentOperation
+from shakenfist.blob import Blob
 from shakenfist.daemons import daemon
 from shakenfist import eventlog
 from shakenfist.eventlog import EVENT_TYPE_AUDIT, EVENT_TYPE_STATUS
@@ -31,6 +33,7 @@ class SFSocketAgent(protocol.SocketAgent):
     STOPPED_TALKING = 'not ready (unresponsive)'
     AGENT_STARTED = 'not ready (agent startup)'
     AGENT_STOPPED = 'not ready (agent stopped)'
+    AGENT_READY = 'ready'
 
     def __init__(self, inst, path, logger=None):
         super(SFSocketAgent, self).__init__(path, logger=logger)
@@ -38,10 +41,9 @@ class SFSocketAgent(protocol.SocketAgent):
 
         self.instance = inst
         self.system_boot_time = 0
-        self.last_response = time.time()
         self.poll_tasks.append(self.is_system_running)
 
-        self.incomplete_file_gets = []
+        self.incomplete_file_get = None
 
         self.add_command('agent-start', self.agent_start)
         self.add_command('agent-stop', self.agent_start)
@@ -51,12 +53,38 @@ class SFSocketAgent(protocol.SocketAgent):
         self.add_command('get-file-response', self.get_file_response)
         self.add_command('watch-file-response', self.watch_file_response)
         self.add_command('execute-response', self.execute_response)
+        self.add_command('chmod-response', self.chmod_response)
+        self.add_command('chown-response', self.chown_response)
 
         self.instance_ready = self.NEVER_TALKED
         self.instance.agent_state = self.NEVER_TALKED
 
     def poll(self):
-        if time.time() - self.last_response > 15:
+        if time.time() - self.last_data > 5:
+            if self.instance_ready == self.AGENT_READY and not self.incomplete_file_get:
+                agentop_uuid = self.instance.agent_operation_dequeue()
+                if agentop_uuid:
+                    self.instance.add_event(
+                        EVENT_TYPE_AUDIT, 'Dequeued agent operation',
+                        extra={'agentoperation': agentop_uuid})
+                    agentop = AgentOperation.from_db(agentop_uuid)
+                    if not agentop:
+                        self.instance.add_event(
+                            EVENT_TYPE_AUDIT, 'Agent operation is missing or deleted',
+                            extra={'agentoperation': agentop_uuid})
+                        return
+
+                    agentop.state = AgentOperation.STATE_EXECUTING
+                    for command in agentop.commands:
+                        if command['command'] == 'put-blob':
+                            b = Blob.from_db(command['blob_uuid'])
+                            if not b:
+                                agentop.error = 'blob missing: %s' % command['blob_uuid']
+                                return
+                            b.ensure_local([])
+                            # Ummm, put_file() is broken.
+
+        elif time.time() - self.last_data > 15:
             if self.instance.agent_state.value != self.NEVER_TALKED:
                 self.instance_ready = self.STOPPED_TALKING
                 self.instance.agent_state = self.STOPPED_TALKING
@@ -74,10 +102,6 @@ class SFSocketAgent(protocol.SocketAgent):
             raise ConnectionIdle()
 
         super(SFSocketAgent, self).poll()
-
-    def dispatch_packet(self, packet):
-        self.last_response = time.time()
-        super(SFSocketAgent, self).dispatch_packet(packet)
 
     def _record_system_boot_time(self, sbt):
         if sbt != self.system_boot_time:
@@ -109,7 +133,7 @@ class SFSocketAgent(protocol.SocketAgent):
         self._record_system_boot_time(sbt)
 
         if ready:
-            new_state = 'ready'
+            new_state = self.AGENT_READY
             if self.is_system_running in self.poll_tasks:
                 self.poll_tasks.remove(self.is_system_running)
         else:
@@ -124,11 +148,11 @@ class SFSocketAgent(protocol.SocketAgent):
                        % (self.instance_ready, new_state))
 
         # We cache the agent state to reduce database load, and then
-        # trigger facts gathering when we transition into the 'ready' state.
+        # trigger facts gathering when we transition into the self.AGENT_READY state.
         if self.instance_ready != new_state:
             self.instance_ready = new_state
             self.instance.agent_state = new_state
-            if new_state == 'ready':
+            if new_state == self.AGENT_READY:
                 self.gather_facts()
 
     def gather_facts(self):
@@ -145,19 +169,19 @@ class SFSocketAgent(protocol.SocketAgent):
         self._send_file('put-file', path)
 
     def get_file(self, path):
-        self.incomplete_file_gets.append({
+        self.incomplete_file_get = {
             'flo': tempfile.NamedTemporaryFile(),
             'source_path': path,
             'callback': self.get_file_complete,
             'callback_args': {}
-        })
+        }
         self.send_packet({
             'command': 'get-file',
             'path': path
             })
 
     def get_file_response(self, packet):
-        if not self.incomplete_file_gets:
+        if not self.incomplete_file_get:
             self.log.with_fields(packet).warning('Unexpected file response')
             return
 
@@ -167,20 +191,20 @@ class SFSocketAgent(protocol.SocketAgent):
 
         if 'chunk' not in packet:
             # A metadata packet
-            self.incomplete_file_gets[0].update(packet['stat_result'])
+            self.incomplete_file_get.update(packet['stat_result'])
             return
 
         if packet['chunk'] is None:
-            self.incomplete_file_gets[0]['flo'].close()
-            self.incomplete_file_gets[0]['callback'](
-                **self.incomplete_file_gets[0]['callback_args']
+            self.incomplete_file_get['flo'].close()
+            self.incomplete_file_get['callback'](
+                **self.incomplete_file_get['callback_args']
             )
-            self.incomplete_file_gets.pop(0)
+            self.incomplete_file_get = None
             self.log.with_fields(packet).info('File get complete')
             return
 
         d = base64.b64decode(packet['chunk'])
-        self.incomplete_file_gets[0]['flo'].write(d)
+        self.incomplete_file_get['flo'].write(d)
 
     def get_file_complete(self):
         pass
@@ -203,6 +227,12 @@ class SFSocketAgent(protocol.SocketAgent):
 
     def execute_response(self, packet):
         self.log.info('Received execute response')
+
+    def chmod_response(self, packet):
+        self.log.info('Received chmod response')
+
+    def chown_response(self, packet):
+        self.log.info('Received chown response')
 
 
 class Monitor(daemon.Daemon):
@@ -263,8 +293,7 @@ class Monitor(daemon.Daemon):
                                     EVENT_TYPE_AUDIT, 'sidechannel %s connected' % chan)
                                 sc_connected[chan] = True
 
-                            sc_clients[chan].dispatch_packet(
-                                packet)
+                            sc_clients[chan].dispatch_packet(packet)
 
                     except (BrokenPipeError,
                             ConnectionRefusedError,
@@ -306,6 +335,8 @@ class Monitor(daemon.Daemon):
                     if not monitors[instance_uuid].is_alive():
                         # Reap process
                         monitors[instance_uuid].join(1)
+                        LOG.info('Reaped dead sidechannel monitor with pid %d'
+                                 % monitors[instance_uuid].pid)
                         eventlog.add_event(
                             EVENT_TYPE_AUDIT, 'instance', instance_uuid,
                             'sidechannel monitor crashed')

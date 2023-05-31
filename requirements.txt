@@ -46,9 +46,10 @@ clingwrap                   # apache2
 py-cpuinfo                  # mit
 distro                      # apache2
 shakenfist-agent            # apache2
-shakenfist-utilities        # apache2
+shakenfist-utilities>=0.5   # apache2
 pbr                         # apache2
 setuptools>=65.3.0          # mit
+symbolicmode>=1.0           # CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
 
 # Is difficult to get install working, use system packages instead. On Ubuntu
 # those are: libvirt-daemon-system libvirt-dev python3-libvirt

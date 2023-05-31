@@ -15,11 +15,14 @@ from flasgger import swag_from
 import os
 import re
 from shakenfist_utilities import api as sf_api, logs
+import symbolicmode
 import uuid
 
+from shakenfist.agentoperation import AgentOperation
 from shakenfist.artifact import (
     Artifact, BLOB_URL, LABEL_URL, SNAPSHOT_URL, UPLOAD_URL)
 from shakenfist import baseobject
+from shakenfist.blob import Blob
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.daemons import daemon
@@ -28,6 +31,7 @@ from shakenfist import eventlog
 from shakenfist.eventlog import EVENT_TYPE_AUDIT
 from shakenfist import exceptions
 from shakenfist.external_api import (
+    agentoperation as api_agentoperation,
     base as api_base,
     util as api_util)
 from shakenfist import instance
@@ -1226,3 +1230,60 @@ class InstanceVDIConsoleHelperEndpoint(sf_api.Resource):
             config, mimetype='application/x-virt-viewer')
         resp.status_code = 200
         return resp
+
+
+class InstanceAgentPutEndpoint(sf_api.Resource):
+    @swag_from(api_base.swagger_helper(
+        'instances', 'Upload a file to an instance via the Shaken Fist agent.',
+        [
+            ('instance_ref', 'query', 'uuidorname',
+             'The UUID or name of the instance.', True),
+            ('blob_uuid', 'body', 'uuid',
+             'The UUID of the blob to put onto the instance.', True),
+            ('path', 'body', 'string',
+             'The path to write the file at inside the instance.', True),
+            ('mode', 'body', 'string',
+             'The mode of the file once written, in symbolic or numeric form.', True)
+        ],
+        [(200, 'An agent operation.', api_agentoperation.agentoperation_get_example),
+         (400, 'No agent connection to instance.', None),
+         (404, 'Instance or blob not found.', None),
+         (406, 'Invalid mode specified', None)]))
+    @api_base.verify_token
+    @api_base.arg_is_instance_ref
+    @api_base.requires_instance_ownership
+    @api_base.requires_instance_active
+    @api_base.log_token_use
+    def post(self, instance_ref=None, blob_uuid=None, path=None, mode=None,
+             instance_from_db=None):
+        if instance_from_db.agent_state.value != 'ready':
+            return sf_api.error(400, 'instance agent not ready')
+
+        try:
+            converted_mode = symbolicmode.symbolic_to_numeric_permissions(mode)
+        except ValueError as e:
+            return sf_api.error(406, 'invalid mode: %s' % e)
+
+        b = Blob.from_db(blob_uuid)
+        if not b:
+            return self.api_error(404, 'blob not found')
+
+        commands = [
+            {
+                'command': 'put-blob',
+                'blob_uuid': blob_uuid
+            },
+            {
+                'command': 'chmod',
+                'mode': converted_mode
+            }
+        ]
+
+        o = AgentOperation.new(str(uuid.uuid4()), instance_from_db.namespace,
+                               instance_from_db.uuid, commands)
+        instance_from_db.agent_operation_enqueue(o.uuid)
+        instance_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'queued agent command',
+            extra={'agentoperation': o.uuid, 'commands': commands})
+        o.state = AgentOperation.STATE_QUEUED
+        return o.external_view()

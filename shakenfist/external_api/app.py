@@ -24,6 +24,7 @@ from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.external_api import (
     admin as api_admin,
+    agentoperation as api_agentoperation,
     auth as api_auth,
     blob as api_blob,
     artifact as api_artifact,
@@ -93,16 +94,13 @@ class Root(sf_api.Resource):
              '<body><h1>Shaken Fist REST API service</h1>'
              '<p>You might be interested in the <a href="/apidocs">apidocs</a>.</p>'
              '<p>Machine searchable API capabilities:</p><ul>'
-             '<li>blob-search-by-hash</li>'
-             '<li>spice-vdi-console</li>'
-             '<li>vdi-console-helper</li>'
-             '<li>artifact-upload-types</li>'
-             '<li>pure-affinity</li>'
-             '<li>artifact-metadata</li>'
-             '<li>blob-metadata</li>'
-             '<li>interface-metadata</li>'
-             '<li>node-get</li>'
-             '<li>node-metadata</li>'
+             '<li>agent-operations: agentoperations-crud</li>'
+             '<li>artifacts: artifact-metadata, artifact-upload-types</li>'
+             '<li>blobs: blob-metadata, blob-search-by-hash</li>'
+             '<li>instances: pure-affinity, spice-vdi-console, vdi-console-helper, '
+             'instance-put-blob<li>'
+             '<li>networkinterfaces: interface-metadata</li>'
+             '<li>nodes: node-get, node-metadata</li>'
              '</ul></p></body></html>'),
             mimetype='text/html')
         resp.status_code = 200
@@ -134,6 +132,9 @@ api.add_resource(api_artifact.ArtifactVersionsEndpoint,
                  '/artifacts/<artifact_ref>/versions')
 api.add_resource(api_artifact.ArtifactVersionEndpoint,
                  '/artifacts/<artifact_ref>/versions/<version_id>')
+
+api.add_resource(api_agentoperation.AgentOperationEndpoint,
+                 '/agentoperations/<operation_uuid>')
 
 api.add_resource(api_auth.AuthEndpoint, '/auth')
 api.add_resource(api_auth.AuthNamespacesEndpoint, '/auth/namespaces')
@@ -187,6 +188,8 @@ api.add_resource(api_instance.InstanceConsoleDataEndpoint,
                  '/instances/<instance_ref>/consoledata')
 api.add_resource(api_instance.InstanceVDIConsoleHelperEndpoint,
                  '/instances/<instance_ref>/vdiconsolehelper')
+api.add_resource(api_instance.InstanceAgentPutEndpoint,
+                 '/instances/<instance_ref>/agent/put')
 
 api.add_resource(api_interface.InterfaceEndpoint,
                  '/interfaces/<interface_uuid>')
